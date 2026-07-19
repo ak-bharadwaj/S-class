@@ -44,11 +44,41 @@ curl -fsSL https://raw.githubusercontent.com/ak-bharadwaj/sclass-v5/master/insta
 ```
 
 ### Usage
+
+#### 1. Configuration Preset
 Inherit this pipeline in any project by adding the following metadata to your local `CLAUDE.md`:
 ```markdown
 pipeline: sclass-v5
 executionMode: Human-in-the-Loop Mode
 ```
+
+#### 2. Executing the FSM State Machine CLI
+The plugin includes an executable Python runtime engine (`runtime.py`) that acts as the single-writer state manager and event router. Run it inside your project directory to coordinate steps:
+
+*   **Initialize Workspace State:**
+    ```bash
+    python ~/.gemini/config/plugins/sclass-v5/runtime.py init
+    ```
+*   **Check Active Phase & Tasks:**
+    ```bash
+    python ~/.gemini/config/plugins/sclass-v5/runtime.py status
+    ```
+*   **Dispatch Event Trigger (State Transition):**
+    ```bash
+    python ~/.gemini/config/plugins/sclass-v5/runtime.py dispatch triage_done
+    ```
+*   **Audit Subagent Capabilities Matrix:**
+    ```bash
+    python ~/.gemini/config/plugins/sclass-v5/runtime.py capabilities dss_builder_v2
+    ```
+*   **Update Task Execution Status:**
+    ```bash
+    python ~/.gemini/config/plugins/sclass-v5/runtime.py task T1 IN_PROGRESS
+    ```
+*   **Record Durable Decision Log:**
+    ```bash
+    python ~/.gemini/config/plugins/sclass-v5/runtime.py decision "Use SQLite" "No concurrency required" dss_architect_v2 0.90
+    ```
 
 ---
 
