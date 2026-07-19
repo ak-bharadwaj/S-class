@@ -1,0 +1,24 @@
+{
+  "id": "sclass-v5",
+  "name": "S-Class Engineering Pipeline",
+  "version": "5.2",
+  "author": "Akshith & Antigravity",
+  "description": "High-productivity S-Class multi-agent FSM pipeline featuring a 10-state state machine, design debate, single-builder coding, event-driven transitions, and user proxy outcomes validation.",
+  "supports": [
+    "FastAPI",
+    "NextJS",
+    "React",
+    "Python",
+    "SQLite"
+  ],
+  "executionModes": [
+    "human",
+    "assisted",
+    "goal"
+  ],
+  "loopModes": [
+    "closed-loop",
+    "open-loop",
+    "watch-loop"
+  ]
+}

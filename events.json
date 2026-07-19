@@ -1,0 +1,67 @@
+[
+  {
+    "event": "triage_done",
+    "description": "Fired when request triage cost and tier classification is completed by dss_optimizer_v2.",
+    "nextState": "ANALYSIS"
+  },
+  {
+    "event": "context_loaded",
+    "description": "Fired when memory loading and requirement analyst checks have populated the design space.",
+    "nextState": "DESIGN"
+  },
+  {
+    "event": "design_drafted",
+    "description": "Fired when the architect has completed system design plans.",
+    "nextState": "DEBATE"
+  },
+  {
+    "event": "spec_approved",
+    "description": "Fired when the design debate completes with weighted confidence >= 80%.",
+    "nextState": "TASK_COMPILATION"
+  },
+  {
+    "event": "tasks_ready",
+    "description": "Fired when the response aggregator compiles specification and critiques into tasks.",
+    "nextState": "CODING"
+  },
+  {
+    "event": "code_written",
+    "description": "Fired when dss_builder_v2 completes coding tasks sequentially.",
+    "nextState": "INTEGRATION"
+  },
+  {
+    "event": "integration_passed",
+    "description": "Fired when integration checks on DTOs, endpoint URLs, and migrations are healthy.",
+    "nextState": "QA"
+  },
+  {
+    "event": "qa_passed",
+    "description": "Fired when pytest/Playwright test suites execute without errors.",
+    "nextState": "RELEASE"
+  },
+  {
+    "event": "qa_failed",
+    "description": "Fired when a test failure, logic flaw, or parameter sanity check fails.",
+    "nextState": "RECOVERY"
+  },
+  {
+    "event": "patch_assigned",
+    "description": "Fired when recovery analysis compiles a Failure Report and maps a fix loop.",
+    "nextState": "CODING"
+  },
+  {
+    "event": "release_ready",
+    "description": "Fired when user validation passes and build is ready for release audits.",
+    "nextState": "RELEASE"
+  },
+  {
+    "event": "release_complete",
+    "description": "Fired when the release manager confirms final build safety.",
+    "nextState": "DONE"
+  },
+  {
+    "event": "cancellation_requested",
+    "description": "Fired when user cancels or modifies objectives, resetting FSM to triage.",
+    "nextState": "TRIAGE"
+  }
+]

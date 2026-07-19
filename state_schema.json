@@ -1,0 +1,110 @@
+{
+  "\$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "S-Class Orcherstration Shared Execution State",
+  "type": "OBJECT",
+  "properties": {
+    "taskId": {
+      "type": "STRING",
+      "format": "uuid"
+    },
+    "currentPhase": {
+      "type": "STRING",
+      "enum": ["TRIAGE", "ANALYSIS", "DESIGN", "DEBATE", "TASK_COMPILATION", "CODING", "INTEGRATION", "QA", "RECOVERY", "RELEASE", "DONE"]
+    },
+    "activeEvent": {
+      "type": ["STRING", "null"]
+    },
+    "currentSpecVersion": {
+      "type": "INTEGER",
+      "minimum": 1
+    },
+    "currentDebateVersion": {
+      "type": "INTEGER",
+      "minimum": 0
+    },
+    "currentTaskVersion": {
+      "type": "INTEGER",
+      "minimum": 0
+    },
+    "retryCount": {
+      "type": "INTEGER",
+      "minimum": 0
+    },
+    "confidenceMatrix": {
+      "type": "OBJECT",
+      "properties": {
+        "weightedScore": {
+          "type": "NUMBER",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "votes": {
+          "type": "OBJECT",
+          "additionalProperties": {
+            "type": "NUMBER",
+            "minimum": 0.0,
+            "maximum": 1.0
+          }
+        }
+      },
+      "required": ["weightedScore", "votes"]
+    },
+    "tasks": {
+      "type": "ARRAY",
+      "items": {
+        "type": "OBJECT",
+        "properties": {
+          "id": {
+            "type": "STRING"
+          },
+          "owner": {
+            "type": "STRING"
+          },
+          "targets": {
+            "type": "ARRAY",
+            "items": { "type": "STRING" }
+          },
+          "dependsOn": {
+            "type": "ARRAY",
+            "items": { "type": "STRING" }
+          },
+          "acceptanceCriteria": {
+            "type": "STRING"
+          },
+          "priority": {
+            "type": "STRING",
+            "enum": ["HIGH", "MEDIUM", "LOW"]
+          },
+          "status": {
+            "type": "STRING",
+            "enum": ["PENDING", "IN_PROGRESS", "COMPLETED", "FAILED"]
+          }
+        },
+        "required": ["id", "owner", "targets", "dependsOn", "acceptanceCriteria", "priority", "status"]
+      }
+    },
+    "decisionLog": {
+      "type": "ARRAY",
+      "items": {
+        "type": "OBJECT",
+        "properties": {
+          "decision": { "type": "STRING" },
+          "reason": { "type": "STRING" },
+          "alternatives": {
+            "type": "ARRAY",
+            "items": { "type": "STRING" }
+          },
+          "confidence": {
+            "type": "NUMBER",
+            "minimum": 0.0,
+            "maximum": 1.0
+          },
+          "timestamp": { "type": "STRING", "format": "date-time" },
+          "agent": { "type": "STRING" }
+        },
+        "required": ["decision", "reason", "alternatives", "confidence", "timestamp", "agent"]
+      }
+    }
+  },
+  "required": ["taskId", "currentPhase", "activeEvent", "currentSpecVersion", "currentDebateVersion", "currentTaskVersion", "retryCount", "confidenceMatrix", "tasks", "decisionLog"]
+}
