@@ -29,3 +29,42 @@ S-Class runs subagents inside the active Antigravity session workspace:
 *   **Context Injection:** The memory agent queries Antigravity's indexed knowledge bases to populate design blueprints.
 *   **State Locking:** Workspace file operations are synchronized to ensure that only `dss_builder_v2` writes code, preventing merge conflicts.
 *   **Global Rule Matching:** Workspaces automatically inherit the FSM rules from the global configuration directories without folder clutter.
+
+---
+
+## 3. Separation of Concerns (Workflow vs. Execution)
+
+To keep responsibilities clean and decouple logic:
+*   **S-Class (Workflow Engine):** Responsible for tracking the active state, registering valid transition event matrices, enforcing capabilities/permissions, executing metadata side-effects (like version increments), and committing changes atomically. *It never decides what agent to call next or runs the LLM model directly.*
+*   **Antigravity (Execution Engine):** Responsible for reading the current phase from the state file, loading the corresponding prompt/agent role from the plugin, running the LLM model, validating outputs, and dispatching transition events back to S-Class.
+
+---
+
+## 4. Host Loop Execution Protocols
+
+The host runs a continuous execution loop determined by the selected mode:
+
+### A. Goal Convergence Mode Loop
+```python
+while state.currentPhase != "DONE":
+    # 1. Fetch current phase and task parameters from state
+    phase = runtime.get_state().currentPhase
+    
+    # 2. Load the prompt template for the phase
+    prompt = load_prompt_file(phase)
+    
+    # 3. Invoke the model & collect output
+    result = host.run_model(prompt)
+    
+    # 4. Assess transition event
+    event = parse_transition_event(result)
+    
+    # 5. Dispatch transition back to state
+    runtime.dispatch_event(event)
+```
+
+### B. Human-in-the-Loop Mode
+Works identically to the Goal Convergence loop but halts for manual human override permissions at selected checkpoints before continuing:
+```
+Current Phase -> Await Output -> Validate & Dispatch -> WAIT (Await User Continue) -> Next Phase
+```
