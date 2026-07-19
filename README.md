@@ -70,6 +70,7 @@ executionMode: Human-in-the-Loop Mode
 *   [docs/plugin-api.md](file:///C:/Users/dorni/.gemini/config/plugins/sclass-v5/docs/plugin-api.md) — Schemas and capabilities specifications.
 *   [docs/recovery.md](file:///C:/Users/dorni/.gemini/config/plugins/sclass-v5/docs/recovery.md) — Self-healing RECOVERY loops and patch strategies.
 *   [docs/sdk.md](file:///C:/Users/dorni/.gemini/config/plugins/sclass-v5/docs/sdk.md) — Blueprint for building other Antigravity plugins.
+*   [docs/roadmap.md](file:///C:/Users/dorni/.gemini/config/plugins/sclass-v5/docs/roadmap.md) — S-Class context management & knowledge indexing roadmap.
 
 ---
 
