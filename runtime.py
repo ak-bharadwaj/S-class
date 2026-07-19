@@ -5,7 +5,7 @@ import json
 import uuid
 import time
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass, asdict, field
 from typing import List, Dict, Optional, Any
 
@@ -56,6 +56,28 @@ class State:
     tasks: List[Task] = field(default_factory=list)
     decisionLog: List[Decision] = field(default_factory=list)
 
+def _process_exists(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+            if handle:
+                kernel32.CloseHandle(handle)
+                return True
+            return False
+        except Exception:
+            return False
+    else:
+        try:
+            os.kill(pid, 0)
+            return True
+        except OSError:
+            return False
+
 class FileLock:
     def __init__(self, lock_path: str, timeout: float = 10.0):
         self.lock_path = lock_path
@@ -67,15 +89,35 @@ class FileLock:
         while True:
             try:
                 self.fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.write(self.fd, str(os.getpid()).encode())
                 break
             except FileExistsError:
+                # Lock exists: audit PID for staleness
+                try:
+                    with open(self.lock_path, "r", encoding="utf-8") as f:
+                        pid_str = f.read().strip()
+                    if pid_str.isdigit():
+                        pid = int(pid_str)
+                        if not _process_exists(pid):
+                            logger.warning(f"Stale lock detected for dead PID {pid}. Cleaning up lock file.")
+                            try:
+                                os.unlink(self.lock_path)
+                            except OSError:
+                                pass
+                            continue
+                except Exception:
+                    pass
+
                 if time.time() - start_time > self.timeout:
                     raise TimeoutError(f"Concurrency Lock Timeout: Failed to acquire {self.lock_path}")
                 time.sleep(0.05)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.fd is not None:
-            os.close(self.fd)
+            try:
+                os.close(self.fd)
+            except OSError:
+                pass
             try:
                 os.unlink(self.lock_path)
             except OSError:
@@ -104,26 +146,52 @@ def write_json_atomic(path, data):
         os.fsync(f.fileno())
     os.replace(tmp_path, path)
 
+def _validate_schema_value(value: Any, schema: Dict[str, Any], path: str = ""):
+    expected_type = schema.get("type")
+    
+    if isinstance(expected_type, list):
+        valid = False
+        for t in expected_type:
+            try:
+                _validate_schema_value(value, {"type": t}, path)
+                valid = True
+                break
+            except TypeError:
+                pass
+        if not valid:
+            raise TypeError(f"Type validation failed at '{path}': expected one of {expected_type}, got {type(value)}")
+        return
+
+    if expected_type == "null":
+        if value is not None:
+            raise TypeError(f"Type validation failed at '{path}': expected null, got {type(value)}")
+    elif expected_type == "string":
+        if not isinstance(value, str):
+            raise TypeError(f"Type validation failed at '{path}': expected string, got {type(value)}")
+    elif expected_type == "integer":
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise TypeError(f"Type validation failed at '{path}': expected integer, got {type(value)}")
+    elif expected_type == "number":
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise TypeError(f"Type validation failed at '{path}': expected number, got {type(value)}")
+    elif expected_type == "array":
+        if not isinstance(value, list):
+            raise TypeError(f"Type validation failed at '{path}': expected array, got {type(value)}")
+        items_schema = schema.get("items")
+        if items_schema:
+            for idx, item in enumerate(value):
+                _validate_schema_value(item, items_schema, f"{path}[{idx}]")
+    elif expected_type == "object":
+        if not isinstance(value, dict):
+            raise TypeError(f"Type validation failed at '{path}': expected object, got {type(value)}")
+        properties = schema.get("properties", {})
+        for prop_key, prop_val in value.items():
+            if prop_key in properties:
+                _validate_schema_value(prop_val, properties[prop_key], f"{path}.{prop_key}")
+
 def validate_state_types(state_dict: Dict[str, Any]):
     schema = load_json(SCHEMA_FILE)
-    properties = schema.get("properties", {})
-    for key, val in state_dict.items():
-        if key not in properties:
-            continue
-            
-        prop_schema = properties[key]
-        expected_type = prop_schema.get("type")
-        
-        if expected_type == "string" and not isinstance(val, str) and val is not None:
-            raise TypeError(f"Type validation failed: property '{key}' expected string, got {type(val)}")
-        elif expected_type == "integer" and not isinstance(val, int):
-            raise TypeError(f"Type validation failed: property '{key}' expected integer, got {type(val)}")
-        elif expected_type == "number" and not isinstance(val, (int, float)):
-            raise TypeError(f"Type validation failed: property '{key}' expected number, got {type(val)}")
-        elif expected_type == "array" and not isinstance(val, list):
-            raise TypeError(f"Type validation failed: property '{key}' expected array, got {type(val)}")
-        elif expected_type == "object" and not isinstance(val, dict):
-            raise TypeError(f"Type validation failed: property '{key}' expected object, got {type(val)}")
+    _validate_schema_value(state_dict, schema)
 
 def _execute_side_effects(state: State, side_effects: List[str]):
     for effect in side_effects:
@@ -183,7 +251,7 @@ def initialize_state(workspace_dir: Optional[str] = None) -> None:
                     "reason": "Created baseline orchestration state and workspace config files.",
                     "alternatives": [],
                     "confidence": 1.0,
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
                     "agent": "dss_optimizer_v2"
                 }
             ]
@@ -220,11 +288,10 @@ def get_state(workspace_dir: Optional[str] = None) -> State:
 
 def save_state(state: State, workspace_dir: Optional[str] = None) -> None:
     """Saves a State dataclass object back to orchestration_state.json atomically."""
-    _, state_file, lock_file, _ = _resolve_paths(workspace_dir)
+    _, state_file, _, _ = _resolve_paths(workspace_dir)
     state_dict = asdict(state)
     validate_state_types(state_dict)
-    with FileLock(lock_file):
-        write_json_atomic(state_file, state_dict)
+    write_json_atomic(state_file, state_dict)
 
 def dispatch_event(event_name: str, workspace_dir: Optional[str] = None) -> None:
     """Dispatches a transition event, updating FSM state and executing side effects."""
@@ -265,7 +332,7 @@ def dispatch_event(event_name: str, workspace_dir: Optional[str] = None) -> None
             reason=f"Fired event '{event_name}' from state '{current_phase}'",
             alternatives=list(valid_transitions.keys()),
             confidence=1.0,
-            timestamp=datetime.utcnow().isoformat() + "Z",
+            timestamp=datetime.now(timezone.utc).isoformat() + "Z",
             agent="state_manager_runtime"
         ))
         
@@ -312,7 +379,7 @@ def log_decision(decision: str, reason: str, agent: str, confidence: float, alts
             reason=reason,
             alternatives=alts_list,
             confidence=float(confidence),
-            timestamp=datetime.utcnow().isoformat() + "Z",
+            timestamp=datetime.now(timezone.utc).isoformat() + "Z",
             agent=agent
         ))
         save_state(state, workspace_dir)
