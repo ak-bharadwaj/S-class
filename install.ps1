@@ -1,5 +1,5 @@
 # S-Class V5.2 Plugin Installer
-# Run: iex (irm -useb https://raw.githubusercontent.com/<username>/sclass-v5/main/install.ps1)
+# Run: iex (irm -useb https://raw.githubusercontent.com/ak-bharadwaj/sclass-v5/master/install.ps1)
 
 $PluginRoot = "$Home\.gemini\config\plugins"
 $PluginDir = "$PluginRoot\sclass-v5"
@@ -14,7 +14,7 @@ if (Test-Path $PluginDir) {
     git pull
 } else {
     Write-Host "Cloning S-Class V5.2 Engineering Pipeline Plugin..." -ForegroundColor Green
-    git clone https://github.com/<username>/sclass-v5.git $PluginDir
+    git clone https://github.com/ak-bharadwaj/sclass-v5.git $PluginDir
 }
 
 Write-Host "Installation complete! Inherit this workflow by adding 'pipeline: sclass-v5' to your CLAUDE.md workspace config." -ForegroundColor Green
