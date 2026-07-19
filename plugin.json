@@ -3,13 +3,13 @@
   "name": "S-Class Engineering Pipeline",
   "version": "5.2.0",
   "author": "ak-bharadwaj",
-  "description": "S-Class SDK: Pluggable workflow runtime engine for multi-agent software engineering, research, and startup execution.",
+  "description": "S-Class SDK: Pluggable workflow runtime engine for multi-agent software engineering, research, and startup execution featuring an 11-state FSM.",
   "supports": [
-    "FastAPI",
-    "NextJS",
-    "React",
-    "Python",
-    "SQLite"
+    "web",
+    "backend",
+    "frontend",
+    "database",
+    "testing"
   ],
   "executionModes": [
     "human",

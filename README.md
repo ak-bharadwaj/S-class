@@ -4,6 +4,18 @@ S-Class is the official engineering workflow plugin for the Antigravity platform
 
 ---
 
+## Why S-Class? (Value Proposition)
+
+| Question | S-Class Workflow Engine | Standard LLM Tools / Claude Code |
+| :--- | :--- | :--- |
+| **What problem does it solve?** | Prevents architectural drift, parameter leaks, and logic regressions on complex codebases. | Single-agent chat interfaces struggle with multi-file scaling and structural logic. |
+| **Why use a Finite-State Machine?** | Forces development through explicit, auditable states (`DEBATE`, `RECOVERY`, etc.) with defined transition rules. | Conversational models skip steps, run tools out of order, or introduce logical stubs. |
+| **Why event-driven routing?** | Supports adaptive loops (e.g. `Database Modified` event triggers migration checks; `QA Failed` routes to Recovery). | Rigid linear scripts break when encountering errors and cannot easily self-correct. |
+| **What is Goal Convergence Mode?** | An autonomous closed-loop that builds, tests, reviews, and patches code until all quality checks are 100% satisfied. | Requires constant human prompt-interruptions to review code outputs and fix errors. |
+| **Why a plugin over prompts?** | Registers capability permissions, executes parallel groups, and commits state updates programmatically. | Prompt templates rely entirely on the LLM remembering instructions without system enforcement. |
+
+---
+
 ## 1. Supported Antigravity Capabilities
 
 S-Class integrates directly with the Antigravity environment to support:
