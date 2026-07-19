@@ -1,59 +1,33 @@
-# S-Class SDK: Designing Custom Pipelines
+# Antigravity Plugin Blueprint: Designing Custom Workflows
 
-The S-Class SDK is a framework for defining custom workflow plugins. By configuring FSM states, capabilities, and events, you can implement pipelines for any domain.
-
----
-
-## 1. Pipeline Creation Guide
-
-To design a new pipeline (e.g. `Research`, `GameDev`, `Startup`):
-
-1.  **Define Metadata:** Create a `plugin.json` describing your pipeline.
-2.  **Declare FSM States:** Write a `workflow.json` mapping your states, parallel groups, and transitions.
-3.  **Define State Properties:** Declare what variables your states record using `state_schema.json`.
-4.  **Register Transition Events:** List your first-class events in `events.json`.
-5.  **Configure Subagent Prompts:** Write prompt files under a `prompts/` directory for each role.
+S-Class serves as the reference architecture and blueprint for building workflow plugins on the Antigravity platform. Developers can clone this structure to create custom pipelines (e.g. Research, Documentation, Security Audits) without changing the core engine.
 
 ---
 
-## 2. Example: Research Pipeline Spec
-
-```json
-{
-  "states": {
-    "LITERATURE_SEARCH": {
-      "transitions": {
-        "literature_indexed": "PAPER_REVIEW"
-      }
-    },
-    "PAPER_REVIEW": {
-      "transitions": {
-        "review_complete": "HYPOTHESIS"
-      }
-    },
-    "HYPOTHESIS": {
-      "transitions": {
-        "hypothesis_framed": "EXPERIMENT"
-      }
-    },
-    "EXPERIMENT": {
-      "transitions": {
-        "data_collected": "PAPER_DRAFT"
-      }
-    },
-    "PAPER_DRAFT": {}
-  }
-}
+## 1. Antigravity Plugin Blueprint Layout
+To build a new workflow extension, organize your files into this standard layout:
+```
+plugins/
+└── <your-plugin-name>/
+    ├── plugin.json          # Plugin metadata & options
+    ├── state_schema.json    # Shared state schema definition
+    ├── events.json          # FSM state transition triggers
+    ├── capabilities.json    # Agent permission constraints
+    ├── workflow.json        # FSM States & parallel groups definition
+    ├── prompts/             # Subagent role definitions
+    └── README.md            # Guide
 ```
 
 ---
 
-## 3. Registering the Custom Pipeline
-Place your new plugin folder inside the global plugins path:
-`C:\Users\<username>\.gemini\config\plugins\<new-plugin-name>/`
+## 2. Implementing New Workflows
 
-Reference it in your local workspace `CLAUDE.md`:
-```markdown
-pipeline: <new-plugin-name>
-```
-The S-Class runtime will automatically bootstrap it.
+### A. Literature Research Workflow (Example)
+To implement a literature research pipeline:
+1.  **workflow.json:** Define states like `LITERATURE_INDEX`, `SYNTHESIS`, `DRAFTING`.
+2.  **prompts/:** Create prompts for specialized roles: `dss_researcher.md` (read-only tools), `dss_writer.md` (write-enabled tools).
+3.  **capabilities.json:** Enforce that the researcher can read the web, but only the writer can compile markdown documents.
+
+### B. Documentation Extraction Workflow (Example)
+1.  **workflow.json:** Map states: `CODE_INSPECT` $\rightarrow$ `API_EXTRACT` $\rightarrow$ `DOCS_COMPILE` $\rightarrow$ `REVIEW`.
+2.  **prompts/:** Define prompts for `dss_inspector.md`, `dss_writer.md`, and `dss_reviewer.md`.

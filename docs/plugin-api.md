@@ -1,38 +1,33 @@
-# S-Class Plugin API & Schema Specifications
+# S-Class Plugin Integration & API
 
-This document outlines the API interfaces, capabilities parameters, and schema structures required to develop and load S-Class plugins.
+This document details the configuration files, manifest variables, and state schemas used to integrate S-Class into the Antigravity environment.
 
 ---
 
-## 1. Plugin Metadata Schema (`plugin.json`)
-Every plugin must declare its compatibility matrix and features:
-```json
-{
-  "id": "sclass-v5",
-  "name": "S-Class Engineering Pipeline",
-  "version": "5.2.0",
-  "author": "ak-bharadwaj",
-  "description": "Short description...",
-  "supports": ["FastAPI", "NextJS", "Python"],
-  "executionModes": ["human", "assisted", "goal"]
-}
-```
+## 1. Antigravity Manifest Schema (`plugin.json`)
+The manifest configures how Antigravity registers and runs the workflow:
+*   `id`: Unique identifier (e.g. `sclass-v5`).
+*   `name`: Display name.
+*   `version`: Semantic versioning (e.g. `5.2.0`).
+*   `author`: Author name.
+*   `supports`: Lists compatible frameworks.
+*   `executionModes`: Declares support for Human-in-the-loop and Goal Convergence modes.
 
 ---
 
 ## 2. Shared State Model (`state_schema.json`)
-The shared state tracking uses standard lowercase JSON Schema parameters (`object`, `array`, `string`, `integer`, `number`):
-*   `taskId`: Unique execution ID.
-*   `currentPhase`: Current FSM State.
-*   `retryCount`: Counter for self-healing loops.
-*   `tasks`: Task queue list with dependencies (`dependsOn`).
-*   `decisionLog`: Log entries detailing choices, alternatives, confidence, and timestamps.
+The State Manager commits task parameters and history to the local workspace file `.agents/orchestration_state.json`:
+*   `taskId`: Current session ID.
+*   `currentPhase`: Active FSM state.
+*   `retryCount`: Failure recovery attempts.
+*   `tasks`: Array of tasks containing `dependsOn` dependency locks.
+*   `decisionLog`: Logs choices, alternatives, confidence metrics, and timestamps.
 
 ---
 
-## 3. Agent Capabilities Matrix (`capabilities.json`)
-Enforces agent boundaries by setting true/false constraints:
-*   `can_read`: Permission to read codebase files.
-*   `can_write`: Permission to write or patch source code files.
-*   `can_dispatch_events`: Permission to trigger FSM transition events.
-*   `can_vote`: Permission to issue confidence scores during gates.
+## 3. Agent Capabilities (`capabilities.json`)
+Restricts subagent actions inside the active Antigravity workspace:
+*   `can_read`: Permission to read files.
+*   `can_write`: Permission to write or patch source files.
+*   `can_dispatch_events`: Permission to trigger event transitions.
+*   `can_vote`: Permission to issue confidence scores during debate rounds.
