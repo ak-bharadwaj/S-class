@@ -86,7 +86,8 @@ def _resolve_paths(workspace_dir: Optional[str] = None) -> tuple:
     state_dir = os.path.join(cwd, ".agents")
     state_file = os.path.join(state_dir, "orchestration_state.json")
     lock_file = os.path.join(state_dir, "state.lock")
-    return state_dir, state_file, lock_file
+    config_file = os.path.join(cwd, "sclass.config.json")
+    return state_dir, state_file, lock_file, config_file
 
 def load_json(path):
     if not os.path.exists(path):
@@ -140,9 +141,24 @@ def _execute_side_effects(state: State, side_effects: List[str]):
 # === Public Library APIs ===
 
 def initialize_state(workspace_dir: Optional[str] = None) -> None:
-    """Initializes a new orchestration_state.json inside the workspace."""
-    state_dir, state_file, lock_file = _resolve_paths(workspace_dir)
+    """Initializes a new orchestration_state.json and generates a default sclass.config.json."""
+    state_dir, state_file, lock_file, config_file = _resolve_paths(workspace_dir)
     os.makedirs(state_dir, exist_ok=True)
+    
+    # Auto-generate workspace config file if it doesn't exist
+    if not os.path.exists(config_file):
+        default_config = {
+            "pipeline": "sclass-v5",
+            "executionMode": "Human-in-the-Loop Mode",
+            "loopMode": "closed-loop",
+            "projectType": "web-application",
+            "commands": {
+                "devServer": "npm run dev",
+                "test": "npm test",
+                "dbMigration": ""
+            }
+        }
+        write_json_atomic(config_file, default_config)
     
     with FileLock(lock_file):
         if os.path.exists(state_file):
@@ -164,7 +180,7 @@ def initialize_state(workspace_dir: Optional[str] = None) -> None:
             "decisionLog": [
                 {
                     "decision": "Initialize S-Class FSM Engine",
-                    "reason": "Created baseline orchestration state file.",
+                    "reason": "Created baseline orchestration state and workspace config files.",
                     "alternatives": [],
                     "confidence": 1.0,
                     "timestamp": datetime.utcnow().isoformat() + "Z",
@@ -178,7 +194,7 @@ def initialize_state(workspace_dir: Optional[str] = None) -> None:
 
 def get_state(workspace_dir: Optional[str] = None) -> State:
     """Loads and validates the current State dataclass object."""
-    _, state_file, _ = _resolve_paths(workspace_dir)
+    _, state_file, _, _ = _resolve_paths(workspace_dir)
     if not os.path.exists(state_file):
         raise FileNotFoundError("State file not initialized. Call initialize_state() first.")
     
@@ -204,7 +220,7 @@ def get_state(workspace_dir: Optional[str] = None) -> State:
 
 def save_state(state: State, workspace_dir: Optional[str] = None) -> None:
     """Saves a State dataclass object back to orchestration_state.json atomically."""
-    _, state_file, lock_file = _resolve_paths(workspace_dir)
+    _, state_file, lock_file, _ = _resolve_paths(workspace_dir)
     state_dict = asdict(state)
     validate_state_types(state_dict)
     with FileLock(lock_file):
@@ -212,7 +228,7 @@ def save_state(state: State, workspace_dir: Optional[str] = None) -> None:
 
 def dispatch_event(event_name: str, workspace_dir: Optional[str] = None) -> None:
     """Dispatches a transition event, updating FSM state and executing side effects."""
-    _, _, lock_file = _resolve_paths(workspace_dir)
+    _, _, lock_file, _ = _resolve_paths(workspace_dir)
     
     with FileLock(lock_file):
         state = get_state(workspace_dir)
@@ -257,7 +273,7 @@ def dispatch_event(event_name: str, workspace_dir: Optional[str] = None) -> None
 
 def update_task(task_id: str, status: str, workspace_dir: Optional[str] = None) -> None:
     """Updates the status of a specific task in the queue."""
-    _, _, lock_file = _resolve_paths(workspace_dir)
+    _, _, lock_file, _ = _resolve_paths(workspace_dir)
     
     with FileLock(lock_file):
         state = get_state(workspace_dir)
@@ -286,7 +302,7 @@ def get_capabilities(agent_name: str) -> Dict[str, bool]:
 
 def log_decision(decision: str, reason: str, agent: str, confidence: float, alts: Optional[List[str]] = None, workspace_dir: Optional[str] = None) -> None:
     """Appends a durable decision log entry."""
-    _, _, lock_file = _resolve_paths(workspace_dir)
+    _, _, lock_file, _ = _resolve_paths(workspace_dir)
     alts_list = alts if alts else []
     
     with FileLock(lock_file):

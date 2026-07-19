@@ -45,14 +45,31 @@ curl -fsSL https://raw.githubusercontent.com/ak-bharadwaj/sclass-v5/master/insta
 
 ### Usage
 
-#### 1. Configuration Preset
-Inherit this pipeline in any project by adding the following metadata to your local `CLAUDE.md`:
-```markdown
-pipeline: sclass-v5
-executionMode: Human-in-the-Loop Mode
+#### 1. Zero-Config Workspace Initialization
+Developers do not need to create configuration files manually. Running S-Class initialization creates both the orchestration state file and a default config preset named `sclass.config.json` in the root of the project:
+```json
+{
+  "pipeline": "sclass-v5",
+  "executionMode": "Human-in-the-Loop Mode",
+  "loopMode": "closed-loop",
+  "projectType": "web-application",
+  "commands": {
+    "devServer": "npm run dev",
+    "test": "npm test",
+    "dbMigration": ""
+  }
+}
 ```
 
-#### 2. Importing the FSM Runtime Library API
+#### 2. Broad NLP Input Decomposition
+S-Class is designed to handle high-level natural language (NLP) requests (e.g. *"Build a dashboard website with active fire tracking and authentication"*). 
+
+The ingestion agents handle system-level decomposition automatically:
+1.  **Requirements Analyst (`dss_analyst`):** Maps the broad user prompt into explicit database models, API signatures, views, and data contracts.
+2.  **System Architect (`dss_architect_v2`):** Designs the complete blueprints (SQL columns, entity relationships, route schemas).
+3.  **Response Aggregator (`dss_aggregator`):** Commits the specification details and compiles them into structured tasks (T1, T2, T3) mapped with dependencies and acceptance criteria for the builder to implement.
+
+#### 3. Importing the FSM Runtime Library API
 S-Class runs as an internal Python library inside the host environment. Subagents and managers import and call state functions directly:
 
 ```python
