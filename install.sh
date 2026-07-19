@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # S-Class SDK Installer for Linux/macOS
-# Run: curl -fsSL https://raw.githubusercontent.com/ak-bharadwaj/sclass-v5/master/install.sh | bash
+# Run: curl -fsSL https://raw.githubusercontent.com/ak-bharadwaj/S-class/master/install.sh | bash
 
 PLUGIN_ROOT="$HOME/.gemini/config/plugins"
 PLUGIN_DIR="$PLUGIN_ROOT/sclass-v5"
@@ -19,7 +19,7 @@ if [ -d "$PLUGIN_DIR" ]; then
     git pull
 else
     echo "Cloning S-Class SDK..."
-    git clone https://github.com/ak-bharadwaj/sclass-v5.git "$PLUGIN_DIR"
+    git clone https://github.com/ak-bharadwaj/S-class.git "$PLUGIN_DIR"
 fi
 
 echo "Installation complete! Inherit this workflow by adding 'pipeline: sclass-v5' to your CLAUDE.md workspace config."

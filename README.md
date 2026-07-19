@@ -35,12 +35,12 @@ S-Class integrates directly with the Antigravity environment to support:
 
 #### Windows (PowerShell):
 ```powershell
-iex (irm -useb https://raw.githubusercontent.com/ak-bharadwaj/sclass-v5/master/install.ps1)
+iex (irm -useb https://raw.githubusercontent.com/ak-bharadwaj/S-class/master/install.ps1)
 ```
 
 #### Linux/macOS (Shell):
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ak-bharadwaj/sclass-v5/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ak-bharadwaj/S-class/master/install.sh | bash
 ```
 
 ### Usage
