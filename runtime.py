@@ -5,7 +5,6 @@ import json
 import uuid
 import time
 import logging
-import argparse
 from datetime import datetime
 from dataclasses import dataclass, asdict, field
 from typing import List, Dict, Optional, Any
@@ -17,51 +16,9 @@ EVENTS_FILE = os.path.join(PLUGIN_DIR, "events.json")
 CAPABILITIES_FILE = os.path.join(PLUGIN_DIR, "capabilities.json")
 SCHEMA_FILE = os.path.join(PLUGIN_DIR, "state_schema.json")
 
-# State path configuration
-STATE_DIR = os.path.join(os.getcwd(), ".agents")
-STATE_FILE = os.path.join(STATE_DIR, "orchestration_state.json")
-LOCK_FILE = os.path.join(STATE_DIR, "state.lock")
-LOG_FILE = os.path.join(STATE_DIR, "orchestration.log")
-
 # Setup Logging
-os.makedirs(STATE_DIR, exist_ok=True)
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] (%(name)s) %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler(LOG_FILE, encoding="utf-8")
-    ]
-)
 logger = logging.getLogger("sclass_runtime")
 
-class FileLock:
-    def __init__(self, lock_path: str, timeout: float = 10.0):
-        self.lock_path = lock_path
-        self.timeout = timeout
-        self.fd = None
-
-    def __enter__(self):
-        start_time = time.time()
-        while True:
-            try:
-                self.fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-                break
-            except FileExistsError:
-                if time.time() - start_time > self.timeout:
-                    logger.error(f"Concurrency Lock Timeout: Failed to acquire {self.lock_path}")
-                    sys.exit(1)
-                time.sleep(0.05)
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.fd is not None:
-            os.close(self.fd)
-            try:
-                os.unlink(self.lock_path)
-            except OSError:
-                pass
-
-# Dataclass models representing schemas
 @dataclass
 class Task:
     id: str
@@ -99,10 +56,41 @@ class State:
     tasks: List[Task] = field(default_factory=list)
     decisionLog: List[Decision] = field(default_factory=list)
 
+class FileLock:
+    def __init__(self, lock_path: str, timeout: float = 10.0):
+        self.lock_path = lock_path
+        self.timeout = timeout
+        self.fd = None
+
+    def __enter__(self):
+        start_time = time.time()
+        while True:
+            try:
+                self.fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                break
+            except FileExistsError:
+                if time.time() - start_time > self.timeout:
+                    raise TimeoutError(f"Concurrency Lock Timeout: Failed to acquire {self.lock_path}")
+                time.sleep(0.05)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.fd is not None:
+            os.close(self.fd)
+            try:
+                os.unlink(self.lock_path)
+            except OSError:
+                pass
+
+def _resolve_paths(workspace_dir: Optional[str] = None) -> tuple:
+    cwd = workspace_dir if workspace_dir else os.getcwd()
+    state_dir = os.path.join(cwd, ".agents")
+    state_file = os.path.join(state_dir, "orchestration_state.json")
+    lock_file = os.path.join(state_dir, "state.lock")
+    return state_dir, state_file, lock_file
+
 def load_json(path):
     if not os.path.exists(path):
-        logger.error(f"Required configuration file missing: {path}")
-        sys.exit(1)
+        raise FileNotFoundError(f"Required configuration file missing: {path}")
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -117,12 +105,9 @@ def write_json_atomic(path, data):
 
 def validate_state_types(state_dict: Dict[str, Any]):
     schema = load_json(SCHEMA_FILE)
-    
-    # Simple validation against schema properties
     properties = schema.get("properties", {})
     for key, val in state_dict.items():
         if key not in properties:
-            logger.warning(f"Extraneous property in state: {key}")
             continue
             
         prop_schema = properties[key]
@@ -139,10 +124,28 @@ def validate_state_types(state_dict: Dict[str, Any]):
         elif expected_type == "object" and not isinstance(val, dict):
             raise TypeError(f"Type validation failed: property '{key}' expected object, got {type(val)}")
 
-def init_state():
-    with FileLock(LOCK_FILE):
-        if os.path.exists(STATE_FILE):
-            logger.info("State file already exists. Skipping initialization.")
+def _execute_side_effects(state: State, side_effects: List[str]):
+    for effect in side_effects:
+        if effect == "incrementSpecVersion":
+            state.currentSpecVersion += 1
+        elif effect == "incrementTaskVersion":
+            state.currentTaskVersion += 1
+        elif effect == "incrementDebateVersion":
+            state.currentDebateVersion += 1
+        elif effect == "incrementRetryCount":
+            state.retryCount += 1
+        elif effect == "resetRetryCount":
+            state.retryCount = 0
+
+# === Public Library APIs ===
+
+def initialize_state(workspace_dir: Optional[str] = None) -> None:
+    """Initializes a new orchestration_state.json inside the workspace."""
+    state_dir, state_file, lock_file = _resolve_paths(workspace_dir)
+    os.makedirs(state_dir, exist_ok=True)
+    
+    with FileLock(lock_file):
+        if os.path.exists(state_file):
             return
         
         state_dict = {
@@ -171,15 +174,15 @@ def init_state():
         }
         
         validate_state_types(state_dict)
-        write_json_atomic(STATE_FILE, state_dict)
-        logger.info(f"Initialized shared orchestration state: {STATE_FILE}")
+        write_json_atomic(state_file, state_dict)
 
-def get_state_obj() -> State:
-    if not os.path.exists(STATE_FILE):
-        logger.error("State file not initialized. Run 'init' first.")
-        sys.exit(1)
+def get_state(workspace_dir: Optional[str] = None) -> State:
+    """Loads and validates the current State dataclass object."""
+    _, state_file, _ = _resolve_paths(workspace_dir)
+    if not os.path.exists(state_file):
+        raise FileNotFoundError("State file not initialized. Call initialize_state() first.")
     
-    state_dict = load_json(STATE_FILE)
+    state_dict = load_json(state_file)
     validate_state_types(state_dict)
     
     tasks = [Task(**t) for t in state_dict.get("tasks", [])]
@@ -199,34 +202,20 @@ def get_state_obj() -> State:
         decisionLog=decisions
     )
 
-def save_state_obj(state: State):
+def save_state(state: State, workspace_dir: Optional[str] = None) -> None:
+    """Saves a State dataclass object back to orchestration_state.json atomically."""
+    _, state_file, lock_file = _resolve_paths(workspace_dir)
     state_dict = asdict(state)
     validate_state_types(state_dict)
-    write_json_atomic(STATE_FILE, state_dict)
+    with FileLock(lock_file):
+        write_json_atomic(state_file, state_dict)
 
-def execute_side_effects(state: State, side_effects: List[str]):
-    for effect in side_effects:
-        if effect == "incrementSpecVersion":
-            state.currentSpecVersion += 1
-            logger.info("Executing SideEffect: Incremented Spec Version")
-        elif effect == "incrementTaskVersion":
-            state.currentTaskVersion += 1
-            logger.info("Executing SideEffect: Incremented Task Version")
-        elif effect == "incrementDebateVersion":
-            state.currentDebateVersion += 1
-            logger.info("Executing SideEffect: Incremented Debate Version")
-        elif effect == "incrementRetryCount":
-            state.retryCount += 1
-            logger.info("Executing SideEffect: Incremented Retry Count")
-        elif effect == "resetRetryCount":
-            state.retryCount = 0
-            logger.info("Executing SideEffect: Reset Retry Count")
-        else:
-            logger.warning(f"Unknown side effect declared in event metadata: {effect}")
-
-def dispatch_event(event_name):
-    with FileLock(LOCK_FILE):
-        state = get_state_obj()
+def dispatch_event(event_name: str, workspace_dir: Optional[str] = None) -> None:
+    """Dispatches a transition event, updating FSM state and executing side effects."""
+    _, _, lock_file = _resolve_paths(workspace_dir)
+    
+    with FileLock(lock_file):
+        state = get_state(workspace_dir)
         workflow = load_json(WORKFLOW_FILE)
         events = load_json(EVENTS_FILE)
         
@@ -235,16 +224,14 @@ def dispatch_event(event_name):
         # Check event existence & load metadata
         event_meta = next((e for e in events if e["event"] == event_name), None)
         if not event_meta:
-            logger.error(f"Event '{event_name}' is not registered in events.json")
-            sys.exit(1)
+            raise ValueError(f"Event '{event_name}' is not registered in events.json")
             
         # Validate FSM State transition
         workflow_state = workflow["states"].get(current_phase, {})
         valid_transitions = workflow_state.get("transitions", {})
         
         if event_name not in valid_transitions:
-            logger.error(f"FSM Veto: Transition '{event_name}' is invalid from current state '{current_phase}'")
-            sys.exit(1)
+            raise ValueError(f"Transition '{event_name}' is invalid from current state '{current_phase}'")
             
         next_phase = valid_transitions[event_name]
         
@@ -252,9 +239,9 @@ def dispatch_event(event_name):
         state.currentPhase = next_phase
         state.activeEvent = event_name
         
-        # Execute metadata side-effects
+        # Execute side-effects
         side_effects = event_meta.get("sideEffects", [])
-        execute_side_effects(state, side_effects)
+        _execute_side_effects(state, side_effects)
         
         # Log Decision Transition
         state.decisionLog.append(Decision(
@@ -266,119 +253,50 @@ def dispatch_event(event_name):
             agent="state_manager_runtime"
         ))
         
-        save_state_obj(state)
-        logger.info(f"Transitioned state: {current_phase} ──({event_name})──> {next_phase}")
+        save_state(state, workspace_dir)
 
-def show_status():
-    state = get_state_obj()
-    print("=== S-Class FSM Execution State ===")
-    print(f"Task ID:        {state.taskId}")
-    print(f"Current Phase:  {state.currentPhase}")
-    print(f"Active Event:   {state.activeEvent}")
-    print(f"Spec Version:   v{state.currentSpecVersion}")
-    print(f"Task Version:   v{state.currentTaskVersion}")
-    print(f"Retry Count:    {state.retryCount}")
-    print(f"Weighted Score: {state.confidenceMatrix.weightedScore * 100}%")
-    print("\n--- Active Tasks Queue ---")
-    if not state.tasks:
-        print("None")
-    for t in state.tasks:
-        print(f"[{t.status}] {t.id} (Owner: {t.owner}) -> Targets: {t.targets} [Acceptance: {t.acceptanceCriteria}] (DependsOn: {t.dependsOn})")
-    print("\n--- Decision History Logs ---")
-    for log in state.decisionLog[-5:]:
-        print(f"[{log.timestamp}] ({log.agent}): {log.decision} - Reason: {log.reason}")
-
-def show_capabilities(agent_name):
-    caps = load_json(CAPABILITIES_FILE)
-    agent_caps = caps.get(agent_name)
-    if not agent_caps:
-        logger.error(f"Agent '{agent_name}' is not registered in capabilities.json")
-        sys.exit(1)
-    print(f"=== Capabilities: {agent_name} ===")
-    for cap, allowed in agent_caps.items():
-        print(f" {cap}: {'Allowed' if allowed else 'Denied'}")
-
-def update_task(task_id, status):
-    with FileLock(LOCK_FILE):
-        state = get_state_obj()
+def update_task(task_id: str, status: str, workspace_dir: Optional[str] = None) -> None:
+    """Updates the status of a specific task in the queue."""
+    _, _, lock_file = _resolve_paths(workspace_dir)
+    
+    with FileLock(lock_file):
+        state = get_state(workspace_dir)
         task = next((t for t in state.tasks if t.id == task_id), None)
         if not task:
-            logger.error(f"Task '{task_id}' not found.")
-            sys.exit(1)
+            raise KeyError(f"Task '{task_id}' not found.")
             
         task.status = status
         
-        # Verify dependencies before starting task
+        # Verify dependencies
         if status == "IN_PROGRESS":
             for dep in task.dependsOn:
                 dep_task = next((t for t in state.tasks if t.id == dep), None)
                 if dep_task and dep_task.status != "COMPLETED":
-                    logger.warning(f"Dependency task '{dep}' has status '{dep_task.status}' (not COMPLETED). Proceed with caution.")
+                    logger.warning(f"Dependency task '{dep}' status is '{dep_task.status}' (expected COMPLETED).")
                     
-        save_state_obj(state)
-        logger.info(f"Updated Task '{task_id}' status to '{status}'")
+        save_state(state, workspace_dir)
 
-def add_decision(decision, reason, agent, confidence, alts=[]):
-    with FileLock(LOCK_FILE):
-        state = get_state_obj()
+def get_capabilities(agent_name: str) -> Dict[str, bool]:
+    """Returns the capability permissions for a specified agent."""
+    caps = load_json(CAPABILITIES_FILE)
+    agent_caps = caps.get(agent_name)
+    if not agent_caps:
+        raise KeyError(f"Agent '{agent_name}' is not registered in capabilities.json")
+    return agent_caps
+
+def log_decision(decision: str, reason: str, agent: str, confidence: float, alts: Optional[List[str]] = None, workspace_dir: Optional[str] = None) -> None:
+    """Appends a durable decision log entry."""
+    _, _, lock_file = _resolve_paths(workspace_dir)
+    alts_list = alts if alts else []
+    
+    with FileLock(lock_file):
+        state = get_state(workspace_dir)
         state.decisionLog.append(Decision(
             decision=decision,
             reason=reason,
-            alternatives=alts,
+            alternatives=alts_list,
             confidence=float(confidence),
             timestamp=datetime.utcnow().isoformat() + "Z",
             agent=agent
         ))
-        save_state_obj(state)
-        logger.info(f"Durable Decision added by '{agent}': {decision}")
-
-def main():
-    parser = argparse.ArgumentParser(description="S-Class FSM Engine CLI Runtime")
-    subparsers = parser.add_subparsers(dest="command", help="Available runtime operations")
-    
-    # Init command
-    subparsers.add_parser("init", help="Initialize shared state orchestration_state.json")
-    
-    # Status command
-    subparsers.add_parser("status", help="Print current state machine status details")
-    
-    # Dispatch command
-    dispatch_parser = subparsers.add_parser("dispatch", help="Trigger FSM transition event")
-    dispatch_parser.add_argument("event", type=str, help="Transition event name")
-    
-    # Capabilities command
-    caps_parser = subparsers.add_parser("capabilities", help="Audits permission matrix of an agent")
-    caps_parser.add_argument("agent", type=str, help="Agent name")
-    
-    # Task update command
-    task_parser = subparsers.add_parser("task", help="Updates task execution status")
-    task_parser.add_argument("id", type=str, help="Task ID (e.g. T1)")
-    task_parser.add_argument("status", type=str, choices=["PENDING", "IN_PROGRESS", "COMPLETED", "FAILED"], help="Target status")
-    
-    # Decision log command
-    dec_parser = subparsers.add_parser("decision", help="Appends durable decision log")
-    dec_parser.add_argument("decision", type=str, help="Decision detail")
-    dec_parser.add_argument("reason", type=str, help="Rationale for selection")
-    dec_parser.add_argument("agent", type=str, help="Author agent")
-    dec_parser.add_argument("confidence", type=float, help="Confidence value (0-1)")
-    dec_parser.add_argument("--alts", nargs="*", default=[], help="Alternative options evaluated")
-    
-    args = parser.parse_args()
-    
-    if args.command == "init":
-        init_state()
-    elif args.command == "status":
-        show_status()
-    elif args.command == "dispatch":
-        dispatch_event(args.event)
-    elif args.command == "capabilities":
-        show_capabilities(args.agent)
-    elif args.command == "task":
-        update_task(args.id, args.status)
-    elif args.command == "decision":
-        add_decision(args.decision, args.reason, args.agent, args.confidence, args.alts)
-    else:
-        parser.print_help()
-
-if __name__ == "__main__":
-    main()
+        save_state(state, workspace_dir)

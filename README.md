@@ -52,33 +52,34 @@ pipeline: sclass-v5
 executionMode: Human-in-the-Loop Mode
 ```
 
-#### 2. Executing the FSM State Machine CLI
-The plugin includes an executable Python runtime engine (`runtime.py`) that acts as the single-writer state manager and event router. Run it inside your project directory to coordinate steps:
+#### 2. Importing the FSM Runtime Library API
+S-Class runs as an internal Python library inside the host environment. Subagents and managers import and call state functions directly:
 
-*   **Initialize Workspace State:**
-    ```bash
-    python ~/.gemini/config/plugins/sclass-v5/runtime.py init
-    ```
-*   **Check Active Phase & Tasks:**
-    ```bash
-    python ~/.gemini/config/plugins/sclass-v5/runtime.py status
-    ```
-*   **Dispatch Event Trigger (State Transition):**
-    ```bash
-    python ~/.gemini/config/plugins/sclass-v5/runtime.py dispatch triage_done
-    ```
-*   **Audit Subagent Capabilities Matrix:**
-    ```bash
-    python ~/.gemini/config/plugins/sclass-v5/runtime.py capabilities dss_builder_v2
-    ```
-*   **Update Task Execution Status:**
-    ```bash
-    python ~/.gemini/config/plugins/sclass-v5/runtime.py task T1 IN_PROGRESS
-    ```
-*   **Record Durable Decision Log:**
-    ```bash
-    python ~/.gemini/config/plugins/sclass-v5/runtime.py decision "Use SQLite" "No concurrency required" dss_architect_v2 0.90
-    ```
+```python
+from sclass-v5 import runtime
+
+# Initialize the workspace state file
+runtime.initialize_state()
+
+# Load the current validated State object
+state = runtime.get_state()
+print(f"Current State: {state.currentPhase}")
+
+# Dispatch an event to transition states
+runtime.dispatch_event("triage_done")
+
+# Update a task status
+runtime.update_task("T1", "IN_PROGRESS")
+
+# Record a durable decision log
+runtime.log_decision(
+    decision="Use SQLite",
+    reason="No concurrent connections needed in operational state",
+    agent="dss_architect_v2",
+    confidence=0.90,
+    alts=["PostgreSQL", "JSON storage"]
+)
+```
 
 ---
 
