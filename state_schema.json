@@ -9,7 +9,7 @@
     },
     "currentPhase": {
       "type": "string",
-      "enum": ["TRIAGE", "ANALYSIS", "DESIGN", "DEBATE", "TASK_COMPILATION", "CODING", "INTEGRATION", "QA", "RECOVERY", "RELEASE", "DONE"]
+      "enum": ["TRIAGE", "ANALYSIS", "CLARIFICATION", "DESIGN", "DEBATE", "TASK_COMPILATION", "CODING", "INTEGRATION", "QA", "RECOVERY", "RELEASE", "DONE"]
     },
     "activeEvent": {
       "type": ["string", "null"]

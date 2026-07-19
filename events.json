@@ -82,5 +82,17 @@
     "description": "Fired when design debate fails to reach consensus score.",
     "nextState": "DESIGN",
     "sideEffects": ["incrementDebateVersion"]
+  },
+  {
+    "event": "ambiguity_detected",
+    "description": "Fired when requirements have omissions or ambiguities requiring user feedback.",
+    "nextState": "CLARIFICATION",
+    "sideEffects": []
+  },
+  {
+    "event": "clarified",
+    "description": "Fired when the user responds to clarifying questions and design begins.",
+    "nextState": "DESIGN",
+    "sideEffects": []
   }
 ]

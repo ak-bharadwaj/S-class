@@ -7,7 +7,13 @@
     },
     "ANALYSIS": {
       "transitions": {
-        "context_loaded": "DESIGN"
+        "context_loaded": "DESIGN",
+        "ambiguity_detected": "CLARIFICATION"
+      }
+    },
+    "CLARIFICATION": {
+      "transitions": {
+        "clarified": "DESIGN"
       }
     },
     "DESIGN": {
