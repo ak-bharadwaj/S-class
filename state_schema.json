@@ -1,47 +1,47 @@
 {
   "\$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "S-Class Orcherstration Shared Execution State",
-  "type": "OBJECT",
+  "title": "S-Class Orchestration Shared Execution State",
+  "type": "object",
   "properties": {
     "taskId": {
-      "type": "STRING",
+      "type": "string",
       "format": "uuid"
     },
     "currentPhase": {
-      "type": "STRING",
+      "type": "string",
       "enum": ["TRIAGE", "ANALYSIS", "DESIGN", "DEBATE", "TASK_COMPILATION", "CODING", "INTEGRATION", "QA", "RECOVERY", "RELEASE", "DONE"]
     },
     "activeEvent": {
-      "type": ["STRING", "null"]
+      "type": ["string", "null"]
     },
     "currentSpecVersion": {
-      "type": "INTEGER",
+      "type": "integer",
       "minimum": 1
     },
     "currentDebateVersion": {
-      "type": "INTEGER",
+      "type": "integer",
       "minimum": 0
     },
     "currentTaskVersion": {
-      "type": "INTEGER",
+      "type": "integer",
       "minimum": 0
     },
     "retryCount": {
-      "type": "INTEGER",
+      "type": "integer",
       "minimum": 0
     },
     "confidenceMatrix": {
-      "type": "OBJECT",
+      "type": "object",
       "properties": {
         "weightedScore": {
-          "type": "NUMBER",
+          "type": "number",
           "minimum": 0.0,
           "maximum": 1.0
         },
         "votes": {
-          "type": "OBJECT",
+          "type": "object",
           "additionalProperties": {
-            "type": "NUMBER",
+            "type": "number",
             "minimum": 0.0,
             "maximum": 1.0
           }
@@ -50,33 +50,33 @@
       "required": ["weightedScore", "votes"]
     },
     "tasks": {
-      "type": "ARRAY",
+      "type": "array",
       "items": {
-        "type": "OBJECT",
+        "type": "object",
         "properties": {
           "id": {
-            "type": "STRING"
+            "type": "string"
           },
           "owner": {
-            "type": "STRING"
+            "type": "string"
           },
           "targets": {
-            "type": "ARRAY",
-            "items": { "type": "STRING" }
+            "type": "array",
+            "items": { "type": "string" }
           },
           "dependsOn": {
-            "type": "ARRAY",
-            "items": { "type": "STRING" }
+            "type": "array",
+            "items": { "type": "string" }
           },
           "acceptanceCriteria": {
-            "type": "STRING"
+            "type": "string"
           },
           "priority": {
-            "type": "STRING",
+            "type": "string",
             "enum": ["HIGH", "MEDIUM", "LOW"]
           },
           "status": {
-            "type": "STRING",
+            "type": "string",
             "enum": ["PENDING", "IN_PROGRESS", "COMPLETED", "FAILED"]
           }
         },
@@ -84,23 +84,23 @@
       }
     },
     "decisionLog": {
-      "type": "ARRAY",
+      "type": "array",
       "items": {
-        "type": "OBJECT",
+        "type": "object",
         "properties": {
-          "decision": { "type": "STRING" },
-          "reason": { "type": "STRING" },
+          "decision": { "type": "string" },
+          "reason": { "type": "string" },
           "alternatives": {
-            "type": "ARRAY",
-            "items": { "type": "STRING" }
+            "type": "array",
+            "items": { "type": "string" }
           },
           "confidence": {
-            "type": "NUMBER",
+            "type": "number",
             "minimum": 0.0,
             "maximum": 1.0
           },
-          "timestamp": { "type": "STRING", "format": "date-time" },
-          "agent": { "type": "STRING" }
+          "timestamp": { "type": "string", "format": "date-time" },
+          "agent": { "type": "string" }
         },
         "required": ["decision", "reason", "alternatives", "confidence", "timestamp", "agent"]
       }

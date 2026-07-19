@@ -1,41 +1,52 @@
-# S-Class V5.2 Engineering Pipeline Plugin
+# S-Class SDK: Pluggable workflow runtime engine for multi-agent execution
 
-This directory contains the pluggable S-Class Engineering Pipeline configuration for Antigravity. It implements a generic 11-state Finite-State Machine (FSM) governed by first-class events, parallel execution groups, an agent capabilities matrix, and multi-variable goal convergence exit gates.
+S-Class SDK is a portable, technology-agnostic framework for defining and executing multi-agent workflows. It maps development, research, and audit stages into a strict 11-state Finite-State Machine (FSM) governed by first-class transition events, capabilities constraints, and parallel execution groups.
 
 ---
 
-## 1. Directory Structure
+## 1. Quick Start
 
+### Installation
+
+#### Windows (PowerShell):
+```powershell
+iex (irm -useb https://raw.githubusercontent.com/ak-bharadwaj/sclass-v5/master/install.ps1)
 ```
-C:\Users\dorni\.gemini\config\plugins\sclass-v5/
-├── plugin.json          # Plugin metadata & compatibility declaration
-├── README.md            # This documentation file
-├── state_schema.json    # JSON schema defining the FSM shared execution state
-├── events.json          # Register for first-class transition events
-└── prompts/             # Isolated system prompts for the 11 subagents
-     ├── analyst.md
-     ├── memory.md
-     ├── architect.md
-     ├── governor.md
-     ├── aggregator.md
-     ├── builder.md
-     ├── integrator.md
-     ├── cso.md
-     ├── reviewer.md
-     ├── qa.md
-     ├── user_alias.md
-     └── release_manager.md
+
+#### Linux/macOS (Shell):
+```bash
+curl -fsSL https://raw.githubusercontent.com/ak-bharadwaj/sclass-v5/master/install.sh | bash
+```
+
+### Usage
+Inherit this pipeline in any project by adding the following metadata to your local `CLAUDE.md`:
+```markdown
+pipeline: sclass-v5
+executionMode: Human-in-the-Loop Mode
 ```
 
 ---
 
-## 2. Dynamic Integration Instructions
+## 2. Directory Layout
 
-To bind a project workspace to this plugin:
-1. Ensure your local `CLAUDE.md` specifies:
-   ```markdown
-   pipeline: sclass-v5
-   executionMode: Human-in-the-Loop | Goal Convergence Mode
-   ```
-2. The orchestrator automatically loads rules from this plugin directory and configures all 11 subagents with their corresponding prompt markdown files.
-3. Only workspace-specific parameters and mathematical formulas are left in the project's local `.agents/orchestration.md`.
+*   [plugin.json](file:///C:/Users/dorni/.gemini/config/plugins/sclass-v5/plugin.json) — Registers pipeline metadata, loop modes, and capabilities.
+*   [state_schema.json](file:///C:/Users/dorni/.gemini/config/plugins/sclass-v5/state_schema.json) — JSON Schema for shared FSM execution state validation.
+*   [events.json](file:///C:/Users/dorni/.gemini/config/plugins/sclass-v5/events.json) — Transition events catalog.
+*   [capabilities.json](file:///C:/Users/dorni/.gemini/config/plugins/sclass-v5/capabilities.json) — Subagent permission boundary matrix.
+*   [workflow.json](file:///C:/Users/dorni/.gemini/config/plugins/sclass-v5/workflow.json) — States and parallel groups declaration.
+*   `prompts/` — System prompts for the 11 subagents.
+
+---
+
+## 3. Documentation Index
+
+*   [docs/runtime.md](file:///C:/Users/dorni/.gemini/config/plugins/sclass-v5/docs/runtime.md) — Engine loops, state ownership, and timeout safety.
+*   [docs/workflow.md](file:///C:/Users/dorni/.gemini/config/plugins/sclass-v5/docs/workflow.md) — FSM States definition and event routing.
+*   [docs/plugin-api.md](file:///C:/Users/dorni/.gemini/config/plugins/sclass-v5/docs/plugin-api.md) — Schemas and capabilities specifications.
+*   [docs/recovery.md](file:///C:/Users/dorni/.gemini/config/plugins/sclass-v5/docs/recovery.md) — Self-healing RECOVERY loops and patch strategies.
+*   [docs/sdk.md](file:///C:/Users/dorni/.gemini/config/plugins/sclass-v5/docs/sdk.md) — Creating custom pipelines (Research, GameDev, etc.).
+
+---
+
+## 4. License
+S-Class SDK is released under the [MIT License](file:///C:/Users/dorni/.gemini/config/plugins/sclass-v5/LICENSE).

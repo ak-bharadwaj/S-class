@@ -1,0 +1,93 @@
+{
+  "dss_optimizer_v2": {
+    "can_read": true,
+    "can_write": false,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": false
+  },
+  "dss_memory": {
+    "can_read": true,
+    "can_write": false,
+    "can_dispatch_events": false,
+    "can_modify_state": false,
+    "can_vote": false
+  },
+  "dss_analyst": {
+    "can_read": true,
+    "can_write": false,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": false
+  },
+  "dss_architect_v2": {
+    "can_read": true,
+    "can_write": false,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": false
+  },
+  "dss_governor": {
+    "can_read": true,
+    "can_write": false,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": true
+  },
+  "dss_aggregator": {
+    "can_read": true,
+    "can_write": false,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": false
+  },
+  "dss_builder_v2": {
+    "can_read": true,
+    "can_write": true,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": false
+  },
+  "dss_integrator": {
+    "can_read": true,
+    "can_write": false,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": true
+  },
+  "dss_cso_v2": {
+    "can_read": true,
+    "can_write": false,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": true
+  },
+  "dss_reviewer_v2": {
+    "can_read": true,
+    "can_write": false,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": true
+  },
+  "dss_qa_v2": {
+    "can_read": true,
+    "can_write": false,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": true
+  },
+  "dss_user_alias_v2": {
+    "can_read": true,
+    "can_write": false,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": true
+  },
+  "dss_release_manager": {
+    "can_read": true,
+    "can_write": false,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": true
+  }
+}

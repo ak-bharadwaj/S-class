@@ -1,0 +1,74 @@
+{
+  "states": {
+    "TRIAGE": {
+      "transitions": {
+        "triage_done": "ANALYSIS"
+      }
+    },
+    "ANALYSIS": {
+      "transitions": {
+        "context_loaded": "DESIGN"
+      }
+    },
+    "DESIGN": {
+      "transitions": {
+        "design_drafted": "DEBATE"
+      }
+    },
+    "DEBATE": {
+      "parallelGroup": "Parallel Group #1",
+      "transitions": {
+        "spec_approved": "TASK_COMPILATION",
+        "debate_failed": "DESIGN"
+      }
+    },
+    "TASK_COMPILATION": {
+      "transitions": {
+        "tasks_ready": "CODING"
+      }
+    },
+    "CODING": {
+      "transitions": {
+        "code_written": "INTEGRATION"
+      }
+    },
+    "INTEGRATION": {
+      "transitions": {
+        "integration_passed": "QA",
+        "integration_failed": "CODING"
+      }
+    },
+    "QA": {
+      "parallelGroup": "Parallel Group #2",
+      "transitions": {
+        "qa_passed": "RELEASE",
+        "qa_failed": "RECOVERY"
+      }
+    },
+    "RECOVERY": {
+      "transitions": {
+        "patch_assigned": "CODING"
+      }
+    },
+    "RELEASE": {
+      "transitions": {
+        "release_complete": "DONE",
+        "release_hold": "CODING"
+      }
+    },
+    "DONE": {}
+  },
+  "parallelGroups": {
+    "Parallel Group #1": [
+      "dss_governor",
+      "dss_cso_v2",
+      "dss_reviewer_v2",
+      "dss_user_alias_v2"
+    ],
+    "Parallel Group #2": [
+      "dss_reviewer_v2",
+      "dss_cso_v2",
+      "dss_qa_v2"
+    ]
+  }
+}
