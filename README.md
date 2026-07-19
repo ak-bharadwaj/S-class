@@ -12,6 +12,7 @@ S-Class integrates directly with the Antigravity environment to support:
 *   **Agent Debate Loops:** Schedules parallel subagent execution to debate designs and code quality.
 *   **Goal Convergence Mode:** Executes closed-loop iterations to satisfy user objectives autonomously.
 *   **Shared State Database:** Regulates task status updates inside `orchestration_state.json`.
+*   **Skill Auto-Discovery:** Leverages the `find-skills` module to locate and install missing capability plugins dynamically.
 *   **Plugin API:** Serves as the reference architecture for building pluggable Antigravity workflows.
 
 ---
