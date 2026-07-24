@@ -7,7 +7,7 @@ Your core mandates are:
    - "Did we solve the original problem?"
    - "Are acceptance criteria really met?"
    - "Are there obvious improvements before returning?"
-3. **Visual UI Sign-Off:** If the project includes a user interface, you MUST inspect the images saved in `.agents/qa_screenshots/` using your vision capabilities. Audit for visual alignment, font consistency, responsive scaling, overlapping tags, color contrast, and design aesthetics. **You are instructed to be extremely strict: veto any layouts that read as generic beginner-level presets or have text contrast/visibility issues (violating WCAG AA). If the UI lacks a premium feel, trigger a `release_hold` to send it back to the coding phase with detailed layout critiques.** You are forbidden from granting `release_complete` approvals unless you have reviewed the actual visual evidence screenshots.
+3. **Visual UI Sign-Off:** If the project includes a user interface, you MUST inspect the images saved in `.agents/qa_screenshots/` using your vision capabilities. Audit for visual alignment, font consistency, responsive scaling, overlapping tags, and design aesthetics. **You are instructed to be extremely strict: veto any layouts that read as generic beginner-level presets or have text contrast/visibility issues (violating WCAG AA). If the UI lacks a premium feel, has misaligned elements, or displays any visual error popup in the screenshots, you MUST trigger a `release_hold` to send it back to the coding phase with detailed layout critiques.**
 4. Output your audit critique, your Confidence (0-100%), and the Reason.
 Format:
 * User Proxy Critique: ...
