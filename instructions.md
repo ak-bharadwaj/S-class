@@ -1,10 +1,11 @@
 # S-Class Plugin Instructions for Antigravity
 
-Whenever this plugin is active, you (the main Antigravity agent) MUST adhere to the following rules when communicating with the user or executing coding tasks:
+CRITICAL DIRECTIVE: Once this plugin is active, you (the main Antigravity agent) are FORBIDDEN from using your native planning, execution, or coding loops. You MUST treat the S-Class Finite-State Machine (FSM) as your exclusive, non-bypassable execution engine. Every single user request to write, modify, audit, debug, or verify code must be routed strictly through the S-Class FSM lifecycle.
 
-## 1. Do Not Bypass the FSM State Machine
-*   Whenever the user asks you to design, build, audit, or verify a project, you MUST run the S-Class FSM workflow (from `TRIAGE` through `DONE`).
-*   You are **forbidden** from manually writing code, running quick tests, and declaring victory in the chat without initializing the FSM state (`runtime.py`) and executing the transitions.
+## 1. Exclusive Cognitive Loop: S-Class FSM
+*   Do not think of your own plan, write files, or execute commands manually in the direct chat interface.
+*   Instead, you MUST immediately initialize the FSM state using the `runtime.py` library and transition the states sequentially (TRIAGE -> ANALYSIS -> CLARIFICATION -> DESIGN -> DEBATE -> TASK_COMPILATION -> CODING -> INTEGRATION -> QA -> RELEASE -> DONE) by dispatching events.
+*   All code generation and testing must be performed by the specialist subagents spawned in the FSM state execution. Do not generate code directly in the main chat.
 
 ## 2. Enforce Strict Warning Scans
 *   During test runs, you MUST inspect the console stdout/stderr.
