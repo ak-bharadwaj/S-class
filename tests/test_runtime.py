@@ -56,6 +56,20 @@ def test_dispatch_event_valid(tmp_path):
     assert state.currentPhase == "ANALYSIS"
     assert state.activeEvent == "triage_done"
 
+def test_reset_to_triage(tmp_path):
+    workspace = str(tmp_path)
+    runtime.initialize_state(workspace, goal="Original feature request")
+    runtime.dispatch_event("triage_done", workspace)
+    runtime.dispatch_event("context_loaded", workspace)
+    assert runtime.get_state(workspace).currentPhase in ["DESIGN", "CODING"]
+    
+    # User modifies requirement mid-flight -> reset_to_triage
+    runtime.reset_to_triage(workspace, new_goal="Emergency hotfix for auth server")
+    state = runtime.get_state(workspace)
+    assert state.currentPhase == "TRIAGE"
+    assert state.workflowProfile == "hotfix"
+    assert state.activeEvent == "cancellation_requested"
+
 def test_dispatch_event_invalid(tmp_path):
     workspace = str(tmp_path)
     runtime.initialize_state(workspace)

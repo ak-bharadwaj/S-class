@@ -26,6 +26,9 @@ CRITICAL DIRECTIVE: Once this plugin is active, you (the main Antigravity agent)
     1. 100% compliance with acceptance criteria in `IntentContract`.
     2. Real-world user UX workflows, responsiveness, and accessibility.
     3. Absence of confusing UI states, broken links, or misleading copy.
-*   **100% QA Verification (`QA` Phase):** `dss_qa_v2` and `dss_user_alias_v2` MUST verify all functional paths, API responses, Playwright tests, and Chrome MCP visual screenshots. Veto release if ANY defect, visual overlap, or console warning remains.
+## 6. Mandatory Mid-Flight Requirement Reset
+*   **Automatic Workflow Reset:** If the user submits ANY new prompt, requirement update, or design change while execution is mid-flight (e.g. during `CODING`, `QA`, or `DEBATE`), you MUST immediately call `runtime.reset_to_triage(workspace_dir, new_goal=...)`.
+*   **Restart Strategy & Planning:** Execution MUST restart from `TRIAGE` / `ANALYSIS` to re-evaluate the strategy, intent contract, and workflow profile for the modified goal. You are strictly FORBIDDEN from patching code mid-flight without resetting strategy and planning.
+
 
 

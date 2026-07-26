@@ -629,6 +629,54 @@ def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce
         
         save_state(state, workspace_dir)
 
+def reset_to_triage(workspace_dir: Optional[str] = None, new_goal: Optional[str] = None) -> None:
+    """Resets the FSM state back to TRIAGE when user modifies requirements mid-flight."""
+    from planner import MetaPlanner, WorkflowProfile
+    from replay import TransitionRecord
+    _, _, lock_file, _ = _resolve_paths(workspace_dir)
+    
+    with FileLock(lock_file):
+        state = get_state(workspace_dir)
+        old_phase = state.currentPhase
+        
+        # Classify new goal strategy if provided
+        if new_goal:
+            plan = MetaPlanner.classify_goal(new_goal)
+            state.workflowProfile = plan.profile.value
+            state.planRationale = plan.rationale
+            
+        state.currentPhase = "TRIAGE"
+        state.activeEvent = "cancellation_requested"
+        state.retryCount = 0
+        
+        ts_now = datetime.now(timezone.utc).isoformat() + "Z"
+        
+        dec_entry = Decision(
+            decision="Reset FSM Workflow to TRIAGE",
+            reason=f"User modified requirements mid-flight from state '{old_phase}'. Restarting strategy & planning.",
+            alternatives=["continue_current_workflow"],
+            confidence=1.0,
+            timestamp=ts_now,
+            agent="meta_planner"
+        )
+        state.decisionLog.append(dec_entry)
+        
+        t_rec = TransitionRecord(
+            stepIndex=len(state.transitionHistory) + 1,
+            fromState=old_phase,
+            toState="TRIAGE",
+            eventFired="cancellation_requested",
+            workflowProfile=state.workflowProfile,
+            evidenceVerified=[],
+            decision=asdict(dec_entry),
+            timestamp=ts_now,
+            agent="meta_planner"
+        )
+        state.transitionHistory.append(t_rec.to_dict())
+        
+        save_state(state, workspace_dir)
+        logger.info(f"FSM Reset: Requirements modified mid-flight in state '{old_phase}'. Workflow reset to TRIAGE.")
+
 def update_task(task_id: str, status: str, workspace_dir: Optional[str] = None) -> None:
     """Updates the status of a specific task in the queue."""
     _, _, lock_file, _ = _resolve_paths(workspace_dir)
