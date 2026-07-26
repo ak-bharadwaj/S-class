@@ -46,22 +46,29 @@ def check_lock_file_clean(workspace_dir: str) -> DoctorCheck:
     lock_file = os.path.join(workspace_dir, ".agents", "state.lock")
     if os.path.exists(lock_file):
         try:
-            with open(lock_file, "r") as f:
-                data = json.load(f)
-            pid = data.get("pid")
-            if pid:
+            with open(lock_file, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+            
+            pid = None
+            if content.isdigit():
+                pid = int(content)
+            elif content.startswith("{"):
                 try:
-                    os.kill(pid, 0)
-                    is_alive = True
-                except OSError:
-                    is_alive = False
-                if not is_alive:
+                    data = json.loads(content)
+                    if isinstance(data, dict):
+                        pid = data.get("pid")
+                except Exception:
+                    pass
+
+            if pid is not None:
+                from runtime import _process_exists
+                if not _process_exists(int(pid)):
                     return DoctorCheck("Lock File", "WARN", f"Stale lock file detected (PID {pid} is dead)")
                 else:
                     return DoctorCheck("Lock File", "PASS", f"Lock file is active (PID {pid} is alive)")
-            return DoctorCheck("Lock File", "WARN", "Lock file exists but has no PID")
-        except Exception:
-            return DoctorCheck("Lock File", "WARN", "Lock file exists but cannot be read")
+            return DoctorCheck("Lock File", "WARN", "Lock file exists but has no valid PID")
+        except Exception as e:
+            return DoctorCheck("Lock File", "WARN", f"Lock file exists but cannot be read: {e}")
     return DoctorCheck("Lock File", "PASS", "No lock file")
 
 def check_config_exists(workspace_dir: str) -> DoctorCheck:
