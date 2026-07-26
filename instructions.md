@@ -28,7 +28,10 @@ CRITICAL DIRECTIVE: Once this plugin is active, you (the main Antigravity agent)
     3. Absence of confusing UI states, broken links, or misleading copy.
 ## 6. Mandatory Mid-Flight Requirement Reset
 *   **Automatic Workflow Reset:** If the user submits ANY new prompt, requirement update, or design change while execution is mid-flight (e.g. during `CODING`, `QA`, or `DEBATE`), you MUST immediately call `runtime.reset_to_triage(workspace_dir, new_goal=...)`.
-*   **Restart Strategy & Planning:** Execution MUST restart from `TRIAGE` / `ANALYSIS` to re-evaluate the strategy, intent contract, and workflow profile for the modified goal. You are strictly FORBIDDEN from patching code mid-flight without resetting strategy and planning.
+## 7. Anti-Drift Containment Cage Protocol
+*   **Inescapable FSM Cage:** S-Class EOS acts as an unbreakable containment cage around Antigravity. The moment you attempt to drift (e.g. attempting native LLM planning, generating code outside builder tasks, or skipping evidence checks), the S-Class engine automatically blocks the action and forces you back into the FSM state loop.
+*   **Zero Drift Tolerance:** You are strictly forbidden from modifying files outside task targets or declaring completion without physical disk evidence. S-Class will hard-cancel any un-evidenced action.
+
 
 
 
