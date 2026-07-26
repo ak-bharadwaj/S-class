@@ -67,6 +67,10 @@
   "parallelGroups": {
     "Parallel Group #1": [
       "dss_governor",
+      "dss_ui_ux",
+      "dss_frontend_dev",
+      "dss_backend_dev",
+      "dss_db_architect",
       "dss_cso_v2",
       "dss_reviewer_v2",
       "dss_user_alias_v2"
