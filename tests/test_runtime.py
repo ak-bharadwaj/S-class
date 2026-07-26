@@ -101,3 +101,52 @@ def test_stale_lock_recovery(tmp_path):
     # Attempting initialization should recover stale lock file successfully
     runtime.initialize_state(workspace)
     assert not os.path.exists(lock_file)  # Lock file is cleaned up after block exit
+
+def test_memory_manager(tmp_path):
+    workspace = str(tmp_path)
+    
+    # Test learn fix
+    runtime.MemoryManager.learn_fix(
+        pattern="Turbopack CSS syntax error",
+        fix_description="Remove rogue closing brace in globals.css",
+        file_path="frontend/app/globals.css",
+        solution_code=".counterfactual-panel { padding: 10px; }",
+        workspace_dir=workspace
+    )
+    
+    # Verify fix retrieval
+    retrieved = runtime.MemoryManager.get_fix("Build failed due to Turbopack CSS syntax error in globals.css", workspace)
+    assert retrieved is not None
+    assert retrieved["filePath"] == "frontend/app/globals.css"
+    assert retrieved["fixDescription"] == "Remove rogue closing brace in globals.css"
+    assert retrieved["solutionCode"] == ".counterfactual-panel { padding: 10px; }"
+    
+    # Non-matching pattern returns None
+    assert runtime.MemoryManager.get_fix("Some other unrelated database lock error", workspace) is None
+
+def test_workspace_config_wizard(tmp_path):
+    workspace = str(tmp_path)
+    
+    # Simulate a full-stack web project directory structure
+    frontend_dir = os.path.join(workspace, "frontend")
+    os.makedirs(frontend_dir, exist_ok=True)
+    with open(os.path.join(frontend_dir, "package.json"), "w", encoding="utf-8") as f:
+        f.write('{"name": "test-frontend"}')
+        
+    backend_dir = os.path.join(workspace, "backend")
+    os.makedirs(backend_dir, exist_ok=True)
+    with open(os.path.join(backend_dir, "main.py"), "w", encoding="utf-8") as f:
+        f.write("# FastAPI entry point")
+        
+    os.makedirs(os.path.join(backend_dir, "prisma"), exist_ok=True)
+    
+    # Run wizard
+    config = runtime.initialize_workspace_wizard(workspace)
+    
+    # Assertions
+    assert config["projectType"] == "full-stack-web"
+    assert config["commands"]["devServer"] == "cd frontend && npm run dev"
+    assert config["commands"]["apiServer"] == "python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
+    assert config["commands"]["test"] == "cd frontend && npm test"
+    assert config["commands"]["dbMigration"] == "npx prisma db push"
+

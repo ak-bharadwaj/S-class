@@ -208,6 +208,120 @@ def _execute_side_effects(state: State, side_effects: List[str]):
 
 # === Public Library APIs ===
 
+class MemoryManager:
+    @staticmethod
+    def get_memory_file(workspace_dir: Optional[str] = None) -> str:
+        cwd = workspace_dir if workspace_dir else os.getcwd()
+        return os.path.join(cwd, ".agents", "learning_memory.json")
+
+    @staticmethod
+    def get_fix(error_msg: str, workspace_dir: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        memory_file = MemoryManager.get_memory_file(workspace_dir)
+        if not os.path.exists(memory_file):
+            return None
+        try:
+            with open(memory_file, "r", encoding="utf-8") as f:
+                memory = json.load(f)
+            # Find matching error pattern
+            for entry in memory.get("fixes", []):
+                pattern = entry.get("pattern", "")
+                if pattern and pattern.lower() in error_msg.lower():
+                    return entry
+        except Exception as e:
+            logger.error(f"Failed to read learning memory: {e}")
+        return None
+
+    @staticmethod
+    def learn_fix(pattern: str, fix_description: str, file_path: str, solution_code: str, workspace_dir: Optional[str] = None) -> None:
+        memory_file = MemoryManager.get_memory_file(workspace_dir)
+        os.makedirs(os.path.dirname(memory_file), exist_ok=True)
+        memory = {"fixes": []}
+        if os.path.exists(memory_file):
+            try:
+                with open(memory_file, "r", encoding="utf-8") as f:
+                    memory = json.load(f)
+            except Exception:
+                pass
+        
+        # Prevent duplicates
+        if not any(f.get("pattern") == pattern for f in memory.get("fixes", [])):
+            memory.setdefault("fixes", []).append({
+                "pattern": pattern,
+                "fixDescription": fix_description,
+                "filePath": file_path,
+                "solutionCode": solution_code,
+                "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
+            })
+            write_json_atomic(memory_file, memory)
+            logger.info(f"Learned new fix for pattern: {pattern}")
+
+def initialize_workspace_wizard(workspace_dir: Optional[str] = None) -> Dict[str, Any]:
+    """Inspects the workspace and configures sclass.config.json automatically."""
+    cwd = workspace_dir if workspace_dir else os.getcwd()
+    _, _, _, config_file = _resolve_paths(workspace_dir)
+    
+    config = {
+        "pipeline": "sclass-v5",
+        "executionMode": "Closed Loop",
+        "loopMode": "closed-loop",
+        "projectType": "unknown",
+        "topology": "hierarchical",
+        "commands": {
+            "devServer": "",
+            "apiServer": "",
+            "test": "",
+            "dbMigration": ""
+        }
+    }
+    
+    # 1. Detect frontend Next.js / package.json
+    frontend_path = os.path.join(cwd, "frontend")
+    if os.path.exists(frontend_path) and os.path.exists(os.path.join(frontend_path, "package.json")):
+        config["projectType"] = "full-stack-web"
+        config["commands"]["devServer"] = "cd frontend && npm run dev"
+        config["commands"]["test"] = "cd frontend && npm test"
+    elif os.path.exists(os.path.join(cwd, "package.json")):
+        config["projectType"] = "node-application"
+        config["commands"]["devServer"] = "npm run dev"
+        config["commands"]["test"] = "npm test"
+        
+    # 2. Detect backend FastAPI / Python
+    backend_path = os.path.join(cwd, "backend")
+    if os.path.exists(backend_path):
+        is_full_stack = config["projectType"] == "full-stack-web"
+        if config["projectType"] == "unknown":
+            config["projectType"] = "python-backend"
+        # Check uvicorn
+        main_py = os.path.join(backend_path, "main.py")
+        app_py = os.path.join(backend_path, "app.py")
+        if os.path.exists(main_py):
+            cmd = "python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
+        elif os.path.exists(app_py):
+            cmd = "python -m uvicorn backend.app:app --host 0.0.0.0 --port 8000 --reload"
+        else:
+            cmd = ""
+            
+        if cmd:
+            if is_full_stack:
+                config["commands"]["apiServer"] = cmd
+            else:
+                config["commands"]["devServer"] = cmd
+            
+        # Check pytest
+        if os.path.exists(os.path.join(cwd, "tests")) or os.path.exists(os.path.join(backend_path, "tests")):
+            config["commands"]["test"] = "python -m pytest"
+            
+        # Check migrations / prisma / alembic
+        if os.path.exists(os.path.join(backend_path, "prisma")):
+            config["commands"]["dbMigration"] = "npx prisma db push"
+        elif os.path.exists(os.path.join(cwd, "alembic.ini")):
+            config["commands"]["dbMigration"] = "alembic upgrade head"
+            
+    # Write config atomically
+    write_json_atomic(config_file, config)
+    logger.info(f"Workspace configuration generated automatically at {config_file}")
+    return config
+
 def initialize_state(workspace_dir: Optional[str] = None) -> None:
     """Initializes a new orchestration_state.json and generates a default sclass.config.json."""
     state_dir, state_file, lock_file, config_file = _resolve_paths(workspace_dir)
@@ -215,18 +329,7 @@ def initialize_state(workspace_dir: Optional[str] = None) -> None:
     
     # Auto-generate workspace config file if it doesn't exist
     if not os.path.exists(config_file):
-        default_config = {
-            "pipeline": "sclass-v5",
-            "executionMode": "Human-in-the-Loop Mode",
-            "loopMode": "closed-loop",
-            "projectType": "web-application",
-            "commands": {
-                "devServer": "npm run dev",
-                "test": "npm test",
-                "dbMigration": ""
-            }
-        }
-        write_json_atomic(config_file, default_config)
+        initialize_workspace_wizard(workspace_dir)
     
     with FileLock(lock_file):
         if os.path.exists(state_file):
