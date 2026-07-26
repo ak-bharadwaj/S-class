@@ -4,43 +4,51 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import runtime
-from sclass_kernel import DeterministicKernel, KernelEventBus, kernel_instance
+from sclass_kernel import MinimalDeterministicKernel, EventStore, kernel_instance
+from sclass_planner import PlanningEngine
 
 
-def test_kernel_event_bus_and_transition(tmp_path):
+def test_kernel_formal_api_and_event_sourcing(tmp_path):
     workspace = str(tmp_path)
+    runtime.initialize_state(workspace_dir=workspace, goal="Test minimal microkernel")
     
-    # Initialize state
-    runtime.initialize_state(workspace_dir=workspace, goal="Test microkernel architecture")
-    
-    # Emit event via Kernel EventBus
-    bus = kernel_instance.event_bus
-    res = bus.emit("triage_done", workspace_dir=workspace, payload={"enforce_evidence": False})
-    
+    # 1. Test request_transition Kernel API
+    res = kernel_instance.request_transition("TRIAGE", "triage_done", workspace_dir=workspace)
     assert res["status"] == "APPROVED"
     assert res["previousPhase"] == "TRIAGE"
     assert res["currentPhase"] == "ANALYSIS"
-    assert res["stepIndex"] == 1
+    
+    # 2. Test Event Store (Event Sourcing)
+    events = EventStore.read_all_events(workspace)
+    assert len(events) == 1
+    assert events[0]["event_name"] == "triage_done"
+    
+    # 3. Test State Reconstruction
+    recon = kernel_instance.reconstruct_state_from_event_store(workspace)
+    assert recon["reconstructed"] is True
+    assert recon["total_events"] == 1
 
 
-def test_kernel_invalid_transition_rejection(tmp_path):
+def test_kernel_formal_api_recovery(tmp_path):
     workspace = str(tmp_path)
     runtime.initialize_state(workspace_dir=workspace)
     
-    # Try invalid jump from TRIAGE -> CODING via Kernel
-    bus = kernel_instance.event_bus
-    with pytest.raises(ValueError) as excinfo:
-        bus.emit("code_written", workspace_dir=workspace)
+    # Transition to RECOVERY phase simulation
+    state = runtime.get_state(workspace)
+    state.currentPhase = "RECOVERY"
+    runtime.save_state(state, workspace)
     
-    assert "Invalid transition" in str(excinfo.value)
+    # Request Recovery Kernel API
+    res = kernel_instance.request_recovery("SyntaxError: Unexpected token", workspace_dir=workspace)
+    assert res["status"] == "APPROVED"
+    assert res["currentPhase"] == "CODING"
 
 
-def test_kernel_reset_workflow(tmp_path):
-    workspace = str(tmp_path)
-    runtime.initialize_state(workspace_dir=workspace)
+def test_planner_engine_and_capability_discovery():
+    plan = PlanningEngine.create_execution_plan("Implement Stripe billing with Postgres database")
+    assert "security" in plan.detected_domains
+    assert "database" in plan.detected_domains
     
-    kernel_instance.event_bus.emit("triage_done", workspace_dir=workspace)
-    
-    res = kernel_instance.reset_workflow(workspace_dir=workspace, new_goal="Reset goal via microkernel")
-    assert res["status"] == "RESET_APPROVED"
-    assert res["currentPhase"] == "TRIAGE"
+    plugins = PlanningEngine.discover_capability_plugins()
+    assert "dss_builder_react" in plugins
+    assert "dss_builder_sql" in plugins

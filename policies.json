@@ -1,0 +1,28 @@
+{
+  "verification_policies": {
+    "ui": {
+      "requires": ["build_check", "screenshot"],
+      "min_strength": 3.0
+    },
+    "frontend": {
+      "requires": ["build_check", "unit_test", "screenshot"],
+      "min_strength": 4.0
+    },
+    "backend": {
+      "requires": ["build_check", "unit_test"],
+      "min_strength": 3.0
+    },
+    "database": {
+      "requires": ["build_check", "unit_test", "migration_check"],
+      "min_strength": 4.0
+    },
+    "auth": {
+      "requires": ["build_check", "unit_test", "security_scan", "integration_test"],
+      "min_strength": 5.0
+    },
+    "security": {
+      "requires": ["build_check", "unit_test", "security_scan"],
+      "min_strength": 5.0
+    }
+  }
+}

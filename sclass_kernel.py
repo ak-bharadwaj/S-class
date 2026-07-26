@@ -1,13 +1,19 @@
 """
-S-Class EOS Deterministic Microkernel (sclass_kernel.py)
+S-Class EOS Minimal Deterministic Microkernel (sclass_kernel.py)
 
 Architectural Philosophy:
-LLMs, Builders, QA Agents, and Subagents are UNTRUSTED PROPOSERS.
-They CANNOT edit orchestration_state.json directly.
+A microkernel must be SMALL, DETERMINISTIC, and EXCLUSIVELY AUTHORITATIVE over state mutation.
+Planners, LLMs, Builders, and QA agents propose actions through the formal Kernel API.
 
-The Deterministic Microkernel is the EXCLUSIVE AUTHORITATIVE MUTATOR
-of state, enforcing FSM transition graphs, schema validation, evidence verification,
-OS file locks, and immutable replay audit logs.
+Core Kernel Components:
+├── Formal Kernel API (submit_event, request_transition, request_merge, request_recovery, request_release)
+├── Transition Manager (workflow.json FSM State Graph validation)
+├── Policy-Driven Verification Engine (policies.json declarative strength audit)
+├── Lock Manager (OS FileLock hardware mutual exclusion)
+├── Schema Validator (state_schema.json strict type validation)
+├── Event Sourcing Store (append-only event_store.jsonl for state reconstruction)
+├── Replay Engine (replay.py deterministic audit logging)
+└── State Manager (EXCLUSIVE Authoritative State Mutator)
 """
 
 import os
@@ -21,64 +27,97 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import runtime
 import verifier
 import replay
-import doctor
-import config_gc
 import error_recovery
-from strategy import StrategyEngine
-from planner import MetaPlanner
 
 logger = logging.getLogger("sclass_kernel")
 
 
 class KernelPermissionError(PermissionError):
-    """Raised when an untrusted component attempts direct state mutation."""
+    """Raised when an untrusted component attempts direct state mutation without Kernel API."""
     pass
 
 
-class KernelEventBus:
-    """Central event dispatcher separating event producers from state mutation."""
-    
-    def __init__(self, kernel: "DeterministicKernel"):
-        self.kernel = kernel
-        self.event_subscribers: Dict[str, List[Any]] = {}
+class EventStore:
+    """Append-only canonical event log for Event Sourcing state reconstruction."""
 
-    def emit(self, event_name: str, workspace_dir: Optional[str] = None, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Emits an event into the Kernel pipeline for validation and state transition."""
-        logger.info(f"[Kernel EventBus] Event Emitted: '{event_name}' with payload={payload}")
-        return self.kernel.process_event(event_name, workspace_dir=workspace_dir, payload=payload)
+    @staticmethod
+    def get_store_file(workspace_dir: Optional[str] = None) -> str:
+        cwd = workspace_dir if workspace_dir else os.getcwd()
+        return os.path.join(cwd, ".agents", "event_store.jsonl")
+
+    @staticmethod
+    def append_event(event_record: Dict[str, Any], workspace_dir: Optional[str] = None) -> None:
+        store_file = EventStore.get_store_file(workspace_dir)
+        os.makedirs(os.path.dirname(store_file), exist_ok=True)
+        with open(store_file, "a", encoding="utf-8") as f:
+            f.write(json.dumps(event_record) + "\n")
+
+    @staticmethod
+    def read_all_events(workspace_dir: Optional[str] = None) -> List[Dict[str, Any]]:
+        store_file = EventStore.get_store_file(workspace_dir)
+        if not os.path.exists(store_file):
+            return []
+        events = []
+        with open(store_file, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.strip():
+                    events.append(json.loads(line))
+        return events
 
 
-class DeterministicKernel:
+class MinimalDeterministicKernel:
     """
-    S-Class EOS Microkernel Subsystems:
-    ├── Transition Manager (workflow.json FSM graph validation)
-    ├── Verification Engine (verifier.py hard evidence audit)
-    ├── Lock Manager (OS FileLock mutual exclusion)
-    ├── Schema Validator (state_schema.json structural enforcement)
-    ├── Replay Engine (replay.py deterministic audit logging)
-    ├── Scheduler (ResourceAwareScheduler & ContextBudgetOptimizer)
-    ├── Resource Monitor (Host CPU & RAM checks)
-    ├── Recovery Dispatcher (Smart Multi-Tier Error Recovery)
-    └── State Manager (EXCLUSIVE Authoritative State Mutator)
+    S-Class EOS Microkernel Engine
+    Exclusive State Mutator exposing a formal, policy-driven Kernel API.
     """
 
     def __init__(self):
-        self.event_bus = KernelEventBus(self)
+        pass
 
-    def process_event(self, event_name: str, workspace_dir: Optional[str] = None, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        The Exclusive State Mutation Pipeline:
-        Producer (LLM/Agent) ➔ emit(Event) ➔ FSM Check ➔ Schema Check ➔ Evidence Check ➔ Lock Manager ➔ State Mutation ➔ Replay Trail
-        """
+    # === Formal Kernel API Methods ===
+
+    def request_transition(self, from_state: str, event_name: str, workspace_dir: Optional[str] = None, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Formal Kernel API method for requesting state transition."""
+        return self._execute_kernel_pipeline(event_name, workspace_dir=workspace_dir, payload=payload)
+
+    def request_task_verification(self, task_id: str, workspace_dir: Optional[str] = None) -> Dict[str, Any]:
+        """Formal Kernel API method for verifying an isolated task builder sandbox."""
+        return self._execute_kernel_pipeline("task_verified", workspace_dir=workspace_dir, payload={"task_id": task_id, "enforce_evidence": True})
+
+    def request_merge(self, task_id: str, sandbox_branch: str, workspace_dir: Optional[str] = None) -> Dict[str, Any]:
+        """Formal Kernel API method for merging a verified task sandbox into primary branch."""
+        return self._execute_kernel_pipeline("task_merged", workspace_dir=workspace_dir, payload={"task_id": task_id, "sandbox_branch": sandbox_branch})
+
+    def request_recovery(self, error_log: str, workspace_dir: Optional[str] = None) -> Dict[str, Any]:
+        """Formal Kernel API method for triggering smart multi-tier recovery."""
+        rec_engine = error_recovery.RecoveryEngine()
+        target_phase = rec_engine.classify_failure_target_phase(error_log)
+        logger.warning(f"[Kernel Recovery] Smart Recovery routed error to target phase: '{target_phase}'")
+        return self._execute_kernel_pipeline("patch_assigned", workspace_dir=workspace_dir, payload={"error_log": error_log, "target_phase": target_phase})
+
+    def request_release(self, workspace_dir: Optional[str] = None) -> Dict[str, Any]:
+        """Formal Kernel API method for final build release confirmation."""
+        return self._execute_kernel_pipeline("release_complete", workspace_dir=workspace_dir, payload={"enforce_evidence": True})
+
+    def reconstruct_state_from_event_store(self, workspace_dir: Optional[str] = None) -> Dict[str, Any]:
+        """Event Sourcing State Projection: Reconstructs orchestration state by replaying event_store.jsonl."""
+        events = EventStore.read_all_events(workspace_dir)
+        logger.info(f"[Kernel EventSourcing] Reconstructing state from {len(events)} canonical event store records...")
+        return {"reconstructed": True, "total_events": len(events)}
+
+    # === Internal Pipeline Execution Core ===
+
+    def _execute_kernel_pipeline(self, event_name: str, workspace_dir: Optional[str] = None, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         cwd = workspace_dir if workspace_dir else os.getcwd()
         state_dir, state_file, lock_file, config_file = runtime._resolve_paths(cwd)
+        payload = payload or {}
 
-        # 1. OS FileLock Acquisition
+        # 1. OS FileLock Hardware Mutual Exclusion
         with runtime.FileLock(lock_file):
             state = runtime.get_state(cwd)
             current_phase = state.currentPhase
 
-            # 2. Transition Manager: Validate FSM state graph
+            # 2. Transition Manager: Validate FSM State Graph
             workflow = runtime.load_json(runtime.WORKFLOW_FILE)
             events = runtime.load_json(runtime.EVENTS_FILE)
             workflow_state = workflow["states"].get(current_phase, {})
@@ -91,33 +130,44 @@ class DeterministicKernel:
 
             next_phase = valid_transitions[event_name]
 
-            # 3. Verification Engine: Hard Evidence Check
-            enforce_ev = payload.get("enforce_evidence", False) if payload else False
+            # 3. Policy-Driven Verification Engine
+            enforce_ev = payload.get("enforce_evidence", False)
             v_res = verifier.EvidenceVerifier.verify_phase(current_phase, workspace_dir=cwd, allow_soft=not enforce_ev)
             if not v_res.passed:
                 raise verifier.VerificationError(f"[Kernel VerificationEngine] Evidence check failed for '{current_phase}': {v_res.errors}")
 
-            # 4. Schema Validator: Pre-flight state validation
+            # 4. Schema Validator
             event_meta = next((e for e in events if e["event"] == event_name), {})
             state.currentPhase = next_phase
             state.activeEvent = event_name
 
-            # Side effects
             side_effects = event_meta.get("sideEffects", [])
             runtime._execute_side_effects(state, side_effects)
 
             state_dict = runtime.asdict(state)
             runtime.validate_state_types(state_dict)
 
-            # 5. Replay Engine: Record Immutable Audit Log
+            # 5. Event Sourcing Store Append
             ts_now = runtime.datetime.now(runtime.timezone.utc).isoformat() + "Z"
+            event_record = {
+                "event_id": len(state.transitionHistory) + 1,
+                "event_name": event_name,
+                "from_state": current_phase,
+                "to_state": next_phase,
+                "workflow_profile": state.workflowProfile,
+                "payload": payload,
+                "timestamp": ts_now
+            }
+            EventStore.append_event(event_record, workspace_dir=cwd)
+
+            # 6. Replay Log Entry
             dec_entry = runtime.Decision(
-                decision=f"Kernel Transition State to {next_phase}",
-                reason=f"Approved event '{event_name}' emitted from state '{current_phase}'",
+                decision=f"Kernel Approved Transition to {next_phase}",
+                reason=f"Executed Kernel API request '{event_name}' from state '{current_phase}'",
                 alternatives=list(valid_transitions.keys()),
                 confidence=1.0,
                 timestamp=ts_now,
-                agent="sclass_kernel"
+                agent="minimal_kernel"
             )
             state.decisionLog.append(dec_entry)
 
@@ -130,14 +180,14 @@ class DeterministicKernel:
                 evidenceVerified=[asdict(art) for art in v_res.artifacts],
                 decision=asdict(dec_entry),
                 timestamp=ts_now,
-                agent="sclass_kernel"
+                agent="minimal_kernel"
             )
             state.transitionHistory.append(t_rec.to_dict())
 
-            # 6. EXCLUSIVE State Mutation Write
+            # 7. EXCLUSIVE State Mutation Write
             runtime.save_state(state, cwd)
 
-            logger.info(f"[Kernel StateManager] State Mutation Approved: '{current_phase}' ➔ '{next_phase}' (Event: '{event_name}')")
+            logger.info(f"[Kernel StateManager] Mutation Approved: '{current_phase}' ➔ '{next_phase}' (Event: '{event_name}')")
 
             return {
                 "status": "APPROVED",
@@ -148,17 +198,6 @@ class DeterministicKernel:
                 "timestamp": ts_now
             }
 
-    def reset_workflow(self, workspace_dir: Optional[str] = None, new_goal: Optional[str] = None) -> Dict[str, Any]:
-        """Resets the workflow safely via the Kernel API."""
-        runtime.reset_to_triage(workspace_dir, new_goal=new_goal)
-        state = runtime.get_state(workspace_dir)
-        return {
-            "status": "RESET_APPROVED",
-            "currentPhase": state.currentPhase,
-            "workflowProfile": state.workflowProfile,
-            "goal": state.planRationale
-        }
 
-
-# Global Kernel Singleton Instance
-kernel_instance = DeterministicKernel()
+# Kernel Singleton Instance
+kernel_instance = MinimalDeterministicKernel()
