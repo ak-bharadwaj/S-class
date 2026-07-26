@@ -20,9 +20,12 @@ CRITICAL DIRECTIVE: Once this plugin is active, you (the main Antigravity agent)
 *   During test runs, you MUST inspect the console stdout/stderr.
 *   If ANY `DeprecationWarning` (including `datetime.utcnow()` deprecation), package warning, or console warning is printed, you MUST mark the state as `qa_failed` or `release_hold` and patch the warnings first. Do not ignore warning lists!
 
-## 4. Mandatory Peer Cross-Examination & Compound Error Correction
-*   **Active Peer Critique:** Subagents running in parallel MUST use `send_message` to cross-examine each other's outputs, designs, and code proposals.
-*   **Error Detection & Patching:** Subagents are forbidden from blindly approving peer outputs. Each agent must actively search for bugs, missing edge cases, security flaws, and type errors in its peers' work.
-*   **Compound Final Output:** If an agent detects a flaw in a peer's proposal, the peer MUST correct the mistake before consensus is reached. The final output delivered at phase completion MUST be a **Compound Verified Solution** integrating all corrections.
-*   **Strict Consensus Gate:** In `DEBATE`, `spec_approved` is forbidden unless the weighted consensus score is >= 0.80. If any peer flags an uncorrected defect, the state must be marked as `debate_failed`.
+## 5. Zero-Defect Design & Mandatory Proxy User Verification
+*   **Zero-Defect Design Gate (`DESIGN` & `DEBATE`):** Design blueprints must have zero unverified assumptions. `dss_architect_v2`, `dss_governor`, and `dss_cso_v2` MUST audit DB column types, API route signatures, authentication bounds, and edge cases. If even 1 ambiguity or flaw is found, code generation is forbidden until resolved.
+*   **Mandatory Proxy User Verification (`dss_user_alias_v2`):** During `DEBATE` and `QA`, `dss_user_alias_v2` (Proxy User) acts as a strict user advocate. It MUST verify:
+    1. 100% compliance with acceptance criteria in `IntentContract`.
+    2. Real-world user UX workflows, responsiveness, and accessibility.
+    3. Absence of confusing UI states, broken links, or misleading copy.
+*   **100% QA Verification (`QA` Phase):** `dss_qa_v2` and `dss_user_alias_v2` MUST verify all functional paths, API responses, Playwright tests, and Chrome MCP visual screenshots. Veto release if ANY defect, visual overlap, or console warning remains.
+
 
