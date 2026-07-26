@@ -20,7 +20,9 @@ CRITICAL DIRECTIVE: Once this plugin is active, you (the main Antigravity agent)
 *   During test runs, you MUST inspect the console stdout/stderr.
 *   If ANY `DeprecationWarning` (including `datetime.utcnow()` deprecation), package warning, or console warning is printed, you MUST mark the state as `qa_failed` or `release_hold` and patch the warnings first. Do not ignore warning lists!
 
-## 3. Mandatory Live UI & API Verification
-*   If the project has a backend API, you MUST launch the local server in the background and execute live HTTP requests (e.g., via `curl` or python fetch) to check routing.
-*   If the project has a frontend UI, you MUST launch the dev server, run Playwright/browser tools, capture E2E screenshots, and save them in `.agents/qa_screenshots/`.
-*   You MUST visually inspect the screenshots for layout overflows, **text overlapping**, or **invisible/low-contrast text**. Veto the release if any visual defect is found.
+## 4. Mandatory Peer Cross-Examination & Compound Error Correction
+*   **Active Peer Critique:** Subagents running in parallel MUST use `send_message` to cross-examine each other's outputs, designs, and code proposals.
+*   **Error Detection & Patching:** Subagents are forbidden from blindly approving peer outputs. Each agent must actively search for bugs, missing edge cases, security flaws, and type errors in its peers' work.
+*   **Compound Final Output:** If an agent detects a flaw in a peer's proposal, the peer MUST correct the mistake before consensus is reached. The final output delivered at phase completion MUST be a **Compound Verified Solution** integrating all corrections.
+*   **Strict Consensus Gate:** In `DEBATE`, `spec_approved` is forbidden unless the weighted consensus score is >= 0.80. If any peer flags an uncorrected defect, the state must be marked as `debate_failed`.
+
