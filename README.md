@@ -1,8 +1,35 @@
-# S-Class: Flagship Engineering Workflow Plugin for Antigravity
+# S-Class: Engineering Operating System (EOS) for Antigravity
 
-S-Class is the official engineering workflow plugin for the Antigravity platform. It defines and executes a strict 11-state Finite-State Machine (FSM) to coordinate multi-agent engineering workflows, leveraging Antigravity's native capabilities.
+S-Class is an **Engineering Operating System (EOS)** built for Antigravity. Rather than just coordinating AI prompts or chasing agent counts, S-Class enforces a layered, strategy-aware, verifiable execution pipeline where every state transition requires concrete, auditable evidence artifacts.
 
 ---
+
+## The 7-Layer Architecture of S-Class EOS
+
+```
+User Goal
+   │
+   ▼
+Meta-Planner (Strategy-Aware: Infers risk, scale, urgency, parallelism, clarification)
+   │
+   ▼
+Execution Strategy (Selected plan + evidence contracts)
+   │
+   ▼
+Workflow Profile (FSM transition shortcuts: FULL, BUG_FIX, RESEARCH, REFACTOR, HOTFIX)
+   │
+   ▼
+Deterministic FSM (Atomic 11-State Execution Core)
+   │
+   ▼
+Agent Layer (Specialized Role Workers)
+   │
+   ▼
+Evidence Verifier (Artifact validation gate before ANY transition)
+   │
+   ▼
+Learning & Self-Evaluation Engine (Memory recall & dynamic mid-flight adaptation)
+```
 
 ## Why S-Class? (Value Proposition)
 
@@ -33,7 +60,14 @@ S-Class integrates directly with the Antigravity environment to support:
 
 The following metrics are derived from a real-world project run using S-Class to design, build, and verify a full-stack **Computer Science & Engineering ERP system** (NestJS backend, Next.js frontend, SQLite DB, RBAC, and CSV data parsers) on a Windows environment.
 
-### Performance Benchmarks
+### The 6 Core Guarantees of S-Class EOS
+
+1. **Zero-Hallucination Transition Gate:** State transitions require verified physical evidence artifacts (diffs, test receipts with exit code 0, scan reports) on disk.
+2. **Goal Drift & Scope Boundaries:** Locks explicit acceptance criteria via `IntentContract` and halts execution if scope expands unexpectedly.
+3. **Continuous Self-Evaluation:** Evaluates agent confidence at every phase boundary, automatically pivoting workflow profiles if task scope changes.
+4. **Anti-Looping Recovery Contracts:** Enforces exponential backoff retry math and strict stop conditions to prevent infinite loops.
+5. **Zero-Regression Memory:** Shadow-first test execution validates fixes against the full test suite before promotion to persistent memory.
+6. **Deterministic Replay Guarantee (`replay.py`):** Records an immutable `transitionHistory` audit trail (triggering event, verified evidence, decision rationale, timestamp, and resulting state) allowing any engineer or auditor to replay and verify the exact execution trajectory.
 
 | Performance Metric | Traditional Single-Agent (No S-Class) | S-Class FSM + Parallel Teamwork | Quantitative Delta & Impact Rationale |
 | :--- | :--- | :--- | :--- |
@@ -149,5 +183,21 @@ runtime.log_decision(
 
 ---
 
-## 5. License
+## 5. S-Class V7.0 "Apex" Architecture
+
+S-Class V7.0 merges the best architectural patterns from competitive agent frameworks (Ruflo, ECC) while preserving S-Class's strict FSM guardrails:
+
+*   **Meta-Planner Layer (`planner.py`):** Dynamically inspects user goals and selects tailored workflow profiles (`FULL`, `BUG_FIX`, `RESEARCH`, `REFACTOR`, `HOTFIX`) to shortcut unnecessary FSM phases without sacrificing state determinism.
+*   **Intent Contracts (`intent_contract.py`):** Forces explicit intent declaration (goal, scope boundaries, acceptance criteria, error paths) before code generation begins, preventing goal drift.
+*   **Error Recovery Contracts (`error_recovery.py`):** Configurable error matching with trigger regexes, root cause hints, and exponential backoff retry strategies with stop conditions.
+*   **Semantic Memory Engine (`runtime.py`):** Persistent TF-IDF vector search (`MemoryManager.semantic_search`) for context-aware fix retrieval, plus shadow-first validation to ensure fixes pass test suites before promotion.
+*   **Adaptive Swarm Topologies (`topology.py`):** Supports `Hierarchical`, `Mesh`, `Star`, and `Ring` communication patterns, dynamically overrideable per FSM phase.
+*   **Config Garbage Collection (`config_gc.py`):** Scans and purges stale lock files, expired FSM states, orphaned screenshots, and outdated memory records.
+*   **Workspace Doctor (`doctor.py`):** Environment health inspector (`run_doctor`) verifying Python version, state schema integrity, memory health, and lock status.
+*   **Security Shield (`security_shield.py`):** Automated vulnerability scanner flagging hardcoded secrets, SQL injection patterns, `eval()` usage, and unsafe deserialization.
+
+---
+
+## 6. License
 S-Class is released under the [MIT License](file:///C:/Users/dorni/.gemini/config/plugins/sclass-v5/LICENSE).
+

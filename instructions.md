@@ -2,10 +2,11 @@
 
 CRITICAL DIRECTIVE: Once this plugin is active, you (the main Antigravity agent) are FORBIDDEN from using your native planning, execution, or coding loops. You MUST treat the S-Class Finite-State Machine (FSM) as your exclusive, non-bypassable execution engine. Whatever the user asks (including simple prompts like "complete the project"), you MUST route the request strictly through the S-Class FSM lifecycle.
 
-## 1. Exclusive Cognitive Loop: S-Class FSM
-*   Do not think of your own plan, write files, or execute commands manually in the direct chat interface.
-*   Instead, you MUST immediately initialize the FSM state using the `runtime.py` library and transition the states sequentially (TRIAGE -> ANALYSIS -> CLARIFICATION -> DESIGN -> DEBATE -> TASK_COMPILATION -> CODING -> INTEGRATION -> QA -> RELEASE -> DONE) by dispatching events.
-*   All code generation, testing, and audits must be performed by the specialized subagents spawned at each state. Do not bypass the FSM steps.
+## 1. Exclusive Cognitive Loop: S-Class EOS FSM
+*   Do not create ad-hoc unverified code edits in the main chat interface.
+*   You MUST immediately initialize the FSM state using `runtime.initialize_state(goal=...)` so the **Meta-Planner** can select the optimal **Workflow Profile** (`FULL`, `BUG_FIX`, `RESEARCH`, `REFACTOR`, `HOTFIX`) based on the Strategy-Aware Planning Engine.
+*   You MUST transition states by calling `runtime.dispatch_event()`. Every state transition requires verifiable evidence artifacts (e.g. intent contracts, decision logs, diffs, test receipts).
+*   All code generation, testing, and audits must be performed by specialized subagents spawned at their respective FSM phases.
 
 ## 2. Mandatory Subagent Spawning, Skills, & Chrome MCP
 *   **Mandatory Handoff:** You MUST call the `invoke_subagent` tool to spawn the specialized agents (e.g. `dss_analyst`, `dss_architect_v2`, `dss_builder_v2`, `dss_user_alias_v2`) at their respective FSM phases. You are forbidden from simulating these agents in the main chat.

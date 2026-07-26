@@ -14,6 +14,12 @@
     "activeEvent": {
       "type": ["string", "null"]
     },
+    "workflowProfile": {
+      "type": "string"
+    },
+    "planRationale": {
+      "type": "string"
+    },
     "currentSpecVersion": {
       "type": "integer",
       "minimum": 1
@@ -103,6 +109,24 @@
           "agent": { "type": "string" }
         },
         "required": ["decision", "reason", "alternatives", "confidence", "timestamp", "agent"]
+      }
+    },
+    "transitionHistory": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "stepIndex": { "type": "integer" },
+          "fromState": { "type": "string" },
+          "toState": { "type": "string" },
+          "eventFired": { "type": "string" },
+          "workflowProfile": { "type": "string" },
+          "evidenceVerified": { "type": "array" },
+          "decision": { "type": "object" },
+          "timestamp": { "type": "string" },
+          "agent": { "type": "string" }
+        },
+        "required": ["stepIndex", "fromState", "toState", "eventFired", "workflowProfile", "timestamp"]
       }
     }
   },

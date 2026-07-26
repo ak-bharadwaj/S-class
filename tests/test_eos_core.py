@@ -1,0 +1,73 @@
+import os
+import sys
+import pytest
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from strategy import StrategyEngine, RiskLevel, Urgency, ProjectScale
+from verifier import EvidenceVerifier, VerificationError
+from evaluation import SelfEvaluator, EvaluationAction
+import runtime
+
+
+def test_strategy_engine_hotfix():
+    strat = StrategyEngine.infer_strategy("Emergency hotfix for auth crash")
+    assert strat.urgency == Urgency.EMERGENCY
+    assert strat.recommended_profile.value == "hotfix"
+    assert strat.risk_level in [RiskLevel.HIGH, RiskLevel.CRITICAL]
+
+
+def test_strategy_engine_bug_fix():
+    strat = StrategyEngine.infer_strategy("Fix typo in error message")
+    assert strat.urgency == Urgency.LOW
+    assert strat.recommended_profile.value == "bug_fix"
+
+
+def test_strategy_engine_research():
+    strat = StrategyEngine.infer_strategy("Audit and research database schema")
+    assert strat.recommended_profile.value == "research"
+
+
+def test_strategy_engine_project_scale():
+    strat = StrategyEngine.infer_strategy("Build feature", codebase_meta={"file_count": 150})
+    assert strat.project_scale == ProjectScale.LARGE
+    assert strat.parallelism_worthwhile is True
+
+
+def test_evidence_verifier_triage(tmp_path):
+    workspace = str(tmp_path)
+    
+    # Before init -> verification fails if allow_soft is False
+    res = EvidenceVerifier.verify_phase("TRIAGE", workspace_dir=workspace, allow_soft=False)
+    assert res.passed is False
+    assert len(res.errors) > 0
+    
+    # After init -> verification passes
+    runtime.initialize_state(workspace_dir=workspace)
+    res = EvidenceVerifier.verify_phase("TRIAGE", workspace_dir=workspace, allow_soft=False)
+    assert res.passed is True
+
+
+def test_self_evaluator_proceed():
+    eval_res = SelfEvaluator.evaluate_phase("CODING", confidence_score=0.95)
+    assert eval_res.action == EvaluationAction.PROCEED
+
+
+def test_self_evaluator_low_confidence():
+    eval_res = SelfEvaluator.evaluate_phase("DESIGN", confidence_score=0.3)
+    assert eval_res.action == EvaluationAction.CLARIFY
+    assert "clarification" in eval_res.reason.lower()
+
+
+def test_self_evaluator_retry_exhausted():
+    eval_res = SelfEvaluator.evaluate_phase("QA", retry_count=3, max_retries=3)
+    assert eval_res.action == EvaluationAction.RECOVER
+
+
+def test_self_evaluator_profile_pivot():
+    eval_res = SelfEvaluator.evaluate_phase(
+        "ANALYSIS",
+        goal_text="Bug fix that turned into a major refactor and rewrite of auth",
+        current_profile="bug_fix"
+    )
+    assert eval_res.action == EvaluationAction.PIVOT_PROFILE
+    assert eval_res.suggested_profile == "full"

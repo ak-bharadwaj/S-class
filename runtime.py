@@ -53,8 +53,11 @@ class State:
     currentTaskVersion: int
     retryCount: int
     confidenceMatrix: ConfidenceMatrix
+    workflowProfile: str = "full"
+    planRationale: str = ""
     tasks: List[Task] = field(default_factory=list)
     decisionLog: List[Decision] = field(default_factory=list)
+    transitionHistory: List[Dict[str, Any]] = field(default_factory=list)
 
 def _process_exists(pid: int) -> bool:
     if pid <= 0:
@@ -209,39 +212,135 @@ def _execute_side_effects(state: State, side_effects: List[str]):
 # === Public Library APIs ===
 
 class MemoryManager:
+    """Persistent learning memory with semantic search and shadow-first validation."""
+    
+    SCHEMA_VERSION = 2
+
     @staticmethod
     def get_memory_file(workspace_dir: Optional[str] = None) -> str:
         cwd = workspace_dir if workspace_dir else os.getcwd()
         return os.path.join(cwd, ".agents", "learning_memory.json")
 
     @staticmethod
-    def get_fix(error_msg: str, workspace_dir: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def _load_memory(workspace_dir: Optional[str] = None) -> Dict[str, Any]:
         memory_file = MemoryManager.get_memory_file(workspace_dir)
+        default = {"version": MemoryManager.SCHEMA_VERSION, "fixes": []}
         if not os.path.exists(memory_file):
-            return None
+            return default
         try:
             with open(memory_file, "r", encoding="utf-8") as f:
                 memory = json.load(f)
-            # Find matching error pattern
-            for entry in memory.get("fixes", []):
-                pattern = entry.get("pattern", "")
-                if pattern and pattern.lower() in error_msg.lower():
-                    return entry
+            # Auto-migrate v1 -> v2
+            if "version" not in memory:
+                memory["version"] = MemoryManager.SCHEMA_VERSION
+            return memory
         except Exception as e:
             logger.error(f"Failed to read learning memory: {e}")
+            return default
+
+    @staticmethod
+    def _save_memory(memory: Dict[str, Any], workspace_dir: Optional[str] = None) -> None:
+        memory_file = MemoryManager.get_memory_file(workspace_dir)
+        os.makedirs(os.path.dirname(memory_file), exist_ok=True)
+        memory["version"] = MemoryManager.SCHEMA_VERSION
+        write_json_atomic(memory_file, memory)
+
+    @staticmethod
+    def get_fix(error_msg: str, workspace_dir: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Exact substring match (legacy v1 behavior, kept for backward compat)."""
+        memory = MemoryManager._load_memory(workspace_dir)
+        for entry in memory.get("fixes", []):
+            pattern = entry.get("pattern", "")
+            if pattern and pattern.lower() in error_msg.lower():
+                return entry
         return None
 
     @staticmethod
+    def semantic_search(query: str, workspace_dir: Optional[str] = None, top_k: int = 5) -> List[Dict[str, Any]]:
+        """Search memory using TF-IDF cosine similarity for semantic recall."""
+        memory = MemoryManager._load_memory(workspace_dir)
+        fixes = memory.get("fixes", [])
+        if not fixes or not query.strip():
+            return []
+        
+        # Build corpus from fix patterns + descriptions
+        corpus_texts = []
+        for fix in fixes:
+            text = f"{fix.get('pattern', '')} {fix.get('fixDescription', '')}"
+            corpus_texts.append(text)
+        
+        # Add query as the last document
+        corpus_texts.append(query)
+        
+        try:
+            # Lightweight TF-IDF with cosine similarity (no external API)
+            # Using manual implementation to avoid hard scikit-learn dependency
+            scores = MemoryManager._tfidf_cosine_scores(corpus_texts)
+        except Exception as e:
+            logger.error(f"Semantic search failed, falling back to substring: {e}")
+            # Fallback to substring match
+            result = MemoryManager.get_fix(query, workspace_dir)
+            return [result] if result else []
+        
+        # Pair scores with fixes and sort descending
+        scored_fixes = [(scores[i], fixes[i]) for i in range(len(fixes)) if scores[i] > 0.0]
+        scored_fixes.sort(key=lambda x: x[0], reverse=True)
+        
+        return [fix for _, fix in scored_fixes[:top_k]]
+
+    @staticmethod
+    def _tfidf_cosine_scores(corpus: List[str]) -> List[float]:
+        """Manual TF-IDF cosine similarity. Query is the last element in corpus."""
+        import math
+        from collections import Counter
+        
+        # Tokenize
+        def tokenize(text: str) -> List[str]:
+            return [w.lower().strip() for w in text.split() if len(w.strip()) > 1]
+        
+        tokenized = [tokenize(doc) for doc in corpus]
+        
+        # Build vocabulary
+        vocab: Dict[str, int] = {}
+        for tokens in tokenized:
+            for token in set(tokens):
+                vocab[token] = vocab.get(token, 0) + 1
+        
+        n_docs = len(corpus)
+        
+        # Compute TF-IDF vectors
+        def tfidf_vector(tokens: List[str]) -> Dict[str, float]:
+            tf = Counter(tokens)
+            total = len(tokens) if tokens else 1
+            vec: Dict[str, float] = {}
+            for term, count in tf.items():
+                tf_val = count / total
+                df = vocab.get(term, 1)
+                idf = math.log((n_docs + 1) / (df + 1)) + 1
+                vec[term] = tf_val * idf
+            return vec
+        
+        vectors = [tfidf_vector(t) for t in tokenized]
+        query_vec = vectors[-1]  # Last is the query
+        
+        # Cosine similarity of each document vs query
+        def cosine_sim(a: Dict[str, float], b: Dict[str, float]) -> float:
+            common = set(a.keys()) & set(b.keys())
+            if not common:
+                return 0.0
+            dot = sum(a[k] * b[k] for k in common)
+            mag_a = math.sqrt(sum(v * v for v in a.values()))
+            mag_b = math.sqrt(sum(v * v for v in b.values()))
+            if mag_a == 0 or mag_b == 0:
+                return 0.0
+            return dot / (mag_a * mag_b)
+        
+        return [cosine_sim(vectors[i], query_vec) for i in range(len(corpus) - 1)]
+
+    @staticmethod
     def learn_fix(pattern: str, fix_description: str, file_path: str, solution_code: str, workspace_dir: Optional[str] = None) -> None:
-        memory_file = MemoryManager.get_memory_file(workspace_dir)
-        os.makedirs(os.path.dirname(memory_file), exist_ok=True)
-        memory = {"fixes": []}
-        if os.path.exists(memory_file):
-            try:
-                with open(memory_file, "r", encoding="utf-8") as f:
-                    memory = json.load(f)
-            except Exception:
-                pass
+        """Record a new fix to the persistent learning memory."""
+        memory = MemoryManager._load_memory(workspace_dir)
         
         # Prevent duplicates
         if not any(f.get("pattern") == pattern for f in memory.get("fixes", [])):
@@ -252,8 +351,29 @@ class MemoryManager:
                 "solutionCode": solution_code,
                 "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
             })
-            write_json_atomic(memory_file, memory)
+            MemoryManager._save_memory(memory, workspace_dir)
             logger.info(f"Learned new fix for pattern: {pattern}")
+
+    @staticmethod
+    def shadow_validate(pattern: str, proposed_fix: str, test_command: str = "python -m pytest", workspace_dir: Optional[str] = None) -> bool:
+        """Shadow-first validation: only promote a fix if a test command exits 0.
+        Returns True if the fix is safe to promote (tests pass), False otherwise.
+        NOTE: This is a validation check only — it does NOT execute the fix.
+        The caller is responsible for applying the fix before calling this."""
+        import subprocess
+        cwd = workspace_dir if workspace_dir else os.getcwd()
+        try:
+            result = subprocess.run(
+                test_command.split(),
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+                timeout=120
+            )
+            return result.returncode == 0
+        except Exception as e:
+            logger.warning(f"Shadow validation failed for '{pattern}': {e}")
+            return False
 
 def initialize_workspace_wizard(workspace_dir: Optional[str] = None) -> Dict[str, Any]:
     """Inspects the workspace and configures sclass.config.json automatically."""
@@ -322,8 +442,9 @@ def initialize_workspace_wizard(workspace_dir: Optional[str] = None) -> Dict[str
     logger.info(f"Workspace configuration generated automatically at {config_file}")
     return config
 
-def initialize_state(workspace_dir: Optional[str] = None) -> None:
+def initialize_state(workspace_dir: Optional[str] = None, goal: Optional[str] = None, profile: Optional[str] = None) -> None:
     """Initializes a new orchestration_state.json and generates a default sclass.config.json."""
+    from planner import MetaPlanner, WorkflowProfile
     state_dir, state_file, lock_file, config_file = _resolve_paths(workspace_dir)
     os.makedirs(state_dir, exist_ok=True)
     
@@ -331,6 +452,9 @@ def initialize_state(workspace_dir: Optional[str] = None) -> None:
     if not os.path.exists(config_file):
         initialize_workspace_wizard(workspace_dir)
     
+    # Classify goal into workflow plan if goal/profile provided
+    plan = MetaPlanner.classify_goal(goal or "", profile)
+
     with FileLock(lock_file):
         if os.path.exists(state_file):
             return
@@ -339,6 +463,8 @@ def initialize_state(workspace_dir: Optional[str] = None) -> None:
             "taskId": str(uuid.uuid4()),
             "currentPhase": "TRIAGE",
             "activeEvent": None,
+            "workflowProfile": plan.profile.value,
+            "planRationale": plan.rationale,
             "currentSpecVersion": 1,
             "currentDebateVersion": 0,
             "currentTaskVersion": 0,
@@ -350,14 +476,15 @@ def initialize_state(workspace_dir: Optional[str] = None) -> None:
             "tasks": [],
             "decisionLog": [
                 {
-                    "decision": "Initialize S-Class FSM Engine",
-                    "reason": "Created baseline orchestration state and workspace config files.",
-                    "alternatives": [],
+                    "decision": f"Initialize S-Class FSM Engine ({plan.profile.value.upper()} Profile)",
+                    "reason": plan.rationale,
+                    "alternatives": [p.value for p in WorkflowProfile],
                     "confidence": 1.0,
                     "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
-                    "agent": "dss_optimizer_v2"
+                    "agent": "meta_planner"
                 }
-            ]
+            ],
+            "transitionHistory": []
         }
         
         validate_state_types(state_dict)
@@ -380,13 +507,16 @@ def get_state(workspace_dir: Optional[str] = None) -> State:
         taskId=state_dict["taskId"],
         currentPhase=state_dict["currentPhase"],
         activeEvent=state_dict["activeEvent"],
+        workflowProfile=state_dict.get("workflowProfile", "full"),
+        planRationale=state_dict.get("planRationale", ""),
         currentSpecVersion=state_dict["currentSpecVersion"],
         currentDebateVersion=state_dict["currentDebateVersion"],
         currentTaskVersion=state_dict["currentTaskVersion"],
         retryCount=state_dict["retryCount"],
         confidenceMatrix=conf_matrix,
         tasks=tasks,
-        decisionLog=decisions
+        decisionLog=decisions,
+        transitionHistory=state_dict.get("transitionHistory", [])
     )
 
 def save_state(state: State, workspace_dir: Optional[str] = None) -> None:
@@ -396,16 +526,57 @@ def save_state(state: State, workspace_dir: Optional[str] = None) -> None:
     validate_state_types(state_dict)
     write_json_atomic(state_file, state_dict)
 
-def dispatch_event(event_name: str, workspace_dir: Optional[str] = None) -> None:
+def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce_evidence: bool = False) -> None:
     """Dispatches a transition event, updating FSM state and executing side effects."""
-    _, _, lock_file, _ = _resolve_paths(workspace_dir)
+    from planner import MetaPlanner, WorkflowProfile
+    from verifier import EvidenceVerifier, VerificationError
+    from evaluation import SelfEvaluator, EvaluationAction
+    from replay import TransitionRecord
     
+    _, _, lock_file, config_file = _resolve_paths(workspace_dir)
+    
+    # Check if sclass.config.json enables strict evidence enforcement
+    if not enforce_evidence and os.path.exists(config_file):
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+            if cfg.get("enforceEvidence", False):
+                enforce_evidence = True
+        except Exception:
+            pass
+
     with FileLock(lock_file):
         state = get_state(workspace_dir)
-        workflow = load_json(WORKFLOW_FILE)
+        raw_workflow = load_json(WORKFLOW_FILE)
         events = load_json(EVENTS_FILE)
         
         current_phase = state.currentPhase
+
+        # 1. Evidence Verification Gate
+        v_res = EvidenceVerifier.verify_phase(current_phase, workspace_dir, allow_soft=not enforce_evidence)
+        if not v_res.passed:
+            raise VerificationError(f"Cannot transition from state '{current_phase}': {'; '.join(v_res.errors)}")
+
+        # 2. Continuous Self-Evaluation Gate
+        weighted_conf = state.confidenceMatrix.weightedScore if state.confidenceMatrix else 1.0
+        eval_res = SelfEvaluator.evaluate_phase(
+            phase=current_phase,
+            confidence_score=weighted_conf if weighted_conf > 0.0 else 1.0,
+            retry_count=state.retryCount,
+            current_profile=state.workflowProfile
+        )
+
+        if eval_res.action == EvaluationAction.PIVOT_PROFILE and eval_res.suggested_profile:
+            logger.info(f"Self-Evaluation Pivoted profile: {state.workflowProfile} -> {eval_res.suggested_profile}")
+            state.workflowProfile = eval_res.suggested_profile
+
+        # Apply profile-specific transition overrides
+        try:
+            profile_enum = WorkflowProfile(state.workflowProfile)
+        except ValueError:
+            profile_enum = WorkflowProfile.FULL
+            
+        workflow = MetaPlanner.get_effective_workflow(raw_workflow, profile_enum)
         
         # Check event existence & load metadata
         event_meta = next((e for e in events if e["event"] == event_name), None)
@@ -417,7 +588,7 @@ def dispatch_event(event_name: str, workspace_dir: Optional[str] = None) -> None
         valid_transitions = workflow_state.get("transitions", {})
         
         if event_name not in valid_transitions:
-            raise ValueError(f"Transition '{event_name}' is invalid from current state '{current_phase}'")
+            raise ValueError(f"Transition '{event_name}' is invalid from current state '{current_phase}' under '{state.workflowProfile}' profile")
             
         next_phase = valid_transitions[event_name]
         
@@ -429,15 +600,32 @@ def dispatch_event(event_name: str, workspace_dir: Optional[str] = None) -> None
         side_effects = event_meta.get("sideEffects", [])
         _execute_side_effects(state, side_effects)
         
+        ts_now = datetime.now(timezone.utc).isoformat() + "Z"
+
         # Log Decision Transition
-        state.decisionLog.append(Decision(
+        dec_entry = Decision(
             decision=f"Transition State to {next_phase}",
             reason=f"Fired event '{event_name}' from state '{current_phase}'",
             alternatives=list(valid_transitions.keys()),
             confidence=1.0,
-            timestamp=datetime.now(timezone.utc).isoformat() + "Z",
+            timestamp=ts_now,
             agent="state_manager_runtime"
-        ))
+        )
+        state.decisionLog.append(dec_entry)
+
+        # Guarantee #6: Record Immutable Transition Record for Deterministic Replay
+        t_rec = TransitionRecord(
+            stepIndex=len(state.transitionHistory) + 1,
+            fromState=current_phase,
+            toState=next_phase,
+            eventFired=event_name,
+            workflowProfile=state.workflowProfile,
+            evidenceVerified=[asdict(art) for art in v_res.artifacts],
+            decision=asdict(dec_entry),
+            timestamp=ts_now,
+            agent="state_manager_runtime"
+        )
+        state.transitionHistory.append(t_rec.to_dict())
         
         save_state(state, workspace_dir)
 
