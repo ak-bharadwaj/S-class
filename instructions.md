@@ -8,10 +8,13 @@ CRITICAL DIRECTIVE: Once this plugin is active, you (the main Antigravity agent)
 *   You MUST transition states by calling `runtime.dispatch_event()`. Every state transition requires verifiable evidence artifacts (e.g. intent contracts, decision logs, diffs, test receipts).
 *   All code generation, testing, and audits must be performed by specialized subagents spawned at their respective FSM phases.
 
-## 2. Mandatory Subagent Spawning, Skills, & Chrome MCP
-*   **Mandatory Handoff:** You MUST call the `invoke_subagent` tool to spawn the specialized agents (e.g. `dss_analyst`, `dss_architect_v2`, `dss_builder_v2`, `dss_user_alias_v2`) at their respective FSM phases. You are forbidden from simulating these agents in the main chat.
-*   **Required Skills:** You and the subagents MUST actively load and use the workspace skills (such as `ui-ux-pro-max`, `frontend-design`, and `webapp-testing`) to execute designs and verification.
-*   **Chrome MCP Integration:** You and the QA Lead MUST use the `chrome-devtools-mcp` tools (such as `new_page`, `navigate_page`, `take_screenshot`) during the QA phase to capture and inspect the visual layout of the running web application.
+## 2. Mandatory Parallel Subagent Spawning, Skills, & Chrome MCP
+*   **Mandatory Handoff:** You MUST call `invoke_subagent` to spawn specialized subagents at their respective FSM phases. You are strictly FORBIDDEN from simulating subagents in the main chat.
+*   **Mandatory Parallel Subagent Execution:**
+    *   During **`DEBATE` Phase**, you MUST invoke `invoke_subagent` passing ALL 4 agents in parallel in a single call: `dss_governor`, `dss_cso_v2`, `dss_reviewer_v2`, and `dss_user_alias_v2`.
+    *   During **`QA` Phase**, you MUST invoke `invoke_subagent` passing ALL 3 agents in parallel in a single call: `dss_reviewer_v2`, `dss_cso_v2`, and `dss_qa_v2`.
+*   **Required Skills:** You and subagents MUST actively load workspace skills (`ui-ux-pro-max`, `frontend-design`, `webapp-testing`).
+*   **Chrome MCP Integration:** You and `dss_qa_v2` MUST use `chrome-devtools-mcp` tools (`new_page`, `navigate_page`, `take_screenshot`) during the QA phase to capture and inspect the visual layout of the running web application in `.agents/qa_screenshots/`.
 
 ## 3. Enforce Strict Warning Scans
 *   During test runs, you MUST inspect the console stdout/stderr.
