@@ -76,6 +76,20 @@
     "can_modify_state": false,
     "can_vote": true
   },
+  "dss_qa_frontend": {
+    "can_read": true,
+    "can_write": false,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": true
+  },
+  "dss_qa_backend": {
+    "can_read": true,
+    "can_write": false,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": true
+  },
   "dss_user_alias_v2": {
     "can_read": true,
     "can_write": false,

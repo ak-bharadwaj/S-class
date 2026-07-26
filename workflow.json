@@ -72,8 +72,11 @@
       "dss_user_alias_v2"
     ],
     "Parallel Group #2": [
+      "dss_qa_frontend",
+      "dss_qa_backend",
       "dss_reviewer_v2",
       "dss_cso_v2",
+      "dss_user_alias_v2",
       "dss_qa_v2"
     ]
   }
