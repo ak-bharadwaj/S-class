@@ -28,6 +28,7 @@
     "can_vote": false
   },
   "dss_governor": {
+    "domains": ["governance", "architecture", "lead"],
     "can_read": true,
     "can_write": false,
     "can_dispatch_events": true,
@@ -35,6 +36,7 @@
     "can_vote": true
   },
   "dss_ui_ux": {
+    "domains": ["ui", "ux", "css", "style", "layout", "design_system", "accessibility", "color", "alignment"],
     "can_read": true,
     "can_write": false,
     "can_dispatch_events": true,
@@ -42,6 +44,7 @@
     "can_vote": true
   },
   "dss_frontend_dev": {
+    "domains": ["frontend", "react", "nextjs", "dom", "component", "state", "button", "navbar"],
     "can_read": true,
     "can_write": false,
     "can_dispatch_events": true,
@@ -49,6 +52,7 @@
     "can_vote": true
   },
   "dss_backend_dev": {
+    "domains": ["backend", "api", "dto", "endpoint", "controller", "server", "express", "nestjs", "fastapi"],
     "can_read": true,
     "can_write": false,
     "can_dispatch_events": true,
@@ -56,6 +60,7 @@
     "can_vote": true
   },
   "dss_db_architect": {
+    "domains": ["database", "sql", "orm", "schema", "migration", "table", "column", "postgres", "sqlite"],
     "can_read": true,
     "can_write": false,
     "can_dispatch_events": true,
@@ -84,6 +89,7 @@
     "can_vote": true
   },
   "dss_cso_v2": {
+    "domains": ["security", "auth", "crypto", "token", "jwt", "rbac", "secret", "stripe", "billing", "payment"],
     "can_read": true,
     "can_write": false,
     "can_dispatch_events": true,
@@ -91,6 +97,7 @@
     "can_vote": true
   },
   "dss_reviewer_v2": {
+    "domains": ["code_quality", "refactor", "review"],
     "can_read": true,
     "can_write": false,
     "can_dispatch_events": true,
@@ -119,6 +126,7 @@
     "can_vote": true
   },
   "dss_user_alias_v2": {
+    "domains": ["user_experience", "acceptance_criteria", "ux_workflow"],
     "can_read": true,
     "can_write": false,
     "can_dispatch_events": true,

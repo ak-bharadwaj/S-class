@@ -25,6 +25,12 @@ class Urgency(Enum):
     EMERGENCY = "emergency"
 
 
+class ReviewDepth(Enum):
+    LIGHT = "light"
+    STANDARD = "standard"
+    DEEP = "deep"
+
+
 class ProjectScale(Enum):
     MICRO = "micro"
     SMALL = "small"
@@ -42,6 +48,8 @@ class ExecutionStrategy:
     parallelism_worthwhile: bool
     clarification_required: bool
     recommended_profile: WorkflowProfile
+    detected_domains: List[str] = field(default_factory=list)
+    review_depth: ReviewDepth = ReviewDepth.STANDARD
     debate_panel: List[str] = field(default_factory=list)
     required_evidence: Dict[str, List[str]] = field(default_factory=dict)
     rationale: str = ""
@@ -55,6 +63,8 @@ class ExecutionStrategy:
             "parallelism_worthwhile": self.parallelism_worthwhile,
             "clarification_required": self.clarification_required,
             "recommended_profile": self.recommended_profile.value,
+            "detected_domains": self.detected_domains,
+            "review_depth": self.review_depth.value,
             "debate_panel": self.debate_panel,
             "required_evidence": self.required_evidence,
             "rationale": self.rationale,
@@ -70,6 +80,8 @@ class ExecutionStrategy:
             parallelism_worthwhile=data.get("parallelism_worthwhile", False),
             clarification_required=data.get("clarification_required", False),
             recommended_profile=WorkflowProfile(data.get("recommended_profile", "full")),
+            detected_domains=data.get("detected_domains", []),
+            review_depth=ReviewDepth(data.get("review_depth", "standard")),
             debate_panel=data.get("debate_panel", []),
             required_evidence=data.get("required_evidence", {}),
             rationale=data.get("rationale", ""),
@@ -95,30 +107,82 @@ DEFAULT_EVIDENCE_CONTRACTS: Dict[str, List[str]] = {
 
 
 class StrategyEngine:
-    """Infers engineering strategy, debate team sizing, and evidence requirements from goal and project context."""
+    """Infers engineering strategy, domain taxonomy, review depth, and capability-matched debate panel."""
 
     @staticmethod
-    def get_adaptive_debate_squad(risk_level: RiskLevel) -> List[str]:
-        """Dynamically sizes the debate panel based on task risk level."""
-        if risk_level == RiskLevel.LOW:
-            # 2 agents for trivial tweaks (saves time & tokens)
-            return ["dss_governor", "dss_ui_ux"]
-        elif risk_level == RiskLevel.MEDIUM:
-            # 4 agents for standard features
-            return ["dss_governor", "dss_frontend_dev", "dss_cso_v2", "dss_reviewer_v2"]
-        elif risk_level == RiskLevel.HIGH:
-            # 8 domain experts for complex features
-            return [
-                "dss_governor", "dss_ui_ux", "dss_frontend_dev", "dss_backend_dev",
-                "dss_db_architect", "dss_cso_v2", "dss_reviewer_v2", "dss_user_alias_v2"
-            ]
-        else:  # CRITICAL
-            # 10 full domain panel for security/billing/crypto/database migrations
-            return [
-                "dss_governor", "dss_ui_ux", "dss_frontend_dev", "dss_backend_dev",
-                "dss_db_architect", "dss_cso_v2", "dss_reviewer_v2", "dss_user_alias_v2",
-                "dss_analyst", "dss_architect_v2"
-            ]
+    def detect_domains(goal: str) -> List[str]:
+        """Detects active software engineering domains from user prompt."""
+        goal_lower = goal.lower()
+        domains = set()
+
+        # UI / UX Domain
+        if any(kw in goal_lower for kw in ["ui", "ux", "css", "style", "layout", "color", "alignment", "design", "navbar", "theme"]):
+            domains.add("ui")
+
+        # Frontend Domain
+        if any(kw in goal_lower for kw in ["frontend", "react", "nextjs", "dom", "component", "button", "page", "view"]):
+            domains.add("frontend")
+
+        # Backend & API Domain
+        if any(kw in goal_lower for kw in ["backend", "api", "dto", "endpoint", "controller", "server", "express", "nestjs", "fastapi", "route", "stripe", "billing", "payment", "auth", "jwt"]):
+            domains.add("backend")
+
+        # Database Domain
+        if any(kw in goal_lower for kw in ["database", "sql", "orm", "schema", "migration", "table", "column", "postgres", "sqlite", "model", "billing", "subscription", "store"]):
+            domains.add("database")
+
+        # Security & Auth Domain
+        if any(kw in goal_lower for kw in ["security", "auth", "crypto", "token", "jwt", "rbac", "secret", "stripe", "billing", "payment", "login"]):
+            domains.add("security")
+
+        # Default fallback domain if none detected
+        if not domains:
+            domains.add("frontend")
+            domains.add("backend")
+
+        return sorted(list(domains))
+
+    @staticmethod
+    def infer_review_depth(risk_level: RiskLevel, urgency: Urgency) -> ReviewDepth:
+        """Determines review depth based on risk level and urgency."""
+        if urgency == Urgency.EMERGENCY or risk_level == RiskLevel.LOW:
+            return ReviewDepth.LIGHT
+        elif risk_level in [RiskLevel.HIGH, RiskLevel.CRITICAL]:
+            return ReviewDepth.DEEP
+        else:
+            return ReviewDepth.STANDARD
+
+    @staticmethod
+    def resolve_debate_squad(domains: List[str], review_depth: ReviewDepth) -> List[str]:
+        """Dynamically matches debate panel agents based on capability taxonomy and review depth."""
+        squad = set()
+
+        # Always include Lead & Governor for architecture review
+        squad.add("dss_governor")
+
+        # Map detected domains to capabilities
+        if "ui" in domains:
+            squad.add("dss_ui_ux")
+        if "frontend" in domains:
+            squad.add("dss_frontend_dev")
+        if "backend" in domains:
+            squad.add("dss_backend_dev")
+        if "database" in domains:
+            squad.add("dss_db_architect")
+        if "security" in domains:
+            squad.add("dss_cso_v2")
+
+        # Add auditors based on review depth
+        if review_depth in [ReviewDepth.STANDARD, ReviewDepth.DEEP]:
+            squad.add("dss_reviewer_v2")
+        if review_depth == ReviewDepth.DEEP:
+            squad.add("dss_user_alias_v2")
+
+        # Fallback to governor & reviewer if squad too small
+        if len(squad) < 2:
+            squad.add("dss_reviewer_v2")
+
+        return sorted(list(squad))
 
     @staticmethod
     def infer_strategy(goal: str, codebase_meta: Optional[Dict[str, Any]] = None) -> ExecutionStrategy:
@@ -140,12 +204,19 @@ class StrategyEngine:
             risk = RiskLevel.CRITICAL if urgency == Urgency.EMERGENCY else RiskLevel.HIGH
         elif any(kw in goal_lower for kw in ["refactor", "architecture", "upgrade", "api change"]):
             risk = RiskLevel.HIGH
-        elif any(kw in goal_lower for kw in ["bug", "fix", "typo", "ui alignment"]):
+        elif any(kw in goal_lower for kw in ["bug", "fix", "typo", "ui alignment", "color", "navbar"]):
             risk = RiskLevel.LOW
         else:
             risk = RiskLevel.MEDIUM
 
-        # 3. Infer Project Scale
+        # 3. Detect Active Domains & Review Depth
+        detected_domains = StrategyEngine.detect_domains(goal)
+        review_depth = StrategyEngine.infer_review_depth(risk, urgency)
+
+        # 4. Resolve Context-Aware Adaptive Debate Squad (Capability Match)
+        debate_squad = StrategyEngine.resolve_debate_squad(detected_domains, review_depth)
+
+        # 5. Infer Project Scale
         file_count = meta.get("file_count", 0)
         if file_count > 500:
             scale = ProjectScale.ENTERPRISE
@@ -158,16 +229,14 @@ class StrategyEngine:
         else:
             scale = ProjectScale.MICRO
 
-        # 4. Infer Parallelism Worthwhile
+        # 6. Infer Parallelism & Clarification
         parallelism = scale in [ProjectScale.MEDIUM, ProjectScale.LARGE, ProjectScale.ENTERPRISE] and risk in [RiskLevel.MEDIUM, RiskLevel.HIGH]
-
-        # 5. Infer Clarification Necessity
         clarification = risk in [RiskLevel.HIGH, RiskLevel.CRITICAL] and not any(kw in goal_lower for kw in ["exact", "specifically", "do not change", "fix line"])
 
-        # 6. Resolve Profile
+        # 7. Resolve Profile
         if urgency == Urgency.EMERGENCY:
             profile = WorkflowProfile.HOTFIX
-        elif risk == RiskLevel.LOW and any(kw in goal_lower for kw in ["fix", "bug", "error"]):
+        elif risk == RiskLevel.LOW and any(kw in goal_lower for kw in ["fix", "bug", "error", "align", "color"]):
             profile = WorkflowProfile.BUG_FIX
         elif any(kw in goal_lower for kw in ["audit", "research", "investigate", "explain"]):
             profile = WorkflowProfile.RESEARCH
@@ -176,14 +245,10 @@ class StrategyEngine:
         else:
             profile = WorkflowProfile.FULL
 
-        # 7. Adaptive Team Sizing
-        debate_squad = StrategyEngine.get_adaptive_debate_squad(risk)
-
         # Construct Rationale
         rationale = (
-            f"Strategy Inferred: Urgency={urgency.value.upper()}, Risk={risk.value.upper()}, "
-            f"Scale={scale.value.upper()}, Parallelism={'YES' if parallelism else 'NO'}, "
-            f"DebateSquadSize={len(debate_squad)}, Profile => {profile.value.upper()}"
+            f"Strategy Inferred: Domains={detected_domains}, ReviewDepth={review_depth.value.upper()}, "
+            f"Risk={risk.value.upper()}, DebateSquad={debate_squad}, Profile => {profile.value.upper()}"
         )
 
         return ExecutionStrategy(
@@ -194,6 +259,8 @@ class StrategyEngine:
             parallelism_worthwhile=parallelism,
             clarification_required=clarification,
             recommended_profile=profile,
+            detected_domains=detected_domains,
+            review_depth=review_depth,
             debate_panel=debate_squad,
             required_evidence=DEFAULT_EVIDENCE_CONTRACTS,
             rationale=rationale,

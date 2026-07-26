@@ -27,10 +27,26 @@ def test_strategy_engine_research():
     assert strat.recommended_profile.value == "research"
 
 
-def test_strategy_engine_project_scale():
-    strat = StrategyEngine.infer_strategy("Build feature", codebase_meta={"file_count": 150})
-    assert strat.project_scale == ProjectScale.LARGE
-    assert strat.parallelism_worthwhile is True
+def test_domain_classification_and_capability_matching():
+    # Prompt 1: UI Alignment -> UI + Frontend domains only
+    strat_ui = StrategyEngine.infer_strategy("Fix navbar alignment and button color")
+    assert "ui" in strat_ui.detected_domains
+    assert "frontend" in strat_ui.detected_domains
+    assert "database" not in strat_ui.detected_domains
+    assert "dss_ui_ux" in strat_ui.debate_panel
+    assert "dss_db_architect" not in strat_ui.debate_panel
+
+    # Prompt 2: Database Migration -> DB + Backend domains only
+    strat_db = StrategyEngine.infer_strategy("Add a new column to Users table in PostgreSQL")
+    assert "database" in strat_db.detected_domains
+    assert "dss_db_architect" in strat_db.debate_panel
+    assert "dss_ui_ux" not in strat_db.debate_panel
+
+    # Prompt 3: Stripe Billing -> Security + Backend + Database domains
+    strat_stripe = StrategyEngine.infer_strategy("Implement Stripe subscription billing with JWT auth")
+    assert "security" in strat_stripe.detected_domains
+    assert "dss_cso_v2" in strat_stripe.debate_panel
+    assert "dss_db_architect" in strat_stripe.debate_panel
 
 
 def test_evidence_verifier_triage(tmp_path):
