@@ -29,6 +29,7 @@ class Task:
     priority: str
     status: str
     confidence: float = 1.0
+    criticality: int = 5
     sandboxBranch: Optional[str] = None
 
 @dataclass

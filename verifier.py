@@ -19,12 +19,21 @@ class VerificationError(Exception):
     pass
 
 
+class EvidenceStrength:
+    LOW_MODIFIED_FILE = 1.0
+    MEDIUM_BUILD_CHECK = 2.0
+    HIGH_TEST_PASSED = 3.0
+    HIGH_PLAYWRIGHT_VISUAL = 4.0
+    CRITICAL_SECURITY_CLEAN = 5.0
+
+
 @dataclass
 class EvidenceArtifact:
     phase: str
     artifact_type: str        # config_file | intent_contract | decision_log | task_queue | modified_files | test_receipt | security_report
     location_or_ref: str
     verified: bool
+    strength: float = 1.0
     details: Dict[str, Any] = field(default_factory=dict)
 
 

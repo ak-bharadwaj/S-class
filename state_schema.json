@@ -90,6 +90,11 @@
             "minimum": 0.0,
             "maximum": 1.0
           },
+          "criticality": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
           "sandboxBranch": {
             "type": ["string", "null"]
           }

@@ -36,3 +36,18 @@ def test_should_stop():
     assert engine.should_stop(2, ep) is False
     assert engine.should_stop(3, ep) is True
     assert engine.should_stop(4, ep) is True
+
+def test_smart_multi_tier_recovery():
+    engine = RecoveryEngine()
+    
+    # Syntax Error -> CODING
+    assert engine.classify_failure_target_phase("SyntaxError: invalid syntax at line 42") == "CODING"
+    
+    # Dependency Error -> INTEGRATION
+    assert engine.classify_failure_target_phase("ModuleNotFoundError: No module named 'express'") == "INTEGRATION"
+    
+    # Type Mismatch -> DESIGN
+    assert engine.classify_failure_target_phase("TypeError: Interface mismatch in DTO schema") == "DESIGN"
+    
+    # Ambiguity Error -> CLARIFICATION
+    assert engine.classify_failure_target_phase("SpecificationMissing: Ambiguity in user role permissions") == "CLARIFICATION"

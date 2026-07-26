@@ -51,5 +51,24 @@ class RecoveryEngine:
             return error_path.backoff_seconds
         return error_path.backoff_seconds
 
+    def classify_failure_target_phase(self, error_output: str) -> str:
+        """Determines exact target phase based on error categorization (Smart Multi-Tier Recovery)."""
+        err_lower = error_output.lower()
+        
+        # 1. Requirement Ambiguity -> CLARIFICATION
+        if any(kw in err_lower for kw in ["ambiguity", "specification missing", "undefined requirement"]):
+            return "CLARIFICATION"
+        
+        # 2. Architectural / Type Mismatch -> DESIGN
+        if any(kw in err_lower for kw in ["typeerror", "interface mismatch", "schemaerror", "constraintviolation"]):
+            return "DESIGN"
+            
+        # 3. Dependency / Import Error -> INTEGRATION
+        if any(kw in err_lower for kw in ["modulenotfounderror", "cannot find module", "importerror", "elifecycle"]):
+            return "INTEGRATION"
+            
+        # 4. Syntax Error -> CODING
+        return "CODING"
+
     def should_stop(self, attempt: int, error_path: ErrorPath) -> bool:
         return attempt >= error_path.max_retries

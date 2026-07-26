@@ -75,6 +75,47 @@
     "can_vote": false
   },
   "dss_builder_v2": {
+    "domains": ["general_coding"],
+    "can_read": true,
+    "can_write": true,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": false
+  },
+  "dss_builder_react": {
+    "domains": ["react", "nextjs", "typescript", "frontend_ui", "jsx", "tsx", "css"],
+    "can_read": true,
+    "can_write": true,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": false
+  },
+  "dss_builder_node": {
+    "domains": ["node", "nestjs", "express", "javascript", "typescript", "api_backend"],
+    "can_read": true,
+    "can_write": true,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": false
+  },
+  "dss_builder_sql": {
+    "domains": ["sql", "postgres", "sqlite", "orm", "database_migration", "prisma"],
+    "can_read": true,
+    "can_write": true,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": false
+  },
+  "dss_builder_python": {
+    "domains": ["python", "fastapi", "django", "flask", "pydantic", "pytest"],
+    "can_read": true,
+    "can_write": true,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": false
+  },
+  "dss_builder_flutter": {
+    "domains": ["flutter", "dart", "mobile", "widgets"],
     "can_read": true,
     "can_write": true,
     "can_dispatch_events": true,
