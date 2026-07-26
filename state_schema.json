@@ -84,6 +84,14 @@
           "status": {
             "type": "string",
             "enum": ["PENDING", "IN_PROGRESS", "COMPLETED", "FAILED"]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0
+          },
+          "sandboxBranch": {
+            "type": ["string", "null"]
           }
         },
         "required": ["id", "owner", "targets", "dependsOn", "acceptanceCriteria", "priority", "status"]

@@ -36,6 +36,24 @@
     "sideEffects": []
   },
   {
+    "event": "task_verified",
+    "description": "Fired when per-task verification passes on isolated builder sandbox.",
+    "nextState": "MERGE",
+    "sideEffects": []
+  },
+  {
+    "event": "task_verification_failed",
+    "description": "Fired when per-task verification fails on isolated builder sandbox.",
+    "nextState": "CODING",
+    "sideEffects": ["incrementRetryCount"]
+  },
+  {
+    "event": "task_merged",
+    "description": "Fired when verified task sandbox is merged cleanly into primary branch.",
+    "nextState": "INTEGRATION",
+    "sideEffects": []
+  },
+  {
     "event": "integration_passed",
     "description": "Fired when integration checks on DTOs, endpoint URLs, and migrations are healthy.",
     "nextState": "QA",

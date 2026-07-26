@@ -28,6 +28,8 @@ class Task:
     acceptanceCriteria: str
     priority: str
     status: str
+    confidence: float = 1.0
+    sandboxBranch: Optional[str] = None
 
 @dataclass
 class Decision:

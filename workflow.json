@@ -35,7 +35,18 @@
     },
     "CODING": {
       "transitions": {
-        "code_written": "INTEGRATION"
+        "code_written": "TASK_VERIFICATION"
+      }
+    },
+    "TASK_VERIFICATION": {
+      "transitions": {
+        "task_verified": "MERGE",
+        "task_verification_failed": "CODING"
+      }
+    },
+    "MERGE": {
+      "transitions": {
+        "task_merged": "INTEGRATION"
       }
     },
     "INTEGRATION": {

@@ -42,6 +42,7 @@ class ExecutionStrategy:
     parallelism_worthwhile: bool
     clarification_required: bool
     recommended_profile: WorkflowProfile
+    debate_panel: List[str] = field(default_factory=list)
     required_evidence: Dict[str, List[str]] = field(default_factory=dict)
     rationale: str = ""
 
@@ -54,6 +55,7 @@ class ExecutionStrategy:
             "parallelism_worthwhile": self.parallelism_worthwhile,
             "clarification_required": self.clarification_required,
             "recommended_profile": self.recommended_profile.value,
+            "debate_panel": self.debate_panel,
             "required_evidence": self.required_evidence,
             "rationale": self.rationale,
         }
@@ -68,6 +70,7 @@ class ExecutionStrategy:
             parallelism_worthwhile=data.get("parallelism_worthwhile", False),
             clarification_required=data.get("clarification_required", False),
             recommended_profile=WorkflowProfile(data.get("recommended_profile", "full")),
+            debate_panel=data.get("debate_panel", []),
             required_evidence=data.get("required_evidence", {}),
             rationale=data.get("rationale", ""),
         )
@@ -82,6 +85,8 @@ DEFAULT_EVIDENCE_CONTRACTS: Dict[str, List[str]] = {
     "DEBATE": ["consensus_score"],
     "TASK_COMPILATION": ["task_queue"],
     "CODING": ["modified_files"],
+    "TASK_VERIFICATION": ["task_verification_receipt"],
+    "MERGE": ["merged_sandbox"],
     "INTEGRATION": ["build_check"],
     "QA": ["test_receipt"],
     "RECOVERY": ["patch_plan"],
@@ -90,7 +95,30 @@ DEFAULT_EVIDENCE_CONTRACTS: Dict[str, List[str]] = {
 
 
 class StrategyEngine:
-    """Infers engineering strategy and evidence requirements from goal and project context."""
+    """Infers engineering strategy, debate team sizing, and evidence requirements from goal and project context."""
+
+    @staticmethod
+    def get_adaptive_debate_squad(risk_level: RiskLevel) -> List[str]:
+        """Dynamically sizes the debate panel based on task risk level."""
+        if risk_level == RiskLevel.LOW:
+            # 2 agents for trivial tweaks (saves time & tokens)
+            return ["dss_governor", "dss_ui_ux"]
+        elif risk_level == RiskLevel.MEDIUM:
+            # 4 agents for standard features
+            return ["dss_governor", "dss_frontend_dev", "dss_cso_v2", "dss_reviewer_v2"]
+        elif risk_level == RiskLevel.HIGH:
+            # 8 domain experts for complex features
+            return [
+                "dss_governor", "dss_ui_ux", "dss_frontend_dev", "dss_backend_dev",
+                "dss_db_architect", "dss_cso_v2", "dss_reviewer_v2", "dss_user_alias_v2"
+            ]
+        else:  # CRITICAL
+            # 10 full domain panel for security/billing/crypto/database migrations
+            return [
+                "dss_governor", "dss_ui_ux", "dss_frontend_dev", "dss_backend_dev",
+                "dss_db_architect", "dss_cso_v2", "dss_reviewer_v2", "dss_user_alias_v2",
+                "dss_analyst", "dss_architect_v2"
+            ]
 
     @staticmethod
     def infer_strategy(goal: str, codebase_meta: Optional[Dict[str, Any]] = None) -> ExecutionStrategy:
@@ -134,7 +162,6 @@ class StrategyEngine:
         parallelism = scale in [ProjectScale.MEDIUM, ProjectScale.LARGE, ProjectScale.ENTERPRISE] and risk in [RiskLevel.MEDIUM, RiskLevel.HIGH]
 
         # 5. Infer Clarification Necessity
-        # Needs clarification if high ambiguity terms or high risk without explicit criteria
         clarification = risk in [RiskLevel.HIGH, RiskLevel.CRITICAL] and not any(kw in goal_lower for kw in ["exact", "specifically", "do not change", "fix line"])
 
         # 6. Resolve Profile
@@ -149,11 +176,14 @@ class StrategyEngine:
         else:
             profile = WorkflowProfile.FULL
 
+        # 7. Adaptive Team Sizing
+        debate_squad = StrategyEngine.get_adaptive_debate_squad(risk)
+
         # Construct Rationale
         rationale = (
             f"Strategy Inferred: Urgency={urgency.value.upper()}, Risk={risk.value.upper()}, "
             f"Scale={scale.value.upper()}, Parallelism={'YES' if parallelism else 'NO'}, "
-            f"ClarificationNeeded={'YES' if clarification else 'NO'}. Profile => {profile.value.upper()}"
+            f"DebateSquadSize={len(debate_squad)}, Profile => {profile.value.upper()}"
         )
 
         return ExecutionStrategy(
@@ -164,6 +194,7 @@ class StrategyEngine:
             parallelism_worthwhile=parallelism,
             clarification_required=clarification,
             recommended_profile=profile,
+            debate_panel=debate_squad,
             required_evidence=DEFAULT_EVIDENCE_CONTRACTS,
             rationale=rationale,
         )
