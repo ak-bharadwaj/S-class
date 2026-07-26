@@ -106,41 +106,55 @@ DEFAULT_EVIDENCE_CONTRACTS: Dict[str, List[str]] = {
 }
 
 
+DOMAIN_INTERACTION_GRAPH: Dict[str, List[str]] = {
+    "database": ["backend", "security"],   # Changing DB automatically triggers Backend & Security review
+    "backend": ["frontend", "security"],   # Changing Backend triggers Frontend API & Security review
+    "frontend": ["ui"],                     # Changing Frontend triggers UI review
+    "security": ["backend", "database"],    # Changing Security triggers Backend & Database review
+    "ui": []
+}
+
+
 class StrategyEngine:
-    """Infers engineering strategy, domain taxonomy, review depth, and capability-matched debate panel."""
+    """Infers engineering strategy, domain interaction graph, review depth, and capability-matched debate panel."""
 
     @staticmethod
     def detect_domains(goal: str) -> List[str]:
-        """Detects active software engineering domains from user prompt."""
+        """Detects active software engineering domains and propagates relationships via Domain Interaction Graph."""
         goal_lower = goal.lower()
-        domains = set()
+        base_domains = set()
 
         # UI / UX Domain
         if any(kw in goal_lower for kw in ["ui", "ux", "css", "style", "layout", "color", "alignment", "design", "navbar", "theme"]):
-            domains.add("ui")
+            base_domains.add("ui")
 
         # Frontend Domain
         if any(kw in goal_lower for kw in ["frontend", "react", "nextjs", "dom", "component", "button", "page", "view"]):
-            domains.add("frontend")
+            base_domains.add("frontend")
 
         # Backend & API Domain
         if any(kw in goal_lower for kw in ["backend", "api", "dto", "endpoint", "controller", "server", "express", "nestjs", "fastapi", "route", "stripe", "billing", "payment", "auth", "jwt"]):
-            domains.add("backend")
+            base_domains.add("backend")
 
         # Database Domain
         if any(kw in goal_lower for kw in ["database", "sql", "orm", "schema", "migration", "table", "column", "postgres", "sqlite", "model", "billing", "subscription", "store"]):
-            domains.add("database")
+            base_domains.add("database")
 
         # Security & Auth Domain
         if any(kw in goal_lower for kw in ["security", "auth", "crypto", "token", "jwt", "rbac", "secret", "stripe", "billing", "payment", "login"]):
-            domains.add("security")
+            base_domains.add("security")
 
-        # Default fallback domain if none detected
-        if not domains:
-            domains.add("frontend")
-            domains.add("backend")
+        if not base_domains:
+            base_domains.add("frontend")
+            base_domains.add("backend")
 
-        return sorted(list(domains))
+        # Propagate domain interaction graph relationships
+        final_domains = set(base_domains)
+        for dom in base_domains:
+            for related in DOMAIN_INTERACTION_GRAPH.get(dom, []):
+                final_domains.add(related)
+
+        return sorted(list(final_domains))
 
     @staticmethod
     def infer_review_depth(risk_level: RiskLevel, urgency: Urgency) -> ReviewDepth:

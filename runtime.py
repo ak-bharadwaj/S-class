@@ -129,6 +129,24 @@ class FileLock:
             except OSError:
                 pass
 
+class ResourceAwareScheduler:
+    """Resource-aware OS task scheduler checking concurrency limits before dispatch."""
+    MAX_CONCURRENT_BUILDERS = 4
+
+    @staticmethod
+    def can_dispatch_task(active_builder_count: int) -> bool:
+        return active_builder_count < ResourceAwareScheduler.MAX_CONCURRENT_BUILDERS
+
+
+class ContextBudgetOptimizer:
+    """Prunes LLM context payload to only required task target files and boundaries."""
+    MAX_CONTEXT_FILES = 5
+
+    @staticmethod
+    def optimize_context(task_targets: List[str]) -> List[str]:
+        return task_targets[:ContextBudgetOptimizer.MAX_CONTEXT_FILES]
+
+
 def _resolve_paths(workspace_dir: Optional[str] = None) -> tuple:
     cwd = workspace_dir if workspace_dir else os.getcwd()
     state_dir = os.path.join(cwd, ".agents")
@@ -259,10 +277,12 @@ class MemoryManager:
         return None
 
     @staticmethod
-    def semantic_search(query: str, workspace_dir: Optional[str] = None, top_k: int = 5) -> List[Dict[str, Any]]:
-        """Search memory using TF-IDF cosine similarity for semantic recall."""
+    def semantic_search(query: str, workspace_dir: Optional[str] = None, domain: Optional[str] = None, top_k: int = 5) -> List[Dict[str, Any]]:
+        """Search memory using TF-IDF cosine similarity with domain namespace isolation."""
         memory = MemoryManager._load_memory(workspace_dir)
         fixes = memory.get("fixes", [])
+        if domain:
+            fixes = [f for f in fixes if f.get("domain", "").lower() == domain.lower() or not f.get("domain")]
         if not fixes or not query.strip():
             return []
         
