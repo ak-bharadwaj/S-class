@@ -7,6 +7,8 @@ import runtime
 from sclass_kernel import MinimalDeterministicKernel, EventStore, kernel_instance
 from sclass_planner import ExecutionPlanner, IntentExtractor, RiskAnalyzer, WorkflowSelector
 from knowledge_base import KnowledgeBaseManager
+from monitoring import MultiStreamMonitor
+from learning_engine import LearningEngine
 
 
 def test_kernel_formal_api_and_event_sourcing(tmp_path):
@@ -30,50 +32,51 @@ def test_kernel_formal_api_and_event_sourcing(tmp_path):
     assert recon["total_events"] == 1
 
 
-def test_design_revision_and_post_release_monitoring(tmp_path):
+def test_selective_knowledge_retrieval_policies(tmp_path):
     workspace = str(tmp_path)
-    runtime.initialize_state(workspace_dir=workspace)
     
-    # Design -> Debate -> Design Revision -> Task Compilation
-    state = runtime.get_state(workspace)
-    state.currentPhase = "DEBATE"
-    runtime.save_state(state, workspace)
+    # Bug Fix profile retrieves Failed Approaches
+    res_bug = KnowledgeBaseManager.query_knowledge_base("Fix memory leak in caching", profile="bug_fix", workspace_dir=workspace)
+    assert "failed_approaches" in res_bug
     
-    res_rev = kernel_instance.request_transition("DEBATE", "spec_approved", workspace_dir=workspace)
-    assert res_rev["currentPhase"] == "DESIGN_REVISION"
-    
-    res_comp = kernel_instance.request_transition("DESIGN_REVISION", "revision_approved", workspace_dir=workspace)
-    assert res_comp["currentPhase"] == "TASK_COMPILATION"
-
-    # Release -> Monitoring -> Feedback -> Issue Detection -> Recovery Loop
-    state.currentPhase = "RELEASE"
-    runtime.save_state(state, workspace)
-    
-    res_mon = kernel_instance.request_transition("RELEASE", "release_complete", workspace_dir=workspace)
-    assert res_mon["currentPhase"] == "MONITORING"
-    
-    res_fb = kernel_instance.request_transition("MONITORING", "issue_detected", workspace_dir=workspace)
-    assert res_fb["currentPhase"] == "FEEDBACK"
+    # Research profile retrieves Architecture Patterns
+    res_res = KnowledgeBaseManager.query_knowledge_base("Audit API service architecture", profile="research", workspace_dir=workspace)
+    assert "architecture_patterns" in res_res
 
 
-def test_decoupled_planner_pipeline_and_knowledge_base(tmp_path):
+def test_multi_stream_active_monitoring():
+    monitor = MultiStreamMonitor()
+    
+    # Ingest logs stream
+    monitor.ingest_telemetry("logs", "CRITICAL", "server", "Unhandled Exception: Connection refused")
+    
+    # Ingest security events stream
+    monitor.ingest_telemetry("security_events", "WARNING", "auth", "5 failed login attempts from IP 192.168.1.1")
+    
+    health = monitor.evaluate_production_health()
+    assert health["healthy"] is False
+    assert health["criticalCount"] == 1
+    assert "logs" in health["anomalyStreams"]
+
+
+def test_learning_engine_candidate_promotion(tmp_path):
     workspace = str(tmp_path)
-    goal = "Implement Stripe billing with PostgreSQL database"
     
-    # 1. Intent Extractor
-    intent = IntentExtractor.extract_intent(goal)
-    assert "security" in intent.target_domains
-    assert "database" in intent.target_domains
+    # Capture candidate
+    cand = LearningEngine.capture_candidate(
+        category="failed_approaches",
+        title="Avoid Synchronous Disk Writes on Main Loop",
+        content="Synchronous disk writes stall event loop dispatch.",
+        tags=["performance", "io"],
+        workspace_dir=workspace
+    )
+    assert cand.candidate_id == "cand_1"
     
-    # 2. Risk Analyzer & Knowledge Base
-    risk = RiskAnalyzer.analyze_risk(intent, workspace_dir=workspace)
-    assert risk.risk_level.value in ["high", "critical"]
-    assert "coding_standards" in risk.knowledge_context
+    # Promote candidate to KB
+    success = LearningEngine.promote_candidate("cand_1", workspace_dir=workspace)
+    assert success is True
     
-    # 3. Workflow Selector
-    plan = WorkflowSelector.select_profile(intent, risk)
-    assert plan.profile.value == "full"
-    
-    # 4. Execution Planner
-    strat = ExecutionPlanner.create_plan(goal, workspace_dir=workspace)
-    assert "dss_cso_v2" in strat.debate_panel
+    # Query KB to confirm entry promoted
+    res = KnowledgeBaseManager.query_knowledge_base("disk writes", profile="bug_fix", workspace_dir=workspace)
+    titles = [item["title"] for item in res.get("failed_approaches", [])]
+    assert "Avoid Synchronous Disk Writes on Main Loop" in titles

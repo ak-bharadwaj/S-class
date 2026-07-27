@@ -1,9 +1,11 @@
 """
-S-Class EOS Pre-Planning Knowledge Base Layer (knowledge_base.py)
+S-Class EOS Selective Knowledge Base Engine (knowledge_base.py)
 
-Queries organizational memory (coding standards, architectural decisions,
-failed approaches, reusable implementations) BEFORE planning begins to prevent
-re-learning past lessons on every run.
+Applies profile-driven retrieval policies:
+- BUG_FIX   -> Retrieves Failed Approaches & Reusable Fixes
+- RESEARCH  -> Retrieves Architecture Patterns & Design Guidelines
+- HOTFIX    -> Retrieves Recent Incidents & Known Regressions
+- FULL      -> Retrieves Architecture Patterns & Coding Standards
 """
 
 import os
@@ -15,16 +17,26 @@ from typing import List, Dict, Any, Optional
 logger = logging.getLogger("sclass_knowledge_base")
 
 
+# Selective Knowledge Retrieval Policies
+RETRIEVAL_POLICIES: Dict[str, List[str]] = {
+    "bug_fix": ["failed_approaches.json", "reusable_modules.json"],
+    "research": ["architecture_patterns.json", "coding_standards.json"],
+    "hotfix": ["failed_approaches.json", "coding_standards.json"],
+    "refactor": ["architecture_patterns.json", "coding_standards.json"],
+    "full": ["coding_standards.json", "architecture_patterns.json", "failed_approaches.json", "reusable_modules.json"]
+}
+
+
 @dataclass
 class KnowledgeEntry:
-    category: str  # coding_standards | architecture_patterns | failed_approaches | reusable_modules
+    category: str
     title: str
     content: str
     tags: List[str] = field(default_factory=list)
 
 
 class KnowledgeBaseManager:
-    """Manages pre-planning organizational knowledge retrieval and storage."""
+    """Manages profile-driven selective organizational knowledge retrieval and storage."""
 
     @staticmethod
     def get_kb_dir(workspace_dir: Optional[str] = None) -> str:
@@ -61,6 +73,14 @@ class KnowledgeBaseManager:
                     "content": "Unbounded in-memory objects cause memory leaks under load. Use SQLite or Redis with TTL.",
                     "tags": ["caching", "memory"]
                 }
+            ],
+            "reusable_modules.json": [
+                {
+                    "category": "reusable_modules",
+                    "title": "JWT Auth Middleware Snippet",
+                    "content": "Use standardized JWT Bearer token validation with automated token refresh handler.",
+                    "tags": ["auth", "jwt"]
+                }
             ]
         }
 
@@ -71,12 +91,13 @@ class KnowledgeBaseManager:
                     json.dump(data, f, indent=2)
 
     @staticmethod
-    def query_knowledge_base(goal: str, workspace_dir: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
-        """Queries the knowledge base for relevant standards, patterns, and past lessons matching the goal."""
+    def query_knowledge_base(goal: str, profile: str = "full", workspace_dir: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
+        """Selectively queries the knowledge base according to profile-driven retrieval policies."""
         kb_dir = KnowledgeBaseManager.get_kb_dir(workspace_dir)
         KnowledgeBaseManager.initialize_kb(workspace_dir)
 
         goal_lower = goal.lower()
+        target_files = RETRIEVAL_POLICIES.get(profile.lower(), RETRIEVAL_POLICIES["full"])
         results: Dict[str, List[Dict[str, Any]]] = {
             "coding_standards": [],
             "architecture_patterns": [],
@@ -84,9 +105,9 @@ class KnowledgeBaseManager:
             "reusable_modules": []
         }
 
-        for fname in os.listdir(kb_dir):
-            if fname.endswith(".json"):
-                filepath = os.path.join(kb_dir, fname)
+        for fname in target_files:
+            filepath = os.path.join(kb_dir, fname)
+            if os.path.exists(filepath):
                 try:
                     with open(filepath, "r", encoding="utf-8") as f:
                         entries = json.load(f)
@@ -102,4 +123,5 @@ class KnowledgeBaseManager:
                 except Exception as e:
                     logger.error(f"Error reading KB file '{fname}': {e}")
 
+        logger.info(f"[KnowledgeBaseManager] Selectively queried KB for profile '{profile}': loaded files {target_files}")
         return results
