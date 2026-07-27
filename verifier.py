@@ -181,7 +181,9 @@ class EvidenceVerifier:
             artifacts.append(EvidenceArtifact(current_phase, "test_receipt", cwd, True))
             screenshots_dir = os.path.join(state_dir, "screenshots")
             has_visual = os.path.exists(screenshots_dir) and len(os.listdir(screenshots_dir)) > 0
-            artifacts.append(EvidenceArtifact(current_phase, "visual_output_check", screenshots_dir, has_visual or allow_soft, strength=EvidenceStrength.HIGH_PLAYWRIGHT_VISUAL))
+            artifacts.append(EvidenceArtifact(current_phase, "visual_output_check", screenshots_dir, has_visual, strength=EvidenceStrength.HIGH_PLAYWRIGHT_VISUAL))
+            if not has_visual and not allow_soft:
+                errors.append("QA verification failed: Mandatory Chrome MCP visual screenshot receipts missing from '.agents/screenshots/'. Run Chrome DevTools MCP to capture screenshots before passing QA.")
 
         elif current_phase == "SECURITY":
             sec_file = os.path.join(state_dir, "security_report.json")
@@ -193,7 +195,7 @@ class EvidenceVerifier:
             screenshots_dir = os.path.join(state_dir, "screenshots")
             has_visual_receipts = os.path.exists(screenshots_dir) and len(os.listdir(screenshots_dir)) > 0
             # User Proxy Acceptance requires MANDATORY Output Contract Evidence signoff
-            artifacts.append(EvidenceArtifact(current_phase, "user_proxy_output_contract_signoff", screenshots_dir, has_visual_receipts or allow_soft, strength=EvidenceStrength.HIGH_PLAYWRIGHT_VISUAL))
+            artifacts.append(EvidenceArtifact(current_phase, "user_proxy_output_contract_signoff", screenshots_dir, has_visual_receipts, strength=EvidenceStrength.HIGH_PLAYWRIGHT_VISUAL))
             if not has_visual_receipts and not allow_soft:
                 errors.append("RELEASE verification failed: Safety Case incomplete. Output Contract Evidence missing from '.agents/screenshots/'. User Proxy rejects release without verified rendered output.")
 
