@@ -5,7 +5,8 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import runtime
 from sclass_kernel import MinimalDeterministicKernel, EventStore, kernel_instance
-from sclass_planner import PlanningEngine
+from sclass_planner import ExecutionPlanner, IntentExtractor, RiskAnalyzer, WorkflowSelector
+from knowledge_base import KnowledgeBaseManager
 
 
 def test_kernel_formal_api_and_event_sourcing(tmp_path):
@@ -29,26 +30,50 @@ def test_kernel_formal_api_and_event_sourcing(tmp_path):
     assert recon["total_events"] == 1
 
 
-def test_kernel_formal_api_recovery(tmp_path):
+def test_design_revision_and_post_release_monitoring(tmp_path):
     workspace = str(tmp_path)
     runtime.initialize_state(workspace_dir=workspace)
     
-    # Transition to RECOVERY phase simulation
+    # Design -> Debate -> Design Revision -> Task Compilation
     state = runtime.get_state(workspace)
-    state.currentPhase = "RECOVERY"
+    state.currentPhase = "DEBATE"
     runtime.save_state(state, workspace)
     
-    # Request Recovery Kernel API
-    res = kernel_instance.request_recovery("SyntaxError: Unexpected token", workspace_dir=workspace)
-    assert res["status"] == "APPROVED"
-    assert res["currentPhase"] == "CODING"
-
-
-def test_planner_engine_and_capability_discovery():
-    plan = PlanningEngine.create_execution_plan("Implement Stripe billing with Postgres database")
-    assert "security" in plan.detected_domains
-    assert "database" in plan.detected_domains
+    res_rev = kernel_instance.request_transition("DEBATE", "spec_approved", workspace_dir=workspace)
+    assert res_rev["currentPhase"] == "DESIGN_REVISION"
     
-    plugins = PlanningEngine.discover_capability_plugins()
-    assert "dss_builder_react" in plugins
-    assert "dss_builder_sql" in plugins
+    res_comp = kernel_instance.request_transition("DESIGN_REVISION", "revision_approved", workspace_dir=workspace)
+    assert res_comp["currentPhase"] == "TASK_COMPILATION"
+
+    # Release -> Monitoring -> Feedback -> Issue Detection -> Recovery Loop
+    state.currentPhase = "RELEASE"
+    runtime.save_state(state, workspace)
+    
+    res_mon = kernel_instance.request_transition("RELEASE", "release_complete", workspace_dir=workspace)
+    assert res_mon["currentPhase"] == "MONITORING"
+    
+    res_fb = kernel_instance.request_transition("MONITORING", "issue_detected", workspace_dir=workspace)
+    assert res_fb["currentPhase"] == "FEEDBACK"
+
+
+def test_decoupled_planner_pipeline_and_knowledge_base(tmp_path):
+    workspace = str(tmp_path)
+    goal = "Implement Stripe billing with PostgreSQL database"
+    
+    # 1. Intent Extractor
+    intent = IntentExtractor.extract_intent(goal)
+    assert "security" in intent.target_domains
+    assert "database" in intent.target_domains
+    
+    # 2. Risk Analyzer & Knowledge Base
+    risk = RiskAnalyzer.analyze_risk(intent, workspace_dir=workspace)
+    assert risk.risk_level.value in ["high", "critical"]
+    assert "coding_standards" in risk.knowledge_context
+    
+    # 3. Workflow Selector
+    plan = WorkflowSelector.select_profile(intent, risk)
+    assert plan.profile.value == "full"
+    
+    # 4. Execution Planner
+    strat = ExecutionPlanner.create_plan(goal, workspace_dir=workspace)
+    assert "dss_cso_v2" in strat.debate_panel

@@ -24,8 +24,14 @@
     "DEBATE": {
       "parallelGroup": "Parallel Group #1",
       "transitions": {
-        "spec_approved": "TASK_COMPILATION",
+        "spec_approved": "DESIGN_REVISION",
         "debate_failed": "DESIGN"
+      }
+    },
+    "DESIGN_REVISION": {
+      "transitions": {
+        "revision_approved": "TASK_COMPILATION",
+        "further_design_needed": "DESIGN"
       }
     },
     "TASK_COMPILATION": {
@@ -69,8 +75,25 @@
     },
     "RELEASE": {
       "transitions": {
-        "release_complete": "DONE",
+        "release_complete": "MONITORING",
         "release_hold": "CODING"
+      }
+    },
+    "MONITORING": {
+      "transitions": {
+        "monitoring_passed": "DONE",
+        "issue_detected": "FEEDBACK"
+      }
+    },
+    "FEEDBACK": {
+      "transitions": {
+        "feedback_analyzed": "ISSUE_DETECTION"
+      }
+    },
+    "ISSUE_DETECTION": {
+      "transitions": {
+        "hotfix_triggered": "RECOVERY",
+        "resolved": "MONITORING"
       }
     },
     "DONE": {}

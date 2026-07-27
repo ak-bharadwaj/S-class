@@ -19,9 +19,21 @@
   },
   {
     "event": "spec_approved",
-    "description": "Fired when the design debate completes with weighted confidence >= 80%.",
-    "nextState": "TASK_COMPILATION",
+    "description": "Fired when the design debate completes with weighted consensus score >= 80%.",
+    "nextState": "DESIGN_REVISION",
     "sideEffects": ["incrementSpecVersion"]
+  },
+  {
+    "event": "revision_approved",
+    "description": "Fired when design author incorporates debate corrections into final design blueprint.",
+    "nextState": "TASK_COMPILATION",
+    "sideEffects": []
+  },
+  {
+    "event": "further_design_needed",
+    "description": "Fired when design revision reveals architectural gaps requiring redesign.",
+    "nextState": "DESIGN",
+    "sideEffects": []
   },
   {
     "event": "tasks_ready",
@@ -86,7 +98,31 @@
   {
     "event": "release_complete",
     "description": "Fired when the release manager confirms final build safety.",
+    "nextState": "MONITORING",
+    "sideEffects": []
+  },
+  {
+    "event": "monitoring_passed",
+    "description": "Fired when continuous monitoring confirms stable post-release deployment.",
     "nextState": "DONE",
+    "sideEffects": []
+  },
+  {
+    "event": "issue_detected",
+    "description": "Fired when telemetry or log monitoring detects a production anomaly.",
+    "nextState": "FEEDBACK",
+    "sideEffects": []
+  },
+  {
+    "event": "feedback_analyzed",
+    "description": "Fired when production feedback is analyzed to isolate root cause.",
+    "nextState": "ISSUE_DETECTION",
+    "sideEffects": []
+  },
+  {
+    "event": "hotfix_triggered",
+    "description": "Fired when an issue requires an emergency hotfix loop.",
+    "nextState": "RECOVERY",
     "sideEffects": []
   },
   {

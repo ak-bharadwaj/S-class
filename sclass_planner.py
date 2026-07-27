@@ -1,35 +1,91 @@
 """
-S-Class EOS Planning Engine (sclass_planner.py)
+S-Class EOS Decoupled Planning Pipeline (sclass_planner.py)
 
-Untrusted Planning Service responsible for:
-- Domain Classification & Domain Interaction Graph
-- Capability Plugin Lookup
-- Adaptive Sequential Tiered Debate Squad Assembly
-- Strategy & Intent Contract Inference
-- Task DAG Compilation & Dependency Confidence Graph
+Decoupled single-responsibility planning components:
+1. IntentExtractor    -> Extracts goals, scope boundaries, and explicit constraints.
+2. RiskAnalyzer       -> Assesses risk level, urgency, review depth, and queries Knowledge Base.
+3. WorkflowSelector   -> Selects optimal workflow profile (FULL, BUG_FIX, RESEARCH, REFACTOR, HOTFIX).
+4. ExecutionPlanner   -> Assembles execution plan, task DAG, and capability plugin squad.
 """
 
 import os
 import sys
 import json
 import logging
+from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from strategy import StrategyEngine, ExecutionStrategy, RiskLevel, ReviewDepth, DOMAIN_INTERACTION_GRAPH
 from planner import MetaPlanner, WorkflowProfile, WorkflowPlan
+from knowledge_base import KnowledgeBaseManager
 
 logger = logging.getLogger("sclass_planner")
 
 
-class PlanningEngine:
-    """Standalone Planning & Strategy Service that proposes Execution Plans to the Kernel."""
+@dataclass
+class ExtractedIntent:
+    goal: str
+    target_domains: List[str]
+    explicit_constraints: List[str] = field(default_factory=list)
+
+
+@dataclass
+class RiskAssessment:
+    risk_level: RiskLevel
+    review_depth: ReviewDepth
+    knowledge_context: Dict[str, List[Dict[str, Any]]]
+
+
+class IntentExtractor:
+    """Stage 1: Extracts intent, domains, and scope boundaries from goal prompt."""
 
     @staticmethod
-    def create_execution_plan(goal: str, codebase_meta: Optional[Dict[str, Any]] = None) -> ExecutionStrategy:
-        """Analyzes goal and generates a comprehensive ExecutionStrategy plan."""
-        logger.info(f"[PlanningEngine] Creating execution plan for goal: '{goal}'")
-        return StrategyEngine.infer_strategy(goal, codebase_meta=codebase_meta)
+    def extract_intent(goal_text: str) -> ExtractedIntent:
+        domains = StrategyEngine.detect_domains(goal_text)
+        constraints = []
+        if "must" in goal_text.lower() or "never" in goal_text.lower():
+            constraints.append("Enforce explicit prompt boundary constraints")
+        return ExtractedIntent(goal=goal_text, target_domains=domains, explicit_constraints=constraints)
+
+
+class RiskAnalyzer:
+    """Stage 2: Assesses risk level, review depth, and retrieves organizational Knowledge Base."""
+
+    @staticmethod
+    def analyze_risk(intent: ExtractedIntent, workspace_dir: Optional[str] = None) -> RiskAssessment:
+        strat = StrategyEngine.infer_strategy(intent.goal)
+        kb_data = KnowledgeBaseManager.query_knowledge_base(intent.goal, workspace_dir=workspace_dir)
+        return RiskAssessment(
+            risk_level=strat.risk_level,
+            review_depth=strat.review_depth,
+            knowledge_context=kb_data
+        )
+
+
+class WorkflowSelector:
+    """Stage 3: Selects the optimal workflow profile."""
+
+    @staticmethod
+    def select_profile(intent: ExtractedIntent, risk: RiskAssessment, override_profile: Optional[str] = None) -> WorkflowPlan:
+        return MetaPlanner.classify_goal(intent.goal, override_profile=override_profile)
+
+
+class ExecutionPlanner:
+    """Stage 4: Assembles the complete Execution Plan and capability squad."""
+
+    @staticmethod
+    def create_plan(goal: str, workspace_dir: Optional[str] = None, codebase_meta: Optional[Dict[str, Any]] = None) -> ExecutionStrategy:
+        # Step 1: Intent Extraction
+        intent = IntentExtractor.extract_intent(goal)
+        # Step 2: Risk & Knowledge Base Retrieval
+        risk = RiskAnalyzer.analyze_risk(intent, workspace_dir=workspace_dir)
+        # Step 3: Workflow Profile Selection
+        plan = WorkflowSelector.select_profile(intent, risk)
+        # Step 4: Assemble Execution Strategy
+        strategy = StrategyEngine.infer_strategy(goal, codebase_meta=codebase_meta)
+        logger.info(f"[ExecutionPlanner] Assembled Execution Plan (Domains={intent.target_domains}, Risk={risk.risk_level.value}, Profile={plan.profile.value})")
+        return strategy
 
     @staticmethod
     def discover_capability_plugins() -> Dict[str, Any]:
