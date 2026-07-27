@@ -72,6 +72,12 @@
     "sideEffects": []
   },
   {
+    "event": "integration_failed",
+    "description": "Fired when integration checks detect breaking inter-module DTO or route incompatibilities.",
+    "nextState": "CODING",
+    "sideEffects": ["incrementRetryCount"]
+  },
+  {
     "event": "qa_passed",
     "description": "Fired when pytest/Playwright test suites execute without errors.",
     "nextState": "RELEASE",
@@ -102,6 +108,12 @@
     "sideEffects": []
   },
   {
+    "event": "release_hold",
+    "description": "Fired when release manager halts deployment due to security or compliance warnings.",
+    "nextState": "CODING",
+    "sideEffects": ["incrementRetryCount"]
+  },
+  {
     "event": "monitoring_passed",
     "description": "Fired when continuous monitoring confirms stable post-release deployment.",
     "nextState": "DONE",
@@ -123,6 +135,12 @@
     "event": "hotfix_triggered",
     "description": "Fired when an issue requires an emergency hotfix loop.",
     "nextState": "RECOVERY",
+    "sideEffects": []
+  },
+  {
+    "event": "resolved",
+    "description": "Fired when a production issue anomaly is marked resolved.",
+    "nextState": "MONITORING",
     "sideEffects": []
   },
   {
