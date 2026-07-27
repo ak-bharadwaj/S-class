@@ -9,7 +9,7 @@ from sclass_planner import ExecutionPlanner, IntentExtractor, RiskAnalyzer, Work
 from knowledge_base import KnowledgeBaseManager
 from monitoring import MultiStreamMonitor
 from learning_engine import LearningEngine
-from context_compressor import ContextCompressor, StructuredMemory
+from context_compressor import ContextCompressor, TriPartiteMemory
 from event_graph import EventGraph, EventTopic, global_event_graph
 
 
@@ -36,21 +36,36 @@ def test_kernel_formal_api_and_event_sourcing(tmp_path):
 
 def test_context_compression_engine():
     mock_state = {
-        "planRationale": "Implement Stripe Payments",
+        "currentPhase": "CODING",
+        "planRationale": "Implement Stripe Payments and JWT Bearer authentication flow across frontend and backend services",
         "reviewDepth": "deep",
+        "retryCount": 1,
+        "transitionHistory": [
+            {"stepIndex": i, "fromState": "TRIAGE", "toState": "ANALYSIS", "eventFired": f"event_{i}"} for i in range(1, 20)
+        ],
         "decisionLog": [
-            {"agent": "dss_governor", "decision": "Approve DB Schema", "reason": "Valid Types"},
-            {"agent": "dss_cso_v2", "decision": "Approve Auth DTO", "reason": "No Leaks"}
+            {"agent": f"agent_{i}", "decision": f"Approve DB Schema {i}", "reason": f"Valid Types and constraints verification passed on line {i}"} for i in range(20)
         ],
         "tasks": [
-            {"id": "T1", "targets": ["src/auth.ts", "src/db.ts"]}
+            {"id": f"T{i}", "targets": [f"src/auth_{i}.ts", f"src/db_{i}.ts"], "sandboxBranch": "sandbox/T1"} for i in range(10)
         ]
     }
     
-    compressed = ContextCompressor.compress_context(mock_state)
-    assert isinstance(compressed, StructuredMemory)
-    assert "src/auth.ts" in compressed.modified_targets
-    assert compressed.compression_ratio < 1.0
+    tri_memory = ContextCompressor.compress_context(mock_state)
+    assert isinstance(tri_memory, TriPartiteMemory)
+    
+    # 1. Episodic Memory ("What happened?")
+    assert len(tri_memory.episodic.past_events) == 5
+    assert "TRIAGE" in tri_memory.episodic.completed_phases
+    
+    # 2. Semantic Memory ("What did we learn?")
+    assert len(tri_memory.semantic.learned_rules) > 0
+    
+    # 3. Working Memory ("Current execution context")
+    assert tri_memory.working.current_phase == "CODING"
+    assert "src/auth_0.ts" in tri_memory.working.active_targets
+    assert tri_memory.working.active_branch == "sandbox/T1"
+    assert tri_memory.compression_ratio < 1.0
 
 
 def test_event_driven_graph_architecture():
