@@ -39,6 +39,14 @@ class ProjectScale(Enum):
     ENTERPRISE = "enterprise"
 
 
+VERIFICATION_PRIORITY_HIERARCHY = {
+    "TIER_1_LOGIC": ["working_flow", "business_logic", "backend_routing", "db_schema", "rbac_security"],
+    "TIER_2_DATA_VISUAL": ["data_rendering_fidelity", "no_prop_leaks", "input_output_form_flow"],
+    "TIER_3_UI": ["layout_structure", "grid_alignment", "component_hierarchy"],
+    "TIER_4_UX": ["ergonomics", "micro_animations", "toast_feedback", "hover_states"]
+}
+
+
 @dataclass
 class ExecutionStrategy:
     goal: str

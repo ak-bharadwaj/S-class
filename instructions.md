@@ -47,6 +47,17 @@ CRITICAL DIRECTIVE: Once this plugin is active, you (the main Antigravity agent)
     2. **Data Pollution & Extra Data Audit:** Output views MUST NOT render extra, unrequested, or leaked internal data (e.g. raw hashes, unformatted timestamps, internal database IDs, or unrequested columns).
     3. **UX Layout Integrity:** If the UI layout or data workflow contradicts what the user requested in `IntentContract`, `dss_user_alias_v2` MUST reject verification.
 
+## 12. Strict 4-Tier Verification Priority Hierarchy
+All subagents, verifiers, and planners MUST evaluate and prioritize task execution, code generation, and verification according to this strict 4-tier hierarchy:
+1. **Tier 1 (Highest Priority): Working Logic & Business Flow**
+   * Backend API routing, DB schema & migrations, business logic calculations, state transitions, security/auth bounds, data persistence.
+2. **Tier 2: Data Visual & Output Fidelity**
+   * Data rendering correctness (no `undefined`, `NaN`, `null`, `[object Object]`), form submission rendering in output views, no data pollution/leaks.
+3. **Tier 3: UI (User Interface) Structure & Layout**
+   * Clean layout alignment, responsive grid bounds, component structure, typography, button placement, visual hierarchy.
+4. **Tier 4: UX (User Experience) Ergonomics & Polish**
+   * Micro-animations, smooth transitions, toast feedback, dark mode aesthetics, loading indicators, subtle hover states.
+
 
 
 
