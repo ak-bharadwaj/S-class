@@ -153,6 +153,7 @@
     "can_vote": true
   },
   "dss_qa_frontend": {
+    "domains": ["frontend_qa", "ui_rendering_verification", "visual_data_fidelity"],
     "can_read": true,
     "can_write": false,
     "can_dispatch_events": true,
@@ -167,7 +168,7 @@
     "can_vote": true
   },
   "dss_user_alias_v2": {
-    "domains": ["user_experience", "acceptance_criteria", "ux_workflow"],
+    "domains": ["user_experience", "acceptance_criteria", "ux_workflow", "visual_screen_audit", "data_rendering_fidelity"],
     "can_read": true,
     "can_write": false,
     "can_dispatch_events": true,
