@@ -10,6 +10,7 @@ from knowledge_base import KnowledgeBaseManager
 from monitoring import MultiStreamMonitor
 from learning_engine import LearningEngine
 from context_compressor import ContextCompressor, TriPartiteMemory
+from resource_scheduler import ResourceAwareScheduler
 from event_graph import EventGraph, EventTopic, global_event_graph
 
 
@@ -66,6 +67,15 @@ def test_context_compression_engine():
     assert "src/auth_0.ts" in tri_memory.working.active_targets
     assert tri_memory.working.active_branch == "sandbox/T1"
     assert tri_memory.compression_ratio < 1.0
+
+
+def test_resource_aware_scheduler():
+    scheduler = ResourceAwareScheduler()
+    assert scheduler.can_dispatch_builder(2) is True
+    assert scheduler.can_dispatch_builder(4) is False
+    
+    pruned = scheduler.optimize_task_context(["f1.ts", "f2.ts", "f3.ts", "f4.ts", "f5.ts", "f6.ts", "f7.ts"])
+    assert len(pruned) == 5
 
 
 def test_event_driven_graph_architecture():

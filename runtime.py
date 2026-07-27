@@ -129,13 +129,7 @@ class FileLock:
             except OSError:
                 pass
 
-class ResourceAwareScheduler:
-    """Resource-aware OS task scheduler checking concurrency limits before dispatch."""
-    MAX_CONCURRENT_BUILDERS = 4
-
-    @staticmethod
-    def can_dispatch_task(active_builder_count: int) -> bool:
-        return active_builder_count < ResourceAwareScheduler.MAX_CONCURRENT_BUILDERS
+from resource_scheduler import ResourceAwareScheduler, global_resource_scheduler
 
 
 class ContextBudgetOptimizer:

@@ -1,31 +1,62 @@
-# S-Class V9.2.0: Event-Sourced Cognitive Memory Microkernel Engine
+# S-Class V9.2: The Deterministic AI Runtime
 
-S-Class is an **Event-Sourced Cognitive Memory Microkernel Engine** built for AI agent platforms. Rather than allowing AI agents to mutate project state directly or drift during long coding sessions, S-Class places all code generation, planning, and state transitions behind a deterministic, policy-driven microkernel.
+> **Event-Sourced Cognitive Memory Microkernel Engine for AI Agent Platforms**
+
+S-Class is a **Deterministic AI Runtime**. Rather than allowing AI agents to mutate project state directly or drift during long coding sessions, S-Class places all code generation, planning, and state transitions behind a deterministic, policy-driven microkernel running on your host operating system.
+
+---
+
+## 30-Second Quick Start Example
+
+```python
+import runtime
+from sclass_kernel import kernel_instance
+from sclass_planner import ExecutionPlanner
+
+# 1. Initialize deterministic FSM state for your engineering goal
+state = runtime.initialize_state(goal="Fix user authentication JWT token validation bug")
+
+# 2. Planning Engine creates an Execution Strategy with domain matching & KB rules
+plan = ExecutionPlanner.create_plan(state.planRationale)
+
+# 3. Formally request Kernel State Transition (Exclusive Authoritative State Mutator)
+res = kernel_instance.request_transition("TRIAGE", "triage_done")
+print(f"Kernel Approved Transition: {res['previousPhase']} ➔ {res['currentPhase']}")
+
+# 4. Request Per-Task Verification on isolated builder sandbox
+ver_res = kernel_instance.request_task_verification(task_id="T1")
+print(f"Sandbox Task Verified: {ver_res['status']}")
+
+# 5. Cleanly merge verified task into primary branch
+merge_res = kernel_instance.request_merge(task_id="T1", sandbox_branch="sandbox/T1")
+print(f"Merged Sandbox: {merge_res['currentPhase']}")
+```
 
 ---
 
 ## Why S-Class EOS? (The Core Advantage)
 
-| Without S-Class | With S-Class EOS V9.2.0 |
+| Without S-Class | With S-Class V9.2 |
 | :--- | :--- |
-| **Direct State Mutation:** Agents edit files and state without formal validation, causing silent corruption. | **Exclusive Kernel Mutator:** Only the deterministic `sclass_kernel` can write state changes to disk. |
+| **Direct State Mutation:** Agents edit files and state without formal validation, causing silent corruption. | **Exclusive Kernel Mutator:** Only the deterministic `sclass_kernel.py` can write state changes to disk. |
 | **Context Window Overflow:** Long-running coding sessions crash or drift as context bloats. | **Tri-Partite Cognitive Memory:** Automatically compresses context into Episodic, Semantic, and Working Memory. |
-| **Speculative Verification:** Completion is self-reported by LLM prompts ("I fixed it!"). | **Policy-Driven Evidence Gates:** Hard-blocks state transitions unless physical test receipts & diffs exist on disk. |
-| **Irreproducible Execution:** Failures cannot be audited or replayed when things go wrong. | **Canonical Event Sourcing & Replay:** Immutable event store (`event_store.jsonl`) enables 100% mathematical replayability. |
+| **Prompt-Dependent Verification:** Completion is self-reported by LLM prompts ("I fixed it!"). | **Policy-Driven Evidence Gates:** Hard-blocks state transitions unless physical test receipts & diffs exist on disk. |
+| **Irreproducible Execution Logs:** Failures cannot be audited or replayed when things go wrong. | **Deterministic Event Replay:** Immutable event store (`event_store.jsonl`) records execution events. |
 | **Static Memory:** Systems relearn the same architectural lessons and mistakes on every run. | **Selective KB & Automated Learning:** Pre-planning knowledge retrieval + automatic candidate learning loop. |
 
 ---
 
-## How S-Class Compares to Other Frameworks
+## Framework Architectural Comparison
 
-| Feature | OpenHands | Claude Code | Codex / Generic Agents | **S-Class EOS V9.2.0** |
+| Architectural Layer | OpenHands | Claude Code | Codex / Generic Agents | **S-Class V9.2 (Deterministic AI Runtime)** |
 | :--- | :--- | :--- | :--- | :--- |
-| **Architecture** | Sandbox Harness | CLI Agent Loop | Prompt Loop | **Deterministic Microkernel** |
-| **State Mutation Guard** | ❌ Direct File Edits | ❌ Direct File Edits | ❌ Direct File Edits | **✅ Exclusive Kernel Mutator** |
-| **Evidence Validation** | ⚠️ Self-Reported | ⚠️ Command Exit Codes | ❌ None | **✅ Policy-Driven Evidence Gates** |
-| **Event Sourcing** | ❌ None | ❌ None | ❌ None | **✅ Append-Only `event_store.jsonl`** |
-| **Cognitive Memory** | ❌ Flat History | ❌ Flat History | ❌ Flat History | **✅ Tri-Partite Memory (Episodic/Semantic/Working)** |
-| **Post-Release Loop** | ❌ Terminal State | ❌ Terminal State | ❌ Terminal State | **✅ Continuous Multi-Stream Telemetry Loop** |
+| **System Philosophy** | Sandbox Harness | CLI Agent Loop | Prompt Execution Loop | **Deterministic Microkernel Engine** |
+| **State Mutation Guard** | File System Writes | File System Writes | File System Writes | **✅ Exclusive Kernel Mutator (`sclass_kernel.py`)** |
+| **Evidence Validation** | Self-Reported Prompt | Command Exit Codes | Unchecked Prompts | **✅ Policy-Driven Evidence Gates (`policies.json`)** |
+| **Event Sourcing** | Flat Execution Log | Command Line Log | Conversation Log | **✅ Append-Only `event_store.jsonl` Canonical Log** |
+| **Cognitive Memory** | Flat Context Window | Flat Context Window | Flat Context Window | **✅ Tri-Partite Memory (`Episodic`, `Semantic`, `Working`)** |
+| **Task Concurrency** | Single Thread Loop | Single Thread Loop | Single Thread Loop | **✅ OS Resource Scheduler (`resource_scheduler.py`)** |
+| **Post-Release Loop** | Terminal State | Terminal State | Terminal State | **✅ Multi-Stream Active Telemetry Loop (`monitoring.py`)** |
 
 ---
 
@@ -35,94 +66,86 @@ S-Class is an **Event-Sourced Cognitive Memory Microkernel Engine** built for AI
    User Request / Prompt
            │
            ▼
-┌──────────────────────┐
-│   Planning Engine    │ ◄── Ingests Organizational Knowledge Base (`knowledge_base.py`)
-│  (`sclass_planner`)  │
-└──────────┬───────────┘
-           │ Proposes Execution Plan
-           ▼
-┌──────────────────────┐
-│ Deterministic Kernel │ ◄── Enforces FSM State Graph & Schema Validation (`sclass_kernel.py`)
-└──────────┬───────────┘
-           │ Dispatches Task
-           ▼
-┌──────────────────────┐
-│ Resource OS Scheduler│ ◄── Checks CPU, RAM, & Concurrency Bounds (`ResourceAwareScheduler`)
-└──────────┬───────────┘
-           │ Spawns Ephemeral Builders
-           ▼
-┌──────────────────────┐
-│ Sandboxed Builders   │ ◄── Build isolated code changes in `sandbox/T1`, `sandbox/T2`
-└──────────┬───────────┘
-           │ Submits Code Outputs
-           ▼
-┌──────────────────────┐
-│ Verifier Evidence    │ ◄── Audits physical diffs, test receipts, & visual screenshots (`verifier.py`)
-└──────────┬───────────┘
-           │ Approves Mutation
-           ▼
-┌──────────────────────┐
-│ Canonical EventStore │ ◄── Appends immutable event to `.agents/event_store.jsonl`
-└──────────┬───────────┘
-           │
-           ├──────────────────────────┐
-           ▼                          ▼
-┌──────────────────────┐   ┌──────────────────────┐
-│ Replay Engine        │   │ Learning Engine      │
-│ (`replay.py`)        │   │ (`learning_engine`)  │
-│ 100% Audit Replay    │   │ Promotes KB Lessons  │
-└──────────────────────┘   └──────────────────────┘
+┌──────────────────────────────┐
+│       Planning Engine        │ ◄── Pre-Planning KB Query (`knowledge_base.py`)
+│     (`sclass_planner.py`)    │
+└──────────────┬───────────────┘
+               │ Proposes Execution Plan
+               ▼
+┌──────────────────────────────┐
+│    Deterministic Kernel      │ ◄── Enforces FSM State Graph & Schema (`sclass_kernel.py`)
+│    (`sclass_kernel.py`)      │
+└──────────────┬───────────────┘
+               │ Dispatches Task
+               ▼
+┌──────────────────────────────┐
+│  Resource OS Task Scheduler  │ ◄── Checks CPU, RAM, & Concurrency Bounds (`resource_scheduler.py`)
+│  (`resource_scheduler.py`)   │
+└──────────────┬───────────────┘
+               │ Spawns Ephemeral Tech Builders
+               ▼
+┌──────────────────────────────┐
+│  Sandboxed Tech Builders    │ ◄── Build isolated code changes in `sandbox/T1`, `sandbox/T2`
+└──────────────┬───────────────┘
+               │ Submits Code Outputs
+               ▼
+┌──────────────────────────────┐
+│   Verifier Evidence Gate     │ ◄── Audits physical diffs, test receipts, & screenshots (`verifier.py`)
+│       (`verifier.py`)        │
+└──────────────┬───────────────┘
+               │ Approves Mutation
+               ▼
+┌──────────────────────────────┐
+│  Canonical Event Sourcing    │ ◄── Appends immutable event to `.agents/event_store.jsonl`
+└──────────────┬───────────────┘
+               │
+               ├──────────────────────────────┐
+               ▼                              ▼
+┌──────────────────────────────┐   ┌──────────────────────────────┐
+│   Event Replay Engine        │   │   Automated Learning Engine  │
+│       (`replay.py`)          │   │    (`learning_engine.py`)     │
+│   Deterministic Audit Log    │   │    Promotes KB Lessons       │
+└──────────────────────────────┘   └──────────────────────────────┘
 ```
 
 ---
 
-## The 8 Core Subsystems of S-Class V9.2.0
+## 1:1 Architecture-to-Module Mapping
 
-| # | Subsystem | Module | Technical Rationale & Impact |
-| :--- | :--- | :--- | :--- |
-| **1** | **Deterministic Microkernel** | `sclass_kernel.py` | Exclusive authoritative state mutator exposing formal Kernel API (`request_transition`, `request_merge`, etc.). |
-| **2** | **Event Sourcing Store** | `.agents/event_store.jsonl` | Append-only event log serves as canonical truth. State can be reconstructed at any time via event replay. |
-| **3** | **Pre-Planning Knowledge Base** | `knowledge_base.py` | Profile-driven selective retrieval loads organizational memory upfront before drafting plans. |
-| **4** | **Decoupled 4-Stage Planner** | `sclass_planner.py` | Single-responsibility pipeline: `IntentExtractor` ➔ `RiskAnalyzer` ➔ `WorkflowSelector` ➔ `ExecutionPlanner`. |
-| **5** | **Tri-Partite Cognitive Memory** | `context_compressor.py` | Separates context into Episodic ("What happened"), Semantic ("What we learned"), & Working Memory ("Current context"). |
-| **6** | **Event-Driven Asynchronous Graph**| `event_graph.py` | Pub/sub event broker (`TASK_STARTED`, `TASK_COMPLETED`, `QA_FAILED`, `RECOVERY_REQUIRED`, `RELEASE_CREATED`, `MONITORING_ALERT`). |
-| **7** | **Multi-Stream Active Monitoring** | `monitoring.py` | Active ingestion across 6 streams: Logs, Metrics, User Reports, Crash Reports, Performance, & Security Events. |
-| **8** | **Automated Learning & KB Promotion**| `learning_engine.py` | Captures knowledge candidates during execution and promotes approved candidates to permanent KB files. |
-
----
-
-## Tri-Partite Cognitive Memory Science
-
-S-Class avoids context window overflow by structuring memory into three distinct cognitive layers:
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│ 1. EPISODIC MEMORY ("What happened?")                                  │
-│    - Past sequential FSM state events & transitions                     │
-│    - Execution failures & retry histories                               │
-│    - Milestone phases completed                                         │
-├─────────────────────────────────────────────────────────────────────────┤
-│ 2. SEMANTIC MEMORY ("What did we learn?")                              │
-│    - Generalized architectural principles & learned rules               │
-│    - Organizational standards & invariant constraints                   │
-├─────────────────────────────────────────────────────────────────────────┤
-│ 3. WORKING MEMORY ("Current execution context")                        │
-│    - Active FSM state phase                                             │
-│    - Target file paths & active sandbox branch                          │
-│    - Active boundary risks & review depth                               │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+| Architecture Box | Dedicated Module File | Key Responsibilities |
+| :--- | :--- | :--- |
+| **Deterministic Microkernel** | `sclass_kernel.py` | Authoritative state mutator, formal Kernel API, FSM graph validation. |
+| **Planning Engine** | `sclass_planner.py` | 4-stage pipeline: Intent, Risk, Workflow selection, Execution Plan assembly. |
+| **Resource OS Scheduler** | `resource_scheduler.py` | Checks host CPU, RAM, context budget, and builder concurrency limits ($\le 4$). |
+| **Pre-Planning Knowledge Base** | `knowledge_base.py` | Profile-driven selective retrieval (`bug_fix`, `research`, `hotfix`, `full`). |
+| **Context Compression Engine** | `context_compressor.py` | Structuring memory into Episodic, Semantic, and Working Memory layers. |
+| **Event-Driven Graph Broker** | `event_graph.py` | Asynchronous pub/sub topic broker (`TASK_STARTED`, `QA_FAILED`, etc.). |
+| **Multi-Stream Monitor** | `monitoring.py` | Active telemetry ingestion across 6 streams (Logs, Metrics, Crash, Perf, Security). |
+| **Automated Learning Engine** | `learning_engine.py` | Captures knowledge candidates and promotes approved fixes to permanent KB. |
+| **Verifier Evidence Gate** | `verifier.py` | Hard-blocks state transitions unless physical disk evidence and test receipts exist. |
+| **Event Replay Engine** | `replay.py` | Deterministic event replay and Markdown trajectory audit report generation. |
+| **Smart Recovery Dispatcher** | `error_recovery.py` | Categorized error recovery routing (Syntax ➔ Coding, Import ➔ Integration, etc.). |
 
 ---
 
-## Test Suite & Verification
+## Comprehensive Test Suite Coverage
 
-S-Class contains **64 automated unit tests** passing cleanly with 100% success across Python 3.10, 3.11, 3.12, 3.13, and 3.14:
+S-Class contains **65 automated unit tests** passing with 100% success across Python 3.10–3.14:
 
-```bash
-python -m pytest tests/ -v
-# Output: 64 passed in 0.40s
-```
+| Test Module File | Test Count | System Functionality Tested |
+| :--- | :--- | :--- |
+| `tests/test_kernel.py` | 6 tests | Kernel formal API, Event Sourcing replay, Tri-Partite Memory, Resource Scheduler, Event Graph. |
+| `tests/test_eos_core.py` | 10 tests | Strategy Engine, Domain Classification, Capability Matching, Self-Evaluator, Evidence Verifier. |
+| `tests/test_error_recovery.py` | 4 tests | Regex error matching, exponential backoff, stop conditions, Smart Multi-Tier Recovery. |
+| `tests/test_planner.py` | 9 tests | Meta-Planner profile selection (`BUG_FIX`, `RESEARCH`, `REFACTOR`, `HOTFIX`), profile shortcuts. |
+| `tests/test_replay.py` | 3 tests | TransitionRecord serialization, ReplayEngine trajectory audit, Markdown export. |
+| `tests/test_runtime.py` | 9 tests | FSM state initialization, schema type validation, event dispatching, FileLock recovery. |
+| `tests/test_memory_semantic.py` | 6 tests | Semantic TF-IDF vector similarity search, memory schema v2, auto-migration. |
+| `tests/test_security_shield.py` | 4 tests | Secret scanning, dangerous AST pattern detection, vulnerability report generation. |
+| `tests/test_topology.py` | 5 tests | Subagent network topologies (Hierarchical, Mesh, Star, Ring phase resolution). |
+| `tests/test_doctor.py` | 4 tests | Environment health verification, corrupt file detection, stale lock recovery. |
+| `tests/test_config_gc.py` | 4 tests | Lock GC, state expiration cleanup, memory pruning, orphaned screenshot GC. |
+| `tests/test_intent_contract.py` | 3 tests | Intent Contract validation, scope boundary enforcement, serialization. |
 
 ---
 
