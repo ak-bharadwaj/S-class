@@ -115,6 +115,20 @@ Without launching the live application server and invoking `chrome-devtools-mcp`
 3. **No Terminal/Log Substitution:** Relying solely on `npm run dev` stdout logs, backend unit tests, or terminal output WITHOUT taking Chrome MCP visual snapshots is an explicit **GOVERNANCE VIOLATION**.
 4. **Safety Case Invariant:** If no Chrome MCP / Playwright visual output receipt exists in `.agents/screenshots/`, `SafetyCase.output_contract_passed` evaluates to `False`, and `PolicyEngine` automatically fires a **`HARD_BLOCK` (`REJECT_RELEASE`)**.
 
+## 15. Full Page Interaction Sweep (Multi-Button & Sub-Page Crawler Rule)
+
+If a page or view contains multiple buttons, tabs, forms, modals, or sub-pages, QA (`dss_qa_v2`) and User Proxy (`dss_user_alias_v2`) **MUST NOT** limit verification to a single button or primary view.
+
+### Mandatory Multi-Button Sweep Protocol:
+1. **Interactive Element Inventory:** Chrome MCP / Playwright MUST scan and log all interactive elements (`<button>`, `<a>`, `<input>`, `<select>`, tab controls, modal triggers) on the page.
+2. **Sub-Page & Modal Crawling:**
+   * **Tabs & Sub-Pages:** Click every tab link and sub-page route ──► verify view renders cleanly without 404/500 errors or broken CSS layout.
+   * **Modals:** Click modal triggers ──► verify modal opens ──► test modal action controls ──► verify modal dismisses cleanly.
+   * **Form Submissions:** Fill required inputs ──► click submit ──► verify data renders in output views with zero `undefined`, `NaN`, `null`, or `[object Object]` text.
+   * **Action Controls (Edit / Delete / Export / Filter):** Click each action control ──► verify underlying handler executes correctly without silent JS console errors or swallowed exceptions.
+3. **Interaction Receipts Persistence:** Write interaction execution records to `.agents/interaction_receipts.json`. If any button click triggers a JS error or fails to update state, record the defect as a Tier 1 / Tier 3a `HARD_BLOCK`.
+
+
 
 
 
