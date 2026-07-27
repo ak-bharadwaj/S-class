@@ -21,6 +21,7 @@ import sys
 import json
 import logging
 from dataclasses import asdict
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -40,12 +41,17 @@ class KernelPermissionError(PermissionError):
 
 
 class EventStore:
-    """Append-only canonical event log for Event Sourcing state reconstruction."""
+    """Append-only canonical event log with Snapshot Checkpointing for O(delta) replay performance."""
 
     @staticmethod
     def get_store_file(workspace_dir: Optional[str] = None) -> str:
         cwd = workspace_dir if workspace_dir else os.getcwd()
         return os.path.join(cwd, ".agents", "event_store.jsonl")
+
+    @staticmethod
+    def get_snapshot_file(workspace_dir: Optional[str] = None) -> str:
+        cwd = workspace_dir if workspace_dir else os.getcwd()
+        return os.path.join(cwd, ".agents", "event_store_snapshot.json")
 
     @staticmethod
     def append_event(event_record: Dict[str, Any], workspace_dir: Optional[str] = None) -> None:
@@ -55,14 +61,38 @@ class EventStore:
             f.write(json.dumps(event_record) + "\n")
 
     @staticmethod
+    def create_checkpoint(state: Dict[str, Any], event_offset: int, workspace_dir: Optional[str] = None) -> None:
+        snapshot_file = EventStore.get_snapshot_file(workspace_dir)
+        os.makedirs(os.path.dirname(snapshot_file), exist_ok=True)
+        snapshot = {
+            "snapshot_at": datetime.now(timezone.utc).isoformat() if 'datetime' in globals() else "",
+            "event_offset": event_offset,
+            "state_snapshot": state
+        }
+        with open(snapshot_file, "w", encoding="utf-8") as f:
+            json.dump(snapshot, f, indent=2)
+
+    @staticmethod
     def read_all_events(workspace_dir: Optional[str] = None) -> List[Dict[str, Any]]:
         store_file = EventStore.get_store_file(workspace_dir)
-        if not os.path.exists(store_file):
-            return []
+        snapshot_file = EventStore.get_snapshot_file(workspace_dir)
         events = []
+        offset = 0
+
+        if os.path.exists(snapshot_file):
+            try:
+                with open(snapshot_file, "r", encoding="utf-8") as sf:
+                    snap_data = json.load(sf)
+                    offset = snap_data.get("event_offset", 0)
+            except Exception:
+                offset = 0
+
+        if not os.path.exists(store_file):
+            return events
+
         with open(store_file, "r", encoding="utf-8") as f:
-            for line in f:
-                if line.strip():
+            for idx, line in enumerate(f):
+                if idx >= offset and line.strip():
                     events.append(json.loads(line))
         return events
 

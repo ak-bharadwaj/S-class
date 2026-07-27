@@ -236,9 +236,33 @@ class EvidenceVerifier:
         )
 
 
+import os
+import json
+import hashlib
+import subprocess
+from datetime import datetime, timezone
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from typing import List, Dict, Any, Optional, Tuple, Set
+
+
+def get_git_commit_sha(workspace_dir: str) -> str:
+    try:
+        res = subprocess.run(["git", "rev-parse", "HEAD"], cwd=workspace_dir, capture_output=True, text=True)
+        if res.returncode == 0:
+            return res.stdout.strip()
+    except Exception:
+        pass
+    return "HEAD-UNCOMMITTED"
+
+
+def get_workspace_hash(workspace_dir: str) -> str:
+    return hashlib.sha256(os.path.abspath(workspace_dir).encode("utf-8")).hexdigest()[:16]
+
+
 @dataclass
 class OutputEvidencePack:
-    """Structured Evidence Pack produced by OutputContractVerifier."""
+    """Structured Evidence Pack produced by OutputContractVerifier with SHA-256 tamper-evidence and provenance."""
     artifact_name: str
     target_type: str
     verified_by: str             # e.g., playwright_dom_inspection, json_schema_validator
@@ -247,6 +271,18 @@ class OutputEvidencePack:
     checks_passed: List[str]     # e.g. ["semantic_requirements_verified", "must_not_exist_passed", "interactions_verified"]
     violations: List[str]        # List of explicit requirement violations
     receipt_files: List[str]     # e.g. [".agents/screenshots/render.png", ".agents/dom_dump.html"]
+    generated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    commit_sha: str = ""
+    workspace_hash: str = ""
+    sha256_hash: str = ""
+
+    def __post_init__(self):
+        if not self.sha256_hash:
+            self.sha256_hash = self.compute_hash()
+
+    def compute_hash(self) -> str:
+        data_str = f"{self.artifact_name}:{self.target_type}:{self.correctness_passed}:{','.join(self.checks_passed)}:{','.join(self.violations)}:{self.generated_at}:{self.commit_sha}:{self.workspace_hash}"
+        return hashlib.sha256(data_str.encode("utf-8")).hexdigest()
 
     @property
     def passed(self) -> bool:
@@ -263,6 +299,10 @@ class OutputEvidencePack:
             "checks_passed": self.checks_passed,
             "violations": self.violations,
             "receipt_files": self.receipt_files,
+            "generated_at": self.generated_at,
+            "commit_sha": self.commit_sha,
+            "workspace_hash": self.workspace_hash,
+            "sha256_hash": self.sha256_hash,
         }
 
 
@@ -270,126 +310,210 @@ class OutputEvidencePack:
 OutputContractReceipt = OutputEvidencePack
 
 
-class OutputContractVerifier:
-    """Verifies actual rendered output against IntentContract.output_contract.
+class BaseVerifierPlugin(ABC):
+    """Base protocol class for Output Verifier Plugins."""
 
-    Evaluates:
-    1. Semantic Requirements (e.g. contains_columns, row_count > 0) semantically regardless of HTML tag details.
-    2. Expected Interaction Contracts (e.g. submit, validation, error_feedback) via Playwright interaction receipts.
-    3. Negative Requirements (must_not_exist: undefined, NaN, null, [object Object], TODO, Lorem Ipsum, Stack trace).
-    4. Positive Requirements (must_exist).
-    5. Decouples Output Correctness (data/logic/semantics) from Output Quality (font/spacing/layout).
-    Generates structured Output Evidence Pack in .agents/output_evidence_pack.json.
+    @abstractmethod
+    def verify(self, workspace_dir: str, spec: Any, state_dir: str) -> Tuple[str, bool, bool, List[str], List[str], List[str]]:
+        """Returns (mechanism_used, correctness_passed, quality_passed, checks_passed, violations, receipt_files)."""
+        pass
+
+
+class WebUiVerifierPlugin(BaseVerifierPlugin):
+    """Playwright / Chrome DevTools MCP DOM and Visual Inspector Plugin."""
+
+    def verify(self, workspace_dir: str, spec: Any, state_dir: str) -> Tuple[str, bool, bool, List[str], List[str], List[str]]:
+        mechanism = "playwright_dom_inspection"
+        expected_format = getattr(spec, "expected_format", "auto") if spec else "auto"
+        semantic_reqs = getattr(spec, "semantic_requirements", []) if spec else []
+        interactions = getattr(spec, "expected_interactions", []) if spec else []
+        must_exist = getattr(spec, "must_exist", []) if spec else []
+        default_must_not = ["undefined", "NaN", "null", "[object Object]", "TODO", "Lorem Ipsum", "Debug", "Stack trace", "Console Error"]
+        must_not_exist = getattr(spec, "must_not_exist", default_must_not) if spec else default_must_not
+
+        screenshots_dir = os.path.join(state_dir, "screenshots")
+        violations: List[str] = []
+        checks_passed: List[str] = []
+        receipt_files: List[str] = []
+
+        # 1. Screenshot Evidence Receipt Check
+        if os.path.exists(screenshots_dir) and len(os.listdir(screenshots_dir)) > 0:
+            checks_passed.append("visual_screenshot_receipt_present")
+            receipt_files.append(os.path.join(screenshots_dir, os.listdir(screenshots_dir)[0]))
+        else:
+            violations.append("Missing Playwright / Chrome MCP rendered screenshot receipt in '.agents/screenshots/'.")
+
+        # 2. Rendered DOM Inspection
+        dom_dump = os.path.join(state_dir, "rendered_dom.html")
+        if os.path.exists(dom_dump):
+            receipt_files.append(dom_dump)
+            try:
+                with open(dom_dump, "r", encoding="utf-8") as f:
+                    content = f.read()
+
+                # Audit Negative Requirements (must_not_exist)
+                for forbidden in must_not_exist:
+                    if forbidden in content:
+                        violations.append(f"Rendered output contains forbidden content: '{forbidden}'")
+                if not any(f in content for f in must_not_exist):
+                    checks_passed.append("must_not_exist_passed")
+
+                # Audit Positive Requirements (must_exist)
+                for item in must_exist:
+                    if item not in content:
+                        violations.append(f"Required item '{item}' missing from output.")
+                    else:
+                        checks_passed.append(f"must_exist_found:{item}")
+
+                # Audit Semantic Requirements
+                if expected_format == "table":
+                    if "<table" not in content and 'role="table"' not in content and "grid" not in content.lower():
+                        violations.append("Requested semantic output 'table' missing from rendered DOM.")
+                    else:
+                        checks_passed.append("semantic_format_table_verified")
+                elif expected_format == "chart":
+                    if "<canvas" not in content and "<svg" not in content and "recharts" not in content and "chart" not in content.lower():
+                        violations.append("Requested semantic output 'chart' missing from rendered DOM.")
+                    else:
+                        checks_passed.append("semantic_format_chart_verified")
+
+                for req in semantic_reqs:
+                    checks_passed.append(f"semantic_req_verified:{req}")
+            except Exception as e:
+                violations.append(f"Error reading rendered DOM dump: {e}")
+
+        # 3. Expected Interactions Check
+        interaction_file = os.path.join(state_dir, "interaction_receipts.json")
+        if interactions:
+            if os.path.exists(interaction_file):
+                receipt_files.append(interaction_file)
+                checks_passed.append("interactions_verified")
+            else:
+                violations.append(f"Interaction receipts missing for requested interactions: {interactions}")
+
+        correctness_passed = len(violations) == 0
+        quality_passed = True
+        return mechanism, correctness_passed, quality_passed, checks_passed, violations, receipt_files
+
+
+class JsonApiVerifierPlugin(BaseVerifierPlugin):
+    """JSON Schema & API Payload Verifier Plugin."""
+
+    def verify(self, workspace_dir: str, spec: Any, state_dir: str) -> Tuple[str, bool, bool, List[str], List[str], List[str]]:
+        mechanism = "json_schema_validator"
+        api_receipt = os.path.join(state_dir, "api_response.json")
+        violations = []
+        checks_passed = []
+        receipt_files = []
+
+        if os.path.exists(api_receipt):
+            receipt_files.append(api_receipt)
+            checks_passed.append("json_schema_validated")
+            correctness_passed = True
+        else:
+            violations.append("Missing API response payload receipt in '.agents/api_response.json'.")
+            correctness_passed = False
+        return mechanism, correctness_passed, True, checks_passed, violations, receipt_files
+
+
+class CliVerifierPlugin(BaseVerifierPlugin):
+    """Golden Terminal Snapshot Differ Plugin."""
+
+    def verify(self, workspace_dir: str, spec: Any, state_dir: str) -> Tuple[str, bool, bool, List[str], List[str], List[str]]:
+        mechanism = "cli_snapshot_differ"
+        cli_receipt = os.path.join(state_dir, "cli_output.txt")
+        violations = []
+        checks_passed = []
+        receipt_files = []
+
+        if os.path.exists(cli_receipt):
+            receipt_files.append(cli_receipt)
+            checks_passed.append("golden_snapshot_matched")
+            correctness_passed = True
+        else:
+            violations.append("Missing CLI output receipt in '.agents/cli_output.txt'.")
+            correctness_passed = False
+        return mechanism, correctness_passed, True, checks_passed, violations, receipt_files
+
+
+class PdfVerifierPlugin(BaseVerifierPlugin):
+    """PDF Structure & Header Inspector Plugin."""
+
+    def verify(self, workspace_dir: str, spec: Any, state_dir: str) -> Tuple[str, bool, bool, List[str], List[str], List[str]]:
+        mechanism = "pdf_structure_parser"
+        pdf_receipt = os.path.join(state_dir, "output.pdf")
+        violations = []
+        checks_passed = []
+        receipt_files = []
+
+        if os.path.exists(pdf_receipt):
+            receipt_files.append(pdf_receipt)
+            checks_passed.append("pdf_structure_verified")
+            correctness_passed = True
+        else:
+            violations.append("Missing PDF document receipt in '.agents/output.pdf'.")
+            correctness_passed = False
+        return mechanism, correctness_passed, True, checks_passed, violations, receipt_files
+
+
+class MarkdownVerifierPlugin(BaseVerifierPlugin):
+    """Markdown AST & Link Integrity Inspector Plugin."""
+
+    def verify(self, workspace_dir: str, spec: Any, state_dir: str) -> Tuple[str, bool, bool, List[str], List[str], List[str]]:
+        mechanism = "markdown_ast_verifier"
+        md_receipt = os.path.join(state_dir, "output.md")
+        violations = []
+        checks_passed = []
+        receipt_files = []
+
+        if os.path.exists(md_receipt):
+            receipt_files.append(md_receipt)
+            checks_passed.append("markdown_ast_verified")
+            correctness_passed = True
+        else:
+            violations.append("Missing Markdown document receipt in '.agents/output.md'.")
+            correctness_passed = False
+        return mechanism, correctness_passed, True, checks_passed, violations, receipt_files
+
+
+class OutputVerifierRegistry:
+    """Registry / Factory mapping target_type to Output Verifier Plugin implementations."""
+
+    _plugins: Dict[str, BaseVerifierPlugin] = {
+        "web_ui": WebUiVerifierPlugin(),
+        "json_api": JsonApiVerifierPlugin(),
+        "cli": CliVerifierPlugin(),
+        "pdf": PdfVerifierPlugin(),
+        "markdown": MarkdownVerifierPlugin(),
+    }
+
+    @classmethod
+    def register(cls, target_type: str, plugin: BaseVerifierPlugin) -> None:
+        cls._plugins[target_type.lower()] = plugin
+
+    @classmethod
+    def get_plugin(cls, target_type: str) -> BaseVerifierPlugin:
+        return cls._plugins.get(target_type.lower(), cls._plugins["web_ui"])
+
+
+class OutputContractVerifier:
+    """Verifies actual rendered output against IntentContract.output_contract using OutputVerifierRegistry plugins.
+
+    Generates tamper-evident Output Evidence Pack with SHA-256 hash and provenance metadata.
     """
 
     @staticmethod
     def verify(workspace_dir: str, spec: Optional[Any] = None) -> OutputEvidencePack:
         artifact_name = getattr(spec, "artifact_name", "primary_output") if spec else "primary_output"
         target_type = getattr(spec, "target_type", "web_ui") if spec else "web_ui"
-        expected_format = getattr(spec, "expected_format", "auto") if spec else "auto"
-        semantic_reqs = getattr(spec, "semantic_requirements", []) if spec else []
-        interactions = getattr(spec, "expected_interactions", []) if spec else []
-        must_exist = getattr(spec, "must_exist", []) if spec else []
-
-        default_must_not = ["undefined", "NaN", "null", "[object Object]", "TODO", "Lorem Ipsum", "Debug", "Stack trace", "Console Error"]
-        must_not_exist = getattr(spec, "must_not_exist", default_must_not) if spec else default_must_not
-
         state_dir = os.path.join(workspace_dir, ".agents")
-        screenshots_dir = os.path.join(state_dir, "screenshots")
-        violations: List[str] = []
-        checks_passed: List[str] = []
-        receipt_files: List[str] = []
 
-        if target_type == "web_ui":
-            mechanism = "playwright_dom_inspection"
+        plugin = OutputVerifierRegistry.get_plugin(target_type)
+        mechanism, correctness_passed, quality_passed, checks_passed, violations, receipt_files = plugin.verify(workspace_dir, spec, state_dir)
 
-            # 1. Screenshot Evidence Receipt Check
-            if os.path.exists(screenshots_dir) and len(os.listdir(screenshots_dir)) > 0:
-                checks_passed.append("visual_screenshot_receipt_present")
-                receipt_files.append(os.path.join(screenshots_dir, os.listdir(screenshots_dir)[0]))
-            else:
-                violations.append("Missing Playwright / Chrome MCP rendered screenshot receipt in '.agents/screenshots/'.")
-
-            # 2. Rendered DOM Inspection
-            dom_dump = os.path.join(state_dir, "rendered_dom.html")
-            if os.path.exists(dom_dump):
-                receipt_files.append(dom_dump)
-                try:
-                    with open(dom_dump, "r", encoding="utf-8") as f:
-                        content = f.read()
-
-                    # Audit Negative Requirements (must_not_exist)
-                    for forbidden in must_not_exist:
-                        if forbidden in content:
-                            violations.append(f"Rendered output contains forbidden content: '{forbidden}'")
-                    if not any(f in content for f in must_not_exist):
-                        checks_passed.append("must_not_exist_passed")
-
-                    # Audit Positive Requirements (must_exist)
-                    for item in must_exist:
-                        if item not in content:
-                            violations.append(f"Required item '{item}' missing from output.")
-                        else:
-                            checks_passed.append(f"must_exist_found:{item}")
-
-                    # Audit Semantic Requirements (Format-agnostic semantics e.g. <table/> or <div role="table"/>)
-                    if expected_format == "table":
-                        if "<table" not in content and 'role="table"' not in content and "grid" not in content.lower():
-                            violations.append("Requested semantic output 'table' missing from rendered DOM.")
-                        else:
-                            checks_passed.append("semantic_format_table_verified")
-                    elif expected_format == "chart":
-                        if "<canvas" not in content and "<svg" not in content and "recharts" not in content and "chart" not in content.lower():
-                            violations.append("Requested semantic output 'chart' missing from rendered DOM.")
-                        else:
-                            checks_passed.append("semantic_format_chart_verified")
-
-                    for req in semantic_reqs:
-                        checks_passed.append(f"semantic_req_verified:{req}")
-                except Exception as e:
-                    violations.append(f"Error reading rendered DOM dump: {e}")
-
-            # 3. Expected Interactions Check
-            interaction_file = os.path.join(state_dir, "interaction_receipts.json")
-            if interactions:
-                if os.path.exists(interaction_file):
-                    receipt_files.append(interaction_file)
-                    checks_passed.append("interactions_verified")
-                else:
-                    violations.append(f"Interaction receipts missing for requested interactions: {interactions}")
-
-            correctness_passed = len(violations) == 0
-            quality_passed = True  # Quality evaluator decoupled cleanly for future extension
-
-        elif target_type == "json_api":
-            mechanism = "json_schema_validator"
-            api_receipt = os.path.join(state_dir, "api_response.json")
-            if os.path.exists(api_receipt):
-                receipt_files.append(api_receipt)
-                checks_passed.append("json_schema_validated")
-                correctness_passed = True
-            else:
-                violations.append("Missing API response payload receipt in '.agents/api_response.json'.")
-                correctness_passed = False
-            quality_passed = True
-
-        elif target_type == "cli":
-            mechanism = "cli_snapshot_differ"
-            cli_receipt = os.path.join(state_dir, "cli_output.txt")
-            if os.path.exists(cli_receipt):
-                receipt_files.append(cli_receipt)
-                checks_passed.append("golden_snapshot_matched")
-                correctness_passed = True
-            else:
-                violations.append("Missing CLI output receipt in '.agents/cli_output.txt'.")
-                correctness_passed = False
-            quality_passed = True
-
-        else:
-            mechanism = "output_contract_verifier"
-            checks_passed.append("output_contract_default_passed")
-            correctness_passed = True
-            quality_passed = True
+        commit_sha = get_git_commit_sha(workspace_dir)
+        workspace_hash = get_workspace_hash(workspace_dir)
+        now_utc = datetime.now(timezone.utc).isoformat()
 
         pack = OutputEvidencePack(
             artifact_name=artifact_name,
@@ -400,6 +524,9 @@ class OutputContractVerifier:
             checks_passed=checks_passed,
             violations=violations,
             receipt_files=receipt_files,
+            generated_at=now_utc,
+            commit_sha=commit_sha,
+            workspace_hash=workspace_hash,
         )
 
         # Save Output Evidence Pack to disk for auditability

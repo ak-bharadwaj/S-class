@@ -298,6 +298,52 @@ def test_user_contract_coverage_gate():
     assert verdict_full_cov.decision == "ALLOW_RELEASE"
 
 
+def test_output_verifier_registry_and_tamper_evidence(tmp_path):
+    from verifier import OutputVerifierRegistry, OutputContractVerifier, BaseVerifierPlugin
+    from intent_contract import OutputContractSpec
+
+    workspace = str(tmp_path)
+    spec = OutputContractSpec(artifact_name="json_api_test", target_type="json_api")
+    
+    # 1. Test Registry Plugin Lookup
+    plugin = OutputVerifierRegistry.get_plugin("json_api")
+    assert plugin.__class__.__name__ == "JsonApiVerifierPlugin"
+
+    # 2. Test Evidence Tamper-Evident SHA-256 Hash and Provenance
+    state_dir = os.path.join(workspace, ".agents")
+    os.makedirs(state_dir, exist_ok=True)
+    with open(os.path.join(state_dir, "api_response.json"), "w", encoding="utf-8") as f:
+        f.write('{"status": "ok"}')
+
+    pack = OutputContractVerifier.verify(workspace, spec=spec)
+    assert pack.sha256_hash != ""
+    assert len(pack.sha256_hash) == 64  # SHA-256 hex string length
+    assert pack.workspace_hash != ""
+    assert pack.generated_at != ""
+
+
+def test_event_store_checkpointing(tmp_path):
+    from sclass_kernel import EventStore
+
+    workspace = str(tmp_path)
+    state_dir = os.path.join(workspace, ".agents")
+    os.makedirs(state_dir, exist_ok=True)
+
+    # Append 5 events
+    for i in range(5):
+        EventStore.append_event({"event_id": i, "action": f"test_{i}"}, workspace_dir=workspace)
+
+    # Create checkpoint snapshot at offset 3
+    EventStore.create_checkpoint({"current_phase": "TRIAGE"}, event_offset=3, workspace_dir=workspace)
+
+    # Replay should skip first 3 events and read from offset 3 onwards (O(delta) efficiency)
+    events = EventStore.read_all_events(workspace_dir=workspace)
+    assert len(events) == 2
+    assert events[0]["event_id"] == 3
+    assert events[1]["event_id"] == 4
+
+
+
 
 
 
