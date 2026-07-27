@@ -28,6 +28,8 @@ import runtime
 import verifier
 import replay
 import error_recovery
+from event_graph import global_event_graph, EventTopic
+from context_compressor import ContextCompressor
 
 logger = logging.getLogger("sclass_kernel")
 
@@ -184,8 +186,16 @@ class MinimalDeterministicKernel:
             )
             state.transitionHistory.append(t_rec.to_dict())
 
-            # 7. EXCLUSIVE State Mutation Write
+            # 7. Context Compression check
+            comp_memory = ContextCompressor.compress_context(runtime.asdict(state))
+            logger.info(f"[Kernel] Context compression active ratio: {comp_memory.compression_ratio}")
+
+            # 8. EXCLUSIVE State Mutation Write
             runtime.save_state(state, cwd)
+
+            # 9. Asynchronous Event Graph Broadcast
+            topic = EventTopic.TASK_COMPLETED if event_name in ["code_written", "task_merged"] else EventTopic.TASK_STARTED
+            global_event_graph.publish(topic, sender="sclass_kernel", payload={"event_name": event_name, "from_phase": current_phase, "to_phase": next_phase})
 
             logger.info(f"[Kernel StateManager] Mutation Approved: '{current_phase}' ➔ '{next_phase}' (Event: '{event_name}')")
 
