@@ -1,58 +1,77 @@
 # S-Class V9.2.0: Event-Sourced Cognitive Memory Microkernel Engine
 
-S-Class is an **Event-Sourced Cognitive Memory Microkernel Engine** designed to provide deterministic, verifiable, and strategy-aware software development for AI agent platforms. 
-
-Rather than treating LLMs as trusted state editors or running unstructured prompt loops, S-Class treats LLMs and subagents as **untrusted decision proposers**, placing all state mutations behind a lean, policy-driven **Deterministic Microkernel (`sclass_kernel.py`)** with **Event Sourcing**, **Tri-Partite Cognitive Memory**, and an **Event-Driven Asynchronous Graph**.
+S-Class is an **Event-Sourced Cognitive Memory Microkernel Engine** built for AI agent platforms. Rather than allowing AI agents to mutate project state directly or drift during long coding sessions, S-Class places all code generation, planning, and state transitions behind a deterministic, policy-driven microkernel.
 
 ---
 
-## Master Architecture Map (V9.2.0)
+## Why S-Class EOS? (The Core Advantage)
+
+| Without S-Class | With S-Class EOS V9.2.0 |
+| :--- | :--- |
+| **Direct State Mutation:** Agents edit files and state without formal validation, causing silent corruption. | **Exclusive Kernel Mutator:** Only the deterministic `sclass_kernel` can write state changes to disk. |
+| **Context Window Overflow:** Long-running coding sessions crash or drift as context bloats. | **Tri-Partite Cognitive Memory:** Automatically compresses context into Episodic, Semantic, and Working Memory. |
+| **Speculative Verification:** Completion is self-reported by LLM prompts ("I fixed it!"). | **Policy-Driven Evidence Gates:** Hard-blocks state transitions unless physical test receipts & diffs exist on disk. |
+| **Irreproducible Execution:** Failures cannot be audited or replayed when things go wrong. | **Canonical Event Sourcing & Replay:** Immutable event store (`event_store.jsonl`) enables 100% mathematical replayability. |
+| **Static Memory:** Systems relearn the same architectural lessons and mistakes on every run. | **Selective KB & Automated Learning:** Pre-planning knowledge retrieval + automatic candidate learning loop. |
+
+---
+
+## How S-Class Compares to Other Frameworks
+
+| Feature | OpenHands | Claude Code | Codex / Generic Agents | **S-Class EOS V9.2.0** |
+| :--- | :--- | :--- | :--- | :--- |
+| **Architecture** | Sandbox Harness | CLI Agent Loop | Prompt Loop | **Deterministic Microkernel** |
+| **State Mutation Guard** | ❌ Direct File Edits | ❌ Direct File Edits | ❌ Direct File Edits | **✅ Exclusive Kernel Mutator** |
+| **Evidence Validation** | ⚠️ Self-Reported | ⚠️ Command Exit Codes | ❌ None | **✅ Policy-Driven Evidence Gates** |
+| **Event Sourcing** | ❌ None | ❌ None | ❌ None | **✅ Append-Only `event_store.jsonl`** |
+| **Cognitive Memory** | ❌ Flat History | ❌ Flat History | ❌ Flat History | **✅ Tri-Partite Memory (Episodic/Semantic/Working)** |
+| **Post-Release Loop** | ❌ Terminal State | ❌ Terminal State | ❌ Terminal State | **✅ Continuous Multi-Stream Telemetry Loop** |
+
+---
+
+## End-to-End Execution Data Flow
 
 ```
-                            User Goal Prompt
-                                   │
-                                   ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│              PRE-PLANNING KNOWLEDGE BASE (`knowledge_base.py`)           │
-│  Profile-Driven Selective Retrieval Policies:                           │
-│  - BUG_FIX Profile   ➔ Loads `failed_approaches` + `reusable_fixes`     │
-│  - RESEARCH Profile  ➔ Loads `architecture_patterns` + `standards`       │
-│  - HOTFIX Profile    ➔ Loads `recent_incidents` + `regressions`         │
-└──────────────────────────────────┬──────────────────────────────────────┘
-                                   │ Injects Organizational Context
-                                   ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│            DECOUPLED PLANNING PIPELINE (`sclass_planner.py`)            │
-│  1. IntentExtractor  ➔ Extracts goals, scope boundaries, & constraints  │
-│  2. RiskAnalyzer     ➔ Assesses risk level, review depth, & KB context  │
-│  3. WorkflowSelector ➔ Selects workflow profile (FULL, BUG_FIX, etc.)   │
-│  4. ExecutionPlanner ➔ Assembles task DAG & capability squad           │
-└──────────────────────────────────┬──────────────────────────────────────┘
-                                   │ Proposes Execution Plan
-                                   ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│              DETERMINISTIC MICROKERNEL (`sclass_kernel.py`)             │
-│  Formally Enforces:                                                    │
-│  Initial Design ➔ DEBATE ➔ DESIGN_REVISION ➔ TASK_COMPILATION ➔         │
-│  CODING ➔ TASK_VERIFICATION ➔ MERGE ➔ INTEGRATION ➔ QA ➔ RELEASE ➔     │
-│  MONITORING ➔ FEEDBACK ➔ ISSUE_DETECTION ➔ HOTFIX / RECOVERY Loop      │
-└──────────────────────────────────┬──────────────────────────────────────┘
-                                   │
-                                   ├──────────────────────────────────────┐
-                                   ▼                                      ▼
-┌────────────────────────────────────────┐ ┌──────────────────────────────┐
-│  TRI-PARTITE COGNITIVE MEMORY          │ │ ACTIVE MULTI-STREAM MONITOR │
-│  (`context_compressor.py`)             │ │ (`monitoring.py`)            │
-│  - Episodic Memory ("What happened?")  │ │ Ingests 6 Telemetry Streams: │
-│  - Semantic Memory ("What we learned") │ │ Logs, Metrics, User Reports, │
-│  - Working Memory ("Current context")  │ │ Crash, Perf, Security        │
-└────────────────────────────────────────┘ └──────────────┬───────────────┘
-                                                          │
-                                                          ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│           AUTOMATED LEARNING ENGINE & PROMOTION (`learning_engine.py`)  │
-│  Execution ➔ Evaluation ➔ Candidate Capture ➔ Approval ➔ KB Update      │
-└─────────────────────────────────────────────────────────────────────────┘
+   User Request / Prompt
+           │
+           ▼
+┌──────────────────────┐
+│   Planning Engine    │ ◄── Ingests Organizational Knowledge Base (`knowledge_base.py`)
+│  (`sclass_planner`)  │
+└──────────┬───────────┘
+           │ Proposes Execution Plan
+           ▼
+┌──────────────────────┐
+│ Deterministic Kernel │ ◄── Enforces FSM State Graph & Schema Validation (`sclass_kernel.py`)
+└──────────┬───────────┘
+           │ Dispatches Task
+           ▼
+┌──────────────────────┐
+│ Resource OS Scheduler│ ◄── Checks CPU, RAM, & Concurrency Bounds (`ResourceAwareScheduler`)
+└──────────┬───────────┘
+           │ Spawns Ephemeral Builders
+           ▼
+┌──────────────────────┐
+│ Sandboxed Builders   │ ◄── Build isolated code changes in `sandbox/T1`, `sandbox/T2`
+└──────────┬───────────┘
+           │ Submits Code Outputs
+           ▼
+┌──────────────────────┐
+│ Verifier Evidence    │ ◄── Audits physical diffs, test receipts, & visual screenshots (`verifier.py`)
+└──────────┬───────────┘
+           │ Approves Mutation
+           ▼
+┌──────────────────────┐
+│ Canonical EventStore │ ◄── Appends immutable event to `.agents/event_store.jsonl`
+└──────────┬───────────┘
+           │
+           ├──────────────────────────┐
+           ▼                          ▼
+┌──────────────────────┐   ┌──────────────────────┐
+│ Replay Engine        │   │ Learning Engine      │
+│ (`replay.py`)        │   │ (`learning_engine`)  │
+│ 100% Audit Replay    │   │ Promotes KB Lessons  │
+└──────────────────────┘   └──────────────────────┘
 ```
 
 ---
@@ -62,7 +81,7 @@ Rather than treating LLMs as trusted state editors or running unstructured promp
 | # | Subsystem | Module | Technical Rationale & Impact |
 | :--- | :--- | :--- | :--- |
 | **1** | **Deterministic Microkernel** | `sclass_kernel.py` | Exclusive authoritative state mutator exposing formal Kernel API (`request_transition`, `request_merge`, etc.). |
-| **2** | **Event Sourcing Store** | `.agents/event_store.jsonl` | Append-only event log serves as canonical truth. State can be reconstructed via event replay. |
+| **2** | **Event Sourcing Store** | `.agents/event_store.jsonl` | Append-only event log serves as canonical truth. State can be reconstructed at any time via event replay. |
 | **3** | **Pre-Planning Knowledge Base** | `knowledge_base.py` | Profile-driven selective retrieval loads organizational memory upfront before drafting plans. |
 | **4** | **Decoupled 4-Stage Planner** | `sclass_planner.py` | Single-responsibility pipeline: `IntentExtractor` ➔ `RiskAnalyzer` ➔ `WorkflowSelector` ➔ `ExecutionPlanner`. |
 | **5** | **Tri-Partite Cognitive Memory** | `context_compressor.py` | Separates context into Episodic ("What happened"), Semantic ("What we learned"), & Working Memory ("Current context"). |
@@ -92,37 +111,6 @@ S-Class avoids context window overflow by structuring memory into three distinct
 │    - Target file paths & active sandbox branch                          │
 │    - Active boundary risks & review depth                               │
 └─────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Formal Kernel API (`sclass_kernel.py`)
-
-Untrusted LLMs, builders, and subagents cannot mutate state directly. All state updates pass through formal, policy-driven Kernel API methods:
-
-```python
-kernel.request_transition(from_state, event_name, workspace_dir)
-kernel.request_task_verification(task_id, workspace_dir)
-kernel.request_merge(task_id, sandbox_branch, workspace_dir)
-kernel.request_recovery(error_log, workspace_dir)
-kernel.request_release(workspace_dir)
-kernel.reconstruct_state_from_event_store(workspace_dir)
-```
-
----
-
-## Declarative Verification Policies (`policies.json`)
-
-Verification requirements are declared as clean policy definitions:
-
-```json
-{
-  "verification_policies": {
-    "ui": { "requires": ["build_check", "screenshot"], "min_strength": 3.0 },
-    "backend": { "requires": ["build_check", "unit_test"], "min_strength": 3.0 },
-    "auth": { "requires": ["build_check", "unit_test", "security_scan", "integration_test"], "min_strength": 5.0 }
-  }
-}
 ```
 
 ---
