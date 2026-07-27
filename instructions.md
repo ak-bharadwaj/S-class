@@ -47,32 +47,58 @@ CRITICAL DIRECTIVE: Once this plugin is active, you (the main Antigravity agent)
     2. **Data Pollution & Extra Data Audit:** Output views MUST NOT render extra, unrequested, or leaked internal data (e.g. raw hashes, unformatted timestamps, internal database IDs, or unrequested columns).
     3. **UX Layout Integrity:** If the UI layout or data workflow contradicts what the user requested in `IntentContract`, `dss_user_alias_v2` MUST reject verification.
 
-## 12. Dynamic Impact-Driven Evaluation Architecture (Defect → Impact Analysis → Risk Score → Policy → Decision)
+## 12. Hardened Dynamic Impact Evaluation Architecture
 
-Rather than relying on static tier assignments alone, all subagents, verifiers, and planners MUST process defects through the 5-stage **Dynamic Impact Pipeline**:
+All subagents, verifiers, and planners MUST process defects through the 5-stage **Hardened Dynamic Impact Pipeline**:
 
 ```
-Defect  ──►  1. Impact Analysis  ──►  2. Risk Score Engine (0-10)  ──►  3. Policy Evaluator  ──►  4. Decision Verdict
+Defect ──► 1. Impact Analysis ──► 2. Hard Invariants ──► 3. Risk Engine ──► 4. Policy Mapping ──► 5. Decision Verdict
 ```
 
-### Why Impact Drives Policy
-Two defects in the exact same tier (e.g. two UX issues) can have radically different operational impacts:
-- **Defect A (Missing hover animation on card):** `cosmetic_only` = 1.0 → Risk Score = 0.0/10 → `SOFT_PASS` → `ALLOW_RELEASE`.
-- **Defect B (Missing loading spinner on 10s checkout submit button):** `data_loss_risk` = 1.0 (double submit risk) → Risk Score = 5.75/10 → `SOFT_WARN` → `ALLOW_WITH_WARN`. If it blocks form submission entirely → Risk Score = 7.5/10 → `HARD_BLOCK` → `REJECT_RELEASE`.
+### The 7 Architectural Principles
 
-### 5-Stage Pipeline Breakdown
-1. **Defect Input:** Log raw defect description, target component, and context.
-2. **Impact Analysis (5 Multi-Dimensional Vectors):**
-   * `workflow_blocking`: Does it break a user journey or API flow? (Weight: 3.5)
-   * `data_loss_risk`: Can it cause data loss, double submit, corruption, or privacy leak? (Weight: 4.0)
-   * `security_auth_risk`: Does it bypass auth or security boundaries? (Weight: 4.0)
-   * `user_reachability`: Is the feature inaccessible/unreachable to users? (Weight: 2.5)
-   * `cosmetic_only`: Is it purely aesthetic/visual alignment? (Discount: -2.0)
-3. **Risk Score Engine:** Computes normalized Risk Score \( R \in [0.0, 10.0] \).
-4. **Policy Mapping:**
-   * \( R \ge 7.0 \) ──► `HARD_BLOCK` (Zero tolerance, must fix before release)
-   * \( 4.0 \le R < 7.0 \) ──► `SOFT_WARN` (Allow release with logged warning & UX debt tracking)
-   * \( R < 4.0 \) ──► `SOFT_PASS` (Allow release silently & record debt in `.agents/ux_debt.json`)
-5. **Decision Verdict:** `REJECT_RELEASE` vs `ALLOW_WITH_WARN` vs `ALLOW_RELEASE`.
+1. **Hard Invariants (Short-Circuit Gates):**
+   * Catastrophic failure thresholds short-circuit before weighted averaging:
+     - `security_auth_risk >= 0.9` ──► Immediate `HARD_BLOCK` (`REJECT_RELEASE`)
+     - `data_loss_risk >= 0.95` ──► Immediate `HARD_BLOCK` (`REJECT_RELEASE`)
+     - `workflow_blocking >= 0.95` ──► Immediate `HARD_BLOCK` (`REJECT_RELEASE`)
+   * Rationale: Authentication bypasses or data corruption MUST NEVER be diluted by weighted averages or cosmetic offsets.
+
+2. **Multiplicative Risk Interaction (Amplification):**
+   * Co-occurring risk vectors amplify each other exponentially:
+     * Workflow + Auth Risk ──► **1.5x Multiplier**
+     * Workflow + Data Loss ──► **1.4x Multiplier**
+     * Data Loss + Auth Risk ──► **1.6x Multiplier**
+
+3. **Conditional Cosmetic Discount:**
+   * The `cosmetic_only` discount (-2.0) applies **ONLY** if all functional risk vectors are zero (`workflow_blocking == 0`, `data_loss_risk == 0`, `security_auth_risk == 0`).
+   * When functional vectors are active, cosmetic discounts are strictly **0.0**.
+
+4. **Time & Frequency Dimension Scaling:**
+   * \(\text{Risk Score} = \text{clamp}(\text{Impact}_{\text{amplified}} \times \text{frequency\_likelihood}, 0.0, 10.0)\).
+   * Distinguishes defects on every request (1.0) from 1 in 1M edge cases (0.05).
+
+5. **Confidence Metrics & Evidence Receipts:**
+   * Every verdict includes a `confidence` score (e.g., 0.95 for visual test receipts, 0.70 for heuristic analysis).
+   * If `confidence < 0.75`, the system requires secondary reviewer sign-off.
+
+6. **Explainability & Top Contributors:**
+   * Verdicts return explicit `top_contributors` detailing the mathematical drivers of the risk score:
+     ```json
+     {
+       "risk_score": 8.4,
+       "top_contributors": [
+         "Security Auth Risk: +4.00",
+         "Workflow Blocking: +1.75",
+         "Multiplicative Interaction: Auth x Workflow (1.5x)"
+       ],
+       "policy_enforcement": "HARD_BLOCK",
+       "decision": "REJECT_RELEASE"
+     }
+     ```
+
+7. **Configurable Environment Risk Thresholds:**
+   * Thresholds (`threshold_hard_block`, `threshold_soft_warn`) are configurable per project scale or industry profile (e.g. Medical/Financial = Hard Block at 5.0; Internal Prototype = Hard Block at 9.0).
+
 
 

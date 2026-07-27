@@ -90,36 +90,69 @@ def test_self_evaluator_profile_pivot():
 
 
 def test_impact_driven_policy_engine():
-    # 1. Defect A: Missing hover animation (Cosmetic UX) -> Risk Score 0.0 -> SOFT_PASS / ALLOW_RELEASE
-    v_a = ImpactDrivenPolicyEngine.evaluate_defect(
-        defect_description="Missing hover animation on card",
-        defect_domain="hover_transitions",
+    # 1. Principle 1: Hard Invariant Check (Short-Circuit Gate)
+    v_inv = ImpactDrivenPolicyEngine.evaluate_defect(
+        defect_description="JWT authentication bypass on backend endpoint",
+        defect_domain="auth",
+        is_auth_security=True,
+        is_pure_cosmetic=True  # Cosmetic flag MUST NOT override security invariant!
+    )
+    assert v_inv.invariant_triggered is True
+    assert v_inv.risk_score == 10.0
+    assert v_inv.policy_enforcement == "HARD_BLOCK"
+    assert v_inv.decision == "REJECT_RELEASE"
+    assert "CRITICAL: Security/Auth Bypass Invariant" in v_inv.top_contributors[0]
+
+    # 2. Principle 2 & 3: Multiplicative Risk Interaction & Conditional Cosmetic Discount
+    # When functional vectors are active, cosmetic discount is strictly 0.0, and multipliers amplify.
+    # Evaluates workflow_blocking=0.5 and data_loss_risk=0.5 to trigger Workflow x Data Loss multiplier (1.4x) without short-circuiting invariants.
+    v_mult = ImpactDrivenPolicyEngine.evaluate_defect(
+        defect_description="Checkout form workflow blocked and form state unsaved",
+        defect_domain="input_output_form_flow",
+        impact_override=ImpactAnalysis(workflow_blocking=0.5, data_loss_risk=0.5)
+    )
+    # base = (0.5*3.5 + 0.5*4.0) = 3.75; multiplier = 1.4x -> 5.25
+    assert v_mult.risk_score == 5.25
+    assert "Multiplicative Interaction: Workflow x Data Loss (1.4x)" in v_mult.top_contributors
+
+    # 3. Principle 3: Pure Cosmetic Discount (Applies ONLY when functional vectors = 0)
+    v_cosmetic = ImpactDrivenPolicyEngine.evaluate_defect(
+        defect_description="Slight margin misalignment on avatar card",
+        defect_domain="margin_alignment",
         is_pure_cosmetic=True
     )
-    assert v_a.risk_score == 0.0
-    assert v_a.policy_enforcement == "SOFT_PASS"
-    assert v_a.decision == "ALLOW_RELEASE"
+    assert v_cosmetic.risk_score == 0.0
+    assert v_cosmetic.policy_enforcement == "SOFT_PASS"
+    assert v_cosmetic.decision == "ALLOW_RELEASE"
 
-    # 2. Defect B: Missing loading spinner on 10s checkout submit button (UX domain, but causes double-click risk)
-    # Impact: data_loss_risk=1.0 -> Risk Score 4.0 -> SOFT_WARN / ALLOW_WITH_WARN
-    v_b = ImpactDrivenPolicyEngine.evaluate_defect(
-        defect_description="Missing loading spinner on 10s checkout submit button",
-        defect_domain="loading_indicators",
-        causes_double_submit=True
+    # 4. Principle 4: Time & Frequency Dimension Scaling (Likelihood)
+    # Evaluates frequency scaling on moderate risk vectors (data_loss_risk=0.5 * 4.0 = 2.0 * x0.10 = 0.20)
+    v_rare = ImpactDrivenPolicyEngine.evaluate_defect(
+        defect_description="Rare edge case data sync mismatch on slow retry",
+        defect_domain="input_output_form_flow",
+        impact_override=ImpactAnalysis(data_loss_risk=0.5, frequency_likelihood=0.10)
     )
-    assert v_b.risk_score == 4.0
-    assert v_b.policy_enforcement == "SOFT_WARN"
-    assert v_b.decision == "ALLOW_WITH_WARN"
+    # base = (0.5 * 4.0) = 2.0; scale = x0.10 -> final_risk = 0.20 -> SOFT_PASS
+    assert v_rare.risk_score == 0.20
+    assert v_rare.policy_enforcement == "SOFT_PASS"
 
-    # 3. Defect C: Submit button off-screen / unreachable (UI domain, but blocks critical workflow)
-    # Impact: workflow_blocking=1.0, user_reachability=1.0 -> Risk Score 6.0 -> if also causes data loss -> Risk Score 10.0 -> HARD_BLOCK
-    v_c = ImpactDrivenPolicyEngine.evaluate_defect(
-        defect_description="Submit button rendered off-screen on mobile view",
-        defect_domain="button_reachability",
-        blocks_user_flow=True,
-        causes_data_loss=True
+    # 5. Principle 5 & 6: Confidence Metrics & Explainability (Top Contributors)
+    v_explain = ImpactDrivenPolicyEngine.evaluate_defect(
+        defect_description="Missing error message toast on failed registration",
+        defect_domain="input_output_form_flow",
+        causes_double_submit=True,
+        evidence_list=["playwright_visual_receipt", "console_log"]
     )
-    assert v_c.risk_score >= 7.0
-    assert v_c.policy_enforcement == "HARD_BLOCK"
-    assert v_c.decision == "REJECT_RELEASE"
+    assert v_explain.confidence == 0.95
+    assert len(v_explain.top_contributors) > 0
+
+    # 6. Principle 7: Configurable Environment Risk Thresholds (Medical = 5.0 vs Prototype = 9.0)
+    v_med = ImpactDrivenPolicyEngine.evaluate_defect(
+        defect_description="Form submission delay",
+        defect_domain="input_output_form_flow",
+        causes_double_submit=True,
+        threshold_hard_block=3.5  # Strict Medical Profile
+    )
+    assert v_med.policy_enforcement == "HARD_BLOCK"  # 4.0 >= 3.5
+
 
