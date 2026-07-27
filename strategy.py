@@ -455,10 +455,58 @@ class DefectEvaluationVerdict:
         }
 
 
-class PolicyEngine:
-    """Standalone Policy Engine: Consumes ONLY RiskReport + SafetyCase to determine release policy.
+PROFILE_COVERAGE_THRESHOLDS: Dict[str, float] = {
+    "prototype": 40.0,
+    "startup_mvp": 70.0,
+    "production_saas": 90.0,
+    "mission_critical": 100.0,
+}
 
-    Decoupled from Risk Engine mathematics. Enforces mandatory Output Contract Evidence & Contract Coverage gates.
+
+@dataclass
+class SafetyReport:
+    """Summarized Safety Report consumed statelessly by PolicyEngine."""
+    build_passed: bool
+    tests_passed: bool
+    security_clean: bool
+    output_contract_passed: bool
+    contract_coverage_percent: float
+    unverified_contracts: List[str]
+    verification_mechanism: str
+    policy_profile: str = "production_saas"
+
+    @classmethod
+    def from_safety_case(cls, safety_case: Optional[Any], policy_profile: str = "production_saas") -> 'SafetyReport':
+        if not safety_case:
+            return cls(
+                build_passed=True,
+                tests_passed=True,
+                security_clean=True,
+                output_contract_passed=True,
+                contract_coverage_percent=100.0,
+                unverified_contracts=[],
+                verification_mechanism="auto",
+                policy_profile=policy_profile,
+            )
+        cov = getattr(safety_case, "contract_coverage", None)
+        cov_pct = cov.coverage_percent if cov else 100.0
+        unverified = cov.unverified_contracts if cov else []
+        return cls(
+            build_passed=getattr(safety_case, "build_passed", True),
+            tests_passed=getattr(safety_case, "tests_passed", True),
+            security_clean=getattr(safety_case, "security_clean", True),
+            output_contract_passed=getattr(safety_case, "output_contract_passed", True),
+            contract_coverage_percent=cov_pct,
+            unverified_contracts=unverified,
+            verification_mechanism=getattr(safety_case, "output_verification_mechanism", "auto"),
+            policy_profile=policy_profile,
+        )
+
+
+class PolicyEngine:
+    """Stateless Policy Engine: Consumes RiskReport + SafetyReport to evaluate pure decision rules.
+
+    Supports Policy Profiles (prototype, startup_mvp, production_saas, mission_critical) and profile-driven contract coverage thresholds.
     """
 
     @staticmethod
@@ -468,11 +516,17 @@ class PolicyEngine:
         safety_case: Optional[SafetyCase] = None,
         threshold_hard_block: float = 7.0,
         threshold_soft_warn: float = 4.0,
-        min_coverage_threshold: float = 85.0,
+        min_coverage_threshold: Optional[float] = None,
+        policy_profile: str = "production_saas",
     ) -> DefectEvaluationVerdict:
-        """Consumes RiskReport and SafetyCase to produce the final policy decision."""
+        """Consumes RiskReport and SafetyReport to produce the final policy decision."""
+        report = SafetyReport.from_safety_case(safety_case, policy_profile=policy_profile)
+
+        # Profile-driven coverage threshold
+        required_coverage = min_coverage_threshold if min_coverage_threshold is not None else PROFILE_COVERAGE_THRESHOLDS.get(policy_profile, 85.0)
+
         # 1. Mandatory Safety Case Output Contract Evidence Gate
-        if safety_case and not safety_case.output_contract_passed:
+        if not report.output_contract_passed:
             return DefectEvaluationVerdict(
                 defect_description=defect_description,
                 risk_report=risk_report,
@@ -482,16 +536,15 @@ class PolicyEngine:
                 rationale="SAFETY CASE INCOMPLETE: Output Contract Evidence is missing. IntentContract requires verified rendered output (Playwright DOM/table/chart, JSON schema, CLI snapshot, or PDF parser) matching user request before release.",
             )
 
-        # 2. Mandatory User Contract Coverage Gate
-        if safety_case and safety_case.contract_coverage.coverage_percent < min_coverage_threshold:
-            cov = safety_case.contract_coverage
+        # 2. Profile-Driven User Contract Coverage Gate
+        if report.contract_coverage_percent < required_coverage:
             return DefectEvaluationVerdict(
                 defect_description=defect_description,
                 risk_report=risk_report,
                 safety_case=safety_case,
                 policy_enforcement=TierEnforcement.HARD_BLOCK,
                 decision="REJECT_RELEASE",
-                rationale=f"SAFETY CASE INCOMPLETE: User Contract Coverage is only {cov.coverage_percent}%, below required {min_coverage_threshold}% threshold ({cov.verified_contracts}/{cov.total_required_contracts} contracts verified). Unverified contracts: {cov.unverified_contracts}",
+                rationale=f"SAFETY CASE INCOMPLETE: [{policy_profile.upper()} PROFILE] User Contract Coverage is only {report.contract_coverage_percent}%, below required {required_coverage}% profile threshold. Unverified contracts: {report.unverified_contracts}",
             )
 
         # 3. Hard Invariants Check
