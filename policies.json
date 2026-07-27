@@ -1,11 +1,11 @@
 {
   "verification_policies": {
     "ui": {
-      "requires": ["build_check", "screenshot"],
-      "min_strength": 3.0
+      "requires": ["build_check", "chrome_mcp_visual", "output_contract_evidence"],
+      "min_strength": 4.0
     },
     "frontend": {
-      "requires": ["build_check", "unit_test", "screenshot"],
+      "requires": ["build_check", "unit_test", "chrome_mcp_visual", "output_contract_evidence"],
       "min_strength": 4.0
     },
     "backend": {

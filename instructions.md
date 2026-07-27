@@ -105,6 +105,17 @@ $$\text{User Contract Coverage} = \frac{\text{Verified User Contracts}}{\text{To
    ```
 3. **No Unvisited Flow Assumptions:** Verification CANNOT be claimed for an entire web application if secondary pages or modals were never rendered or tested via Chrome MCP / Playwright.
 
+## 14. Mandatory Live Server & Chrome MCP Verification Requirement
+
+Without launching the live application server and invoking `chrome-devtools-mcp` tools, agents CANNOT obtain actual visual rendered output.
+
+### Hard Mandates:
+1. **Live Server Execution Required:** Before starting QA or User Proxy verification, the builder agent MUST start the application dev/live server (e.g., `npm run dev`, `vite`, `next dev`, `python app.py`) as a background task.
+2. **Chrome MCP Verification Call Required:** `dss_user_alias_v2` (User Proxy) and `dss_qa_v2` (QA Agent) MUST execute Chrome DevTools MCP tools (`navigate_page`, `take_screenshot`, `take_snapshot`, `click`, `fill`) against the running application URL (e.g., `http://localhost:3000`).
+3. **No Terminal/Log Substitution:** Relying solely on `npm run dev` stdout logs, backend unit tests, or terminal output WITHOUT taking Chrome MCP visual snapshots is an explicit **GOVERNANCE VIOLATION**.
+4. **Safety Case Invariant:** If no Chrome MCP / Playwright visual output receipt exists in `.agents/screenshots/`, `SafetyCase.output_contract_passed` evaluates to `False`, and `PolicyEngine` automatically fires a **`HARD_BLOCK` (`REJECT_RELEASE`)**.
+
+
 
 
 
