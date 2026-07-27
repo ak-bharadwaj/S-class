@@ -59,6 +59,21 @@ class TriPartiteMemory:
 class ContextCompressor:
     """Compresses verbose execution state into a Tri-Partite Cognitive Memory structure."""
 
+    RAW_SIZE_THRESHOLD_BYTES = 5000  # Triggers compression when state size exceeds 5 KB
+    MAJOR_PHASE_ENDPOINTS = ["spec_approved", "tasks_ready", "qa_passed", "release_complete", "issue_detected"]
+
+    @staticmethod
+    def should_compress(state_dict: Dict[str, Any], event_name: Optional[str] = None) -> bool:
+        """Determines if context compression should be executed based on size or phase boundary thresholds."""
+        raw_size = len(json.dumps(state_dict))
+        if raw_size >= ContextCompressor.RAW_SIZE_THRESHOLD_BYTES:
+            return True
+        if event_name in ContextCompressor.MAJOR_PHASE_ENDPOINTS:
+            return True
+        if len(state_dict.get("decisionLog", [])) >= 10:
+            return True
+        return False
+
     @staticmethod
     def compress_context(state_dict: Dict[str, Any], max_history_entries: int = 5) -> TriPartiteMemory:
         """Compresses state into Episodic, Semantic, and Working Memory layers."""

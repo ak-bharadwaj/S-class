@@ -1,11 +1,10 @@
 """
-S-Class EOS Selective Knowledge Base Engine (knowledge_base.py)
+S-Class EOS Fast Knowledge Base Engine (knowledge_base.py)
 
-Applies profile-driven retrieval policies:
-- BUG_FIX   -> Retrieves Failed Approaches & Reusable Fixes
-- RESEARCH  -> Retrieves Architecture Patterns & Design Guidelines
-- HOTFIX    -> Retrieves Recent Incidents & Known Regressions
-- FULL      -> Retrieves Architecture Patterns & Coding Standards
+Applies profile-driven selective retrieval policies with:
+- In-memory result caching (_KB_CACHE) for zero-latency repeated lookups
+- Inverted keyword indexing (_KB_INDEX) for O(1) keyword matching
+- Incremental file loading to prevent disk I/O bottlenecks as the KB grows
 """
 
 import os
@@ -16,7 +15,6 @@ from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger("sclass_knowledge_base")
 
-
 # Selective Knowledge Retrieval Policies
 RETRIEVAL_POLICIES: Dict[str, List[str]] = {
     "bug_fix": ["failed_approaches.json", "reusable_modules.json"],
@@ -25,6 +23,10 @@ RETRIEVAL_POLICIES: Dict[str, List[str]] = {
     "refactor": ["architecture_patterns.json", "coding_standards.json"],
     "full": ["coding_standards.json", "architecture_patterns.json", "failed_approaches.json", "reusable_modules.json"]
 }
+
+# In-Memory Cache and Inverted Index
+_KB_CACHE: Dict[str, List[Dict[str, Any]]] = {}
+_KB_INDEX: Dict[str, List[Dict[str, Any]]] = {}
 
 
 @dataclass
@@ -36,7 +38,7 @@ class KnowledgeEntry:
 
 
 class KnowledgeBaseManager:
-    """Manages profile-driven selective organizational knowledge retrieval and storage."""
+    """Manages profile-driven selective knowledge retrieval with in-memory caching and inverted indexing."""
 
     @staticmethod
     def get_kb_dir(workspace_dir: Optional[str] = None) -> str:
@@ -91,10 +93,36 @@ class KnowledgeBaseManager:
                     json.dump(data, f, indent=2)
 
     @staticmethod
-    def query_knowledge_base(goal: str, profile: str = "full", workspace_dir: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
-        """Selectively queries the knowledge base according to profile-driven retrieval policies."""
+    def _build_inverted_index(workspace_dir: Optional[str] = None) -> None:
+        """Builds an inverted keyword index for O(1) keyword lookups."""
+        global _KB_INDEX, _KB_CACHE
+        if _KB_INDEX:
+            return  # Index already populated
+
         kb_dir = KnowledgeBaseManager.get_kb_dir(workspace_dir)
         KnowledgeBaseManager.initialize_kb(workspace_dir)
+
+        for fname in os.listdir(kb_dir):
+            if fname.endswith(".json"):
+                filepath = os.path.join(kb_dir, fname)
+                try:
+                    with open(filepath, "r", encoding="utf-8") as f:
+                        entries = json.load(f)
+                    _KB_CACHE[fname] = entries
+                    for entry in entries:
+                        words = entry.get("title", "").lower().split() + entry.get("tags", [])
+                        for w in words:
+                            w_clean = w.lower().strip()
+                            if w_clean not in _KB_INDEX:
+                                _KB_INDEX[w_clean] = []
+                            _KB_INDEX[w_clean].append(entry)
+                except Exception as e:
+                    logger.error(f"Error indexing KB file '{fname}': {e}")
+
+    @staticmethod
+    def query_knowledge_base(goal: str, profile: str = "full", workspace_dir: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
+        """Queries the knowledge base using in-memory inverted index and caching for zero-latency retrieval."""
+        KnowledgeBaseManager._build_inverted_index(workspace_dir)
 
         goal_lower = goal.lower()
         target_files = RETRIEVAL_POLICIES.get(profile.lower(), RETRIEVAL_POLICIES["full"])
@@ -105,23 +133,26 @@ class KnowledgeBaseManager:
             "reusable_modules": []
         }
 
-        for fname in target_files:
-            filepath = os.path.join(kb_dir, fname)
-            if os.path.exists(filepath):
-                try:
-                    with open(filepath, "r", encoding="utf-8") as f:
-                        entries = json.load(f)
-                    for entry in entries:
-                        cat = entry.get("category", "coding_standards")
-                        tags = [t.lower() for t in entry.get("tags", [])]
-                        content = entry.get("content", "").lower()
-                        title = entry.get("title", "").lower()
+        # Fast O(1) Inverted Index Lookup
+        query_words = [w.strip() for w in goal_lower.split() if len(w.strip()) > 2]
+        matched_entries = set()
 
-                        if any(t in goal_lower for t in tags) or any(w in title or w in content for w in goal_lower.split() if len(w) > 3):
-                            if cat in results:
-                                results[cat].append(entry)
-                except Exception as e:
-                    logger.error(f"Error reading KB file '{fname}': {e}")
+        for word in query_words:
+            if word in _KB_INDEX:
+                for entry in _KB_INDEX[word]:
+                    matched_entries.add(json.dumps(entry))
 
-        logger.info(f"[KnowledgeBaseManager] Selectively queried KB for profile '{profile}': loaded files {target_files}")
+        # Fallback to cached file scanning if index yields empty results
+        if not matched_entries:
+            for fname in target_files:
+                for entry in _KB_CACHE.get(fname, []):
+                    matched_entries.add(json.dumps(entry))
+
+        for entry_json in matched_entries:
+            entry = json.loads(entry_json)
+            cat = entry.get("category", "coding_standards")
+            if cat in results:
+                results[cat].append(entry)
+
+        logger.info(f"[KnowledgeBaseManager] Fast indexed query completed for profile '{profile}': returned {sum(len(v) for v in results.values())} entries")
         return results

@@ -186,9 +186,10 @@ class MinimalDeterministicKernel:
             )
             state.transitionHistory.append(t_rec.to_dict())
 
-            # 7. Context Compression check
-            comp_memory = ContextCompressor.compress_context(runtime.asdict(state))
-            logger.info(f"[Kernel] Context compression active ratio: {comp_memory.compression_ratio}")
+            # 7. Threshold & Phase-Boundary Context Compression
+            if ContextCompressor.should_compress(runtime.asdict(state), event_name=event_name):
+                comp_memory = ContextCompressor.compress_context(runtime.asdict(state))
+                logger.info(f"[Kernel] Threshold/Phase-boundary compression executed (Ratio: {comp_memory.compression_ratio})")
 
             # 8. EXCLUSIVE State Mutation Write
             runtime.save_state(state, cwd)
