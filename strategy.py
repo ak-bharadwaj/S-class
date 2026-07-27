@@ -373,8 +373,14 @@ class SafetyCase:
     build_passed: bool = False
     tests_passed: bool = False
     security_clean: bool = False
-    visual_inspection_passed: bool = False  # MANDATORY: Playwright / Chrome MCP visual verification receipt
+    output_contract_passed: bool = False         # MANDATORY: Output Contract Evidence verified against IntentContract
+    output_verification_mechanism: str = ""       # Mechanism used: playwright_dom | json_schema | cli_golden_snapshot | markdown_ast
     risk_report: Optional[RiskReport] = None
+
+    @property
+    def visual_inspection_passed(self) -> bool:
+        """Backwards-compatible alias for output_contract_passed."""
+        return self.output_contract_passed
 
     def is_complete(self) -> bool:
         """Verifies all safety case evidence requirements are met."""
@@ -382,7 +388,7 @@ class SafetyCase:
             self.build_passed and
             self.tests_passed and
             self.security_clean and
-            self.visual_inspection_passed  # MANDATORY visual output gate!
+            self.output_contract_passed  # MANDATORY output contract evidence!
         )
 
 
@@ -417,6 +423,7 @@ class DefectEvaluationVerdict:
             "defect_description": self.defect_description,
             "risk_report": self.risk_report.to_dict(),
             "safety_case_complete": self.safety_case.is_complete() if self.safety_case else False,
+            "output_verification_mechanism": self.safety_case.output_verification_mechanism if self.safety_case else "",
             "policy_enforcement": self.policy_enforcement,
             "decision": self.decision,
             "rationale": self.rationale,
@@ -426,7 +433,7 @@ class DefectEvaluationVerdict:
 class PolicyEngine:
     """Standalone Policy Engine: Consumes ONLY RiskReport + SafetyCase to determine release policy.
 
-    Decoupled from Risk Engine mathematics. Enforces mandatory visual evidence gates.
+    Decoupled from Risk Engine mathematics. Enforces mandatory Output Contract Evidence gates.
     """
 
     @staticmethod
@@ -438,15 +445,15 @@ class PolicyEngine:
         threshold_soft_warn: float = 4.0,
     ) -> DefectEvaluationVerdict:
         """Consumes RiskReport and SafetyCase to produce the final policy decision."""
-        # 1. Mandatory Safety Case Visual Inspection Gate
-        if safety_case and not safety_case.visual_inspection_passed:
+        # 1. Mandatory Safety Case Output Contract Evidence Gate
+        if safety_case and not safety_case.output_contract_passed:
             return DefectEvaluationVerdict(
                 defect_description=defect_description,
                 risk_report=risk_report,
                 safety_case=safety_case,
                 policy_enforcement=TierEnforcement.HARD_BLOCK,
                 decision="REJECT_RELEASE",
-                rationale="SAFETY CASE INCOMPLETE: Visual output inspection receipt is missing. User Proxy and verifier require Playwright / Chrome MCP visual verification before release.",
+                rationale="SAFETY CASE INCOMPLETE: Output Contract Evidence is missing. IntentContract requires verified rendered output (Playwright DOM/table/chart, JSON schema, CLI snapshot, or PDF parser) matching user request before release.",
             )
 
         # 2. Hard Invariants Check
@@ -503,7 +510,6 @@ class ImpactDrivenPolicyEngine:
         """Facade method delegating to RiskEngine and PolicyEngine."""
         # 1. Compute RiskReport via RiskEngine
         if impact_override is not None and isinstance(impact_override, ImpactAnalysis):
-            # Backwards compatibility helper for tests using ImpactAnalysis dataclass
             conf = EVIDENCE_CONFIDENCE_WEIGHTS.get(evidence_source, 0.40)
             overrides = {
                 "workflow_blocking": ImpactVectorEvaluation(severity=impact_override.workflow_blocking, confidence=conf, source=evidence_source),
@@ -531,7 +537,8 @@ class ImpactDrivenPolicyEngine:
             build_passed=True,
             tests_passed=True,
             security_clean=True,
-            visual_inspection_passed=True,
+            output_contract_passed=True,
+            output_verification_mechanism="playwright_dom_inspection",
             risk_report=report,
         )
 

@@ -185,12 +185,12 @@ def test_decoupled_risk_and_policy_engine_and_safety_case():
     # Higher confidence source yields higher effective risk impact (2.74 vs 1.40)
     assert report_playwright.risk_score > report_llm.risk_score
 
-    # 2. Test Mandatory Safety Case Visual Gate in PolicyEngine
+    # 2. Test Mandatory Safety Case Output Contract Evidence Gate in PolicyEngine
     incomplete_safety_case = SafetyCase(
         build_passed=True,
         tests_passed=True,
         security_clean=True,
-        visual_inspection_passed=False  # Missing visual output receipt!
+        output_contract_passed=False  # Missing Output Contract Evidence!
     )
     verdict_incomplete = PolicyEngine.evaluate_policy(
         defect_description="Minor alignment tweak",
@@ -206,7 +206,7 @@ def test_decoupled_risk_and_policy_engine_and_safety_case():
         build_passed=True,
         tests_passed=True,
         security_clean=True,
-        visual_inspection_passed=True  # Visual output verified!
+        output_contract_passed=True  # Output Contract Evidence verified!
     )
     verdict_complete = PolicyEngine.evaluate_policy(
         defect_description="Minor alignment tweak",

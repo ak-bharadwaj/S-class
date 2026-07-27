@@ -47,58 +47,40 @@ CRITICAL DIRECTIVE: Once this plugin is active, you (the main Antigravity agent)
     2. **Data Pollution & Extra Data Audit:** Output views MUST NOT render extra, unrequested, or leaked internal data (e.g. raw hashes, unformatted timestamps, internal database IDs, or unrequested columns).
     3. **UX Layout Integrity:** If the UI layout or data workflow contradicts what the user requested in `IntentContract`, `dss_user_alias_v2` MUST reject verification.
 
-## 12. Hardened Dynamic Impact Evaluation Architecture
+## 12. Safety Case Architecture & Output Contract Evidence
 
-All subagents, verifiers, and planners MUST process defects through the 5-stage **Hardened Dynamic Impact Pipeline**:
+In S-Class EOS, software release is approved ONLY when supported by a complete, multi-evidence **Safety Case**:
 
 ```
-Defect ──► 1. Impact Analysis ──► 2. Hard Invariants ──► 3. Risk Engine ──► 4. Policy Mapping ──► 5. Decision Verdict
+                              Release Candidate
+                                      │
+                                      ▼
+                                 SafetyCase
+                                      │
+ ┌─────────────────────┬──────────────┴───────┬─────────────────────┐
+ ▼                     ▼                      ▼                     ▼
+Build Evidence        Test Evidence       Security Evidence     Output Contract Evidence
+(Build Passed)       (Tests Passed)      (Security Clean)       (Verified against
+                                                               IntentContract via
+                                                               dynamic mechanism)
 ```
 
-### The 7 Architectural Principles
+### Dynamic Mechanism Selection per Output Contract
 
-1. **Hard Invariants (Short-Circuit Gates):**
-   * Catastrophic failure thresholds short-circuit before weighted averaging:
-     - `security_auth_risk >= 0.9` ──► Immediate `HARD_BLOCK` (`REJECT_RELEASE`)
-     - `data_loss_risk >= 0.95` ──► Immediate `HARD_BLOCK` (`REJECT_RELEASE`)
-     - `workflow_blocking >= 0.95` ──► Immediate `HARD_BLOCK` (`REJECT_RELEASE`)
-   * Rationale: Authentication bypasses or data corruption MUST NEVER be diluted by weighted averages or cosmetic offsets.
+Verification mechanism is derived automatically from `IntentContract.output_contract`:
 
-2. **Multiplicative Risk Interaction (Amplification):**
-   * Co-occurring risk vectors amplify each other exponentially:
-     * Workflow + Auth Risk ──► **1.5x Multiplier**
-     * Workflow + Data Loss ──► **1.4x Multiplier**
-     * Data Loss + Auth Risk ──► **1.6x Multiplier**
+| User Requested Output Target | Output Contract Verifier Mechanism | Verification Check |
+|---|---|---|
+| **Web UI** (`table`, `chart`, `form`) | `playwright_dom_inspection` | Inspects DOM for tags (`<table/>`, `<canvas/>`, SVG elements), verifies layout positioning, verifies absence of `undefined`, `NaN`, `null`, `[object Object]` text. |
+| **JSON API** | `json_schema_validator` | Validates API response schema keys, data types, and status bounds. |
+| **CLI Tool** | `cli_snapshot_differ` | Compares terminal stdout/stderr against golden output snapshot. |
+| **Markdown Document** | `markdown_ast_verifier` | Verifies rendered Markdown AST structure and link integrity. |
+| **PDF Document** | `pdf_structure_parser` | Inspects generated PDF pages, headers, and text formatting. |
 
-3. **Conditional Cosmetic Discount:**
-   * The `cosmetic_only` discount (-2.0) applies **ONLY** if all functional risk vectors are zero (`workflow_blocking == 0`, `data_loss_risk == 0`, `security_auth_risk == 0`).
-   * When functional vectors are active, cosmetic discounts are strictly **0.0**.
+### Mandatory User Proxy Output Contract Gate
+* `dss_user_alias_v2` (User Proxy) **CANNOT** accept QA or Release based on unit tests, build receipts, or logs alone.
+* `SafetyCase.output_contract_passed` MUST be `True` via the mechanism appropriate for the user's requested output type, or else release is **HARD-BLOCKED (`REJECT_RELEASE`)**.
 
-4. **Time & Frequency Dimension Scaling:**
-   * \(\text{Risk Score} = \text{clamp}(\text{Impact}_{\text{amplified}} \times \text{frequency\_likelihood}, 0.0, 10.0)\).
-   * Distinguishes defects on every request (1.0) from 1 in 1M edge cases (0.05).
-
-5. **Confidence Metrics & Evidence Receipts:**
-   * Every verdict includes a `confidence` score (e.g., 0.95 for visual test receipts, 0.70 for heuristic analysis).
-   * If `confidence < 0.75`, the system requires secondary reviewer sign-off.
-
-6. **Explainability & Top Contributors:**
-   * Verdicts return explicit `top_contributors` detailing the mathematical drivers of the risk score:
-     ```json
-     {
-       "risk_score": 8.4,
-       "top_contributors": [
-         "Security Auth Risk: +4.00",
-         "Workflow Blocking: +1.75",
-         "Multiplicative Interaction: Auth x Workflow (1.5x)"
-       ],
-       "policy_enforcement": "HARD_BLOCK",
-       "decision": "REJECT_RELEASE"
-     }
-     ```
-
-7. **Configurable Environment Risk Thresholds:**
-   * Thresholds (`threshold_hard_block`, `threshold_soft_warn`) are configurable per project scale or industry profile (e.g. Medical/Financial = Hard Block at 5.0; Internal Prototype = Hard Block at 9.0).
 
 
 
