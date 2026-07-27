@@ -40,6 +40,13 @@ CRITICAL DIRECTIVE: Once this plugin is active, you (the main Antigravity agent)
     3. **Interactive Re-render Failures:** Form submission or action clicks that fail to visually refresh the screen view.
 *   **Mandatory QA Defect Trigger:** If ANY visual rendering defect, unmapped prop placeholder, or UI exception is visible on screen, `dss_user_alias_v2` MUST immediately fire `qa_failed` or `task_verification_failed`, regardless of clean backend test results.
 
+## 11. Intent-Remembering User Proxy Input-Output Verification Rule
+*   **Intent Memory Fidelity:** `dss_user_alias_v2` MUST load `IntentContract.json` and verify that screen UI renders strictly match the user's saved `expected_io_flows` and `user_visual_expectations`.
+*   **Input-to-Visual-Output Validation:**
+    1. **Data Submission Rendering:** Submitting a form MUST visually render the created record in the output view (table/list/card). If data is accepted by the backend (HTTP 200 OK) but fails to visually render on screen, `dss_user_alias_v2` MUST trigger `qa_failed`.
+    2. **Data Pollution & Extra Data Audit:** Output views MUST NOT render extra, unrequested, or leaked internal data (e.g. raw hashes, unformatted timestamps, internal database IDs, or unrequested columns).
+    3. **UX Layout Integrity:** If the UI layout or data workflow contradicts what the user requested in `IntentContract`, `dss_user_alias_v2` MUST reject verification.
+
 
 
 
