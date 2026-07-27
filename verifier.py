@@ -10,8 +10,68 @@ from typing import List, Dict, Any, Optional
 import os
 import json
 import logging
+from datetime import datetime, timezone
 
 logger = logging.getLogger("sclass_verifier")
+
+
+class UxDebtTracker:
+    """Tracks soft-passed Tier 3b/4a/4b defects in .agents/ux_debt.json.
+
+    Prevents deferred UX items from getting lost forever by recording them
+    as structured debt entries with component paths and severity labels.
+    """
+
+    def __init__(self, workspace_dir: str):
+        self.state_dir = os.path.join(workspace_dir, ".agents")
+        self.debt_file = os.path.join(self.state_dir, "ux_debt.json")
+
+    def _load(self) -> Dict[str, Any]:
+        if os.path.exists(self.debt_file):
+            try:
+                with open(self.debt_file, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, IOError):
+                pass
+        return {"deferred_items": [], "total_count": 0, "accumulated_severity": "none"}
+
+    def _save(self, data: Dict[str, Any]) -> None:
+        os.makedirs(self.state_dir, exist_ok=True)
+        with open(self.debt_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+
+    def record_deferred_item(self, tier: str, description: str, component: str = "", severity: str = "cosmetic") -> None:
+        """Record a soft-passed defect as UX debt."""
+        data = self._load()
+        data["deferred_items"].append({
+            "tier": tier,
+            "description": description,
+            "severity": severity,
+            "component": component,
+            "deferred_at": datetime.now(timezone.utc).isoformat(),
+        })
+        data["total_count"] = len(data["deferred_items"])
+
+        # Compute accumulated severity
+        count = data["total_count"]
+        if count == 0:
+            data["accumulated_severity"] = "none"
+        elif count <= 3:
+            data["accumulated_severity"] = "low"
+        elif count <= 5:
+            data["accumulated_severity"] = "medium"
+        elif count <= 10:
+            data["accumulated_severity"] = "high"
+        else:
+            data["accumulated_severity"] = "critical"
+
+        self._save(data)
+
+    def get_deferred_count(self) -> int:
+        return self._load()["total_count"]
+
+    def get_accumulated_severity(self) -> str:
+        return self._load()["accumulated_severity"]
 
 
 class VerificationError(Exception):

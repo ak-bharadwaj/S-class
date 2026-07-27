@@ -3,8 +3,8 @@ import sys
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from strategy import StrategyEngine, RiskLevel, Urgency, ProjectScale
-from verifier import EvidenceVerifier, VerificationError
+from strategy import StrategyEngine, RiskLevel, Urgency, ProjectScale, TierEnforcement, classify_defect_tier, get_enforcement_level, check_accumulation_threshold, ImpactDrivenPolicyEngine, ImpactAnalysis
+from verifier import EvidenceVerifier, VerificationError, UxDebtTracker
 from evaluation import SelfEvaluator, EvaluationAction
 import runtime
 
@@ -87,3 +87,39 @@ def test_self_evaluator_profile_pivot():
     )
     assert eval_res.action == EvaluationAction.PIVOT_PROFILE
     assert eval_res.suggested_profile == "full"
+
+
+def test_impact_driven_policy_engine():
+    # 1. Defect A: Missing hover animation (Cosmetic UX) -> Risk Score 0.0 -> SOFT_PASS / ALLOW_RELEASE
+    v_a = ImpactDrivenPolicyEngine.evaluate_defect(
+        defect_description="Missing hover animation on card",
+        defect_domain="hover_transitions",
+        is_pure_cosmetic=True
+    )
+    assert v_a.risk_score == 0.0
+    assert v_a.policy_enforcement == "SOFT_PASS"
+    assert v_a.decision == "ALLOW_RELEASE"
+
+    # 2. Defect B: Missing loading spinner on 10s checkout submit button (UX domain, but causes double-click risk)
+    # Impact: data_loss_risk=1.0 -> Risk Score 4.0 -> SOFT_WARN / ALLOW_WITH_WARN
+    v_b = ImpactDrivenPolicyEngine.evaluate_defect(
+        defect_description="Missing loading spinner on 10s checkout submit button",
+        defect_domain="loading_indicators",
+        causes_double_submit=True
+    )
+    assert v_b.risk_score == 4.0
+    assert v_b.policy_enforcement == "SOFT_WARN"
+    assert v_b.decision == "ALLOW_WITH_WARN"
+
+    # 3. Defect C: Submit button off-screen / unreachable (UI domain, but blocks critical workflow)
+    # Impact: workflow_blocking=1.0, user_reachability=1.0 -> Risk Score 6.0 -> if also causes data loss -> Risk Score 10.0 -> HARD_BLOCK
+    v_c = ImpactDrivenPolicyEngine.evaluate_defect(
+        defect_description="Submit button rendered off-screen on mobile view",
+        defect_domain="button_reachability",
+        blocks_user_flow=True,
+        causes_data_loss=True
+    )
+    assert v_c.risk_score >= 7.0
+    assert v_c.policy_enforcement == "HARD_BLOCK"
+    assert v_c.decision == "REJECT_RELEASE"
+

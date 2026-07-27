@@ -10,6 +10,7 @@ class IntentContract:
     error_paths: List[ErrorPath]     # Explicit failure handling
     expected_io_flows: List[str] = field(default_factory=list) # Form inputs -> Expected Output visual display mappings
     user_visual_expectations: List[str] = field(default_factory=list) # Visual layout & data pollution bounds
+    ux_debt_ledger: List[Dict[str, str]] = field(default_factory=list)  # Soft-passed Tier 3b/4a/4b items tracked as debt
     max_retries: int = 3
     backoff_strategy: str = "exponential"  # linear | exponential | fixed
     stop_conditions: List[str] = field(default_factory=list)  # When to give up entirely
@@ -30,6 +31,7 @@ class IntentContract:
             "error_paths": [ep.to_dict() for ep in self.error_paths],
             "expected_io_flows": self.expected_io_flows,
             "user_visual_expectations": self.user_visual_expectations,
+            "ux_debt_ledger": self.ux_debt_ledger,
             "max_retries": self.max_retries,
             "backoff_strategy": self.backoff_strategy,
             "stop_conditions": self.stop_conditions,
@@ -44,6 +46,7 @@ class IntentContract:
             error_paths=[ErrorPath.from_dict(ep) for ep in data["error_paths"]],
             expected_io_flows=data.get("expected_io_flows", []),
             user_visual_expectations=data.get("user_visual_expectations", []),
+            ux_debt_ledger=data.get("ux_debt_ledger", []),
             max_retries=data.get("max_retries", 3),
             backoff_strategy=data.get("backoff_strategy", "exponential"),
             stop_conditions=data.get("stop_conditions", []),

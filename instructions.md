@@ -47,18 +47,32 @@ CRITICAL DIRECTIVE: Once this plugin is active, you (the main Antigravity agent)
     2. **Data Pollution & Extra Data Audit:** Output views MUST NOT render extra, unrequested, or leaked internal data (e.g. raw hashes, unformatted timestamps, internal database IDs, or unrequested columns).
     3. **UX Layout Integrity:** If the UI layout or data workflow contradicts what the user requested in `IntentContract`, `dss_user_alias_v2` MUST reject verification.
 
-## 12. Strict Tier 1 vs. Flexible Tier 4 Verification Enforcement
-All subagents, verifiers, and planners MUST evaluate and prioritize task execution according to this strict enforcement policy:
-1. **Tier 1 (Working Logic & Business Flow) — STRICT HARD BLOCK (Zero Tolerance):**
-   * Backend API routing, DB schema & Prisma migrations, business logic calculations, state transitions, security/auth bounds, data persistence.
-   * **Rule:** If EVEN ONE Tier 1 flaw exists, verification MUST BE HARD-BLOCKED. ZERO exceptions allowed.
-2. **Tier 2 (Data Visual & Output Fidelity) — STRICT HARD BLOCK:**
-   * Data rendering correctness (no `undefined`, `NaN`, `null`, `[object Object]`), form submission rendering in output views, no data pollution/leaks.
-   * **Rule:** Hard-block if form inputs fail to render in output views.
-3. **Tier 3 & Tier 4 (UI Layout & UX Ergonomics) — FLEXIBLE (ALLOWABLE SOFT PASS):**
-   * Responsive grid alignment, micro-animations, smooth transitions, toast feedback, dark mode aesthetics, loading spinners.
-   * **Rule:** If Tier 1 (Logic) and Tier 2 (Data Fidelity) pass 100% cleanly, missing Tier 3/4 UX polish items CAN BE ALLOWED (`allow_soft=True`) so that software delivery is never blocked by cosmetic UX details.
+## 12. Dynamic Impact-Driven Evaluation Architecture (Defect → Impact Analysis → Risk Score → Policy → Decision)
 
+Rather than relying on static tier assignments alone, all subagents, verifiers, and planners MUST process defects through the 5-stage **Dynamic Impact Pipeline**:
 
+```
+Defect  ──►  1. Impact Analysis  ──►  2. Risk Score Engine (0-10)  ──►  3. Policy Evaluator  ──►  4. Decision Verdict
+```
+
+### Why Impact Drives Policy
+Two defects in the exact same tier (e.g. two UX issues) can have radically different operational impacts:
+- **Defect A (Missing hover animation on card):** `cosmetic_only` = 1.0 → Risk Score = 0.0/10 → `SOFT_PASS` → `ALLOW_RELEASE`.
+- **Defect B (Missing loading spinner on 10s checkout submit button):** `data_loss_risk` = 1.0 (double submit risk) → Risk Score = 5.75/10 → `SOFT_WARN` → `ALLOW_WITH_WARN`. If it blocks form submission entirely → Risk Score = 7.5/10 → `HARD_BLOCK` → `REJECT_RELEASE`.
+
+### 5-Stage Pipeline Breakdown
+1. **Defect Input:** Log raw defect description, target component, and context.
+2. **Impact Analysis (5 Multi-Dimensional Vectors):**
+   * `workflow_blocking`: Does it break a user journey or API flow? (Weight: 3.5)
+   * `data_loss_risk`: Can it cause data loss, double submit, corruption, or privacy leak? (Weight: 4.0)
+   * `security_auth_risk`: Does it bypass auth or security boundaries? (Weight: 4.0)
+   * `user_reachability`: Is the feature inaccessible/unreachable to users? (Weight: 2.5)
+   * `cosmetic_only`: Is it purely aesthetic/visual alignment? (Discount: -2.0)
+3. **Risk Score Engine:** Computes normalized Risk Score \( R \in [0.0, 10.0] \).
+4. **Policy Mapping:**
+   * \( R \ge 7.0 \) ──► `HARD_BLOCK` (Zero tolerance, must fix before release)
+   * \( 4.0 \le R < 7.0 \) ──► `SOFT_WARN` (Allow release with logged warning & UX debt tracking)
+   * \( R < 4.0 \) ──► `SOFT_PASS` (Allow release silently & record debt in `.agents/ux_debt.json`)
+5. **Decision Verdict:** `REJECT_RELEASE` vs `ALLOW_WITH_WARN` vs `ALLOW_RELEASE`.
 
 
