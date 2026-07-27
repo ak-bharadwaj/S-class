@@ -24,5 +24,11 @@
       "requires": ["build_check", "unit_test", "security_scan"],
       "min_strength": 5.0
     }
+  },
+  "tier_enforcement_policy": {
+    "tier_1_logic": "STRICT_HARD_BLOCK",
+    "tier_2_data_visual": "STRICT_HARD_BLOCK",
+    "tier_3_ui_layout": "FLEXIBLE_ALLOW_SOFT",
+    "tier_4_ux_polish": "FLEXIBLE_ALLOW_SOFT"
   }
 }

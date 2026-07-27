@@ -47,16 +47,17 @@ CRITICAL DIRECTIVE: Once this plugin is active, you (the main Antigravity agent)
     2. **Data Pollution & Extra Data Audit:** Output views MUST NOT render extra, unrequested, or leaked internal data (e.g. raw hashes, unformatted timestamps, internal database IDs, or unrequested columns).
     3. **UX Layout Integrity:** If the UI layout or data workflow contradicts what the user requested in `IntentContract`, `dss_user_alias_v2` MUST reject verification.
 
-## 12. Strict 4-Tier Verification Priority Hierarchy
-All subagents, verifiers, and planners MUST evaluate and prioritize task execution, code generation, and verification according to this strict 4-tier hierarchy:
-1. **Tier 1 (Highest Priority): Working Logic & Business Flow**
-   * Backend API routing, DB schema & migrations, business logic calculations, state transitions, security/auth bounds, data persistence.
-2. **Tier 2: Data Visual & Output Fidelity**
+## 12. Strict Tier 1 vs. Flexible Tier 4 Verification Enforcement
+All subagents, verifiers, and planners MUST evaluate and prioritize task execution according to this strict enforcement policy:
+1. **Tier 1 (Working Logic & Business Flow) — STRICT HARD BLOCK (Zero Tolerance):**
+   * Backend API routing, DB schema & Prisma migrations, business logic calculations, state transitions, security/auth bounds, data persistence.
+   * **Rule:** If EVEN ONE Tier 1 flaw exists, verification MUST BE HARD-BLOCKED. ZERO exceptions allowed.
+2. **Tier 2 (Data Visual & Output Fidelity) — STRICT HARD BLOCK:**
    * Data rendering correctness (no `undefined`, `NaN`, `null`, `[object Object]`), form submission rendering in output views, no data pollution/leaks.
-3. **Tier 3: UI (User Interface) Structure & Layout**
-   * Clean layout alignment, responsive grid bounds, component structure, typography, button placement, visual hierarchy.
-4. **Tier 4: UX (User Experience) Ergonomics & Polish**
-   * Micro-animations, smooth transitions, toast feedback, dark mode aesthetics, loading indicators, subtle hover states.
+   * **Rule:** Hard-block if form inputs fail to render in output views.
+3. **Tier 3 & Tier 4 (UI Layout & UX Ergonomics) — FLEXIBLE (ALLOWABLE SOFT PASS):**
+   * Responsive grid alignment, micro-animations, smooth transitions, toast feedback, dark mode aesthetics, loading spinners.
+   * **Rule:** If Tier 1 (Logic) and Tier 2 (Data Fidelity) pass 100% cleanly, missing Tier 3/4 UX polish items CAN BE ALLOWED (`allow_soft=True`) so that software delivery is never blocked by cosmetic UX details.
 
 
 
