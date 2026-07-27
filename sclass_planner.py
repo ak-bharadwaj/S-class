@@ -28,6 +28,7 @@ class ExtractedIntent:
     goal: str
     target_domains: List[str]
     explicit_constraints: List[str] = field(default_factory=list)
+    extracted_features: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -38,15 +39,38 @@ class RiskAssessment:
 
 
 class IntentExtractor:
-    """Stage 1: Extracts intent, domains, and scope boundaries from goal prompt."""
+    """Stage 1: Extracts intent, domains, scope boundaries, and structured spec features from files."""
 
     @staticmethod
-    def extract_intent(goal_text: str) -> ExtractedIntent:
+    def extract_spec_features(workspace_dir: Optional[str] = None) -> List[str]:
+        """Parses specification files (e.g. implementation-details.txt) to extract all explicit feature headings."""
+        cwd = workspace_dir if workspace_dir else os.getcwd()
+        features = []
+        spec_candidates = ["implementation-details.txt", "spec.md", "REQUIREMENTS.md", "PROJECT.md"]
+        for fname in spec_candidates:
+            fpath = os.path.join(cwd, fname)
+            if os.path.exists(fpath):
+                try:
+                    with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
+                        for line in f:
+                            l_strip = line.strip()
+                            if "feature:" in l_strip.lower() or "milestone" in l_strip.lower():
+                                features.append(l_strip)
+                except Exception as e:
+                    logger.error(f"[IntentExtractor] Spec file parse error '{fname}': {e}")
+        return features
+
+    @staticmethod
+    def extract_intent(goal_text: str, workspace_dir: Optional[str] = None) -> ExtractedIntent:
         domains = StrategyEngine.detect_domains(goal_text)
         constraints = []
         if "must" in goal_text.lower() or "never" in goal_text.lower():
             constraints.append("Enforce explicit prompt boundary constraints")
-        return ExtractedIntent(goal=goal_text, target_domains=domains, explicit_constraints=constraints)
+        
+        features = IntentExtractor.extract_spec_features(workspace_dir)
+        if features:
+            logger.info(f"[IntentExtractor] Parsed {len(features)} explicit specification features from workspace")
+        return ExtractedIntent(goal=goal_text, target_domains=domains, explicit_constraints=constraints, extracted_features=features)
 
 
 class RiskAnalyzer:

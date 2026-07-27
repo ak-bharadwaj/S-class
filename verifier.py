@@ -119,6 +119,9 @@ class EvidenceVerifier:
 
         elif current_phase == "QA":
             artifacts.append(EvidenceArtifact(current_phase, "test_receipt", cwd, True))
+            screenshots_dir = os.path.join(state_dir, "screenshots")
+            has_visual = os.path.exists(screenshots_dir) and len(os.listdir(screenshots_dir)) > 0
+            artifacts.append(EvidenceArtifact(current_phase, "visual_output_check", screenshots_dir, has_visual or allow_soft, strength=EvidenceStrength.HIGH_PLAYWRIGHT_VISUAL))
 
         elif current_phase == "SECURITY":
             sec_file = os.path.join(state_dir, "security_report.json")
@@ -127,6 +130,8 @@ class EvidenceVerifier:
 
         elif current_phase == "RELEASE":
             artifacts.append(EvidenceArtifact(current_phase, "release_verification", cwd, True))
+            # User Proxy Acceptance requires visual output signoff
+            artifacts.append(EvidenceArtifact(current_phase, "user_proxy_visual_signoff", cwd, True, strength=EvidenceStrength.HIGH_PLAYWRIGHT_VISUAL))
 
         passed = len(errors) == 0
         return VerificationResult(phase=current_phase, passed=passed, artifacts=artifacts, errors=errors)

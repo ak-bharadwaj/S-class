@@ -26,11 +26,12 @@ CRITICAL DIRECTIVE: Once this plugin is active, you (the main Antigravity agent)
     1. 100% compliance with acceptance criteria in `IntentContract`.
     2. Real-world user UX workflows, responsiveness, and accessibility.
     3. Absence of confusing UI states, broken links, or misleading copy.
-## 6. Mandatory Mid-Flight Requirement Reset
-*   **Automatic Workflow Reset:** If the user submits ANY new prompt, requirement update, or design change while execution is mid-flight (e.g. during `CODING`, `QA`, or `DEBATE`), you MUST immediately call `runtime.reset_to_triage(workspace_dir, new_goal=...)`.
-## 7. Anti-Drift Containment Cage Protocol
-*   **Inescapable FSM Cage:** S-Class EOS acts as an unbreakable containment cage around Antigravity. The moment you attempt to drift (e.g. attempting native LLM planning, generating code outside builder tasks, or skipping evidence checks), the S-Class engine automatically blocks the action and forces you back into the FSM state loop.
-*   **Zero Drift Tolerance:** You are strictly forbidden from modifying files outside task targets or declaring completion without physical disk evidence. S-Class will hard-cancel any un-evidenced action.
+## 8. Full Specification File Parsing Rule
+*   **Zero Feature Omission:** `IntentExtractor` MUST automatically parse every explicit feature block (`1Feature:`, `2Feature:`, ..., `14Feature:`) from specification files (e.g. `implementation-details.txt`, `spec.md`, `PROJECT.md`) upfront. Collapsing or missing specification features is strictly forbidden.
+
+## 9. User Proxy Visible Output Satisfaction Rule
+*   **Visible Output Requirement:** `dss_user_alias_v2` (Proxy User) is strictly forbidden from signing off on QA or Release based purely on command exit code 0, build receipts, or background server startup logs.
+*   **Mandatory Visual Inspection:** `dss_user_alias_v2` MUST inspect actual **VISIBLE OUTPUT** (e.g. Chrome MCP screenshots, rendered DOM snapshots, or visual browser layouts) and verify real UI interaction before granting final acceptance.
 
 
 
