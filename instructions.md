@@ -81,6 +81,31 @@ Verification mechanism is derived automatically from `IntentContract.output_cont
 * `dss_user_alias_v2` (User Proxy) **CANNOT** accept QA or Release based on unit tests, build receipts, or logs alone.
 * `SafetyCase.output_contract_passed` MUST be `True` via the mechanism appropriate for the user's requested output type, or else release is **HARD-BLOCKED (`REJECT_RELEASE`)**.
 
+## 13. User Contract Coverage & Mandatory Chrome MCP Navigation Rule
+
+To prevent "partial verification illusion" (e.g., verifying only the home page while Settings, Reports, and Export flows remain unvisited), S-Class EOS enforces **User Contract Coverage**:
+
+$$\text{User Contract Coverage} = \frac{\text{Verified User Contracts}}{\text{Total Required Contracts in IntentContract}} \times 100\%$$
+
+### Mandatory Governance Rules for Agents (`dss_user_alias_v2` & `dss_qa_v2`):
+1. **100% Navigation Mandate:** Agents MUST use `chrome-devtools-mcp` / Playwright to navigate to and inspect **100% of defined pages, flows, and interactive components** in `IntentContract.expected_io_flows` and `acceptance_criteria`.
+2. **Contract Coverage Gate:** If `contract_coverage_percent < 85.0%`, `PolicyEngine` fires an immediate **`HARD_BLOCK` (`REJECT_RELEASE`)**:
+   ```json
+   {
+     "contract_coverage": {
+       "total_required_contracts": 12,
+       "verified_contracts": 5,
+       "coverage_percent": 41.7,
+       "unverified_contracts": ["Settings page", "Reports tab", "Export modal"]
+     },
+     "policy_enforcement": "HARD_BLOCK",
+     "decision": "REJECT_RELEASE",
+     "rationale": "SAFETY CASE INCOMPLETE: User Contract Coverage is only 41.7%, below required 85.0% threshold."
+   }
+   ```
+3. **No Unvisited Flow Assumptions:** Verification CANNOT be claimed for an entire web application if secondary pages or modals were never rendered or tested via Chrome MCP / Playwright.
+
+
 
 
 

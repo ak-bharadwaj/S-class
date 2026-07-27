@@ -259,5 +259,45 @@ def test_output_evidence_pack_verification(tmp_path):
     assert os.path.exists(os.path.join(state_dir, "output_evidence_pack.json"))
 
 
+def test_user_contract_coverage_gate():
+    from strategy import ContractCoverage, SafetyCase, PolicyEngine, RiskReport
+
+    # 1. Coverage below 85.0% threshold (e.g. 5/12 contracts verified = 41.7%) -> HARD_BLOCK
+    low_cov_case = SafetyCase(
+        build_passed=True,
+        tests_passed=True,
+        security_clean=True,
+        output_contract_passed=True,
+        contract_coverage=ContractCoverage(total_required_contracts=12, verified_contracts=5, unverified_contracts=["Settings", "Reports", "Export"])
+    )
+
+    verdict_low_cov = PolicyEngine.evaluate_policy(
+        defect_description="Full system release",
+        risk_report=RiskReport(risk_score=1.0, overall_confidence=0.98, hard_invariant_triggered=False, top_contributors=[], vector_evaluations={}),
+        safety_case=low_cov_case
+    )
+    assert verdict_low_cov.policy_enforcement == "HARD_BLOCK"
+    assert verdict_low_cov.decision == "REJECT_RELEASE"
+    assert "User Contract Coverage is only 41.7%" in verdict_low_cov.rationale
+
+    # 2. Coverage at 100.0% -> SOFT_PASS / ALLOW_RELEASE
+    full_cov_case = SafetyCase(
+        build_passed=True,
+        tests_passed=True,
+        security_clean=True,
+        output_contract_passed=True,
+        contract_coverage=ContractCoverage(total_required_contracts=12, verified_contracts=12, unverified_contracts=[])
+    )
+
+    verdict_full_cov = PolicyEngine.evaluate_policy(
+        defect_description="Full system release",
+        risk_report=RiskReport(risk_score=1.0, overall_confidence=0.98, hard_invariant_triggered=False, top_contributors=[], vector_evaluations={}),
+        safety_case=full_cov_case
+    )
+    assert verdict_full_cov.policy_enforcement == "SOFT_PASS"
+    assert verdict_full_cov.decision == "ALLOW_RELEASE"
+
+
+
 
 

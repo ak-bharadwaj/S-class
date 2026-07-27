@@ -368,6 +368,28 @@ class RiskEngine:
 
 
 @dataclass
+class ContractCoverage:
+    """Tracks coverage metrics across user contract features, pages, and interaction flows."""
+    total_required_contracts: int = 1
+    verified_contracts: int = 1
+    unverified_contracts: List[str] = field(default_factory=list)
+
+    @property
+    def coverage_percent(self) -> float:
+        if self.total_required_contracts == 0:
+            return 100.0
+        return round((self.verified_contracts / self.total_required_contracts) * 100.0, 1)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "total_required_contracts": self.total_required_contracts,
+            "verified_contracts": self.verified_contracts,
+            "unverified_contracts": self.unverified_contracts,
+            "coverage_percent": self.coverage_percent,
+        }
+
+
+@dataclass
 class SafetyCase:
     """Avionics & Medical Grade Safety Case. Release requires complete body of evidence."""
     build_passed: bool = False
@@ -375,6 +397,7 @@ class SafetyCase:
     security_clean: bool = False
     output_contract_passed: bool = False         # MANDATORY: Output Contract Evidence verified against IntentContract
     output_verification_mechanism: str = ""       # Mechanism used: playwright_dom | json_schema | cli_golden_snapshot | markdown_ast
+    contract_coverage: ContractCoverage = field(default_factory=ContractCoverage) # User Contract Coverage metrics
     risk_report: Optional[RiskReport] = None
 
     @property
@@ -383,12 +406,13 @@ class SafetyCase:
         return self.output_contract_passed
 
     def is_complete(self) -> bool:
-        """Verifies all safety case evidence requirements are met."""
+        """Verifies all safety case evidence requirements are met, including >= 85.0% contract coverage threshold."""
         return (
             self.build_passed and
             self.tests_passed and
             self.security_clean and
-            self.output_contract_passed  # MANDATORY output contract evidence!
+            self.output_contract_passed and
+            self.contract_coverage.coverage_percent >= 85.0  # Mandatory contract coverage threshold!
         )
 
 
@@ -424,6 +448,7 @@ class DefectEvaluationVerdict:
             "risk_report": self.risk_report.to_dict(),
             "safety_case_complete": self.safety_case.is_complete() if self.safety_case else False,
             "output_verification_mechanism": self.safety_case.output_verification_mechanism if self.safety_case else "",
+            "contract_coverage": self.safety_case.contract_coverage.to_dict() if self.safety_case else {},
             "policy_enforcement": self.policy_enforcement,
             "decision": self.decision,
             "rationale": self.rationale,
@@ -433,7 +458,7 @@ class DefectEvaluationVerdict:
 class PolicyEngine:
     """Standalone Policy Engine: Consumes ONLY RiskReport + SafetyCase to determine release policy.
 
-    Decoupled from Risk Engine mathematics. Enforces mandatory Output Contract Evidence gates.
+    Decoupled from Risk Engine mathematics. Enforces mandatory Output Contract Evidence & Contract Coverage gates.
     """
 
     @staticmethod
@@ -443,6 +468,7 @@ class PolicyEngine:
         safety_case: Optional[SafetyCase] = None,
         threshold_hard_block: float = 7.0,
         threshold_soft_warn: float = 4.0,
+        min_coverage_threshold: float = 85.0,
     ) -> DefectEvaluationVerdict:
         """Consumes RiskReport and SafetyCase to produce the final policy decision."""
         # 1. Mandatory Safety Case Output Contract Evidence Gate
@@ -456,7 +482,19 @@ class PolicyEngine:
                 rationale="SAFETY CASE INCOMPLETE: Output Contract Evidence is missing. IntentContract requires verified rendered output (Playwright DOM/table/chart, JSON schema, CLI snapshot, or PDF parser) matching user request before release.",
             )
 
-        # 2. Hard Invariants Check
+        # 2. Mandatory User Contract Coverage Gate
+        if safety_case and safety_case.contract_coverage.coverage_percent < min_coverage_threshold:
+            cov = safety_case.contract_coverage
+            return DefectEvaluationVerdict(
+                defect_description=defect_description,
+                risk_report=risk_report,
+                safety_case=safety_case,
+                policy_enforcement=TierEnforcement.HARD_BLOCK,
+                decision="REJECT_RELEASE",
+                rationale=f"SAFETY CASE INCOMPLETE: User Contract Coverage is only {cov.coverage_percent}%, below required {min_coverage_threshold}% threshold ({cov.verified_contracts}/{cov.total_required_contracts} contracts verified). Unverified contracts: {cov.unverified_contracts}",
+            )
+
+        # 3. Hard Invariants Check
         if risk_report.hard_invariant_triggered or risk_report.risk_score >= threshold_hard_block:
             return DefectEvaluationVerdict(
                 defect_description=defect_description,
@@ -467,7 +505,7 @@ class PolicyEngine:
                 rationale=f"HARD BLOCK: Risk Score {risk_report.risk_score}/10 >= {threshold_hard_block} threshold or Hard Invariant fired.",
             )
 
-        # 3. Soft Warn vs Soft Pass
+        # 4. Soft Warn vs Soft Pass
         if risk_report.risk_score >= threshold_soft_warn:
             return DefectEvaluationVerdict(
                 defect_description=defect_description,
