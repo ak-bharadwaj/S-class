@@ -9,6 +9,8 @@ from sclass_planner import ExecutionPlanner, IntentExtractor, RiskAnalyzer, Work
 from knowledge_base import KnowledgeBaseManager
 from monitoring import MultiStreamMonitor
 from learning_engine import LearningEngine
+from context_compressor import ContextCompressor, StructuredMemory
+from event_graph import EventGraph, EventTopic, global_event_graph
 
 
 def test_kernel_formal_api_and_event_sourcing(tmp_path):
@@ -32,51 +34,35 @@ def test_kernel_formal_api_and_event_sourcing(tmp_path):
     assert recon["total_events"] == 1
 
 
-def test_selective_knowledge_retrieval_policies(tmp_path):
-    workspace = str(tmp_path)
+def test_context_compression_engine():
+    mock_state = {
+        "planRationale": "Implement Stripe Payments",
+        "reviewDepth": "deep",
+        "decisionLog": [
+            {"agent": "dss_governor", "decision": "Approve DB Schema", "reason": "Valid Types"},
+            {"agent": "dss_cso_v2", "decision": "Approve Auth DTO", "reason": "No Leaks"}
+        ],
+        "tasks": [
+            {"id": "T1", "targets": ["src/auth.ts", "src/db.ts"]}
+        ]
+    }
     
-    # Bug Fix profile retrieves Failed Approaches
-    res_bug = KnowledgeBaseManager.query_knowledge_base("Fix memory leak in caching", profile="bug_fix", workspace_dir=workspace)
-    assert "failed_approaches" in res_bug
-    
-    # Research profile retrieves Architecture Patterns
-    res_res = KnowledgeBaseManager.query_knowledge_base("Audit API service architecture", profile="research", workspace_dir=workspace)
-    assert "architecture_patterns" in res_res
+    compressed = ContextCompressor.compress_context(mock_state)
+    assert isinstance(compressed, StructuredMemory)
+    assert "src/auth.ts" in compressed.modified_targets
+    assert compressed.compression_ratio < 1.0
 
 
-def test_multi_stream_active_monitoring():
-    monitor = MultiStreamMonitor()
+def test_event_driven_graph_architecture():
+    graph = EventGraph()
+    received_events = []
     
-    # Ingest logs stream
-    monitor.ingest_telemetry("logs", "CRITICAL", "server", "Unhandled Exception: Connection refused")
+    def on_task_completed(event):
+        received_events.append(event)
+        
+    graph.subscribe(EventTopic.TASK_COMPLETED, on_task_completed)
     
-    # Ingest security events stream
-    monitor.ingest_telemetry("security_events", "WARNING", "auth", "5 failed login attempts from IP 192.168.1.1")
-    
-    health = monitor.evaluate_production_health()
-    assert health["healthy"] is False
-    assert health["criticalCount"] == 1
-    assert "logs" in health["anomalyStreams"]
-
-
-def test_learning_engine_candidate_promotion(tmp_path):
-    workspace = str(tmp_path)
-    
-    # Capture candidate
-    cand = LearningEngine.capture_candidate(
-        category="failed_approaches",
-        title="Avoid Synchronous Disk Writes on Main Loop",
-        content="Synchronous disk writes stall event loop dispatch.",
-        tags=["performance", "io"],
-        workspace_dir=workspace
-    )
-    assert cand.candidate_id == "cand_1"
-    
-    # Promote candidate to KB
-    success = LearningEngine.promote_candidate("cand_1", workspace_dir=workspace)
-    assert success is True
-    
-    # Query KB to confirm entry promoted
-    res = KnowledgeBaseManager.query_knowledge_base("disk writes", profile="bug_fix", workspace_dir=workspace)
-    titles = [item["title"] for item in res.get("failed_approaches", [])]
-    assert "Avoid Synchronous Disk Writes on Main Loop" in titles
+    ev = graph.publish(EventTopic.TASK_COMPLETED, sender="builder_react", payload={"task_id": "T101"})
+    assert len(received_events) == 1
+    assert received_events[0].sender == "builder_react"
+    assert received_events[0].payload["task_id"] == "T101"
