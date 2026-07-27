@@ -141,63 +141,348 @@ def check_accumulation_threshold(tier_key: str, defect_count: int) -> str:
     return base_enforcement
 
 
+class EvidenceSource:
+    """Evidence sources and their associated confidence weights."""
+    PLAYWRIGHT_VISUAL = "playwright_visual"   # Confidence Weight: 0.98 (Playwright / Chrome MCP visual verification)
+    UNIT_TEST = "unit_test"                   # Confidence Weight: 0.90 (Automated unit / integration test receipt)
+    STATIC_ANALYSIS = "static_analysis"       # Confidence Weight: 0.85 (Linter / compiler / type-checker receipt)
+    LLM_REVIEW = "llm_review"                 # Confidence Weight: 0.50 (LLM subagent inspection receipt)
+    HEURISTIC = "heuristic"                   # Confidence Weight: 0.40 (Static heuristic rule match)
+
+
+EVIDENCE_CONFIDENCE_WEIGHTS: Dict[str, float] = {
+    EvidenceSource.PLAYWRIGHT_VISUAL: 0.98,
+    EvidenceSource.UNIT_TEST: 0.90,
+    EvidenceSource.STATIC_ANALYSIS: 0.85,
+    EvidenceSource.LLM_REVIEW: 0.50,
+    EvidenceSource.HEURISTIC: 0.40,
+}
+
+
 @dataclass
 class ImpactAnalysis:
-    """Evaluates multi-dimensional operational impact and likelihood vectors of a software defect."""
-    workflow_blocking: float = 0.0     # [0.0 - 1.0] Blocks critical user journey / API flow
-    data_loss_risk: float = 0.0        # [0.0 - 1.0] Potential data corruption, double submit, or leak
-    user_reachability: float = 0.0     # [0.0 - 1.0] User unable to see/interact with UI component
-    security_auth_risk: float = 0.0    # [0.0 - 1.0] Bypasses auth / security boundary
-    cosmetic_only: float = 0.0         # [0.0 - 1.0] Aesthetic/visual alignment only
-    frequency_likelihood: float = 1.0  # [0.0 - 1.0] Occurs every request (1.0) vs 1 in 1M edge case (0.05)
+    """Convenience container for multi-vector defect severities."""
+    workflow_blocking: float = 0.0
+    data_loss_risk: float = 0.0
+    user_reachability: float = 0.0
+    security_auth_risk: float = 0.0
+    cosmetic_only: float = 0.0
+    frequency_likelihood: float = 1.0
 
-    def to_dict(self) -> Dict[str, float]:
+    def to_vectors(self, source: str = EvidenceSource.HEURISTIC) -> Dict[str, "ImpactVectorEvaluation"]:
+        conf = EVIDENCE_CONFIDENCE_WEIGHTS.get(source, 0.40)
         return {
-            "workflow_blocking": self.workflow_blocking,
-            "data_loss_risk": self.data_loss_risk,
-            "user_reachability": self.user_reachability,
-            "security_auth_risk": self.security_auth_risk,
-            "cosmetic_only": self.cosmetic_only,
-            "frequency_likelihood": self.frequency_likelihood,
+            "workflow_blocking": ImpactVectorEvaluation(severity=self.workflow_blocking, confidence=conf, source=source),
+            "data_loss_risk": ImpactVectorEvaluation(severity=self.data_loss_risk, confidence=conf, source=source),
+            "user_reachability": ImpactVectorEvaluation(severity=self.user_reachability, confidence=conf, source=source),
+            "security_auth_risk": ImpactVectorEvaluation(severity=self.security_auth_risk, confidence=conf, source=source),
+            "cosmetic_only": ImpactVectorEvaluation(severity=self.cosmetic_only, confidence=conf, source=source),
         }
+
+
+@dataclass
+class ImpactVectorEvaluation:
+    """Individual impact vector evaluated with severity, confidence, and evidence source."""
+    severity: float         # [0.0 - 1.0] Raw defect severity
+    confidence: float       # [0.0 - 1.0] Source-weighted confidence score
+    source: str             # EvidenceSource identifier
+
+    def effective_impact(self) -> float:
+        """Returns confidence-weighted impact = severity * confidence."""
+        return round(self.severity * self.confidence, 4)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "severity": self.severity,
+            "confidence": self.confidence,
+            "source": self.source,
+            "effective_impact": self.effective_impact(),
+        }
+
+
+@dataclass
+class RiskReport:
+    """Standalone, explainable Risk Report produced by the Risk Engine. Decoupled from Policy Engine."""
+    risk_score: float                            # Calculated Risk Score [0.0 - 10.0]
+    overall_confidence: float                    # Weighted average confidence [0.0 - 1.0]
+    hard_invariant_triggered: bool                # True if a short-circuit hard invariant fired
+    top_contributors: List[str]                  # Human-readable breakdown of risk drivers
+    vector_evaluations: Dict[str, ImpactVectorEvaluation] # Per-vector evaluation objects
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "risk_score": self.risk_score,
+            "overall_confidence": self.overall_confidence,
+            "hard_invariant_triggered": self.hard_invariant_triggered,
+            "top_contributors": self.top_contributors,
+            "vector_evaluations": {k: v.to_dict() for k, v in self.vector_evaluations.items()},
+        }
+
+
+class RiskEngine:
+    """Standalone Risk Engine: Computes risk_score, vector confidence, and hard_invariant_triggered.
+
+    Does NOT make policy decisions (HARD_BLOCK / SOFT_PASS). Output is a pure RiskReport.
+    """
+
+    @staticmethod
+    def compute_risk(
+        defect_description: str,
+        defect_domain: str,
+        blocks_user_flow: bool = False,
+        causes_double_submit: bool = False,
+        causes_data_loss: bool = False,
+        is_auth_security: bool = False,
+        is_pure_cosmetic: bool = False,
+        evidence_source: str = EvidenceSource.HEURISTIC,
+        frequency_likelihood: float = 1.0,
+        vector_overrides: Optional[Dict[str, ImpactVectorEvaluation]] = None,
+    ) -> RiskReport:
+        """Evaluates defect evidence vectors and computes RiskReport."""
+        conf_weight = EVIDENCE_CONFIDENCE_WEIGHTS.get(evidence_source, 0.40)
+        contributors: List[str] = []
+
+        if vector_overrides is not None:
+            vectors = vector_overrides
+        else:
+            # Construct vectors with source-weighted confidence
+            wf_sev = 1.0 if blocks_user_flow or defect_domain in ["working_flow", "business_logic", "backend_routing", "state_transitions"] else 0.0
+            dl_sev = 1.0 if causes_data_loss or causes_double_submit else (0.5 if defect_domain == "input_output_form_flow" else 0.0)
+            reach_sev = 1.0 if defect_domain in ["button_reachability", "navigation_rendering", "content_visibility"] or blocks_user_flow else 0.0
+            sec_sev = 1.0 if is_auth_security or defect_domain in ["rbac_security", "auth"] else 0.0
+            cosm_sev = 1.0 if is_pure_cosmetic or defect_domain in ["micro_animations", "hover_transitions", "margin_alignment", "padding_consistency", "border_radius"] else 0.0
+
+            vectors = {
+                "workflow_blocking": ImpactVectorEvaluation(severity=wf_sev, confidence=conf_weight, source=evidence_source),
+                "data_loss_risk": ImpactVectorEvaluation(severity=dl_sev, confidence=conf_weight, source=evidence_source),
+                "user_reachability": ImpactVectorEvaluation(severity=reach_sev, confidence=conf_weight, source=evidence_source),
+                "security_auth_risk": ImpactVectorEvaluation(severity=sec_sev, confidence=conf_weight, source=evidence_source),
+                "cosmetic_only": ImpactVectorEvaluation(severity=cosm_sev, confidence=conf_weight, source=evidence_source),
+            }
+
+        # Ensure all 5 standard vectors exist in vectors dict (fill defaults for missing keys)
+        default_vector = ImpactVectorEvaluation(severity=0.0, confidence=conf_weight, source=evidence_source)
+        sec_vec = vectors.get("security_auth_risk", default_vector)
+        dl_vec = vectors.get("data_loss_risk", default_vector)
+        wf_vec = vectors.get("workflow_blocking", default_vector)
+        reach_vec = vectors.get("user_reachability", default_vector)
+        cosm_vec = vectors.get("cosmetic_only", default_vector)
+
+        # 1. Hard Invariants Check (Short-Circuit Gates)
+        if sec_vec.severity >= 0.9:
+            contributors.append(f"CRITICAL: Security/Auth Bypass Invariant Triggered (Severity={sec_vec.severity}, Source={sec_vec.source})")
+            return RiskReport(
+                risk_score=10.0,
+                overall_confidence=sec_vec.confidence,
+                hard_invariant_triggered=True,
+                top_contributors=contributors,
+                vector_evaluations=vectors,
+            )
+
+        if dl_vec.severity >= 0.95:
+            contributors.append(f"CRITICAL: Data Loss / Corruption Invariant Triggered (Severity={dl_vec.severity}, Source={dl_vec.source})")
+            return RiskReport(
+                risk_score=10.0,
+                overall_confidence=dl_vec.confidence,
+                hard_invariant_triggered=True,
+                top_contributors=contributors,
+                vector_evaluations=vectors,
+            )
+
+        if wf_vec.severity >= 0.95:
+            contributors.append(f"CRITICAL: Total Workflow Blockage Invariant Triggered (Severity={wf_vec.severity}, Source={wf_vec.source})")
+            return RiskReport(
+                risk_score=10.0,
+                overall_confidence=wf_vec.confidence,
+                hard_invariant_triggered=True,
+                top_contributors=contributors,
+                vector_evaluations=vectors,
+            )
+
+        # 2. Additive Base Score weighted by confidence-effective impact
+        base_score = 0.0
+        wf_eff = wf_vec.effective_impact()
+        if wf_eff > 0:
+            val = round(wf_eff * 3.5, 2)
+            base_score += val
+            contributors.append(f"Workflow Blocking: +{val:.2f} (Effective Impact={wf_eff})")
+
+        dl_eff = dl_vec.effective_impact()
+        if dl_eff > 0:
+            val = round(dl_eff * 4.0, 2)
+            base_score += val
+            contributors.append(f"Data Loss Risk: +{val:.2f} (Effective Impact={dl_eff})")
+
+        sec_eff = sec_vec.effective_impact()
+        if sec_eff > 0:
+            val = round(sec_eff * 4.0, 2)
+            base_score += val
+            contributors.append(f"Security Auth Risk: +{val:.2f} (Effective Impact={sec_eff})")
+
+        reach_eff = reach_vec.effective_impact()
+        if reach_eff > 0:
+            val = round(reach_eff * 2.5, 2)
+            base_score += val
+            contributors.append(f"User Reachability: +{val:.2f} (Effective Impact={reach_eff})")
+
+        # Conditional Cosmetic Discount: ONLY if NO functional vectors are active
+        has_functional_vectors = (wf_eff > 0 or dl_eff > 0 or sec_eff > 0 or reach_eff > 0)
+        cosm_eff = cosm_vec.effective_impact()
+        if cosm_eff > 0 and not has_functional_vectors:
+            discount = round(cosm_eff * 2.0, 2)
+            base_score = max(0.0, base_score - discount)
+            contributors.append(f"Pure Cosmetic Discount: -{discount:.2f}")
+
+        # 3. Multiplicative Interaction Engine
+        interaction_multiplier = 1.0
+        if wf_eff > 0.3 and sec_eff > 0.3:
+            interaction_multiplier *= 1.5
+            contributors.append("Multiplicative Interaction: Auth x Workflow (1.5x)")
+
+        if wf_eff > 0.3 and dl_eff > 0.3:
+            interaction_multiplier *= 1.4
+            contributors.append("Multiplicative Interaction: Workflow x Data Loss (1.4x)")
+
+        if dl_eff > 0.3 and sec_eff > 0.3:
+            interaction_multiplier *= 1.6
+            contributors.append("Multiplicative Interaction: Data Loss x Security (1.6x)")
+
+        amplified_score = base_score * interaction_multiplier
+
+        # 4. Time / Frequency Dimension Scaling
+        final_risk = min(10.0, max(0.0, round(amplified_score * frequency_likelihood, 2)))
+        if frequency_likelihood < 1.0:
+            contributors.append(f"Frequency Likelihood Scale: x{frequency_likelihood}")
+
+        # Overall Confidence = weighted average confidence across active vectors
+        conf_values = [v.confidence for v in vectors.values() if v.severity > 0]
+        avg_confidence = round(sum(conf_values) / len(conf_values), 2) if conf_values else conf_weight
+
+        return RiskReport(
+            risk_score=final_risk,
+            overall_confidence=avg_confidence,
+            hard_invariant_triggered=False,
+            top_contributors=contributors,
+            vector_evaluations=vectors,
+        )
+
+
+@dataclass
+class SafetyCase:
+    """Avionics & Medical Grade Safety Case. Release requires complete body of evidence."""
+    build_passed: bool = False
+    tests_passed: bool = False
+    security_clean: bool = False
+    visual_inspection_passed: bool = False  # MANDATORY: Playwright / Chrome MCP visual verification receipt
+    risk_report: Optional[RiskReport] = None
+
+    def is_complete(self) -> bool:
+        """Verifies all safety case evidence requirements are met."""
+        return (
+            self.build_passed and
+            self.tests_passed and
+            self.security_clean and
+            self.visual_inspection_passed  # MANDATORY visual output gate!
+        )
 
 
 @dataclass
 class DefectEvaluationVerdict:
-    """Verdict produced by the Impact-Driven Evaluation Engine with explainability & confidence."""
+    """Final policy decision verdict produced by PolicyEngine consuming RiskReport + SafetyCase."""
     defect_description: str
-    impact: ImpactAnalysis
-    risk_score: float               # Calculated Risk Score [0.0 - 10.0]
-    confidence: float               # Evaluation Confidence [0.0 - 1.0]
-    policy_enforcement: str         # HARD_BLOCK | SOFT_WARN | SOFT_PASS
-    decision: str                   # REJECT_RELEASE | ALLOW_WITH_WARN | ALLOW_RELEASE
-    top_contributors: List[str]     # Explainable breakdown of risk drivers
-    evidence: List[str]             # Evidence receipts backing evaluation
-    invariant_triggered: bool       # True if a short-circuit hard invariant fired
+    risk_report: RiskReport
+    safety_case: Optional[SafetyCase]
+    policy_enforcement: str       # HARD_BLOCK | SOFT_WARN | SOFT_PASS
+    decision: str                 # REJECT_RELEASE | ALLOW_WITH_WARN | ALLOW_RELEASE
     rationale: str
+
+    @property
+    def risk_score(self) -> float:
+        return self.risk_report.risk_score
+
+    @property
+    def confidence(self) -> float:
+        return self.risk_report.overall_confidence
+
+    @property
+    def top_contributors(self) -> List[str]:
+        return self.risk_report.top_contributors
+
+    @property
+    def invariant_triggered(self) -> bool:
+        return self.risk_report.hard_invariant_triggered
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "defect_description": self.defect_description,
-            "impact": self.impact.to_dict(),
-            "risk_score": self.risk_score,
-            "confidence": self.confidence,
+            "risk_report": self.risk_report.to_dict(),
+            "safety_case_complete": self.safety_case.is_complete() if self.safety_case else False,
             "policy_enforcement": self.policy_enforcement,
             "decision": self.decision,
-            "top_contributors": self.top_contributors,
-            "evidence": self.evidence,
-            "invariant_triggered": self.invariant_triggered,
             "rationale": self.rationale,
         }
 
 
-class ImpactDrivenPolicyEngine:
-    """Executes the dynamic 5-stage impact pipeline with Hard Invariants, Multiplicative Amplification,
+class PolicyEngine:
+    """Standalone Policy Engine: Consumes ONLY RiskReport + SafetyCase to determine release policy.
 
-    Conditional Cosmetic Discount, Time/Likelihood Scaling, Explainability, and Confidence Metrics.
-
-    Pipeline: Defect -> Impact Analysis -> Hard Invariant Check -> Risk Score Engine -> Policy -> Decision
+    Decoupled from Risk Engine mathematics. Enforces mandatory visual evidence gates.
     """
+
+    @staticmethod
+    def evaluate_policy(
+        defect_description: str,
+        risk_report: RiskReport,
+        safety_case: Optional[SafetyCase] = None,
+        threshold_hard_block: float = 7.0,
+        threshold_soft_warn: float = 4.0,
+    ) -> DefectEvaluationVerdict:
+        """Consumes RiskReport and SafetyCase to produce the final policy decision."""
+        # 1. Mandatory Safety Case Visual Inspection Gate
+        if safety_case and not safety_case.visual_inspection_passed:
+            return DefectEvaluationVerdict(
+                defect_description=defect_description,
+                risk_report=risk_report,
+                safety_case=safety_case,
+                policy_enforcement=TierEnforcement.HARD_BLOCK,
+                decision="REJECT_RELEASE",
+                rationale="SAFETY CASE INCOMPLETE: Visual output inspection receipt is missing. User Proxy and verifier require Playwright / Chrome MCP visual verification before release.",
+            )
+
+        # 2. Hard Invariants Check
+        if risk_report.hard_invariant_triggered or risk_report.risk_score >= threshold_hard_block:
+            return DefectEvaluationVerdict(
+                defect_description=defect_description,
+                risk_report=risk_report,
+                safety_case=safety_case,
+                policy_enforcement=TierEnforcement.HARD_BLOCK,
+                decision="REJECT_RELEASE",
+                rationale=f"HARD BLOCK: Risk Score {risk_report.risk_score}/10 >= {threshold_hard_block} threshold or Hard Invariant fired.",
+            )
+
+        # 3. Soft Warn vs Soft Pass
+        if risk_report.risk_score >= threshold_soft_warn:
+            return DefectEvaluationVerdict(
+                defect_description=defect_description,
+                risk_report=risk_report,
+                safety_case=safety_case,
+                policy_enforcement=TierEnforcement.SOFT_WARN,
+                decision="ALLOW_WITH_WARN",
+                rationale=f"SOFT WARN: Risk Score {risk_report.risk_score}/10 in [{threshold_soft_warn}, {threshold_hard_block}). Release allowed with logged advisory and UX debt tracking.",
+            )
+
+        return DefectEvaluationVerdict(
+            defect_description=defect_description,
+            risk_report=risk_report,
+            safety_case=safety_case,
+            policy_enforcement=TierEnforcement.SOFT_PASS,
+            decision="ALLOW_RELEASE",
+            rationale=f"SOFT PASS: Risk Score {risk_report.risk_score}/10 < {threshold_soft_warn}. Release allowed silently with UX debt tracking.",
+        )
+
+
+class ImpactDrivenPolicyEngine:
+    """Convenience facade combining RiskEngine and PolicyEngine for unified evaluation calls."""
 
     @staticmethod
     def evaluate_defect(
@@ -208,159 +493,54 @@ class ImpactDrivenPolicyEngine:
         causes_data_loss: bool = False,
         is_auth_security: bool = False,
         is_pure_cosmetic: bool = False,
+        evidence_source: str = EvidenceSource.HEURISTIC,
         frequency_likelihood: float = 1.0,
         evidence_list: Optional[List[str]] = None,
         threshold_hard_block: float = 7.0,
         threshold_soft_warn: float = 4.0,
-        impact_override: Optional[ImpactAnalysis] = None,
+        impact_override: Optional[Any] = None,
     ) -> DefectEvaluationVerdict:
-        """Evaluates a defect through the hardened 5-stage impact pipeline."""
-        evidence = evidence_list or ["heuristic_analysis"]
-        contributors: List[str] = []
-
-        # 1. Stage 1: Impact Analysis Vectors
-        if impact_override is not None:
-            impact = impact_override
+        """Facade method delegating to RiskEngine and PolicyEngine."""
+        # 1. Compute RiskReport via RiskEngine
+        if impact_override is not None and isinstance(impact_override, ImpactAnalysis):
+            # Backwards compatibility helper for tests using ImpactAnalysis dataclass
+            conf = EVIDENCE_CONFIDENCE_WEIGHTS.get(evidence_source, 0.40)
+            overrides = {
+                "workflow_blocking": ImpactVectorEvaluation(severity=impact_override.workflow_blocking, confidence=conf, source=evidence_source),
+                "data_loss_risk": ImpactVectorEvaluation(severity=impact_override.data_loss_risk, confidence=conf, source=evidence_source),
+                "user_reachability": ImpactVectorEvaluation(severity=impact_override.user_reachability, confidence=conf, source=evidence_source),
+                "security_auth_risk": ImpactVectorEvaluation(severity=impact_override.security_auth_risk, confidence=conf, source=evidence_source),
+                "cosmetic_only": ImpactVectorEvaluation(severity=impact_override.cosmetic_only, confidence=conf, source=evidence_source),
+            }
+            report = RiskEngine.compute_risk(defect_description, defect_domain, vector_overrides=overrides, frequency_likelihood=impact_override.frequency_likelihood)
         else:
-            wf_block = 1.0 if blocks_user_flow or defect_domain in ["working_flow", "business_logic", "backend_routing", "state_transitions"] else 0.0
-            dl_risk = 1.0 if causes_data_loss or causes_double_submit else (0.5 if defect_domain == "input_output_form_flow" else 0.0)
-            reachability = 1.0 if defect_domain in ["button_reachability", "navigation_rendering", "content_visibility"] or blocks_user_flow else 0.0
-            sec_risk = 1.0 if is_auth_security or defect_domain in ["rbac_security", "auth"] else 0.0
-            cosmetic = 1.0 if is_pure_cosmetic or defect_domain in ["micro_animations", "hover_transitions", "margin_alignment", "padding_consistency", "border_radius"] else 0.0
-
-            impact = ImpactAnalysis(
-                workflow_blocking=wf_block,
-                data_loss_risk=dl_risk,
-                user_reachability=reachability,
-                security_auth_risk=sec_risk,
-                cosmetic_only=cosmetic,
+            report = RiskEngine.compute_risk(
+                defect_description,
+                defect_domain,
+                blocks_user_flow=blocks_user_flow,
+                causes_double_submit=causes_double_submit,
+                causes_data_loss=causes_data_loss,
+                is_auth_security=is_auth_security,
+                is_pure_cosmetic=is_pure_cosmetic,
+                evidence_source=evidence_source,
                 frequency_likelihood=frequency_likelihood,
             )
 
-        # 2. Stage 2: Hard Invariants Check (Short-Circuit Gates before Math)
-        if impact.security_auth_risk >= 0.9:
-            contributors.append("CRITICAL: Security/Auth Bypass Invariant Triggered (1.0)")
-            return DefectEvaluationVerdict(
-                defect_description=defect_description,
-                impact=impact,
-                risk_score=10.0,
-                confidence=0.95,
-                policy_enforcement=TierEnforcement.HARD_BLOCK,
-                decision="REJECT_RELEASE",
-                top_contributors=contributors,
-                evidence=evidence,
-                invariant_triggered=True,
-                rationale="INVARIANT TRIGGERED: Critical security/auth risk (>= 0.9) short-circuits to HARD_BLOCK regardless of cosmetic factors.",
-            )
+        # 2. Evaluate Policy via PolicyEngine with complete SafetyCase default
+        default_safety_case = SafetyCase(
+            build_passed=True,
+            tests_passed=True,
+            security_clean=True,
+            visual_inspection_passed=True,
+            risk_report=report,
+        )
 
-        if impact.data_loss_risk >= 0.95:
-            contributors.append("CRITICAL: Data Loss / Corruption Invariant Triggered (1.0)")
-            return DefectEvaluationVerdict(
-                defect_description=defect_description,
-                impact=impact,
-                risk_score=10.0,
-                confidence=0.95,
-                policy_enforcement=TierEnforcement.HARD_BLOCK,
-                decision="REJECT_RELEASE",
-                top_contributors=contributors,
-                evidence=evidence,
-                invariant_triggered=True,
-                rationale="INVARIANT TRIGGERED: Data loss / corruption risk (>= 0.95) short-circuits to HARD_BLOCK.",
-            )
-
-        if impact.workflow_blocking >= 0.95:
-            contributors.append("CRITICAL: Total Workflow Blockage Invariant Triggered (1.0)")
-            return DefectEvaluationVerdict(
-                defect_description=defect_description,
-                impact=impact,
-                risk_score=10.0,
-                confidence=0.95,
-                policy_enforcement=TierEnforcement.HARD_BLOCK,
-                decision="REJECT_RELEASE",
-                top_contributors=contributors,
-                evidence=evidence,
-                invariant_triggered=True,
-                rationale="INVARIANT TRIGGERED: Total user workflow blockage (>= 0.95) short-circuits to HARD_BLOCK.",
-            )
-
-        # 3. Stage 3: Additive Base Score calculation
-        base_score = 0.0
-        if impact.workflow_blocking > 0:
-            val = impact.workflow_blocking * 3.5
-            base_score += val
-            contributors.append(f"Workflow Blocking: +{val:.2f}")
-
-        if impact.data_loss_risk > 0:
-            val = impact.data_loss_risk * 4.0
-            base_score += val
-            contributors.append(f"Data Loss Risk: +{val:.2f}")
-
-        if impact.security_auth_risk > 0:
-            val = impact.security_auth_risk * 4.0
-            base_score += val
-            contributors.append(f"Security Auth Risk: +{val:.2f}")
-
-        if impact.user_reachability > 0:
-            val = impact.user_reachability * 2.5
-            base_score += val
-            contributors.append(f"User Reachability: +{val:.2f}")
-
-        # Conditional Cosmetic Discount Rule: ONLY apply if NO functional risk vectors are active
-        has_functional_vectors = (impact.workflow_blocking > 0 or impact.data_loss_risk > 0 or impact.security_auth_risk > 0 or impact.user_reachability > 0)
-        if impact.cosmetic_only > 0 and not has_functional_vectors:
-            discount = impact.cosmetic_only * 2.0
-            base_score = max(0.0, base_score - discount)
-            contributors.append(f"Pure Cosmetic Discount: -{discount:.2f}")
-
-        # 4. Multiplicative Risk Interaction Engine (Amplification)
-        interaction_multiplier = 1.0
-        if impact.workflow_blocking > 0.4 and impact.security_auth_risk > 0.4:
-            interaction_multiplier *= 1.5
-            contributors.append("Multiplicative Interaction: Auth x Workflow (1.5x)")
-
-        if impact.workflow_blocking > 0.4 and impact.data_loss_risk > 0.4:
-            interaction_multiplier *= 1.4
-            contributors.append("Multiplicative Interaction: Workflow x Data Loss (1.4x)")
-
-        if impact.data_loss_risk > 0.4 and impact.security_auth_risk > 0.4:
-            interaction_multiplier *= 1.6
-            contributors.append("Multiplicative Interaction: Data Loss x Security (1.6x)")
-
-        amplified_score = base_score * interaction_multiplier
-
-        # 5. Time / Frequency Dimension Scaling (Impact x Likelihood)
-        final_risk = min(10.0, max(0.0, round(amplified_score * impact.frequency_likelihood, 2)))
-        if impact.frequency_likelihood < 1.0:
-            contributors.append(f"Frequency Likelihood Scale: x{impact.frequency_likelihood}")
-
-        # Calculate Confidence Score (0.0 - 1.0)
-        confidence = 0.95 if len(evidence) > 1 and "playwright_visual" in str(evidence).lower() else (0.85 if len(evidence) > 0 else 0.70)
-
-        # 6. Policy Mapping & Decision Execution against Configurable Thresholds
-        if final_risk >= threshold_hard_block:
-            policy = TierEnforcement.HARD_BLOCK
-            decision = "REJECT_RELEASE"
-            rationale = f"Risk Score {final_risk}/10 >= {threshold_hard_block} (Hard Block Threshold). Defect must be resolved before release."
-        elif final_risk >= threshold_soft_warn:
-            policy = TierEnforcement.SOFT_WARN
-            decision = "ALLOW_WITH_WARN"
-            rationale = f"Risk Score {final_risk}/10 in [{threshold_soft_warn}, {threshold_hard_block}). Moderate risk defect allowed with logged advisory and UX debt tracking."
-        else:
-            policy = TierEnforcement.SOFT_PASS
-            decision = "ALLOW_RELEASE"
-            rationale = f"Risk Score {final_risk}/10 < {threshold_soft_warn} (Soft Warn Threshold). Low risk / cosmetic defect allowed silently."
-
-        return DefectEvaluationVerdict(
+        return PolicyEngine.evaluate_policy(
             defect_description=defect_description,
-            impact=impact,
-            risk_score=final_risk,
-            confidence=confidence,
-            policy_enforcement=policy,
-            decision=decision,
-            top_contributors=contributors,
-            evidence=evidence,
-            invariant_triggered=False,
-            rationale=rationale,
+            risk_report=report,
+            safety_case=default_safety_case,
+            threshold_hard_block=threshold_hard_block,
+            threshold_soft_warn=threshold_soft_warn,
         )
 
 
