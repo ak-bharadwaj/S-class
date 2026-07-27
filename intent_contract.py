@@ -3,29 +3,44 @@ from typing import List, Dict, Any
 from error_recovery import ErrorPath
 
 
+DEFAULT_MUST_NOT_EXIST: List[str] = [
+    "undefined", "NaN", "null", "[object Object]",
+    "TODO", "Lorem Ipsum", "Debug", "Stack trace", "Console Error"
+]
+
+
 @dataclass
 class OutputContractSpec:
-    """Specifies expected output type, format, element constraints, and forbidden rendering strings."""
-    target_type: str = "web_ui"        # web_ui | json_api | cli | pdf | markdown | email
-    expected_format: str = "auto"      # table | chart | form | dashboard | golden_snapshot | schema
-    expected_elements: List[str] = field(default_factory=list) # e.g. ["table", "th:Name", "canvas"]
-    forbidden_strings: List[str] = field(default_factory=lambda: ["undefined", "NaN", "null", "[object Object]"])
+    """Specifies expected output artifact, semantic requirements, interaction contracts, and negative requirements."""
+    artifact_name: str = "primary_output"  # e.g., employee_table, login_form, sales_chart
+    target_type: str = "web_ui"            # web_ui | json_api | cli | pdf | markdown | email
+    expected_format: str = "auto"          # table | chart | form | dashboard | golden_snapshot | schema
+    semantic_requirements: List[str] = field(default_factory=list) # e.g. ["contains_columns(Name, Department)", "row_count > 0"]
+    expected_interactions: List[str] = field(default_factory=list) # e.g. ["submit", "validation", "error_feedback"]
+    must_exist: List[str] = field(default_factory=list)             # e.g. ["Name", "Department"]
+    must_not_exist: List[str] = field(default_factory=lambda: list(DEFAULT_MUST_NOT_EXIST))
 
     def to_dict(self) -> Dict[str, Any]:
         return {
+            "artifact_name": self.artifact_name,
             "target_type": self.target_type,
             "expected_format": self.expected_format,
-            "expected_elements": self.expected_elements,
-            "forbidden_strings": self.forbidden_strings,
+            "semantic_requirements": self.semantic_requirements,
+            "expected_interactions": self.expected_interactions,
+            "must_exist": self.must_exist,
+            "must_not_exist": self.must_not_exist,
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'OutputContractSpec':
         return cls(
+            artifact_name=data.get("artifact_name", "primary_output"),
             target_type=data.get("target_type", "web_ui"),
             expected_format=data.get("expected_format", "auto"),
-            expected_elements=data.get("expected_elements", []),
-            forbidden_strings=data.get("forbidden_strings", ["undefined", "NaN", "null", "[object Object]"]),
+            semantic_requirements=data.get("semantic_requirements", []),
+            expected_interactions=data.get("expected_interactions", []),
+            must_exist=data.get("must_exist", []),
+            must_not_exist=data.get("must_not_exist", list(DEFAULT_MUST_NOT_EXIST)),
         )
 
 

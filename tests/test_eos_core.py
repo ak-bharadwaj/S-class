@@ -217,4 +217,47 @@ def test_decoupled_risk_and_policy_engine_and_safety_case():
     assert verdict_complete.decision == "ALLOW_RELEASE"
 
 
+def test_output_evidence_pack_verification(tmp_path):
+    from intent_contract import OutputContractSpec
+    from verifier import OutputContractVerifier, OutputEvidencePack
+
+    workspace = str(tmp_path)
+    state_dir = os.path.join(workspace, ".agents")
+    screenshots_dir = os.path.join(state_dir, "screenshots")
+    os.makedirs(screenshots_dir, exist_ok=True)
+
+    # 1. Create a visual screenshot receipt
+    with open(os.path.join(screenshots_dir, "render.png"), "wb") as f:
+        f.write(b"PNG_MOCK")
+
+    # 2. Create rendered DOM containing forbidden placeholder 'undefined'
+    with open(os.path.join(state_dir, "rendered_dom.html"), "w", encoding="utf-8") as f:
+        f.write('<div role="table"><span>Name</span><span>undefined</span></div>')
+
+    spec = OutputContractSpec(
+        artifact_name="employee_table",
+        target_type="web_ui",
+        expected_format="table",
+        semantic_requirements=["contains_columns(Name, Department)", "row_count > 0"],
+        must_not_exist=["undefined", "NaN", "TODO", "Lorem Ipsum"]
+    )
+
+    pack = OutputContractVerifier.verify(workspace, spec=spec)
+    assert isinstance(pack, OutputEvidencePack)
+    assert pack.artifact_name == "employee_table"
+    assert pack.correctness_passed is False  # Fails because 'undefined' exists in rendered DOM!
+    assert any("forbidden content: 'undefined'" in v for v in pack.violations)
+    assert "semantic_format_table_verified" in pack.checks_passed  # Semantically recognizes <div role="table"/>!
+
+    # 3. Fix DOM content (remove 'undefined', add proper data)
+    with open(os.path.join(state_dir, "rendered_dom.html"), "w", encoding="utf-8") as f:
+        f.write('<div role="table"><span>Name</span><span>Department</span><span>Alice</span><span>Engineering</span></div>')
+
+    pack_fixed = OutputContractVerifier.verify(workspace, spec=spec)
+    assert pack_fixed.correctness_passed is True
+    assert "must_not_exist_passed" in pack_fixed.checks_passed
+    assert os.path.exists(os.path.join(state_dir, "output_evidence_pack.json"))
+
+
+
 

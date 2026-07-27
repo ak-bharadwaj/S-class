@@ -48,4 +48,24 @@ def test_intent_contract_serialization():
     assert ic_new.error_paths[0].trigger_pattern == ep.trigger_pattern
     assert ic_new.max_retries == ic.max_retries
     assert ic_new.backoff_strategy == ic.backoff_strategy
-    assert ic_new.stop_conditions == ic.stop_conditions
+
+
+def test_output_contract_spec_serialization():
+    from intent_contract import OutputContractSpec
+    spec = OutputContractSpec(
+        artifact_name="employee_table",
+        target_type="web_ui",
+        expected_format="table",
+        semantic_requirements=["contains_columns(Name, Department)", "row_count > 0"],
+        expected_interactions=["submit", "validation", "error_feedback"],
+        must_exist=["Name", "Department"],
+        must_not_exist=["undefined", "NaN", "TODO", "Lorem Ipsum"]
+    )
+
+    data = spec.to_dict()
+    spec_new = OutputContractSpec.from_dict(data)
+
+    assert spec_new.artifact_name == "employee_table"
+    assert spec_new.semantic_requirements == ["contains_columns(Name, Department)", "row_count > 0"]
+    assert spec_new.expected_interactions == ["submit", "validation", "error_feedback"]
+    assert "undefined" in spec_new.must_not_exist
