@@ -162,11 +162,12 @@ class MinimalDeterministicKernel:
 
             next_phase = valid_transitions[event_name]
 
-            # 3. Policy-Driven Verification Engine
-            enforce_ev = payload.get("enforce_evidence", False)
-            v_res = verifier.EvidenceVerifier.verify_phase(current_phase, workspace_dir=cwd, allow_soft=not enforce_ev)
+            # 3. Policy-Driven Verification Engine (QA & RELEASE phases strictly block soft evidence bypass)
+            enforce_ev = payload.get("enforce_evidence", True)
+            allow_soft = False if current_phase in ["QA", "RELEASE", "VERIFYING"] else not enforce_ev
+            v_res = verifier.EvidenceVerifier.verify_phase(current_phase, workspace_dir=cwd, allow_soft=allow_soft)
             if not v_res.passed:
-                raise verifier.VerificationError(f"[Kernel VerificationEngine] Evidence check failed for '{current_phase}': {v_res.errors}")
+                raise verifier.VerificationError(f"[Kernel VerificationEngine] Evidence check failed for '{current_phase}': {'; '.join(v_res.errors)}")
 
             # 4. Schema Validator
             event_meta = next((e for e in events if e["event"] == event_name), {})

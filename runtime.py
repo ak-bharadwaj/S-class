@@ -543,7 +543,7 @@ def save_state(state: State, workspace_dir: Optional[str] = None) -> None:
     validate_state_types(state_dict)
     write_json_atomic(state_file, state_dict)
 
-def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce_evidence: bool = False) -> None:
+def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce_evidence: bool = True) -> None:
     """Dispatches a transition event, updating FSM state and executing side effects."""
     from planner import MetaPlanner, WorkflowProfile
     from verifier import EvidenceVerifier, VerificationError
@@ -553,12 +553,12 @@ def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce
     _, _, lock_file, config_file = _resolve_paths(workspace_dir)
     
     # Check if sclass.config.json enables strict evidence enforcement
-    if not enforce_evidence and os.path.exists(config_file):
+    if os.path.exists(config_file):
         try:
             with open(config_file, "r", encoding="utf-8") as f:
                 cfg = json.load(f)
-            if cfg.get("enforceEvidence", False):
-                enforce_evidence = True
+            if "enforceEvidence" in cfg:
+                enforce_evidence = cfg["enforceEvidence"]
         except Exception:
             pass
 
@@ -569,8 +569,9 @@ def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce
         
         current_phase = state.currentPhase
 
-        # 1. Evidence Verification Gate
-        v_res = EvidenceVerifier.verify_phase(current_phase, workspace_dir, allow_soft=not enforce_evidence)
+        # 1. Evidence Verification Gate (QA & RELEASE phases strictly block soft evidence bypass)
+        allow_soft = False if current_phase in ["QA", "RELEASE", "VERIFYING"] else not enforce_evidence
+        v_res = EvidenceVerifier.verify_phase(current_phase, workspace_dir, allow_soft=allow_soft)
         if not v_res.passed:
             raise VerificationError(f"Cannot transition from state '{current_phase}': {'; '.join(v_res.errors)}")
 
