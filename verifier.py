@@ -180,10 +180,33 @@ class EvidenceVerifier:
         elif current_phase == "QA":
             artifacts.append(EvidenceArtifact(current_phase, "test_receipt", cwd, True))
             screenshots_dir = os.path.join(state_dir, "screenshots")
-            has_visual = os.path.exists(screenshots_dir) and len(os.listdir(screenshots_dir)) > 0
-            artifacts.append(EvidenceArtifact(current_phase, "visual_output_check", screenshots_dir, has_visual, strength=EvidenceStrength.HIGH_PLAYWRIGHT_VISUAL))
+            screenshot_files = [f for f in os.listdir(screenshots_dir) if f.endswith(('.png', '.jpg', '.jpeg', '.webp'))] if os.path.exists(screenshots_dir) else []
+            has_visual = len(screenshot_files) > 0
+
+            # Determine required screenshot count based on intent contract flows or project scale
+            intent_file = os.path.join(state_dir, "intent_contract.json")
+            required_min_screenshots = 1
+            if os.path.exists(intent_file):
+                try:
+                    with open(intent_file, "r", encoding="utf-8") as f:
+                        ic_data = json.load(f)
+                    flows = ic_data.get("expected_io_flows", [])
+                    visual_exp = ic_data.get("user_visual_expectations", [])
+                    required_min_screenshots = max(1, len(flows), len(visual_exp))
+                except Exception:
+                    pass
+
+            artifacts.append(EvidenceArtifact(
+                current_phase,
+                "visual_output_check",
+                screenshots_dir,
+                has_visual and len(screenshot_files) >= required_min_screenshots,
+                strength=EvidenceStrength.HIGH_PLAYWRIGHT_VISUAL
+            ))
             if not has_visual and not allow_soft:
                 errors.append("QA verification failed: Mandatory Chrome MCP visual screenshot receipts missing from '.agents/screenshots/'. Run Chrome DevTools MCP to capture screenshots before passing QA.")
+            elif len(screenshot_files) < required_min_screenshots and not allow_soft:
+                errors.append(f"QA verification failed: Insufficient visual screenshot coverage. Found only {len(screenshot_files)} screenshot(s) ({', '.join(screenshot_files)}), but project requires at least {required_min_screenshots} distinct visual screenshots covering all core user roles and flows.")
 
         elif current_phase == "SECURITY":
             sec_file = os.path.join(state_dir, "security_report.json")
@@ -193,11 +216,33 @@ class EvidenceVerifier:
         elif current_phase == "RELEASE":
             artifacts.append(EvidenceArtifact(current_phase, "release_verification", cwd, True))
             screenshots_dir = os.path.join(state_dir, "screenshots")
-            has_visual_receipts = os.path.exists(screenshots_dir) and len(os.listdir(screenshots_dir)) > 0
-            # User Proxy Acceptance requires MANDATORY Output Contract Evidence signoff
-            artifacts.append(EvidenceArtifact(current_phase, "user_proxy_output_contract_signoff", screenshots_dir, has_visual_receipts, strength=EvidenceStrength.HIGH_PLAYWRIGHT_VISUAL))
+            screenshot_files = [f for f in os.listdir(screenshots_dir) if f.endswith(('.png', '.jpg', '.jpeg', '.webp'))] if os.path.exists(screenshots_dir) else []
+            has_visual_receipts = len(screenshot_files) > 0
+
+            intent_file = os.path.join(state_dir, "intent_contract.json")
+            required_min_screenshots = 1
+            if os.path.exists(intent_file):
+                try:
+                    with open(intent_file, "r", encoding="utf-8") as f:
+                        ic_data = json.load(f)
+                    flows = ic_data.get("expected_io_flows", [])
+                    visual_exp = ic_data.get("user_visual_expectations", [])
+                    required_min_screenshots = max(1, len(flows), len(visual_exp))
+                except Exception:
+                    pass
+
+            # User Proxy Acceptance requires MANDATORY Output Contract Evidence signoff with full route coverage
+            artifacts.append(EvidenceArtifact(
+                current_phase,
+                "user_proxy_output_contract_signoff",
+                screenshots_dir,
+                has_visual_receipts and len(screenshot_files) >= required_min_screenshots,
+                strength=EvidenceStrength.HIGH_PLAYWRIGHT_VISUAL
+            ))
             if not has_visual_receipts and not allow_soft:
                 errors.append("RELEASE verification failed: Safety Case incomplete. Output Contract Evidence missing from '.agents/screenshots/'. User Proxy rejects release without verified rendered output.")
+            elif len(screenshot_files) < required_min_screenshots and not allow_soft:
+                errors.append(f"RELEASE verification failed: Insufficient visual screenshot coverage. Found only {len(screenshot_files)} screenshot(s) ({', '.join(screenshot_files)}), but project requires at least {required_min_screenshots} distinct visual screenshots covering all core user roles and flows.")
 
         passed = len(errors) == 0
         return VerificationResult(phase=current_phase, passed=passed, artifacts=artifacts, errors=errors)
@@ -209,18 +254,26 @@ class EvidenceVerifier:
         cwd = workspace_dir if workspace_dir else os.getcwd()
         receipt = OutputContractVerifier.verify(cwd, spec=output_spec)
 
-        # Calculate User Contract Coverage metrics
+        screenshots_dir = os.path.join(cwd, ".agents", "screenshots")
+        screenshot_files = [f for f in os.listdir(screenshots_dir) if f.endswith(('.png', '.jpg', '.jpeg', '.webp'))] if os.path.exists(screenshots_dir) else []
+
+        # Calculate User Contract Coverage metrics across multi-route visual evidence
         total = 1
-        verified = 1
+        verified = 0
         unverified = []
         if intent_contract is not None:
             flows = getattr(intent_contract, "expected_io_flows", [])
             criteria = getattr(intent_contract, "acceptance_criteria", [])
             total = max(1, len(flows) + len(criteria))
-            verified_count = len(receipt.checks_passed)
-            verified = min(total, max(1, verified_count))
+            verified_count = len(receipt.checks_passed) + len(screenshot_files)
+            verified = min(total, verified_count)
             if verified < total:
-                unverified = [f"Unverified contract #{i+1}" for i in range(total - verified)]
+                unverified = [f"Unverified contract / flow #{i+1}" for i in range(total - verified)]
+        else:
+            has_ss = len(screenshot_files) > 0
+            verified = 1 if (receipt.passed and has_ss) else 0
+            if not verified:
+                unverified = ["Missing visual screenshot evidence or output contract receipt"]
 
         cov = ContractCoverage(
             total_required_contracts=total,
@@ -232,7 +285,7 @@ class EvidenceVerifier:
             build_passed=True,
             tests_passed=True,
             security_clean=True,
-            output_contract_passed=receipt.passed or allow_soft,
+            output_contract_passed=receipt.passed and len(screenshot_files) > 0,
             output_verification_mechanism=receipt.mechanism_used,
             contract_coverage=cov,
         )
