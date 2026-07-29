@@ -142,7 +142,32 @@ class EvidenceVerifier:
             if not (has_intent or allow_soft):
                 errors.append(f"CLARIFICATION verification failed: Intent contract missing at '{intent_file}'")
 
-        elif current_phase in ["DESIGN", "DEBATE"]:
+        elif current_phase == "DESIGN":
+            design_file = os.path.join(state_dir, "design_blueprint.json")
+            has_design = os.path.exists(design_file)
+            has_valid_tiers = False
+            missing_tiers = []
+            if has_design:
+                try:
+                    with open(design_file, "r", encoding="utf-8") as f:
+                        ddata = json.load(f)
+                    has_backend = bool(ddata.get("backend_spec"))
+                    has_db = bool(ddata.get("db_schema"))
+                    has_frontend = bool(ddata.get("frontend_layout"))
+                    has_valid_tiers = has_backend and has_db and has_frontend
+                    if not has_backend: missing_tiers.append("backend_spec")
+                    if not has_db: missing_tiers.append("db_schema")
+                    if not has_frontend: missing_tiers.append("frontend_layout")
+                except Exception:
+                    pass
+
+            artifacts.append(EvidenceArtifact(current_phase, "design_blueprint_3tier", design_file, has_valid_tiers or allow_soft))
+            if not has_design and not allow_soft:
+                errors.append("DESIGN verification failed: Missing '.agents/design_blueprint.json'. Architect must save full-stack design blueprint covering backend_spec, db_schema, and frontend_layout.")
+            elif missing_tiers and not allow_soft:
+                errors.append(f"DESIGN verification failed: Design blueprint in '.agents/design_blueprint.json' is missing required SDLC tiers: {', '.join(missing_tiers)}.")
+
+        elif current_phase == "DEBATE":
             if os.path.exists(state_file):
                 try:
                     with open(state_file, "r", encoding="utf-8") as f:

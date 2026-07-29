@@ -158,6 +158,19 @@ The parent Antigravity agent is strictly an **Orchestrator Microkernel**. Direct
 2. **Mandatory Subagent Delegation:** During **`CODING`**, **`INTEGRATION`**, and **`RECOVERY`** phases, ALL code implementation, bug fixes, refactoring, database migrations, and frontend component creation MUST be delegated to specialized subagents (`dss_builder_v2`, `sclass_builder`, `dss_backend_dev`, `dss_frontend_dev`) via `invoke_subagent`.
 3. **Execution Responsibility:** The parent agent's responsibility is limited to initializing state (`runtime.initialize_state`), spawning subagents (`invoke_subagent`), validating transitions (`runtime.dispatch_event`), and reporting verified safety results to the user.
 
+## 18. Full-Stack SDLC Design Blueprinting Mandate (Backend, DB, & Frontend Layouts)
+
+To replicate a real-world Software Development Lifecycle (SDLC) and produce high-quality software output, the `DESIGN` phase MUST produce comprehensive blueprints across all 3 engineering tiers saved to `.agents/design_blueprint.json`:
+
+### Mandatory 3-Tier Design Specification:
+1. **`backend_spec`:** Complete API route table, HTTP verbs, request/response DTO schemas, status codes, controller methods, and auth middleware.
+2. **`db_schema`:** Entity relational diagram (ERD), table columns, primary/foreign keys, indexing strategies, and ORM migration definitions.
+3. **`frontend_layout`:** Route navigation tree, component breakdown, screen wireframe layouts, state management bindings, and Rule 16 design system tokens (`ui-ux-pro-max` Google Fonts, glassmorphic layout, color palette).
+
+### Evidence Gate Enforcement:
+* `EvidenceVerifier.verify_phase("DESIGN")` verifies that `.agents/design_blueprint.json` exists on disk and contains non-empty definitions for ALL 3 tiers (`backend_spec`, `db_schema`, `frontend_layout`).
+* If missing any tier, `verify_phase("DESIGN")` **FAILS WITH A HARD VERIFICATION ERROR**, blocking transition to `DEBATE` or `TASK_COMPILATION` until the full-stack design blueprint is complete.
+
 
 
 
