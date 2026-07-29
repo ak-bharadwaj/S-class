@@ -149,6 +149,15 @@ S-Class EOS strictly forbids basic, amateur, or unstyled UI templates. Builders 
 7. **Strict User Proxy Veto Mandate:**
    * `dss_user_alias_v2` (User Proxy) MUST inspect Chrome MCP screenshots. If the UI looks like a generic unstyled template, lacks responsive padding, or uses browser-default inputs, `dss_user_alias_v2` **MUST TRIGGER `qa_failed` AND REJECT RELEASE**.
 
+## 17. Mandatory Subagent Handoff for Code Generation (Zero Direct Parent Code Edits)
+
+The parent Antigravity agent is strictly an **Orchestrator Microkernel**. Direct file modifications on project code by the parent agent are strictly forbidden:
+
+### Hard Delegation Directives:
+1. **Parent Agent Role Restriction:** The parent Antigravity agent is strictly forbidden from directly calling file edit tools (`replace_file_content`, `multi_replace_file_content`, `write_to_file`) on target project source code files.
+2. **Mandatory Subagent Delegation:** During **`CODING`**, **`INTEGRATION`**, and **`RECOVERY`** phases, ALL code implementation, bug fixes, refactoring, database migrations, and frontend component creation MUST be delegated to specialized subagents (`dss_builder_v2`, `sclass_builder`, `dss_backend_dev`, `dss_frontend_dev`) via `invoke_subagent`.
+3. **Execution Responsibility:** The parent agent's responsibility is limited to initializing state (`runtime.initialize_state`), spawning subagents (`invoke_subagent`), validating transitions (`runtime.dispatch_event`), and reporting verified safety results to the user.
+
 
 
 
