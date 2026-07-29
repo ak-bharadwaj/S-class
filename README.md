@@ -1,12 +1,67 @@
-# S-Class V10.0: The Deterministic AI Runtime & Safety-Case Verification Engine
+# S-Class V10.0: The Deterministic AI Runtime & Safety-Case Engine
 
-> **Event-Sourced Cognitive Memory Microkernel Engine with Output Contract Evidence & Profile-Driven Safety Case Verification**
-
-S-Class is a **Deterministic AI Runtime**. Rather than allowing AI agents to mutate project state directly or drift during long coding sessions, S-Class places all code generation, planning, and state transitions behind a deterministic microkernel and an **Avionics & Medical-Grade Safety Case Engine**.
+> **Plug-and-play AI execution microkernel that stops AI agent drift, eliminates broken UIs, and enforces multi-page visual evidence verification.**
 
 ---
 
-## 30-Second Quick Start Example
+## 🚀 What is S-Class & How to Add & Start (Beginner's Quick Guide)
+
+### What is S-Class?
+When an AI agent (like Antigravity or Claude Code) works on a coding project, it often:
+- **Drifts:** Gets stuck in loops, forgets requirements, or makes unverified file edits.
+- **Fakes Verification:** Claims *"Everything works!"* without actually testing the web app.
+- **Builds Basic UIs:** Generates ugly, unstyled templates without modern design systems.
+
+**S-Class fixes this completely.** It acts as an **Execution Microkernel** for AI agents. It forces the agent to route all work through state gates, delegate code edits to specialized subagents, use modern design tokens (`ui-ux-pro-max`), and verify every page visually using Chrome DevTools MCP before release is allowed.
+
+---
+
+### Step 1: Install S-Class (One-Line Command)
+
+#### Windows (PowerShell):
+```powershell
+iex (irm -useb https://raw.githubusercontent.com/ak-bharadwaj/S-class/master/install.ps1)
+```
+
+#### Linux / macOS (Terminal):
+```bash
+curl -fsSL https://raw.githubusercontent.com/ak-bharadwaj/S-class/master/install.sh | bash
+```
+
+---
+
+### Step 2: Add S-Class Rule to Your Workspace
+
+Create or open `.cursorrules`, `CLAUDE.md`, or `AGENTS.md` in your project root directory and add:
+
+```markdown
+pipeline: sclass-v5
+CRITICAL DIRECTIVE: You MUST route all engineering goals strictly through S-Class EOS FSM (runtime.initialize_state & runtime.dispatch_event). Direct parent code edits are strictly forbidden (Rule 17). Subagents MUST enforce Rule 16 UI/UX design tokens and Chrome MCP multi-page visual screenshots (Rule 14 & 15).
+```
+
+---
+
+### Step 3: How to Start Antigravity with S-Class
+
+Simply enter your goal in the chat interface:
+
+```bash
+# Example 1: Full App / Major Portal
+"start this project client requirements is in implementation-details.txt and follow sclass strictly"
+
+# Example 2: Fast-Track Bug Fix (Runs in ~30 Seconds)
+"fix the login submit button alignment bug following sclass strictly"
+```
+
+#### What S-Class Will Do Automatically:
+1. **Initialize State:** Calls `runtime.initialize_state(goal=...)` and detects the optimal workflow profile (`BUG_FIX` $\rightarrow$ 30s vs `FULL`).
+2. **Delegate Coding to Subagents:** Spawns builder subagents (`dss_builder_v2`) to write clean backend/frontend code enforcing Rule 16 design system tokens (Google Fonts, Glassmorphism, tailored dark/light HSL palettes).
+3. **Launch Server & Chrome MCP:** Spawns application server and runs `chrome-devtools-mcp` tools (`navigate_page`, `take_screenshot`, `click`, `fill`) across 100% of defined pages and forms.
+4. **Enforce Safety Case:** Releases ONLY when Build ✓, Tests ✓, Security ✓, Output Evidence ✓, and User Contract Coverage ($\ge 85\%$) pass cleanly!
+
+---
+
+## 30-Second Python SDK Example
 
 ```python
 import runtime
@@ -52,10 +107,11 @@ print(f"Rationale: {verdict.rationale}")
 
 | Without S-Class | With S-Class V10.0 |
 | :--- | :--- |
-| **Direct State Mutation:** Agents edit files and state without formal validation, causing silent corruption. | **Exclusive Kernel Mutator:** Only the deterministic `sclass_kernel.py` can write state changes to disk. |
+| **Direct State Mutation:** Agents edit files and state without formal validation, causing silent corruption. | **Exclusive Kernel Mutator:** Only the deterministic `sclass_kernel.py` can write state changes to disk. Parent direct edits forbidden (Rule 17). |
 | **Prompt Self-Verification:** Completion is self-reported by LLM prompts ("I fixed it!"). | **Safety Case Evidence Gate:** Release requires complete body of evidence (Build ✓, Tests ✓, Security ✓, Output Evidence ✓, Coverage ≥ 85% ✓). |
-| **Partial Verification Illusion:** Verifying only the Home page allows release while Settings and Export flows remain unvisited. | **Profile-Driven Contract Coverage Engine:** Tracks user contract coverage metrics across 100% of defined pages and flows. |
+| **Partial Verification Illusion:** Verifying only the Home page allows release while Settings and Export flows remain unvisited. | **Multi-Route Visual Coverage Engine:** Tracks user contract coverage metrics across 100% of defined pages and flows (Rule 14, 15). |
 | **Tag-Specific Hardcoding:** Verifiers break when `<table>` is refactored into `<div role="table">` or CSS grids. | **Semantic Requirements & Typed Predicate DSL:** Verifies data semantics and interaction contracts independent of HTML implementation tags. |
+| **Amateur Templated UI:** AI agents generate plain, unstyled HTML with default browser fonts. | **Rule 16 Professional Design Tokens:** Enforces `ui-ux-pro-max` design intelligence (Google Fonts, Glassmorphism, tailored HSL palettes, SVG charts). |
 | **Irreproducible Execution Logs:** Failures cannot be audited or replayed when things go wrong. | **Tamper-Evident Event Store & SHA-256 Hashing:** Immutable `.agents/output_evidence_pack.json` with SHA-256 hash and Git provenance. |
 
 ---
@@ -67,6 +123,7 @@ print(f"Rationale: {verdict.rationale}")
 | **System Philosophy** | Sandbox Harness | CLI Agent Loop | Prompt Execution Loop | **Deterministic Microkernel & Safety Case Engine** |
 | **State Mutation Guard** | File System Writes | File System Writes | File System Writes | **✅ Exclusive Kernel Mutator (`sclass_kernel.py`)** |
 | **Output Contract Verification** | None | None | None | **✅ `OutputContractVerifier` (Web UI, API, CLI, PDF)** |
+| **UI/UX Design System** | Default HTML | Default HTML | Default HTML | **✅ Rule 16 `ui-ux-pro-max` Design Intelligence** |
 | **Evidence Tamper-Resistance** | None | None | None | **✅ SHA-256 Hashing & Git Commit Provenance** |
 | **User Contract Coverage** | None | None | None | **✅ Profile-Driven `ContractCoverage` Engine ($\ge 85\%$)** |
 | **Multi-Button Sweep Protocol** | Single Action | Single Action | Single Action | **✅ Mandatory Chrome MCP Crawl (Rule 15)** |
@@ -152,22 +209,6 @@ S-Class contains **73 automated unit and benchmark tests** passing with 100% suc
 | `tests/test_topology.py` | 5 tests | Subagent network topologies (Hierarchical, Mesh, Star, Ring phase resolution). |
 | `tests/test_doctor.py` | 4 tests | Environment health verification, corrupt file detection, stale lock recovery. |
 | `tests/test_config_gc.py` | 4 tests | Lock GC, state expiration cleanup, memory pruning, orphaned screenshot GC. |
-
----
-
-## Quick Start & Installation
-
-### Installation
-
-#### Windows (PowerShell):
-```powershell
-iex (irm -useb https://raw.githubusercontent.com/ak-bharadwaj/S-class/master/install.ps1)
-```
-
-#### Linux / macOS (Shell):
-```bash
-curl -fsSL https://raw.githubusercontent.com/ak-bharadwaj/S-class/master/install.sh | bash
-```
 
 ---
 
