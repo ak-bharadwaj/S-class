@@ -128,6 +128,27 @@ If a page or view contains multiple buttons, tabs, forms, modals, or sub-pages, 
    * **Action Controls (Edit / Delete / Export / Filter):** Click each action control ──► verify underlying handler executes correctly without silent JS console errors or swallowed exceptions.
 3. **Interaction Receipts Persistence:** Write interaction execution records to `.agents/interaction_receipts.json`. If any button click triggers a JS error or fails to update state, record the defect as a Tier 1 / Tier 3a `HARD_BLOCK`.
 
+## 16. Professional UI/UX & Design System Execution Mandate (Zero Generic Templates)
+
+S-Class EOS strictly forbids basic, amateur, or unstyled UI templates. Builders and Verifiers MUST enforce modern, state-of-the-art web design standards across all frontend components:
+
+### Hard UI/UX Standards:
+1. **Mandatory Workspace Skill Activation:**
+   * Builders (`dss_builder_v2`, `dss_frontend_dev`) MUST read and apply the local skill databases: `ui-ux-pro-max` (84 design styles, 192 color palettes, 74 font pairings, 16 GSAP motion presets) and `frontend-design`.
+2. **Modern Typography & Google Fonts:**
+   * EVERY web UI MUST import and use professional Google Fonts (`Inter`, `Outfit`, `Plus Jakarta Sans`, `Roboto`, or `Poppins`) instead of default browser fonts (`Times New Roman`, basic `Arial`).
+3. **Tailored Curated Color Palettes & Dark/Light System:**
+   * Plain saturated red/green/blue and plain black/white defaults are STRICTLY FORBIDDEN.
+   * Components MUST use tailored dark/glassmorphic or sleek light palettes (e.g. Slate `#0f172a`, Deep Indigo `#6366f1`, Emerald Glow `#10b981`, Amber Badges `#f59e0b`).
+4. **Glassmorphism, Shadows & Border Radius:**
+   * Use backdrop blur filters (`backdrop-filter: blur(12px)`), layered box shadows (`0 8px 32px 0 rgba(0, 0, 0, 0.37)`), subtle CSS linear gradients, and rounded container radii (`12px` to `16px`).
+5. **Micro-Animations & Smooth Transitions:**
+   * Add smooth hover state transitions (`transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1)`), button hover scale transforms (`transform: translateY(-2px)`), active tab indicators, and pulse loading states.
+6. **Rich Interactive Data Visualization & Stats Cards:**
+   * Replace raw text tables/lists with styled data cards, interactive SVG charts (Recharts / Chart.js), metric stats cards with trending arrows, search/filter toolbars, and dynamic badges.
+7. **Strict User Proxy Veto Mandate:**
+   * `dss_user_alias_v2` (User Proxy) MUST inspect Chrome MCP screenshots. If the UI looks like a generic unstyled template, lacks responsive padding, or uses browser-default inputs, `dss_user_alias_v2` **MUST TRIGGER `qa_failed` AND REJECT RELEASE**.
+
 
 
 
