@@ -8,13 +8,19 @@ CRITICAL DIRECTIVE: Once this plugin is active, you (the main Antigravity agent)
 *   You MUST transition states by calling `runtime.dispatch_event()`. Every state transition requires verifiable evidence artifacts (e.g. intent contracts, decision logs, diffs, test receipts).
 *   All code generation, testing, and audits must be performed by specialized subagents spawned at their respective FSM phases.
 
-## 2. Mandatory Parallel Subagent Spawning, Skills, & Chrome MCP
-*   **Mandatory Handoff:** You MUST call `invoke_subagent` to spawn specialized subagents at their respective FSM phases. You are strictly FORBIDDEN from simulating subagents in the main chat.
-*   **Mandatory Parallel Subagent Execution:**
-    *   During **`DEBATE` Phase**, you MUST invoke `invoke_subagent` passing ALL 8 domain experts in parallel in a single call: `dss_governor` (System Lead), `dss_ui_ux` (UI/UX Ergonomics), `dss_frontend_dev` (React/Next.js Rendering), `dss_backend_dev` (API Routes/DTOs), `dss_db_architect` (SQL/ORM Schema & Migrations), `dss_cso_v2` (Security Auditor), `dss_reviewer_v2` (Code Quality Auditor), and `dss_user_alias_v2` (Proxy User Advocate).
-    *   During **`QA` Phase**, you MUST invoke `invoke_subagent` passing ALL 6 specialized agents in parallel in a single call: `dss_qa_frontend` (UI/Playwright/Chrome MCP visual QA), `dss_qa_backend` (API/routing/DB/server logs QA), `dss_reviewer_v2` (Code Reviewer), `dss_cso_v2` (Security Auditor), `dss_user_alias_v2` (Proxy User advocate), and `dss_qa_v2` (System QA Lead).
-*   **Required Skills:** You and subagents MUST actively load workspace skills (`ui-ux-pro-max`, `frontend-design`, `webapp-testing`).
-*   **Chrome MCP Integration:** You and `dss_qa_v2` MUST use `chrome-devtools-mcp` tools (`new_page`, `navigate_page`, `take_screenshot`) during the QA phase to capture and inspect the visual layout of the running web application in `.agents/qa_screenshots/`.
+## 2. Mandatory Subagent Invocation & Zero Parent Direct Mutations
+
+CRITICAL HARD BLOCK: The parent Antigravity agent is strictly FORBIDDEN from performing direct file edits (`replace_file_content`, `write_to_file`) or running scratch python scripts to modify project code.
+
+* **Mandatory Tool Call (`invoke_subagent`):** At EVERY FSM phase, you MUST explicitly issue the `invoke_subagent` tool call to spawn specialized subagents:
+  - **`ANALYSIS`:** `invoke_subagent` with `dss_analyst`
+  - **`DESIGN`:** `invoke_subagent` with `dss_architect_v2` and `dss_ui_ux`
+  - **`DEBATE`:** `invoke_subagent` with `dss_governor`, `dss_cso_v2`, `dss_reviewer_v2`, `dss_user_alias_v2` in a single parallel call
+  - **`CODING`:** `invoke_subagent` with `dss_builder_v2`, `dss_backend_dev`, `dss_frontend_dev`
+  - **`QA`:** `invoke_subagent` with `dss_qa_v2`, `dss_qa_frontend`, `dss_qa_backend`, `dss_user_alias_v2` in a single parallel call
+* **IDE UI Visibility Guarantee:** Calling `invoke_subagent` registers subagents in the background and increments the `Subagents N >` counter in the IDE right sidebar. Simulating subagents or bypassing `invoke_subagent` is STRICTLY FORBIDDEN.
+* **Required Skills:** You and subagents MUST actively load workspace skills (`ui-ux-pro-max`, `frontend-design`, `webapp-testing`).
+* **Chrome MCP Integration:** You and `dss_qa_v2` MUST use `chrome-devtools-mcp` tools (`new_page`, `navigate_page`, `take_screenshot`) during the QA phase to capture and inspect the visual layout of the running web application in `.agents/qa_screenshots/`.
 
 ## 3. Enforce Strict Warning Scans
 *   During test runs, you MUST inspect the console stdout/stderr.
