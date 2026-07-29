@@ -183,6 +183,23 @@ S-Class EOS strictly forbids shallow, high-level, or degraded architectural desi
    - **Frontend:** Complete Component Tree, state management store (Zustand/Redux/React Context), route guards, skeleton loaders, and Rule 16 `ui-ux-pro-max` design system tokens.
 3. **Rigorous DEBATE Audit Gate:** Subagents (`dss_governor`, `dss_reviewer_v2`, `dss_cso_v2`) MUST perform line-by-line technical audits on `.agents/design_blueprint.json`. Superficial approvals are forbidden. If a design lacks API DTOs, DB indexes, or UI design tokens, the DEBATE phase **MUST FAIL AND REJECT THE SPEC**.
 
+## 20. Cross-Domain Role-Coupled Brainstorming Mandate (Roles -> APIs -> DB -> UI)
+
+To ensure client prompt words are intelligently coupled across the entire software architecture, subagents MUST brainstorm and save `.agents/role_interaction_matrix.json` during the `DESIGN` phase:
+
+### Mandatory Role-Coupling Matrix Schema:
+For every User Role (`Admin`, `Faculty`, `Student`, `Public`) identified in client prompts or spec documents, the matrix MUST map:
+1. **User Roles:** List of system actor roles.
+2. **Permitted Views:** Screen routes accessible by each role (e.g. `/portal/admin`, `/portal/faculty`).
+3. **User Actions:** Actions allowed per role (e.g. `submit_attendance`, `upload_document`, `view_placements`).
+4. **API Endpoints:** Explicit backend route DTOs and HTTP verbs backing each action (e.g. `POST /api/attendance`, `POST /api/documents`).
+5. **DB Entities:** Database tables and foreign key relationships affected by each action (e.g. `AttendanceRecord`, `Document`, `User`).
+6. **Frontend Components:** Component UI files rendering each role's view (e.g. `AdminPortal.tsx`, `FacultyPortal.tsx`, `StudentPortal.tsx`).
+
+### Evidence Gate Enforcement:
+* `EvidenceVerifier.verify_phase("DESIGN")` verifies that `.agents/role_interaction_matrix.json` exists on disk and links every User Role to its corresponding API endpoints, DB entities, and Frontend components.
+* If missing or uncoupled, `verify_phase("DESIGN")` **FAILS WITH A HARD VERIFICATION ERROR**, blocking progress to `DEBATE` or `TASK_COMPILATION`.
+
 
 
 

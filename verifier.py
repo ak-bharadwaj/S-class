@@ -144,7 +144,9 @@ class EvidenceVerifier:
 
         elif current_phase == "DESIGN":
             design_file = os.path.join(state_dir, "design_blueprint.json")
+            role_matrix_file = os.path.join(state_dir, "role_interaction_matrix.json")
             has_design = os.path.exists(design_file)
+            has_role_matrix = os.path.exists(role_matrix_file)
             has_valid_tiers = False
             missing_tiers = []
             if has_design:
@@ -162,10 +164,13 @@ class EvidenceVerifier:
                     pass
 
             artifacts.append(EvidenceArtifact(current_phase, "design_blueprint_3tier", design_file, has_valid_tiers or allow_soft))
+            artifacts.append(EvidenceArtifact(current_phase, "role_interaction_matrix", role_matrix_file, has_role_matrix or allow_soft))
             if not has_design and not allow_soft:
                 errors.append("DESIGN verification failed: Missing '.agents/design_blueprint.json'. Architect must save full-stack design blueprint covering backend_spec, db_schema, and frontend_layout.")
             elif missing_tiers and not allow_soft:
                 errors.append(f"DESIGN verification failed: Design blueprint in '.agents/design_blueprint.json' is missing required SDLC tiers: {', '.join(missing_tiers)}.")
+            if not has_role_matrix and not allow_soft:
+                errors.append("DESIGN verification failed: Missing '.agents/role_interaction_matrix.json'. Architect and Analyst must save role-coupled interaction matrix mapping User Roles -> Actions -> API Endpoints -> DB Entities -> Frontend Views.")
 
         elif current_phase == "DEBATE":
             if os.path.exists(state_file):
