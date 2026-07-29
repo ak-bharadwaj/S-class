@@ -43,7 +43,7 @@ class IntentExtractor:
 
     @staticmethod
     def extract_spec_features(workspace_dir: Optional[str] = None) -> List[str]:
-        """Parses specification files (e.g. implementation-details.txt) to extract all explicit feature headings."""
+        """Parses specification files (e.g. implementation-details.txt) to extract all explicit feature headings and sections."""
         cwd = workspace_dir if workspace_dir else os.getcwd()
         features = []
         spec_candidates = ["implementation-details.txt", "spec.md", "REQUIREMENTS.md", "PROJECT.md"]
@@ -54,7 +54,16 @@ class IntentExtractor:
                     with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
                         for line in f:
                             l_strip = line.strip()
-                            if "feature:" in l_strip.lower() or "milestone" in l_strip.lower():
+                            if not l_strip:
+                                continue
+                            l_lower = l_strip.lower()
+                            # Match headings, features, milestones, modules, and numbered list items
+                            if (l_strip.startswith("#") or
+                                "feature:" in l_lower or
+                                "milestone" in l_lower or
+                                "module:" in l_lower or
+                                any(l_lower.startswith(f"{i}.") for i in range(1, 25)) or
+                                any(l_lower.startswith(f"{i}feature:") for i in range(1, 25))):
                                 features.append(l_strip)
                 except Exception as e:
                     logger.error(f"[IntentExtractor] Spec file parse error '{fname}': {e}")

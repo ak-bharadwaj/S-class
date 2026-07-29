@@ -171,6 +171,18 @@ To replicate a real-world Software Development Lifecycle (SDLC) and produce high
 * `EvidenceVerifier.verify_phase("DESIGN")` verifies that `.agents/design_blueprint.json` exists on disk and contains non-empty definitions for ALL 3 tiers (`backend_spec`, `db_schema`, `frontend_layout`).
 * If missing any tier, `verify_phase("DESIGN")` **FAILS WITH A HARD VERIFICATION ERROR**, blocking transition to `DEBATE` or `TASK_COMPILATION` until the full-stack design blueprint is complete.
 
+## 19. High-Intelligence Full-Stack Architecture Mandate (Zero Design Degradation)
+
+S-Class EOS strictly forbids shallow, high-level, or degraded architectural designs:
+
+### High-Intelligence Directives:
+1. **Zero-Loss Spec Extraction:** `IntentExtractor` MUST capture 100% of feature headers, numbered items, and module definitions from spec files (e.g. `implementation-details.txt`) without omitting or collapsing items.
+2. **Production-Grade Engineering Detail:** `dss_architect_v2` MUST write deep, production-grade technical designs in `.agents/design_blueprint.json`:
+   - **Backend:** Detailed request/response DTO schemas, Zod/Pydantic validation schemas, middleware pipelines, error handling, rate limiting, and status code matrices.
+   - **Database:** Full Relational ERD with column data types (`VARCHAR`, `TIMESTAMP`, `BOOLEAN`, `FOREIGN KEY`), indexing strategies, cascade rules, and ORM models.
+   - **Frontend:** Complete Component Tree, state management store (Zustand/Redux/React Context), route guards, skeleton loaders, and Rule 16 `ui-ux-pro-max` design system tokens.
+3. **Rigorous DEBATE Audit Gate:** Subagents (`dss_governor`, `dss_reviewer_v2`, `dss_cso_v2`) MUST perform line-by-line technical audits on `.agents/design_blueprint.json`. Superficial approvals are forbidden. If a design lacks API DTOs, DB indexes, or UI design tokens, the DEBATE phase **MUST FAIL AND REJECT THE SPEC**.
+
 
 
 
