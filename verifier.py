@@ -6,10 +6,11 @@ before state transitions are permitted by the FSM runtime.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple, Set
 import os
 import json
 import logging
+import hashlib
 from datetime import datetime, timezone
 
 logger = logging.getLogger("sclass_verifier")
@@ -107,6 +108,325 @@ class VerificationResult:
 
 class EvidenceVerifier:
     """Audits phase execution evidence before allowing FSM state transitions."""
+
+    @staticmethod
+    def _verify_qa_evidence_shared(cwd: str, state_dir: str, state_file: str, allow_soft: bool) -> Tuple[List[str], List[str], int]:
+        errors = []
+        real_screenshots = []
+        required_min_screenshots = 1
+
+        screenshots_dir = os.path.join(state_dir, "screenshots")
+        
+        # Calculate session start time from decisionLog[0].timestamp to detect true stale screenshots across build sessions
+        session_start_time = 0
+        if os.path.exists(state_file):
+            try:
+                with open(state_file, "r", encoding="utf-8") as sf:
+                    sdata = json.load(sf)
+                decisions = sdata.get("decisionLog", [])
+                if decisions and isinstance(decisions, list) and "timestamp" in decisions[0]:
+                    ts_str = str(decisions[0]["timestamp"]).rstrip("Z")
+                    dt = datetime.fromisoformat(ts_str)
+                    session_start_time = dt.timestamp()
+            except Exception:
+                pass
+        if session_start_time == 0 and os.path.exists(state_file):
+            session_start_time = os.path.getmtime(state_file)
+
+        mock_detected = False
+        stale_screenshots_detected = False
+        duplicate_screenshots_detected = False
+        
+        # Keep track of full screenshot content hashes to detect duplicate files
+        screenshot_hashes = set()
+        
+        if os.path.exists(screenshots_dir):
+            for f in os.listdir(screenshots_dir):
+                if f.endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                    fp = os.path.join(screenshots_dir, f)
+                    size_bytes = os.path.getsize(fp)
+                    if size_bytes < 10240:
+                        mock_detected = True
+                        continue
+                    
+                    mtime = os.path.getmtime(fp)
+                    if session_start_time > 0 and mtime < (session_start_time - 300):
+                        stale_screenshots_detected = True
+                        continue
+                        
+                    try:
+                        with open(fp, "rb") as imgf:
+                            content = imgf.read()
+                            header = content[:8]
+                        
+                        # Check magic bytes
+                        if not (header.startswith(b'\x89PNG') or header.startswith(b'\xff\xd8\xff') or header.startswith(b'RIFF')):
+                            mock_detected = True
+                            continue
+                            
+                        # Check duplicate full-file hash detection
+                        file_hash = hashlib.md5(content).hexdigest()
+                        if file_hash in screenshot_hashes:
+                            duplicate_screenshots_detected = True
+                            continue
+                        screenshot_hashes.add(file_hash)
+                        
+                        real_screenshots.append(f)
+                    except Exception:
+                        mock_detected = True
+
+        has_visual = len(real_screenshots) > 0
+
+        # Audit Test Stub Quality: Ensure test files contain real assertions
+        test_dirs = [os.path.join(cwd, "tests"), os.path.join(cwd, "backend", "test"), os.path.join(cwd, "frontend", "__tests__")]
+        empty_test_stubs = False
+        for td in test_dirs:
+            if os.path.exists(td):
+                for root, _, files in os.walk(td):
+                    for tf in files:
+                        if tf.endswith(('.py', '.ts', '.tsx', '.js', '.jsx')):
+                            tfp = os.path.join(root, tf)
+                            try:
+                                with open(tfp, "r", encoding="utf-8") as tff:
+                                    t_content = tff.read()
+                                if ("def test_" in t_content or "it(" in t_content or "test(" in t_content) and not ("assert" in t_content or "expect(" in t_content):
+                                    empty_test_stubs = True
+                            except Exception:
+                                pass
+
+        # Determine required screenshot count based on intent contract flows or project scale
+        intent_file = os.path.join(state_dir, "intent_contract.json")
+        if os.path.exists(intent_file):
+            try:
+                with open(intent_file, "r", encoding="utf-8") as f:
+                    ic_data = json.load(f)
+                flows = ic_data.get("expected_io_flows", [])
+                visual_exp = ic_data.get("user_visual_expectations", [])
+                required_min_screenshots = max(1, len(flows), len(visual_exp))
+            except Exception:
+                pass
+
+        # Audit User Proxy DOM State Change & Interaction Receipts
+        receipts_file = os.path.join(state_dir, "interaction_receipts.json")
+        failed_auth_or_error = False
+        dom_actions_performed = False
+        roles_tested = set()
+        route_protection_verified = False
+        negative_tested = False
+        distinct_urls = set()
+        invalid_receipt_schema = False
+        
+        interactions = []
+        if os.path.exists(receipts_file):
+            try:
+                with open(receipts_file, "r", encoding="utf-8") as rf:
+                    rdata = json.load(rf)
+                interactions = rdata if isinstance(rdata, list) else rdata.get("interactions", [])
+                if not isinstance(interactions, list):
+                    invalid_receipt_schema = True
+                    interactions = []
+                    
+                # Schema check: Ensure keys exist in interactions
+                for i in interactions:
+                    if not isinstance(i, dict) or not any(k in i for k in ["action", "role", "url"]):
+                        invalid_receipt_schema = True
+                        break
+                
+                # Verify user performed real DOM interactions (clicks, form submits, navigation)
+                valid_actions = [i for i in interactions if i.get("action") in ["click", "fill", "submit", "navigate"] and not i.get("hasError", False)]
+                if len(valid_actions) >= 2:
+                    dom_actions_performed = True
+                for inter in interactions:
+                    res_status = str(inter.get("status", "")).upper()
+                    has_error = inter.get("hasError", False) or "FAILED" in res_status or "401" in res_status or "500" in res_status or "ERROR" in res_status
+                    if has_error:
+                        failed_auth_or_error = True
+                    
+                    role = inter.get("role") or inter.get("persona")
+                    if role:
+                        roles_tested.add(str(role).upper())
+                    
+                    url = inter.get("url") or inter.get("finalUrl")
+                    if url:
+                        distinct_urls.add(str(url).split("?")[0].rstrip("/"))
+                        
+                    if inter.get("authAttempt") == "unauthenticated" and "/login" in str(inter.get("finalUrl", "")):
+                        route_protection_verified = True
+                        
+                    if inter.get("negativeTest") or inter.get("testType") == "negative" or inter.get("authAttempt") == "unauthenticated":
+                        negative_tested = True
+            except Exception:
+                invalid_receipt_schema = True
+        else:
+            frontend_dir = os.path.join(cwd, "frontend")
+            if os.path.exists(frontend_dir) and not allow_soft:
+                dom_actions_performed = False
+
+        # Audit Console Log Errors & Fabricated logs
+        console_audit_file = os.path.join(state_dir, "console_audit.json")
+        console_error_found = False
+        console_fabricated = False
+        console_error_msg = ""
+        if os.path.exists(console_audit_file):
+            try:
+                with open(console_audit_file, "r", encoding="utf-8") as cf:
+                    cdata = json.load(cf)
+                err_count = cdata.get("errorCount", 0)
+                err_list = cdata.get("errors", [])
+                if err_count > 0 or len(err_list) > 0:
+                    console_error_found = True
+                    console_error_msg = err_list[0].get("message", "JavaScript Error") if err_list else "Console error detected"
+                if "totalMessageCount" in cdata and cdata.get("totalMessageCount") == 0 and os.path.exists(os.path.join(cwd, "frontend")):
+                    console_fabricated = True
+            except Exception:
+                pass
+        elif os.path.exists(os.path.join(cwd, "frontend")) and not allow_soft:
+            console_error_found = True
+            console_error_msg = "Console audit receipt (console_audit.json) missing."
+
+        # Audit Network Request Failures & Fabrication
+        network_audit_file = os.path.join(state_dir, "network_audit.json")
+        network_error_found = False
+        network_fabricated = False
+        network_error_msg = ""
+        if os.path.exists(network_audit_file):
+            try:
+                with open(network_audit_file, "r", encoding="utf-8") as nf:
+                    ndata = json.load(nf)
+                fail_count = ndata.get("failedCount", 0)
+                fail_list = ndata.get("failedRequests", [])
+                if fail_count > 0 or len(fail_list) > 0:
+                    network_error_found = True
+                    network_error_msg = f"HTTP {fail_list[0].get('status', 'Error')} for {fail_list[0].get('url', '')}" if fail_list else "API request failure detected"
+                if "totalRequestCount" in ndata and ndata.get("totalRequestCount") == 0 and os.path.exists(os.path.join(cwd, "frontend")):
+                    network_fabricated = True
+            except Exception:
+                pass
+        elif os.path.exists(os.path.join(cwd, "frontend")) and not allow_soft:
+            network_error_found = True
+            network_error_msg = "Network audit receipt (network_audit.json) missing."
+
+        # Audit Desktop & Mobile Responsive Viewports
+        has_desktop_ss = False
+        has_mobile_ss = False
+        for f in real_screenshots:
+            fn_lower = f.lower()
+            if "desktop" in fn_lower or "1920" in fn_lower or "1080" in fn_lower:
+                has_desktop_ss = True
+            if "mobile" in fn_lower or "375" in fn_lower or "667" in fn_lower or "iphone" in fn_lower:
+                has_mobile_ss = True
+
+        # Audit DOM Sanity Placeholder Strings & Snapshot completeness
+        snapshots_dir = os.path.join(state_dir, "snapshots")
+        dom_sanity_failed = False
+        bad_token_found = ""
+        missing_snapshots = False
+        if os.path.exists(snapshots_dir):
+            files = [f for f in os.listdir(snapshots_dir) if f.endswith(('.txt', '.html', '.json'))]
+            if not files and os.path.exists(os.path.join(cwd, "frontend")):
+                missing_snapshots = True
+            for f in files:
+                fp = os.path.join(snapshots_dir, f)
+                try:
+                    with open(fp, "r", encoding="utf-8") as sf:
+                        snapshot_text = sf.read()
+                    for token in ["undefined", "NaN", "[object Object]"]:
+                        if token in snapshot_text:
+                            dom_sanity_failed = True
+                            bad_token_found = token
+                            break
+                    if dom_sanity_failed:
+                        break
+                except Exception:
+                    pass
+        elif os.path.exists(os.path.join(cwd, "frontend")):
+            missing_snapshots = True
+
+        # Audit Lighthouse Performance & Accessibility Baseline
+        lh_file = os.path.join(state_dir, "lighthouse_audit.json")
+        missing_lh = False
+        low_lh_score = False
+        lh_score_val = 0
+        if os.path.exists(os.path.join(cwd, "frontend")):
+            if not os.path.exists(lh_file):
+                missing_lh = True
+            else:
+                try:
+                    with open(lh_file, "r", encoding="utf-8") as lf:
+                        lh_data = json.load(lf)
+                    lh_score_val = lh_data.get("accessibility", 0)
+                    if lh_score_val < 50:
+                        low_lh_score = True
+                except Exception:
+                    pass
+
+        # Programmatic Zero-Loophole Error Assertions (Independent if blocks)
+        if not dom_actions_performed and os.path.exists(os.path.join(cwd, "frontend")) and not allow_soft:
+            errors.append("QA verification failed: USER PROXY INACTION DETECTED! Taking static screenshots without interactive DOM testing (clicking buttons, filling forms, submitting data) is FORBIDDEN. User Proxy (dss_user_alias_v2) MUST perform interactive DOM actions (clicks, form fills) using Chrome MCP and log receipts in '.agents/interaction_receipts.json'.")
+        
+        if failed_auth_or_error and not allow_soft:
+            errors.append("QA verification failed: FAILED LOGIN / UI ERROR DETECTED! Chrome MCP captured an unauthenticated or error state (e.g. login failed, 401, or 500 server error). Post-login authenticated routes (/dashboard) must be reached cleanly with zero errors.")
+        
+        if console_error_found and not allow_soft:
+            errors.append(f"QA verification failed: Browser Console Error detected! Details: {console_error_msg}. UI components must be fully clean of uncaught JavaScript runtime exceptions.")
+        
+        if console_fabricated and not allow_soft:
+            errors.append("QA verification failed: CHEATING DETECTED! Fabricated console logs (totalMessageCount = 0) detected. Browser session logs must represent real live framework output.")
+        
+        if network_error_found and not allow_soft:
+            errors.append(f"QA verification failed: Failed API Network Requests detected! Details: {network_error_msg}. All network endpoint calls must succeed cleanly.")
+            
+        if network_fabricated and not allow_soft:
+            errors.append("QA verification failed: CHEATING DETECTED! Fabricated network logs (totalRequestCount = 0) detected. Browser session network logs must represent real live asset and endpoint fetches.")
+        
+        if stale_screenshots_detected and not allow_soft:
+            errors.append("QA verification failed: CHEATING DETECTED! Stale screenshots from a previous build cycle detected. All screenshots must be freshly captured within the current FSM execution session.")
+            
+        if duplicate_screenshots_detected and not allow_soft:
+            errors.append("QA verification failed: CHEATING DETECTED! Identical/Duplicate screenshots found. Taking the same screenshot and saving it under multiple filenames to bypass viewport layout requirements is strictly forbidden.")
+        
+        if missing_snapshots and not allow_soft:
+            errors.append("QA verification failed: Missing DOM A11y Snapshots. Professional QA testing must capture DOM / Accessibility tree text snapshots in '.agents/snapshots/'.")
+        
+        if missing_lh and not allow_soft:
+            errors.append("QA verification failed: Missing Lighthouse Audit Receipt. Execute 'lighthouse_audit' tool and save receipt to '.agents/lighthouse_audit.json'.")
+        
+        if low_lh_score and not allow_soft:
+            errors.append(f"QA verification failed: Lighthouse Accessibility score too low ({lh_score_val} < 50). UI layout must meet accessibility standards.")
+            
+        if invalid_receipt_schema and not allow_soft:
+            errors.append("QA verification failed: Malformed interaction receipts file (interaction_receipts.json). Check that interaction receipts match the required schema format.")
+        
+        if os.path.exists(os.path.join(cwd, "frontend")) and not allow_soft:
+            if not has_desktop_ss:
+                errors.append("QA verification failed: Missing desktop viewport test screenshot. Capture desktop visual state containing 'desktop' or '1920' in screenshot filename.")
+            if not has_mobile_ss:
+                errors.append("QA verification failed: Missing mobile viewport test screenshot. Capture mobile visual state containing 'mobile' or '375' in screenshot filename.")
+            if len(roles_tested) < 2:
+                errors.append(f"QA verification failed: Multi-role journey coverage test failed. Roles tested: {list(roles_tested)}. Must test at least 2 distinct user persona roles.")
+            if len(distinct_urls) < 2:
+                errors.append(f"QA verification failed: Route navigation diversity test failed. Navigated URLs: {list(distinct_urls)}. Must navigate to at least 2 distinct page routes.")
+            if not route_protection_verified:
+                errors.append("QA verification failed: Unauthenticated Route Protection test missing. Attempt direct access to a protected dashboard route while unauthenticated and log redirect to /login.")
+            if not negative_tested:
+                errors.append("QA verification failed: Negative Boundary test missing. User Proxy must perform at least 1 negative/boundary condition interaction (e.g. invalid auth or empty form submit).")
+        
+        if dom_sanity_failed and not allow_soft:
+            errors.append(f"QA verification failed: Rendered HTML/DOM Visual Fidelity error! Found raw unmapped frontend prop placeholder string '{bad_token_found}' in a captured DOM/A11y snapshot file. Rendered output must be fully clean.")
+        
+        if empty_test_stubs and not allow_soft:
+            errors.append("QA verification failed: Empty or unasserted test stubs detected! Test files must contain real assertions ('expect(' or 'assert').")
+        
+        if mock_detected and not allow_soft:
+            errors.append("QA verification failed: CHEATING DETECTED! Mock or fake screenshot receipts (<10KB or invalid binary image magic bytes) were found. Real Chrome DevTools MCP visual screenshots (>10KB valid PNG/JPEG) are strictly required.")
+        
+        if not has_visual and not allow_soft:
+            errors.append("QA verification failed: Mandatory Chrome MCP visual screenshot receipts missing from '.agents/screenshots/'. Run Chrome DevTools MCP to capture real screenshots before passing QA.")
+        
+        if len(real_screenshots) < required_min_screenshots and not allow_soft:
+            errors.append(f"QA verification failed: Insufficient visual screenshot coverage. Found only {len(real_screenshots)} valid screenshot(s) ({', '.join(real_screenshots)}), but project requires at least {required_min_screenshots} distinct visual screenshots covering all core user roles and flows.")
+
+        return errors, real_screenshots, required_min_screenshots
 
     @staticmethod
     def verify_phase(current_phase: str, workspace_dir: Optional[str] = None, allow_soft: bool = True) -> VerificationResult:
@@ -237,107 +557,19 @@ class EvidenceVerifier:
                     errors.append("INTEGRATION verification failed: Frontend code lacks responsive layout breakpoints ('md:', 'lg:', or '@media').")
 
         elif current_phase == "QA":
-            artifacts.append(EvidenceArtifact(current_phase, "test_receipt", cwd, True))
-            screenshots_dir = os.path.join(state_dir, "screenshots")
+            shared_errors, real_screenshots, required_min_screenshots = EvidenceVerifier._verify_qa_evidence_shared(cwd, state_dir, state_file, allow_soft)
+            errors.extend(shared_errors)
             
-            real_screenshots = []
-            mock_detected = False
-            if os.path.exists(screenshots_dir):
-                for f in os.listdir(screenshots_dir):
-                    if f.endswith(('.png', '.jpg', '.jpeg', '.webp')):
-                        fp = os.path.join(screenshots_dir, f)
-                        # Require real binary image files > 10KB
-                        size_bytes = os.path.getsize(fp)
-                        if size_bytes < 10240:
-                            mock_detected = True
-                            continue
-                        try:
-                            with open(fp, "rb") as imgf:
-                                header = imgf.read(8)
-                            # Check PNG (\x89PNG\r\n\x1a\n), JPEG (\xff\xd8\xff), or WebP (RIFF) magic bytes
-                            if header.startswith(b'\x89PNG') or header.startswith(b'\xff\xd8\xff') or header.startswith(b'RIFF'):
-                                real_screenshots.append(f)
-                            else:
-                                mock_detected = True
-                        except Exception:
-                            mock_detected = True
-
+            screenshots_dir = os.path.join(state_dir, "screenshots")
             has_visual = len(real_screenshots) > 0
-
-            # Audit Test Stub Quality: Ensure test files contain real assertions
-            test_dirs = [os.path.join(cwd, "tests"), os.path.join(cwd, "backend", "test"), os.path.join(cwd, "frontend", "__tests__")]
-            empty_test_stubs = False
-            for td in test_dirs:
-                if os.path.exists(td):
-                    for root, _, files in os.walk(td):
-                        for tf in files:
-                            if tf.endswith(('.py', '.ts', '.tsx', '.js', '.jsx')):
-                                tfp = os.path.join(root, tf)
-                                try:
-                                    with open(tfp, "r", encoding="utf-8") as tff:
-                                        t_content = tff.read()
-                                    if ("def test_" in t_content or "it(" in t_content or "test(" in t_content) and not ("assert" in t_content or "expect(" in t_content):
-                                        empty_test_stubs = True
-                                except Exception:
-                                    pass
-
-            # Determine required screenshot count based on intent contract flows or project scale
-            intent_file = os.path.join(state_dir, "intent_contract.json")
-            required_min_screenshots = 1
-            if os.path.exists(intent_file):
-                try:
-                    with open(intent_file, "r", encoding="utf-8") as f:
-                        ic_data = json.load(f)
-                    flows = ic_data.get("expected_io_flows", [])
-                    visual_exp = ic_data.get("user_visual_expectations", [])
-                    required_min_screenshots = max(1, len(flows), len(visual_exp))
-                except Exception:
-                    pass
-
-            # Audit User Proxy DOM State Change & Interaction Receipts
-            receipts_file = os.path.join(state_dir, "interaction_receipts.json")
-            failed_auth_or_error = False
-            dom_actions_performed = False
-            if os.path.exists(receipts_file):
-                try:
-                    with open(receipts_file, "r", encoding="utf-8") as rf:
-                        rdata = json.load(rf)
-                    interactions = rdata if isinstance(rdata, list) else rdata.get("interactions", [])
-                    # Verify user performed real DOM interactions (clicks, form submits, navigation)
-                    valid_actions = [i for i in interactions if i.get("action") in ["click", "fill", "submit", "navigate"] and not i.get("hasError", False)]
-                    if len(valid_actions) >= 2:
-                        dom_actions_performed = True
-                    for inter in interactions:
-                        res_status = str(inter.get("status", "")).upper()
-                        has_error = inter.get("hasError", False) or "FAILED" in res_status or "401" in res_status or "500" in res_status or "ERROR" in res_status
-                        if has_error:
-                            failed_auth_or_error = True
-                except Exception:
-                    pass
-            else:
-                frontend_dir = os.path.join(cwd, "frontend")
-                if os.path.exists(frontend_dir) and not allow_soft:
-                    dom_actions_performed = False
-
+            
             artifacts.append(EvidenceArtifact(
                 current_phase,
                 "visual_output_check",
                 screenshots_dir,
-                has_visual and len(real_screenshots) >= required_min_screenshots and dom_actions_performed and not failed_auth_or_error,
+                has_visual and len(real_screenshots) >= required_min_screenshots and len(shared_errors) == 0,
                 strength=EvidenceStrength.HIGH_PLAYWRIGHT_VISUAL
             ))
-            if not dom_actions_performed and os.path.exists(os.path.join(cwd, "frontend")) and not allow_soft:
-                errors.append("QA verification failed: USER PROXY INACTION DETECTED! Taking static screenshots without interactive DOM testing (clicking buttons, filling forms, submitting data) is FORBIDDEN. User Proxy (dss_user_alias_v2) MUST perform interactive DOM actions (clicks, form fills) using Chrome MCP and log receipts in '.agents/interaction_receipts.json'.")
-            elif failed_auth_or_error and not allow_soft:
-                errors.append("QA verification failed: FAILED LOGIN / UI ERROR DETECTED! Chrome MCP captured an unauthenticated or error state (e.g. login failed, 401, or 500 server error). Post-login authenticated routes (/dashboard) must be reached cleanly with zero errors.")
-            elif empty_test_stubs and not allow_soft:
-                errors.append("QA verification failed: Empty or unasserted test stubs detected! Test files must contain real assertions ('expect(' or 'assert').")
-            elif mock_detected and not allow_soft:
-                errors.append("QA verification failed: CHEATING DETECTED! Mock or fake screenshot receipts (<10KB or invalid binary image magic bytes) were found. Real Chrome DevTools MCP visual screenshots (>10KB valid PNG/JPEG) are strictly required.")
-            elif not has_visual and not allow_soft:
-                errors.append("QA verification failed: Mandatory Chrome MCP visual screenshot receipts missing from '.agents/screenshots/'. Run Chrome DevTools MCP to capture real screenshots before passing QA.")
-            elif len(real_screenshots) < required_min_screenshots and not allow_soft:
-                errors.append(f"QA verification failed: Insufficient visual screenshot coverage. Found only {len(real_screenshots)} valid screenshot(s) ({', '.join(real_screenshots)}), but project requires at least {required_min_screenshots} distinct visual screenshots covering all core user roles and flows.")
 
         elif current_phase == "SECURITY":
             sec_file = os.path.join(state_dir, "security_report.json")
@@ -359,47 +591,22 @@ class EvidenceVerifier:
 
         elif current_phase == "RELEASE":
             artifacts.append(EvidenceArtifact(current_phase, "release_verification", cwd, True))
-            screenshots_dir = os.path.join(state_dir, "screenshots")
             
-            real_screenshots = []
-            if os.path.exists(screenshots_dir):
-                for f in os.listdir(screenshots_dir):
-                    if f.endswith(('.png', '.jpg', '.jpeg', '.webp')):
-                        fp = os.path.join(screenshots_dir, f)
-                        if os.path.getsize(fp) >= 10240:
-                            try:
-                                with open(fp, "rb") as imgf:
-                                    header = imgf.read(8)
-                                if header.startswith(b'\x89PNG') or header.startswith(b'\xff\xd8\xff') or header.startswith(b'RIFF'):
-                                    real_screenshots.append(f)
-                            except Exception:
-                                pass
+            shared_errors, real_screenshots, required_min_screenshots = EvidenceVerifier._verify_qa_evidence_shared(cwd, state_dir, state_file, allow_soft)
+            for err in shared_errors:
+                errors.append(err.replace("QA verification failed", "RELEASE verification failed"))
+                
+            screenshots_dir = os.path.join(state_dir, "screenshots")
             has_visual_receipts = len(real_screenshots) > 0
-
-            intent_file = os.path.join(state_dir, "intent_contract.json")
-            required_min_screenshots = 1
-            if os.path.exists(intent_file):
-                try:
-                    with open(intent_file, "r", encoding="utf-8") as f:
-                        ic_data = json.load(f)
-                    flows = ic_data.get("expected_io_flows", [])
-                    visual_exp = ic_data.get("user_visual_expectations", [])
-                    required_min_screenshots = max(1, len(flows), len(visual_exp))
-                except Exception:
-                    pass
 
             # User Proxy Acceptance requires MANDATORY Output Contract Evidence signoff with full route coverage
             artifacts.append(EvidenceArtifact(
                 current_phase,
                 "user_proxy_output_contract_signoff",
                 screenshots_dir,
-                has_visual_receipts and len(real_screenshots) >= required_min_screenshots,
+                has_visual_receipts and len(real_screenshots) >= required_min_screenshots and len(shared_errors) == 0,
                 strength=EvidenceStrength.HIGH_PLAYWRIGHT_VISUAL
             ))
-            if not has_visual_receipts and not allow_soft:
-                errors.append("RELEASE verification failed: Safety Case incomplete. Output Contract Evidence missing from '.agents/screenshots/'. User Proxy rejects release without verified rendered output.")
-            elif len(real_screenshots) < required_min_screenshots and not allow_soft:
-                errors.append(f"RELEASE verification failed: Insufficient visual screenshot coverage. Found only {len(real_screenshots)} valid screenshot(s) ({', '.join(real_screenshots)}), but project requires at least {required_min_screenshots} distinct visual screenshots covering all core user roles and flows.")
 
         passed = len(errors) == 0
         return VerificationResult(phase=current_phase, passed=passed, artifacts=artifacts, errors=errors)

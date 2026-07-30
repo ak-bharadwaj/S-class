@@ -26,12 +26,12 @@ CRITICAL HARD BLOCK: The parent Antigravity agent is strictly FORBIDDEN from per
 *   During test runs, you MUST inspect the console stdout/stderr.
 *   If ANY `DeprecationWarning` (including `datetime.utcnow()` deprecation), package warning, or console warning is printed, you MUST mark the state as `qa_failed` or `release_hold` and patch the warnings first. Do not ignore warning lists!
 
-## 5. Zero-Defect Design & Mandatory Proxy User Verification
+## 5. Zero-Defect Design & Mandatory Real QA Tester Protocol (`dss_user_alias_v2`)
 *   **Zero-Defect Design Gate (`DESIGN` & `DEBATE`):** Design blueprints must have zero unverified assumptions. `dss_architect_v2`, `dss_governor`, and `dss_cso_v2` MUST audit DB column types, API route signatures, authentication bounds, and edge cases. If even 1 ambiguity or flaw is found, code generation is forbidden until resolved.
-*   **Mandatory Proxy User Verification (`dss_user_alias_v2`):** During `DEBATE` and `QA`, `dss_user_alias_v2` (Proxy User) acts as a strict user advocate. It MUST verify:
-    1. 100% compliance with acceptance criteria in `IntentContract`.
-    2. Real-world user UX workflows, responsiveness, and accessibility.
-    3. Absence of confusing UI states, broken links, or misleading copy.
+*   **Mandatory Real QA Tester Protocol (`dss_user_alias_v2`):** During `QA` phase, `dss_user_alias_v2` acts as a Real Professional QA Automation Engineer & Human Tester. It MUST execute:
+    1. **Multi-Role User Personas:** Test at least 2 distinct user roles (`STUDENT`, `FACULTY`, `HOD/ADMIN`) using Chrome DevTools MCP.
+    2. **Destructive Negative Testing:** Test empty form submissions and boundary input errors to verify graceful UI error messages (`"Please enter a valid email"`), NOT 500 crashes or blank screens.
+    3. **Console & Network Error Audit:** Run `list_console_messages` & `list_network_requests`. Any unhandled JS exception (`TypeError`, `UnhandledPromiseRejection`) or failed HTTP 500 API call **MUST FAIL QA**.
 ## 8. Full Specification File Parsing Rule
 *   **Zero Feature Omission:** `IntentExtractor` MUST automatically parse every explicit feature block (`1Feature:`, `2Feature:`, ..., `14Feature:`) from specification files (e.g. `implementation-details.txt`, `spec.md`, `PROJECT.md`) upfront. Collapsing or missing specification features is strictly forbidden.
 
