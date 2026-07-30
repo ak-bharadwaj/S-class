@@ -294,14 +294,43 @@ class EvidenceVerifier:
                 except Exception:
                     pass
 
+            # Audit User Proxy DOM State Change & Interaction Receipts
+            receipts_file = os.path.join(state_dir, "interaction_receipts.json")
+            failed_auth_or_error = False
+            dom_actions_performed = False
+            if os.path.exists(receipts_file):
+                try:
+                    with open(receipts_file, "r", encoding="utf-8") as rf:
+                        rdata = json.load(rf)
+                    interactions = rdata if isinstance(rdata, list) else rdata.get("interactions", [])
+                    # Verify user performed real DOM interactions (clicks, form submits, navigation)
+                    valid_actions = [i for i in interactions if i.get("action") in ["click", "fill", "submit", "navigate"] and not i.get("hasError", False)]
+                    if len(valid_actions) >= 2:
+                        dom_actions_performed = True
+                    for inter in interactions:
+                        res_status = str(inter.get("status", "")).upper()
+                        has_error = inter.get("hasError", False) or "FAILED" in res_status or "401" in res_status or "500" in res_status or "ERROR" in res_status
+                        if has_error:
+                            failed_auth_or_error = True
+                except Exception:
+                    pass
+            else:
+                frontend_dir = os.path.join(cwd, "frontend")
+                if os.path.exists(frontend_dir) and not allow_soft:
+                    dom_actions_performed = False
+
             artifacts.append(EvidenceArtifact(
                 current_phase,
                 "visual_output_check",
                 screenshots_dir,
-                has_visual and len(real_screenshots) >= required_min_screenshots,
+                has_visual and len(real_screenshots) >= required_min_screenshots and dom_actions_performed and not failed_auth_or_error,
                 strength=EvidenceStrength.HIGH_PLAYWRIGHT_VISUAL
             ))
-            if empty_test_stubs and not allow_soft:
+            if not dom_actions_performed and os.path.exists(os.path.join(cwd, "frontend")) and not allow_soft:
+                errors.append("QA verification failed: USER PROXY INACTION DETECTED! Taking static screenshots without interactive DOM testing (clicking buttons, filling forms, submitting data) is FORBIDDEN. User Proxy (dss_user_alias_v2) MUST perform interactive DOM actions (clicks, form fills) using Chrome MCP and log receipts in '.agents/interaction_receipts.json'.")
+            elif failed_auth_or_error and not allow_soft:
+                errors.append("QA verification failed: FAILED LOGIN / UI ERROR DETECTED! Chrome MCP captured an unauthenticated or error state (e.g. login failed, 401, or 500 server error). Post-login authenticated routes (/dashboard) must be reached cleanly with zero errors.")
+            elif empty_test_stubs and not allow_soft:
                 errors.append("QA verification failed: Empty or unasserted test stubs detected! Test files must contain real assertions ('expect(' or 'assert').")
             elif mock_detected and not allow_soft:
                 errors.append("QA verification failed: CHEATING DETECTED! Mock or fake screenshot receipts (<10KB or invalid binary image magic bytes) were found. Real Chrome DevTools MCP visual screenshots (>10KB valid PNG/JPEG) are strictly required.")
