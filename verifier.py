@@ -239,8 +239,47 @@ class EvidenceVerifier:
         elif current_phase == "QA":
             artifacts.append(EvidenceArtifact(current_phase, "test_receipt", cwd, True))
             screenshots_dir = os.path.join(state_dir, "screenshots")
-            screenshot_files = [f for f in os.listdir(screenshots_dir) if f.endswith(('.png', '.jpg', '.jpeg', '.webp'))] if os.path.exists(screenshots_dir) else []
-            has_visual = len(screenshot_files) > 0
+            
+            real_screenshots = []
+            mock_detected = False
+            if os.path.exists(screenshots_dir):
+                for f in os.listdir(screenshots_dir):
+                    if f.endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                        fp = os.path.join(screenshots_dir, f)
+                        # Require real binary image files > 10KB
+                        size_bytes = os.path.getsize(fp)
+                        if size_bytes < 10240:
+                            mock_detected = True
+                            continue
+                        try:
+                            with open(fp, "rb") as imgf:
+                                header = imgf.read(8)
+                            # Check PNG (\x89PNG\r\n\x1a\n), JPEG (\xff\xd8\xff), or WebP (RIFF) magic bytes
+                            if header.startswith(b'\x89PNG') or header.startswith(b'\xff\xd8\xff') or header.startswith(b'RIFF'):
+                                real_screenshots.append(f)
+                            else:
+                                mock_detected = True
+                        except Exception:
+                            mock_detected = True
+
+            has_visual = len(real_screenshots) > 0
+
+            # Audit Test Stub Quality: Ensure test files contain real assertions
+            test_dirs = [os.path.join(cwd, "tests"), os.path.join(cwd, "backend", "test"), os.path.join(cwd, "frontend", "__tests__")]
+            empty_test_stubs = False
+            for td in test_dirs:
+                if os.path.exists(td):
+                    for root, _, files in os.walk(td):
+                        for tf in files:
+                            if tf.endswith(('.py', '.ts', '.tsx', '.js', '.jsx')):
+                                tfp = os.path.join(root, tf)
+                                try:
+                                    with open(tfp, "r", encoding="utf-8") as tff:
+                                        t_content = tff.read()
+                                    if ("def test_" in t_content or "it(" in t_content or "test(" in t_content) and not ("assert" in t_content or "expect(" in t_content):
+                                        empty_test_stubs = True
+                                except Exception:
+                                    pass
 
             # Determine required screenshot count based on intent contract flows or project scale
             intent_file = os.path.join(state_dir, "intent_contract.json")
@@ -259,24 +298,54 @@ class EvidenceVerifier:
                 current_phase,
                 "visual_output_check",
                 screenshots_dir,
-                has_visual and len(screenshot_files) >= required_min_screenshots,
+                has_visual and len(real_screenshots) >= required_min_screenshots,
                 strength=EvidenceStrength.HIGH_PLAYWRIGHT_VISUAL
             ))
-            if not has_visual and not allow_soft:
-                errors.append("QA verification failed: Mandatory Chrome MCP visual screenshot receipts missing from '.agents/screenshots/'. Run Chrome DevTools MCP to capture screenshots before passing QA.")
-            elif len(screenshot_files) < required_min_screenshots and not allow_soft:
-                errors.append(f"QA verification failed: Insufficient visual screenshot coverage. Found only {len(screenshot_files)} screenshot(s) ({', '.join(screenshot_files)}), but project requires at least {required_min_screenshots} distinct visual screenshots covering all core user roles and flows.")
+            if empty_test_stubs and not allow_soft:
+                errors.append("QA verification failed: Empty or unasserted test stubs detected! Test files must contain real assertions ('expect(' or 'assert').")
+            elif mock_detected and not allow_soft:
+                errors.append("QA verification failed: CHEATING DETECTED! Mock or fake screenshot receipts (<10KB or invalid binary image magic bytes) were found. Real Chrome DevTools MCP visual screenshots (>10KB valid PNG/JPEG) are strictly required.")
+            elif not has_visual and not allow_soft:
+                errors.append("QA verification failed: Mandatory Chrome MCP visual screenshot receipts missing from '.agents/screenshots/'. Run Chrome DevTools MCP to capture real screenshots before passing QA.")
+            elif len(real_screenshots) < required_min_screenshots and not allow_soft:
+                errors.append(f"QA verification failed: Insufficient visual screenshot coverage. Found only {len(real_screenshots)} valid screenshot(s) ({', '.join(real_screenshots)}), but project requires at least {required_min_screenshots} distinct visual screenshots covering all core user roles and flows.")
 
         elif current_phase == "SECURITY":
             sec_file = os.path.join(state_dir, "security_report.json")
-            has_sec = os.path.exists(sec_file) or allow_soft
+            from security_shield import SecurityShield
+            shield = SecurityShield()
+            sec_findings = []
+            for root, _, files in os.walk(cwd):
+                if any(ignored in root for ignored in [".git", "node_modules", ".next", "__pycache__", ".agents"]):
+                    continue
+                for f in files:
+                    if f.endswith(('.ts', '.tsx', '.js', '.jsx', '.py', '.json', '.env')):
+                        sec_findings.extend(shield.scan_file(os.path.join(root, f)))
+            
+            crit_findings = [f for f in sec_findings if f.severity in ["CRITICAL", "HIGH"]]
+            has_sec = len(crit_findings) == 0
             artifacts.append(EvidenceArtifact(current_phase, "security_report", sec_file, has_sec))
+            if crit_findings and not allow_soft:
+                errors.append(f"SECURITY verification failed: {len(crit_findings)} CRITICAL/HIGH security vulnerability finding(s) detected! (e.g. {crit_findings[0].description} in {os.path.basename(crit_findings[0].file_path)}:L{crit_findings[0].line_number}).")
 
         elif current_phase == "RELEASE":
             artifacts.append(EvidenceArtifact(current_phase, "release_verification", cwd, True))
             screenshots_dir = os.path.join(state_dir, "screenshots")
-            screenshot_files = [f for f in os.listdir(screenshots_dir) if f.endswith(('.png', '.jpg', '.jpeg', '.webp'))] if os.path.exists(screenshots_dir) else []
-            has_visual_receipts = len(screenshot_files) > 0
+            
+            real_screenshots = []
+            if os.path.exists(screenshots_dir):
+                for f in os.listdir(screenshots_dir):
+                    if f.endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                        fp = os.path.join(screenshots_dir, f)
+                        if os.path.getsize(fp) >= 10240:
+                            try:
+                                with open(fp, "rb") as imgf:
+                                    header = imgf.read(8)
+                                if header.startswith(b'\x89PNG') or header.startswith(b'\xff\xd8\xff') or header.startswith(b'RIFF'):
+                                    real_screenshots.append(f)
+                            except Exception:
+                                pass
+            has_visual_receipts = len(real_screenshots) > 0
 
             intent_file = os.path.join(state_dir, "intent_contract.json")
             required_min_screenshots = 1
@@ -295,13 +364,13 @@ class EvidenceVerifier:
                 current_phase,
                 "user_proxy_output_contract_signoff",
                 screenshots_dir,
-                has_visual_receipts and len(screenshot_files) >= required_min_screenshots,
+                has_visual_receipts and len(real_screenshots) >= required_min_screenshots,
                 strength=EvidenceStrength.HIGH_PLAYWRIGHT_VISUAL
             ))
             if not has_visual_receipts and not allow_soft:
                 errors.append("RELEASE verification failed: Safety Case incomplete. Output Contract Evidence missing from '.agents/screenshots/'. User Proxy rejects release without verified rendered output.")
-            elif len(screenshot_files) < required_min_screenshots and not allow_soft:
-                errors.append(f"RELEASE verification failed: Insufficient visual screenshot coverage. Found only {len(screenshot_files)} screenshot(s) ({', '.join(screenshot_files)}), but project requires at least {required_min_screenshots} distinct visual screenshots covering all core user roles and flows.")
+            elif len(real_screenshots) < required_min_screenshots and not allow_soft:
+                errors.append(f"RELEASE verification failed: Insufficient visual screenshot coverage. Found only {len(real_screenshots)} valid screenshot(s) ({', '.join(real_screenshots)}), but project requires at least {required_min_screenshots} distinct visual screenshots covering all core user roles and flows.")
 
         passed = len(errors) == 0
         return VerificationResult(phase=current_phase, passed=passed, artifacts=artifacts, errors=errors)
