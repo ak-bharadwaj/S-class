@@ -134,26 +134,29 @@ If a page or view contains multiple buttons, tabs, forms, modals, or sub-pages, 
    * **Action Controls (Edit / Delete / Export / Filter):** Click each action control ──► verify underlying handler executes correctly without silent JS console errors or swallowed exceptions.
 3. **Interaction Receipts Persistence:** Write interaction execution records to `.agents/interaction_receipts.json`. If any button click triggers a JS error or fails to update state, record the defect as a Tier 1 / Tier 3a `HARD_BLOCK`.
 
-## 16. Professional UI/UX & Design System Execution Mandate (Zero Generic Templates)
+## 16. Professional UI/UX, Device-Adaptive & Motion-Budgeted Mandate
 
 S-Class EOS strictly forbids basic, amateur, or unstyled UI templates. Builders and Verifiers MUST enforce modern, state-of-the-art web design standards across all frontend components:
 
 ### Hard UI/UX Standards:
 1. **Mandatory Workspace Skill Activation:**
-   * Builders (`dss_builder_v2`, `dss_frontend_dev`) MUST read and apply the local skill databases: `ui-ux-pro-max` (84 design styles, 192 color palettes, 74 font pairings, 16 GSAP motion presets) and `frontend-design`.
+   * Builders (`dss_builder_v2`, `dss_frontend_dev`) MUST read and apply local skill databases: `ui-ux-pro-max` (84 design styles, 192 color palettes, 74 font pairings, 16 GSAP/Framer motion presets) and `frontend-design`.
 2. **Modern Typography & Google Fonts:**
-   * EVERY web UI MUST import and use professional Google Fonts (`Inter`, `Outfit`, `Plus Jakarta Sans`, `Roboto`, or `Poppins`) instead of default browser fonts (`Times New Roman`, basic `Arial`).
-3. **Tailored Curated Color Palettes & Dark/Light System:**
-   * Plain saturated red/green/blue and plain black/white defaults are STRICTLY FORBIDDEN.
-   * Components MUST use tailored dark/glassmorphic or sleek light palettes (e.g. Slate `#0f172a`, Deep Indigo `#6366f1`, Emerald Glow `#10b981`, Amber Badges `#f59e0b`).
-4. **Glassmorphism, Shadows & Border Radius:**
-   * Use backdrop blur filters (`backdrop-filter: blur(12px)`), layered box shadows (`0 8px 32px 0 rgba(0, 0, 0, 0.37)`), subtle CSS linear gradients, and rounded container radii (`12px` to `16px`).
-5. **Micro-Animations & Smooth Transitions:**
-   * Add smooth hover state transitions (`transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1)`), button hover scale transforms (`transform: translateY(-2px)`), active tab indicators, and pulse loading states.
-6. **Rich Interactive Data Visualization & Stats Cards:**
-   * Replace raw text tables/lists with styled data cards, interactive SVG charts (Recharts / Chart.js), metric stats cards with trending arrows, search/filter toolbars, and dynamic badges.
-7. **Strict User Proxy Veto Mandate:**
-   * `dss_user_alias_v2` (User Proxy) MUST inspect Chrome MCP screenshots. If the UI looks like a generic unstyled template, lacks responsive padding, or uses browser-default inputs, `dss_user_alias_v2` **MUST TRIGGER `qa_failed` AND REJECT RELEASE**.
+   * EVERY web UI MUST import and use professional Google Fonts (`Outfit` headings, `Inter` / `Plus Jakarta Sans` body copy) instead of default browser fonts.
+3. **Context-Aware Dynamic Color Palette Selection:**
+   * Do NOT hardcode fixed hex colors into system rules. Builders MUST select a tailored color palette dynamically matching the application domain and user context (drawing from `ui-ux-pro-max`'s 192 domain-tailored color palettes: FinTech ➔ Emerald/Slate, Healthcare ➔ Clinical Teal/Navy, ERP/Management ➔ Zinc/Obsidian, E-Commerce ➔ Warm Amber/Indigo).
+4. **Device-Adaptive Layout Ergonomics (PC Desktop vs Mobile):**
+   * **Desktop (PC / Large Monitors):** High-density multi-column grid layouts, persistent or collapsible side navigation drawers, multi-pane stat cards, floating command toolbars, and rich multi-column data grids.
+   * **Mobile (Smartphones / Tablets):** Single-column vertical stack layouts, bottom navigation bar or mobile slide-out drawer, touch-friendly tap targets (minimum `48px` touch height), compact stat chips, and responsive swipe controls.
+5. **Adaptive Motion Budget & Performance Tuning (PC vs Mobile):**
+   * **PC / Desktop (High Performance):** Rich Framer Motion spring physics (`motion.div`, `AnimatePresence`), entrance staggers (`staggerChildren: 0.05`), page transition springs, and hover scale transforms (`whileHover={{ scale: 1.015, translateY: -2 }}`).
+   * **Mobile / Low Power & `prefers-reduced-motion`:** Lightweight CSS fade/slide transitions (`opacity: 0` ➔ `1`), disabled layout reflow animations to conserve mobile battery, and zero-jank 60fps touch scrolling performance.
+6. **Claude-Style Minimalist Layout Structure:**
+   * Feature floating command bar toolbars, rounded pill tab controls, elevated frosted glass card containers (`backdrop-filter: blur(12px)`), and clean visual hierarchy.
+7. **Rich Data Density & Visual Cards:**
+   * Replace raw text tables with metric KPI stat cards (`+12.4%` trending badges), interactive SVG graphs, search/filter pill chips, and clear status indicators.
+8. **Strict User Proxy Veto Mandate:**
+   * `dss_user_alias_v2` (User Proxy) MUST inspect Chrome MCP screenshots across both Desktop (`1920x1080`) and Mobile (`390x844`) viewports. If the UI looks like a generic unstyled template, lacks responsive padding, or fails touch targets, `dss_user_alias_v2` **MUST TRIGGER `qa_failed` AND REJECT RELEASE**.
 
 ## 17. Mandatory Subagent Handoff for Code Generation (Zero Direct Parent Code Edits)
 
@@ -214,6 +217,17 @@ Whenever the user introduces a new plan, requirement update, or major feature ad
 1. **Mandatory State Re-Initialization:** The parent agent MUST immediately call `runtime.initialize_state(goal=new_plan)` or `runtime.reset_to_triage(goal=new_plan)`.
 2. **Re-Execute Planning Lifecycle:** The reset forces the system to execute the full SDLC lifecycle for the new plan: `TRIAGE` ➔ `ANALYSIS` ➔ `DESIGN` (3-tier blueprints) ➔ `DEBATE` ➔ `TASK_COMPILATION` before any builder subagent writes code for the new plan.
 3. **Zero Shortcut Bypass:** Bypassing architectural design, debate, or task compilation when a new plan is introduced is classified as a governance violation.
+
+## 22. High-Density Visual Content & Data-Rich Layout Mandate (Zero Empty Screens)
+
+S-Class EOS strictly forbids sparse, empty, or unpopulated frontend layouts. Builders (`dss_builder_v2`, `dss_frontend_dev`) MUST ensure screens are data-rich, visually engaging, and enterprise-dense:
+
+### Mandatory High-Density UI Directives:
+1. **Top-Level KPI Metric Stat Cards:** Every dashboard view MUST render top stat cards featuring large numerical KPIs (e.g. "Total Students: 1,450", "Average Attendance: 92.4%"), trending percentage badges (`+8.2% vs last term`), and glowing icon containers.
+2. **High-Density Seed Data Population:** Data lists, tables, and card grids MUST be populated with realistic, high-density seed data (minimum 5-10 records per view). Sparse 1-item screens are strictly forbidden.
+3. **Interactive Search & Filter Toolbars:** Every data-driven screen MUST include a search input field, category filter chips, role dropdowns, and sorting controls.
+4. **Visual Data Visualization Graphs:** Dashboards MUST render SVG / Chart data visualizations (e.g. attendance trends over time, grade distribution bar charts).
+5. **Polished Empty-State Fallbacks:** If a view contains no data, it MUST render a frosted glass empty-state component complete with an SVG illustration, descriptive title, guidance text, and a primary CTA action button—never a blank empty void!
 
 
 

@@ -206,6 +206,35 @@ class EvidenceVerifier:
 
         elif current_phase == "INTEGRATION":
             artifacts.append(EvidenceArtifact(current_phase, "build_check", cwd, True))
+            # Programmatic Frontend AST / Code Quality Verification
+            frontend_dir = os.path.join(cwd, "frontend")
+            if os.path.exists(frontend_dir) and not allow_soft:
+                code_files = []
+                for root, _, files in os.walk(os.path.join(frontend_dir, "src")):
+                    for f in files:
+                        if f.endswith(('.tsx', '.jsx', '.css')):
+                            code_files.append(os.path.join(root, f))
+                
+                has_font = False
+                has_responsive = False
+                has_motion = False
+                for cfp in code_files:
+                    try:
+                        with open(cfp, "r", encoding="utf-8") as cf:
+                            content = cf.read()
+                        if "fonts.googleapis.com" in content or "next/font" in content or "Outfit" in content or "Inter" in content:
+                            has_font = True
+                        if "md:" in content or "lg:" in content or "@media" in content:
+                            has_responsive = True
+                        if "framer-motion" in content or "motion." in content or "transition" in content:
+                            has_motion = True
+                    except Exception:
+                        pass
+                
+                if code_files and not has_font:
+                    errors.append("INTEGRATION verification failed: Frontend code lacks Google Fonts / professional typography imports ('next/font', 'Outfit', or 'Inter').")
+                if code_files and not has_responsive:
+                    errors.append("INTEGRATION verification failed: Frontend code lacks responsive layout breakpoints ('md:', 'lg:', or '@media').")
 
         elif current_phase == "QA":
             artifacts.append(EvidenceArtifact(current_phase, "test_receipt", cwd, True))
