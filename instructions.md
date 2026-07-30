@@ -206,6 +206,15 @@ For every User Role (`Admin`, `Faculty`, `Student`, `Public`) identified in clie
 * `EvidenceVerifier.verify_phase("DESIGN")` verifies that `.agents/role_interaction_matrix.json` exists on disk and links every User Role to its corresponding API endpoints, DB entities, and Frontend components.
 * If missing or uncoupled, `verify_phase("DESIGN")` **FAILS WITH A HARD VERIFICATION ERROR**, blocking progress to `DEBATE` or `TASK_COMPILATION`.
 
+## 21. Mid-Flight Scope Pivot Mandate (New Plan -> Mandatory State Reset)
+
+Whenever the user introduces a new plan, requirement update, or major feature addition while an FSM session is active, the agent is **STRICTLY FORBIDDEN** from skipping phases or writing ad-hoc code in the current state:
+
+### Mid-Flight Pivot Directives:
+1. **Mandatory State Re-Initialization:** The parent agent MUST immediately call `runtime.initialize_state(goal=new_plan)` or `runtime.reset_to_triage(goal=new_plan)`.
+2. **Re-Execute Planning Lifecycle:** The reset forces the system to execute the full SDLC lifecycle for the new plan: `TRIAGE` ➔ `ANALYSIS` ➔ `DESIGN` (3-tier blueprints) ➔ `DEBATE` ➔ `TASK_COMPILATION` before any builder subagent writes code for the new plan.
+3. **Zero Shortcut Bypass:** Bypassing architectural design, debate, or task compilation when a new plan is introduced is classified as a governance violation.
+
 
 
 

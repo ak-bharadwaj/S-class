@@ -473,16 +473,45 @@ def initialize_state(workspace_dir: Optional[str] = None, goal: Optional[str] = 
     plan = MetaPlanner.classify_goal(goal or "", profile)
 
     with FileLock(lock_file):
-        if os.path.exists(state_file):
+        if os.path.exists(state_file) and not goal:
             return
         
+        # If state_file exists and a new goal is provided, re-initialize to TRIAGE
+        prev_spec_version = 1
+        if os.path.exists(state_file):
+            try:
+                existing_dict = load_json(state_file)
+                prev_spec_version = existing_dict.get("currentSpecVersion", 1) + 1
+            except Exception:
+                pass
+        
+        # Archive old evidence artifacts for clean spec versioning
+        if prev_spec_version > 1:
+            archive_dir = os.path.join(state_dir, f"archive_v{prev_spec_version - 1}")
+            os.makedirs(archive_dir, exist_ok=True)
+            for fname in ["design_blueprint.json", "design_blueprint.md", "role_interaction_matrix.json", "role_interaction_matrix.md", "output_evidence_pack.json"]:
+                fpath = os.path.join(state_dir, fname)
+                if os.path.exists(fpath):
+                    try:
+                        import shutil
+                        shutil.move(fpath, os.path.join(archive_dir, fname))
+                    except Exception:
+                        pass
+            ss_dir = os.path.join(state_dir, "screenshots")
+            if os.path.exists(ss_dir):
+                try:
+                    import shutil
+                    shutil.move(ss_dir, os.path.join(archive_dir, "screenshots"))
+                except Exception:
+                    pass
+
         state_dict = {
             "taskId": str(uuid.uuid4()),
             "currentPhase": "TRIAGE",
             "activeEvent": None,
             "workflowProfile": plan.profile.value,
             "planRationale": plan.rationale,
-            "currentSpecVersion": 1,
+            "currentSpecVersion": prev_spec_version,
             "currentDebateVersion": 0,
             "currentTaskVersion": 0,
             "retryCount": 0,
