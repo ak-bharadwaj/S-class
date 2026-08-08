@@ -227,11 +227,16 @@ S-Class EOS strictly forbids sparse, empty, or unpopulated frontend layouts. Bui
 2. **High-Density Seed Data Population:** Data lists, tables, and card grids MUST be populated with realistic, high-density seed data (minimum 5-10 records per view). Sparse 1-item screens are strictly forbidden.
 3. **Interactive Search & Filter Toolbars:** Every data-driven screen MUST include a search input field, category filter chips, role dropdowns, and sorting controls.
 4. **Visual Data Visualization Graphs:** Dashboards MUST render SVG / Chart data visualizations (e.g. attendance trends over time, grade distribution bar charts).
-5. **Polished Empty-State Fallbacks:** If a view contains no data, it MUST render a frosted glass empty-state component complete with an SVG illustration, descriptive title, guidance text, and a primary CTA action button—never a blank empty void!
+## 23. Pre-Flight Spec Grilling & Crash-Safe Plan Red-Teaming Rule
 
+Inspired by Meta AI's heavy benchmark engineering, S-Class EOS strictly forbids jumping into code generation without pre-flight plan red-teaming:
 
-
-
-
-
-
+### Mandatory Plan Grilling Protocol (`sclass_grill.py`):
+1. **Pre-Flight Red-Teaming Gate (`DEBATE` Phase):** Prior to transitioning from `DEBATE` to `TASK_COMPILATION` or `CODING`, `sclass_grill.py` MUST evaluate the specification against 5 heavy benchmark threat vectors:
+   - **Concurrency & Race Conditions:** Verify fast double-clicks, async loading states, and atomic DB transactions.
+   - **Database Schema Integrity:** Verify foreign key constraints, migration fallbacks, and indexed join columns.
+   - **UI Null & Undefined Safety:** Verify try/catch error boundaries, empty-state fallback components, and zero `[object Object]` text.
+   - **API Route Signature Completeness:** Verify explicit HTTP methods, DTO request schemas, and endpoint contracts.
+   - **Security Input Injection & Auth Guards:** Verify Zod/Pydantic input validation and authentication route guards.
+2. **Grill Receipt Persistence:** Write evaluation results to `.agents/grill_report.json`. If ANY critical defect is found, code generation is **HARD-BLOCKED** until remediated.
+3. **Crash-Safe Append-Only Event Log:** All kernel state transitions and grill receipts are committed to `.agents/event_store.jsonl` for deterministic resume capability.

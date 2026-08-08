@@ -74,6 +74,18 @@ def qa_workspace(tmp_path):
     with open(os.path.join(state_dir, "lighthouse_audit.json"), "w", encoding="utf-8") as f:
         json.dump({"accessibility": 95, "seo": 90, "best-practices": 95}, f)
         
+    # Create clean User Flow Receipts
+    with open(os.path.join(state_dir, "user_flow_receipts.json"), "w", encoding="utf-8") as f:
+        json.dump({
+            "flows": [
+                {
+                    "flow_id": "create_student_flow",
+                    "input_rendered_on_screen": True,
+                    "passed": True
+                }
+            ]
+        }, f)
+
     return workspace, state_dir
 
 def test_robust_qa_verification_success(qa_workspace):

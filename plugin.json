@@ -1,7 +1,7 @@
 {
   "id": "sclass-v5",
   "name": "S-Class Engineering Pipeline",
-  "version": "7.0.0",
+  "version": "11.0.0",
   "author": "ak-bharadwaj",
   "description": "S-Class SDK: Pluggable workflow runtime engine for multi-agent software engineering, research, and startup execution featuring an 11-state FSM.",
   "supports": [

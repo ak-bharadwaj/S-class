@@ -262,6 +262,28 @@ class EvidenceVerifier:
             if os.path.exists(frontend_dir) and not allow_soft:
                 dom_actions_performed = False
 
+        # Audit Live Input-to-Output User Flow Receipts (.agents/user_flow_receipts.json)
+        user_flow_receipts_file = os.path.join(state_dir, "user_flow_receipts.json")
+        missing_user_flow_receipts = False
+        unrendered_input_flow_detected = False
+        if os.path.exists(os.path.join(cwd, "frontend")) and not allow_soft:
+            if not os.path.exists(user_flow_receipts_file):
+                missing_user_flow_receipts = True
+            else:
+                try:
+                    with open(user_flow_receipts_file, "r", encoding="utf-8") as uff:
+                        uf_data = json.load(uff)
+                    flows_list = uf_data if isinstance(uf_data, list) else uf_data.get("flows", [])
+                    if not flows_list:
+                        missing_user_flow_receipts = True
+                    for flow in flows_list:
+                        if isinstance(flow, dict):
+                            if not flow.get("input_rendered_on_screen", True) or flow.get("passed") is False:
+                                unrendered_input_flow_detected = True
+                                break
+                except Exception:
+                    missing_user_flow_receipts = True
+
         # Audit Console Log Errors & Fabricated logs
         console_audit_file = os.path.join(state_dir, "console_audit.json")
         console_error_found = False
@@ -321,6 +343,14 @@ class EvidenceVerifier:
         dom_sanity_failed = False
         bad_token_found = ""
         missing_snapshots = False
+        FORBIDDEN_DOM_TOKENS = [
+            "undefined", "NaN", "[object Object]",
+            "500 Internal Server Error", "404 Not Found",
+            "Unhandled Runtime Error", "TypeError:", "Failed to fetch",
+            "Network Error", "Connection Refused", "Error: ",
+            "Something went wrong", "Uncaught Exception", "Uncaught Error",
+            "Application error: a client-side exception occurred"
+        ]
         if os.path.exists(snapshots_dir):
             files = [f for f in os.listdir(snapshots_dir) if f.endswith(('.txt', '.html', '.json'))]
             if not files and os.path.exists(os.path.join(cwd, "frontend")):
@@ -330,7 +360,7 @@ class EvidenceVerifier:
                 try:
                     with open(fp, "r", encoding="utf-8") as sf:
                         snapshot_text = sf.read()
-                    for token in ["undefined", "NaN", "[object Object]"]:
+                    for token in FORBIDDEN_DOM_TOKENS:
                         if token in snapshot_text:
                             dom_sanity_failed = True
                             bad_token_found = token
@@ -394,6 +424,12 @@ class EvidenceVerifier:
         if low_lh_score and not allow_soft:
             errors.append(f"QA verification failed: Lighthouse Accessibility score too low ({lh_score_val} < 50). UI layout must meet accessibility standards.")
             
+        if missing_user_flow_receipts and not allow_soft:
+            errors.append("QA verification failed: USER PROXY FLOW VERIFICATION MISSING! User Proxy (dss_user_alias_v2) MUST examine the live website by submitting input data (forms) and verifying that the submitted output visually renders in screen views. Log flow receipts in '.agents/user_flow_receipts.json'.")
+
+        if unrendered_input_flow_detected and not allow_soft:
+            errors.append("QA verification failed: UNRENDERED INPUT DATA DETECTED ON SCREEN! A submitted user form accepted data on the backend but failed to visually render the created record on the live screen UI.")
+
         if invalid_receipt_schema and not allow_soft:
             errors.append("QA verification failed: Malformed interaction receipts file (interaction_receipts.json). Check that interaction receipts match the required schema format.")
         
@@ -502,6 +538,16 @@ class EvidenceVerifier:
                     artifacts.append(EvidenceArtifact(current_phase, "decision_log", state_file, has_decisions, {"count": len(decisions)}))
                     if not has_decisions:
                         errors.append(f"{current_phase} verification failed: No decision log entries recorded.")
+                    
+                    # Run Meta-style Spec Grilling & Plan Red-Teaming Engine
+                    try:
+                        from sclass_grill import SpecGrillerEngine
+                        grill_report = SpecGrillerEngine.grill_specification(workspace_dir=cwd)
+                        artifacts.append(EvidenceArtifact(current_phase, "grill_report", os.path.join(state_dir, "grill_report.json"), grill_report.overall_passed or allow_soft))
+                        if not grill_report.overall_passed and not allow_soft:
+                            errors.append(f"DEBATE verification failed: Spec Griller found {grill_report.critical_defects_found} critical red-teaming defect(s). Resolve plan risks in .agents/grill_report.json before coding.")
+                    except Exception as ge:
+                        logger.warning(f"[Verifier] SpecGriller audit warning: {ge}")
                 except Exception as e:
                     errors.append(f"{current_phase} verification failed: Corrupt state file: {e}")
             else:
@@ -747,7 +793,11 @@ class WebUiVerifierPlugin(BaseVerifierPlugin):
         semantic_reqs = getattr(spec, "semantic_requirements", []) if spec else []
         interactions = getattr(spec, "expected_interactions", []) if spec else []
         must_exist = getattr(spec, "must_exist", []) if spec else []
-        default_must_not = ["undefined", "NaN", "null", "[object Object]", "TODO", "Lorem Ipsum", "Debug", "Stack trace", "Console Error"]
+        default_must_not = [
+            "undefined", "NaN", "null", "[object Object]", "TODO", "Lorem Ipsum", "Debug", "Stack trace", "Console Error",
+            "500 Internal Server Error", "404 Not Found", "Unhandled Runtime Error", "TypeError:", "Failed to fetch",
+            "Network Error", "Connection Refused", "Something went wrong", "Uncaught Exception", "Uncaught Error"
+        ]
         must_not_exist = getattr(spec, "must_not_exist", default_must_not) if spec else default_must_not
 
         screenshots_dir = os.path.join(state_dir, "screenshots")
