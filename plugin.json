@@ -14,7 +14,10 @@
   "executionModes": [
     "human",
     "assisted",
-    "goal"
+    "goal",
+    "grill",
+    "inquire",
+    "doubt"
   ],
   "loopModes": [
     "closed-loop",
