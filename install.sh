@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# S-Class V11.0 SDK Installer for Linux/macOS
+# S-Class V11.1 SDK Installer for Linux/macOS
 # Run: curl -fsSL https://raw.githubusercontent.com/ak-bharadwaj/S-class/master/install.sh | bash
 
 PLUGIN_ROOT="$HOME/.gemini/config/plugins"
@@ -14,11 +14,11 @@ fi
 
 # Clone or pull updates
 if [ -d "$PLUGIN_DIR" ]; then
-    echo "Updating S-Class V11.0 SDK..."
+    echo "Updating S-Class V11.1 SDK..."
     git -C "$PLUGIN_DIR" pull
 else
-    echo "Cloning S-Class V11.0 SDK..."
+    echo "Cloning S-Class V11.1 SDK..."
     git clone https://github.com/ak-bharadwaj/S-class.git "$PLUGIN_DIR"
 fi
 
-echo "S-Class V11.0 installation complete! Plugin active at $PLUGIN_DIR"
+echo "S-Class V11.1 installation complete! Plugin active at $PLUGIN_DIR"
