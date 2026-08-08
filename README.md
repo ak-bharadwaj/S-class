@@ -213,4 +213,4 @@ S-Class contains **73 automated unit and benchmark tests** passing with 100% suc
 ---
 
 ## License
-S-Class is released under the [MIT License](LICENSE).
+S-Class is Proprietary Software. All Rights Reserved (c) 2026 ak-bharadwaj. Access and usage are strictly restricted to authorized users. See [LICENSE](LICENSE).
