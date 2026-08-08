@@ -250,3 +250,13 @@ Whenever the user asks a question, clarifies a doubt, or requests an explanation
 2. **Read-Only Inspection Tools:** To answer user doubts about active code, architecture, or project status, the agent MUST use read-only inspection tools (`view_file`, `grep_search`, `list_dir`, `runtime.get_state()`) or delegate research to the read-only `research` subagent.
 3. **Concurrent Background Execution:** Background subagents (`dss_builder_v2`, `dss_qa_v2`) continue executing active tasks in parallel, while the parent agent immediately answers the user's doubt in chat.
 4. **Dual Response Pattern:** The response provides a direct, technical answer to the user's doubt followed by a 1-line status update on the ongoing background FSM task.
+
+## 25. Isolated Runtime Workspace & Project-Centric README Mandate
+
+S-Class EOS runtime metadata MUST stay completely isolated from the target user project, and project documentation MUST focus 100% on the user's application:
+
+### Mandatory Workspace Isolation & Clean Readme Protocol:
+1. **Isolated Runtime Metadata (.agents/ Aside Directory):** All S-Class state files (`orchestration_state.json`), event logs (`event_store.jsonl`), screenshots, snapshots, interaction receipts, and grill reports MUST be saved exclusively inside `.agents/` (a hidden aside folder). S-Class runtime metadata files MUST NOT clutter or pollute the main project source tree (`src/`, `components/`, `app/`, `api/`).
+2. **Project-Centric README.md (Zero S-Class Branding in Project Docs):** The target project's `README.md` MUST be 100% focused on the **User's Application** (Project Description, Key Features, Tech Stack, Setup Instructions, API Routes, How to Run Locally).
+3. **Strict S-Class Name Exclusion:** Project `README.md` MUST **NEVER** mention S-Class plugin names, pipeline rules, S-Class FSM state machines, or agent framework internal branding.
+4. **Clean Merge Release Gate:** Intermediate code builds and experimental branches remain isolated until the RELEASE phase confirms 100% evidence verification, merging only clean production code into the primary project branch.
