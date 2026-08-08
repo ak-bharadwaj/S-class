@@ -572,6 +572,20 @@ class EvidenceVerifier:
 
         elif current_phase == "INTEGRATION":
             artifacts.append(EvidenceArtifact(current_phase, "build_check", cwd, True))
+            
+            # S-Class V12 Automated Dependency Resolution & Zero-Infra DB Guard
+            try:
+                from ast_dependency_resolver import ASTDependencyResolver
+                from zero_infra_db import ZeroInfraDbEngine
+                dep_res = ASTDependencyResolver.resolve_workspace_dependencies(workspace_dir=cwd)
+                db_res = ZeroInfraDbEngine.audit_and_fallback_database(workspace_dir=cwd)
+                if dep_res.get("npm_packages_injected"):
+                    logger.info(f"[Verifier] Auto-injected missing NPM packages: {dep_res['npm_packages_injected']}")
+                if db_res.get("fallbacks_applied"):
+                    logger.info(f"[Verifier] Auto-injected Zero-Infra DB fallbacks: {db_res['fallbacks_applied']}")
+            except Exception as ex:
+                logger.warning(f"[Verifier] S-Class V12 resolution engine warning: {ex}")
+
             # Programmatic Frontend AST / Code Quality Verification
             frontend_dir = os.path.join(cwd, "frontend")
             if os.path.exists(frontend_dir) and not allow_soft:

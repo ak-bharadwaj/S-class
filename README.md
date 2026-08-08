@@ -1,4 +1,4 @@
-# S-Class V11.1: The Deterministic AI Runtime & Safety-Case Engine
+# S-Class V12.0: The Deterministic AI Runtime & Safety-Case Engine
 
 > **Plug-and-play AI execution microkernel that stops AI agent drift, eliminates broken UIs, and enforces multi-page visual evidence verification.**
 
@@ -105,7 +105,7 @@ print(f"Rationale: {verdict.rationale}")
 
 ## Why S-Class EOS? (The Core Advantage)
 
-| Without S-Class | With S-Class V11.1 |
+| Without S-Class | With S-Class V12.0 |
 | :--- | :--- |
 | **Direct State Mutation:** Agents edit files and state without formal validation, causing silent corruption. | **Exclusive Kernel Mutator:** Only the deterministic `sclass_kernel.py` can write state changes to disk. Parent direct edits forbidden (Rule 17). |
 | **Prompt Self-Verification:** Completion is self-reported by LLM prompts ("I fixed it!"). | **Safety Case Evidence Gate:** Release requires complete body of evidence (Build ✓, Tests ✓, Security ✓, Output Evidence ✓, Coverage ≥ 85% ✓). |
@@ -118,7 +118,7 @@ print(f"Rationale: {verdict.rationale}")
 
 ## Framework Architectural Comparison
 
-| Architectural Layer | OpenHands | Claude Code | Codex / Generic Agents | **S-Class V11.1 (Deterministic AI Runtime)** |
+| Architectural Layer | OpenHands | Claude Code | Codex / Generic Agents | **S-Class V12.0 (Deterministic AI Runtime)** |
 | :--- | :--- | :--- | :--- | :--- |
 | **System Philosophy** | Sandbox Harness | CLI Agent Loop | Prompt Execution Loop | **Deterministic Microkernel & Safety Case Engine** |
 | **State Mutation Guard** | File System Writes | File System Writes | File System Writes | **✅ Exclusive Kernel Mutator (`sclass_kernel.py`)** |

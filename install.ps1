@@ -1,4 +1,4 @@
-# S-Class V11.1 Plugin Installer for Windows PowerShell
+# S-Class V12.0 Plugin Installer for Windows PowerShell
 # Run: iex (irm -useb https://raw.githubusercontent.com/ak-bharadwaj/S-class/master/install.ps1)
 
 $PluginRoot = "$Home\.gemini\config\plugins"
@@ -9,11 +9,11 @@ if (-not (Test-Path $PluginRoot)) {
 }
 
 if (Test-Path $PluginDir) {
-    Write-Host "Updating S-Class V11.1 Engineering Pipeline Plugin..." -ForegroundColor Green
+    Write-Host "Updating S-Class V12.0 Engineering Pipeline Plugin..." -ForegroundColor Green
     git -C "$PluginDir" pull
 } else {
-    Write-Host "Cloning S-Class V11.1 Engineering Pipeline Plugin..." -ForegroundColor Green
+    Write-Host "Cloning S-Class V12.0 Engineering Pipeline Plugin..." -ForegroundColor Green
     git clone https://github.com/ak-bharadwaj/S-class.git "$PluginDir"
 }
 
-Write-Host "S-Class V11.1 installation complete! Plugin active at $PluginDir" -ForegroundColor Green
+Write-Host "S-Class V12.0 installation complete! Plugin active at $PluginDir" -ForegroundColor Green
