@@ -240,3 +240,13 @@ Inspired by Meta AI's heavy benchmark engineering, S-Class EOS strictly forbids 
    - **Security Input Injection & Auth Guards:** Verify Zod/Pydantic input validation and authentication route guards.
 2. **Grill Receipt Persistence:** Write evaluation results to `.agents/grill_report.json`. If ANY critical defect is found, code generation is **HARD-BLOCKED** until remediated.
 3. **Crash-Safe Append-Only Event Log:** All kernel state transitions and grill receipts are committed to `.agents/event_store.jsonl` for deterministic resume capability.
+
+## 24. Non-Interrupting Inquiry & Concurrent Doubt Channel Rule
+
+Whenever the user asks a question, clarifies a doubt, or requests an explanation while an FSM task or background subagent loop is active, the agent MUST process the inquiry WITHOUT interrupting or resetting the main task state:
+
+### Non-Interrupting Inquiry Protocol:
+1. **Zero FSM State Reset:** Answering user questions or clarifying doubts MUST NOT call `runtime.reset_to_triage()` or trigger state transitions that disrupt ongoing `CODING`, `BUILDING`, or `QA` execution threads.
+2. **Read-Only Inspection Tools:** To answer user doubts about active code, architecture, or project status, the agent MUST use read-only inspection tools (`view_file`, `grep_search`, `list_dir`, `runtime.get_state()`) or delegate research to the read-only `research` subagent.
+3. **Concurrent Background Execution:** Background subagents (`dss_builder_v2`, `dss_qa_v2`) continue executing active tasks in parallel, while the parent agent immediately answers the user's doubt in chat.
+4. **Dual Response Pattern:** The response provides a direct, technical answer to the user's doubt followed by a 1-line status update on the ongoing background FSM task.
