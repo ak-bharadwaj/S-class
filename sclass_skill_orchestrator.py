@@ -185,6 +185,33 @@ class SkillTaxonomy:
             technologies=["React Doctor", "AST Linting", "Hook Dependency Inspector"],
             default_active=True
         ),
+        "react-doctor-performance": SkillDefinition(
+            id="react-doctor-performance",
+            name="React Doctor Performance Profiler",
+            tier="quality",
+            purpose="Profiles component render durations, memoization bounds, and Virtual DOM reflow budgets.",
+            rule_guideline="Ensure zero unneeded component re-renders during high-frequency user input events.",
+            technologies=["React Profiler API", "Render Budget"],
+            default_active=True
+        ),
+        "react-doctor-memory": SkillDefinition(
+            id="react-doctor-memory",
+            name="React Doctor Memory Leak Auditor",
+            tier="quality",
+            purpose="Audits uncleaned useEffect subscriptions, event listeners, and detached DOM nodes.",
+            rule_guideline="Ensure all subscriptions and timers are cleaned up in useEffect return functions.",
+            technologies=["Heap Snapshot", "Memory Leak Audit"],
+            default_active=True
+        ),
+        "react-doctor-a11y": SkillDefinition(
+            id="react-doctor-a11y",
+            name="React Doctor Accessibility & Focus Guard",
+            tier="quality",
+            purpose="Audits dynamic focus management, keyboard traps, and aria-expanded state sync.",
+            rule_guideline="Ensure all modals, drawers, and popovers trap focus and restore focus on dismiss.",
+            technologies=["A11y Tree", "Focus Management"],
+            default_active=True
+        ),
 
         # Tier 5 — ERP Domain Specific Skills
         "role-based-ux": SkillDefinition(
