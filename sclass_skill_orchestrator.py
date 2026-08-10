@@ -176,6 +176,15 @@ class SkillTaxonomy:
             technologies=["Chrome DevTools MCP", "PNG Header Audit"],
             default_active=True
         ),
+        "react-doctor": SkillDefinition(
+            id="react-doctor",
+            name="React Doctor Code Quality & Performance Audit",
+            tier="quality",
+            purpose="Audits React component trees for missing keys, unhooked re-renders, prop drilling, unmemoized functions, and hydration errors.",
+            rule_guideline="Run React Doctor checks before release; ensure zero missing array keys, zero hook dependency warnings, and zero unhandled re-render loops.",
+            technologies=["React Doctor", "AST Linting", "Hook Dependency Inspector"],
+            default_active=True
+        ),
 
         # Tier 5 — ERP Domain Specific Skills
         "role-based-ux": SkillDefinition(
