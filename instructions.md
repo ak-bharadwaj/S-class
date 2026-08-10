@@ -260,3 +260,30 @@ S-Class EOS runtime metadata MUST stay completely isolated from the target user 
 2. **Project-Centric README.md (Zero S-Class Branding in Project Docs):** The target project's `README.md` MUST be 100% focused on the **User's Application** (Project Description, Key Features, Tech Stack, Setup Instructions, API Routes, How to Run Locally).
 3. **Strict S-Class Name Exclusion:** Project `README.md` MUST **NEVER** mention S-Class plugin names, pipeline rules, S-Class FSM state machines, or agent framework internal branding.
 4. **Clean Merge Release Gate:** Intermediate code builds and experimental branches remain isolated until the RELEASE phase confirms 100% evidence verification, merging only clean production code into the primary project branch.
+
+## 26. Modular Frontend Skill Stack Orchestration Rule
+
+S-Class EOS strictly forbids dumping one giant "frontend skill" or monolithic prompt into agent calls. Instead, S-Class orchestrates a 23-skill modular frontend taxonomy across 5 architectural tiers (`FOUNDATION`, `INTERACTION`, `DATA`, `QUALITY`, `DOMAIN`):
+
+### Dynamic Skill Stack Protocol (`sclass_skill_orchestrator.py`):
+1. **No Monolithic Prompt Dumps:** Agents MUST NOT dump giant un-scoped UI prompt instructions. Skills MUST be dynamically resolved, activated, and injected based on current FSM phase (`DESIGN`, `CODING`, `QA`) and active screen route requirements.
+2. **Day-1 Core Skill Stack (8 Core Skills):**
+   - `frontend-design`: Visual direction & composition (Anthropic official).
+   - `ux-architecture`: Information architecture & user workflows.
+   - `design-system`: Tokens, component patterns, and UI consistency (`ui-ux-pro-max`).
+   - `motion-design`: State-communicating motion & spring physics (*Motion communicates state, hierarchy, or spatial continuity—never animate randomly*).
+   - `data-visualization`: Charting intelligence for attendance trends, SGPA/CGPA marks, and faculty workload (Recharts/Nivo/SVG).
+   - `responsive-design`: Desktop (`1920x1080` multi-column grid) vs Mobile (`390x844` single-column stack with 48px tap targets).
+   - `frontend-engineering`: React 18 / Next.js 14 App Router modular component architecture.
+   - `visual-qa`: Chrome DevTools MCP visual inspection & DOM sanitization.
+3. **ERP Domain Skill Stack (5 Specialist Skills):**
+   - `role-based-ux`: Role-tailored dashboards (`STUDENT`, `FACULTY`, `HOD`, `ADMIN`).
+   - `academic-workflows`: Institutional semester, section, subject allocation, marks, and regulation (R22) domain rules.
+   - `approval-workflows`: Multi-tier approval status timelines (`Student Request` ➔ `Faculty` ➔ `Coordinator` ➔ `HOD`).
+   - `data-dense-ui`: Enterprise data tables with sorting, multi-column filtering, pagination, bulk actions, and inline editing.
+   - `command-search`: `⌘/Ctrl+K` global command palette for instant student/faculty/timetable lookups.
+4. **Conditional Tier-2 Activation Rule:**
+   - `scroll-experience`: Activate ONLY when page requires sticky section navigation or contextual disclosure (ERP rule: *scroll = navigation + contextual info*, NOT marketing parallax).
+   - `3d-webgl`: Activate ONLY when structural visualization is explicitly required (e.g. course dependency graph, lab map, department structure)—**NEVER render spinning 3D objects beside data tables**.
+   - `creative-interaction`: Activate for tactile hover previews, expandable card surfaces, and drag-and-drop handles.
+```

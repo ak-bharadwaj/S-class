@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚡ S-CLASS EOS V12.0
+# ⚡ S-CLASS EOS V12.1
 ### The Deterministic AI Systems Runtime & Safety-Case Engine
 
 *Enterprise-grade execution microkernel that eliminates AI agent drift, blocks broken UI releases, and enforces multi-page visual evidence verification.*
