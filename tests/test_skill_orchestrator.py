@@ -23,6 +23,10 @@ class TestSkillOrchestrator(unittest.TestCase):
         self.assertIn("emil-apple-design", SkillTaxonomy.SKILLS)
         self.assertIn("emil-ask-sonner", SkillTaxonomy.SKILLS)
         self.assertIn("react-doctor", SkillTaxonomy.SKILLS)
+        self.assertIn("zod-pydantic-contract", SkillTaxonomy.SKILLS)
+        self.assertIn("auth-jwt-rbac", SkillTaxonomy.SKILLS)
+        self.assertIn("prisma-drizzle-orm", SkillTaxonomy.SKILLS)
+        self.assertIn("ci-cd-docker-deploy", SkillTaxonomy.SKILLS)
 
     def test_resolve_default_skills_in_coding_phase(self):
         skills = SClassSkillOrchestrator.resolve_active_skills(

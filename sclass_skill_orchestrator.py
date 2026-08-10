@@ -242,6 +242,82 @@ class SkillTaxonomy:
             default_active=True
         ),
 
+        # Tier 9 — Enterprise Full-Stack, Security, & Infrastructure Skills
+        "zod-pydantic-contract": SkillDefinition(
+            id="zod-pydantic-contract",
+            name="Type-Safe API Contract & Schema Matching",
+            tier="data",
+            purpose="Generates matching Zod schemas on frontend and Pydantic/TypeScript DTOs on backend to eliminate runtime API mismatch.",
+            rule_guideline="Every API route MUST share strict input validation schemas (Zod on client, Pydantic/DTO on server).",
+            technologies=["Zod", "Pydantic", "TypeScript DTOs"],
+            default_active=True
+        ),
+        "prisma-drizzle-orm": SkillDefinition(
+            id="prisma-drizzle-orm",
+            name="Production Relational ORM & Migration Engine",
+            tier="domain",
+            purpose="Enforces relational foreign keys, indexing, cascade rules, connection pooling, and zero-loss migrations.",
+            rule_guideline="Always include explicit indexes on foreign key columns and write idempotent migration scripts.",
+            technologies=["Prisma", "Drizzle ORM", "SQLAlchemy", "TypeORM"],
+            default_active=True
+        ),
+        "auth-jwt-rbac": SkillDefinition(
+            id="auth-jwt-rbac",
+            name="Production Auth, JWT Rotation & RBAC Middleware",
+            tier="domain",
+            purpose="Implements access/refresh token rotation, HTTP-only cookies, bcrypt/argon2 hashing, and role-based route guards.",
+            rule_guideline="Protect all non-public backend controllers with JWT authentication guards and server-side RBAC checks.",
+            technologies=["JWT", "NextAuth", "Passport.js", "argon2/bcrypt"],
+            default_active=True
+        ),
+        "stripe-payment-checkout": SkillDefinition(
+            id="stripe-payment-checkout",
+            name="Stripe Payment, Subscription & Webhook Architecture",
+            tier="domain",
+            purpose="Handles Stripe Checkout sessions, multi-tier subscription billing, webhook signature verification, and billing portals.",
+            rule_guideline="Verify raw request signature headers on Stripe webhooks and handle asynchronous payment events.",
+            technologies=["Stripe API", "Stripe Webhooks", "Billing Portals"],
+            default_active=False,
+            conditional_keywords=["stripe", "payment", "billing", "subscription", "checkout"]
+        ),
+        "file-upload-storage": SkillDefinition(
+            id="file-upload-storage",
+            name="Secure Multi-Part File Upload & Storage Engine",
+            tier="domain",
+            purpose="Manages image/document uploads, MIME-type validation, size limits, and AWS S3 / local storage signed URLs.",
+            rule_guideline="Validate file extensions and MIME headers on the server side before persisting files.",
+            technologies=["Multer", "AWS S3", "Signed URLs", "File Sanitization"],
+            default_active=True
+        ),
+        "realtime-websockets": SkillDefinition(
+            id="realtime-websockets",
+            name="Realtime Event Feeds & WebSockets Engine",
+            tier="interaction",
+            purpose="Delivers real-time notifications, live activity feeds, chat streams, and state synchronization.",
+            rule_guideline="Use Socket.io or Server-Sent Events (SSE) for live dashboard metric updates and notification badges.",
+            technologies=["Socket.io", "Server-Sent Events", "WebSockets"],
+            default_active=False,
+            conditional_keywords=["realtime", "websocket", "socket", "live feed", "chat stream"]
+        ),
+        "ci-cd-docker-deploy": SkillDefinition(
+            id="ci-cd-docker-deploy",
+            name="Containerization, Docker & Deployment Pipelines",
+            tier="quality",
+            purpose="Generates multi-stage Dockerfiles, Docker Compose setups, Vercel/Railway config, and CI/CD GitHub Actions.",
+            rule_guideline="Build lightweight multi-stage Docker images and include healthcheck endpoints.",
+            technologies=["Docker", "Docker Compose", "GitHub Actions", "Vercel"],
+            default_active=True
+        ),
+        "dark-mode-theme-system": SkillDefinition(
+            id="dark-mode-theme-system",
+            name="Seamless Dark/Light Mode Theme Architecture",
+            tier="foundation",
+            purpose="Handles system color scheme detection, CSS variable theme toggles, and zero-FOUC theme persistence.",
+            rule_guideline="Use next-themes or CSS variable tokens to support instant Dark/Light mode switching without layout flash.",
+            technologies=["next-themes", "CSS Variables", "Tailwind Dark Mode"],
+            default_active=True
+        ),
+
         # Tier 6 — Paul Bakaus Impeccable Skill Suite (35 Playbooks)
         "impeccable-craft": SkillDefinition(
             id="impeccable-craft",
