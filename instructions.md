@@ -312,3 +312,20 @@ Whenever S-Class invokes or coordinates background subagents (`dss_frontend_dev`
    - Current Status (`🚀 LAUNCHED`, `⚡ RUNNING`, `✅ COMPLETED`)
 2. **Transparent Progress Updates:** When subagents report back or emit log notifications, the agent MUST summarize their exact findings and audit reports concisely in chat, showing the user that multi-agent execution occurred.
 3. **Receipt Trail:** Save subagent deployment receipts to `.agents/subagent_deployment_log.json`.
+
+## 29. Mandatory Full 8-Subagent Concurrent Dispatch & Dynamic Skill Binding Protocol
+
+S-Class EOS strictly forbids partial or single-agent shortcuts on complex projects. During the multi-agent `DEBATE`, `CODING`, and `QA` phases, S-Class MUST dispatch **ALL 8 Defined Subagents Concurrently**:
+
+### Full 8-Subagent Concurrent Dispatch Protocol (`sclass_subagent_registry.py`):
+1. **Concurrent Dispatch Matrix (All 8 Active Specialists):**
+   - **`dss_governor` (Lead Governance Architect):** Debate Chair & Architectural Reviewer (`impeccable-craft`, `ux-architecture`).
+   - **`dss_ui_ux` (UI/UX Aesthetic Specialist):** Visual Direction & Taste Designer (`frontend-design`, `taste-aesthetic`, `taste-soft`).
+   - **`dss_frontend_dev` (Frontend Architect):** Client-Side Component & State Builder (`frontend-engineering`, `emil-apple-design`, `data-dense-ui`).
+   - **`dss_backend_dev` (Backend Controller Architect):** Server-Side API Builder (`impeccable-harden`, `zero-infra-db`, `ast-dependency-resolver`).
+   - **`dss_db_architect` (Relational DB Architect):** Schema & Migration Specialist (`academic-workflows`, `approval-workflows`).
+   - **`dss_cso_v2` (Chief Security Officer):** Auth Guards & Security Inspector (`impeccable-harden`, `security-shield`).
+   - **`dss_qa_frontend` (Visual QA Specialist):** Browser Inspector & DOM Error Sanitizer (`visual-qa`, `impeccable-critique`).
+   - **`dss_user_alias_v2` (User Proxy Verifier):** Interactive User Flow Receipt Sign-Off (`responsive-design`, `role-based-ux`).
+2. **Equipped Skill Discovery Engine (`find-skill`):** Every subagent is equipped with `SkillDiscoveryEngine` (`find-skill`). If any subagent requires additional specialized skills during execution, it MUST dynamically discover and bind them.
+3. **Concurrent Execution:** All 8 subagents run in parallel via `invoke_subagent` and report back to the main agent controller.
