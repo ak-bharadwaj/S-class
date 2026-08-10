@@ -465,6 +465,344 @@ class SkillTaxonomy:
             source_repo="emilkowalski/skills",
             reference_playbook=os.path.join(EMIL_REF, "pick-ui-library", "SKILL.md"),
             default_active=True
+        ),
+        "emil-animate": SkillDefinition(
+            id="emil-animate",
+            name="Emil Kowalski Animation Recipes",
+            tier="emil",
+            purpose="Applies production-grade micro-interaction recipes for modals, tabs, and lists.",
+            rule_guideline="Use Framer Motion spring physics and layout animations for UI state transitions.",
+            technologies=["Framer Motion", "CSS Keyframes"],
+            source_repo="emilkowalski/skills",
+            reference_playbook=os.path.join(EMIL_REF, "animate", "SKILL.md"),
+            default_active=True
+        ),
+        "emil-animation-vocabulary": SkillDefinition(
+            id="emil-animation-vocabulary",
+            name="Emil Animation Vocabulary & Timing Curves",
+            tier="emil",
+            purpose="Establishes motion vocabulary, easing functions, and duration guidelines.",
+            rule_guideline="Use consistent duration (150ms - 300ms) and spring stiffness/damping pairs.",
+            technologies=["Cubic Bezier", "Spring Physics"],
+            source_repo="emilkowalski/skills",
+            reference_playbook=os.path.join(EMIL_REF, "animation-vocabulary", "SKILL.md"),
+            default_active=True
+        ),
+        "emil-prototype": SkillDefinition(
+            id="emil-prototype",
+            name="Emil Rapid Prototyping & Motion Sandbox",
+            tier="emil",
+            purpose="Enables rapid iteration on complex micro-interactions before production deployment.",
+            rule_guideline="Test layout transforms in isolated component sandboxes prior to merge.",
+            technologies=["Framer Sandbox", "Storybook"],
+            source_repo="emilkowalski/skills",
+            reference_playbook=os.path.join(EMIL_REF, "prototype", "SKILL.md"),
+            default_active=True
+        ),
+        "emil-review-animations": SkillDefinition(
+            id="emil-review-animations",
+            name="Emil Motion Review & Frame-Rate Audit",
+            tier="emil",
+            purpose="Audits UI animations for 60fps performance and layout reflow jank.",
+            rule_guideline="Ensure zero layout reflow during active transforms; use transform and opacity properties exclusively.",
+            technologies=["FPS Profiler", "Performance Timeline"],
+            source_repo="emilkowalski/skills",
+            reference_playbook=os.path.join(EMIL_REF, "review-animations", "SKILL.md"),
+            default_active=True
+        ),
+
+        # Impeccable Extended Suite
+        "impeccable-adapt-native": SkillDefinition(
+            id="impeccable-adapt-native",
+            name="Impeccable Native Platform Adaptation",
+            tier="impeccable",
+            purpose="Adapts web design systems to native iOS/Android design languages.",
+            rule_guideline="Respect platform navigation idioms and touch target guidelines.",
+            technologies=["React Native", "Tailwind Native"],
+            source_repo="pbakaus/impeccable",
+            default_active=True
+        ),
+        "impeccable-android": SkillDefinition(
+            id="impeccable-android",
+            name="Impeccable Android Material Design 3",
+            tier="impeccable",
+            purpose="Enforces Android Material You design guidelines.",
+            rule_guideline="Use Material You dynamic color tokens and elevation levels.",
+            technologies=["Material 3", "Android UI"],
+            source_repo="pbakaus/impeccable",
+            default_active=True
+        ),
+        "impeccable-ios": SkillDefinition(
+            id="impeccable-ios",
+            name="Impeccable iOS Human Interface Guidelines",
+            tier="impeccable",
+            purpose="Enforces Apple Human Interface Guidelines for iOS web apps.",
+            rule_guideline="Use SF Pro typography, translucent tab bars, and native spring physics.",
+            technologies=["iOS HIG", "Apple WebKit"],
+            source_repo="pbakaus/impeccable",
+            default_active=True
+        ),
+        "impeccable-animate": SkillDefinition(
+            id="impeccable-animate",
+            name="Impeccable Motion & Kinetic Direction",
+            tier="impeccable",
+            purpose="Coordinates macro page transitions and kinetic visual effects.",
+            rule_guideline="Ensure kinetic animations enhance user comprehension of spatial layout.",
+            technologies=["Framer Motion", "GSAP"],
+            source_repo="pbakaus/impeccable",
+            default_active=True
+        ),
+        "impeccable-clarify": SkillDefinition(
+            id="impeccable-clarify",
+            name="Impeccable Copywriting & Label Clarity",
+            tier="impeccable",
+            purpose="Refines button labels, error messages, and micro-copy for zero ambiguity.",
+            rule_guideline="Use active verbs and concise, plain language in all UI text.",
+            technologies=["Micro-copy Rules"],
+            source_repo="pbakaus/impeccable",
+            default_active=True
+        ),
+        "impeccable-colorize": SkillDefinition(
+            id="impeccable-colorize",
+            name="Impeccable Dynamic Palette Orchestrator",
+            tier="impeccable",
+            purpose="Generates accessible dynamic HSL color schemes.",
+            rule_guideline="Verify 4.5:1 text contrast ratios across dark and light surfaces.",
+            technologies=["HSL Color Space", "WCAG Contrast"],
+            source_repo="pbakaus/impeccable",
+            default_active=True
+        ),
+        "impeccable-delight": SkillDefinition(
+            id="impeccable-delight",
+            name="Impeccable Micro-Delight & Reward Moments",
+            tier="impeccable",
+            purpose="Adds subtle celebratory micro-animations on key user achievement milestones.",
+            rule_guideline="Trigger confetti or subtle badge scale effects on successful task completions.",
+            technologies=["Canvas Confetti", "Spring Badges"],
+            source_repo="pbakaus/impeccable",
+            default_active=True
+        ),
+        "impeccable-distill": SkillDefinition(
+            id="impeccable-distill",
+            name="Impeccable Visual Distillation",
+            tier="impeccable",
+            purpose="Strips unnecessary decorative elements to focus strictly on content.",
+            rule_guideline="Remove redundant lines, backgrounds, and badges; maximize signal-to-noise ratio.",
+            technologies=["Minimalist Craft"],
+            source_repo="pbakaus/impeccable",
+            default_active=True
+        ),
+        "impeccable-doctor": SkillDefinition(
+            id="impeccable-doctor",
+            name="Impeccable System Diagnostics",
+            tier="impeccable",
+            purpose="Audits design system compliance across all components.",
+            rule_guideline="Ensure zero unmapped CSS variables or broken design tokens.",
+            technologies=["Design Token Linter"],
+            source_repo="pbakaus/impeccable",
+            default_active=True
+        ),
+        "impeccable-document": SkillDefinition(
+            id="impeccable-document",
+            name="Impeccable Component Documentation",
+            tier="impeccable",
+            purpose="Generates clean Storybook and Markdown component documentation.",
+            rule_guideline="Document component props, usage examples, and accessibility guidelines.",
+            technologies=["Storybook", "Markdown AST"],
+            source_repo="pbakaus/impeccable",
+            default_active=True
+        ),
+        "impeccable-extract": SkillDefinition(
+            id="impeccable-extract",
+            name="Impeccable Design Token Extractor",
+            tier="impeccable",
+            purpose="Extracts design tokens from existing codebases into clean CSS variables.",
+            rule_guideline="Consolidate duplicate color values and font sizes into a unified token map.",
+            technologies=["AST Parser", "CSS Extractor"],
+            source_repo="pbakaus/impeccable",
+            default_active=True
+        ),
+        "impeccable-hooks": SkillDefinition(
+            id="impeccable-hooks",
+            name="Impeccable React UI Hooks",
+            tier="impeccable",
+            purpose="Provides optimized custom React hooks for media queries, focus, and scroll.",
+            rule_guideline="Use memoized custom hooks for responsive behavior and state management.",
+            technologies=["React Custom Hooks"],
+            source_repo="pbakaus/impeccable",
+            default_active=True
+        ),
+        "impeccable-init": SkillDefinition(
+            id="impeccable-init",
+            name="Impeccable Project Setup",
+            tier="impeccable",
+            purpose="Initializes projects with Impeccable design system templates.",
+            rule_guideline="Pre-configure Vite, Tailwind, Google Fonts, and design tokens.",
+            technologies=["Project Boilerplate"],
+            source_repo="pbakaus/impeccable",
+            default_active=True
+        ),
+        "impeccable-layout": SkillDefinition(
+            id="impeccable-layout",
+            name="Impeccable Macro Layout Engine",
+            tier="impeccable",
+            purpose="Designs high-density multi-column grid layouts for web applications.",
+            rule_guideline="Use CSS Grid with fractional units for flexible responsive layouts.",
+            technologies=["CSS Grid", "Flexbox"],
+            source_repo="pbakaus/impeccable",
+            default_active=True
+        ),
+        "impeccable-live": SkillDefinition(
+            id="impeccable-live",
+            name="Impeccable Live Browser Inspection",
+            tier="impeccable",
+            purpose="Inspects live running web applications using browser devtools.",
+            rule_guideline="Verify rendered DOM elements and responsive layout breakpoints live.",
+            technologies=["Chrome DevTools MCP"],
+            source_repo="pbakaus/impeccable",
+            default_active=True
+        ),
+        "impeccable-onboard": SkillDefinition(
+            id="impeccable-onboard",
+            name="Impeccable User Onboarding & Guidance",
+            tier="impeccable",
+            purpose="Designs interactive walkthrough tours and empty state guidance.",
+            rule_guideline="Guide new users through core workflows with progressive disclosure.",
+            technologies=["Product Tours", "Step Guides"],
+            source_repo="pbakaus/impeccable",
+            default_active=True
+        ),
+        "impeccable-operate": SkillDefinition(
+            id="impeccable-operate",
+            name="Impeccable Operations & Dashboard Design",
+            tier="impeccable",
+            purpose="Specializes in high-density enterprise dashboard design.",
+            rule_guideline="Prioritize key metrics, quick actions, and data table filtering.",
+            technologies=["Dashboard Architecture"],
+            source_repo="pbakaus/impeccable",
+            default_active=True
+        ),
+        "impeccable-optimize": SkillDefinition(
+            id="impeccable-optimize",
+            name="Impeccable Asset & Font Optimization",
+            tier="impeccable",
+            purpose="Optimizes images, web fonts, and bundle sizes for fast loading.",
+            rule_guideline="Use WebP image formats, font subsetting, and lazy loading.",
+            technologies=["Vite Bundler", "WebP Converter"],
+            source_repo="pbakaus/impeccable",
+            default_active=True
+        ),
+        "impeccable-overdrive": SkillDefinition(
+            id="impeccable-overdrive",
+            name="Impeccable High-Performance UI Rendering",
+            tier="impeccable",
+            purpose="Ensures zero-jank 60fps rendering for complex interactive UIs.",
+            rule_guideline="Use virtualization for long lists and avoid heavy DOM re-renders.",
+            technologies=["React Virtual", "GPU Acceleration"],
+            source_repo="pbakaus/impeccable",
+            default_active=True
+        ),
+        "impeccable-routing": SkillDefinition(
+            id="impeccable-routing",
+            name="Impeccable Navigation & Route Transition",
+            tier="impeccable",
+            purpose="Designs smooth page routing and layout persistence.",
+            rule_guideline="Keep top navigation and sidebars persistent across sub-page route transitions.",
+            technologies=["React Router", "Next App Router"],
+            source_repo="pbakaus/impeccable",
+            default_active=True
+        ),
+        "impeccable-shape": SkillDefinition(
+            id="impeccable-shape",
+            name="Impeccable Spatial Geometry & Radii",
+            tier="impeccable",
+            purpose="Establishes mathematical border radius and shape hierarchy.",
+            rule_guideline="Use nested radii math: outer radius = inner radius + padding.",
+            technologies=["Geometry Math"],
+            source_repo="pbakaus/impeccable",
+            default_active=True
+        ),
+        "impeccable-typeset": SkillDefinition(
+            id="impeccable-typeset",
+            name="Impeccable Typographic Hierarchy & Scale",
+            tier="impeccable",
+            purpose="Enforces modular typography scale and proportional line heights.",
+            rule_guideline="Pair display headings with clean body copy and monospace data labels.",
+            technologies=["Modular Scale", "Google Fonts"],
+            source_repo="pbakaus/impeccable",
+            default_active=True
+        ),
+        "impeccable-visualize": SkillDefinition(
+            id="impeccable-visualize",
+            name="Impeccable Complex Data Visualization",
+            tier="impeccable",
+            purpose="Designs custom SVG and Canvas data visualizations.",
+            rule_guideline="Make complex data scannable with clear color coding and tooltips.",
+            technologies=["SVG Rendering", "D3.js"],
+            source_repo="pbakaus/impeccable",
+            default_active=True
+        ),
+
+        # Taste Extended Suite
+        "taste-gpt": SkillDefinition(
+            id="taste-gpt",
+            name="Taste GPT UI Prompt Engineer",
+            tier="taste",
+            purpose="Refines AI prompts for high-craft UI generation.",
+            rule_guideline="Inject explicit aesthetic rules, fonts, and HSL palettes into UI prompts.",
+            technologies=["Prompt Refinement"],
+            source_repo="Leonxlnx/taste-skill",
+            default_active=True
+        ),
+        "taste-imagegen-mobile": SkillDefinition(
+            id="taste-imagegen-mobile",
+            name="Taste Mobile Layout Generator",
+            tier="taste",
+            purpose="Generates mobile UI layouts with 48px touch targets.",
+            rule_guideline="Optimize for portrait smartphone screens and thumb navigation zones.",
+            technologies=["Mobile Design"],
+            source_repo="Leonxlnx/taste-skill",
+            default_active=True
+        ),
+        "taste-imagegen-web": SkillDefinition(
+            id="taste-imagegen-web",
+            name="Taste Web Desktop Layout Generator",
+            tier="taste",
+            purpose="Generates multi-pane desktop web layouts.",
+            rule_guideline="Utilize widescreen desktop display space with multi-column grids.",
+            technologies=["Web Layouts"],
+            source_repo="Leonxlnx/taste-skill",
+            default_active=True
+        ),
+        "taste-output": SkillDefinition(
+            id="taste-output",
+            name="Taste Output Code Sanitizer",
+            tier="taste",
+            purpose="Sanitizes generated UI code to remove generic inline styling.",
+            rule_guideline="Ensure all styles use design system tokens and semantic classes.",
+            technologies=["Code Sanitization"],
+            source_repo="Leonxlnx/taste-skill",
+            default_active=True
+        ),
+        "taste-redesign": SkillDefinition(
+            id="taste-redesign",
+            name="Taste Complete UI Redesign Engine",
+            tier="taste",
+            purpose="Transforms outdated interfaces into modern state-of-the-art web apps.",
+            rule_guideline="Modernize layout, typography, colors, and interactive elements in one pass.",
+            technologies=["UI Redesign"],
+            source_repo="Leonxlnx/taste-skill",
+            default_active=True
+        ),
+        "taste-v1": SkillDefinition(
+            id="taste-v1",
+            name="Taste Classic Aesthetic Baseline",
+            tier="taste",
+            purpose="Provides solid visual baseline design tokens.",
+            rule_guideline="Maintain clean visual contrast and baseline grid alignment.",
+            technologies=["Baseline Tokens"],
+            source_repo="Leonxlnx/taste-skill",
+            default_active=True
         )
     }
 
