@@ -1,6 +1,6 @@
 {
   "id": "sclass-v5",
-  "name": "S-Class Engineering Pipeline",
+  "name": "S-Class EOS Engineering Pipeline V12",
   "version": "12.1.0",
   "author": "ak-bharadwaj",
   "description": "S-Class SDK: Pluggable workflow runtime engine for multi-agent software engineering, research, and startup execution featuring an 11-state FSM.",
