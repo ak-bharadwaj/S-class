@@ -522,13 +522,7 @@ class SClassSkillOrchestrator:
 
     @classmethod
     def _filter_skills_for_phase(cls, skills: List[SkillDefinition], phase: str) -> List[SkillDefinition]:
-        phase_upper = phase.upper()
-        if phase_upper in ["DESIGN", "DEBATE", "CLARIFICATION"]:
-            return [s for s in skills if s.tier in ["foundation", "domain", "taste", "impeccable"]]
-        elif phase_upper in ["CODING", "TASK_COMPILATION", "INTEGRATION"]:
-            return [s for s in skills if s.tier in ["foundation", "interaction", "data", "domain", "impeccable", "emil", "taste"]]
-        elif phase_upper in ["QA", "RELEASE", "VERIFYING"]:
-            return [s for s in skills if s.tier in ["quality", "foundation", "domain", "impeccable", "emil"]]
+        # Enforce 100% full skill utilization across all phases without dropping any skill tier
         return skills
 
     @classmethod
