@@ -242,7 +242,147 @@ class SkillTaxonomy:
             default_active=True
         ),
 
-        # Tier 11 — Essential Production Operations & Developer Ergonomics (Completing the 100-Skill Century)
+        # Tier 12 — Heavy Enterprise Backend, Microservices, & Distributed Systems (15 Production Backend Skills)
+        "microservice-event-bus": SkillDefinition(
+            id="microservice-event-bus",
+            name="Kafka / RabbitMQ Event-Driven Microservices",
+            tier="domain",
+            purpose="Handles event publishing, consumer group subscriptions, dead letter queues (DLQ), and idempotent message processing.",
+            rule_guideline="Publish domain events asynchronously for inter-service communication; use Dead Letter Queues for failed messages.",
+            technologies=["Apache Kafka", "RabbitMQ", "Event Bus", "DLQ"],
+            default_active=True
+        ),
+        "grpc-protobuf-rpc": SkillDefinition(
+            id="grpc-protobuf-rpc",
+            name="High-Performance gRPC & Protobuf RPC Engine",
+            tier="domain",
+            purpose="Provides binary gRPC streaming, .proto schema definitions, gRPC-web gateways, and bi-directional RPC streams.",
+            rule_guideline="Use gRPC with Protobuf for low-latency inter-microservice communication.",
+            technologies=["gRPC", "Protocol Buffers", "gRPC-Web"],
+            default_active=False,
+            conditional_keywords=["grpc", "protobuf", "proto", "rpc stream"]
+        ),
+        "db-sharding-read-replicas": SkillDefinition(
+            id="db-sharding-read-replicas",
+            name="Database Read Replicas & Connection Pooling",
+            tier="domain",
+            purpose="Manages read-write query splitting, connection pooling (PgBouncer), read-replica routing, and database sharding.",
+            rule_guideline="Route SELECT read queries to read replicas and INSERT/UPDATE writes to the primary database node.",
+            technologies=["PgBouncer", "Read Replicas", "Database Sharding"],
+            default_active=True
+        ),
+        "elasticsearch-vector-search": SkillDefinition(
+            id="elasticsearch-vector-search",
+            name="Full-Text Search & Vector Embeddings Engine",
+            tier="data",
+            purpose="Handles Elasticsearch/OpenSearch indexing, fuzzy search, vector embeddings (pgvector/Pinecone), and faceted filtering.",
+            rule_guideline="Index searchable entity fields into Elasticsearch/pgvector for sub-10ms full-text and semantic search.",
+            technologies=["Elasticsearch", "pgvector", "OpenSearch", "Pinecone"],
+            default_active=False,
+            conditional_keywords=["elasticsearch", "search index", "vector search", "pgvector", "fuzzy search"]
+        ),
+        "oauth-sso-saml-auth": SkillDefinition(
+            id="oauth-sso-saml-auth",
+            name="Enterprise Single Sign-On (SSO) & SAML 2.0 Auth",
+            tier="domain",
+            purpose="Implements Google/GitHub OAuth2, SAML 2.0 enterprise identity providers (Okta, Auth0, Azure AD), and session token exchange.",
+            rule_guideline="Support OAuth2 PKCE flows and enterprise SAML 2.0 assertions for institutional single sign-on.",
+            technologies=["OAuth2", "SAML 2.0", "Okta", "Auth0"],
+            default_active=True
+        ),
+        "rate-limiting-redis-bucket": SkillDefinition(
+            id="rate-limiting-redis-bucket",
+            name="Distributed Token Bucket Rate Limiting & Quotas",
+            tier="domain",
+            purpose="Enforces Redis token bucket rate limiting, IP/User API quotas, and HTTP 429 Retry-After header responses.",
+            rule_guideline="Apply rate limiting middleware to authentication and public API routes to prevent DDoS and brute-force attacks.",
+            technologies=["Redis Rate Limiter", "Token Bucket", "HTTP 429"],
+            default_active=True
+        ),
+        "circuit-breaker-resilience": SkillDefinition(
+            id="circuit-breaker-resilience",
+            name="Circuit Breaker & Fallback Fault Tolerance",
+            tier="quality",
+            purpose="Implements Cockatiel/Resilience4j circuit breakers, timeout fallbacks, and exponential backoff retry policies.",
+            rule_guideline="Wrap external API calls in circuit breakers to isolate third-party service outages from main app loops.",
+            technologies=["Circuit Breaker", "Exponential Backoff", "Cockatiel"],
+            default_active=True
+        ),
+        "file-streaming-chunked-transfer": SkillDefinition(
+            id="file-streaming-chunked-transfer",
+            name="Chunked Video & Large File Streaming Engine",
+            tier="domain",
+            purpose="Handles HTTP Range requests for video/audio streaming, multipart file uploads, and streaming ZIP generation.",
+            rule_guideline="Use HTTP 206 Partial Content streams for video playback and large file downloads.",
+            technologies=["HTTP Range Requests", "Chunked Transfer", "Stream Pipelines"],
+            default_active=False,
+            conditional_keywords=["streaming", "chunked", "video stream", "range header"]
+        ),
+        "tenant-isolation-multi-tenancy": SkillDefinition(
+            id="tenant-isolation-multi-tenancy",
+            name="Multi-Tenant Data Isolation & Schema-per-Tenant",
+            tier="domain",
+            purpose="Enforces Row-Level Security (RLS), tenant ID context middleware, dynamic schema switching, and tenant data isolation.",
+            rule_guideline="Strictly scope all database queries by tenant_id middleware context to guarantee data isolation.",
+            technologies=["Row-Level Security (RLS)", "Multi-Tenancy", "Schema Switching"],
+            default_active=True
+        ),
+        "distributed-tracing-opentelemetry": SkillDefinition(
+            id="distributed-tracing-opentelemetry",
+            name="OpenTelemetry & Distributed Microservice Tracing",
+            tier="quality",
+            purpose="Propagates W3C trace context headers, Jaeger/Zipkin request tracing, latency profiling, and span correlation.",
+            rule_guideline="Inject trace parent headers into outgoing HTTP and gRPC requests for end-to-end distributed tracing.",
+            technologies=["OpenTelemetry", "Jaeger", "W3C Trace Context"],
+            default_active=True
+        ),
+        "cqrs-event-sourcing": SkillDefinition(
+            id="cqrs-event-sourcing",
+            name="CQRS Command-Query Separation & Event Sourcing",
+            tier="domain",
+            purpose="Separates Command and Query data models, append-only event stores, read-model projections, and event replay.",
+            rule_guideline="Separate high-throughput read models from write-heavy command handlers in complex sub-systems.",
+            technologies=["CQRS", "Event Sourcing", "Read Model Projections"],
+            default_active=False,
+            conditional_keywords=["cqrs", "event sourcing", "read model", "command handler"]
+        ),
+        "api-versioning-deprecation": SkillDefinition(
+            id="api-versioning-deprecation",
+            name="API Versioning & Sunset Deprecation Headers",
+            tier="domain",
+            purpose="Handles URL/Header API versioning (/v1, /v2), Sunset deprecation headers, and backward-compatible DTO transforms.",
+            rule_guideline="Include explicit Sunset and Deprecation headers when deprecating legacy API endpoints.",
+            technologies=["API Versioning", "Sunset Headers", "Deprecation Policy"],
+            default_active=True
+        ),
+        "graphql-federation-subgraphs": SkillDefinition(
+            id="graphql-federation-subgraphs",
+            name="Apollo GraphQL Federation & Subgraph Mesh",
+            tier="data",
+            purpose="Handles supergraph schema stitching, federated entity resolvers, and directive-based field security.",
+            rule_guideline="Decompose monolithic GraphQL schemas into federated subgraphs joined by a central gateway.",
+            technologies=["Apollo Federation", "Subgraph Mesh", "Schema Stitching"],
+            default_active=False,
+            conditional_keywords=["federation", "subgraph", "supergraph", "apollo federation"]
+        ),
+        "background-pdf-excel-exporter": SkillDefinition(
+            id="background-pdf-excel-exporter",
+            name="High-Volume PDF & Excel Report Generation Engine",
+            tier="domain",
+            purpose="Generates PDF documents (Puppeteer/PDFKit), Excel XLSX spreadsheets (exceljs), and background download links.",
+            rule_guideline="Render complex academic transcripts and financial reports asynchronously via background worker workers.",
+            technologies=["Puppeteer PDF", "exceljs", "Report Generator"],
+            default_active=True
+        ),
+        "secret-rotation-vault": SkillDefinition(
+            id="secret-rotation-vault",
+            name="HashiCorp Vault & Zero-Downtime Secret Rotation",
+            tier="quality",
+            purpose="Handles dynamic database credential generation, HashiCorp Vault secret fetching, zero-downtime rotation, and env sanitization.",
+            rule_guideline="Fetch secrets dynamically from Vault or environment managers rather than storing static keys.",
+            technologies=["HashiCorp Vault", "Secret Rotation", "Dynamic Credentials"],
+            default_active=True
+        ),
         "graphql-trpc-schema": SkillDefinition(
             id="graphql-trpc-schema",
             name="Type-Safe RPC & Schema Router Architecture",

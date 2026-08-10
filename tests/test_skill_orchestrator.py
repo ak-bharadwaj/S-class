@@ -15,7 +15,7 @@ class TestSkillOrchestrator(unittest.TestCase):
         self.test_dir = tempfile.mkdtemp()
 
     def test_taxonomy_skill_count(self):
-        self.assertGreaterEqual(len(SkillTaxonomy.SKILLS), 100)
+        self.assertGreaterEqual(len(SkillTaxonomy.SKILLS), 115)
         self.assertIn("impeccable-craft", SkillTaxonomy.SKILLS)
         self.assertIn("impeccable-new-work", SkillTaxonomy.SKILLS)
         self.assertIn("taste-aesthetic", SkillTaxonomy.SKILLS)
@@ -33,6 +33,10 @@ class TestSkillOrchestrator(unittest.TestCase):
         self.assertIn("page-route-architecture", SkillTaxonomy.SKILLS)
         self.assertIn("health-check-telemetry", SkillTaxonomy.SKILLS)
         self.assertIn("cron-job-background-workers", SkillTaxonomy.SKILLS)
+        self.assertIn("microservice-event-bus", SkillTaxonomy.SKILLS)
+        self.assertIn("db-sharding-read-replicas", SkillTaxonomy.SKILLS)
+        self.assertIn("rate-limiting-redis-bucket", SkillTaxonomy.SKILLS)
+        self.assertIn("tenant-isolation-multi-tenancy", SkillTaxonomy.SKILLS)
 
     def test_resolve_default_skills_in_coding_phase(self):
         skills = SClassSkillOrchestrator.resolve_active_skills(
