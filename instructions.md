@@ -300,3 +300,15 @@ S-Class EOS strictly forbids skipping specialized skills or using safe/timid AI 
    - Long text truncation & 100-character name overflow.
    - Loading skeletons & Sonner toast notification state changes.
    - Desktop (`1920x1080`) multi-pane layouts and Mobile (`390x844`) 48px tap targets.
+
+## 28. Mandatory Subagent Deployment Dashboard & Visibility Mandate
+
+Whenever S-Class invokes or coordinates background subagents (`dss_frontend_dev`, `dss_backend_dev`, `dss_db_architect`, `dss_qa_v2`, `dss_builder_v2`, etc.), the agent MUST output a clear, visible **Subagent Deployment Dashboard** in the chat UI:
+
+### Subagent Visibility Protocol:
+1. **Explicit Deployment Callout:** Immediately upon calling `invoke_subagent`, the agent MUST display a GitHub-markdown table detailing all deployed subagents:
+   - Subagent Name & Role
+   - Assigned Task & Target Files
+   - Current Status (`🚀 LAUNCHED`, `⚡ RUNNING`, `✅ COMPLETED`)
+2. **Transparent Progress Updates:** When subagents report back or emit log notifications, the agent MUST summarize their exact findings and audit reports concisely in chat, showing the user that multi-agent execution occurred.
+3. **Receipt Trail:** Save subagent deployment receipts to `.agents/subagent_deployment_log.json`.
