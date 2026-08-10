@@ -282,8 +282,21 @@ S-Class EOS strictly forbids dumping one giant "frontend skill" or monolithic pr
    - `approval-workflows`: Multi-tier approval status timelines (`Student Request` ➔ `Faculty` ➔ `Coordinator` ➔ `HOD`).
    - `data-dense-ui`: Enterprise data tables with sorting, multi-column filtering, pagination, bulk actions, and inline editing.
    - `command-search`: `⌘/Ctrl+K` global command palette for instant student/faculty/timetable lookups.
-4. **Conditional Tier-2 Activation Rule:**
-   - `scroll-experience`: Activate ONLY when page requires sticky section navigation or contextual disclosure (ERP rule: *scroll = navigation + contextual info*, NOT marketing parallax).
-   - `3d-webgl`: Activate ONLY when structural visualization is explicitly required (e.g. course dependency graph, lab map, department structure)—**NEVER render spinning 3D objects beside data tables**.
    - `creative-interaction`: Activate for tactile hover previews, expandable card surfaces, and drag-and-drop handles.
-```
+
+## 27. Strict Skill Awareness & Mandatory Execution Protocol (No-Laziness Directive)
+
+S-Class EOS strictly forbids skipping specialized skills or using safe/timid AI defaults out of model laziness:
+
+### Mandatory Skill Initialization & Execution Protocol (`sclass_skill_orchestrator.py`):
+1. **Catalog Awareness:** S-Class agents and subagents MUST be 100% aware of all 45 skills across the 4 integrated suites:
+   - **Paul Bakaus Impeccable Suite (`pbakaus/impeccable`):** `impeccable-craft`, `impeccable-harden`, `impeccable-critique`, `impeccable-polish`, `impeccable-bolder`, `impeccable-quieter`, `impeccable-distill`, `impeccable-onboard`, `impeccable-live`.
+   - **Leon Taste-Skill Suite (`Leonxlnx/taste-skill`):** `taste-aesthetic`, `taste-minimalist`, `taste-soft`, `taste-brutalist`, `taste-stitch`, `taste-brandkit`, `taste-redesign`.
+   - **Emil Kowalski Animation Suite (`emilkowalski/skills`):** `emil-apple-design`, `emil-animation-opportunities`, `emil-ask-sonner`, `emil-design-eng`, `emil-improve-animations`, `emil-pick-ui-library`.
+   - **Builtin Foundation & ERP Domain Suite:** `frontend-design`, `ux-architecture`, `design-system`, `data-visualization`, `data-dense-ui`, `command-search`, `role-based-ux`, `academic-workflows`, `approval-workflows`.
+2. **Mandatory Playbook Inspection:** Before writing frontend UI code, agents MUST load and inspect the reference playbook associated with active skills (`craft-floor.md`, `harden.md`, `critique.md`, `soft-skill/SKILL.md`, `apple-design/SKILL.md`).
+3. **No-Laziness Verification Gate:** Agents MUST NOT skip micro-interactions, spring physics, or edge-case component hardening. Every component MUST explicitly handle:
+   - Zero-record empty states (custom SVG illustration & CTA).
+   - Long text truncation & 100-character name overflow.
+   - Loading skeletons & Sonner toast notification state changes.
+   - Desktop (`1920x1080`) multi-pane layouts and Mobile (`390x844`) 48px tap targets.

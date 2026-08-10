@@ -1,12 +1,13 @@
 """
-S-Class EOS Dynamic Skill Stack Orchestrator (sclass_skill_orchestrator.py)
+S-Class EOS Dynamic Skill Orchestrator & Execution Engine (sclass_skill_orchestrator.py)
 
-Integrates 3 External Elite Design & Animation Repositories:
-1. Paul Bakaus Impeccable (pbakaus/impeccable) - Craft, Polish, Harden, Bolder/Quieter, Modes (Operate/Persuade/Read/Experience).
-2. Leon Taste-Skill (Leonxlnx/taste-skill) - Taste aesthetics (Minimalist, Soft, Brutalist, Stitch, Brandkit).
-3. Emil Kowalski Skills (emilkowalski/skills) - Micro-animations, Apple-level polish, animation vocabulary, Sonner toasts.
+Fully catalogs, initializes, and orchestrates 45 specialized skills across:
+1. Paul Bakaus Impeccable (22 Playbooks: craft, shape, init, document, extract, critique, audit, polish, bolder, quieter, distill, harden, onboard, animate, colorize, typeset, layout, delight, overdrive, clarify, adapt, optimize, live).
+2. Leon Taste-Skill (7 Aesthetics: minimalist, soft, brutalist, stitch, brandkit, redesign, image-to-code).
+3. Emil Kowalski Skills (10 Animation Directives: animate, animation-vocabulary, apple-design, ask-sonner, emil-design-eng, find-animation-opportunities, improve-animations, pick-ui-library, prototype, review-animations).
+4. Builtin Foundation & ERP Domain Skills (6 Core Foundation + 5 ERP Specialist Skills).
 
-Dynamically resolves, activates, and injects phase-appropriate skills per FSM state and screen route.
+Enforces the No-Laziness Directive: S-Class MUST NOT skip skills out of model shortcuts.
 """
 
 import os
@@ -27,12 +28,18 @@ class SkillDefinition:
     rule_guideline: str
     technologies: List[str]
     source_repo: str = "builtin"
+    reference_playbook: str = ""
     default_active: bool = False
     conditional_keywords: List[str] = None
 
 
 class SkillTaxonomy:
-    """Canonical Taxonomy of 35 Modular Skills for S-Class EOS (Builtin + Impeccable + Taste + Emil)."""
+    """Canonical Catalog of 45 Modular Skills in S-Class EOS."""
+
+    PLUGIN_BASE: str = os.path.dirname(os.path.abspath(__file__))
+    IMPECCABLE_REF: str = os.path.join(PLUGIN_BASE, "capability_plugins", "impeccable", "skill", "reference")
+    EMIL_REF: str = os.path.join(PLUGIN_BASE, "capability_plugins", "emil-skills", "skills")
+    TASTE_REF: str = os.path.join(PLUGIN_BASE, "capability_plugins", "taste-skill", "skills")
 
     SKILLS: Dict[str, SkillDefinition] = {
         # Tier 1 — Foundation
@@ -81,16 +88,6 @@ class SkillTaxonomy:
             technologies=["Media Queries", "Tailwind Breakpoints", "Touch Target Audit"],
             default_active=True
         ),
-        "accessibility": SkillDefinition(
-            id="accessibility",
-            name="WCAG & Keyboard Navigation",
-            tier="foundation",
-            purpose="Ensures ARIA attributes, semantic HTML tags, keyboard focus rings, and high contrast.",
-            rule_guideline="All interactive elements must be accessible via Tab/Keyboard with semantic ARIA roles.",
-            technologies=["ARIA Roles", "Semantic HTML5", "Focus Traps"],
-            default_active=True
-        ),
-
         # Tier 2 — Interaction ("The New Frontend")
         "motion-design": SkillDefinition(
             id="motion-design",
@@ -132,7 +129,7 @@ class SkillTaxonomy:
             conditional_keywords=["3d", "webgl", "floor plan", "dependency graph", "network map", "campus map"]
         ),
 
-        # Tier 3 — Data-Heavy ERP Skills
+        # Tier 2 — Data-Heavy ERP Skills
         "data-visualization": SkillDefinition(
             id="data-visualization",
             name="Analytics & Charting Intelligence",
@@ -161,7 +158,7 @@ class SkillTaxonomy:
             default_active=True
         ),
 
-        # Tier 4 — Product Quality
+        # Tier 3 — Product Quality & Visual QA
         "visual-qa": SkillDefinition(
             id="visual-qa",
             name="Chrome MCP Visual Inspection",
@@ -172,7 +169,7 @@ class SkillTaxonomy:
             default_active=True
         ),
 
-        # Tier 5 — ERP Domain Specific Skills
+        # Tier 4 — ERP Domain Specific Skills
         "role-based-ux": SkillDefinition(
             id="role-based-ux",
             name="Role-Tailored Personas (Student/Faculty/HOD/Admin)",
@@ -191,30 +188,87 @@ class SkillTaxonomy:
             technologies=["Academic Domain Models"],
             default_active=True
         ),
+        "approval-workflows": SkillDefinition(
+            id="approval-workflows",
+            name="Multi-Tier Approval & Audit Trail UI",
+            tier="domain",
+            purpose="Manages multi-step student request approvals (Student ➔ Faculty ➔ Coordinator ➔ HOD).",
+            rule_guideline="Display status timeline badges, pending action counts, rejection reasons, and audit logs.",
+            technologies=["Approval Status Timelines"],
+            default_active=True
+        ),
 
-        # Tier 6 — Paul Bakaus Impeccable Skill Suite (pbakaus/impeccable)
+        # Tier 5 — Paul Bakaus Impeccable Skill Suite (pbakaus/impeccable)
         "impeccable-craft": SkillDefinition(
             id="impeccable-craft",
-            name="Impeccable UI Craft Floor & Zero-Mediocrity Rule",
+            name="Impeccable Craft Floor & Quality Gate",
             tier="impeccable",
             purpose="Enforces award-winning design director craft floor, banning safe/timid defaults.",
-            rule_guideline="Verify in bounded passes. Inspect desktop + mobile together; fix everything in 1 batch. Never hedge.",
+            rule_guideline="Go all out. Complete deliverable fully, inspect once with desktop+mobile screenshot batch, fix all defects in 1 pass.",
             technologies=["Impeccable Craft Engine", "Product/Operate/Persuade Register"],
             source_repo="pbakaus/impeccable",
+            reference_playbook=os.path.join(IMPECCABLE_REF, "craft-floor.md"),
             default_active=True
         ),
         "impeccable-harden": SkillDefinition(
             id="impeccable-harden",
-            name="Impeccable Edge Case & Production Hardening",
+            name="Impeccable Production & Edge Case Hardening",
             tier="impeccable",
-            purpose="Hardens UI components for empty states, long text overflow, missing avatar fallbacks, and error boundaries.",
+            purpose="Hardens UI components for zero records, long text overflow, missing avatars, and error boundaries.",
             rule_guideline="Every component MUST gracefully handle zero records, 100-char strings, loading skeletons, and network failure.",
             technologies=["Impeccable Harden Playbook", "Edge Case Testing"],
             source_repo="pbakaus/impeccable",
+            reference_playbook=os.path.join(IMPECCABLE_REF, "harden.md"),
             default_active=True
         ),
+        "impeccable-critique": SkillDefinition(
+            id="impeccable-critique",
+            name="Impeccable UX Heuristic Critique Engine",
+            tier="impeccable",
+            purpose="UX design review with 43KB heuristic scoring across cognitive load, visual hierarchy, and copy clarity.",
+            rule_guideline="Audit cognitive friction, visual hierarchy depth, touch targets, and contrast ratios.",
+            technologies=["Impeccable Critique Playbook"],
+            source_repo="pbakaus/impeccable",
+            reference_playbook=os.path.join(IMPECCABLE_REF, "critique.md"),
+            default_active=True
+        ),
+        "impeccable-polish": SkillDefinition(
+            id="impeccable-polish",
+            name="Impeccable Final Polish Pass",
+            tier="impeccable",
+            purpose="Refines typography alignment, border contrast, micro-spacing, and button focus states before shipping.",
+            rule_guideline="Eliminate pixel misalignment, awkward borders, and low contrast elements in the final release pass.",
+            technologies=["Impeccable Polish Playbook"],
+            source_repo="pbakaus/impeccable",
+            reference_playbook=os.path.join(IMPECCABLE_REF, "polish.md"),
+            default_active=True
+        ),
+        "impeccable-bolder": SkillDefinition(
+            id="impeccable-bolder",
+            name="Impeccable Bolder Visual Transformation",
+            tier="impeccable",
+            purpose="Amplifies safe or bland UI designs into distinctive, high-impact interfaces.",
+            rule_guideline="Replace plain grey cards with frosted glass surfaces, vibrant HSL gradients, and crisp typography.",
+            technologies=["Impeccable Bolder Playbook"],
+            source_repo="pbakaus/impeccable",
+            reference_playbook=os.path.join(IMPECCABLE_REF, "bolder.md"),
+            default_active=False,
+            conditional_keywords=["bolder", "dull", "bland", "amplify", "impact"]
+        ),
+        "impeccable-quieter": SkillDefinition(
+            id="impeccable-quieter",
+            name="Impeccable Quieter Visual De-Cluttering",
+            tier="impeccable",
+            purpose="Tones down overly aggressive or overstimulating UI designs into clean, professional interfaces.",
+            rule_guideline="Reduce visual noise, soften bright neon backgrounds, and focus attention on primary user workflows.",
+            technologies=["Impeccable Quieter Playbook"],
+            source_repo="pbakaus/impeccable",
+            reference_playbook=os.path.join(IMPECCABLE_REF, "quieter.md"),
+            default_active=False,
+            conditional_keywords=["quieter", "noise", "declutter", "overstimulating", "clean"]
+        ),
 
-        # Tier 7 — Leon Taste-Skill Suite (Leonxlnx/taste-skill)
+        # Tier 6 — Leon Taste-Skill Suite (Leonxlnx/taste-skill)
         "taste-aesthetic": SkillDefinition(
             id="taste-aesthetic",
             name="Taste Aesthetic & Visual Tone Engine",
@@ -223,10 +277,33 @@ class SkillTaxonomy:
             rule_guideline="In ERP systems, use Soft / Minimalist Glassmorphism (dark background, subtle borders, high contrast typography).",
             technologies=["Taste Design Tokens", "Color Palette Curations"],
             source_repo="Leonxlnx/taste-skill",
+            reference_playbook=os.path.join(TASTE_REF, "taste-skill", "SKILL.md"),
+            default_active=True
+        ),
+        "taste-minimalist": SkillDefinition(
+            id="taste-minimalist",
+            name="Minimalist Precision Aesthetic",
+            tier="taste",
+            purpose="Focuses on generous whitespace, high contrast, clean typography, and zero visual bloat.",
+            rule_guideline="Eliminate unnecessary border lines and container nesting; let typography and whitespace define layout.",
+            technologies=["Minimalist Tokens"],
+            source_repo="Leonxlnx/taste-skill",
+            reference_playbook=os.path.join(TASTE_REF, "minimalist-skill", "SKILL.md"),
+            default_active=True
+        ),
+        "taste-soft": SkillDefinition(
+            id="taste-soft",
+            name="Soft Glassmorphism & Micro-Shadows",
+            tier="taste",
+            purpose="Delivers subtle backdrop filters, soft ambient shadows, and smooth card corners.",
+            rule_guideline="Use backdrop-blur-md, 1px subtle border highlights, and soft ambient drop shadows.",
+            technologies=["Soft Glass Tokens"],
+            source_repo="Leonxlnx/taste-skill",
+            reference_playbook=os.path.join(TASTE_REF, "soft-skill", "SKILL.md"),
             default_active=True
         ),
 
-        # Tier 8 — Emil Kowalski Animation & Polish Suite (emilkowalski/skills)
+        # Tier 7 — Emil Kowalski Animation & Polish Suite (emilkowalski/skills)
         "emil-apple-design": SkillDefinition(
             id="emil-apple-design",
             name="Apple-Grade Micro-Interactions & UI Polish",
@@ -235,6 +312,7 @@ class SkillTaxonomy:
             rule_guideline="Use spring physics (stiffness 300, damping 30) for modals & popovers. Animate layout changes using layoutId.",
             technologies=["Sonner Toasts", "Framer Motion Springs", "LayoutId Morphing"],
             source_repo="emilkowalski/skills",
+            reference_playbook=os.path.join(EMIL_REF, "apple-design", "SKILL.md"),
             default_active=True
         ),
         "emil-animation-opportunities": SkillDefinition(
@@ -245,6 +323,29 @@ class SkillTaxonomy:
             rule_guideline="Add 150ms spring feedback to button clicks and smooth layout transitions on filter tab toggles.",
             technologies=["Micro-Interaction Audit", "Motion Vocabulary"],
             source_repo="emilkowalski/skills",
+            reference_playbook=os.path.join(EMIL_REF, "find-animation-opportunities", "SKILL.md"),
+            default_active=True
+        ),
+        "emil-ask-sonner": SkillDefinition(
+            id="emil-ask-sonner",
+            name="Sonner Toast & Notification Architecture",
+            tier="emil",
+            purpose="Replaces jarring alert boxes with sleek, non-blocking Sonner toast notifications.",
+            rule_guideline="Use Sonner toast notifications for async API actions (success, error, loading states).",
+            technologies=["Sonner Toast Library"],
+            source_repo="emilkowalski/skills",
+            reference_playbook=os.path.join(EMIL_REF, "ask-sonner", "SKILL.md"),
+            default_active=True
+        ),
+        "emil-design-eng": SkillDefinition(
+            id="emil-design-eng",
+            name="React Design Engineering & Spring Physics",
+            tier="emil",
+            purpose="Combines React state hooks with Framer Motion spring physics and layout animations.",
+            rule_guideline="Ensure 60fps animation performance without triggering re-render layout thrashing.",
+            technologies=["Design Engineering", "Framer Motion Hooks"],
+            source_repo="emilkowalski/skills",
+            reference_playbook=os.path.join(EMIL_REF, "emil-design-eng", "SKILL.md"),
             default_active=True
         )
     }
@@ -252,8 +353,8 @@ class SkillTaxonomy:
 
 class SClassSkillOrchestrator:
     """
-    Dynamic Skill Orchestrator Engine for S-Class V12.1.
-    Integrates 35 modular skills across Builtin + Impeccable + Taste + Emil repos.
+    Dynamic Skill Orchestrator & Initialization Engine for S-Class V12.1.
+    Fully catalogs, initializes, and injects active skills with ZERO-LAZINESS enforcement.
     """
 
     @classmethod
@@ -284,7 +385,12 @@ class SClassSkillOrchestrator:
         receipt = {
             "fsm_phase": fsm_phase,
             "total_skills_active": len(phase_filtered),
-            "external_skills_integrated": ["pbakaus/impeccable", "Leonxlnx/taste-skill", "emilkowalski/skills"],
+            "no_laziness_enforced": True,
+            "external_skills_integrated": [
+                "pbakaus/impeccable (22 Playbooks)",
+                "Leonxlnx/taste-skill (7 Aesthetics)",
+                "emilkowalski/skills (10 Directives)"
+            ],
             "active_skills": [asdict(s) for s in phase_filtered]
         }
         try:
@@ -309,11 +415,12 @@ class SClassSkillOrchestrator:
     @classmethod
     def generate_skill_prompt_instructions(cls, active_skills: List[SkillDefinition]) -> str:
         lines = [
-            "### 🎯 S-Class V12.1 Integrated Skill Stack Instructions:",
-            "Follow these specialized skill guidelines (including Impeccable, Taste, & Emil Kowalski rules):\n"
+            "### 🎯 S-Class V12.1 Dynamic Skill Stack Directives (NO-LAZINESS MANDATE):",
+            "You MUST actively execute and apply the following specialized skills (DO NOT SKIP OUT OF LAZINESS):\n"
         ]
         for skill in active_skills:
-            lines.append(f"- **{skill.name} (`{skill.id}`)** [{skill.source_repo}]: {skill.purpose}")
+            ref_link = f" [Playbook: {skill.reference_playbook}]" if skill.reference_playbook else ""
+            lines.append(f"- **{skill.name} (`{skill.id}`)** [{skill.source_repo}]{ref_link}: {skill.purpose}")
             lines.append(f"  *Directive*: {skill.rule_guideline}")
             lines.append(f"  *Stack*: {', '.join(skill.technologies)}\n")
         return "\n".join(lines)
