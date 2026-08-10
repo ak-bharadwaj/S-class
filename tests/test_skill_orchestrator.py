@@ -27,6 +27,10 @@ class TestSkillOrchestrator(unittest.TestCase):
         self.assertIn("auth-jwt-rbac", SkillTaxonomy.SKILLS)
         self.assertIn("prisma-drizzle-orm", SkillTaxonomy.SKILLS)
         self.assertIn("ci-cd-docker-deploy", SkillTaxonomy.SKILLS)
+        self.assertIn("backend-domain-logic", SkillTaxonomy.SKILLS)
+        self.assertIn("api-data-flow-architecture", SkillTaxonomy.SKILLS)
+        self.assertIn("role-based-layout-engine", SkillTaxonomy.SKILLS)
+        self.assertIn("page-route-architecture", SkillTaxonomy.SKILLS)
 
     def test_resolve_default_skills_in_coding_phase(self):
         skills = SClassSkillOrchestrator.resolve_active_skills(

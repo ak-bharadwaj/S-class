@@ -242,7 +242,61 @@ class SkillTaxonomy:
             default_active=True
         ),
 
-        # Tier 9 — Enterprise Full-Stack, Security, & Infrastructure Skills
+        # Tier 10 — Core Backend Logic, Data Flow, & Role/Page Layout Skills
+        "backend-domain-logic": SkillDefinition(
+            id="backend-domain-logic",
+            name="Core Backend Business Logic & Transaction Isolation",
+            tier="domain",
+            purpose="Enforces pure domain business rules, atomic database transactions, idempotency keys, and zero leak of business logic into controllers.",
+            rule_guideline="Isolate core domain logic inside dedicated service classes; wrap multi-entity writes in atomic database transactions.",
+            technologies=["Domain-Driven Design", "Atomic Transactions", "Business Rule Engine"],
+            default_active=True
+        ),
+        "api-data-flow-architecture": SkillDefinition(
+            id="api-data-flow-architecture",
+            name="Controller-to-Repository API Data Pipeline",
+            tier="domain",
+            purpose="Standardizes data flow from Controller ➔ Service ➔ Repository, handling cursor pagination, payload DTO transformation, and clean HTTP status codes.",
+            rule_guideline="Use standard envelope responses ({ success, data, meta, error }) and enforce strict DTO transform pipes.",
+            technologies=["NestJS Services", "FastAPI Routers", "Data Pipelines"],
+            default_active=True
+        ),
+        "database-query-optimizer": SkillDefinition(
+            id="database-query-optimizer",
+            name="Database Query Tuning & N+1 Elimination",
+            tier="domain",
+            purpose="Eliminates N+1 relational query traps, tunes composite indexes, optimizes CTE joins, and integrates Redis/in-memory query caching.",
+            rule_guideline="Include explicit relation includes/joins (avoid N+1 loop queries) and index frequently filtered search columns.",
+            technologies=["SQL Query Tuning", "N+1 Elimination", "Prisma Include", "Redis Cache"],
+            default_active=True
+        ),
+        "role-based-layout-engine": SkillDefinition(
+            id="role-based-layout-engine",
+            name="Dynamic Role-Based Layout & Navigation Density",
+            tier="foundation",
+            purpose="Adapts screen layouts, sidebar links, action toolbars, and widget visibility dynamically per user role (Student vs Faculty vs HOD vs Admin).",
+            rule_guideline="Student gets simplified card dashboards; Faculty gets class attendance grids; HOD gets verification queues & lock toggles.",
+            technologies=["RBAC Layout Engine", "Dynamic Sidebar", "Role-Tailored Dashboards"],
+            default_active=True
+        ),
+        "page-route-architecture": SkillDefinition(
+            id="page-route-architecture",
+            name="Nested Page Routes, Layouts & Loading States",
+            tier="foundation",
+            purpose="Structures App Router layout hierarchy (layout.tsx, loading.tsx, error.tsx, page.tsx) with breadcrumbs and smooth route transitions.",
+            rule_guideline="Provide instant skeleton loading states (loading.tsx) and error fallback boundaries (error.tsx) for every page route.",
+            technologies=["Next.js App Router Layouts", "Skeleton Loading", "Error Boundaries"],
+            default_active=True
+        ),
+        "data-dense-dashboard-layout": SkillDefinition(
+            id="data-dense-dashboard-layout",
+            name="Data-Dense Dashboard & Multi-Pane Layout Design",
+            tier="foundation",
+            purpose="Designs high-density multi-column KPI grids, split-pane drawers, sticky header toolbars, and contextual detail side-panels.",
+            rule_guideline="Structure complex dashboard pages using 4-column KPI stat cards, main data table, and sliding drawer detail views.",
+            technologies=["Multi-Pane Layout", "Split Drawers", "Sticky Toolbars"],
+            default_active=True
+        ),
         "zod-pydantic-contract": SkillDefinition(
             id="zod-pydantic-contract",
             name="Type-Safe API Contract & Schema Matching",
