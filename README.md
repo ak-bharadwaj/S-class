@@ -5,9 +5,9 @@
 
 *Enterprise-grade execution microkernel that eliminates AI agent drift, blocks broken UI releases, and enforces multi-page visual evidence verification.*
 
-[![Version](https://img.shields.io/badge/version-12.0.0-blue.svg)](https://github.com/ak-bharadwaj/S-class)
+[![Version](https://img.shields.io/badge/version-12.1.0-blue.svg)](https://github.com/ak-bharadwaj/S-class)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-green.svg)](https://github.com/ak-bharadwaj/S-class)
-[![Build](https://img.shields.io/badge/tests-91%2F91%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class)
+[![Build](https://img.shields.io/badge/tests-98%2F98%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class)
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 
 [Quick Start](#-quick-start) • [Architecture](#-system-architecture) • [Features](#-core-architectural-innovations) • [Python SDK](#-30-second-python-sdk-quickstart) • [Benchmark Comparison](#-framework-architectural-comparison) • [License](#-license)
@@ -23,7 +23,7 @@ When autonomous AI coding agents (such as Claude Code, Cursor, or OpenHands) exe
 2. **Fake Verification:** They claim *"Everything works cleanly!"* based on unit tests or build logs, while the actual web interface renders broken components, `undefined`/`NaN` text, or HTTP 500 errors.
 3. **Sparse & Amateur UIs:** They build unstyled HTML templates with default browser fonts and empty 1-row data tables.
 
-**S-Class EOS V12.0 fixes this completely.** Operating as an **Authoritative Execution Microkernel**, S-Class intercepts all agent actions, routes engineering goals through a strict 11-state Finite State Machine (FSM), red-teams plans before writing code, and verifies live web applications visually using Chrome DevTools MCP before release is allowed.
+**S-Class EOS V12.1 fixes this completely.** Operating as an **Authoritative Execution Microkernel**, S-Class intercepts all agent actions, routes engineering goals through a strict 11-state Finite State Machine (FSM), red-teams plans before writing code, and verifies live web applications visually using Chrome DevTools MCP before release is allowed.
 
 ---
 
@@ -38,9 +38,9 @@ When autonomous AI coding agents (such as Claude Code, Cursor, or OpenHands) exe
                                         │
       ┌────────────────────────┬────────┴────────┬────────────────────────┐
       ▼                        ▼                 ▼                        ▼
-Workspace Pre-Flight    Spec Griller      Subagent Swarm           Safety-Case Engine
- Scanner                Engine            Worker Pool               (verifier.py)
- (workspace_digest)     (sclass_grill)    (dss_builder_v2)                │
+Workspace Pre-Flight    Spec Griller      Full 8-Subagent Swarm    Safety-Case Engine
+ Scanner                Engine            (sclass_subagent_reg)     (verifier.py)
+ (workspace_digest)     (sclass_grill)    (find-skill Enabled)            │
       │                        │                 │                        │
       └────────────────────────┴────────┬────────┴────────────────────────┘
                                         │
@@ -53,34 +53,32 @@ Workspace Pre-Flight    Spec Griller      Subagent Swarm           Safety-Case E
 
 ## 🚀 Core Architectural Innovations
 
-### 1. Pre-Flight Spec Griller Engine (`sclass_grill.py`)
-Inspired by Meta AI's plan stress-testing workflows, `sclass_grill.py` automatically evaluates design specifications against **5 heavy benchmark threat vectors** during the `DEBATE` phase:
-* **Concurrency & Race Conditions:** Audits async submit triggers, button loading/disabled states, and atomic DB transactions.
-* **Database Schema Integrity:** Verifies foreign key constraints, migration boundaries, and relational indexing.
-* **UI Null & Undefined Safety:** Audits component error boundaries, empty-state fallbacks, and checks for raw `[object Object]` / `NaN` placeholders.
-* **API Signature Completeness:** Verifies explicit HTTP verbs, request/response DTO schemas, and controller signatures.
-* **Security & Auth Guarding:** Verifies Zod/Pydantic input validation and authentication route guards.
+### 1. Complete 70-Skill Catalog & Orchestrator (`sclass_skill_orchestrator.py`)
+S-Class strictly forbids dumping one giant "frontend skill" or monolithic prompt. Instead, S-Class orchestrates a **70-skill modular catalog** across 4 integrated skill suites:
+* **Paul Bakaus Impeccable Suite (35 Playbooks)**: `impeccable-craft` ([craft-floor.md](capability_plugins/impeccable/skill/reference/craft-floor.md)), `impeccable-new-work`, `impeccable-harden`, `impeccable-critique`, `impeccable-polish`, `impeccable-bolder`, `impeccable-quieter`, `impeccable-distill`, `impeccable-onboard`, `impeccable-adapt`, `impeccable-audit`, `impeccable-optimize`, `impeccable-clarify`, `impeccable-typeset`, `impeccable-layout`, `impeccable-colorize`, `impeccable-live`.
+* **Leon Taste-Skill Suite (13 Aesthetics)**: `taste-aesthetic`, `taste-minimalist`, `taste-soft`, `taste-brutalist`, `taste-stitch`, `taste-brandkit`, `taste-redesign`, `taste-image-to-code`.
+* **Emil Kowalski Animation Suite (10 Directives)**: `emil-apple-design`, `emil-animation-opportunities`, `emil-ask-sonner`, `emil-design-eng`, `emil-improve-animations`, `emil-pick-ui-library`, `emil-prototype`, `emil-review-animations`.
+* **Builtin Foundation & ERP Domain Suite (12 Core Skills)**: `frontend-design`, `ux-architecture`, `design-system`, `frontend-engineering`, `responsive-design`, `accessibility`, `visual-qa`, `data-visualization`, `data-dense-ui`, `command-search`, `role-based-ux`, `academic-workflows`, `approval-workflows`.
 
-### 2. Live Input-to-Output User Flow Verification (`user_flow_receipts.json`)
-The User Proxy agent (`dss_user_alias_v2`) is strictly forbidden from signing off on QA or Release based on static screenshots alone. It MUST execute live form submissions using Chrome DevTools MCP tools (`fill`, `click`, `submit`) and verify that submitted data **actually renders visually on the screen output view**.
+### 2. Dynamic Skill Discovery & Auto-Installer Engine (`sclass_skill_discovery.py`)
+Analyzes project goals and domain requirements upfront. Automatically discovers, installs, and binds missing specialized skills into S-Class's active skill stack (`.agents/skill_discovery_receipt.json`), ensuring S-Class never lacks required capabilities for complex engineering tasks.
 
-### 3. Visual DOM Error Token Sanitization
-S-Class automatically scans rendered HTML and DOM Accessibility trees for visual error indicators (`500 Internal Server Error`, `404 Not Found`, `TypeError:`, `Failed to fetch`, `Unhandled Runtime Error`, `Connection Refused`). If any error token is detected on screen, release is **HARD-BLOCKED**.
+### 3. Full 8-Subagent Concurrent Dispatch Matrix (`sclass_subagent_registry.py`)
+S-Class strictly forbids single-agent shortcuts. During the multi-agent `DEBATE`, `CODING`, and `QA` phases, S-Class dispatches **ALL 8 defined subagents concurrently** (`dss_governor`, `dss_ui_ux`, `dss_frontend_dev`, `dss_backend_dev`, `dss_db_architect`, `dss_cso_v2`, `dss_qa_frontend`, `dss_user_alias_v2`), each equipped with `SkillDiscoveryEngine` (`find-skill`) capability under Rule 29.
 
-### 4. AST Dependency Resolver (`ast_dependency_resolver.py`)
-Scans generated JavaScript, TypeScript, and Python code for imported packages (`lucide-react`, `framer-motion`, `zod`, `axios`, `express`, `cors`) and automatically syncs missing dependencies into `package.json` and `requirements.txt` upfront.
+### 4. Mandatory Rules 27, 28, & 29 Enforcement
+* **Rule 27 (No-Laziness Directive)**: Mandates playbook inspection before writing UI code and enforces zero-record empty states, 100-char text truncation, loading skeletons, and 48px mobile touch targets.
+* **Rule 28 (Subagent Visibility Dashboard)**: Renders a real-time markdown status table in the chat UI whenever subagents are deployed.
+* **Rule 29 (Full 8 Concurrent Subagent Swarms)**: Enforces parallel dispatch of all 8 specialized subagents equipped with skill stacks and `find-skill`.
 
 ### 5. Zero-Infrastructure Database Fallback Guard (`zero_infra_db.py`)
 Tests host database port reachability (PostgreSQL 5432, MongoDB 27017, Redis 6379). If host databases are not running on the user's computer, it automatically injects an **In-Memory SQLite** (`file:./dev.db`) driver so applications build and run out of the box with zero manual DB setup.
-
-### 6. Full Workspace Pre-Flight Scanner (`workspace_preflight_scanner.py`)
-Performs a 100% workspace file scan upfront, extracting AST symbol trees, exported functions, environment variable keys, and package dependencies into `.agents/workspace_digest.json` to eliminate AI context blind spots.
 
 ---
 
 ## 💻 Dedicated Execution Modes & Slash Commands
 
-S-Class V12.0 introduces dedicated command execution modes for developer workflows:
+S-Class V12.1 introduces dedicated command execution modes for developer workflows:
 
 | Slash Command / Mode | Execution Purpose | Action Performed |
 | :--- | :--- | :--- |
@@ -93,7 +91,7 @@ S-Class V12.0 introduces dedicated command execution modes for developer workflo
 
 ## ⚡ Quick Start
 
-### Step 1: Install or Update S-Class V12.0 (One-Line Command)
+### Step 1: Install or Update S-Class V12.1 (One-Line Command)
 
 #### Windows (PowerShell):
 ```powershell
@@ -113,24 +111,7 @@ Create or open `.cursorrules`, `AGENTS.md`, or `CLAUDE.md` in your project root 
 
 ```markdown
 pipeline: sclass-v5
-CRITICAL DIRECTIVE: You MUST route all engineering goals strictly through S-Class EOS FSM (runtime.initialize_state & runtime.dispatch_event). Direct parent code edits are strictly forbidden (Rule 17). Subagents MUST enforce Rule 16 UI/UX design tokens and Chrome MCP multi-page visual screenshots (Rule 14 & 15).
-```
-
----
-
-### Step 3: Run S-Class in Chat
-
-Simply enter your goal or command in your AI assistant prompt:
-
-```bash
-# Example 1: Full Application Project
-"Build a Driving Academy Portal with student booking, instructor scheduling, and admin analytics following sclass"
-
-# Example 2: Plan Red-Teaming Audit
-"/grill Verify authentication route guards and database migration boundaries"
-
-# Example 3: Non-Interrupting Doubt Inquiry (Main task continues in background)
-"/doubt What database schema are we using for instructor schedules?"
+CRITICAL DIRECTIVE: You MUST route all engineering goals strictly through S-Class EOS FSM (runtime.initialize_state & runtime.dispatch_event). Direct parent code edits are strictly forbidden (Rule 17). Subagents MUST enforce Rule 27 No-Laziness Directive, Rule 28 Subagent Deployment Dashboard, Rule 29 Full 8 Concurrent Subagent Swarms, and Chrome MCP multi-page visual screenshots (Rule 14 & 15).
 ```
 
 ---
@@ -141,23 +122,20 @@ Simply enter your goal or command in your AI assistant prompt:
 import runtime
 from sclass_kernel import kernel_instance
 from sclass_grill import SpecGrillerEngine
-from ast_dependency_resolver import ASTDependencyResolver
-from zero_infra_db import ZeroInfraDbEngine
-from verifier import OutputContractVerifier
+from sclass_skill_orchestrator import SClassSkillOrchestrator
+from sclass_skill_discovery import SkillDiscoveryEngine
+from sclass_subagent_registry import SubagentRegistry
 
 # 1. Initialize S-Class FSM State
-state = runtime.initialize_state(goal="Build Driving Academy Portal", workspace_dir="./")
-print(f"FSM State Initialized: Phase='{state.currentPhase}', Profile='{state.workflowProfile}'")
+state = runtime.initialize_state(goal="Build CSE Department ERP Portal", workspace_dir="./")
 
-# 2. Run Pre-Flight Spec Grilling Red-Teaming Engine
-grill_report = SpecGrillerEngine.grill_specification(workspace_dir="./")
-print(f"Plan Red-Teaming Result: Passed={grill_report.overall_passed} (Critical Defects={grill_report.critical_defects_found})")
+# 2. Run Upfront Skill Discovery & Auto-Bind 70-Skill Catalog
+discovery = SkillDiscoveryEngine.find_and_bind_required_skills(goal_text="Build CSE Department ERP Portal", workspace_dir="./")
+print(f"Bound Skills: Discovered={discovery['discovered_skills_count']}, Active={discovery['total_active_skills_bound']}")
 
-# 3. Auto-Resolve Missing Package Dependencies & DB Drivers
-dep_res = ASTDependencyResolver.resolve_workspace_dependencies(workspace_dir="./")
-db_res = ZeroInfraDbEngine.audit_and_fallback_database(workspace_dir="./")
-print(f"Auto-Injected Packages: {dep_res['npm_packages_injected']}")
-print(f"Zero-Infra DB Driver: {db_res['fallbacks_applied']}")
+# 3. Dispatch Full 8 Concurrent Subagent Matrix with find-skill Capability
+dispatch = SubagentRegistry.prepare_full_8_subagent_dispatch(goal_text="Build CSE Department ERP Portal", fsm_phase="DEBATE", workspace_dir="./")
+print(f"Dispatched {dispatch['total_subagents_dispatched']} Subagents Concurrently (Skill Discovery Active={dispatch['skill_discovery_active']})")
 
 # 4. Dispatch FSM Transition via Deterministic Microkernel
 res = kernel_instance.request_transition(from_state="TRIAGE", event_name="triage_complete", workspace_dir="./")
@@ -168,14 +146,14 @@ print(f"Kernel Approved Mutation: '{res['previousPhase']}' ➔ '{res['currentPha
 
 ## 📊 Framework Architectural Comparison
 
-| Architectural Layer | OpenHands | Claude Code | Meta Muse Code | **S-Class V12.0 (Deterministic Runtime)** |
+| Architectural Layer | OpenHands | Claude Code | Meta Muse Code | **S-Class V12.1 (Deterministic Runtime)** |
 | :--- | :--- | :--- | :--- | :--- |
 | **System Philosophy** | Sandbox Harness | CLI Agent Loop | Model Co-Trained CLI | **Deterministic Microkernel & Safety-Case Engine** |
 | **State Mutation Guard** | File System Writes | File System Writes | File System Writes | **✅ Exclusive Kernel Mutator (`sclass_kernel.py`)** |
-| **Pre-Flight Plan Red-Teaming** | None | None | Interactive `/grill` | **✅ Automated 5-Vector `SpecGrillerEngine`** |
-| **Visual Evidence Gate** | Heuristic | None | Heuristic | **✅ Chrome DevTools MCP + PNG Magic Header + User Flow Receipts** |
-| **Visual DOM Error Parsing** | None | None | None | **✅ Sanitizes `500 Server Error`, `TypeError`, `Failed to fetch`** |
-| **Missing Package Resolution** | Manual Error Retry | Manual Error Retry | Manual Error Retry | **✅ Automated `ASTDependencyResolver` (`package.json` Sync)** |
+| **Modular Skill Stack** | Single Prompt Dump | Single Prompt Dump | Single Prompt Dump | **✅ 70-Skill Catalog (`sclass_skill_orchestrator.py`)** |
+| **Skill Discovery Engine** | None | None | None | **✅ `SkillDiscoveryEngine` (`find-skill` Auto-Installer)** |
+| **Subagent Swarm Dispatch** | Single Worker | Single Worker | Single Worker | **✅ Full 8 Concurrent Subagent Matrix (`SubagentRegistry`)** |
+| **Visual Evidence Gate** | Heuristic | None | Heuristic | **✅ Chrome DevTools MCP + PNG Magic Header + Flow Receipts** |
 | **Zero-Infra DB Fallback** | Host DB Dependent | Host DB Dependent | Host DB Dependent | **✅ Automated `ZeroInfraDbEngine` (SQLite File Driver)** |
 | **Model Independence** | Provider Dependent | Locked to Anthropic | Locked to Meta API | **✅ 100% Model Agnostic (Gemini, Claude, GPT, DeepSeek)** |
 | **OS Compatibility** | Docker / Unix | Linux / macOS | Linux / macOS | **✅ Windows PowerShell, macOS, Linux Native** |
@@ -184,10 +162,13 @@ print(f"Kernel Approved Mutation: '{res['previousPhase']}' ➔ '{res['currentPha
 
 ## 🧪 Comprehensive Automated Test Suite
 
-S-Class V12.0 contains **91 automated unit and integration tests** passing with 100% success across Python 3.10–3.14:
+S-Class V12.1 contains **98 automated unit and integration tests** passing with 100% success across Python 3.10–3.14:
 
 | Test Module File | Test Count | Functionality Tested |
 | :--- | :--- | :--- |
+| `tests/test_subagent_registry.py` | 2 tests | Full 8 subagent concurrent dispatch, role assignment, `find-skill` capability binding. |
+| `tests/test_skill_discovery.py` | 1 test | Upfront tech/domain scanner, auto-cloning missing repos, skill discovery receipt generation. |
+| `tests/test_skill_orchestrator.py` | 4 tests | 70-skill catalog resolution, phase filtering, active skill stack receipt generation. |
 | `tests/test_v12_engines.py` | 3 tests | Automated AST dependency resolution, zero-infra DB fallbacks, port conflict resolution. |
 | `tests/test_spec_griller.py` | 2 tests | 5-vector threat audit, red-teaming report generation, critical defect detection. |
 | `tests/test_robust_qa.py` | 13 tests | Chrome DevTools DOM sanitization, user flow receipts, duplicate screenshot detection, Lighthouse audits. |
@@ -197,7 +178,6 @@ S-Class V12.0 contains **91 automated unit and integration tests** passing with 
 | `tests/test_intent_contract.py` | 4 tests | Composable contracts, OutputContractSpec v2.1 serialization, typed predicates. |
 | `tests/test_planner.py` | 9 tests | Meta-Planner workflow profile selection (`FULL`, `BUG_FIX`, `RESEARCH`, `REFACTOR`, `HOTFIX`). |
 | `tests/test_runtime.py` | 9 tests | FSM state initialization, schema validation, event dispatching, FileLock hardware mutual exclusion. |
-| `tests/test_memory_semantic.py` | 6 tests | Semantic TF-IDF vector similarity search, memory schema v2 auto-migration. |
 | `tests/test_security_shield.py` | 4 tests | Secret scanning, dangerous AST pattern detection, vulnerability report generation. |
 | `tests/test_topology.py` | 5 tests | Subagent network topologies (`WorkerMeshPool`, Star, Mesh, Ring phase resolution). |
 
@@ -207,6 +187,6 @@ S-Class V12.0 contains **91 automated unit and integration tests** passing with 
 
 **Copyright (c) 2026 ak-bharadwaj. All Rights Reserved.**
 
-S-Class EOS V12.0 is **Proprietary and Confidential Software**. 
+S-Class EOS V12.1 is **Proprietary and Confidential Software**. 
 
 Unauthorized copying, modification, redistribution, sublicensing, deployment, or public hosting of this Software, via any medium, is strictly prohibited. Access and usage are granted exclusively under explicit written authorization by the copyright holder (`ak-bharadwaj`). See [LICENSE](LICENSE) for full details.
