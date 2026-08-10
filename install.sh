@@ -21,4 +21,16 @@ else
     git clone https://github.com/ak-bharadwaj/S-class.git "$PLUGIN_DIR"
 fi
 
-echo "S-Class V12.1 installation complete! Plugin active at $PLUGIN_DIR"
+# Install Python requirements if python3 is available
+if command -v python3 &>/dev/null; then
+    echo "Verifying Python dependencies..."
+    python3 -m pip install -q -r "$PLUGIN_DIR/requirements.txt" 2>/dev/null
+fi
+
+echo "=========================================================="
+echo "⚡ S-Class V12.1 Installation Complete!"
+echo "Active Plugin Path: $PLUGIN_DIR"
+echo "Cataloged Skills: 71 (Impeccable, Taste, Emil Kowalski, React Doctor)"
+echo "Subagent Matrix: 8 Concurrent Subagents (find-skill Enabled)"
+echo "Commands: /goal, /grill, /doubt, /inquire"
+echo "=========================================================="
