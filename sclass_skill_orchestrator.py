@@ -242,7 +242,116 @@ class SkillTaxonomy:
             default_active=True
         ),
 
-        # Tier 10 — Core Backend Logic, Data Flow, & Role/Page Layout Skills
+        # Tier 11 — Essential Production Operations & Developer Ergonomics (Completing the 100-Skill Century)
+        "graphql-trpc-schema": SkillDefinition(
+            id="graphql-trpc-schema",
+            name="Type-Safe RPC & Schema Router Architecture",
+            tier="data",
+            purpose="Provides type-safe RPC query routing, tRPC transformers, GraphQL resolvers, and query batching.",
+            rule_guideline="Enforce end-to-end type safety between client hooks and server query procedures.",
+            technologies=["tRPC", "GraphQL", "Type-Safe Routers"],
+            default_active=True
+        ),
+        "cache-invalidation-redis": SkillDefinition(
+            id="cache-invalidation-redis",
+            name="Distributed Redis Caching & Invalidation Policies",
+            tier="domain",
+            purpose="Handles cache-aside pattern, TTL policies, tag invalidation, and Redis pub/sub state synchronization.",
+            rule_guideline="Invalidate related cache keys immediately upon database write/update mutations.",
+            technologies=["Redis", "Cache-Aside", "Tag Invalidation"],
+            default_active=True
+        ),
+        "cron-job-background-workers": SkillDefinition(
+            id="cron-job-background-workers",
+            name="Async Task Queues & Scheduled Cron Jobs",
+            tier="domain",
+            purpose="Manages BullMQ/Celery background task queues, exponential retry backoff, and recurring cron jobs.",
+            rule_guideline="Offload heavy PDF generation, email dispatches, and nightly data syncs to background workers.",
+            technologies=["BullMQ", "Celery", "Cron Jobs", "Redis Queue"],
+            default_active=True
+        ),
+        "seo-metadata-open-graph": SkillDefinition(
+            id="seo-metadata-open-graph",
+            name="SEO & OpenGraph Social Card Architecture",
+            tier="foundation",
+            purpose="Generates dynamic meta title/description tags, OpenGraph preview cards, Twitter cards, and JSON-LD data.",
+            rule_guideline="Include explicit page titles, meta descriptions, and OpenGraph image tags on all routes.",
+            technologies=["Next.js Metadata API", "OpenGraph", "JSON-LD"],
+            default_active=True
+        ),
+        "i18n-localization-engine": SkillDefinition(
+            id="i18n-localization-engine",
+            name="Multi-Language Localization & RTL Support",
+            tier="foundation",
+            purpose="Handles translation keys (next-intl / react-i18next), locale routing, and Right-to-Left (RTL) layout switching.",
+            rule_guideline="Store user-visible UI copy in structured translation dictionaries rather than hardcoded strings.",
+            technologies=["next-intl", "react-i18next", "RTL Layouts"],
+            default_active=False,
+            conditional_keywords=["i18n", "translation", "locale", "language", "rtl"]
+        ),
+        "audit-log-security-trail": SkillDefinition(
+            id="audit-log-security-trail",
+            name="Immutable Audit Logging & Activity Trail",
+            tier="domain",
+            purpose="Records immutable security audit logs (user ID, action, target resource, IP address, timestamp) for governance.",
+            rule_guideline="Log all administrative lock changes, grade edits, and approval actions to an append-only audit trail.",
+            technologies=["Audit Logging", "Security Trail", "Append-Only Logs"],
+            default_active=True
+        ),
+        "form-validation-field-errors": SkillDefinition(
+            id="form-validation-field-errors",
+            name="Form State & Inline Field Error Ergonomics",
+            tier="foundation",
+            purpose="Integrates React Hook Form, Zod resolvers, dynamic array field append/remove, and inline error micro-typography.",
+            rule_guideline="Display clear, contextual red error messages directly beneath invalid input fields upon blur.",
+            technologies=["React Hook Form", "Zod Resolvers", "Inline Error UI"],
+            default_active=True
+        ),
+        "skeleton-shimmer-states": SkillDefinition(
+            id="skeleton-shimmer-states",
+            name="Progressive Skeleton Loader & Shimmer Ergonomics",
+            tier="interaction",
+            purpose="Displays layout-matching skeleton shimmer placeholders while asynchronous API data is resolving.",
+            rule_guideline="Match skeleton loader shapes exactly to target card grids and table rows before data populates.",
+            technologies=["Skeleton Loaders", "Tailwind Animate Shimmer"],
+            default_active=True
+        ),
+        "toast-notification-system": SkillDefinition(
+            id="toast-notification-system",
+            name="Non-Blocking Sonner Toast & Dialog Alert Suite",
+            tier="interaction",
+            purpose="Replaces blocking browser alerts with sleek Sonner toasts (success, error, loading) and modal dialogs.",
+            rule_guideline="Trigger success toasts on mutation completion and error toasts on network failure.",
+            technologies=["Sonner Toasts", "Radix Dialogs"],
+            default_active=True
+        ),
+        "keyboard-shortcut-hotkeys": SkillDefinition(
+            id="keyboard-shortcut-hotkeys",
+            name="Power User Keyboard Hotkey Shortcuts",
+            tier="interaction",
+            purpose="Provides keyboard hotkey listeners (Ctrl/⌘+S, Esc, Tab focus traps, arrow key table navigation).",
+            rule_guideline="Support keyboard navigation across data tables, modal dialogs, and command bars.",
+            technologies=["react-hotkeys-hook", "Keyboard Listeners"],
+            default_active=True
+        ),
+        "error-boundary-fallbacks": SkillDefinition(
+            id="error-boundary-fallbacks",
+            name="Component Error Boundaries & Self-Healing Fallbacks",
+            tier="quality",
+            purpose="Catches runtime JavaScript rendering exceptions in component sub-trees and renders graceful reset UI.",
+            rule_guideline="Wrap major page sections in React Error Boundaries to prevent full app white-screen crashes.",
+            technologies=["React Error Boundary", "Fallback UI"],
+            default_active=True
+        ),
+        "health-check-telemetry": SkillDefinition(
+            id="health-check-telemetry",
+            name="Application Health Probes & Telemetry Metrics",
+            tier="quality",
+            purpose="Provides /api/health readiness/liveness probes, database connection checks, and error logging.",
+            rule_guideline="Include /api/health route returning DB connection status, memory usage, and uptime.",
+            technologies=["Health Probes", "Telemetry", "Prometheus Metrics"],
+            default_active=True
+        ),
         "backend-domain-logic": SkillDefinition(
             id="backend-domain-logic",
             name="Core Backend Business Logic & Transaction Isolation",
