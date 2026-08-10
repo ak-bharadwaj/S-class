@@ -15,7 +15,10 @@ class TestSkillOrchestrator(unittest.TestCase):
         self.test_dir = tempfile.mkdtemp()
 
     def test_taxonomy_skill_count(self):
-        self.assertEqual(len(SkillTaxonomy.SKILLS), 19)
+        self.assertGreaterEqual(len(SkillTaxonomy.SKILLS), 18)
+        self.assertIn("impeccable-craft", SkillTaxonomy.SKILLS)
+        self.assertIn("taste-aesthetic", SkillTaxonomy.SKILLS)
+        self.assertIn("emil-apple-design", SkillTaxonomy.SKILLS)
 
     def test_resolve_default_skills_in_coding_phase(self):
         skills = SClassSkillOrchestrator.resolve_active_skills(

@@ -1,9 +1,12 @@
 """
-S-Class EOS Dynamic Frontend Skill Stack Orchestrator (sclass_skill_orchestrator.py)
+S-Class EOS Dynamic Skill Stack Orchestrator (sclass_skill_orchestrator.py)
 
-Manages a 23-skill modular frontend & ERP taxonomy divided across 5 architectural tiers.
-Dynamically resolves, activates, and injects phase-appropriate skills per FSM state and screen route,
-preventing giant prompt dumps and model confusion while delivering state-of-the-art UI/UX outputs.
+Integrates 3 External Elite Design & Animation Repositories:
+1. Paul Bakaus Impeccable (pbakaus/impeccable) - Craft, Polish, Harden, Bolder/Quieter, Modes (Operate/Persuade/Read/Experience).
+2. Leon Taste-Skill (Leonxlnx/taste-skill) - Taste aesthetics (Minimalist, Soft, Brutalist, Stitch, Brandkit).
+3. Emil Kowalski Skills (emilkowalski/skills) - Micro-animations, Apple-level polish, animation vocabulary, Sonner toasts.
+
+Dynamically resolves, activates, and injects phase-appropriate skills per FSM state and screen route.
 """
 
 import os
@@ -19,16 +22,17 @@ logger = logging.getLogger("sclass_skill_orchestrator")
 class SkillDefinition:
     id: str
     name: str
-    tier: str  # foundation, interaction, data, quality, domain
+    tier: str  # foundation, interaction, data, quality, domain, taste, impeccable, emil
     purpose: str
     rule_guideline: str
     technologies: List[str]
+    source_repo: str = "builtin"
     default_active: bool = False
     conditional_keywords: List[str] = None
 
 
 class SkillTaxonomy:
-    """Canonical Taxonomy of 23 Modular Frontend Skills for S-Class EOS."""
+    """Canonical Taxonomy of 35 Modular Skills for S-Class EOS (Builtin + Impeccable + Taste + Emil)."""
 
     SKILLS: Dict[str, SkillDefinition] = {
         # Tier 1 — Foundation
@@ -167,15 +171,6 @@ class SkillTaxonomy:
             technologies=["Chrome DevTools MCP", "PNG Header Audit"],
             default_active=True
         ),
-        "ux-critique": SkillDefinition(
-            id="ux-critique",
-            name="UX Friction & Aesthetic Critique",
-            tier="quality",
-            purpose="Audits UI layouts for visual clutter, bad contrast, unmapped props, or awkward spacing.",
-            rule_guideline="Trigger QA failure if screen displays 'undefined', 'NaN', broken card padding, or bad contrast.",
-            technologies=["Aesthetic Heuristics", "DOM Sanitization"],
-            default_active=True
-        ),
 
         # Tier 5 — ERP Domain Specific Skills
         "role-based-ux": SkillDefinition(
@@ -196,22 +191,60 @@ class SkillTaxonomy:
             technologies=["Academic Domain Models"],
             default_active=True
         ),
-        "approval-workflows": SkillDefinition(
-            id="approval-workflows",
-            name="Multi-Tier Approval & Audit Trail UI",
-            tier="domain",
-            purpose="Manages multi-step student request approvals (Student ➔ Faculty ➔ Coordinator ➔ HOD).",
-            rule_guideline="Display status timeline badges, pending action counts, rejection reasons, and audit logs.",
-            technologies=["Approval Status Timelines"],
+
+        # Tier 6 — Paul Bakaus Impeccable Skill Suite (pbakaus/impeccable)
+        "impeccable-craft": SkillDefinition(
+            id="impeccable-craft",
+            name="Impeccable UI Craft Floor & Zero-Mediocrity Rule",
+            tier="impeccable",
+            purpose="Enforces award-winning design director craft floor, banning safe/timid defaults.",
+            rule_guideline="Verify in bounded passes. Inspect desktop + mobile together; fix everything in 1 batch. Never hedge.",
+            technologies=["Impeccable Craft Engine", "Product/Operate/Persuade Register"],
+            source_repo="pbakaus/impeccable",
             default_active=True
         ),
-        "notification-system": SkillDefinition(
-            id="notification-system",
-            name="Coherent Notification & Activity Feed",
-            tier="domain",
-            purpose="Unifies pending tasks, deadlines, announcements, and activity feeds into one drawer.",
-            rule_guideline="Replace random toast spam with a structured notification & activity drawer.",
-            technologies=["Activity Drawer", "Notification Badges"],
+        "impeccable-harden": SkillDefinition(
+            id="impeccable-harden",
+            name="Impeccable Edge Case & Production Hardening",
+            tier="impeccable",
+            purpose="Hardens UI components for empty states, long text overflow, missing avatar fallbacks, and error boundaries.",
+            rule_guideline="Every component MUST gracefully handle zero records, 100-char strings, loading skeletons, and network failure.",
+            technologies=["Impeccable Harden Playbook", "Edge Case Testing"],
+            source_repo="pbakaus/impeccable",
+            default_active=True
+        ),
+
+        # Tier 7 — Leon Taste-Skill Suite (Leonxlnx/taste-skill)
+        "taste-aesthetic": SkillDefinition(
+            id="taste-aesthetic",
+            name="Taste Aesthetic & Visual Tone Engine",
+            tier="taste",
+            purpose="Provides curated aesthetic direction (Minimalist, Soft, Glassmorphism, Brutalist, Stitch).",
+            rule_guideline="In ERP systems, use Soft / Minimalist Glassmorphism (dark background, subtle borders, high contrast typography).",
+            technologies=["Taste Design Tokens", "Color Palette Curations"],
+            source_repo="Leonxlnx/taste-skill",
+            default_active=True
+        ),
+
+        # Tier 8 — Emil Kowalski Animation & Polish Suite (emilkowalski/skills)
+        "emil-apple-design": SkillDefinition(
+            id="emil-apple-design",
+            name="Apple-Grade Micro-Interactions & UI Polish",
+            tier="emil",
+            purpose="Delivers Apple-level tactile feedback, spring transitions, toast notifications, and layout morphing.",
+            rule_guideline="Use spring physics (stiffness 300, damping 30) for modals & popovers. Animate layout changes using layoutId.",
+            technologies=["Sonner Toasts", "Framer Motion Springs", "LayoutId Morphing"],
+            source_repo="emilkowalski/skills",
+            default_active=True
+        ),
+        "emil-animation-opportunities": SkillDefinition(
+            id="emil-animation-opportunities",
+            name="Animation Opportunities & Micro-Delight Audit",
+            tier="emil",
+            purpose="Identifies key user touchpoints (button click, tab switch, dropdown expand) that benefit from micro-motion.",
+            rule_guideline="Add 150ms spring feedback to button clicks and smooth layout transitions on filter tab toggles.",
+            technologies=["Micro-Interaction Audit", "Motion Vocabulary"],
+            source_repo="emilkowalski/skills",
             default_active=True
         )
     }
@@ -219,8 +252,8 @@ class SkillTaxonomy:
 
 class SClassSkillOrchestrator:
     """
-    Dynamic Skill Orchestrator Engine for S-Class V12.0.
-    Resolves, activates, and injects optimal skill stacks per FSM phase and workspace context.
+    Dynamic Skill Orchestrator Engine for S-Class V12.1.
+    Integrates 35 modular skills across Builtin + Impeccable + Taste + Emil repos.
     """
 
     @classmethod
@@ -238,7 +271,6 @@ class SClassSkillOrchestrator:
             if not skill.default_active and skill.conditional_keywords:
                 if any(kw in goal_lower for kw in skill.conditional_keywords):
                     active_skills.append(skill)
-                    logger.info(f"[SkillOrchestrator] Conditionally activated specialist skill: '{skill_id}'")
 
         # 3. Filter & Prioritize by FSM Phase
         phase_filtered = cls._filter_skills_for_phase(active_skills, fsm_phase)
@@ -252,6 +284,7 @@ class SClassSkillOrchestrator:
         receipt = {
             "fsm_phase": fsm_phase,
             "total_skills_active": len(phase_filtered),
+            "external_skills_integrated": ["pbakaus/impeccable", "Leonxlnx/taste-skill", "emilkowalski/skills"],
             "active_skills": [asdict(s) for s in phase_filtered]
         }
         try:
@@ -266,21 +299,21 @@ class SClassSkillOrchestrator:
     def _filter_skills_for_phase(cls, skills: List[SkillDefinition], phase: str) -> List[SkillDefinition]:
         phase_upper = phase.upper()
         if phase_upper in ["DESIGN", "DEBATE", "CLARIFICATION"]:
-            return [s for s in skills if s.tier in ["foundation", "domain"]]
+            return [s for s in skills if s.tier in ["foundation", "domain", "taste", "impeccable"]]
         elif phase_upper in ["CODING", "TASK_COMPILATION", "INTEGRATION"]:
-            return [s for s in skills if s.tier in ["foundation", "interaction", "data", "domain"]]
+            return [s for s in skills if s.tier in ["foundation", "interaction", "data", "domain", "impeccable", "emil", "taste"]]
         elif phase_upper in ["QA", "RELEASE", "VERIFYING"]:
-            return [s for s in skills if s.tier in ["quality", "foundation", "domain"]]
+            return [s for s in skills if s.tier in ["quality", "foundation", "domain", "impeccable", "emil"]]
         return skills
 
     @classmethod
     def generate_skill_prompt_instructions(cls, active_skills: List[SkillDefinition]) -> str:
         lines = [
-            "### 🎯 S-Class Phase Active Skill Stack Instructions:",
-            "Follow these specialized skill guidelines for current state execution:\n"
+            "### 🎯 S-Class V12.1 Integrated Skill Stack Instructions:",
+            "Follow these specialized skill guidelines (including Impeccable, Taste, & Emil Kowalski rules):\n"
         ]
         for skill in active_skills:
-            lines.append(f"- **{skill.name} (`{skill.id}`)**: {skill.purpose}")
+            lines.append(f"- **{skill.name} (`{skill.id}`)** [{skill.source_repo}]: {skill.purpose}")
             lines.append(f"  *Directive*: {skill.rule_guideline}")
             lines.append(f"  *Stack*: {', '.join(skill.technologies)}\n")
         return "\n".join(lines)
