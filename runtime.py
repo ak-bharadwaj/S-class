@@ -684,6 +684,17 @@ def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce
                 ]
                 matched_path = rec_engine.match_error(last_error, default_paths)
                 backoff = rec_engine.calculate_backoff(state.retryCount, matched_path) if matched_path else 1.0
+                
+                # Write Failure Report for RECOVERY evidence gate
+                state_dir = os.path.join(workspace_dir, ".agents")
+                os.makedirs(state_dir, exist_ok=True)
+                write_json_atomic(os.path.join(state_dir, "failure_report.json"), {
+                    "error_log": last_error,
+                    "target_phase": target_phase,
+                    "matched_action": matched_path.recovery_action if matched_path else "retry",
+                    "backoff_seconds": backoff,
+                    "timestamp": ts_now
+                })
                 logger.warning(f"[Runtime RecoveryEngine] Smart Recovery classified error: TargetPhase='{target_phase}', Action='{matched_path.recovery_action if matched_path else 'retry'}', Backoff={backoff}s")
             except Exception as r_ex:
                 logger.warning(f"[Runtime] Recovery engine note: {r_ex}")
@@ -700,6 +711,13 @@ def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce
                 from monitoring import MultiStreamMonitor
                 mon = MultiStreamMonitor(workspace_dir)
                 mon.record_event("monitoring_heartbeat", {"phase": "MONITORING", "status": "ACTIVE", "timestamp": ts_now})
+                state_dir = os.path.join(workspace_dir, ".agents")
+                os.makedirs(state_dir, exist_ok=True)
+                write_json_atomic(os.path.join(state_dir, "monitoring_heartbeat.json"), {
+                    "phase": "MONITORING",
+                    "status": "ACTIVE",
+                    "timestamp": ts_now
+                })
             except Exception as m_ex:
                 logger.warning(f"[Runtime] Telemetry monitor note: {m_ex}")
 

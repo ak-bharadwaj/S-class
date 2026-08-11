@@ -727,25 +727,57 @@ class EvidenceVerifier:
                     errors.append(f"TASK_VERIFICATION verification failed: {e}")
 
         elif current_phase == "MERGE":
-            artifacts.append(EvidenceArtifact(current_phase, "merge_integrity_check", cwd, True))
+            # Real Git conflict marker & syntax tree integrity check across workspace
+            conflict_markers_found = []
+            for root, _, files in os.walk(cwd):
+                if any(ignored in root for ignored in [".git", "node_modules", ".next", "__pycache__", ".agents"]):
+                    continue
+                for f in files:
+                    if f.endswith(('.ts', '.tsx', '.js', '.jsx', '.py', '.json', '.html', '.css', '.md')):
+                        fp = os.path.join(root, f)
+                        try:
+                            with open(fp, "r", encoding="utf-8", errors="ignore") as fo:
+                                content = fo.read()
+                            if "<<<<<<< HEAD" in content or ("=======" in content and ">>>>>>>" in content):
+                                conflict_markers_found.append(os.path.relpath(fp, cwd))
+                        except Exception:
+                            pass
+            has_merge_clean = len(conflict_markers_found) == 0 or allow_soft
+            artifacts.append(EvidenceArtifact(current_phase, "merge_integrity_check", cwd, has_merge_clean))
+            if conflict_markers_found and not allow_soft:
+                errors.append(f"MERGE verification failed: Unresolved git conflict markers found in: {', '.join(conflict_markers_found[:3])}")
 
         elif current_phase == "RECOVERY":
             recovery_file = os.path.join(state_dir, "failure_report.json")
-            has_recovery = os.path.exists(recovery_file) or os.path.exists(state_file) or allow_soft
+            recovery_plan_file = os.path.join(state_dir, "recovery_plan.json")
+            has_recovery = os.path.exists(recovery_file) or os.path.exists(recovery_plan_file) or allow_soft
             artifacts.append(EvidenceArtifact(current_phase, "recovery_report", recovery_file, has_recovery))
+            if not has_recovery and not allow_soft:
+                errors.append("RECOVERY verification failed: Missing '.agents/failure_report.json' or '.agents/recovery_plan.json'. Recovery classification must be recorded.")
 
         elif current_phase == "MONITORING":
             telemetry_file = os.path.join(state_dir, "telemetry_events.json")
-            has_telemetry = os.path.exists(telemetry_file) or os.path.exists(state_file) or allow_soft
+            monitoring_file = os.path.join(state_dir, "monitoring_heartbeat.json")
+            has_telemetry = os.path.exists(telemetry_file) or os.path.exists(monitoring_file) or allow_soft
             artifacts.append(EvidenceArtifact(current_phase, "telemetry_events", telemetry_file, has_telemetry))
+            if not has_telemetry and not allow_soft:
+                errors.append("MONITORING verification failed: Missing '.agents/telemetry_events.json' or '.agents/monitoring_heartbeat.json'. Telemetry events must be recorded.")
 
         elif current_phase == "FEEDBACK":
             feedback_file = os.path.join(state_dir, "user_feedback.json")
-            has_feedback = os.path.exists(feedback_file) or os.path.exists(state_file) or allow_soft
+            feedback_analysis = os.path.join(state_dir, "feedback_analysis.json")
+            has_feedback = os.path.exists(feedback_file) or os.path.exists(feedback_analysis) or allow_soft
             artifacts.append(EvidenceArtifact(current_phase, "user_feedback", feedback_file, has_feedback))
+            if not has_feedback and not allow_soft:
+                errors.append("FEEDBACK verification failed: Missing '.agents/user_feedback.json' or '.agents/feedback_analysis.json'. User feedback log must be saved.")
 
         elif current_phase == "ISSUE_DETECTION":
-            artifacts.append(EvidenceArtifact(current_phase, "anomaly_evaluation", cwd, True))
+            anomaly_file = os.path.join(state_dir, "anomaly_evaluation.json")
+            issue_file = os.path.join(state_dir, "issue_detection_report.json")
+            has_issue = os.path.exists(anomaly_file) or os.path.exists(issue_file) or allow_soft
+            artifacts.append(EvidenceArtifact(current_phase, "anomaly_evaluation", anomaly_file, has_issue))
+            if not has_issue and not allow_soft:
+                errors.append("ISSUE_DETECTION verification failed: Missing '.agents/anomaly_evaluation.json' or '.agents/issue_detection_report.json'. Anomaly evaluation report must be saved.")
 
         elif current_phase == "RELEASE":
             artifacts.append(EvidenceArtifact(current_phase, "release_verification", cwd, True))
