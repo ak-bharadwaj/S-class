@@ -7,10 +7,12 @@ before state transitions are permitted by the FSM runtime.
 
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional, Tuple, Set
+from abc import ABC, abstractmethod
 import os
 import json
 import logging
 import hashlib
+import subprocess
 from datetime import datetime, timezone
 
 logger = logging.getLogger("sclass_verifier")
@@ -783,16 +785,6 @@ class EvidenceVerifier:
             output_verification_mechanism=receipt.mechanism_used,
             contract_coverage=cov,
         )
-
-
-import os
-import json
-import hashlib
-import subprocess
-from datetime import datetime, timezone
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional, Tuple, Set
 
 
 def get_git_commit_sha(workspace_dir: str) -> str:
