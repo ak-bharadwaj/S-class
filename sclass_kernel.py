@@ -174,11 +174,19 @@ class MinimalDeterministicKernel:
                 if "taskVersion" in payload:
                     task_version = payload["taskVersion"]
 
-            # Aggregate decision and history logs if present
+            # Aggregate decision and history logs, enriching with event metadata if present
             if "decision" in payload and isinstance(payload["decision"], dict):
-                decision_log.append(payload["decision"])
+                dec = dict(payload["decision"])
+                if meta.get("actor") and "agent" not in dec:
+                    dec["agent"] = meta["actor"]
+                decision_log.append(dec)
             if "transitionRecord" in payload and isinstance(payload["transitionRecord"], dict):
-                transition_history.append(payload["transitionRecord"])
+                rec = dict(payload["transitionRecord"])
+                if meta.get("timestamp") and "timestamp" not in rec:
+                    rec["timestamp"] = meta["timestamp"]
+                if meta.get("actor") and "actor" not in rec:
+                    rec["actor"] = meta["actor"]
+                transition_history.append(rec)
 
         state = runtime.State(
             taskId=events[0].get("taskId", "reconstructed-task"),

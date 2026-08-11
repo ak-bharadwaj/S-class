@@ -95,7 +95,6 @@ class KnowledgeBaseManager:
     @staticmethod
     def _build_inverted_index(workspace_dir: Optional[str] = None, force_refresh: bool = False) -> None:
         """Builds an inverted keyword index for O(1) keyword lookups."""
-        global _KB_INDEX, _KB_CACHE
         if _KB_INDEX and not force_refresh:
             return
 

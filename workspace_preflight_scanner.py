@@ -72,7 +72,7 @@ class WorkspacePreflightScanner:
                         with open(fp, "r", encoding="utf-8", errors="ignore") as fo:
                             for line in fo:
                                 line_str = line.strip()
-                                if line_str and not line_str.startswith("#") and "=" in line_str:
+                                if line_str and not line_str.startswith("#") and env_pattern.match(line_str):
                                     env_vars_declared.add(line_str.split("=")[0].strip())
                     except Exception:
                         pass
