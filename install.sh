@@ -3,6 +3,8 @@
 # S-Class V12.1 SDK Installer for Linux/macOS
 # Run: curl -fsSL https://raw.githubusercontent.com/ak-bharadwaj/S-class/master/install.sh | bash
 
+set -e
+
 PLUGIN_ROOT="$HOME/.gemini/config/plugins"
 PLUGIN_DIR="$PLUGIN_ROOT/sclass-v5"
 
@@ -24,7 +26,7 @@ fi
 # Install Python requirements if python3 is available
 if command -v python3 &>/dev/null; then
     echo "Verifying Python dependencies..."
-    python3 -m pip install -q -r "$PLUGIN_DIR/requirements.txt" 2>/dev/null
+    python3 -m pip install -q -r "$PLUGIN_DIR/requirements.txt"
 fi
 
 echo "=========================================================="

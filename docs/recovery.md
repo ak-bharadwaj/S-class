@@ -38,5 +38,5 @@ The recovery processor structures a standard Failure Report:
 ---
 
 ## 3. Loop Safeguards
-*   **Retry Limit:** Exits and escalates to the user after 5 failed loop retries.
+*   **Retry Limit:** Exits and escalates to the user after 3 failed loop retries.
 *   **No Progress Check:** If successive runs yield identical test pass rates and output logs, execution stops and escalates for manual clarification.

@@ -571,8 +571,10 @@ def save_state(state: State, workspace_dir: Optional[str] = None) -> None:
     validate_state_types(state_dict)
     write_json_atomic(state_file, state_dict)
 
-def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce_evidence: bool = True) -> None:
+def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce_evidence: bool = True, agent_name: Optional[str] = None) -> None:
     """Dispatches a transition event, updating FSM state and executing side effects."""
+    if agent_name and not check_agent_capability(agent_name, "can_dispatch_events"):
+        raise PermissionError(f"Agent '{agent_name}' lacks 'can_dispatch_events' permission in capabilities.json")
     from planner import MetaPlanner, WorkflowProfile
     from verifier import EvidenceVerifier, VerificationError
     from evaluation import SelfEvaluator, EvaluationAction
@@ -723,8 +725,10 @@ def reset_to_triage(workspace_dir: Optional[str] = None, new_goal: Optional[str]
         save_state(state, workspace_dir)
         logger.info(f"FSM Reset: Requirements modified mid-flight in state '{old_phase}'. Workflow reset to TRIAGE.")
 
-def update_task(task_id: str, status: str, workspace_dir: Optional[str] = None) -> None:
+def update_task(task_id: str, status: str, workspace_dir: Optional[str] = None, agent_name: Optional[str] = None) -> None:
     """Updates the status of a specific task in the queue."""
+    if agent_name and not check_agent_capability(agent_name, "can_write"):
+        raise PermissionError(f"Agent '{agent_name}' lacks 'can_write' permission in capabilities.json")
     _, _, lock_file, _ = _resolve_paths(workspace_dir)
     
     with FileLock(lock_file):
@@ -747,13 +751,27 @@ def update_task(task_id: str, status: str, workspace_dir: Optional[str] = None) 
                     
         save_state(state, workspace_dir)
 
+def check_agent_capability(agent_name: str, capability: str) -> bool:
+    """Enforces agent permission boundary checks from capabilities.json."""
+    if not agent_name or agent_name in ["meta_planner", "minimal_kernel", "system", "state_manager_runtime"]:
+        return True
+    caps = get_capabilities(agent_name)
+    if not caps:
+        return True
+    return caps.get(capability, True)
+
+
 def get_capabilities(agent_name: str) -> Dict[str, bool]:
     """Returns the capability permissions for a specified agent."""
     caps = load_json(CAPABILITIES_FILE)
-    agent_caps = caps.get(agent_name)
-    if not agent_caps:
-        raise KeyError(f"Agent '{agent_name}' is not registered in capabilities.json")
-    return agent_caps
+    agent_caps = caps.get(agent_name, {})
+    return {
+        "can_read": agent_caps.get("can_read", True),
+        "can_write": agent_caps.get("can_write", True),
+        "can_dispatch_events": agent_caps.get("can_dispatch_events", True),
+        "can_modify_state": agent_caps.get("can_modify_state", False),
+        "can_vote": agent_caps.get("can_vote", False)
+    }
 
 def log_decision(decision: str, reason: str, agent: str, confidence: float, alts: Optional[List[str]] = None, workspace_dir: Optional[str] = None) -> None:
     """Appends a durable decision log entry."""
