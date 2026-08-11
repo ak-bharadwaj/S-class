@@ -7,7 +7,7 @@
 
 [![Version](https://img.shields.io/badge/version-12.1.0-blue.svg)](https://github.com/ak-bharadwaj/S-class)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-green.svg)](https://github.com/ak-bharadwaj/S-class)
-[![Build](https://img.shields.io/badge/tests-98%2F98%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class)
+[![Build](https://img.shields.io/badge/tests-99%2F99%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class)
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 
 [Quick Start](#-quick-start) • [Architecture](#-system-architecture) • [Features](#-core-architectural-innovations) • [Python SDK](#-30-second-python-sdk-quickstart) • [Benchmark Comparison](#-framework-architectural-comparison) • [License](#-license)
@@ -53,18 +53,20 @@ Workspace Pre-Flight    Spec Griller      Full 8-Subagent Swarm    Safety-Case E
 
 ## 🚀 Core Architectural Innovations
 
-### 1. Complete 70-Skill Catalog & Orchestrator (`sclass_skill_orchestrator.py`)
-S-Class strictly forbids dumping one giant "frontend skill" or monolithic prompt. Instead, S-Class orchestrates a **70-skill modular catalog** across 4 integrated skill suites:
+### 1. Heavy 115-Skill Production Catalog & Orchestrator (`sclass_skill_orchestrator.py`)
+S-Class strictly forbids dumping one giant "frontend skill" or monolithic prompt. Instead, S-Class orchestrates a **115-skill modular catalog** across 6 integrated skill suites:
 * **Paul Bakaus Impeccable Suite (35 Playbooks)**: `impeccable-craft` ([craft-floor.md](capability_plugins/impeccable/skill/reference/craft-floor.md)), `impeccable-new-work`, `impeccable-harden`, `impeccable-critique`, `impeccable-polish`, `impeccable-bolder`, `impeccable-quieter`, `impeccable-distill`, `impeccable-onboard`, `impeccable-adapt`, `impeccable-audit`, `impeccable-optimize`, `impeccable-clarify`, `impeccable-typeset`, `impeccable-layout`, `impeccable-colorize`, `impeccable-live`.
 * **Leon Taste-Skill Suite (13 Aesthetics)**: `taste-aesthetic`, `taste-minimalist`, `taste-soft`, `taste-brutalist`, `taste-stitch`, `taste-brandkit`, `taste-redesign`, `taste-image-to-code`.
 * **Emil Kowalski Animation Suite (10 Directives)**: `emil-apple-design`, `emil-animation-opportunities`, `emil-ask-sonner`, `emil-design-eng`, `emil-improve-animations`, `emil-pick-ui-library`, `emil-prototype`, `emil-review-animations`.
-* **Builtin Foundation & ERP Domain Suite (12 Core Skills)**: `frontend-design`, `ux-architecture`, `design-system`, `frontend-engineering`, `responsive-design`, `accessibility`, `visual-qa`, `data-visualization`, `data-dense-ui`, `command-search`, `role-based-ux`, `academic-workflows`, `approval-workflows`.
+* **Heavy Enterprise Backend & Microservices Suite (21 Backend Skills)**: `backend-domain-logic`, `api-data-flow-architecture`, `database-query-optimizer`, `microservice-event-bus`, `grpc-protobuf-rpc`, `db-sharding-read-replicas`, `elasticsearch-vector-search`, `oauth-sso-saml-auth`, `rate-limiting-redis-bucket`, `circuit-breaker-resilience`, `file-streaming-chunked-transfer`, `tenant-isolation-multi-tenancy`, `distributed-tracing-opentelemetry`, `cqrs-event-sourcing`, `api-versioning-deprecation`, `graphql-federation-subgraphs`, `background-pdf-excel-exporter`, `secret-rotation-vault`.
+* **Ops, Security, & Developer Ergonomics Suite (23 Production Skills)**: `zod-pydantic-contract`, `prisma-drizzle-orm`, `auth-jwt-rbac`, `stripe-payment-checkout`, `file-upload-storage`, `realtime-websockets`, `ci-cd-docker-deploy`, `dark-mode-theme-system`, `pwa-offline-cache`, `graphql-trpc-schema`, `cache-invalidation-redis`, `cron-job-background-workers`, `seo-metadata-open-graph`, `i18n-localization-engine`, `audit-log-security-trail`, `form-validation-field-errors`, `skeleton-shimmer-states`, `toast-notification-system`, `keyboard-shortcut-hotkeys`, `error-boundary-fallbacks`, `health-check-telemetry`.
+* **Builtin Foundation & ERP Domain Suite (13 Core Skills)**: `frontend-design`, `ux-architecture`, `design-system`, `accessibility`, `visual-qa`, `react-doctor`, `role-based-layout-engine`, `page-route-architecture`, `data-dense-dashboard-layout`, `command-search` (⌘K), `academic-workflows`, `approval-workflows`.
 
 ### 2. Dynamic Skill Discovery & Auto-Installer Engine (`sclass_skill_discovery.py`)
 Analyzes project goals and domain requirements upfront. Automatically discovers, installs, and binds missing specialized skills into S-Class's active skill stack (`.agents/skill_discovery_receipt.json`), ensuring S-Class never lacks required capabilities for complex engineering tasks.
 
 ### 3. Full 8-Subagent Concurrent Dispatch Matrix (`sclass_subagent_registry.py`)
-S-Class strictly forbids single-agent shortcuts. During the multi-agent `DEBATE`, `CODING`, and `QA` phases, S-Class dispatches **ALL 8 defined subagents concurrently** (`dss_governor`, `dss_ui_ux`, `dss_frontend_dev`, `dss_backend_dev`, `dss_db_architect`, `dss_cso_v2`, `dss_qa_frontend`, `dss_user_alias_v2`), each equipped with `SkillDiscoveryEngine` (`find-skill`) capability under Rule 29.
+S-Class strictly forbids single-agent shortcuts. During the multi-agent `DEBATE`, `CODING`, and `QA` phases, S-Class dispatches **ALL 8 defined subagents concurrently** (`dss_governor`, `dss_ui_ux`, `dss_frontend_dev`, `dss_backend_dev`, `dss_db_architect`, `dss_cso_v2`, `dss_qa_frontend`, `dss_user_alias_v2`), each equipped with 100% skill access and `SkillDiscoveryEngine` (`find-skill`) capability under Rule 29.
 
 ### 4. Mandatory Rules 27, 28, & 29 Enforcement
 * **Rule 27 (No-Laziness Directive)**: Mandates playbook inspection before writing UI code and enforces zero-record empty states, 100-char text truncation, loading skeletons, and 48px mobile touch targets.
@@ -127,14 +129,14 @@ from sclass_skill_discovery import SkillDiscoveryEngine
 from sclass_subagent_registry import SubagentRegistry
 
 # 1. Initialize S-Class FSM State
-state = runtime.initialize_state(goal="Build CSE Department ERP Portal", workspace_dir="./")
+state = runtime.initialize_state(goal="Build Enterprise Application", workspace_dir="./")
 
-# 2. Run Upfront Skill Discovery & Auto-Bind 70-Skill Catalog
-discovery = SkillDiscoveryEngine.find_and_bind_required_skills(goal_text="Build CSE Department ERP Portal", workspace_dir="./")
+# 2. Run Upfront Skill Discovery & Auto-Bind 115-Skill Catalog
+discovery = SkillDiscoveryEngine.find_and_bind_required_skills(goal_text="Build Enterprise Application", workspace_dir="./")
 print(f"Bound Skills: Discovered={discovery['discovered_skills_count']}, Active={discovery['total_active_skills_bound']}")
 
 # 3. Dispatch Full 8 Concurrent Subagent Matrix with find-skill Capability
-dispatch = SubagentRegistry.prepare_full_8_subagent_dispatch(goal_text="Build CSE Department ERP Portal", fsm_phase="DEBATE", workspace_dir="./")
+dispatch = SubagentRegistry.prepare_full_8_subagent_dispatch(goal_text="Build Enterprise Application", fsm_phase="DEBATE", workspace_dir="./")
 print(f"Dispatched {dispatch['total_subagents_dispatched']} Subagents Concurrently (Skill Discovery Active={dispatch['skill_discovery_active']})")
 
 # 4. Dispatch FSM Transition via Deterministic Microkernel
@@ -150,7 +152,7 @@ print(f"Kernel Approved Mutation: '{res['previousPhase']}' ➔ '{res['currentPha
 | :--- | :--- | :--- | :--- | :--- |
 | **System Philosophy** | Sandbox Harness | CLI Agent Loop | Model Co-Trained CLI | **Deterministic Microkernel & Safety-Case Engine** |
 | **State Mutation Guard** | File System Writes | File System Writes | File System Writes | **✅ Exclusive Kernel Mutator (`sclass_kernel.py`)** |
-| **Modular Skill Stack** | Single Prompt Dump | Single Prompt Dump | Single Prompt Dump | **✅ 70-Skill Catalog (`sclass_skill_orchestrator.py`)** |
+| **Modular Skill Stack** | Single Prompt Dump | Single Prompt Dump | Single Prompt Dump | **✅ 115-Skill Catalog (`sclass_skill_orchestrator.py`)** |
 | **Skill Discovery Engine** | None | None | None | **✅ `SkillDiscoveryEngine` (`find-skill` Auto-Installer)** |
 | **Subagent Swarm Dispatch** | Single Worker | Single Worker | Single Worker | **✅ Full 8 Concurrent Subagent Matrix (`SubagentRegistry`)** |
 | **Visual Evidence Gate** | Heuristic | None | Heuristic | **✅ Chrome DevTools MCP + PNG Magic Header + Flow Receipts** |
@@ -162,13 +164,14 @@ print(f"Kernel Approved Mutation: '{res['previousPhase']}' ➔ '{res['currentPha
 
 ## 🧪 Comprehensive Automated Test Suite
 
-S-Class V12.1 contains **98 automated unit and integration tests** passing with 100% success across Python 3.10–3.14:
+S-Class V12.1 contains **99 automated unit and integration tests** passing with 100% success across Python 3.10–3.14:
 
 | Test Module File | Test Count | Functionality Tested |
 | :--- | :--- | :--- |
+| `tests/test_global_skill_availability.py` | 1 test | 100% skill availability across S-Class and all 8 subagents 24/7 across all phases. |
 | `tests/test_subagent_registry.py` | 2 tests | Full 8 subagent concurrent dispatch, role assignment, `find-skill` capability binding. |
 | `tests/test_skill_discovery.py` | 1 test | Upfront tech/domain scanner, auto-cloning missing repos, skill discovery receipt generation. |
-| `tests/test_skill_orchestrator.py` | 4 tests | 70-skill catalog resolution, phase filtering, active skill stack receipt generation. |
+| `tests/test_skill_orchestrator.py` | 4 tests | 115-skill catalog resolution, phase filtering, active skill stack receipt generation. |
 | `tests/test_v12_engines.py` | 3 tests | Automated AST dependency resolution, zero-infra DB fallbacks, port conflict resolution. |
 | `tests/test_spec_griller.py` | 2 tests | 5-vector threat audit, red-teaming report generation, critical defect detection. |
 | `tests/test_robust_qa.py` | 13 tests | Chrome DevTools DOM sanitization, user flow receipts, duplicate screenshot detection, Lighthouse audits. |
