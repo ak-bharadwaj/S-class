@@ -91,6 +91,17 @@ def handle_tool_call(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any
             "strategy": exec_plan.to_dict()
         }
 
+    elif tool_name == "sclass_spec_synthesis":
+        from spec_synthesis import SpecSynthesisEngine
+        raw_intent = arguments.get("raw_intent", "Fullstack App Build")
+        spec = SpecSynthesisEngine.run_synthesis(raw_intent=raw_intent, workspace_dir=workspace_dir)
+        return {"synthesized_spec": spec.__dict__}
+
+    elif tool_name == "sclass_preflight_scan":
+        from workspace_preflight_scanner import WorkspacePreflightScanner
+        discovery = WorkspacePreflightScanner.full_project_discovery(workspace_dir)
+        return {"project_discovery": discovery}
+
     else:
         raise ValueError(f"Unknown MCP tool: {tool_name}")
 
@@ -122,7 +133,9 @@ def main():
                             {"name": "sclass_gc", "description": "Garbage collect stale state & lock files"},
                             {"name": "sclass_audit_replay", "description": "Audit deterministic execution replay trail"},
                             {"name": "sclass_security_scan", "description": "Scan file for secrets & vulnerabilities"},
-                            {"name": "sclass_strategy_planner", "description": "Infer workflow profile and execution strategy"}
+                            {"name": "sclass_strategy_planner", "description": "Infer workflow profile and execution strategy"},
+                            {"name": "sclass_spec_synthesis", "description": "Synthesize evidence-driven specification and semantic gate"},
+                            {"name": "sclass_preflight_scan", "description": "Run 100% upfront workspace AST and project discovery"}
                         ]
                     }
                 }
