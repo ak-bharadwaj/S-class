@@ -296,7 +296,19 @@ class MinimalDeterministicKernel:
             runtime.save_state(state, cwd)
 
             # 9. Asynchronous Event Graph Broadcast
-            topic = EventTopic.TASK_COMPLETED if event_name in ["code_written", "task_merged"] else EventTopic.TASK_STARTED
+            if event_name in ["qa_failed", "verification_failed"]:
+                topic = EventTopic.QA_FAILED
+            elif event_name in ["patch_assigned", "issue_detected", "recovery_needed"]:
+                topic = EventTopic.RECOVERY_REQUIRED
+            elif event_name in ["release_complete", "released"]:
+                topic = EventTopic.RELEASE_CREATED
+            elif event_name in ["monitoring_alert", "telemetry_anomaly"]:
+                topic = EventTopic.MONITORING_ALERT
+            elif event_name in ["code_written", "task_merged", "spec_approved", "triage_done"]:
+                topic = EventTopic.TASK_COMPLETED
+            else:
+                topic = EventTopic.TASK_STARTED
+
             global_event_graph.publish(topic, sender="sclass_kernel", payload={"event_name": event_name, "from_phase": current_phase, "to_phase": next_phase})
 
             logger.info(f"[Kernel StateManager] Mutation Approved: '{current_phase}' ➔ '{next_phase}' (Event: '{event_name}')")

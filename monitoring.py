@@ -35,6 +35,31 @@ class MultiStreamMonitor:
         self.workspace_dir = workspace_dir if workspace_dir else os.getcwd()
         self.events: List[TelemetryEvent] = []
         self._load_telemetry()
+        self.register_event_graph_subscribers()
+
+    def register_event_graph_subscribers(self) -> None:
+        """Hooks MultiStreamMonitor as an active subscriber to EventGraph topics."""
+        try:
+            from event_graph import global_event_graph, EventTopic, GraphEvent
+
+            def _handle_qa_failed(evt: GraphEvent) -> None:
+                self.ingest_telemetry("crash_reports", "CRITICAL", evt.sender, f"QA Verification Failed: {evt.payload.get('event_name')}", metadata=evt.payload)
+
+            def _handle_recovery(evt: GraphEvent) -> None:
+                self.ingest_telemetry("logs", "WARNING", evt.sender, f"Recovery required from phase: {evt.payload.get('from_phase')}", metadata=evt.payload)
+
+            def _handle_release(evt: GraphEvent) -> None:
+                self.ingest_telemetry("metrics", "INFO", evt.sender, f"Release completed successfully to phase: {evt.payload.get('to_phase')}", metadata=evt.payload)
+
+            def _handle_alert(evt: GraphEvent) -> None:
+                self.ingest_telemetry("security_events", "CRITICAL", evt.sender, f"Monitoring alert triggered: {evt.payload.get('event_name')}", metadata=evt.payload)
+
+            global_event_graph.subscribe(EventTopic.QA_FAILED, _handle_qa_failed)
+            global_event_graph.subscribe(EventTopic.RECOVERY_REQUIRED, _handle_recovery)
+            global_event_graph.subscribe(EventTopic.RELEASE_CREATED, _handle_release)
+            global_event_graph.subscribe(EventTopic.MONITORING_ALERT, _handle_alert)
+        except Exception as e:
+            logger.warning(f"[MultiStreamMonitor] EventGraph subscription registration skipped: {e}")
 
     def _get_telemetry_file(self) -> str:
         state_dir = os.path.join(self.workspace_dir, ".agents")

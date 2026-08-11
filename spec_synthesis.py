@@ -364,10 +364,22 @@ class SpecSynthesisEngine:
         
         requirements_list = self.synthesize_requirements(intent, evidence)
         
-        # Build Graph
+        # Build Graph & Resolve Dependencies / Orphan Detection
         graph = RequirementGraph()
         for req in requirements_list:
             graph.add_node(req)
+
+        # Wire dependencies between derived/supported requirements and explicit parent requirements
+        for req in requirements_list:
+            if req.type in [RequirementType.DERIVED, RequirementType.SUPPORTED, RequirementType.OPTIONAL]:
+                for parent in requirements_list:
+                    if parent.id != req.id and parent.type in [RequirementType.EXPLICIT, RequirementType.REUSE]:
+                        if any(sys in parent.affects for sys in req.affects):
+                            graph.add_dependency(req.id, parent.id)
+
+        orphans = graph.detect_orphans()
+        if orphans:
+            logger.warning(f"[SpecSynthesis] Detected {len(orphans)} orphaned requirement(s): {[o.id for o in orphans]}")
             
         impacts = self.analyze_impact(requirements_list)
         conflicts = self.check_conflicts(requirements_list, evidence)

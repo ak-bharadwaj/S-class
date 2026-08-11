@@ -73,6 +73,6 @@ class SClassProactiveDoctor:
 
 if __name__ == "__main__":
     import sys
-    target = sys.argv[1] if len(sys.argv) > 1 else r"c:\Users\dorni\OneDrive\Desktop\aa"
+    target = sys.argv[1] if len(sys.argv) > 1 else os.getcwd()
     report = SClassProactiveDoctor.audit_workspace(target)
     print(json.dumps(report, indent=2))

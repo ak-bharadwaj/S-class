@@ -15,14 +15,7 @@ class GCReport:
     total_bytes_freed: int = 0
     errors: List[str] = field(default_factory=list)
 
-def _process_exists(pid: int) -> bool:
-    if pid <= 0:
-        return False
-    try:
-        os.kill(pid, 0)
-    except OSError:
-        return False
-    return True
+from runtime import _process_exists
 
 def run_gc(workspace_dir: str, state_max_age_days: int = 7, memory_max_age_days: int = 30) -> GCReport:
     report = GCReport()

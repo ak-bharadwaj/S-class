@@ -55,7 +55,7 @@ class SkillDiscoveryEngine:
         }
 
         for keyword, (skill_id, repo_key) in domain_skill_triggers.items():
-            if keyword in goal_lower:
+            if re.search(r"\b" + re.escape(keyword) + r"\b", goal_lower):
                 discovered_skills.append(skill_id)
                 # Verify if external repo is installed
                 if repo_key != "builtin":

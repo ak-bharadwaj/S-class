@@ -4,7 +4,7 @@ S-Class EOS Fast Knowledge Base Engine (knowledge_base.py)
 Applies profile-driven selective retrieval policies with:
 - In-memory result caching (_KB_CACHE) for zero-latency repeated lookups
 - Inverted keyword indexing (_KB_INDEX) for O(1) keyword matching
-- Incremental file loading to prevent disk I/O bottlenecks as the KB grows
+- Profile-driven target file filtering across all index and cache paths
 """
 
 import os
@@ -93,14 +93,21 @@ class KnowledgeBaseManager:
                     json.dump(data, f, indent=2)
 
     @staticmethod
-    def _build_inverted_index(workspace_dir: Optional[str] = None) -> None:
+    def _build_inverted_index(workspace_dir: Optional[str] = None, force_refresh: bool = False) -> None:
         """Builds an inverted keyword index for O(1) keyword lookups."""
         global _KB_INDEX, _KB_CACHE
-        if _KB_INDEX:
-            return  # Index already populated
+        if _KB_INDEX and not force_refresh:
+            return
+
+        if force_refresh:
+            _KB_INDEX.clear()
+            _KB_CACHE.clear()
 
         kb_dir = KnowledgeBaseManager.get_kb_dir(workspace_dir)
         KnowledgeBaseManager.initialize_kb(workspace_dir)
+
+        if not os.path.exists(kb_dir):
+            return
 
         for fname in os.listdir(kb_dir):
             if fname.endswith(".json"):
@@ -108,21 +115,33 @@ class KnowledgeBaseManager:
                 try:
                     with open(filepath, "r", encoding="utf-8") as f:
                         entries = json.load(f)
-                    _KB_CACHE[fname] = entries
+                    
+                    annotated_entries = []
                     for entry in entries:
+                        tagged_entry = dict(entry)
+                        tagged_entry["_source_file"] = fname
+                        annotated_entries.append(tagged_entry)
+
                         words = entry.get("title", "").lower().split() + entry.get("tags", [])
                         for w in words:
                             w_clean = w.lower().strip()
                             if w_clean not in _KB_INDEX:
                                 _KB_INDEX[w_clean] = []
-                            _KB_INDEX[w_clean].append(entry)
+                            _KB_INDEX[w_clean].append(tagged_entry)
+
+                    _KB_CACHE[fname] = annotated_entries
                 except Exception as e:
                     logger.error(f"Error indexing KB file '{fname}': {e}")
 
     @staticmethod
-    def query_knowledge_base(goal: str, profile: str = "full", workspace_dir: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
-        """Queries the knowledge base using in-memory inverted index and caching for zero-latency retrieval."""
-        KnowledgeBaseManager._build_inverted_index(workspace_dir)
+    def refresh_index(workspace_dir: Optional[str] = None) -> None:
+        """Forces immediate index rebuild on disk mutation."""
+        KnowledgeBaseManager._build_inverted_index(workspace_dir, force_refresh=True)
+
+    @staticmethod
+    def query_knowledge_base(goal: str, profile: str = "full", workspace_dir: Optional[str] = None, force_refresh: bool = False) -> Dict[str, List[Dict[str, Any]]]:
+        """Queries the knowledge base enforcing profile-driven selective file filtering."""
+        KnowledgeBaseManager._build_inverted_index(workspace_dir, force_refresh=force_refresh)
 
         goal_lower = goal.lower()
         target_files = RETRIEVAL_POLICIES.get(profile.lower(), RETRIEVAL_POLICIES["full"])
@@ -133,16 +152,18 @@ class KnowledgeBaseManager:
             "reusable_modules": []
         }
 
-        # Fast O(1) Inverted Index Lookup
+        # O(1) Inverted Index Lookup with mandatory profile target file filtering
         query_words = [w.strip() for w in goal_lower.split() if len(w.strip()) > 2]
         matched_entries = set()
 
         for word in query_words:
             if word in _KB_INDEX:
                 for entry in _KB_INDEX[word]:
-                    matched_entries.add(json.dumps(entry))
+                    # Profile-driven selective retrieval gate
+                    if entry.get("_source_file") in target_files:
+                        matched_entries.add(json.dumps(entry))
 
-        # Fallback to cached file scanning if index yields empty results
+        # Fallback to cached target file scanning if keyword match yielded nothing
         if not matched_entries:
             for fname in target_files:
                 for entry in _KB_CACHE.get(fname, []):
@@ -152,7 +173,9 @@ class KnowledgeBaseManager:
             entry = json.loads(entry_json)
             cat = entry.get("category", "coding_standards")
             if cat in results:
-                results[cat].append(entry)
+                # Remove internal _source_file meta tag before returning
+                clean_entry = {k: v for k, v in entry.items() if k != "_source_file"}
+                results[cat].append(clean_entry)
 
-        logger.info(f"[KnowledgeBaseManager] Fast indexed query completed for profile '{profile}': returned {sum(len(v) for v in results.values())} entries")
+        logger.info(f"[KnowledgeBaseManager] Profile-driven query completed for profile '{profile}': returned {sum(len(v) for v in results.values())} entries from target files {target_files}")
         return results

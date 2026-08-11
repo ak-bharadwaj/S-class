@@ -104,5 +104,5 @@ def export_blueprints_to_md(workspace_dir: str):
 
 if __name__ == "__main__":
     import sys
-    target = sys.argv[1] if len(sys.argv) > 1 else r"c:\Users\dorni\OneDrive\Desktop\aa"
+    target = sys.argv[1] if len(sys.argv) > 1 else os.getcwd()
     export_blueprints_to_md(target)
