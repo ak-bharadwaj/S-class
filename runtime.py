@@ -654,9 +654,39 @@ def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce
         if next_phase in ["ANALYSIS", "SPECIFICATION_SYNTHESIS"]:
             try:
                 from workspace_preflight_scanner import WorkspacePreflightScanner
+                from knowledge_base import KnowledgeBaseManager
                 WorkspacePreflightScanner.full_project_discovery(workspace_dir)
+                kb_data = KnowledgeBaseManager.query_knowledge_base(state.planRationale or "Project Architecture", workspace_dir=workspace_dir)
+                logger.info(f"[Runtime KnowledgeBase] Retrieved {len(kb_data)} knowledge context entries for phase '{next_phase}'")
             except Exception as p_ex:
-                logger.warning(f"[Runtime] Preflight scanner note: {p_ex}")
+                logger.warning(f"[Runtime] Preflight & KB scanner note: {p_ex}")
+
+        if next_phase in ["ANALYSIS", "DESIGN", "CODING"]:
+            try:
+                from sclass_skill_discovery import SkillDiscoveryEngine
+                from sclass_skill_orchestrator import SClassSkillOrchestrator
+                SkillDiscoveryEngine.find_and_bind_required_skills(state.planRationale or "Fullstack App", workspace_dir)
+                active_skills = SClassSkillOrchestrator.resolve_active_skills(next_phase, state.planRationale or "", workspace_dir)
+                logger.info(f"[Runtime SkillOrchestrator] Bound {len(active_skills)} skills for phase '{next_phase}'")
+            except Exception as s_ex:
+                logger.warning(f"[Runtime] Skill orchestrator note: {s_ex}")
+
+        if next_phase == "RECOVERY" or event_name in ["qa_failed", "integration_failed", "task_verification_failed", "spec_conflict_detected"]:
+            try:
+                from error_recovery import RecoveryEngine, ErrorPath
+                rec_engine = RecoveryEngine()
+                last_error = "; ".join(v_res.errors) if not v_res.passed else f"Failure event '{event_name}'"
+                target_phase = rec_engine.classify_failure_target_phase(last_error)
+                default_paths = [
+                    ErrorPath(r"ModuleNotFoundError|cannot find module|importerror", "Missing module dependency", "retry", max_retries=3),
+                    ErrorPath(r"TypeError|Interface Mismatch|SchemaError", "Type contract violation", "escalate", max_retries=3),
+                    ErrorPath(r"SyntaxError|ParseError", "Syntax error in written code", "retry", max_retries=3)
+                ]
+                matched_path = rec_engine.match_error(last_error, default_paths)
+                backoff = rec_engine.calculate_backoff(state.retryCount, matched_path) if matched_path else 1.0
+                logger.warning(f"[Runtime RecoveryEngine] Smart Recovery classified error: TargetPhase='{target_phase}', Action='{matched_path.recovery_action if matched_path else 'retry'}', Backoff={backoff}s")
+            except Exception as r_ex:
+                logger.warning(f"[Runtime] Recovery engine note: {r_ex}")
 
         if next_phase == "INTEGRATION":
             try:
