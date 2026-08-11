@@ -51,48 +51,48 @@ class WorkflowPlan:
 # Profile Definitions
 PROFILE_SEQUENCES: Dict[WorkflowProfile, List[str]] = {
     WorkflowProfile.FULL: [
-        "TRIAGE", "ANALYSIS", "CLARIFICATION", "DESIGN", "DEBATE",
-        "TASK_COMPILATION", "CODING", "INTEGRATION", "QA", "RECOVERY", "RELEASE", "DONE"
+        "TRIAGE", "ANALYSIS", "SPECIFICATION_SYNTHESIS", "DESIGN", "DEBATE",
+        "DESIGN_REVISION", "TASK_COMPILATION", "CODING", "TASK_VERIFICATION",
+        "MERGE", "INTEGRATION", "QA", "RELEASE", "MONITORING", "DONE"
     ],
     WorkflowProfile.BUG_FIX: [
-        "TRIAGE", "ANALYSIS", "CODING", "INTEGRATION", "QA", "RECOVERY", "RELEASE", "DONE"
+        "TRIAGE", "ANALYSIS", "SPECIFICATION_SYNTHESIS", "CODING",
+        "TASK_VERIFICATION", "MERGE", "INTEGRATION", "QA", "RELEASE", "MONITORING", "DONE"
     ],
     WorkflowProfile.RESEARCH: [
-        "TRIAGE", "ANALYSIS", "DEBATE", "DONE"
+        "TRIAGE", "ANALYSIS", "SPECIFICATION_SYNTHESIS", "DESIGN", "DEBATE", "DONE"
     ],
     WorkflowProfile.REFACTOR: [
-        "TRIAGE", "ANALYSIS", "DESIGN", "CODING", "INTEGRATION", "QA", "RECOVERY", "RELEASE", "DONE"
+        "TRIAGE", "ANALYSIS", "SPECIFICATION_SYNTHESIS", "DESIGN", "CODING",
+        "TASK_VERIFICATION", "MERGE", "INTEGRATION", "QA", "RELEASE", "MONITORING", "DONE"
     ],
     WorkflowProfile.HOTFIX: [
-        "TRIAGE", "CODING", "QA", "RECOVERY", "RELEASE", "DONE"
+        "TRIAGE", "CODING", "TASK_VERIFICATION", "MERGE", "INTEGRATION",
+        "QA", "RELEASE", "MONITORING", "DONE"
     ]
 }
 
 # Transition overrides per profile (overrides default transitions from workflow.json)
 PROFILE_TRANSITIONS: Dict[WorkflowProfile, Dict[str, Dict[str, str]]] = {
     WorkflowProfile.BUG_FIX: {
-        "ANALYSIS": {
-            "context_loaded": "CODING",       # Bypass DESIGN, DEBATE, TASK_COMPILATION
-            "ambiguity_detected": "CLARIFICATION"
+        "SPECIFICATION_SYNTHESIS": {
+            "spec_synthesized": "CODING",     # Bypass DESIGN, DEBATE, DESIGN_REVISION, TASK_COMPILATION
+            "spec_conflict_detected": "CLARIFICATION"
         }
     },
     WorkflowProfile.RESEARCH: {
-        "ANALYSIS": {
-            "context_loaded": "DEBATE",       # Jump straight to debate/audit
-        },
         "DEBATE": {
-            "spec_approved": "DONE",          # No coding needed for research
-            "debate_failed": "ANALYSIS"
+            "spec_approved": "DONE",          # No coding/build execution needed for research audit
         }
     },
     WorkflowProfile.REFACTOR: {
         "DESIGN": {
-            "design_drafted": "CODING",       # Bypass DEBATE & TASK_COMPILATION
+            "design_drafted": "CODING",       # Bypass DEBATE, DESIGN_REVISION & TASK_COMPILATION
         }
     },
     WorkflowProfile.HOTFIX: {
         "TRIAGE": {
-            "triage_done": "CODING",          # Jump directly from TRIAGE to CODING
+            "triage_done": "CODING",          # Direct emergency patch jump from TRIAGE to CODING
         }
     }
 }
