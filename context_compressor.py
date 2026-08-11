@@ -101,11 +101,24 @@ class ContextCompressor:
         )
 
         # 2. Build Semantic Memory ("What did we learn?")
-        learned_rules = [
-            "Always verify DB schema migrations before API service deployment",
-            "Enforce strict DTO type validation at route boundaries"
-        ]
+        learned_rules = []
+        for dec in decisions:
+            if isinstance(dec, dict):
+                decision_text = dec.get("decision", "")
+                reason_text = dec.get("reason", "")
+                agent_name = dec.get("agent", "")
+                if decision_text or reason_text:
+                    rule_entry = f"[{agent_name}] {decision_text}: {reason_text}" if agent_name else f"{decision_text}: {reason_text}"
+                    learned_rules.append(rule_entry)
+
+        if not learned_rules:
+            learned_rules = [
+                "Always verify DB schema migrations before API service deployment",
+                "Enforce strict DTO type validation at route boundaries"
+            ]
+
         architectural_standards = [
+            f"Workflow Profile: {state_dict.get('workflowProfile', 'full').upper()}",
             "Decoupled Microkernel Architecture with Event Sourcing Store"
         ]
 

@@ -13,7 +13,7 @@ Ingests 6 active telemetry streams to detect post-release production anomalies:
 import os
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger("sclass_monitoring")
@@ -29,13 +29,55 @@ class TelemetryEvent:
 
 
 class MultiStreamMonitor:
-    """Ingests multi-stream telemetry data and evaluates production health."""
+    """Ingests multi-stream telemetry data, persists events to disk, and evaluates production health."""
 
-    def __init__(self):
+    def __init__(self, workspace_dir: Optional[str] = None):
+        self.workspace_dir = workspace_dir if workspace_dir else os.getcwd()
         self.events: List[TelemetryEvent] = []
+        self._load_telemetry()
 
-    def ingest_telemetry(self, stream: str, severity: str, source: str, message: str, metadata: Optional[Dict[str, Any]] = None) -> TelemetryEvent:
-        """Ingests a telemetry event into the active monitoring pipeline."""
+    def _get_telemetry_file(self) -> str:
+        state_dir = os.path.join(self.workspace_dir, ".agents")
+        return os.path.join(state_dir, "telemetry_events.json")
+
+    def _load_telemetry(self) -> None:
+        tf = self._get_telemetry_file()
+        if os.path.exists(tf):
+            try:
+                with open(tf, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                for item in data.get("events", []):
+                    self.events.append(TelemetryEvent(
+                        stream=item.get("stream", "logs"),
+                        severity=item.get("severity", "INFO"),
+                        source=item.get("source", "system"),
+                        message=item.get("message", ""),
+                        metadata=item.get("metadata", {})
+                    ))
+            except Exception as e:
+                logger.warning(f"[MultiStreamMonitor] Failed to load persistent telemetry: {e}")
+
+    def _persist_telemetry(self) -> None:
+        tf = self._get_telemetry_file()
+        try:
+            state_dir = os.path.dirname(tf)
+            os.makedirs(state_dir, exist_ok=True)
+            payload = {
+                "totalCount": len(self.events),
+                "events": [asdict(e) for e in self.events]
+            }
+            tmp_path = tf + ".tmp"
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=2)
+            os.replace(tmp_path, tf)
+        except Exception as e:
+            logger.warning(f"[MultiStreamMonitor] Failed to persist telemetry events: {e}")
+
+    def ingest_telemetry(self, stream: str, severity: str, source: str, message: str, metadata: Optional[Dict[str, Any]] = None, workspace_dir: Optional[str] = None) -> TelemetryEvent:
+        """Ingests a telemetry event into the active monitoring pipeline and persists to disk."""
+        if workspace_dir:
+            self.workspace_dir = workspace_dir
+            
         event = TelemetryEvent(
             stream=stream,
             severity=severity,
@@ -44,7 +86,8 @@ class MultiStreamMonitor:
             metadata=metadata or {}
         )
         self.events.append(event)
-        logger.info(f"[MultiStreamMonitor] Telemetry Ingested [{stream.upper()} - {severity}]: {message}")
+        self._persist_telemetry()
+        logger.info(f"[MultiStreamMonitor] Telemetry Ingested & Persisted [{stream.upper()} - {severity}]: {message}")
         return event
 
     def evaluate_production_health(self) -> Dict[str, Any]:

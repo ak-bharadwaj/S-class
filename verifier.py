@@ -687,6 +687,8 @@ class EvidenceVerifier:
                     errors.append("INTEGRATION verification failed: Frontend code lacks Google Fonts / professional typography imports ('next/font', 'Outfit', or 'Inter').")
                 if code_files and not has_responsive:
                     errors.append("INTEGRATION verification failed: Frontend code lacks responsive layout breakpoints ('md:', 'lg:', or '@media').")
+                if code_files and not has_motion:
+                    errors.append("INTEGRATION verification failed: Frontend code lacks smooth animation or CSS transition declarations ('framer-motion', 'motion.', or 'transition').")
 
         elif current_phase == "QA":
             shared_errors, real_screenshots, required_min_screenshots = EvidenceVerifier._verify_qa_evidence_shared(cwd, state_dir, state_file, allow_soft)
