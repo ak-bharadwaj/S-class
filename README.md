@@ -118,7 +118,7 @@ Create or open `.cursorrules`, `AGENTS.md`, or `CLAUDE.md` in your project root 
 
 ```markdown
 pipeline: sclass-v5
-CRITICAL DIRECTIVE: You MUST route all engineering goals strictly through S-Class EOS FSM (runtime.initialize_state & runtime.dispatch_event). Direct parent code edits are strictly forbidden (Rule 17). Subagents MUST enforce Rule 27 No-Laziness Directive, Rule 28 Subagent Deployment Dashboard, Rule 29 Full 8 Concurrent Subagent Swarms, and Chrome MCP multi-page visual screenshots (Rule 14 & 15).
+CRITICAL DIRECTIVE: You MUST route all engineering goals strictly through S-Class EOS FSM (runtime.initialize_state & runtime.dispatch_event). Direct parent code edits are strictly forbidden (Rule 17). Subagents MUST enforce Rule 27 No-Laziness Directive, Rule 28 Subagent Deployment Dashboard, Rule 29 Full 8 Concurrent Subagent Swarms, Rule 30 Specification Synthesis, Rule 31 Semantic Gate, and Chrome MCP multi-page visual screenshots (Rule 14 & 15).
 ```
 
 ---
@@ -132,20 +132,26 @@ from sclass_grill import SpecGrillerEngine
 from sclass_skill_orchestrator import SClassSkillOrchestrator
 from sclass_skill_discovery import SkillDiscoveryEngine
 from sclass_subagent_registry import SubagentRegistry
+from spec_synthesis import SpecSynthesisEngine
 
 # 1. Initialize S-Class FSM State
 state = runtime.initialize_state(goal="Build Enterprise Application", workspace_dir="./")
 
-# 2. Run Upfront Skill Discovery & Auto-Bind 115-Skill Catalog
+# 2. Execute Specification Synthesis Engine (Inspect Before Inferring)
+synth_engine = SpecSynthesisEngine()
+synthesized_spec = synth_engine.run_synthesis("Build student dashboard with profile", workspace_dir="./")
+print(f"Synthesized Spec Gate Result: {synthesized_spec.gate_result} (Assumption Weight: {synthesized_spec.total_assumption_weight}/10)")
+
+# 3. Run Upfront Skill Discovery & Auto-Bind 118-Skill Catalog
 discovery = SkillDiscoveryEngine.find_and_bind_required_skills(goal_text="Build Enterprise Application", workspace_dir="./")
 print(f"Bound Skills: Discovered={discovery['discovered_skills_count']}, Active={discovery['total_active_skills_bound']}")
 
-# 3. Dispatch Full 8 Concurrent Subagent Matrix with find-skill Capability
+# 4. Dispatch Full 8 Concurrent Subagent Matrix with find-skill Capability
 dispatch = SubagentRegistry.prepare_full_8_subagent_dispatch(goal_text="Build Enterprise Application", fsm_phase="DEBATE", workspace_dir="./")
 print(f"Dispatched {dispatch['total_subagents_dispatched']} Subagents Concurrently (Skill Discovery Active={dispatch['skill_discovery_active']})")
 
-# 4. Dispatch FSM Transition via Deterministic Microkernel
-res = kernel_instance.request_transition(from_state="TRIAGE", event_name="triage_complete", workspace_dir="./")
+# 5. Dispatch FSM Transition via Deterministic Microkernel
+res = kernel_instance.request_transition(from_state="TRIAGE", event_name="triage_done", workspace_dir="./")
 print(f"Kernel Approved Mutation: '{res['previousPhase']}' ➔ '{res['currentPhase']}'")
 ```
 
@@ -157,7 +163,8 @@ print(f"Kernel Approved Mutation: '{res['previousPhase']}' ➔ '{res['currentPha
 | :--- | :--- | :--- | :--- | :--- |
 | **System Philosophy** | Sandbox Harness | CLI Agent Loop | Model Co-Trained CLI | **Deterministic Microkernel & Safety-Case Engine** |
 | **State Mutation Guard** | File System Writes | File System Writes | File System Writes | **✅ Exclusive Kernel Mutator (`sclass_kernel.py`)** |
-| **Modular Skill Stack** | Single Prompt Dump | Single Prompt Dump | Single Prompt Dump | **✅ 115-Skill Catalog (`sclass_skill_orchestrator.py`)** |
+| **Specification Synthesis** | Generic Prompting | Generic Prompting | Generic Prompting | **✅ `SpecSynthesisEngine` + `SemanticGate` Anti-Bypass (`spec_synthesis.py`)** |
+| **Modular Skill Stack** | Single Prompt Dump | Single Prompt Dump | Single Prompt Dump | **✅ 118-Skill Catalog (`sclass_skill_orchestrator.py`)** |
 | **Skill Discovery Engine** | None | None | None | **✅ `SkillDiscoveryEngine` (`find-skill` Auto-Installer)** |
 | **Subagent Swarm Dispatch** | Single Worker | Single Worker | Single Worker | **✅ Full 8 Concurrent Subagent Matrix (`SubagentRegistry`)** |
 | **Visual Evidence Gate** | Heuristic | None | Heuristic | **✅ Chrome DevTools MCP + PNG Magic Header + Flow Receipts** |
@@ -169,14 +176,15 @@ print(f"Kernel Approved Mutation: '{res['previousPhase']}' ➔ '{res['currentPha
 
 ## 🧪 Comprehensive Automated Test Suite
 
-S-Class V12.1 contains **99 automated unit and integration tests** passing with 100% success across Python 3.10–3.14:
+S-Class V12.1 contains **113 automated unit and integration tests** passing with 100% success across Python 3.10–3.14:
 
 | Test Module File | Test Count | Functionality Tested |
 | :--- | :--- | :--- |
+| `tests/test_spec_synthesis.py` | 14 tests | Specification synthesis V2.1, evidence-driven capability expansion, conservative inference, semantic gate, assumption budget, anti-bypass verifier gate. |
 | `tests/test_global_skill_availability.py` | 1 test | 100% skill availability across S-Class and all 8 subagents 24/7 across all phases. |
 | `tests/test_subagent_registry.py` | 2 tests | Full 8 subagent concurrent dispatch, role assignment, `find-skill` capability binding. |
 | `tests/test_skill_discovery.py` | 1 test | Upfront tech/domain scanner, auto-cloning missing repos, skill discovery receipt generation. |
-| `tests/test_skill_orchestrator.py` | 4 tests | 115-skill catalog resolution, phase filtering, active skill stack receipt generation. |
+| `tests/test_skill_orchestrator.py` | 4 tests | 118-skill catalog resolution, phase filtering, active skill stack receipt generation. |
 | `tests/test_v12_engines.py` | 3 tests | Automated AST dependency resolution, zero-infra DB fallbacks, port conflict resolution. |
 | `tests/test_spec_griller.py` | 2 tests | 5-vector threat audit, red-teaming report generation, critical defect detection. |
 | `tests/test_robust_qa.py` | 13 tests | Chrome DevTools DOM sanitization, user flow receipts, duplicate screenshot detection, Lighthouse audits. |
