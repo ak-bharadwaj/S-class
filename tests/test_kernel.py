@@ -91,3 +91,20 @@ def test_event_driven_graph_architecture():
     assert len(received_events) == 1
     assert received_events[0].sender == "builder_react"
     assert received_events[0].payload["task_id"] == "T101"
+
+
+def test_learning_engine_capture_and_promote(tmp_path):
+    workspace = str(tmp_path)
+    cand = LearningEngine.capture_candidate(
+        category="coding_standards",
+        title="Always validate DTO schemas",
+        content="Enforce strict Zod validation at controller boundaries",
+        tags=["dto", "zod"],
+        confidence_score=0.95,
+        workspace_dir=workspace
+    )
+    assert cand.candidate_id == "cand_1"
+    assert cand.approved is False
+
+    promoted = LearningEngine.promote_candidate("cand_1", workspace_dir=workspace)
+    assert promoted is True

@@ -101,15 +101,28 @@ class ContextCompressor:
         )
 
         # 2. Build Semantic Memory ("What did we learn?")
+        from learning_engine import LearningEngine
         learned_rules = []
         for dec in decisions:
             if isinstance(dec, dict):
                 decision_text = dec.get("decision", "")
                 reason_text = dec.get("reason", "")
                 agent_name = dec.get("agent", "")
+                conf = dec.get("confidence", 0.9)
                 if decision_text or reason_text:
                     rule_entry = f"[{agent_name}] {decision_text}: {reason_text}" if agent_name else f"{decision_text}: {reason_text}"
                     learned_rules.append(rule_entry)
+                    if conf >= 0.85:
+                        try:
+                            LearningEngine.capture_candidate(
+                                category="architecture_patterns",
+                                title=decision_text[:60] if decision_text else "Architectural Pattern",
+                                content=rule_entry,
+                                tags=["context_compressor", current_phase],
+                                confidence_score=conf
+                            )
+                        except Exception:
+                            pass
 
         if not learned_rules:
             learned_rules = [

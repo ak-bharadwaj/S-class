@@ -78,6 +78,8 @@ def check_config_exists(workspace_dir: str) -> DoctorCheck:
     return DoctorCheck("Config File", "WARN", "Missing sclass.config.json")
 
 def run_doctor(workspace_dir: str) -> DoctorReport:
+    from sclass_doctor import SClassProactiveDoctor
+
     checks = [
         check_python_version(),
         check_state_file_integrity(workspace_dir),
@@ -86,6 +88,24 @@ def run_doctor(workspace_dir: str) -> DoctorReport:
         check_config_exists(workspace_dir)
     ]
     
+    try:
+        sclass_audit = SClassProactiveDoctor.audit_workspace(workspace_dir)
+        for audit_name, audit_data in sclass_audit.get("audits", {}).items():
+            st = audit_data.get("status", "PASSED")
+            msg = audit_data.get("message", f"Status: {st}")
+            if "missing" in audit_data:
+                msg = f"Missing: {', '.join(audit_data['missing'])}"
+            elif "count" in audit_data:
+                msg = f"{msg} (count: {audit_data['count']})"
+            st_mapped = "WARN" if st == "FAILED" else ("PASS" if st == "PASSED" else "WARN")
+            checks.append(DoctorCheck(
+                name=f"S-Class {audit_name.replace('_', ' ').title()}",
+                status=st_mapped,
+                message=msg
+            ))
+    except Exception as ex:
+        checks.append(DoctorCheck("S-Class Proactive Audit", "WARN", f"Audit warning: {ex}"))
+
     statuses = [c.status for c in checks]
     if "FAIL" in statuses:
         overall = "BROKEN"
