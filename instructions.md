@@ -16,9 +16,9 @@ CRITICAL HARD BLOCK: The parent Antigravity agent is strictly FORBIDDEN from per
   - **`ANALYSIS`:** `invoke_subagent` with `dss_analyst`
   - **`SPECIFICATION_SYNTHESIS`:** `invoke_subagent` with `requirement-expansion`
   - **`DESIGN`:** `invoke_subagent` with `dss_architect_v2` and `dss_ui_ux`
-  - **`DEBATE`:** `invoke_subagent` with `dss_governor`, `dss_cso_v2`, `dss_reviewer_v2`, `dss_user_alias_v2` in a single parallel call
-  - **`CODING`:** `invoke_subagent` with `dss_builder_v2`, `dss_backend_dev`, `dss_frontend_dev`
-  - **`QA`:** `invoke_subagent` with `dss_qa_v2`, `dss_qa_frontend`, `dss_qa_backend`, `dss_user_alias_v2` in a single parallel call
+  - **`DEBATE`:** `invoke_subagent` with `dss_governor`, `dss_cso_v2`, `dss_qa_frontend`, `dss_user_alias_v2` in a single parallel call
+  - **`CODING`:** `invoke_subagent` with `dss_frontend_dev`, `dss_backend_dev`, `dss_db_architect`
+  - **`QA`:** `invoke_subagent` with `dss_qa_frontend`, `dss_user_alias_v2`, `dss_cso_v2`, `dss_governor` in a single parallel call
 * **IDE UI Visibility Guarantee:** Calling `invoke_subagent` registers subagents in the background and increments the `Subagents N >` counter in the IDE right sidebar. Simulating subagents or bypassing `invoke_subagent` is STRICTLY FORBIDDEN.
 * **Required Skills:** You and subagents MUST actively load workspace skills (`ui-ux-pro-max`, `frontend-design`, `webapp-testing`).
 * **Chrome MCP Integration:** You and `dss_qa_v2` MUST use `chrome-devtools-mcp` tools (`new_page`, `navigate_page`, `take_screenshot`) during the QA phase to capture and inspect the visual layout of the running web application in `.agents/qa_screenshots/`.
@@ -191,7 +191,7 @@ S-Class EOS strictly forbids shallow, high-level, or degraded architectural desi
    - **Backend:** Detailed request/response DTO schemas, Zod/Pydantic validation schemas, middleware pipelines, error handling, rate limiting, and status code matrices.
    - **Database:** Full Relational ERD with column data types (`VARCHAR`, `TIMESTAMP`, `BOOLEAN`, `FOREIGN KEY`), indexing strategies, cascade rules, and ORM models.
    - **Frontend:** Complete Component Tree, state management store (Zustand/Redux/React Context), route guards, skeleton loaders, and Rule 16 `ui-ux-pro-max` design system tokens.
-3. **Rigorous DEBATE Audit Gate:** Subagents (`dss_governor`, `dss_reviewer_v2`, `dss_cso_v2`) MUST perform line-by-line technical audits on `.agents/design_blueprint.json`. Superficial approvals are forbidden. If a design lacks API DTOs, DB indexes, or UI design tokens, the DEBATE phase **MUST FAIL AND REJECT THE SPEC**.
+3. **Rigorous DEBATE Audit Gate:** Subagents (`dss_governor`, `dss_qa_frontend`, `dss_cso_v2`) MUST perform line-by-line technical audits on `.agents/design_blueprint.json`. Superficial approvals are forbidden. If a design lacks API DTOs, DB indexes, or UI design tokens, the DEBATE phase **MUST FAIL AND REJECT THE SPEC**.
 
 ## 20. Cross-Domain Role-Coupled Brainstorming Mandate (Roles -> APIs -> DB -> UI)
 

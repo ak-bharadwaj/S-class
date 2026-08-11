@@ -792,13 +792,13 @@ class StrategyEngine:
 
         # Add auditors based on review depth
         if review_depth in [ReviewDepth.STANDARD, ReviewDepth.DEEP]:
-            squad.add("dss_reviewer_v2")
+            squad.add("dss_governor")
         if review_depth == ReviewDepth.DEEP:
             squad.add("dss_user_alias_v2")
 
-        # Fallback to governor & reviewer if squad too small
+        # Fallback to governor & CSO if squad too small
         if len(squad) < 2:
-            squad.add("dss_reviewer_v2")
+            squad.add("dss_governor")
 
         return sorted(list(squad))
 

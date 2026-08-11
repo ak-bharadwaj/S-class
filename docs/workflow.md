@@ -12,7 +12,7 @@ S-Class manages workflows through 19 explicit states:
 3.  **`CLARIFICATION`:** Handles human-in-the-loop clarification for unresolved scope/design ambiguities.
 4.  **`SPECIFICATION_SYNTHESIS`:** Synthesizes explicit/derived requirements, runs evidence-driven expansion (`spec_synthesis.py`), and evaluates semantic gate.
 5.  **`DESIGN`:** Establishes 3-tier full-stack blueprints (`backend_spec`, `db_schema`, `frontend_layout`).
-6.  **`DEBATE`:** Reviews spec designs concurrently across Parallel Group #1 (`dss_governor`, `dss_ui_ux`, `dss_frontend_dev`, `dss_backend_dev`, `dss_db_architect`, `dss_cso_v2`, `dss_reviewer_v2`, `dss_user_alias_v2`).
+6.  **`DEBATE`:** Reviews spec designs concurrently across Parallel Group #1 (`dss_governor`, `dss_ui_ux`, `dss_frontend_dev`, `dss_backend_dev`, `dss_db_architect`, `dss_cso_v2`, `dss_qa_frontend`, `dss_user_alias_v2`).
 7.  **`DESIGN_REVISION`:** Incorporates red-team debate findings into revised design blueprints.
 8.  **`TASK_COMPILATION`:** Aggregates critiques and design specifications into structured task DAGs.
 9.  **`CODING`:** Builder subagents implement task lists into sandbox workspace branches.
