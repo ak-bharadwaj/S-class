@@ -498,7 +498,77 @@ class EvidenceVerifier:
             if not (has_intent or allow_soft):
                 errors.append(f"CLARIFICATION verification failed: Intent contract missing at '{intent_file}'")
 
+        elif current_phase == "SPECIFICATION_SYNTHESIS":
+            spec_file = os.path.join(state_dir, "synthesized_spec.json")
+            has_spec = os.path.exists(spec_file)
+            valid_gate = False
+            missing_sections = []
+
+            if has_spec:
+                try:
+                    with open(spec_file, "r", encoding="utf-8") as f:
+                        spec_data = json.load(f)
+
+                    # Validate required sections
+                    has_intent = bool(spec_data.get("intent"))
+                    has_requirements = bool(spec_data.get("requirements"))
+                    has_affected = bool(spec_data.get("affected"))
+                    has_criteria = bool(spec_data.get("acceptance_criteria"))
+                    gate_result = spec_data.get("gate_result", "")
+
+                    if not has_intent: missing_sections.append("intent")
+                    if not has_requirements: missing_sections.append("requirements")
+                    if not has_affected: missing_sections.append("affected")
+                    if not has_criteria: missing_sections.append("acceptance_criteria")
+
+                    valid_gate = len(missing_sections) == 0
+
+                    if gate_result == "BLOCKED":
+                        errors.append("SPECIFICATION_SYNTHESIS verification failed: Gate result is BLOCKED due to conflicts or budget overflow. Resolve issues before proceeding to DESIGN.")
+                        valid_gate = False
+
+                    # Invoke SemanticGate validation if spec_synthesis module is available
+                    try:
+                        from spec_synthesis import SemanticGate, SynthesizedSpec
+                        # Convert dict back or run SemanticGate.validate_dict
+                        sem_res = SemanticGate.validate_dict(spec_data, workspace_dir=cwd)
+                        if not sem_res.get("passed", True):
+                            valid_gate = False
+                            for err_msg in sem_res.get("errors", []):
+                                errors.append(f"SPECIFICATION_SYNTHESIS semantic gate failed: {err_msg}")
+                    except Exception as s_err:
+                        logger.warning(f"[Verifier] SemanticGate check note: {s_err}")
+
+                except Exception as e:
+                    errors.append(f"SPECIFICATION_SYNTHESIS verification failed: Corrupt spec file: {e}")
+
+            artifacts.append(EvidenceArtifact(
+                current_phase, "synthesized_spec", spec_file, valid_gate,
+                strength=EvidenceStrength.HIGH_TEST_PASSED
+            ))
+
+            if not has_spec:
+                errors.append(
+                    "SPECIFICATION_SYNTHESIS verification failed: Missing '.agents/synthesized_spec.json'. "
+                    "SpecSynthesisEngine MUST run requirement expansion before DESIGN phase. "
+                    "This gate CANNOT be bypassed under any circumstances."
+                )
+            elif missing_sections:
+                errors.append(
+                    f"SPECIFICATION_SYNTHESIS verification failed: synthesized_spec.json is missing "
+                    f"required sections: {', '.join(missing_sections)}. All sections are mandatory."
+                )
+
         elif current_phase == "DESIGN":
+            spec_file = os.path.join(state_dir, "synthesized_spec.json")
+            has_synth_spec = os.path.exists(spec_file)
+            if not has_synth_spec:
+                errors.append(
+                    "DESIGN verification failed: Missing '.agents/synthesized_spec.json'. "
+                    "SPECIFICATION_SYNTHESIS phase was not executed. Design CANNOT proceed "
+                    "without a synthesized specification. This is a HARD BLOCK."
+                )
+
             design_file = os.path.join(state_dir, "design_blueprint.json")
             role_matrix_file = os.path.join(state_dir, "role_interaction_matrix.json")
             has_design = os.path.exists(design_file)

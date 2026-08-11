@@ -61,7 +61,7 @@ def test_reset_to_triage(tmp_path):
     runtime.initialize_state(workspace, goal="Original feature request")
     runtime.dispatch_event("triage_done", workspace)
     runtime.dispatch_event("context_loaded", workspace)
-    assert runtime.get_state(workspace).currentPhase in ["DESIGN", "CODING"]
+    assert runtime.get_state(workspace).currentPhase in ["SPECIFICATION_SYNTHESIS", "DESIGN", "CODING"]
     
     # User modifies requirement mid-flight -> reset_to_triage
     runtime.reset_to_triage(workspace, new_goal="Emergency hotfix for auth server")

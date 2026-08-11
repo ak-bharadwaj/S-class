@@ -14,6 +14,7 @@ CRITICAL HARD BLOCK: The parent Antigravity agent is strictly FORBIDDEN from per
 
 * **Mandatory Tool Call (`invoke_subagent`):** At EVERY FSM phase, you MUST explicitly issue the `invoke_subagent` tool call to spawn specialized subagents:
   - **`ANALYSIS`:** `invoke_subagent` with `dss_analyst`
+  - **`SPECIFICATION_SYNTHESIS`:** `invoke_subagent` with `requirement-expansion`
   - **`DESIGN`:** `invoke_subagent` with `dss_architect_v2` and `dss_ui_ux`
   - **`DEBATE`:** `invoke_subagent` with `dss_governor`, `dss_cso_v2`, `dss_reviewer_v2`, `dss_user_alias_v2` in a single parallel call
   - **`CODING`:** `invoke_subagent` with `dss_builder_v2`, `dss_backend_dev`, `dss_frontend_dev`
@@ -329,3 +330,65 @@ S-Class EOS strictly forbids partial or single-agent shortcuts on complex projec
    - **`dss_user_alias_v2` (User Proxy Verifier):** Interactive User Flow Receipt Sign-Off (`responsive-design`, `role-based-ux`).
 2. **Equipped Skill Discovery Engine (`find-skill`):** Every subagent is equipped with `SkillDiscoveryEngine` (`find-skill`). If any subagent requires additional specialized skills during execution, it MUST dynamically discover and bind them.
 3. **Concurrent Execution:** All 8 subagents run in parallel via `invoke_subagent` and report back to the main agent controller.
+
+## 30. SPECIFICATION_SYNTHESIS — Inspect Before Inferring (Rule 30)
+
+After ANALYSIS completes and before DESIGN begins, the orchestrator MUST execute
+the SPECIFICATION_SYNTHESIS phase. This is the most critical quality gate in the entire pipeline.
+
+### The Critical Rule
+**The agent MUST NOT silently invent requirements.** Every discovered requirement
+gets classified into exactly one of 6 types:
+
+| Type | Meaning | Action |
+|---|---|---|
+| `EXPLICIT` | User directly requested it | Include always |
+| `SUPPORTED` | Existing project docs/code requires it | Include always |
+| `DERIVED` | Logically necessary to implement the request | Include, auto-decide |
+| `OPTIONAL` | Reasonable enhancement, but not necessary | Ask human |
+| `UNKNOWN` | Cannot safely determine | Ask human |
+| `CONFLICT` | Contradicts existing project requirements | Hard stop |
+
+### Investigation Order (MANDATORY)
+
+The agent MUST follow this exact investigation order:
+
+```
+USER REQUEST → SCAN EXISTING PROJECT → UNDERSTAND EXISTING MODEL → THEN INFER
+```
+
+NEVER:
+```
+USER REQUEST → LLM's generic software knowledge → invent a product
+```
+
+### Human Decision Gate Thresholds
+
+| Threshold | Meaning | Example | Action |
+|---|---|---|---|
+| `AUTO_DECIDE` | Trivial UX necessity | Back button, breadcrumbs | Agent decides, no question |
+| `PROBABLY_DECIDE` | Standard pattern | Loading states, error handling | Agent decides, no question |
+| `MUST_ASK` | Scope-changing decision | New DB field, new API, new page route | Ask human before proceeding |
+| `MUST_STOP` | Contradiction with existing code | Editing an immutable field | Hard stop, fire `spec_conflict_detected` |
+
+### Phase Transitions
+
+- On success (all items AUTO/PROBABLY/EXPLICIT/SUPPORTED/DERIVED): Fire `spec_synthesized` → proceed to DESIGN
+- On MUST_ASK items found: Fire `spec_scope_decision_needed` → loop to CLARIFICATION → human decides → return to SPECIFICATION_SYNTHESIS
+- On CONFLICT items found: Fire `spec_conflict_detected` → loop to CLARIFICATION → human resolves → return to SPECIFICATION_SYNTHESIS
+
+### Output Contract
+
+The phase MUST produce `.agents/synthesized_spec.json` containing:
+- `intent`: Structured intent extraction from user request
+- `requirements`: All requirements grouped by classification type
+- `affected`: Impact matrix (frontend/backend/database/auth/navigation)
+- `conflicts`: Any CONFLICT-type requirements
+- `questions`: Questions for human (MUST_ASK + MUST_STOP items only)
+- `acceptance_criteria`: Testable criteria derived from EXPLICIT + SUPPORTED requirements
+- `gate_result`: "PASS" | "NEEDS_HUMAN_DECISION" | "CONFLICT_DETECTED"
+
+The phase also produces `.agents/synthesized_spec.md` — a human-readable markdown summary for review.
+
+## 31. Semantic Gate & Implementation Contract Enforcement
+All implementations must satisfy the constraints generated during the SPECIFICATION_SYNTHESIS phase. Any gaps require human review before coding begins.

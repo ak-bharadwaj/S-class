@@ -30,7 +30,7 @@ fi
 echo "=========================================================="
 echo "⚡ S-Class V12.1 Installation Complete!"
 echo "Active Plugin Path: $PLUGIN_DIR"
-echo "Cataloged Skills: 71 (Impeccable, Taste, Emil Kowalski, React Doctor)"
+echo "Cataloged Skills: 118 (Impeccable, Taste, Emil Kowalski, Specification Synthesis, Heavy Backend)"
 echo "Subagent Matrix: 8 Concurrent Subagents (find-skill Enabled)"
 echo "Commands: /goal, /grill, /doubt, /inquire"
 echo "=========================================================="

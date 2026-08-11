@@ -7,8 +7,8 @@
   },
   {
     "event": "context_loaded",
-    "description": "Fired when memory loading and requirement analyst checks have populated the design space.",
-    "nextState": "DESIGN",
+    "description": "Fired when memory loading and requirement analyst checks have populated the specification synthesis space.",
+    "nextState": "SPECIFICATION_SYNTHESIS",
     "sideEffects": []
   },
   {
@@ -141,6 +141,24 @@
     "event": "resolved",
     "description": "Fired when a production issue anomaly is marked resolved.",
     "nextState": "MONITORING",
+    "sideEffects": []
+  },
+  {
+    "event": "spec_synthesized",
+    "description": "Fired when requirement expansion completes with no blocking conflicts or scope decisions pending. All requirements classified as EXPLICIT, SUPPORTED, DERIVED, or AUTO_DECIDE.",
+    "nextState": "DESIGN",
+    "sideEffects": ["incrementSpecVersion"]
+  },
+  {
+    "event": "spec_conflict_detected",
+    "description": "Fired when requirement expansion discovers a CONFLICT-type requirement that contradicts existing project requirements. Hard stop requiring human resolution.",
+    "nextState": "CLARIFICATION",
+    "sideEffects": []
+  },
+  {
+    "event": "spec_scope_decision_needed",
+    "description": "Fired when requirement expansion identifies MUST_ASK scope-changing decisions (new DB fields, new APIs, new page routes, new UX patterns) that require human approval before design begins.",
+    "nextState": "CLARIFICATION",
     "sideEffects": []
   },
   {

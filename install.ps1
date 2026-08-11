@@ -25,7 +25,7 @@ if (Get-Command python -ErrorAction SilentlyContinue) {
 Write-Host "==========================================================" -ForegroundColor Green
 Write-Host "⚡ S-Class V12.1 Installation Complete!" -ForegroundColor Green
 Write-Host "Active Plugin Path: $PluginDir" -ForegroundColor Yellow
-Write-Host "Cataloged Skills: 71 (Impeccable, Taste, Emil Kowalski, React Doctor)" -ForegroundColor Cyan
+Write-Host "Cataloged Skills: 118 (Impeccable, Taste, Emil Kowalski, Specification Synthesis, Heavy Backend)" -ForegroundColor Cyan
 Write-Host "Subagent Matrix: 8 Concurrent Subagents (find-skill Enabled)" -ForegroundColor Cyan
 Write-Host "Commands: /goal, /grill, /doubt, /inquire" -ForegroundColor Magenta
 Write-Host "==========================================================" -ForegroundColor Green

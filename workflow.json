@@ -7,13 +7,20 @@
     },
     "ANALYSIS": {
       "transitions": {
-        "context_loaded": "DESIGN",
+        "context_loaded": "SPECIFICATION_SYNTHESIS",
         "ambiguity_detected": "CLARIFICATION"
       }
     },
     "CLARIFICATION": {
       "transitions": {
-        "clarified": "DESIGN"
+        "clarified": "SPECIFICATION_SYNTHESIS"
+      }
+    },
+    "SPECIFICATION_SYNTHESIS": {
+      "transitions": {
+        "spec_synthesized": "DESIGN",
+        "spec_conflict_detected": "CLARIFICATION",
+        "spec_scope_decision_needed": "CLARIFICATION"
       }
     },
     "DESIGN": {

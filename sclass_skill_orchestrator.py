@@ -41,6 +41,16 @@ class SkillTaxonomy:
 
     SKILLS: Dict[str, SkillDefinition] = {
         # Tier 1 — Foundation
+        "requirement-expansion": SkillDefinition(
+            id="requirement-expansion",
+            name="Specification Synthesis & Requirement Expansion",
+            tier="foundation",
+            purpose="Converts incomplete human requests into complete, traceable, implementation-ready specifications. Classifies every requirement as EXPLICIT, SUPPORTED, DERIVED, OPTIONAL, UNKNOWN, or CONFLICT. Prevents agents from silently inventing requirements.",
+            rule_guideline="Rule 30: NEVER invent requirements from generic LLM knowledge. ALWAYS inspect existing project docs/schema/code FIRST, then infer. Ask human for scope-changing decisions. Fire spec_conflict_detected on contradictions.",
+            technologies=["Requirement Classification", "Project Discovery", "Impact Analysis", "Conflict Detection", "Decision Gate"],
+            default_active=True,
+            conditional_keywords=["requirement", "specification", "spec", "feature", "scope", "plan", "design"]
+        ),
         "frontend-design": SkillDefinition(
             id="frontend-design",
             name="Visual Direction & Composition",
