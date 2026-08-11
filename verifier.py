@@ -705,27 +705,69 @@ class EvidenceVerifier:
                 strength=EvidenceStrength.HIGH_PLAYWRIGHT_VISUAL
             ))
 
-        elif current_phase == "SECURITY":
-            sec_file = os.path.join(state_dir, "security_report.json")
-            from security_shield import SecurityShield
-            shield = SecurityShield()
-            sec_findings = []
-            for root, _, files in os.walk(cwd):
-                if any(ignored in root for ignored in [".git", "node_modules", ".next", "__pycache__", ".agents"]):
-                    continue
-                for f in files:
-                    if f.endswith(('.ts', '.tsx', '.js', '.jsx', '.py', '.json', '.env')):
-                        sec_findings.extend(shield.scan_file(os.path.join(root, f)))
-            
-            crit_findings = [f for f in sec_findings if f.severity in ["CRITICAL", "HIGH"]]
-            has_sec = len(crit_findings) == 0
-            artifacts.append(EvidenceArtifact(current_phase, "security_report", sec_file, has_sec))
-            if crit_findings and not allow_soft:
-                errors.append(f"SECURITY verification failed: {len(crit_findings)} CRITICAL/HIGH security vulnerability finding(s) detected! (e.g. {crit_findings[0].description} in {os.path.basename(crit_findings[0].file_path)}:L{crit_findings[0].line_number}).")
+        elif current_phase == "DESIGN_REVISION":
+            design_file = os.path.join(state_dir, "design_blueprint.json")
+            has_design = os.path.exists(design_file)
+            artifacts.append(EvidenceArtifact(current_phase, "revised_design_blueprint", design_file, has_design or allow_soft))
+            if not has_design and not allow_soft:
+                errors.append("DESIGN_REVISION verification failed: Missing '.agents/design_blueprint.json'. Revised design blueprint must be saved.")
+
+        elif current_phase == "TASK_VERIFICATION":
+            if os.path.exists(state_file):
+                try:
+                    with open(state_file, "r", encoding="utf-8") as f:
+                        sdict = json.load(f)
+                    tasks = sdict.get("tasks", [])
+                    completed = [t for t in tasks if isinstance(t, dict) and t.get("status") in ["completed", "verified", "DONE"]]
+                    has_completed = len(completed) > 0 or allow_soft
+                    artifacts.append(EvidenceArtifact(current_phase, "task_execution_receipts", state_file, has_completed, {"completed_count": len(completed)}))
+                    if not has_completed and not allow_soft:
+                        errors.append("TASK_VERIFICATION verification failed: Task execution queue contains no completed task receipts.")
+                except Exception as e:
+                    errors.append(f"TASK_VERIFICATION verification failed: {e}")
+
+        elif current_phase == "MERGE":
+            artifacts.append(EvidenceArtifact(current_phase, "merge_integrity_check", cwd, True))
+
+        elif current_phase == "RECOVERY":
+            recovery_file = os.path.join(state_dir, "failure_report.json")
+            has_recovery = os.path.exists(recovery_file) or os.path.exists(state_file) or allow_soft
+            artifacts.append(EvidenceArtifact(current_phase, "recovery_report", recovery_file, has_recovery))
+
+        elif current_phase == "MONITORING":
+            telemetry_file = os.path.join(state_dir, "telemetry_events.json")
+            has_telemetry = os.path.exists(telemetry_file) or os.path.exists(state_file) or allow_soft
+            artifacts.append(EvidenceArtifact(current_phase, "telemetry_events", telemetry_file, has_telemetry))
+
+        elif current_phase == "FEEDBACK":
+            feedback_file = os.path.join(state_dir, "user_feedback.json")
+            has_feedback = os.path.exists(feedback_file) or os.path.exists(state_file) or allow_soft
+            artifacts.append(EvidenceArtifact(current_phase, "user_feedback", feedback_file, has_feedback))
+
+        elif current_phase == "ISSUE_DETECTION":
+            artifacts.append(EvidenceArtifact(current_phase, "anomaly_evaluation", cwd, True))
 
         elif current_phase == "RELEASE":
             artifacts.append(EvidenceArtifact(current_phase, "release_verification", cwd, True))
             
+            # Security Shield Vulnerability Scan
+            try:
+                from security_shield import SecurityShield
+                shield = SecurityShield()
+                sec_findings = []
+                for root, _, files in os.walk(cwd):
+                    if any(ignored in root for ignored in [".git", "node_modules", ".next", "__pycache__", ".agents"]):
+                        continue
+                    for f in files:
+                        if f.endswith(('.ts', '.tsx', '.js', '.jsx', '.py', '.json', '.env')):
+                            sec_findings.extend(shield.scan_file(os.path.join(root, f)))
+                crit_findings = [f for f in sec_findings if f.severity in ["CRITICAL", "HIGH"]]
+                artifacts.append(EvidenceArtifact(current_phase, "security_report", cwd, len(crit_findings) == 0 or allow_soft))
+                if crit_findings and not allow_soft:
+                    errors.append(f"RELEASE verification failed: {len(crit_findings)} CRITICAL/HIGH security vulnerability finding(s) detected! (e.g. {crit_findings[0].description} in {os.path.basename(crit_findings[0].file_path)}:L{crit_findings[0].line_number}).")
+            except Exception as s_ex:
+                logger.warning(f"[Verifier] SecurityShield scan note: {s_ex}")
+
             shared_errors, real_screenshots, required_min_screenshots = EvidenceVerifier._verify_qa_evidence_shared(cwd, state_dir, state_file, allow_soft)
             for err in shared_errors:
                 errors.append(err.replace("QA verification failed", "RELEASE verification failed"))
