@@ -116,9 +116,12 @@ class SpecGrillerEngine:
         findings = []
         fe_layout = blueprint.get("frontend_layout", {})
         components = str(fe_layout)
+        backend_str = str(blueprint.get("backend_spec", {})).lower()
+        db_str = str(blueprint.get("db_schema", {})).lower()
+
         if "loading" not in components.lower() and "disabled" not in components.lower():
             findings.append("Frontend layout lacks explicit button loading/disabled state triggers during async submissions.")
-        if "async" in str(blueprint.get("backend_spec", {})).lower() and "transaction" not in str(blueprint.get("db_schema", {})).lower():
+        if "async" in backend_str and "transaction" not in db_str and "transaction" not in backend_str:
             findings.append("Backend contains async mutation routes but database schema lacks explicit atomic transaction boundaries.")
 
         passed = len(findings) == 0
@@ -126,7 +129,7 @@ class SpecGrillerEngine:
             vector_id="concurrency_race_conditions",
             name="Concurrency & State Race Conditions",
             passed=passed,
-            risk_level="MEDIUM" if findings else "LOW",
+            risk_level="HIGH" if findings else "LOW",
             findings=findings if findings else ["No concurrency or state race risks detected."],
             remediation_recommendation="Ensure form submit buttons bind loading states and backend async mutations wrap DB writes in transactions."
         )

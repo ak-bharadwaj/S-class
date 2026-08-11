@@ -43,7 +43,7 @@ class Decision:
 
 @dataclass
 class ConfidenceMatrix:
-    weightedScore: float
+    weightedScore: float = 1.0
     votes: Dict[str, float] = field(default_factory=dict)
 
 @dataclass
@@ -133,12 +133,11 @@ from resource_scheduler import ResourceAwareScheduler, global_resource_scheduler
 
 
 class ContextBudgetOptimizer:
-    """Prunes LLM context payload to only required task target files and boundaries."""
-    MAX_CONTEXT_FILES = 5
+    """Prunes LLM context payload to only required task target files and boundaries using ResourceAwareScheduler."""
 
     @staticmethod
     def optimize_context(task_targets: List[str]) -> List[str]:
-        return task_targets[:ContextBudgetOptimizer.MAX_CONTEXT_FILES]
+        return global_resource_scheduler.optimize_task_context(task_targets)
 
 
 def _resolve_paths(workspace_dir: Optional[str] = None) -> tuple:
@@ -736,8 +735,11 @@ def update_task(task_id: str, status: str, workspace_dir: Optional[str] = None) 
             
         task.status = status
         
-        # Verify dependencies
+        # Verify dependencies and hardware resource availability
         if status == "IN_PROGRESS":
+            active_builders = sum(1 for t in state.tasks if t.status == "IN_PROGRESS")
+            if not global_resource_scheduler.can_dispatch_builder(active_builders):
+                logger.warning(f"Resource Scheduler throttled dispatch for task '{task_id}'. Hardware resources or concurrency limit reached.")
             for dep in task.dependsOn:
                 dep_task = next((t for t in state.tasks if t.id == dep), None)
                 if dep_task and dep_task.status != "COMPLETED":

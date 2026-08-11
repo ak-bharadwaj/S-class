@@ -405,14 +405,15 @@ class SafetyCase:
         """Backwards-compatible alias for output_contract_passed."""
         return self.output_contract_passed
 
-    def is_complete(self) -> bool:
-        """Verifies all safety case evidence requirements are met, including >= 85.0% contract coverage threshold."""
+    def is_complete(self, target_threshold: Optional[float] = None, policy_profile: str = "production_saas") -> bool:
+        """Verifies all safety case evidence requirements are met using profile-driven contract coverage thresholds."""
+        required = target_threshold if target_threshold is not None else PROFILE_COVERAGE_THRESHOLDS.get(policy_profile, 85.0)
         return (
             self.build_passed and
             self.tests_passed and
             self.security_clean and
             self.output_contract_passed and
-            self.contract_coverage.coverage_percent >= 85.0  # Mandatory contract coverage threshold!
+            self.contract_coverage.coverage_percent >= required
         )
 
 

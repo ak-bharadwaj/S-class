@@ -79,6 +79,16 @@ def handle_tool_call(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any
             return {"security_report": report}
         return {"error": f"Target file '{target_file}' does not exist"}
 
+    elif tool_name == "sclass_strategy_planner":
+        goal = arguments.get("goal", "")
+        plan = MetaPlanner.select_profile(goal)
+        strategy = StrategyEngine.infer_strategy(goal)
+        return {
+            "profile": plan.profile.value,
+            "rationale": plan.rationale,
+            "strategy": strategy.to_dict()
+        }
+
     else:
         raise ValueError(f"Unknown MCP tool: {tool_name}")
 
@@ -109,7 +119,8 @@ def main():
                             {"name": "sclass_doctor", "description": "Inspect workspace environment health"},
                             {"name": "sclass_gc", "description": "Garbage collect stale state & lock files"},
                             {"name": "sclass_audit_replay", "description": "Audit deterministic execution replay trail"},
-                            {"name": "sclass_security_scan", "description": "Scan file for secrets & vulnerabilities"}
+                            {"name": "sclass_security_scan", "description": "Scan file for secrets & vulnerabilities"},
+                            {"name": "sclass_strategy_planner", "description": "Infer workflow profile and execution strategy"}
                         ]
                     }
                 }

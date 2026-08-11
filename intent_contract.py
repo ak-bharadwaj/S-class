@@ -9,12 +9,6 @@ DEFAULT_MUST_NOT_EXIST: List[str] = [
 ]
 
 
-DEFAULT_MUST_NOT_EXIST: List[str] = [
-    "undefined", "NaN", "null", "[object Object]",
-    "TODO", "Lorem Ipsum", "Debug", "Stack trace", "Console Error"
-]
-
-
 @dataclass
 class ExecutionContract:
     """Execution bounds, goals, acceptance criteria, and failure recovery paths."""

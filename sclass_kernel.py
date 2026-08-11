@@ -133,9 +133,79 @@ class MinimalDeterministicKernel:
 
     def reconstruct_state_from_event_store(self, workspace_dir: Optional[str] = None) -> Dict[str, Any]:
         """Event Sourcing State Projection: Reconstructs orchestration state by replaying event_store.jsonl."""
-        events = EventStore.read_all_events(workspace_dir)
+        cwd = workspace_dir if workspace_dir else os.getcwd()
+        events = EventStore.read_all_events(cwd)
         logger.info(f"[Kernel EventSourcing] Reconstructing state from {len(events)} canonical event store records...")
-        return {"reconstructed": True, "total_events": len(events)}
+        
+        if not events:
+            # No events to replay
+            state = runtime.get_state(cwd)
+            return {"reconstructed": False, "total_events": 0, "currentPhase": state.currentPhase, "state": runtime.asdict(state)}
+
+        # Replay event stream to fold projected state
+        current_phase = "TRIAGE"
+        active_event = None
+        spec_version = 1
+        debate_version = 0
+        task_version = 0
+        retry_count = 0
+        workflow_profile = "full"
+        plan_rationale = ""
+        decision_log = []
+        transition_history = []
+        tasks = []
+
+        for record in events:
+            event_type = record.get("eventType")
+            payload = record.get("payload", {})
+            meta = record.get("metadata", {})
+
+            if event_type == "STATE_INITIALIZED":
+                workflow_profile = payload.get("workflowProfile", "full")
+                plan_rationale = payload.get("planRationale", "")
+                current_phase = "TRIAGE"
+            elif event_type in ["PHASE_MUTATED", "MUTATION_RECORDED"]:
+                current_phase = payload.get("toPhase", payload.get("toState", current_phase))
+                active_event = payload.get("eventName", payload.get("eventFired", active_event))
+                if "specVersion" in payload:
+                    spec_version = payload["specVersion"]
+                if "debateVersion" in payload:
+                    debate_version = payload["debateVersion"]
+                if "taskVersion" in payload:
+                    task_version = payload["taskVersion"]
+
+            # Aggregate decision and history logs if present
+            if "decision" in payload and isinstance(payload["decision"], dict):
+                decision_log.append(payload["decision"])
+            if "transitionRecord" in payload and isinstance(payload["transitionRecord"], dict):
+                transition_history.append(payload["transitionRecord"])
+
+        state = runtime.State(
+            taskId=events[0].get("taskId", "reconstructed-task"),
+            currentPhase=current_phase,
+            activeEvent=active_event,
+            currentSpecVersion=spec_version,
+            currentDebateVersion=debate_version,
+            currentTaskVersion=task_version,
+            retryCount=retry_count,
+            confidenceMatrix=runtime.ConfidenceMatrix(),
+            workflowProfile=workflow_profile,
+            planRationale=plan_rationale,
+            tasks=tasks,
+            decisionLog=decision_log,
+            transitionHistory=transition_history
+        )
+
+        # Save reconstructed state to disk
+        runtime.save_state(state, cwd)
+        logger.info(f"[Kernel EventSourcing] State projected successfully at phase '{current_phase}'.")
+
+        return {
+            "reconstructed": True,
+            "total_events": len(events),
+            "currentPhase": current_phase,
+            "state": runtime.asdict(state)
+        }
 
     # === Internal Pipeline Execution Core ===
 

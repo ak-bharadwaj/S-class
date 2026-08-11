@@ -109,15 +109,19 @@ class ExecutionPlanner:
 
     @staticmethod
     def create_plan(goal: str, workspace_dir: Optional[str] = None, codebase_meta: Optional[Dict[str, Any]] = None) -> ExecutionStrategy:
-        # Step 1: Intent Extraction
-        intent = IntentExtractor.extract_intent(goal)
+        # Step 1: Intent Extraction & Spec Feature Parsing
+        intent = IntentExtractor.extract_intent(goal, workspace_dir=workspace_dir)
         # Step 2: Risk & Knowledge Base Retrieval
         risk = RiskAnalyzer.analyze_risk(intent, workspace_dir=workspace_dir)
         # Step 3: Workflow Profile Selection
         plan = WorkflowSelector.select_profile(intent, risk)
-        # Step 4: Assemble Execution Strategy
+        # Step 4: Assemble Execution Strategy chained with Pipeline outputs
         strategy = StrategyEngine.infer_strategy(goal, codebase_meta=codebase_meta)
-        logger.info(f"[ExecutionPlanner] Assembled Execution Plan (Domains={intent.target_domains}, Risk={risk.risk_level.value}, Profile={plan.profile.value})")
+        strategy.target_domains = list(dict.fromkeys(strategy.target_domains + intent.target_domains))
+        strategy.risk_level = risk.risk_level
+        strategy.review_depth = risk.review_depth
+
+        logger.info(f"[ExecutionPlanner] Assembled Execution Plan (Domains={strategy.target_domains}, Risk={risk.risk_level.value}, Profile={plan.profile.value})")
         return strategy
 
     @staticmethod

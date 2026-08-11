@@ -113,18 +113,30 @@ class MetaPlanner:
                 rationale = f"Unknown profile '{override_profile}', defaulting to FULL"
         else:
             goal_lower = goal_text.lower()
-            if any(kw in goal_lower for kw in ["hotfix", "urgent patch", "emergency", "crash fix"]):
+
+            def _match_keywords(keywords: List[str]) -> bool:
+                import re
+                for kw in keywords:
+                    if " " in kw or "-" in kw:
+                        if kw in goal_lower:
+                            return True
+                    else:
+                        if re.search(r"\b" + re.escape(kw) + r"\b", goal_lower):
+                            return True
+                return False
+
+            if _match_keywords(["hotfix", "urgent patch", "emergency", "crash fix"]):
                 profile = WorkflowProfile.HOTFIX
                 rationale = "Goal indicates an emergency hotfix requiring immediate patch execution."
-            elif any(kw in goal_lower for kw in ["bug", "fix", "error", "exception", "failed", "broken", "issue", "typo"]):
-                profile = WorkflowProfile.BUG_FIX
-                rationale = "Goal indicates a targeted bug fix. Bypassing spec debate and heavy design phase."
-            elif any(kw in goal_lower for kw in ["research", "investigate", "audit", "survey", "explain", "analyze", "compare"]):
-                profile = WorkflowProfile.RESEARCH
-                rationale = "Goal indicates a research/audit request. Bypassing build and release execution."
-            elif any(kw in goal_lower for kw in ["refactor", "clean up", "restructure", "optimize", "rename", "format"]):
+            elif _match_keywords(["refactor", "clean up", "restructure", "optimize", "rename", "format"]):
                 profile = WorkflowProfile.REFACTOR
                 rationale = "Goal indicates internal code refactoring. Bypassing multi-agent spec debate."
+            elif _match_keywords(["bug", "fix", "error", "exception", "failed", "broken", "issue", "typo"]):
+                profile = WorkflowProfile.BUG_FIX
+                rationale = "Goal indicates a targeted bug fix. Bypassing spec debate and heavy design phase."
+            elif _match_keywords(["research", "investigate", "audit", "survey", "explain", "analyze", "compare"]):
+                profile = WorkflowProfile.RESEARCH
+                rationale = "Goal indicates a research/audit request. Bypassing build and release execution."
             else:
                 profile = WorkflowProfile.FULL
                 rationale = "Goal requires comprehensive feature development through full 11-state pipeline."
