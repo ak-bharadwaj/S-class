@@ -432,7 +432,7 @@ class SpecSynthesisEngine:
             
         # Write Markdown
         try:
-            md_content = f"# Synthesized Specification\n\n"
+            md_content = "# Synthesized Specification\n\n"
             md_content += f"**Intent**: {spec.intent_summary}\n"
             md_content += f"**Gate Result**: {spec.gate_result} (Assumption Weight: {spec.total_assumption_weight}/10)\n\n"
             

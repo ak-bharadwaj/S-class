@@ -150,5 +150,5 @@ class SubagentRegistry:
         except Exception as e:
             logger.error(f"[SubagentRegistry] Failed to save dispatch receipt: {e}")
 
-        logger.info(f"[SubagentRegistry] Successfully prepared and dispatched all 8 subagents concurrently.")
+        logger.info("[SubagentRegistry] Successfully prepared and dispatched all subagents concurrently.")
         return receipt
