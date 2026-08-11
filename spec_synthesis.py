@@ -417,8 +417,18 @@ class SpecSynthesisEngine:
         # Write JSON
         try:
             write_json_atomic(json_path, spec.__dict__)
+            
+            # Instantiate and save IntentContract
+            from intent_contract import IntentContract
+            ic = IntentContract(
+                goal=spec.intent_summary,
+                scope_boundaries=[],
+                acceptance_criteria=spec.acceptance_criteria,
+                error_paths=[]
+            )
+            write_json_atomic(os.path.join(agents_dir, "intent_contract.json"), ic.to_dict())
         except Exception as e:
-            logger.error(f"Failed to write JSON output: {e}")
+            logger.error(f"Failed to write JSON outputs: {e}")
             
         # Write Markdown
         try:

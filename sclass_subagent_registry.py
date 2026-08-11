@@ -104,9 +104,16 @@ class SubagentRegistry:
         
         # 1. Run upfront Skill Discovery
         discovery_res = SkillDiscoveryEngine.find_and_bind_required_skills(goal_text, cwd)
+
+        # 2. Resolve Phase Topology Router Targets
+        from topology import TopologyRouter, SwarmTopology
+        topo_router = TopologyRouter(SwarmTopology.STAR)
+        phase_topology = topo_router.resolve_phase_topology(fsm_phase, {})
+        all_agent_ids = list(cls.SUBAGENTS.keys())
         
         dispatched_subagents = []
         for sa_id, sa in cls.SUBAGENTS.items():
+            targets = topo_router.get_communication_targets(sa_id, all_agent_ids)
             # Resolve dynamic skill stack for subagent
             subagent_skills = SClassSkillOrchestrator.resolve_active_skills(fsm_phase, goal_text, cwd)
             skill_ids = [s.id for s in subagent_skills]

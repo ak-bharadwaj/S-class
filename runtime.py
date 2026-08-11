@@ -650,6 +650,45 @@ def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce
         
         ts_now = datetime.now(timezone.utc).isoformat() + "Z"
 
+        # Execution Hooks for Specialized Engines
+        if next_phase in ["ANALYSIS", "SPECIFICATION_SYNTHESIS"]:
+            try:
+                from workspace_preflight_scanner import WorkspacePreflightScanner
+                WorkspacePreflightScanner.full_project_discovery(workspace_dir)
+            except Exception as p_ex:
+                logger.warning(f"[Runtime] Preflight scanner note: {p_ex}")
+
+        if next_phase == "INTEGRATION":
+            try:
+                from port_resolver import PortConflictResolver
+                PortConflictResolver.audit_and_resolve_ports(workspace_dir)
+            except Exception as p_ex:
+                logger.warning(f"[Runtime] Port resolver note: {p_ex}")
+
+        if next_phase == "MONITORING":
+            try:
+                from monitoring import MultiStreamMonitor
+                mon = MultiStreamMonitor(workspace_dir)
+                mon.record_event("monitoring_heartbeat", {"phase": "MONITORING", "status": "ACTIVE", "timestamp": ts_now})
+            except Exception as m_ex:
+                logger.warning(f"[Runtime] Telemetry monitor note: {m_ex}")
+
+        # Event Sourcing Append
+        try:
+            from sclass_kernel import EventStore
+            EventStore.append_event({
+                "event_id": len(state.transitionHistory) + 1,
+                "eventType": "PHASE_MUTATED",
+                "event_name": event_name,
+                "from_state": current_phase,
+                "to_state": next_phase,
+                "workflow_profile": state.workflowProfile,
+                "payload": {"eventName": event_name, "fromPhase": current_phase, "toPhase": next_phase},
+                "timestamp": ts_now
+            }, workspace_dir=workspace_dir)
+        except Exception as e_ex:
+            logger.warning(f"[Runtime] Event store append note: {e_ex}")
+
         # Log Decision Transition
         dec_entry = Decision(
             decision=f"Transition State to {next_phase}",
@@ -657,7 +696,7 @@ def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce
             alternatives=list(valid_transitions.keys()),
             confidence=1.0,
             timestamp=ts_now,
-            agent="state_manager_runtime"
+            agent=agent_name if agent_name else "state_manager_runtime"
         )
         state.decisionLog.append(dec_entry)
 
@@ -671,7 +710,7 @@ def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce
             evidenceVerified=[asdict(art) for art in v_res.artifacts],
             decision=asdict(dec_entry),
             timestamp=ts_now,
-            agent="state_manager_runtime"
+            agent=agent_name if agent_name else "state_manager_runtime"
         )
         state.transitionHistory.append(t_rec.to_dict())
         
