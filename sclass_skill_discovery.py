@@ -66,7 +66,10 @@ class SkillDiscoveryEngine:
                         if success:
                             installed_repos.append(repo_key)
 
-        # 2. Resolve Active Skill Stack
+        # 2. Auto-connect all workspace SKILL.md files into S-Class
+        cls.auto_connect_workspace_skills(workspace_dir=cwd)
+
+        # 3. Resolve Active Skill Stack
         active_skills = SClassSkillOrchestrator.resolve_active_skills(
             fsm_phase="ANALYSIS",
             goal_text=goal_text,
@@ -110,3 +113,98 @@ class SkillDiscoveryEngine:
         except Exception as e:
             logger.error(f"[SkillDiscovery] Error cloning skill repo {repo_url}: {e}")
             return False
+
+    @classmethod
+    def auto_connect_workspace_skills(cls, workspace_dir: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Scans workspace .agents/skills/ for any custom or newly added SKILL.md files.
+        Automatically parses, registers, auto-assigns subagents, phase mapping, and connects them into S-Class.
+        """
+        cwd = workspace_dir if workspace_dir else os.getcwd()
+        skills_dir = os.path.join(cwd, ".agents", "skills")
+        if not os.path.exists(skills_dir):
+            return {"connected_count": 0, "connected_skills": []}
+
+        connected_skills = []
+        for item in os.listdir(skills_dir):
+            item_path = os.path.join(skills_dir, item)
+            if os.path.isdir(item_path):
+                skill_md = os.path.join(item_path, "SKILL.md")
+                if os.path.exists(skill_md):
+                    try:
+                        with open(skill_md, "r", encoding="utf-8", errors="ignore") as f:
+                            content = f.read()
+
+                        name = item
+                        description = f"Custom workspace skill for {item}"
+                        if content.startswith("---"):
+                            parts = content.split("---", 2)
+                            if len(parts) >= 3:
+                                frontmatter = parts[1]
+                                for line in frontmatter.splitlines():
+                                    if line.startswith("name:"):
+                                        name = line.split("name:", 1)[1].strip()
+                                    elif line.startswith("description:"):
+                                        description = line.split("description:", 1)[1].strip()
+
+                        desc_lower = description.lower() + " " + content[:500].lower()
+
+                        if any(kw in desc_lower for kw in ["ui", "aesthetic", "visual", "taste", "style", "css", "color", "typography"]):
+                            agent_id = "dss_ui_ux"
+                        elif any(kw in desc_lower for kw in ["react", "next.js", "component", "frontend", "animation", "motion", "spring"]):
+                            agent_id = "dss_frontend_dev"
+                        elif any(kw in desc_lower for kw in ["backend", "api", "controller", "route", "service"]):
+                            agent_id = "dss_backend_dev"
+                        elif any(kw in desc_lower for kw in ["database", "schema", "sql", "orm", "migration"]):
+                            agent_id = "dss_db_architect"
+                        elif any(kw in desc_lower for kw in ["security", "auth", "guard", "vulnerability", "secret"]):
+                            agent_id = "dss_cso_v2"
+                        elif any(kw in desc_lower for kw in ["qa", "test", "dom", "browser", "screenshot", "lighthouse"]):
+                            agent_id = "dss_qa_frontend"
+                        elif any(kw in desc_lower for kw in ["user", "acceptance", "proxy", "flow"]):
+                            agent_id = "dss_user_alias_v2"
+                        else:
+                            agent_id = "dss_governor"
+
+                        phases = ["DESIGN", "CODING"] if agent_id in ["dss_ui_ux", "dss_frontend_dev"] else ["CODING", "INTEGRATION"]
+
+                        skill_def = SkillDefinition(
+                            id=name,
+                            name=name.replace("-", " ").title(),
+                            tier="workspace",
+                            purpose=description,
+                            rule_guideline=f"Enforce directives from {name}/SKILL.md",
+                            technologies=["Workspace Skill"],
+                            source_repo="workspace/.agents/skills",
+                            reference_playbook=skill_md,
+                            default_active=True,
+                            recommended_agent_id=agent_id,
+                            applicable_phases=phases
+                        )
+
+                        SkillTaxonomy.SKILLS[name] = skill_def
+                        connected_skills.append({
+                            "skill_id": name,
+                            "name": skill_def.name,
+                            "recommended_agent_id": agent_id,
+                            "applicable_phases": phases,
+                            "reference_playbook": skill_md
+                        })
+                        logger.info(f"[SkillDiscovery] Auto-connected workspace skill '{name}' to subagent '{agent_id}'")
+                    except Exception as ex:
+                        logger.error(f"[SkillDiscovery] Failed auto-connecting skill '{item}': {ex}")
+
+        state_dir = os.path.join(cwd, ".agents")
+        os.makedirs(state_dir, exist_ok=True)
+        connection_file = os.path.join(state_dir, "skill_auto_connection_receipt.json")
+        try:
+            with open(connection_file, "w", encoding="utf-8") as f:
+                json.dump({
+                    "auto_connection_status": "SUCCESS",
+                    "total_connected": len(connected_skills),
+                    "connected_skills": connected_skills
+                }, f, indent=2)
+        except Exception:
+            pass
+
+        return {"connected_count": len(connected_skills), "connected_skills": connected_skills}
