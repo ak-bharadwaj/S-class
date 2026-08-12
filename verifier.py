@@ -512,9 +512,9 @@ class EvidenceVerifier:
                         spec_data = json.load(f)
 
                     # Validate required sections
-                    has_intent = bool(spec_data.get("intent"))
+                    has_intent = bool(spec_data.get("intent") or spec_data.get("intent_summary"))
                     has_requirements = bool(spec_data.get("requirements"))
-                    has_affected = bool(spec_data.get("affected"))
+                    has_affected = bool(spec_data.get("affected") or spec_data.get("affected_systems"))
                     has_criteria = bool(spec_data.get("acceptance_criteria"))
                     gate_result = spec_data.get("gate_result", "")
 

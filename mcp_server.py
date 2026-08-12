@@ -102,6 +102,20 @@ def handle_tool_call(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any
         discovery = WorkspacePreflightScanner.full_project_discovery(workspace_dir)
         return {"project_discovery": discovery}
 
+    elif tool_name == "sclass_advance_fsm":
+        advance_res = runtime.FSMGoalSequenceRunner.advance_one_state(workspace_dir)
+        return {"advance_result": advance_res}
+
+    elif tool_name == "sclass_run_goal_sequence":
+        history = runtime.FSMGoalSequenceRunner.run_full_sequence(workspace_dir)
+        state = runtime.get_state(workspace_dir)
+        return {
+            "status": "SEQUENCE_RUN_FINISHED",
+            "active_phase": state.currentPhase,
+            "steps_executed": len(history),
+            "sequence_history": history
+        }
+
     else:
         raise ValueError(f"Unknown MCP tool: {tool_name}")
 
