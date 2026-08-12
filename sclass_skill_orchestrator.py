@@ -29,6 +29,9 @@ class SkillDefinition:
     reference_playbook: str = ""
     default_active: bool = False
     conditional_keywords: List[str] = None
+    recommended_agent_id: str = "dss_frontend_dev"
+    applicable_phases: List[str] = None
+    execution_combos: List[str] = None
 
 
 class SkillTaxonomy:
@@ -1229,6 +1232,82 @@ class SClassSkillOrchestrator:
     Exhaustively catalogs, initializes, and injects active skills with ZERO-LAZINESS enforcement.
     """
 
+    SKILL_COMBOS: Dict[str, Dict[str, Any]] = {
+        "APPLE_FLUID_UI_COMBO": {
+            "name": "Apple Fluid Micro-Interactions & Spring Motion Stack",
+            "skills": ["emil-apple-design", "frontend-design", "design-system", "emil-animation-opportunities", "taste-minimalist", "responsive-design"],
+            "primary_agents": ["dss_ui_ux", "dss_frontend_dev"],
+            "applicable_phases": ["DESIGN", "CODING"],
+            "purpose": "Delivers Apple-level 1:1 touch tracking, spring physics (damping 1.0/0.8), momentum projection, and layout morphing."
+        },
+        "ENTERPRISE_FULLSTACK_COMBO": {
+            "name": "Enterprise Fullstack Zero-Defect Architecture Stack",
+            "skills": ["requirement-expansion", "frontend-engineering", "zero-infra-db", "ast-dependency-resolver", "security-shield"],
+            "primary_agents": ["dss_frontend_dev", "dss_backend_dev", "dss_governor"],
+            "applicable_phases": ["SPECIFICATION_SYNTHESIS", "DESIGN", "CODING", "INTEGRATION"],
+            "purpose": "Ensures complete requirement coverage, decoupled component state, auto-injected NPM/DB fallbacks, and security protection."
+        },
+        "ZERO_DEFECT_QA_COMBO": {
+            "name": "Visual QA & User Acceptance Sign-Off Stack",
+            "skills": ["visual-qa", "impeccable-critique", "impeccable-polish", "accessibility", "emil-review-animations"],
+            "primary_agents": ["dss_qa_frontend", "dss_user_alias_v2"],
+            "applicable_phases": ["QA", "RELEASE"],
+            "purpose": "Validates DOM sanity, visual screenshot evidence, Lighthouse metrics, and user proxy contract sign-offs."
+        },
+        "SECURE_HARDENED_BACKEND_COMBO": {
+            "name": "Secure Hardened Backend & Relational DB Stack",
+            "skills": ["security-shield", "impeccable-harden", "zero-infra-db", "ast-dependency-resolver"],
+            "primary_agents": ["dss_cso_v2", "dss_backend_dev", "dss_db_architect"],
+            "applicable_phases": ["CODING", "INTEGRATION", "RELEASE"],
+            "purpose": "Audits secret leaks, pattern vulnerabilities, auth guards, zero-infra DB fallbacks, and package dependencies."
+        },
+        "TASTE_AESTHETIC_REBRAND_COMBO": {
+            "name": "Taste Aesthetic Rebrand & Visual Elevation Stack",
+            "skills": ["taste-brandkit", "taste-minimalist", "taste-soft", "taste-brutalist", "taste-redesign"],
+            "primary_agents": ["dss_ui_ux"],
+            "applicable_phases": ["DESIGN", "CODING"],
+            "purpose": "Transforms plain AI templates into curated HSL color schemes, glassmorphic surfaces, and bespoke typography."
+        }
+    }
+
+    @classmethod
+    def resolve_skill_combos(cls, goal_text: str) -> List[Dict[str, Any]]:
+        """Resolves active synergistic skill combos matching goal keywords or scope."""
+        goal_lower = goal_text.lower()
+        matched_combos = []
+        
+        # Default match logic
+        if any(kw in goal_lower for kw in ["apple", "animation", "motion", "spring", "ui", "gesture", "fluid", "design"]):
+            matched_combos.append(cls.SKILL_COMBOS["APPLE_FLUID_UI_COMBO"])
+        if any(kw in goal_lower for kw in ["fullstack", "backend", "database", "api", "app", "system", "spec"]):
+            matched_combos.append(cls.SKILL_COMBOS["ENTERPRISE_FULLSTACK_COMBO"])
+        if any(kw in goal_lower for kw in ["qa", "test", "audit", "visual", "quality", "browser"]):
+            matched_combos.append(cls.SKILL_COMBOS["ZERO_DEFECT_QA_COMBO"])
+        if any(kw in goal_lower for kw in ["auth", "security", "harden", "secret", "permission"]):
+            matched_combos.append(cls.SKILL_COMBOS["SECURE_HARDENED_BACKEND_COMBO"])
+        if any(kw in goal_lower for kw in ["aesthetic", "rebrand", "style", "color", "minimalist", "brutalist"]):
+            matched_combos.append(cls.SKILL_COMBOS["TASTE_AESTHETIC_REBRAND_COMBO"])
+            
+        if not matched_combos:
+            matched_combos.append(cls.SKILL_COMBOS["ENTERPRISE_FULLSTACK_COMBO"])
+            matched_combos.append(cls.SKILL_COMBOS["APPLE_FLUID_UI_COMBO"])
+
+        return matched_combos
+
+    @classmethod
+    def get_subagent_skill_matrix(cls) -> Dict[str, List[str]]:
+        """Maps all 8 canonical subagents to their authorized skill IDs."""
+        return {
+            "dss_governor": ["impeccable-craft", "ux-architecture", "academic-workflows", "requirement-expansion"],
+            "dss_ui_ux": ["frontend-design", "taste-aesthetic", "taste-soft", "taste-minimalist", "design-system", "emil-apple-design"],
+            "dss_frontend_dev": ["frontend-engineering", "emil-apple-design", "emil-design-eng", "data-dense-ui", "command-search", "responsive-design"],
+            "dss_backend_dev": ["impeccable-harden", "zero-infra-db", "ast-dependency-resolver", "impeccable-operate"],
+            "dss_db_architect": ["academic-workflows", "approval-workflows", "data-dense-ui", "zero-infra-db"],
+            "dss_cso_v2": ["impeccable-harden", "security-shield", "accessibility"],
+            "dss_qa_frontend": ["visual-qa", "impeccable-critique", "impeccable-polish", "emil-review-animations"],
+            "dss_user_alias_v2": ["responsive-design", "role-based-ux", "emil-animation-opportunities", "emil-prototype"]
+        }
+
     @classmethod
     def resolve_active_skills(cls, fsm_phase: str, goal_text: str, workspace_dir: Optional[str] = None) -> List[SkillDefinition]:
         goal_lower = goal_text.lower()
@@ -1253,12 +1332,15 @@ class SClassSkillOrchestrator:
         state_dir = os.path.join(cwd, ".agents")
         os.makedirs(state_dir, exist_ok=True)
         
+        active_combos = cls.resolve_skill_combos(goal_text)
+        
         stack_file = os.path.join(state_dir, "active_skill_stack.json")
         receipt = {
             "fsm_phase": fsm_phase,
             "total_skills_cataloged": len(SkillTaxonomy.SKILLS),
             "total_skills_active": len(phase_filtered),
             "no_laziness_enforced": True,
+            "active_combos": active_combos,
             "external_skills_integrated": [
                 "pbakaus/impeccable (35 Playbooks)",
                 "Leonxlnx/taste-skill (13 Aesthetics)",
