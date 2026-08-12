@@ -1309,12 +1309,65 @@ class SClassSkillOrchestrator:
         }
 
     @classmethod
+    def _auto_populate_skill_metadata(cls, skill: SkillDefinition) -> SkillDefinition:
+        """Guarantees 100% complete agent, phase, and combo configuration for every skill."""
+        s_id = skill.id.lower()
+        desc = (skill.purpose + " " + skill.rule_guideline + " " + " ".join(skill.technologies)).lower()
+
+        # 1. Agent Auto-Inference
+        if not skill.recommended_agent_id or skill.recommended_agent_id == "dss_frontend_dev":
+            if "impeccable-harden" in s_id or "security" in s_id or "cso" in desc:
+                skill.recommended_agent_id = "dss_cso_v2"
+            elif "qa" in s_id or "critique" in s_id or "polish" in s_id or "audit" in s_id:
+                skill.recommended_agent_id = "dss_qa_frontend"
+            elif "taste" in s_id or "brandkit" in s_id or "design-system" in s_id or "frontend-design" in s_id:
+                skill.recommended_agent_id = "dss_ui_ux"
+            elif "db" in s_id or "database" in s_id or "schema" in desc or "migration" in desc:
+                skill.recommended_agent_id = "dss_db_architect"
+            elif "backend" in desc or "zero-infra" in s_id or "ast-dependency" in s_id:
+                skill.recommended_agent_id = "dss_backend_dev"
+            elif "responsive" in s_id or "user" in s_id or "prototype" in s_id or "acceptance" in desc:
+                skill.recommended_agent_id = "dss_user_alias_v2"
+            elif "requirement" in s_id or "craft" in s_id or "ux-architecture" in s_id:
+                skill.recommended_agent_id = "dss_governor"
+            else:
+                skill.recommended_agent_id = "dss_frontend_dev"
+
+        # 2. Phase Auto-Inference
+        if not skill.applicable_phases:
+            if skill.recommended_agent_id in ["dss_ui_ux", "dss_governor"]:
+                skill.applicable_phases = ["SPECIFICATION_SYNTHESIS", "DESIGN", "DEBATE"]
+            elif skill.recommended_agent_id in ["dss_frontend_dev", "dss_backend_dev", "dss_db_architect"]:
+                skill.applicable_phases = ["CODING", "INTEGRATION"]
+            elif skill.recommended_agent_id in ["dss_qa_frontend", "dss_cso_v2"]:
+                skill.applicable_phases = ["QA", "RELEASE"]
+            else:
+                skill.applicable_phases = ["RELEASE", "MONITORING"]
+
+        # 3. Combo Auto-Inference
+        if not skill.execution_combos:
+            combos = []
+            if any(k in s_id or k in desc for k in ["apple", "animation", "taste", "ui", "design", "motion"]):
+                combos.append("APPLE_FLUID_UI_COMBO")
+                combos.append("TASTE_AESTHETIC_REBRAND_COMBO")
+            if any(k in s_id or k in desc for k in ["engineering", "backend", "db", "ast", "requirement"]):
+                combos.append("ENTERPRISE_FULLSTACK_COMBO")
+            if any(k in s_id or k in desc for k in ["qa", "critique", "polish", "accessibility", "visual"]):
+                combos.append("ZERO_DEFECT_QA_COMBO")
+            if any(k in s_id or k in desc for k in ["security", "harden", "zero-infra"]):
+                combos.append("SECURE_HARDENED_BACKEND_COMBO")
+            skill.execution_combos = list(set(combos)) if combos else ["ENTERPRISE_FULLSTACK_COMBO"]
+
+        return skill
+
+    @classmethod
     def resolve_active_skills(cls, fsm_phase: str, goal_text: str, workspace_dir: Optional[str] = None) -> List[SkillDefinition]:
         goal_lower = goal_text.lower()
         active_skills: List[SkillDefinition] = []
 
-        # 1. Collect Default Active Core Skills
+        # 1. Collect Default Active Core Skills & Auto-Populate Configurations
         for skill_id, skill in SkillTaxonomy.SKILLS.items():
+            cls._auto_populate_skill_metadata(skill)
             if skill.default_active:
                 active_skills.append(skill)
 

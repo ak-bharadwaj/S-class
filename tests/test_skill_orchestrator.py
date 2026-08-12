@@ -71,6 +71,18 @@ class TestSkillOrchestrator(unittest.TestCase):
             data = json.load(f)
         self.assertEqual(data["fsm_phase"], "DESIGN")
 
+    def test_all_skills_fully_configured(self):
+        skills = SClassSkillOrchestrator.resolve_active_skills(
+            fsm_phase="CODING",
+            goal_text="Full system test",
+            workspace_dir=self.test_dir
+        )
+        for s_id, skill in SkillTaxonomy.SKILLS.items():
+            SClassSkillOrchestrator._auto_populate_skill_metadata(skill)
+            self.assertIsNotNone(skill.recommended_agent_id, f"Skill {s_id} missing recommended_agent_id")
+            self.assertGreater(len(skill.applicable_phases), 0, f"Skill {s_id} missing applicable_phases")
+            self.assertGreater(len(skill.execution_combos), 0, f"Skill {s_id} missing execution_combos")
+
 
 if __name__ == "__main__":
     unittest.main()
