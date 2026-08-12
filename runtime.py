@@ -535,6 +535,18 @@ def initialize_state(workspace_dir: Optional[str] = None, goal: Optional[str] = 
         validate_state_types(state_dict)
         write_json_atomic(state_file, state_dict)
 
+    # Upfront Spec Synthesis & Project Discovery Guarantee
+    if goal:
+        try:
+            from spec_synthesis import SpecSynthesisEngine
+            from workspace_preflight_scanner import WorkspacePreflightScanner
+            WorkspacePreflightScanner.full_project_discovery(workspace_dir)
+            engine = SpecSynthesisEngine()
+            synthesized_spec = engine.run_synthesis(raw_request=goal, workspace_dir=workspace_dir)
+            logger.info(f"[InitializeState] Upfront spec synthesis generated '.agents/synthesized_spec.json' and '.agents/synthesized_spec.md' with {len(synthesized_spec.questions_for_human)} questions.")
+        except Exception as ss_ex:
+            logger.warning(f"[InitializeState] Spec synthesis upfront note: {ss_ex}")
+
 def get_state(workspace_dir: Optional[str] = None) -> State:
     """Loads and validates the current State dataclass object."""
     _, state_file, _, _ = _resolve_paths(workspace_dir)
@@ -821,6 +833,19 @@ def reset_to_triage(workspace_dir: Optional[str] = None, new_goal: Optional[str]
         state.transitionHistory.append(t_rec.to_dict())
         
         save_state(state, workspace_dir)
+        
+        # Upfront Spec Synthesis & Project Discovery Guarantee
+        if new_goal:
+            try:
+                from spec_synthesis import SpecSynthesisEngine
+                from workspace_preflight_scanner import WorkspacePreflightScanner
+                WorkspacePreflightScanner.full_project_discovery(workspace_dir)
+                engine = SpecSynthesisEngine()
+                synthesized_spec = engine.run_synthesis(raw_request=new_goal, workspace_dir=workspace_dir)
+                logger.info(f"[InitializeState] Upfront spec synthesis generated '.agents/synthesized_spec.json' and '.agents/synthesized_spec.md' with {len(synthesized_spec.questions_for_human)} questions.")
+            except Exception as ss_ex:
+                logger.warning(f"[InitializeState] Spec synthesis upfront note: {ss_ex}")
+
         logger.info(f"FSM Reset: Requirements modified mid-flight in state '{old_phase}'. Workflow reset to TRIAGE.")
 
 def update_task(task_id: str, status: str, workspace_dir: Optional[str] = None, agent_name: Optional[str] = None) -> None:
