@@ -181,8 +181,8 @@
   },
   {
     "event": "clarified",
-    "description": "Fired when the user responds to clarifying questions and design begins.",
-    "nextState": "DESIGN",
+    "description": "Fired when the user responds to clarifying questions and spec synthesis resumes.",
+    "nextState": "SPECIFICATION_SYNTHESIS",
     "sideEffects": []
   }
 ]

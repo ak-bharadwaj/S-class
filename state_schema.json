@@ -9,7 +9,10 @@
     },
     "currentPhase": {
       "type": "string",
-      "enum": ["TRIAGE", "ANALYSIS", "CLARIFICATION", "DESIGN", "DEBATE", "TASK_COMPILATION", "CODING", "INTEGRATION", "QA", "RECOVERY", "RELEASE", "DONE"]
+      "enum": ["TRIAGE", "ANALYSIS", "CLARIFICATION", "SPECIFICATION_SYNTHESIS", "DESIGN", "DEBATE", "DESIGN_REVISION", "TASK_COMPILATION", "CODING", "TASK_VERIFICATION", "MERGE", "INTEGRATION", "QA", "RECOVERY", "RELEASE", "MONITORING", "FEEDBACK", "ISSUE_DETECTION", "DONE"]
+    },
+    "goal": {
+      "type": "string"
     },
     "activeEvent": {
       "type": ["string", "null"]

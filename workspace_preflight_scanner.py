@@ -17,7 +17,7 @@ logger = logging.getLogger("sclass_workspace_preflight_scanner")
 
 class WorkspacePreflightScanner:
     """
-    Full Workspace File & AST Pre-Flight Scanner for S-Class V12.0.
+    Full Workspace File & AST Pre-Flight Scanner for S-Class V12.1.
     Guarantees 100% context awareness across all project files upfront.
     """
 
@@ -49,7 +49,7 @@ class WorkspacePreflightScanner:
                 scanned_files.append(rel_path)
                 total_files += 1
                 fp = os.path.join(root, f)
-                
+
                 try:
                     size = os.path.getsize(fp)
                     total_bytes += size
@@ -89,6 +89,10 @@ class WorkspacePreflightScanner:
                     except Exception:
                         pass
 
+        # Also extract python dependencies if present
+        py_deps = cls.extract_python_deps(cwd)
+        pkg_dependencies.update(py_deps)
+
         digest = {
             "total_files": total_files,
             "total_bytes": total_bytes,
@@ -107,6 +111,40 @@ class WorkspacePreflightScanner:
 
         logger.info(f"[WorkspacePreflightScanner] Scanned {total_files} workspace files ({len(exported_symbols)} symbols extracted)")
         return digest
+
+    @classmethod
+    def extract_python_deps(cls, cwd: str) -> List[str]:
+        deps = set()
+        req_path = os.path.join(cwd, "requirements.txt")
+        if os.path.exists(req_path):
+            try:
+                with open(req_path, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        line_str = line.strip()
+                        if line_str and not line_str.startswith("#") and not line_str.startswith("-"):
+                            pkg_name = re.split(r'(?:==|>=|<=|>|<|~=|!=)', line_str)[0].strip()
+                            if pkg_name:
+                                deps.add(pkg_name)
+            except Exception:
+                pass
+
+        toml_path = os.path.join(cwd, "pyproject.toml")
+        if os.path.exists(toml_path):
+            try:
+                with open(toml_path, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
+                deps_block_matches = re.findall(r'(?:dependencies\s*=\s*\[([^\]]+)\])|(?:\[(?:tool\.poetry\.)?dependencies\]([^\[]+))', content, re.MULTILINE)
+                for match in deps_block_matches:
+                    block = match[0] or match[1]
+                    for line in block.splitlines():
+                        line = line.strip().strip(',"')
+                        if line and not line.startswith('#') and not line.startswith('['):
+                            pkg_name = re.split(r'[=><~^!]', line)[0].strip().strip('"\'')
+                            if pkg_name and pkg_name.lower() not in ["python", "project", "build-system"]:
+                                deps.add(pkg_name)
+            except Exception:
+                pass
+        return list(deps)
 
     @classmethod
     def extract_db_schema(cls, cwd: str) -> List[Dict]:
@@ -128,9 +166,23 @@ class WorkspacePreflightScanner:
                         with open(fp, "r", encoding="utf-8", errors="ignore") as fo:
                             content = fo.read()
                         if 'Base' in content or 'Model' in content:
-                            classes = re.findall(r'class\s+(\w+)\s*\([^)]*\):', content)
-                            for c in classes:
-                                schema.append({"name": c, "fields": [], "source": rel_path})
+                            classes_with_bodies = re.findall(r'class\s+(\w+)\s*\([^)]*(?:Model|Base)[^)]*\):([^\n]+(?:\n(?!\s*class\s+).*)*)', content)
+                            for c_name, body in classes_with_bodies:
+                                fields = re.findall(r'^\s{4}(\w+)\s*=\s*(?:models\.|Column\(|Field\()', body, re.MULTILINE)
+                                schema.append({"name": c_name, "fields": fields, "source": rel_path})
+                    elif f.endswith('.sql'):
+                        with open(fp, "r", encoding="utf-8", errors="ignore") as fo:
+                            content = fo.read()
+                        create_blocks = re.findall(r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["`]?(\w+)["`]?\s*\(([^;]+)\);', content, re.IGNORECASE | re.DOTALL)
+                        for t_name, body in create_blocks:
+                            fields = []
+                            for line in body.splitlines():
+                                line_s = line.strip()
+                                if line_s and not line_s.upper().startswith(('PRIMARY', 'FOREIGN', 'KEY', 'CONSTRAINT', 'UNIQUE', 'CHECK', 'INDEX', '--')):
+                                    col_match = re.match(r'["`]?(\w+)["`]?\s+([A-Za-z0-9_()]+)', line_s)
+                                    if col_match:
+                                        fields.append(f"{col_match.group(1)} {col_match.group(2)}")
+                            schema.append({"name": t_name, "fields": fields, "source": rel_path})
                 except Exception:
                     pass
         return schema
@@ -141,7 +193,7 @@ class WorkspacePreflightScanner:
         pattern = re.compile(r'@(?:router|app|app)\.(get|post|put|delete|patch)\([\'"]([^\'"]+)[\'"]')
         js_pattern = re.compile(r'(?:router|app)\.(get|post|put|delete|patch)\([\'"]([^\'"]+)[\'"]')
         nest_pattern = re.compile(r'@(Get|Post|Put|Delete|Patch)\([\'"]?([^\'"]*)[\'"]?\)')
-        
+
         for root, dirs, files in os.walk(cwd):
             dirs[:] = [d for d in dirs if d not in cls.EXCLUDED_DIRS and not d.startswith(".")]
             for f in files:
@@ -152,13 +204,13 @@ class WorkspacePreflightScanner:
                 try:
                     with open(fp, "r", encoding="utf-8", errors="ignore") as fo:
                         content = fo.read()
-                        
+
                     for method, path in pattern.findall(content):
                         routes.append({"method": method.upper(), "path": path, "source": rel_path})
-                        
+
                     for method, path in js_pattern.findall(content):
                         routes.append({"method": method.upper(), "path": path, "source": rel_path})
-                        
+
                     for method, path in nest_pattern.findall(content):
                         routes.append({"method": method.upper(), "path": path, "source": rel_path})
                 except Exception:
@@ -173,7 +225,7 @@ class WorkspacePreflightScanner:
             (os.path.join(agents_dir, 'design_blueprint.json'), 'design_blueprint'),
             (os.path.join(agents_dir, 'role_interaction_matrix.json'), 'role_interaction_matrix')
         ]
-        
+
         for path, key in files_to_check:
             if os.path.exists(path):
                 try:
@@ -181,7 +233,7 @@ class WorkspacePreflightScanner:
                         docs[key] = json.load(f)
                 except Exception:
                     pass
-                    
+
         for root, dirs, files in os.walk(cwd):
             dirs[:] = [d for d in dirs if d not in cls.EXCLUDED_DIRS and not d.startswith(".")]
             for f in files:
@@ -216,13 +268,53 @@ class WorkspacePreflightScanner:
         return list(set(components))
 
     @classmethod
+    def extract_docker_services(cls, cwd: str) -> List[str]:
+        services = []
+        compose_paths = [
+            os.path.join(cwd, "docker-compose.yml"),
+            os.path.join(cwd, "docker-compose.yaml"),
+            os.path.join(cwd, "compose.yml"),
+            os.path.join(cwd, "compose.yaml")
+        ]
+        for p in compose_paths:
+            if os.path.exists(p):
+                try:
+                    with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                        content = f.read()
+                    services_match = re.search(r'^services:\s*\n((?:\s{2,}.*\n?)+)', content, re.MULTILINE)
+                    if services_match:
+                        services_block = services_match.group(1)
+                        matches = re.findall(r'^\s{2}([a-zA-Z0-9_\-]+):', services_block, re.MULTILINE)
+                        services.extend(matches)
+                except Exception:
+                    pass
+        return list(set(services))
+
+    @classmethod
     def extract_auth_permissions(cls, cwd: str) -> List[str]:
-        perms = []
-        return perms
+        perms = set()
+        for root, dirs, files in os.walk(cwd):
+            dirs[:] = [d for d in dirs if d not in cls.EXCLUDED_DIRS and not d.startswith(".")]
+            for f in files:
+                if f.endswith(('.ts', '.tsx', '.js', '.py')):
+                    fp = os.path.join(root, f)
+                    try:
+                        with open(fp, "r", encoding="utf-8", errors="ignore") as fo:
+                            content = fo.read()
+                        matches = re.findall(r'(?:role|permission|guard)\s*[:=]\s*["\']([a-zA-Z0-9_:]+)["\']', content, re.IGNORECASE)
+                        perms.update(matches)
+                    except Exception:
+                        pass
+        return list(perms)
 
     @classmethod
     def extract_tests(cls, cwd: str) -> List[str]:
         tests = []
+        for root, dirs, files in os.walk(cwd):
+            dirs[:] = [d for d in dirs if d not in cls.EXCLUDED_DIRS and not d.startswith(".")]
+            for f in files:
+                if f.startswith("test_") or f.endswith(("_test.py", ".test.ts", ".test.tsx", ".spec.ts", ".spec.tsx")):
+                    tests.append(os.path.relpath(os.path.join(root, f), cwd))
         return tests
 
     @classmethod
@@ -233,10 +325,11 @@ class WorkspacePreflightScanner:
             "api_routes": cls.extract_api_routes(cwd),
             "design_documents": cls.extract_design_documents(cwd),
             "ui_components": cls.extract_ui_components(cwd),
+            "docker_services": cls.extract_docker_services(cwd),
             "auth_permissions": cls.extract_auth_permissions(cwd),
             "tests": cls.extract_tests(cwd)
         }
-        
+
         state_dir = os.path.join(cwd, ".agents")
         os.makedirs(state_dir, exist_ok=True)
         discovery_file = os.path.join(state_dir, "project_discovery.json")
@@ -245,5 +338,5 @@ class WorkspacePreflightScanner:
                 json.dump(discovery, df, indent=2)
         except Exception as e:
             logger.error(f"Failed to save project discovery: {e}")
-            
+
         return discovery

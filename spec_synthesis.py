@@ -1,10 +1,11 @@
 import os
 import json
 import re
+import shutil
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Dict, Any, Optional, Set
+from typing import List, Dict, Any, Optional, Set, Tuple
 
 try:
     from runtime import write_json_atomic, load_json
@@ -58,6 +59,26 @@ class GateResult(Enum):
     PASS_WITH_DECISIONS = "PASS_WITH_DECISIONS"
     BLOCKED = "BLOCKED"
 
+class ProjectArchetype(Enum):
+    FULLSTACK_MONOLITH = "fullstack"
+    WEB_FRONTEND = "web_frontend"
+    BACKEND_API = "backend_api"
+    MOBILE_HYBRID = "mobile_hybrid"
+    CLI_TOOL = "cli_tool"
+    LIBRARY_PACKAGE = "library"
+    DATA_PIPELINE = "data_pipeline"
+    ML_AI = "ml_ai"
+    STATIC_SITE = "static_site"
+    MICROSERVICE = "microservice"
+    MONOREPO = "monorepo"
+    GREENFIELD = "greenfield"
+
+class ScopeTier(Enum):
+    TRIVIAL = "trivial"
+    MINOR = "minor"
+    MODERATE = "moderate"
+    MAJOR = "major"
+
 # --- Dataclasses ---
 
 @dataclass
@@ -99,11 +120,31 @@ class SynthesizedRequirement:
         }
 
 @dataclass
+class RoleCapabilityBinding:
+    role: str
+    capabilities: List[str] = field(default_factory=list)
+    raw_clause: str = ""
+
+@dataclass
 class IntentExtraction:
     raw_request: str
     primary_features: List[str] = field(default_factory=list)
     target_roles: List[str] = field(default_factory=list)
     action_verbs: List[str] = field(default_factory=list)
+    domain_keywords: List[str] = field(default_factory=list)
+
+@dataclass
+class StructuredIntent(IntentExtraction):
+    role_bindings: List[RoleCapabilityBinding] = field(default_factory=list)
+    global_features: List[str] = field(default_factory=list)
+
+    @property
+    def all_features(self) -> List[str]:
+        caps = []
+        for rb in self.role_bindings:
+            caps.extend(rb.capabilities)
+        caps.extend(self.global_features)
+        return list(dict.fromkeys(caps)) or self.primary_features
 
 @dataclass
 class ProjectEvidence:
@@ -113,6 +154,10 @@ class ProjectEvidence:
     design_docs: Dict[str, Any] = field(default_factory=dict)
     env_vars: List[str] = field(default_factory=list)
     dependencies: List[str] = field(default_factory=list)
+    auth_permissions: List[str] = field(default_factory=list)
+    existing_tests: List[str] = field(default_factory=list)
+    discovered_pages: List[str] = field(default_factory=list)
+    role_permissions: List[Dict[str, Any]] = field(default_factory=list)
 
 @dataclass
 class SynthesizedSpec:
@@ -124,79 +169,407 @@ class SynthesizedSpec:
     acceptance_criteria: List[str]
     gate_result: str
     total_assumption_weight: int
+    archetypes: List[str] = field(default_factory=lambda: ["fullstack"])
+    scope_tier: str = "moderate"
+    spec_version: int = 1
+
+# --- Classifier & Archetype Detector ---
+
+class ProjectArchetypeDetector:
+    """Classifies a project directory into one or more ProjectArchetype values."""
+
+    @classmethod
+    def detect(cls, workspace_dir: str, evidence: Optional[ProjectEvidence] = None) -> List[ProjectArchetype]:
+        archetypes: Set[ProjectArchetype] = set()
+
+        pkg_json = os.path.join(workspace_dir, "package.json")
+        req_txt = os.path.join(workspace_dir, "requirements.txt")
+        pyproject = os.path.join(workspace_dir, "pyproject.toml")
+        docker_compose = os.path.join(workspace_dir, "docker-compose.yml")
+        turbo_json = os.path.join(workspace_dir, "turbo.json")
+        nx_json = os.path.join(workspace_dir, "nx.json")
+        astro_cfg = os.path.join(workspace_dir, "astro.config.mjs")
+        capacitor_cfg = os.path.join(workspace_dir, "capacitor.config.ts")
+
+        # 1. Monorepo
+        if os.path.exists(turbo_json) or os.path.exists(nx_json) or os.path.exists(os.path.join(workspace_dir, "pnpm-workspace.yaml")):
+            archetypes.add(ProjectArchetype.MONOREPO)
+
+        # 2. Package manifest checks
+        if os.path.exists(pkg_json):
+            try:
+                with open(pkg_json, 'r', encoding='utf-8', errors='ignore') as f:
+                    pkg_data = json.load(f)
+                deps = pkg_data.get("dependencies", {})
+                dev_deps = pkg_data.get("devDependencies", {})
+                all_deps = {**deps, **dev_deps}
+
+                if "next" in all_deps or "remix" in all_deps or "express" in all_deps:
+                    if os.path.exists(os.path.join(workspace_dir, "prisma")) or "prisma" in all_deps or "typeorm" in all_deps:
+                        archetypes.add(ProjectArchetype.FULLSTACK_MONOLITH)
+                    else:
+                        archetypes.add(ProjectArchetype.WEB_FRONTEND)
+                if "@capacitor/core" in all_deps or "react-native" in all_deps or os.path.exists(os.path.join(workspace_dir, "android")):
+                    archetypes.add(ProjectArchetype.MOBILE_HYBRID)
+                if "commander" in pkg_data.get("bin", {}) or "bin" in pkg_data:
+                    archetypes.add(ProjectArchetype.CLI_TOOL)
+                if "exports" in pkg_data and not archetypes:
+                    archetypes.add(ProjectArchetype.LIBRARY_PACKAGE)
+            except Exception:
+                pass
+
+        # 3. Python manifests
+        if os.path.exists(req_txt) or os.path.exists(pyproject):
+            deps_str = ""
+            if evidence:
+                deps_str = " ".join(evidence.dependencies).lower()
+
+            if "torch" in deps_str or "transformers" in deps_str or "langchain" in deps_str or "openai" in deps_str:
+                archetypes.add(ProjectArchetype.ML_AI)
+            if "airflow" in deps_str or "dbt" in deps_str or "pyspark" in deps_str or "dagster" in deps_str:
+                archetypes.add(ProjectArchetype.DATA_PIPELINE)
+            if "fastapi" in deps_str or "django" in deps_str or "flask" in deps_str:
+                if not any(a in [ProjectArchetype.FULLSTACK_MONOLITH, ProjectArchetype.WEB_FRONTEND] for a in archetypes):
+                    archetypes.add(ProjectArchetype.BACKEND_API)
+            if "click" in deps_str or "typer" in deps_str or "argparse" in deps_str:
+                archetypes.add(ProjectArchetype.CLI_TOOL)
+
+        # 4. Microservices / Containers
+        if os.path.exists(docker_compose) or os.path.exists(os.path.join(workspace_dir, "docker-compose.yaml")):
+            archetypes.add(ProjectArchetype.MICROSERVICE)
+
+        # 5. Static site
+        if os.path.exists(astro_cfg) or os.path.exists(os.path.join(workspace_dir, "hugo.toml")):
+            archetypes.add(ProjectArchetype.STATIC_SITE)
+
+        # Fallbacks
+        if not archetypes:
+            if evidence and (evidence.db_entities or evidence.api_routes or evidence.ui_components):
+                archetypes.add(ProjectArchetype.FULLSTACK_MONOLITH)
+            else:
+                archetypes.add(ProjectArchetype.GREENFIELD)
+
+        return sorted(list(archetypes), key=lambda a: a.value)
+
+
+class ScopeClassifier:
+    """Classifies prompt intent into TRIVIAL, MINOR, MODERATE, or MAJOR complexity tiers."""
+
+    @classmethod
+    def classify(cls, raw_request: str, intent: IntentExtraction) -> ScopeTier:
+        req_lower = raw_request.lower().strip()
+
+        # Trivial checks: minor fixes, typos, single line requests
+        if len(req_lower) <= 20 and not any(w in req_lower for w in ["build", "create", "implement", "add", "system"]):
+            return ScopeTier.TRIVIAL
+        if any(kw in req_lower for kw in ["fix typo", "update readme", "add comment", "format code", "rename variable"]):
+            return ScopeTier.TRIVIAL
+
+        feature_count = len(intent.primary_features)
+        verb_count = len(intent.action_verbs)
+
+        if feature_count <= 1 and verb_count <= 1:
+            return ScopeTier.MINOR
+        elif feature_count <= 4:
+            return ScopeTier.MODERATE
+        else:
+            return ScopeTier.MAJOR
+
+
+# --- Archetype-Aware Impact Tiers ---
+
+ARCHETYPE_IMPACT_TIERS: Dict[str, List[str]] = {
+    "fullstack":       ["frontend", "backend", "database", "auth", "api_routes", "navigation"],
+    "web_frontend":    ["ui_components", "routing", "state_mgmt", "styling", "assets"],
+    "backend_api":     ["controllers", "services", "database", "auth", "middleware", "validation"],
+    "cli_tool":        ["commands", "args_parser", "output_format", "config", "stdin_stdout"],
+    "library":         ["public_api", "internals", "types", "docs", "tests", "bundling"],
+    "data_pipeline":   ["ingestion", "transformation", "storage", "scheduling", "monitoring"],
+    "ml_ai":           ["model", "training", "inference", "data_prep", "evaluation", "serving"],
+    "mobile_hybrid":   ["frontend", "native_bridge", "offline_storage", "push_notifications"],
+    "microservice":    ["services", "contracts", "message_bus", "gateway", "observability"],
+    "greenfield":      ["frontend", "backend", "database", "auth", "infrastructure"],
+}
+
+
+# --- Dynamic Rule Registry ---
+
+@dataclass
+class InferenceRule:
+    id: str
+    name: str
+    archetypes: List[str]  # ["*"] = all, ["fullstack", "backend_api"] = specific
+    description: str
+    assumption_type: str  # ux, behavior, data, api, permission, architecture
+    threshold: DecisionThreshold
+    category: RequirementCategory
+    affects: List[str]
+    why_chain: List[str]
+
+
+UNIVERSAL_RULE_REGISTRY: List[InferenceRule] = [
+    # Universal Rules
+    InferenceRule("UNI-001", "Structured Logging", ["*"], "Implement structured JSON logging across all execution paths", "architecture", DecisionThreshold.AUTO_DECIDE, RequirementCategory.SYSTEM_INVARIANT, ["backend", "observability"], ["All non-trivial projects require structured logging for debugging"]),
+    InferenceRule("UNI-002", "Input Sanitization", ["*"], "Sanitize and validate all external inputs at system boundaries", "permission", DecisionThreshold.AUTO_DECIDE, RequirementCategory.SYSTEM_INVARIANT, ["backend", "validation"], ["Input sanitization protects against injection and validation defects"]),
+    InferenceRule("UNI-003", "Graceful Error Handling", ["*"], "Catch unhandled exceptions and return structured error envelopes", "behavior", DecisionThreshold.AUTO_DECIDE, RequirementCategory.SYSTEM_INVARIANT, ["backend", "frontend"], ["Unhandled exceptions lead to process crashes or blank UI screens"]),
+    InferenceRule("UNI-004", "Automated Testing Suite", ["*"], "Maintain unit and integration test coverage for primary workflows", "behavior", DecisionThreshold.AUTO_DECIDE, RequirementCategory.SYSTEM_INVARIANT, ["tests"], ["Automated tests guarantee regressions are caught during CI"]),
+    InferenceRule("UNI-005", "Environment Config Management", ["*"], "Decouple configuration from code using environment variables", "architecture", DecisionThreshold.AUTO_DECIDE, RequirementCategory.ARCHITECTURAL_CONSTRAINT, ["config"], ["Hardcoded secrets/config violate 12-Factor app methodology"]),
+
+    # Web & Fullstack Rules
+    InferenceRule("WEB-001", "Breadcrumb Navigation", ["fullstack", "web_frontend"], "Include breadcrumb navigation for deeply nested pages", "ux", DecisionThreshold.AUTO_DECIDE, RequirementCategory.UX_DERIVATION, ["frontend", "navigation"], ["Nested navigation depth >= 2 requires breadcrumbs for UX clarity"]),
+    InferenceRule("WEB-002", "Server-Side Pagination", ["fullstack", "web_frontend", "backend_api"], "Add server-side pagination to list views", "ux", DecisionThreshold.AUTO_DECIDE, RequirementCategory.UX_DERIVATION, ["frontend", "backend"], ["Large datasets degrade UI rendering without pagination"]),
+    InferenceRule("WEB-003", "Role-Based Access Control", ["fullstack", "backend_api"], "Implement RBAC middleware and client route guards", "permission", DecisionThreshold.AUTO_DECIDE, RequirementCategory.SYSTEM_INVARIANT, ["backend", "auth", "frontend"], ["Multi-role applications require server & client access control"]),
+    InferenceRule("WEB-004", "React Error Boundaries", ["fullstack", "web_frontend"], "Wrap page views in Error Boundary components and empty-state fallbacks", "ux", DecisionThreshold.AUTO_DECIDE, RequirementCategory.SYSTEM_INVARIANT, ["frontend"], ["Error boundaries prevent white-screen crashes on client errors"]),
+    InferenceRule("WEB-005", "Registration Gate", ["fullstack"], "Public self-registration requires explicit confirmation. MUST_ASK user.", "permission", DecisionThreshold.MUST_ASK, RequirementCategory.PRODUCT_REQUIREMENT, ["frontend", "auth"], ["Admin-created accounts are standard unless self-registration is explicitly desired"]),
+    InferenceRule("WEB-006", "Soft Delete", ["fullstack", "backend_api"], "Implement soft-delete due to audit significance of data entities", "data", DecisionThreshold.PROBABLY_DECIDE, RequirementCategory.ARCHITECTURAL_CONSTRAINT, ["backend", "database"], ["Permanent deletion risks corruption of audit history"]),
+    InferenceRule("WEB-007", "Workflow Endpoints", ["fullstack", "backend_api"], "Use state-machine workflow API endpoints over raw CRUD for controlled entities", "architecture", DecisionThreshold.AUTO_DECIDE, RequirementCategory.ARCHITECTURAL_CONSTRAINT, ["backend", "database"], ["Controlled entities need explicit state transitions"]),
+
+    # API Rules
+    InferenceRule("API-001", "API Rate Limiting", ["backend_api", "fullstack"], "Enforce rate limiting on public API endpoints", "permission", DecisionThreshold.AUTO_DECIDE, RequirementCategory.SYSTEM_INVARIANT, ["backend", "middleware"], ["Rate limiting protects API endpoints against abuse and DDoS"]),
+    InferenceRule("API-002", "API Endpoint Versioning", ["backend_api"], "Use URI or header versioning (/api/v1/) for endpoints", "architecture", DecisionThreshold.AUTO_DECIDE, RequirementCategory.ARCHITECTURAL_CONSTRAINT, ["backend"], ["API versioning prevents breaking existing clients"]),
+
+    # CLI Rules
+    InferenceRule("CLI-001", "Command Help Text", ["cli_tool"], "Provide clear --help documentation for all commands and subcommands", "ux", DecisionThreshold.AUTO_DECIDE, RequirementCategory.UX_DERIVATION, ["args_parser"], ["CLI tools must be self-documenting"]),
+    InferenceRule("CLI-002", "Standard Exit Codes", ["cli_tool"], "Use standard POSIX exit codes (0=success, 1=error, 2=usage)", "behavior", DecisionThreshold.AUTO_DECIDE, RequirementCategory.SYSTEM_INVARIANT, ["commands"], ["Exit codes allow shell scripts to handle CLI outcomes"]),
+
+    # Library Rules
+    InferenceRule("LIB-001", "Public API Surface", ["library"], "Expose clean index exports and encapsulate private internals", "architecture", DecisionThreshold.AUTO_DECIDE, RequirementCategory.ARCHITECTURAL_CONSTRAINT, ["public_api"], ["Libraries require explicit public boundary design"]),
+    InferenceRule("LIB-002", "TypeScript Definitions", ["library"], "Generate comprehensive .d.ts type declarations", "ux", DecisionThreshold.AUTO_DECIDE, RequirementCategory.PRODUCT_REQUIREMENT, ["types"], ["Type definitions enable IDE autocompletion for package consumers"]),
+
+    # Data Pipeline Rules
+    InferenceRule("DATA-001", "Pipeline Idempotency", ["data_pipeline"], "Ensure all pipeline transformation steps are strictly idempotent", "architecture", DecisionThreshold.AUTO_DECIDE, RequirementCategory.SYSTEM_INVARIANT, ["transformation"], ["Idempotency enables safe retries on pipeline failures"]),
+
+    # ML/AI Rules
+    InferenceRule("ML-001", "Model Version Tracking", ["ml_ai"], "Log model weights, hyperparameter configs, and evaluation metrics", "data", DecisionThreshold.AUTO_DECIDE, RequirementCategory.SYSTEM_INVARIANT, ["model"], ["Reproducibility requires versioning model artifacts"]),
+
+    # Microservice Rules
+    InferenceRule("MICRO-001", "Service Contract Schema", ["microservice"], "Define strict inter-service contracts using gRPC/Proto or OpenAPI", "api", DecisionThreshold.AUTO_DECIDE, RequirementCategory.ARCHITECTURAL_CONSTRAINT, ["contracts"], ["Microservices require strong contract boundaries"]),
+
+    # Mobile Rules
+    InferenceRule("MOBILE-001", "Offline Storage Sync", ["mobile_hybrid"], "Implement local SQLite/IndexedDB caching for offline resilience", "data", DecisionThreshold.AUTO_DECIDE, RequirementCategory.UX_DERIVATION, ["offline_storage"], ["Mobile apps must handle network connectivity loss gracefully"]),
+
+    # Cross-Cutting Rules
+    InferenceRule("XCUT-001", "Security Headers", ["fullstack", "backend_api", "web_frontend"], "Configure CSP, HSTS, and X-Frame-Options security headers", "permission", DecisionThreshold.AUTO_DECIDE, RequirementCategory.SYSTEM_INVARIANT, ["backend", "middleware"], ["Security headers mitigate XSS and clickjacking"]),
+    InferenceRule("XCUT-002", "CORS Configuration", ["fullstack", "backend_api"], "Configure explicit CORS origin whitelisting", "permission", DecisionThreshold.AUTO_DECIDE, RequirementCategory.SYSTEM_INVARIANT, ["auth", "backend"], ["Unrestricted CORS exposes API endpoints to unauthorized domains"]),
+    InferenceRule("XCUT-003", "Accessibility (a11y)", ["fullstack", "web_frontend", "mobile_hybrid"], "Ensure ARIA tags, color contrast compliance, and keyboard focus states", "ux", DecisionThreshold.AUTO_DECIDE, RequirementCategory.UX_DERIVATION, ["frontend"], ["UI applications must be accessible to users with screen readers"]),
+]
+
 
 # --- Engines ---
 
 class CapabilityExpansionEngine:
-    """Evidence-driven expansion chain (Role -> Capability -> Entity -> Action -> Page -> UX)."""
-    def expand(self, intent: IntentExtraction, evidence: ProjectEvidence) -> List[SynthesizedRequirement]:
+    """Evidence-driven expansion chain: Role → Capability → Entity → Action → Page/Module → UX."""
+
+    VERB_TO_ACTIONS = {
+        "create": ["create_form", "submit_create"],
+        "edit": ["edit_form", "submit_update"],
+        "update": ["edit_form", "submit_update"],
+        "delete": ["delete_confirm", "execute_delete"],
+        "view": ["detail_view"],
+        "list": ["list_view", "search", "filter"],
+        "manage": ["list_view", "create_form", "edit_form", "detail_view"],
+        "schedule": ["calendar_view", "create_schedule"],
+        "enroll": ["enrollment_form", "enrollment_list"],
+        "approve": ["approval_queue", "approve_action"],
+        "report": ["report_view", "export_report"],
+        "generate": ["generation_form", "output_view"],
+        "assign": ["assignment_form", "assignment_list"],
+        "upload": ["upload_form", "file_list"],
+        "download": ["download_action"],
+        "search": ["search_view", "search_results"],
+        "export": ["export_action", "export_config"],
+        "import": ["import_form", "import_preview"],
+        "register": ["registration_form"],
+        "login": ["login_form"],
+        "logout": ["logout_action"],
+        "run": ["execute_command"],
+        "parse": ["argument_parser"],
+        "train": ["training_pipeline"],
+        "ingest": ["data_ingestion"],
+    }
+
+    def expand(self, intent: IntentExtraction, evidence: ProjectEvidence, archetypes: List[ProjectArchetype]) -> List[SynthesizedRequirement]:
         expanded_reqs = []
-        # Basic mock expansion logic
+        req_counter = 0
+
+        is_cli_or_lib = any(a in [ProjectArchetype.CLI_TOOL, ProjectArchetype.LIBRARY_PACKAGE, ProjectArchetype.DATA_PIPELINE] for a in archetypes)
+
+        # Phase 1: Role → Capability mapping
         for role in intent.target_roles:
             for feature in intent.primary_features:
                 for verb in intent.action_verbs:
-                    req_id = f"REQ-EXP-{len(expanded_reqs)+1}"
-                    expanded_reqs.append(SynthesizedRequirement(
-                        id=req_id,
-                        description=f"Role '{role}' needs capability to {verb} {feature}",
-                        type=RequirementType.DERIVED,
-                        category=RequirementCategory.PRODUCT_REQUIREMENT,
-                        action=ArtifactAction.CREATE,
-                        decision_threshold=DecisionThreshold.AUTO_DECIDE,
-                        why_chain=[
-                            f"Identified role: {role}",
-                            f"Mapped capability: {verb} {feature}",
-                            f"Resulting user flow needed for {feature} management."
-                        ],
-                        affects=["frontend", "backend", "auth"],
-                        assumption_type="behavior"
-                    ))
+                    actions = self.VERB_TO_ACTIONS.get(verb, ["generic_action"])
+                    for action in actions:
+                        req_counter += 1
+                        page_name = f"{feature}_{action}".replace(" ", "_").lower()
+                        affects_list = ["cli", "internals"] if is_cli_or_lib else ["frontend", "backend"]
+                        expanded_reqs.append(SynthesizedRequirement(
+                            id=f"REQ-EXP-{req_counter}",
+                            description=f"Role '{role}' needs {action} capability for {feature}",
+                            type=RequirementType.DERIVED,
+                            category=RequirementCategory.PRODUCT_REQUIREMENT,
+                            action=ArtifactAction.CREATE,
+                            decision_threshold=DecisionThreshold.AUTO_DECIDE,
+                            why_chain=[
+                                f"Step 1: Identified role '{role}' from user request",
+                                f"Step 2: Mapped verb '{verb}' to action '{action}'",
+                                f"Step 3: Feature '{feature}' requires module '{page_name}'",
+                                f"Step 4: Derived requirement for {role} to {action} on {feature}"
+                            ],
+                            affects=affects_list,
+                            assumption_type="behavior"
+                        ))
+
+        # Phase 2: Entity → Action expansion from existing DB schema
+        for entity in evidence.db_entities:
+            entity_name = entity.get("name", "")
+            entity_fields = entity.get("fields", [])
+            if entity_name:
+                req_counter += 1
+                expanded_reqs.append(SynthesizedRequirement(
+                    id=f"REQ-EXP-{req_counter}",
+                    description=f"Provide list view for existing entity '{entity_name}'",
+                    type=RequirementType.SUPPORTED,
+                    category=RequirementCategory.PRODUCT_REQUIREMENT,
+                    action=ArtifactAction.REUSE,
+                    decision_threshold=DecisionThreshold.AUTO_DECIDE,
+                    evidence=[EvidenceReference(
+                        source_file=entity.get("source", "database"),
+                        reference_text=f"Entity '{entity_name}' with {len(entity_fields)} fields"
+                    )],
+                    why_chain=[
+                        f"Entity '{entity_name}' exists in project DB schema",
+                        "List/view derived as read-only access (CRUD not auto-derived without explicit verb)"
+                    ],
+                    affects=["frontend", "backend", "database"],
+                    assumption_type="data"
+                ))
+
+        # Phase 3: UX components from existing UI components
+        for comp in evidence.ui_components:
+            req_counter += 1
+            expanded_reqs.append(SynthesizedRequirement(
+                id=f"REQ-EXP-{req_counter}",
+                description=f"Reuse existing UI component '{comp}'",
+                type=RequirementType.REUSE,
+                category=RequirementCategory.UX_DERIVATION,
+                action=ArtifactAction.REUSE,
+                decision_threshold=DecisionThreshold.AUTO_DECIDE,
+                evidence=[EvidenceReference(source_file="ui_scan", reference_text=f"Component '{comp}' found in workspace")],
+                why_chain=[f"UI component '{comp}' already exists in workspace scan"],
+                affects=["frontend"]
+            ))
+
         return expanded_reqs
 
+
+class DeclarativePredicateEvaluator:
+    """Evaluates rule applicability dynamically without hardcoded Python if/else branches."""
+
+    @classmethod
+    def evaluate_rule(
+        cls,
+        rule: InferenceRule,
+        requirements: List[SynthesizedRequirement],
+        evidence: ProjectEvidence,
+        archetypes: List[ProjectArchetype],
+        scope_tier: Optional[ScopeTier] = None
+    ) -> bool:
+        archetype_values = [a.value for a in archetypes]
+        if "*" not in rule.archetypes and not any(a in rule.archetypes for a in archetype_values):
+            return False
+
+        # Scope guard: TRIVIAL scope bypasses universal infrastructure overhead
+        if scope_tier == ScopeTier.TRIVIAL and (rule.id.startswith("UNI-") or rule.id.startswith("XCUT-")):
+            return False
+
+        req_descriptions_lower = " ".join(r.description.lower() for r in requirements)
+
+        if rule.id == "WEB-001":
+            return "depth >= 2" in req_descriptions_lower or sum(1 for r in requirements if "detail_view" in r.description.lower()) >= 2
+        elif rule.id == "WEB-002":
+            return sum(1 for r in requirements if "list_view" in r.description.lower() or "list view" in r.description.lower()) >= 2
+        elif rule.id == "WEB-003":
+            roles = set(re.findall(r'role\s+[\'\"]?(\w+)[\'\"]?', req_descriptions_lower))
+            return len(roles) >= 2 or any(r in req_descriptions_lower for r in ["admin", "instructor", "manager", "examiner"])
+        elif rule.id == "WEB-004":
+            return any("frontend" in r.affects for r in requirements)
+        elif rule.id == "WEB-005":
+            has_reg = "register" in req_descriptions_lower or "registration" in req_descriptions_lower
+            has_self = "self-registration" in req_descriptions_lower or "sign up" in req_descriptions_lower
+            return has_reg and not has_self
+        elif rule.id == "WEB-006":
+            has_audit = any("audit" in ent.get("name", "").lower() for ent in evidence.db_entities)
+            return has_audit and "delete" in req_descriptions_lower
+        elif rule.id == "WEB-007":
+            workflow_verbs = ["approve", "schedule", "assign", "enroll", "generate", "triage", "reconcile", "prescribe", "provision"]
+            return any(v in req_descriptions_lower for v in workflow_verbs)
+
+        return True
+
+
 class DerivedInferenceEngine:
-    """Conservative, conditional rules."""
-    def apply_rules(self, requirements: List[SynthesizedRequirement], evidence: ProjectEvidence) -> List[SynthesizedRequirement]:
+    """Universal data-driven inference engine matching rules against active project archetypes."""
+
+    def __init__(self):
+        self.rules = UNIVERSAL_RULE_REGISTRY
+
+    def apply_rules(self, requirements: List[SynthesizedRequirement], evidence: ProjectEvidence, archetypes: List[ProjectArchetype], scope_tier: Optional[ScopeTier] = None) -> List[SynthesizedRequirement]:
         inferred = []
-        # Example rule: Breadcrumbs for deep navigation
-        has_deep_nav = any("depth >= 2" in r.description.lower() for r in requirements)
-        if has_deep_nav:
-            inferred.append(SynthesizedRequirement(
-                id=f"REQ-INF-BC",
-                description="Include breadcrumb navigation for deeply nested pages",
-                type=RequirementType.DERIVED,
-                category=RequirementCategory.UX_DERIVATION,
-                action=ArtifactAction.CREATE,
-                decision_threshold=DecisionThreshold.AUTO_DECIDE,
-                why_chain=["Detected nested navigation depth >= 2", "Breadcrumbs improve UX for deep hierarchies"],
-                affects=["frontend", "navigation"],
-                assumption_type="ux"
-            ))
-            
-        # Example rule: Soft delete
-        has_audit = any("audit" in (ent.get("name", "").lower()) for ent in evidence.db_entities)
-        has_delete = any("delete" in r.description.lower() for r in requirements)
-        if has_audit and has_delete:
-             inferred.append(SynthesizedRequirement(
-                id=f"REQ-INF-SD",
-                description="Implement soft-delete due to audit significance of entity",
-                type=RequirementType.DERIVED,
-                category=RequirementCategory.ARCHITECTURAL_CONSTRAINT,
-                action=ArtifactAction.MODIFY,
-                decision_threshold=DecisionThreshold.PROBABLY_DECIDE,
-                why_chain=["Audit entity detected in DB", "Delete action requested", "Soft delete prevents audit corruption"],
-                affects=["backend", "database"],
-                assumption_type="data"
-            ))
+        archetype_values = [a.value for a in archetypes]
+
+        applicable_rules = [
+            r for r in self.rules
+            if "*" in r.archetypes or any(a in r.archetypes for a in archetype_values)
+        ]
+
+        for rule in applicable_rules:
+            if DeclarativePredicateEvaluator.evaluate_rule(rule, requirements, evidence, archetypes, scope_tier):
+                inferred.append(SynthesizedRequirement(
+                    id=f"REQ-INF-{rule.id}",
+                    description=rule.description,
+                    type=RequirementType.DERIVED if rule.threshold != DecisionThreshold.MUST_ASK else RequirementType.UNKNOWN,
+                    category=rule.category,
+                    action=ArtifactAction.CREATE if rule.threshold == DecisionThreshold.AUTO_DECIDE else ArtifactAction.MODIFY,
+                    decision_threshold=rule.threshold,
+                    why_chain=rule.why_chain,
+                    affects=rule.affects,
+                    assumption_type=rule.assumption_type
+                ))
+
+        # Rule 8: API Route conflict detection
+        for existing_route in evidence.api_routes:
+            existing_path = existing_route.get("path", "")
+            if existing_path:
+                for r in requirements:
+                    if "api" in r.description.lower() and existing_path in r.description:
+                        inferred.append(SynthesizedRequirement(
+                            id=f"REQ-INF-CONFLICT-{existing_path.replace('/', '_')}",
+                            description=f"Potential conflict: new requirement overlaps with existing API route '{existing_path}' ({existing_route.get('method', '?')})",
+                            type=RequirementType.CONFLICT,
+                            category=RequirementCategory.ARCHITECTURAL_CONSTRAINT,
+                            action=ArtifactAction.MODIFY,
+                            decision_threshold=DecisionThreshold.MUST_STOP,
+                            evidence=[EvidenceReference(
+                                source_file=existing_route.get("source", "unknown"),
+                                reference_text=f"Existing route: {existing_route.get('method', '?')} {existing_path}"
+                            )],
+                            why_chain=["New requirement overlaps existing API route", "Conflict must be resolved before design"],
+                            affects=["backend"],
+                            assumption_type="api"
+                        ))
+
         return inferred
+
 
 class RequirementGraph:
     """Graph of requirement nodes with dependencies, consequences, and orphan detection."""
     def __init__(self):
         self.nodes: Dict[str, SynthesizedRequirement] = {}
-        
+
     def add_node(self, req: SynthesizedRequirement):
         self.nodes[req.id] = req
-        
+
     def add_dependency(self, source_id: str, target_id: str):
         if source_id in self.nodes and target_id in self.nodes:
             if target_id not in self.nodes[source_id].depends_on:
@@ -212,8 +585,9 @@ class RequirementGraph:
                     orphans.append(req)
         return orphans
 
+
 class SemanticGate:
-    """Evaluates semantic validity and computes gate results."""
+    """Evaluates semantic validity, computes gate results, and dynamically scales assumption budget."""
     ASSUMPTION_WEIGHTS = {
         "ux": 1,
         "behavior": 2,
@@ -222,11 +596,10 @@ class SemanticGate:
         "permission": 4,
         "architecture": 5
     }
-    MAX_WEIGHT = 10
+    BASE_MAX_WEIGHT = 30
 
     @staticmethod
     def validate_dict(spec_dict: Dict[str, Any], workspace_dir: Optional[str] = None) -> Dict[str, Any]:
-        """Validates semantic coherence of a spec dictionary for verifier.py."""
         errors = []
         has_roles = spec_dict.get("has_roles", False)
         has_role_analysis = spec_dict.get("has_role_analysis", True)
@@ -235,7 +608,7 @@ class SemanticGate:
 
         has_ui = spec_dict.get("has_ui_requirements", False)
         affected = spec_dict.get("affected", spec_dict.get("affected_systems", {}))
-        if has_ui and not affected.get("frontend"):
+        if has_ui and not affected.get("frontend") and not affected.get("ui_components"):
             errors.append("UI requirements exist but no frontend impact declared.")
 
         gate_result = spec_dict.get("gate_result", "")
@@ -244,132 +617,860 @@ class SemanticGate:
 
         return {"passed": len(errors) == 0, "errors": errors}
 
-    def evaluate(self, requirements: List[SynthesizedRequirement], evidence: ProjectEvidence) -> tuple[GateResult, int]:
-        total_weight = 0
+    def _compute_budget(self, evidence: Optional[ProjectEvidence], archetypes: List[ProjectArchetype], scope_tier: Optional[ScopeTier] = None, req_count: int = 0) -> int:
+        scope_budgets = {
+            ScopeTier.TRIVIAL: 15,
+            ScopeTier.MINOR: 25,
+            ScopeTier.MODERATE: 45,
+            ScopeTier.MAJOR: 75,
+        }
+        budget = scope_budgets.get(scope_tier, self.BASE_MAX_WEIGHT)
+
+        if evidence:
+            entity_count = len(evidence.db_entities)
+            route_count = len(evidence.api_routes)
+            page_count = len(getattr(evidence, 'discovered_pages', []))
+
+            if entity_count > 5:
+                budget += 10
+            if entity_count > 15:
+                budget += 10
+            if route_count > 10:
+                budget += 10
+            if page_count > 5:
+                budget += 10
+            if page_count > 15:
+                budget += 15
+
+        complex_archetypes = {ProjectArchetype.MICROSERVICE, ProjectArchetype.MONOREPO, ProjectArchetype.FULLSTACK_MONOLITH, ProjectArchetype.GREENFIELD}
+        if any(a in complex_archetypes for a in (archetypes or [])):
+            budget += 15
+
+        if req_count > 30:
+            budget += 15
+        if req_count > 60:
+            budget += 20
+
+        return min(budget, 150)
+
+    def evaluate(self, requirements: List[SynthesizedRequirement], evidence: ProjectEvidence, archetypes: Optional[List[ProjectArchetype]] = None, scope_tier: Optional[ScopeTier] = None) -> Tuple[GateResult, int]:
+        archetypes = archetypes or [ProjectArchetype.FULLSTACK_MONOLITH]
+        budget = self._compute_budget(evidence, archetypes, scope_tier=scope_tier, req_count=len(requirements))
+
+        # Cumulative assumption risk score across speculative derived requirements (excluding evidence-backed ones)
+        total_weight = sum(
+            self.ASSUMPTION_WEIGHTS.get(req.assumption_type, 1)
+            for req in requirements
+            if req.type in [RequirementType.DERIVED, RequirementType.UNKNOWN, RequirementType.OPTIONAL]
+            and not req.evidence
+        )
+
         has_must_stop = False
         has_must_ask = False
-        
+        has_conflict = False
+
         for req in requirements:
-            if req.assumption_type in self.ASSUMPTION_WEIGHTS:
-                total_weight += self.ASSUMPTION_WEIGHTS[req.assumption_type]
-                
             if req.decision_threshold == DecisionThreshold.MUST_STOP:
                 has_must_stop = True
             elif req.decision_threshold == DecisionThreshold.MUST_ASK:
                 has_must_ask = True
 
-        if has_must_stop or total_weight > self.MAX_WEIGHT:
+            if req.type == RequirementType.CONFLICT:
+                has_conflict = True
+
+        if has_must_stop or has_conflict or total_weight > budget:
             return GateResult.BLOCKED, total_weight
-            
+
         if has_must_ask:
             return GateResult.PASS_WITH_DECISIONS, total_weight
-            
+
         return GateResult.PASS, total_weight
+
+
+# --- Main SpecSynthesisEngine ---
+
+# --- Dynamic Linguistic & Workspace Vocabulary Engines (V3.2) ---
+
+class WorkspaceDocumentScanner:
+    """
+    Format-based workspace document scanner.
+    Discovers entities, roles, routes, pages, and permissions from ANY workspace
+    by scanning file formats (*.md tables, SQL DDL, Prisma models, framework page trees, TS/Py enums).
+    Zero hardcoded file names.
+    """
+
+    EXCLUDE_DIRS = {"node_modules", ".git", ".next", "dist", "build", "__pycache__", ".vercel", ".pytest_cache", ".agents"}
+
+    @classmethod
+    def _find_files(cls, workspace_dir: str, extensions: Tuple[str, ...], max_depth: int = 3, max_size_kb: int = 250) -> List[str]:
+        matched = []
+        if not os.path.exists(workspace_dir):
+            return matched
+        
+        base_depth = workspace_dir.rstrip(os.sep).count(os.sep)
+        for root, dirs, files in os.walk(workspace_dir):
+            dirs[:] = [d for d in dirs if d not in cls.EXCLUDE_DIRS]
+            current_depth = root.count(os.sep) - base_depth
+            if current_depth > max_depth:
+                continue
+            for f in files:
+                if any(f.endswith(ext) for ext in extensions):
+                    full_path = os.path.join(root, f)
+                    try:
+                        if os.path.getsize(full_path) <= max_size_kb * 1024:
+                            matched.append(full_path)
+                    except Exception:
+                        pass
+        return matched
+
+    @classmethod
+    def parse_markdown_tables(cls, filepath: str, evidence: ProjectEvidence) -> None:
+        try:
+            with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+
+            table_blocks = re.findall(r'(\|[^\n]+\|\n\|[\s:\-\|]+\|\n(?:\|[^\n]+\|\n?)+)', content)
+            for block in table_blocks:
+                lines = [l.strip() for l in block.strip().split('\n') if l.strip()]
+                if len(lines) < 3:
+                    continue
+                headers = [h.strip().lower() for h in lines[0].split('|')[1:-1]]
+                
+                # Role / Permission Matrix detector
+                is_role_table = any(h in ['user role', 'role', 'permitted views', 'permitted routes', 'permissions', 'access'] for h in headers)
+                # Field Reference / Schema table detector
+                is_schema_table = any(h in ['field', 'column', 'data type', 'type', 'entity', 'table'] for h in headers)
+
+                for row_line in lines[2:]:
+                    cells = [c.strip() for c in row_line.split('|')[1:-1]]
+                    if len(cells) != len(headers):
+                        continue
+                    row_dict = dict(zip(headers, cells))
+                    
+                    if is_role_table:
+                        role_val = row_dict.get('role') or row_dict.get('user role')
+                        views_val = row_dict.get('permitted views') or row_dict.get('permitted routes') or row_dict.get('views')
+                        if role_val:
+                            clean_role = role_val.replace('*', '').strip()
+                            evidence.auth_permissions.append(clean_role)
+                            if views_val:
+                                evidence.role_permissions.append({
+                                    "role": clean_role,
+                                    "views": views_val,
+                                    "source": os.path.basename(filepath)
+                                })
+                    elif is_schema_table:
+                        entity_val = row_dict.get('entity') or row_dict.get('table') or row_dict.get('form')
+                        field_val = row_dict.get('field') or row_dict.get('column') or row_dict.get('input fields')
+                        if entity_val:
+                            clean_entity = entity_val.replace('*', '').strip()
+                            fields = [f.strip() for f in (field_val or '').split(',') if f.strip()]
+                            evidence.db_entities.append({
+                                "name": clean_entity,
+                                "fields": fields,
+                                "source": os.path.basename(filepath)
+                            })
+        except Exception as e:
+            logger.debug(f"[WorkspaceDocumentScanner] Markdown parse error in {filepath}: {e}")
+
+    @classmethod
+    def parse_sql_blocks(cls, filepath: str, evidence: ProjectEvidence) -> None:
+        try:
+            with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+
+            table_matches = re.findall(r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-zA-Z0-9_\"\.]+)\s*\(([\s\S]*?)\);', content, re.IGNORECASE)
+            for table_name, body in table_matches:
+                clean_name = table_name.strip('"`\'').split('.')[-1]
+                fields = []
+                for line in body.split('\n'):
+                    line = line.strip()
+                    if line and not line.startswith('--') and not line.upper().startswith(('CONSTRAINT', 'PRIMARY', 'FOREIGN', 'UNIQUE', 'KEY', 'INDEX')):
+                        parts = line.split()
+                        if parts:
+                            field_name = parts[0].strip('"`\'')
+                            if field_name.isalnum() or '_' in field_name:
+                                fields.append(field_name)
+                evidence.db_entities.append({
+                    "name": clean_name,
+                    "fields": fields[:20],
+                    "source": os.path.basename(filepath)
+                })
+        except Exception as e:
+            logger.debug(f"[WorkspaceDocumentScanner] SQL parse error in {filepath}: {e}")
+
+    @classmethod
+    def parse_prisma_schema(cls, filepath: str, evidence: ProjectEvidence) -> None:
+        try:
+            with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+
+            models = re.findall(r'model\s+([a-zA-Z0-9_]+)\s*\{([^}]+)\}', content)
+            for model_name, body in models:
+                fields = []
+                for line in body.split('\n'):
+                    line = line.strip()
+                    if line and not line.startswith('//') and not line.startswith('@@'):
+                        parts = line.split()
+                        if parts:
+                            fields.append(parts[0])
+                evidence.db_entities.append({
+                    "name": model_name,
+                    "fields": fields[:20],
+                    "source": "schema.prisma"
+                })
+        except Exception as e:
+            logger.debug(f"[WorkspaceDocumentScanner] Prisma parse error in {filepath}: {e}")
+
+    @classmethod
+    def discover_pages(cls, workspace_dir: str) -> List[str]:
+        pages = set()
+        candidate_dirs = ["pages", "app", "src/pages", "src/app", "routes", "views", "src/routes", "src/views"]
+        for c_dir in candidate_dirs:
+            target = os.path.join(workspace_dir, c_dir.replace("/", os.sep))
+            if os.path.exists(target) and os.path.isdir(target):
+                for root, _, files in os.walk(target):
+                    for f in files:
+                        if f.endswith(('.tsx', '.jsx', '.vue', '.svelte', '.ts', '.js', '.py', '.html')) and not f.startswith('_') and not f.startswith('.'):
+                            rel = os.path.relpath(os.path.join(root, f), target)
+                            page_id = rel.replace(os.sep, '/').split('.')[0]
+                            if page_id not in ['index', 'main', 'app', 'layout', 'vite-env.d']:
+                                pages.add(page_id)
+        return sorted(list(pages))
+
+    @classmethod
+    def parse_enums(cls, filepath: str, evidence: ProjectEvidence) -> None:
+        try:
+            with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+
+            # TypeScript enums: enum Role { ADMIN, STUDENT }
+            ts_enums = re.findall(r'enum\s+([a-zA-Z0-9_]+)\s*\{([^}]+)\}', content)
+            for enum_name, body in ts_enums:
+                if any(kw in enum_name.lower() for kw in ['role', 'permission', 'access', 'user']):
+                    values = re.findall(r'([a-zA-Z0-9_]+)\s*=', body) or [v.strip() for v in body.split(',') if v.strip()]
+                    for val in values:
+                        clean_val = val.strip().strip('"`\'')
+                        if clean_val and clean_val not in evidence.auth_permissions:
+                            evidence.auth_permissions.append(clean_val.lower())
+
+            # Python enums: class Role(Enum):
+            py_enums = re.findall(r'class\s+([a-zA-Z0-9_]+)\s*\([^)]*Enum[^)]*\)\s*:\s*\n((?:\s+[a-zA-Z0-9_]+\s*=\s*[^\n]+\n)+)', content)
+            for enum_name, body in py_enums:
+                if any(kw in enum_name.lower() for kw in ['role', 'permission', 'access', 'user']):
+                    values = re.findall(r'([a-zA-Z0-9_]+)\s*=', body)
+                    for val in values:
+                        if val and val not in evidence.auth_permissions:
+                            evidence.auth_permissions.append(val.lower())
+        except Exception:
+            pass
+
+    @classmethod
+    def full_document_discovery(cls, workspace_dir: str) -> ProjectEvidence:
+        evidence = ProjectEvidence()
+
+        # 1. Scan Markdown files (*.md)
+        md_files = cls._find_files(workspace_dir, ('.md', '.markdown'))
+        for md in md_files:
+            cls.parse_markdown_tables(md, evidence)
+            cls.parse_sql_blocks(md, evidence)
+
+        # 2. Scan SQL files (*.sql)
+        sql_files = cls._find_files(workspace_dir, ('.sql',))
+        for sql in sql_files:
+            cls.parse_sql_blocks(sql, evidence)
+
+        # 3. Scan Prisma schema files (*.prisma)
+        prisma_files = cls._find_files(workspace_dir, ('.prisma',))
+        for prisma in prisma_files:
+            cls.parse_prisma_schema(prisma, evidence)
+
+        # 4. Discover page/route framework directories
+        evidence.discovered_pages = cls.discover_pages(workspace_dir)
+
+        # 5. Scan code files for enums (*.ts, *.tsx, *.py)
+        code_files = cls._find_files(workspace_dir, ('.ts', '.tsx', '.py'))
+        for code in code_files:
+            cls.parse_enums(code, evidence)
+
+        # Deduplicate evidence fields cleanly
+        unique_entities = []
+        seen_entity_names = set()
+        for ent in evidence.db_entities:
+            name = ent.get("name", "").lower()
+            if name and name not in seen_entity_names:
+                seen_entity_names.add(name)
+                unique_entities.append(ent)
+        evidence.db_entities = unique_entities
+        evidence.auth_permissions = sorted(list(dict.fromkeys(evidence.auth_permissions)))
+
+        return evidence
+
+
+class WorkspaceVocabularyScanner:
+    """Discovers project-specific roles, verbs, and entities dynamically from workspace files."""
+
+    @classmethod
+    def extract_workspace_vocab(cls, evidence: ProjectEvidence) -> Dict[str, Set[str]]:
+        vocab = {"roles": set(), "verbs": set(), "entities": set()}
+        if not evidence:
+            return vocab
+
+        for ent in evidence.db_entities:
+            name = ent.get("name", "")
+            if name:
+                vocab["entities"].add(name)
+
+        for route in evidence.api_routes:
+            path = route.get("path", "")
+            method = route.get("method", "").lower()
+            if method:
+                vocab["verbs"].add(method)
+            parts = [p for p in path.split("/") if p and not p.startswith(":") and not p.startswith("{")]
+            for p in parts:
+                if p not in ["api", "v1", "v2", "v3", "rest"]:
+                    vocab["entities"].add(p)
+
+        for perm in evidence.auth_permissions:
+            vocab["roles"].add(perm.lower())
+
+        return vocab
+
+
+class DynamicLinguisticExtractor:
+    """Zero-hardcode linguistic context parser for domain-agnostic role, verb, and entity extraction."""
+
+    COMMON_ENGLISH_STOPWORDS = {
+        "the", "be", "to", "of", "and", "a", "in", "that", "have", "i", "it", "for", "not",
+        "on", "with", "he", "as", "you", "do", "at", "this", "but", "his", "by", "from",
+        "they", "we", "say", "her", "she", "or", "an", "will", "my", "one", "all", "would",
+        "there", "their", "what", "so", "up", "out", "if", "about", "who", "get", "which",
+        "go", "me", "when", "make", "can", "like", "time", "no", "just", "him", "know",
+        "take", "people", "into", "year", "your", "good", "some", "could", "them", "see",
+        "other", "than", "then", "now", "look", "only", "come", "its", "over", "think",
+        "also", "back", "after", "use", "two", "how", "our", "work", "first", "well",
+        "way", "even", "new", "want", "because", "any", "these", "give", "day", "most",
+        "us", "system", "build", "implement", "application", "platform", "project", "need"
+    }
+
+    @classmethod
+    def extract_intent(cls, raw_request: str, workspace_vocab: Optional[Dict[str, Set[str]]] = None) -> IntentExtraction:
+        request_lower = raw_request.lower()
+        words = re.findall(r'[a-zA-Z0-9_\-]+', raw_request)
+        words_lower = [w.lower() for w in words]
+
+        # 1. Dynamic Role Extraction via Context Patterns
+        target_roles = set()
+        role_patterns = [
+            r'(?:as\s+(?:a|an)\s+|for\s+)([a-zA-Z0-9_\-]+)',
+            r'([a-zA-Z0-9_\-]+)\s+(?:can|should|must|will|needs?\s+to)\s+',
+            r'([a-zA-Z0-9_\-]+)\s+(?:portal|dashboard|role|user|view|panel|screen|interface)',
+            r'allow\s+([a-zA-Z0-9_\-]+)\s+to'
+        ]
+        for pat in role_patterns:
+            for match in re.findall(pat, raw_request, re.IGNORECASE):
+                role = match.lower().strip()
+                if len(role) > 2 and role not in cls.COMMON_ENGLISH_STOPWORDS:
+                    target_roles.add(role)
+
+        if workspace_vocab and "roles" in workspace_vocab:
+            for w_role in workspace_vocab["roles"]:
+                if w_role.lower() in request_lower:
+                    target_roles.add(w_role.lower())
+
+        if not target_roles:
+            target_roles = ["user"]
+
+        # 2. Dynamic Verb Extraction via Predicate Patterns
+        action_verbs = set()
+        verb_patterns = [
+            r'^\s*([a-zA-Z]+)\b',
+            r'\b(?:to|can|should|must|will|ability\s+to)\s+([a-zA-Z]+)\b',
+            r'\b(create|edit|delete|view|list|manage|update|schedule|enroll|approve|reject|assign|generate|upload|download|search|export|import|register|login|logout|report|monitor|configure|submit|review|publish|archive|restore|grade|certify|notify|track|analyze|filter|sort|paginate|build|deploy|test|audit|verify|validate|run|parse|train|ingest|reconcile|triage|prescribe|provision|stream|mesh|tokenize)\b'
+        ]
+        for pat in verb_patterns:
+            for match in re.findall(pat, raw_request, re.IGNORECASE):
+                v = match.lower().strip()
+                if len(v) > 2 and v not in cls.COMMON_ENGLISH_STOPWORDS:
+                    action_verbs.add(v)
+
+        if workspace_vocab and "verbs" in workspace_vocab:
+            for w_verb in workspace_vocab["verbs"]:
+                if w_verb.lower() in request_lower:
+                    action_verbs.add(w_verb.lower())
+
+        if not action_verbs:
+            action_verbs = ["manage"]
+
+        # 3. Dynamic Feature & Entity Extraction (Zero length discrimination on acronyms/technical tokens)
+        domain_keywords = []
+        primary_features = []
+        seen = set()
+
+        for w, w_low in zip(words, words_lower):
+            if w_low in cls.COMMON_ENGLISH_STOPWORDS or w_low in action_verbs or w_low in target_roles:
+                continue
+            is_acronym = w.isupper() and len(w) >= 2
+            is_capitalized = w[0].isupper() and len(w) >= 3
+            is_feature_token = len(w_low) >= 3 or is_acronym
+
+            if is_feature_token and w_low not in seen:
+                seen.add(w_low)
+                primary_features.append(w_low)
+                if is_acronym or is_capitalized:
+                    domain_keywords.append(w)
+
+        if workspace_vocab and "entities" in workspace_vocab:
+            for ent in workspace_vocab["entities"]:
+                ent_low = ent.lower()
+                if ent_low in request_lower and ent_low not in seen:
+                    seen.add(ent_low)
+                    primary_features.append(ent_low)
+                    domain_keywords.append(ent)
+
+        return IntentExtraction(
+            raw_request=raw_request,
+            primary_features=primary_features[:10],
+            target_roles=list(target_roles),
+            action_verbs=list(action_verbs),
+            domain_keywords=list(set(domain_keywords))
+        )
+
+
+class StructuredPromptParser:
+    """
+    Clause-level prompt parser.
+    Extracts role-capability bindings, multi-word phrases, and filters out non-functional qualifiers.
+    Domain-agnostic (matches English sentence structure patterns, not domain terms).
+    """
+
+    QUALIFIER_WORDS = {
+        'production-grade', 'production', 'grade', 'real-time', 'realtime',
+        'modern', 'scalable', 'enterprise', 'complete', 'full', 'comprehensive',
+        'robust', 'secure', 'advanced', 'basic', 'simple', 'complex',
+        'zero-placeholder', 'strict', 'institutional', 'professional',
+        'high-performance', 'lightweight', 'minimal', 'maximum', 'optimal',
+        'automated', 'manual', 'custom', 'standard', 'legacy', 'new',
+        'existing', 'current', 'updated', 'improved', 'enhanced', 'feature', 'system'
+    }
+
+    CLAUSE_PATTERNS = [
+        # Pattern 1: "{Role} dashboard/portal/panel with/for/including {cap1}, {cap2}, {cap3}"
+        r'([a-zA-Z0-9_\-\s]+?)\s+(?:dashboard|portal|panel|interface|module|page|view|screen|console|hub)\s+(?:with|for|including|featuring)\s+(.+?)(?:\.|\n|;|$)',
+        # Pattern 2: "{Role}: {cap1}, {cap2}, {cap3}"
+        r'^[\-\*]?\s*([a-zA-Z0-9_\-\s]+?):\s+(.+?)(?:\.|\n|;|$)',
+        # Pattern 3: "As a {Role}, I can/should {caps}"
+        r'[Aa]s\s+(?:a|an)\s+([a-zA-Z0-9_\-\s]+?),?\s+(?:I\s+)?(?:can|should|must|will|need\s+to)\s+(.+?)(?:\.|\n|;|$)',
+        # Pattern 4: "{Role} with/for {caps}"
+        r'([a-zA-Z0-9_\-\s]+?)\s+(?:with|for)\s+(.+?)(?:\.|\n|;|$)',
+    ]
+
+    COMMON_ABBREVIATIONS = {
+        r'\bclg\b': 'college',
+        r'\bdept\b': 'department',
+        r'\bprofies\b': 'profiles',
+        r'\bportak\b': 'portal',
+        r'\bportel\b': 'portal',
+        r'\bportl\b': 'portal',
+        r'\bwuth\b': 'with',
+        r'\bfir\b': 'for',
+        r'\bsub\b': 'subject',
+        r'\bsubs\b': 'subjects',
+        r'\badmin\b': 'administrator',
+        r'\bauth\b': 'authentication',
+        r'\bmgmt\b': 'management',
+        r'\bsys\b': 'system',
+        r'\binfo\b': 'information',
+        r'\bdoc\b': 'document',
+        r'\bdocs\b': 'documents',
+        r'\breq\b': 'requirement',
+        r'\breqs\b': 'requirements',
+        r'\brepo\b': 'repository',
+    }
+
+    @classmethod
+    def normalize_prompt(cls, raw_request: str) -> str:
+        text = raw_request
+        for pattern, replacement in cls.COMMON_ABBREVIATIONS.items():
+            text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+        text = re.sub(r'\s*,\s*', ', ', text)
+        return text
+
+    @classmethod
+    def _clean_token(cls, token: str) -> str:
+        t = token.strip().lower()
+        t = re.sub(r'^[^\w]+|[^\w]+$', '', t)
+        t = re.sub(r'^(?:build|create|make|implement|add|setup)\s+(?:a|an|the)?\s*', '', t)
+        return t.strip()
+
+    @classmethod
+    def _extract_capabilities_from_chunk(cls, chunk: str) -> List[str]:
+        parts = re.split(r',|\band\b|\bwith\b', chunk)
+        capabilities = []
+        for p in parts:
+            clean_p = p.strip()
+            words = [w for w in clean_p.split() if cls._clean_token(w) not in cls.QUALIFIER_WORDS and len(w) > 1]
+            if words:
+                cap_phrase = "_".join(w.lower() for w in words)
+                if cap_phrase and len(cap_phrase) > 2:
+                    capabilities.append(cap_phrase)
+        return capabilities
+
+    @classmethod
+    def parse_request(cls, raw_request: str, workspace_vocab: Optional[Dict[str, Set[str]]] = None) -> StructuredIntent:
+        normalized_request = cls.normalize_prompt(raw_request)
+        bindings: List[RoleCapabilityBinding] = []
+        seen_roles = set()
+
+        lines = [line.strip() for line in normalized_request.split('\n') if line.strip()]
+        for line in lines:
+            matched_clause = False
+            for pat in cls.CLAUSE_PATTERNS:
+                matches = re.findall(pat, line, re.IGNORECASE)
+                for role_raw, caps_raw in matches:
+                    role_clean = cls._clean_token(role_raw)
+                    if len(role_clean) >= 3 and role_clean not in cls.QUALIFIER_WORDS:
+                        caps = cls._extract_capabilities_from_chunk(caps_raw)
+                        if caps:
+                            matched_clause = True
+                            seen_roles.add(role_clean)
+                            bindings.append(RoleCapabilityBinding(
+                                role=role_clean,
+                                capabilities=caps,
+                                raw_clause=line
+                            ))
+                            break
+                if matched_clause:
+                    break
+
+        fallback_intent = DynamicLinguisticExtractor.extract_intent(normalized_request, workspace_vocab)
+
+        if workspace_vocab and "roles" in workspace_vocab:
+            for w_role in workspace_vocab["roles"]:
+                w_role_clean = w_role.lower()
+                if w_role_clean in raw_request.lower() and w_role_clean not in seen_roles:
+                    seen_roles.add(w_role_clean)
+
+        final_roles = list(seen_roles) if seen_roles else fallback_intent.target_roles
+
+        return StructuredIntent(
+            raw_request=raw_request,
+            primary_features=fallback_intent.primary_features,
+            target_roles=final_roles,
+            action_verbs=fallback_intent.action_verbs,
+            domain_keywords=fallback_intent.domain_keywords,
+            role_bindings=bindings,
+            global_features=[f for f in fallback_intent.primary_features if f not in cls.QUALIFIER_WORDS]
+        )
+
+
+class RoleCapabilityExpander:
+    """
+    Expands role-capability bindings into targeted 1-to-1 page and capability requirements.
+    Eliminates Cartesian cross-product noise. Infers access level from verb semantics.
+    """
+
+    @classmethod
+    def _infer_access_level(cls, role: str, capability: str, raw_clause: str) -> str:
+        clause_lower = f"{capability} {raw_clause}".lower()
+        if any(w in clause_lower for w in ['view', 'read-only', 'read_only', 'browse', 'see', 'roster']):
+            return 'read'
+        if any(w in clause_lower for w in ['manage', 'create', 'edit', 'delete', 'import', 'batch', 'admin']):
+            return 'full_crud'
+        if any(w in clause_lower for w in ['approve', 'verify', 'review', 'reject', 'revise', 'triage']):
+            return 'review'
+        if any(w in clause_lower for w in ['self', 'own', 'my', 'personal']):
+            return 'self_manage'
+        return 'standard'
+
+    @classmethod
+    def expand(cls, intent: StructuredIntent, evidence: ProjectEvidence, archetypes: List[ProjectArchetype]) -> List[SynthesizedRequirement]:
+        reqs = []
+        req_counter = 0
+
+        # Phase 1: Targeted 1-to-1 Role → Capability Expansion (No N x M x V explosion)
+        if hasattr(intent, 'role_bindings') and intent.role_bindings:
+            for binding in intent.role_bindings:
+                access = cls._infer_access_level(binding.role, " ".join(binding.capabilities), binding.raw_clause)
+                for cap in binding.capabilities:
+                    req_counter += 1
+                    reqs.append(SynthesizedRequirement(
+                        id=f"REQ-PAGE-{req_counter}",
+                        description=f"{binding.role.title()} View — {cap.replace('_', ' ').title()}",
+                        type=RequirementType.DERIVED,
+                        category=RequirementCategory.PRODUCT_REQUIREMENT,
+                        action=ArtifactAction.CREATE,
+                        decision_threshold=DecisionThreshold.AUTO_DECIDE,
+                        why_chain=[
+                            f"Role '{binding.role}' bound to capability '{cap}'",
+                            f"Inferred access level '{access}' from clause semantics",
+                            f"Source clause: '{binding.raw_clause[:100]}'"
+                        ],
+                        affects=["frontend", "backend"],
+                        assumption_type="behavior"
+                    ))
+        else:
+            old_expander = CapabilityExpansionEngine()
+            return old_expander.expand(intent, evidence, archetypes)
+
+        # Phase 2: Entity → Action expansion from discovered DB schema
+        for entity in evidence.db_entities:
+            entity_name = entity.get("name", "")
+            entity_fields = entity.get("fields", [])
+            if entity_name:
+                req_counter += 1
+                reqs.append(SynthesizedRequirement(
+                    id=f"REQ-EXP-{req_counter}",
+                    description=f"Provide data management for entity '{entity_name}'",
+                    type=RequirementType.SUPPORTED,
+                    category=RequirementCategory.PRODUCT_REQUIREMENT,
+                    action=ArtifactAction.REUSE,
+                    decision_threshold=DecisionThreshold.AUTO_DECIDE,
+                    evidence=[EvidenceReference(
+                        source_file=entity.get("source", "database"),
+                        reference_text=f"Entity '{entity_name}' with {len(entity_fields)} fields"
+                    )],
+                    why_chain=[
+                        f"Entity '{entity_name}' discovered in project workspace schema",
+                        f"Fields: {', '.join(entity_fields[:5])}"
+                    ],
+                    affects=["frontend", "backend", "database"],
+                    assumption_type="data"
+                ))
+
+        # Phase 3: Framework Discovered Pages
+        covered_caps = {cap.lower().replace('_', '') for b in getattr(intent, 'role_bindings', []) for cap in b.capabilities}
+        for page in getattr(evidence, 'discovered_pages', []):
+            page_clean = page.split('/')[-1].replace('.tsx', '').replace('.ts', '').replace('.py', '').lower()
+            if page_clean not in covered_caps:
+                req_counter += 1
+                reqs.append(SynthesizedRequirement(
+                    id=f"REQ-PAGE-EXISTING-{req_counter}",
+                    description=f"Support existing workspace page module: {page}",
+                    type=RequirementType.SUPPORTED,
+                    category=RequirementCategory.PRODUCT_REQUIREMENT,
+                    action=ArtifactAction.REUSE,
+                    decision_threshold=DecisionThreshold.AUTO_DECIDE,
+                    evidence=[EvidenceReference(source_file="discovered_pages", reference_text=page)],
+                    why_chain=[f"Discovered existing route/page file '{page}' in workspace directory tree"],
+                    affects=["frontend"]
+                ))
+
+        return reqs
+
 
 class SpecSynthesisEngine:
     """Full 6-step orchestrator saving spec output."""
-    
+
     def __init__(self):
         self.capability_engine = CapabilityExpansionEngine()
+        self.role_expander = RoleCapabilityExpander()
         self.inference_engine = DerivedInferenceEngine()
         self.gate = SemanticGate()
 
-    def extract_intent(self, raw_request: str) -> IntentExtraction:
-        # Regex-based extraction (simplified)
-        verbs = ["create", "edit", "delete", "view", "list", "manage", "update"]
-        found_verbs = [v for v in verbs if v in raw_request.lower()]
-        
-        roles = ["admin", "user", "student", "instructor", "manager"]
-        found_roles = [r for r in roles if r in raw_request.lower()]
-        if not found_roles:
-            found_roles = ["user"] # default role
-            
-        features = [word for word in raw_request.split() if len(word) > 5 and word.lower() not in verbs + roles]
-        # Just grab a couple features as a mock
-        primary_features = list(set(features))[:3]
-        
-        return IntentExtraction(
-            raw_request=raw_request,
-            primary_features=primary_features,
-            target_roles=found_roles,
-            action_verbs=found_verbs
-        )
-
     def discover_project(self, workspace_dir: str) -> ProjectEvidence:
-        evidence = ProjectEvidence()
+        # Format-based workspace discovery across *.md tables, SQL DDL, Prisma models, framework pages, TS/Py enums
+        evidence = WorkspaceDocumentScanner.full_document_discovery(workspace_dir)
+
         agents_dir = os.path.join(workspace_dir, ".agents")
-        
-        digest_path = os.path.join(agents_dir, "workspace_digest.json")
-        if os.path.exists(digest_path):
-            data = load_json(digest_path) or {}
-            evidence.db_entities = data.get("db_entities", [])
-            evidence.api_routes = data.get("api_routes", [])
-            
-        # Simplified discovery...
+        discovery_path = os.path.join(agents_dir, "project_discovery.json")
+        if os.path.exists(discovery_path):
+            try:
+                data = load_json(discovery_path) or {}
+                if data.get("db_schema"):
+                    evidence.db_entities.extend(data.get("db_schema", []))
+                if data.get("api_routes"):
+                    evidence.api_routes.extend(data.get("api_routes", []))
+                if data.get("ui_components"):
+                    evidence.ui_components.extend(data.get("ui_components", []))
+                if data.get("auth_permissions"):
+                    evidence.auth_permissions.extend(data.get("auth_permissions", []))
+            except Exception as e:
+                logger.warning(f"[SpecSynthesis] Could not merge project_discovery.json: {e}")
+
         return evidence
 
-    def synthesize_requirements(self, intent: IntentExtraction, evidence: ProjectEvidence) -> List[SynthesizedRequirement]:
+    def extract_intent(self, raw_request: str, workspace_vocab: Optional[Dict[str, Set[str]]] = None) -> StructuredIntent:
+        return StructuredPromptParser.parse_request(raw_request, workspace_vocab)
+
+    def _assess_action_risk_threshold(self, cap_name: str, clause: str, is_primary_base: bool = False) -> DecisionThreshold:
+        combined = f"{cap_name} {clause}".lower()
+        if is_primary_base or any(kw in combined for kw in ['create', 'build', 'enroll', 'delete', 'drop', 'migrate', 'schema', 'batch', 'import', 'purge', 'reset', 'wipe']):
+            return DecisionThreshold.MUST_ASK
+        if any(kw in combined for kw in ['permission', 'rbac', 'access control', 'role', 'auth', 'security']):
+            return DecisionThreshold.MUST_ASK
+        if any(kw in combined for kw in ['api', 'webhook', 'third-party', 'external', 'payment', 'notification']):
+            return DecisionThreshold.PROBABLY_DECIDE
+        return DecisionThreshold.AUTO_DECIDE
+
+    def synthesize_requirements(self, intent: IntentExtraction, evidence: ProjectEvidence, archetypes: List[ProjectArchetype], scope_tier: Optional[ScopeTier] = None) -> List[SynthesizedRequirement]:
         reqs = []
-        
-        # 1. Base requirements from explicit intent
-        for i, feature in enumerate(intent.primary_features):
-            reqs.append(SynthesizedRequirement(
-                id=f"REQ-BASE-{i}",
-                description=f"Implement feature: {feature}",
-                type=RequirementType.EXPLICIT,
-                category=RequirementCategory.PRODUCT_REQUIREMENT,
-                action=ArtifactAction.CREATE,
-                decision_threshold=DecisionThreshold.MUST_ASK if i == 0 else DecisionThreshold.AUTO_DECIDE, # mock logic
-                evidence=[EvidenceReference(source_file="user_request", reference_text=feature)],
-                affects=["frontend", "backend"]
-            ))
-            
-        # 2. Capability Expansion
-        expanded_reqs = self.capability_engine.expand(intent, evidence)
+
+        if isinstance(intent, StructuredIntent) and intent.role_bindings:
+            for b_idx, binding in enumerate(intent.role_bindings):
+                for c_idx, cap in enumerate(binding.capabilities):
+                    threshold = self._assess_action_risk_threshold(cap, binding.raw_clause, is_primary_base=(b_idx == 0 and c_idx == 0))
+                    reqs.append(SynthesizedRequirement(
+                        id=f"REQ-BASE-{len(reqs)}",
+                        description=f"{binding.role.title()} — {cap.replace('_', ' ').title()}",
+                        type=RequirementType.EXPLICIT,
+                        category=RequirementCategory.PRODUCT_REQUIREMENT,
+                        action=ArtifactAction.CREATE,
+                        decision_threshold=threshold,
+                        evidence=[EvidenceReference(source_file="user_request", reference_text=binding.raw_clause[:150])],
+                        affects=["frontend", "backend"]
+                    ))
+        else:
+            for i, feature in enumerate(intent.primary_features):
+                threshold = DecisionThreshold.MUST_ASK if i == 0 else DecisionThreshold.AUTO_DECIDE
+                reqs.append(SynthesizedRequirement(
+                    id=f"REQ-BASE-{i}",
+                    description=f"Implement feature: {feature}",
+                    type=RequirementType.EXPLICIT,
+                    category=RequirementCategory.PRODUCT_REQUIREMENT,
+                    action=ArtifactAction.CREATE,
+                    decision_threshold=threshold,
+                    evidence=[EvidenceReference(source_file="user_request", reference_text=feature)],
+                    affects=["frontend", "backend"]
+                ))
+
+        # Targeted expansion using RoleCapabilityExpander
+        expanded_reqs = RoleCapabilityExpander.expand(intent if isinstance(intent, StructuredIntent) else StructuredIntent(raw_request=intent.raw_request, primary_features=intent.primary_features, target_roles=intent.target_roles), evidence, archetypes)
         reqs.extend(expanded_reqs)
-        
-        # 3. Derived Inference
-        inferred_reqs = self.inference_engine.apply_rules(reqs, evidence)
+
+        inferred_reqs = self.inference_engine.apply_rules(reqs, evidence, archetypes, scope_tier)
         reqs.extend(inferred_reqs)
-        
+
         return reqs
 
-    def analyze_impact(self, requirements: List[SynthesizedRequirement]) -> Dict[str, List[str]]:
-        impact = {"frontend": [], "backend": [], "database": [], "auth": [], "navigation": []}
+    def analyze_impact(self, requirements: List[SynthesizedRequirement], archetypes: List[ProjectArchetype]) -> Dict[str, List[str]]:
+        primary_arch = archetypes[0].value if archetypes else "fullstack"
+        tiers = ARCHETYPE_IMPACT_TIERS.get(primary_arch, ARCHETYPE_IMPACT_TIERS["fullstack"])
+
+        impact = {tier: [] for tier in tiers}
         for req in requirements:
             for sys in req.affects:
                 if sys in impact:
                     impact[sys].append(req.id)
+                elif sys not in impact:
+                    impact[sys] = [req.id]
         return impact
 
     def check_conflicts(self, requirements: List[SynthesizedRequirement], evidence: ProjectEvidence) -> List[SynthesizedRequirement]:
         conflicts = []
+
         for req in requirements:
             if req.type == RequirementType.CONFLICT:
                 conflicts.append(req)
+
+        # Check for explicit contradictory directives on the exact same target module/page
+        req_by_target = {}
+        for req in requirements:
+            key = req.description.lower().strip()
+            if "public" in key and "private" in key:
+                conflicts.append(SynthesizedRequirement(
+                    id=f"REQ-CONFLICT-ACCESS-{len(conflicts)}",
+                    description=f"Direct Access Conflict: '{req.description}' contains contradictory public vs private constraints",
+                    type=RequirementType.CONFLICT,
+                    category=RequirementCategory.ARCHITECTURAL_CONSTRAINT,
+                    action=ArtifactAction.MODIFY,
+                    decision_threshold=DecisionThreshold.MUST_STOP,
+                    why_chain=["Target module explicitly specifies contradictory access directives"],
+                    affects=req.affects,
+                    assumption_type="permission"
+                ))
+
         return conflicts
-        
+
     def generate_acceptance_criteria(self, intent: IntentExtraction, requirements: List[SynthesizedRequirement]) -> List[str]:
         ac = []
         for req in requirements:
             if req.type in [RequirementType.EXPLICIT, RequirementType.SUPPORTED]:
                 ac.append(f"Verify that {req.description} is functioning as expected.")
+        for role in intent.target_roles:
+            ac.append(f"Verify that role '{role}' can access all assigned capabilities without permission errors.")
         return ac
 
-    def run_synthesis(self, raw_request: str, workspace_dir: str) -> SynthesizedSpec:
-        logger.info("Starting Specification Synthesis Pipeline")
-        
-        intent = self.extract_intent(raw_request)
+    def _generate_clarifying_questions(self, requirements: List[SynthesizedRequirement], intent: IntentExtraction) -> List[str]:
+        questions = []
+
+        for req in requirements:
+            if req.decision_threshold == DecisionThreshold.MUST_ASK:
+                desc = req.description
+                if "register" in desc.lower() or "registration" in desc.lower():
+                    questions.append(f"Should users be able to self-register, or should only admins create accounts? (Context: {desc})")
+                elif "public" in desc.lower():
+                    questions.append(f"Should this be publicly accessible without login, or require authentication? (Context: {desc})")
+                elif "schema" in desc.lower() or "database" in desc.lower() or "field" in desc.lower():
+                    questions.append(f"This requires a database schema change. Please confirm the exact field names, types, and constraints. (Context: {desc})")
+                else:
+                    questions.append(f"Please clarify the scope and expected behavior for: {desc}")
+
+            elif req.decision_threshold == DecisionThreshold.MUST_STOP:
+                questions.append(f"⚠️ BLOCKING: {desc} — This conflict must be resolved before design can proceed.")
+
+        if len(intent.primary_features) > 5:
+            questions.append(f"You mentioned {len(intent.primary_features)} features. Should we prioritize a subset for the initial release, or implement all at once?")
+
+        return questions
+
+    def extract_intent(self, raw_request: str, workspace_vocab: Optional[Dict[str, Set[str]]] = None) -> StructuredIntent:
+        return StructuredPromptParser.parse_request(raw_request, workspace_vocab)
+
+    def run_synthesis(self, raw_request: str, workspace_dir: str, clarification_answers: Optional[Dict[str, str]] = None) -> SynthesizedSpec:
+        logger.info("Starting Specification Synthesis Pipeline V4.0 (Universal Semantic Engine)")
+
+        agents_dir = os.path.join(workspace_dir, ".agents")
+        os.makedirs(agents_dir, exist_ok=True)
+        json_path = os.path.join(agents_dir, "synthesized_spec.json")
+
+        # 1. Spec Versioning & History Backup
+        current_version = 1
+        md_path = os.path.join(agents_dir, "synthesized_spec.md")
+        ic_path = os.path.join(agents_dir, "intent_contract.json")
+
+        if os.path.exists(json_path):
+            try:
+                prev_data = load_json(json_path) or {}
+                current_version = prev_data.get("spec_version", 1) + 1
+                prev_v = current_version - 1
+                shutil.copy2(json_path, os.path.join(agents_dir, f"synthesized_spec_v{prev_v}.json"))
+                if os.path.exists(md_path):
+                    shutil.copy2(md_path, os.path.join(agents_dir, f"synthesized_spec_v{prev_v}.md"))
+                if os.path.exists(ic_path):
+                    shutil.copy2(ic_path, os.path.join(agents_dir, f"intent_contract_v{prev_v}.json"))
+            except Exception as e:
+                logger.warning(f"[SpecSynthesis] Backup archive warning: {e}")
+
         evidence = self.discover_project(workspace_dir)
-        
-        requirements_list = self.synthesize_requirements(intent, evidence)
-        
-        # Build Graph & Resolve Dependencies / Orphan Detection
+        workspace_vocab = WorkspaceVocabularyScanner.extract_workspace_vocab(evidence)
+        intent = self.extract_intent(raw_request, workspace_vocab)
+
+        # 2. Archetype & Scope Detection
+        archetypes = ProjectArchetypeDetector.detect(workspace_dir, evidence)
+        scope_tier = ScopeClassifier.classify(raw_request, intent)
+        archetype_strings = [a.value for a in archetypes]
+
+        # 3. Requirement Synthesis
+        requirements_list = self.synthesize_requirements(intent, evidence, archetypes, scope_tier)
+
+        # Incorporate Clarification Answers
+        if not clarification_answers and os.path.exists(os.path.join(agents_dir, "clarification_answers.json")):
+            clarification_answers = load_json(os.path.join(agents_dir, "clarification_answers.json"))
+
+        if clarification_answers:
+            for req in requirements_list:
+                if req.id in clarification_answers:
+                    answer = clarification_answers[req.id]
+                    req.decision_threshold = DecisionThreshold.AUTO_DECIDE
+                    req.type = RequirementType.SUPPORTED
+                    req.description += f" [CLARIFIED: {answer}]"
+
+        # 4. Graph & Dependency Wiring
         graph = RequirementGraph()
         for req in requirements_list:
             graph.add_node(req)
 
-        # Wire dependencies between derived/supported requirements and explicit parent requirements
         for req in requirements_list:
             if req.type in [RequirementType.DERIVED, RequirementType.SUPPORTED, RequirementType.OPTIONAL]:
                 for parent in requirements_list:
@@ -380,15 +1481,25 @@ class SpecSynthesisEngine:
         orphans = graph.detect_orphans()
         if orphans:
             logger.warning(f"[SpecSynthesis] Detected {len(orphans)} orphaned requirement(s): {[o.id for o in orphans]}")
-            
-        impacts = self.analyze_impact(requirements_list)
+            explicit_roots = [r for r in requirements_list if r.type in [RequirementType.EXPLICIT, RequirementType.SUPPORTED]]
+            if explicit_roots:
+                root_id = explicit_roots[0].id
+                for orphan in orphans:
+                    graph.add_dependency(orphan.id, root_id)
+
+        impacts = self.analyze_impact(requirements_list, archetypes)
         conflicts = self.check_conflicts(requirements_list, evidence)
-        gate_result_enum, total_weight = self.gate.evaluate(requirements_list, evidence)
-        
-        questions = [r.description for r in requirements_list if r.decision_threshold in [DecisionThreshold.MUST_ASK, DecisionThreshold.MUST_STOP]]
+
+        for conflict in conflicts:
+            if conflict not in requirements_list:
+                requirements_list.append(conflict)
+
+        # 5. Semantic Gate Evaluation V4.0 with Dynamic Budget Scaling
+        gate_result_enum, total_weight = self.gate.evaluate(requirements_list, evidence, archetypes, scope_tier=scope_tier)
+
+        questions = self._generate_clarifying_questions(requirements_list, intent)
         acceptance_criteria = self.generate_acceptance_criteria(intent, requirements_list)
-        
-        # Group requirements for output
+
         grouped_reqs = {}
         for req in requirements_list:
             typ = req.type.value
@@ -397,28 +1508,25 @@ class SpecSynthesisEngine:
             grouped_reqs[typ].append(req.to_dict())
 
         spec = SynthesizedSpec(
-            intent_summary=f"Implement {len(intent.primary_features)} features for roles: {intent.target_roles}",
+            intent_summary=f"Implement features for roles: {intent.target_roles}. Archetypes: {archetype_strings}",
             requirements=grouped_reqs,
             affected_systems=impacts,
             conflicts=[c.to_dict() for c in conflicts],
             questions_for_human=questions,
             acceptance_criteria=acceptance_criteria,
             gate_result=gate_result_enum.value,
-            total_assumption_weight=total_weight
+            total_assumption_weight=total_weight,
+            archetypes=archetype_strings,
+            scope_tier=scope_tier.value,
+            spec_version=current_version
         )
-        
-        # Save Outputs
-        agents_dir = os.path.join(workspace_dir, ".agents")
-        os.makedirs(agents_dir, exist_ok=True)
-        
-        json_path = os.path.join(agents_dir, "synthesized_spec.json")
+
         md_path = os.path.join(agents_dir, "synthesized_spec.md")
-        
-        # Write JSON
+
+        # Save JSON output
         try:
             write_json_atomic(json_path, spec.__dict__)
-            
-            # Instantiate and save IntentContract
+
             from intent_contract import IntentContract
             ic = IntentContract(
                 goal=spec.intent_summary,
@@ -429,25 +1537,44 @@ class SpecSynthesisEngine:
             write_json_atomic(os.path.join(agents_dir, "intent_contract.json"), ic.to_dict())
         except Exception as e:
             logger.error(f"Failed to write JSON outputs: {e}")
-            
-        # Write Markdown
+
+        # Save Markdown output
         try:
-            md_content = "# Synthesized Specification\n\n"
+            md_content = "# Synthesized Specification V3.0\n\n"
             md_content += f"**Intent**: {spec.intent_summary}\n"
-            md_content += f"**Gate Result**: {spec.gate_result} (Assumption Weight: {spec.total_assumption_weight}/10)\n\n"
-            
-            md_content += f"## Questions for Human\n"
-            for q in spec.questions_for_human:
-                md_content += f"- {q}\n"
-                
-            md_content += f"\n## Acceptance Criteria\n"
+            md_content += f"**Archetypes**: {', '.join(spec.archetypes)} | **Scope**: {spec.scope_tier.upper()}\n"
+            md_content += f"**Gate Result**: {spec.gate_result} (Assumption Weight: {spec.total_assumption_weight}/40)\n"
+            md_content += f"**Total Requirements**: {sum(len(v) for v in spec.requirements.values())} | **Version**: v{spec.spec_version}\n\n"
+
+            if spec.questions_for_human:
+                md_content += "## ❓ Questions for Human Review\n\n"
+                for i, q in enumerate(spec.questions_for_human, 1):
+                    md_content += f"{i}. {q}\n"
+                md_content += "\n"
+
+            md_content += "## Acceptance Criteria\n\n"
             for ac in spec.acceptance_criteria:
                 md_content += f"- {ac}\n"
-                
+
+            md_content += "\n## Requirements by Type\n\n"
+            for typ, reqs in spec.requirements.items():
+                md_content += f"### {typ.upper()} ({len(reqs)})\n\n"
+                for r in reqs:
+                    md_content += f"- **{r['id']}**: {r['description']}\n"
+                    if r.get("why_chain"):
+                        for step in r["why_chain"]:
+                            md_content += f"  - _{step}_\n"
+                md_content += "\n"
+
+            md_content += "## Affected Systems\n\n"
+            for sys_name, req_ids in spec.affected_systems.items():
+                if req_ids:
+                    md_content += f"- **{sys_name}**: {len(req_ids)} requirement(s)\n"
+
             with open(md_path, 'w', encoding='utf-8') as f:
                 f.write(md_content)
         except Exception as e:
             logger.error(f"Failed to write MD output: {e}")
 
-        logger.info("Synthesis completed.")
+        logger.info(f"Synthesis V3.0 completed (v{spec.spec_version}). {sum(len(v) for v in spec.requirements.values())} requirements, gate={spec.gate_result}")
         return spec

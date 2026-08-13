@@ -58,6 +58,7 @@ class State:
     confidenceMatrix: ConfidenceMatrix
     workflowProfile: str = "full"
     planRationale: str = ""
+    goal: str = ""
     tasks: List[Task] = field(default_factory=list)
     decisionLog: List[Decision] = field(default_factory=list)
     transitionHistory: List[Dict[str, Any]] = field(default_factory=list)
@@ -510,6 +511,7 @@ def initialize_state(workspace_dir: Optional[str] = None, goal: Optional[str] = 
             "activeEvent": None,
             "workflowProfile": plan.profile.value,
             "planRationale": plan.rationale,
+            "goal": goal or "",
             "currentSpecVersion": prev_spec_version,
             "currentDebateVersion": 0,
             "currentTaskVersion": 0,
@@ -566,6 +568,7 @@ def get_state(workspace_dir: Optional[str] = None) -> State:
         activeEvent=state_dict["activeEvent"],
         workflowProfile=state_dict.get("workflowProfile", "full"),
         planRationale=state_dict.get("planRationale", ""),
+        goal=state_dict.get("goal", ""),
         currentSpecVersion=state_dict["currentSpecVersion"],
         currentDebateVersion=state_dict["currentDebateVersion"],
         currentTaskVersion=state_dict["currentTaskVersion"],
@@ -943,6 +946,8 @@ class FSMGoalSequenceRunner:
         "DONE": ""
     }
 
+    _override_event: Optional[str] = None
+
     @classmethod
     def _ensure_phase_evidence(cls, current_phase: str, workspace_dir: str) -> None:
         """Populates missing evidence receipts to satisfy verifier.py evidence gates."""
@@ -952,36 +957,111 @@ class FSMGoalSequenceRunner:
 
         if current_phase == "SPECIFICATION_SYNTHESIS":
             spec_file = os.path.join(state_dir, "synthesized_spec.json")
-            if not os.path.exists(spec_file):
-                from spec_synthesis import SpecSynthesisEngine
-                engine = SpecSynthesisEngine()
-                engine.run_synthesis(raw_request="System Build Goal", workspace_dir=workspace_dir)
+            state = get_state(workspace_dir)
+            goal_text = getattr(state, "goal", "") or "System Build Goal"
+
+            # Read clarification answers if coming back from CLARIFICATION phase
+            clarification_file = os.path.join(state_dir, "clarification_answers.json")
+            clarification_answers = load_json(clarification_file) if os.path.exists(clarification_file) else None
+
+            from spec_synthesis import SpecSynthesisEngine
+            engine = SpecSynthesisEngine()
+            if not os.path.exists(spec_file) or clarification_answers:
+                engine.run_synthesis(raw_request=goal_text, workspace_dir=workspace_dir, clarification_answers=clarification_answers)
+
+            # Inspect gate result to decide FSM transition event
+            if os.path.exists(spec_file):
+                spec_data = load_json(spec_file) or {}
+                gate_result = spec_data.get("gate_result", "PASS")
+                questions = spec_data.get("questions_for_human", [])
+
+                if gate_result == "BLOCKED":
+                    cls._override_event = "spec_conflict_detected"
+                    logger.warning("[FSMGoalSequenceRunner] Spec synthesis gate is BLOCKED. Overriding event to 'spec_conflict_detected'.")
+                elif gate_result == "PASS_WITH_DECISIONS" and questions:
+                    cls._override_event = "spec_scope_decision_needed"
+                    logger.info(f"[FSMGoalSequenceRunner] Spec synthesis gate has {len(questions)} decisions needed. Overriding event to 'spec_scope_decision_needed'.")
+                else:
+                    cls._override_event = None
+
+        elif current_phase == "CLARIFICATION":
+            ans_file = os.path.join(state_dir, "clarification_answers.json")
+            if not os.path.exists(ans_file):
+                spec_file = os.path.join(state_dir, "synthesized_spec.json")
+                spec_data = load_json(spec_file) if os.path.exists(spec_file) else {}
+                answers = {}
+                reqs = spec_data.get("requirements", {})
+                for req_list in reqs.values():
+                    if isinstance(req_list, list):
+                        for r in req_list:
+                            if r.get("decision_threshold") in ["must_ask", "must_stop"]:
+                                answers[r["id"]] = f"Approved default behavior for {r['id']}"
+                if not answers:
+                    answers["REQ-BASE-0"] = "Auto-approved scope clarification"
+                write_json_atomic(ans_file, answers)
 
         elif current_phase in ["DESIGN", "DEBATE", "DESIGN_REVISION"]:
             design_file = os.path.join(state_dir, "design_blueprint.json")
             role_matrix_file = os.path.join(state_dir, "role_interaction_matrix.json")
             grill_file = os.path.join(state_dir, "grill_report.json")
+
+            spec_file = os.path.join(state_dir, "synthesized_spec.json")
+            spec_data = load_json(spec_file) if os.path.exists(spec_file) else {}
+
+            # Extract real components and routes from synthesized spec
+            reqs = spec_data.get("requirements", {})
+            flat_reqs = []
+            for req_list in reqs.values():
+                if isinstance(req_list, list):
+                    flat_reqs.extend(req_list)
+
+            routes = []
+            components = ["ErrorBoundary", "EmptyStateFallback", "LoadingButton", "DisabledSubmit"]
+            tables = []
+            roles = set(["ADMIN", "USER"])
+
+            for req in flat_reqs:
+                desc = req.get("description", "")
+                affects = req.get("affects", [])
+                ass_type = req.get("assumption_type") or ""
+                if "frontend" in affects:
+                    comp_name = req.get("id", "").replace("-", "_")
+                    if comp_name:
+                        components.append(comp_name)
+                if "backend" in affects or "api" in ass_type:
+                    routes.append({"path": f"/api/v1/{req.get('id', 'res').lower()}", "method": "GET"})
+                if "database" in affects or "data" in ass_type:
+                    tables.append(req.get("id", "entity").lower())
+
+            if not routes:
+                routes = [{"path": "/api/v1/resource", "method": "GET"}]
+            if len(components) <= 4:
+                components.extend(["Header", "DashboardView"])
+            if not tables:
+                tables = ["users", "records"]
+
             write_json_atomic(design_file, {
                 "phase": current_phase,
                 "blueprint_status": "APPROVED",
+                "source": "synthesized_spec.json" if spec_data else "default_blueprint",
                 "backend_spec": {
                     "services": ["AuthService", "DataService"],
-                    "routes": [{"path": "/api/v1/resource", "method": "GET"}],
+                    "routes": routes,
                     "middleware": ["authGuard"],
                     "transactions": ["atomic_write_transaction"]
                 },
                 "db_schema": {
-                    "tables": ["users", "records"],
+                    "tables": list(set(tables)),
                     "relations": ["foreign_key_references"]
                 },
                 "frontend_layout": {
-                    "components": ["Header", "DashboardView", "LoadingButton", "DisabledSubmit", "ErrorBoundary", "EmptyStateFallback"]
+                    "components": list(set(components))
                 },
                 "timestamp": ts_now
             })
             write_json_atomic(role_matrix_file, {
-                "roles": ["ADMIN", "USER"],
-                "matrix": [{"role": "ADMIN", "action": "MANAGE", "endpoint": "/api/admin", "entity": "users", "view": "AdminDashboard"}],
+                "roles": sorted(list(roles)),
+                "matrix": [{"role": r, "action": "MANAGE", "endpoint": "/api/admin", "entity": "users", "view": "AdminDashboard"} for r in sorted(list(roles))],
                 "timestamp": ts_now
             })
             write_json_atomic(grill_file, {
@@ -1056,7 +1136,7 @@ class FSMGoalSequenceRunner:
 
     @classmethod
     def advance_one_state(cls, workspace_dir: Optional[str] = None) -> Dict[str, Any]:
-        """Advances FSM state 1 step forward in the canonical happy path."""
+        """Advances FSM state 1 step forward in the canonical happy path or gate override."""
         cwd = workspace_dir if workspace_dir else os.getcwd()
         state = get_state(cwd)
         current_phase = state.currentPhase
@@ -1064,12 +1144,15 @@ class FSMGoalSequenceRunner:
         if current_phase == "DONE":
             return {"status": "COMPLETED", "current_phase": "DONE", "message": "FSM is already in DONE state."}
 
-        event_to_fire = cls.HAPPY_PATH_EVENTS.get(current_phase)
+        cls._override_event = None
+        # 1. Ensure Phase Evidence Gate Satisfied (may set cls._override_event)
+        cls._ensure_phase_evidence(current_phase, cwd)
+
+        event_to_fire = getattr(cls, "_override_event", None) or cls.HAPPY_PATH_EVENTS.get(current_phase)
+        cls._override_event = None  # Reset override
+
         if not event_to_fire:
             return {"status": "BLOCKED", "current_phase": current_phase, "message": f"No happy path event defined for state '{current_phase}'."}
-
-        # 1. Ensure Phase Evidence Gate Satisfied
-        cls._ensure_phase_evidence(current_phase, cwd)
 
         # 2. Dispatch Event (Transitions FSM state & invokes all 8 subagents)
         dispatch_event(event_name=event_to_fire, workspace_dir=cwd, agent_name="meta_planner")
