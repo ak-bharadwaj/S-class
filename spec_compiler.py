@@ -18,6 +18,14 @@ from domain_primitives import (
     AssumptionRecord
 )
 
+def _plural(name: str) -> str:
+    cleaned = name.strip().lower()
+    if cleaned.endswith('s') or cleaned.endswith('x') or cleaned.endswith('z') or cleaned.endswith('ch') or cleaned.endswith('sh'):
+        if cleaned.endswith('s'):
+            return cleaned
+        return f"{cleaned}es"
+    return f"{cleaned}s"
+
 
 class GraphInferenceEngine:
     """
@@ -156,10 +164,10 @@ class GraphInferenceEngine:
                     }
                 ],
                 "api_endpoints": [
-                    f"GET /api/{doc.id.replace('doc_', '')}s",
-                    f"POST /api/{doc.id.replace('doc_', '')}s",
-                    f"GET /api/{doc.id.replace('doc_', '')}s/{{id}}",
-                    f"POST /api/{doc.id.replace('doc_', '')}s/{{id}}/sign"
+                    f"GET /api/{_plural(doc.id.replace('doc_', ''))}",
+                    f"POST /api/{_plural(doc.id.replace('doc_', ''))}",
+                    f"GET /api/{_plural(doc.id.replace('doc_', ''))}/{{id}}",
+                    f"POST /api/{_plural(doc.id.replace('doc_', ''))}/{{id}}/sign"
                 ],
                 "validation_rules": [
                     f"{doc.name} requires certified cryptographic or physical signature verification"
@@ -194,9 +202,9 @@ class GraphInferenceEngine:
                     }
                 ],
                 "api_endpoints": [
-                    f"GET /api/{res.id.replace('resource_', '')}s",
-                    f"POST /api/{res.id.replace('resource_', '')}s",
-                    f"GET /api/{res.id.replace('resource_', '')}s/{{id}}/health"
+                    f"GET /api/{_plural(res.id.replace('resource_', ''))}",
+                    f"POST /api/{_plural(res.id.replace('resource_', ''))}",
+                    f"GET /api/{_plural(res.id.replace('resource_', ''))}/{{id}}/health"
                 ],
                 "validation_rules": [
                     f"{res.name} operational status must meet safety compliance thresholds"
@@ -233,10 +241,10 @@ class GraphInferenceEngine:
                     }
                 ],
                 "api_endpoints": [
-                    f"GET /api/{ent.id.replace('entity_', '')}s",
-                    f"POST /api/{ent.id.replace('entity_', '')}s",
-                    f"GET /api/{ent.id.replace('entity_', '')}s/{{id}}",
-                    f"PUT /api/{ent.id.replace('entity_', '')}s/{{id}}"
+                    f"GET /api/{_plural(ent.id.replace('entity_', ''))}",
+                    f"POST /api/{_plural(ent.id.replace('entity_', ''))}",
+                    f"GET /api/{_plural(ent.id.replace('entity_', ''))}/{{id}}",
+                    f"PUT /api/{_plural(ent.id.replace('entity_', ''))}/{{id}}"
                 ],
                 "validation_rules": [
                     f"{ent.name} identifier must be unique"
@@ -258,16 +266,58 @@ class SpecificationCompiler:
     """
 
     @classmethod
-    def compile_specification(cls, graph: SemanticDomainGraph, intent_features: List[str]) -> Tuple[Dict[str, List[Dict[str, Any]]], Dict[str, Dict[str, Any]], List[Dict[str, Any]]]:
+    def compile_specification(
+        cls,
+        graph: SemanticDomainGraph,
+        intent_features: List[str],
+        archetypes: Optional[List[str]] = None
+    ) -> Tuple[Dict[str, List[Dict[str, Any]]], Dict[str, Dict[str, Any]], List[Dict[str, Any]]]:
         capabilities, assumptions = GraphInferenceEngine.infer_domain_capabilities(graph)
         actors = graph.get_nodes_by_type(DomainPrimitiveType.ACTOR)
 
         page_spreads: Dict[str, List[Dict[str, Any]]] = {}
         low_level_designs: Dict[str, Dict[str, Any]] = {}
 
+        is_pure_cli = bool(archetypes and "cli_tool" in archetypes and not any(a in ["fullstack", "web_frontend", "mobile_hybrid"] for a in archetypes))
+
         for actor in actors:
             actor_key = actor.name.lower().replace(' ', '_')
             pages: List[Dict[str, Any]] = []
+
+            if is_pure_cli:
+                # Compile CLI Subcommand & Flag Catalog instead of Web UI
+                cli_actions = [f"cmd_{f.lower().replace(' ', '_')}" for f in intent_features if len(f.split()) <= 3]
+                if not cli_actions:
+                    cli_actions = ["init", "diff", "push", "status", "config"]
+
+                pages.append({
+                    "route": "cli://subcommands",
+                    "page_name": f"{actor.name} CLI Command Dispatcher",
+                    "module_key": "cli_dispatcher",
+                    "description": f"CLI command suite and subcommands for {actor.name}"
+                })
+                low_level_designs[f"{actor_key}:cli://subcommands"] = {
+                    "role": actor_key,
+                    "page_name": f"{actor.name} CLI Command Suite",
+                    "route": "cli://subcommands",
+                    "layout": "cli_subcommand_dispatch",
+                    "sub_components": ["ArgParser", "SubcommandRouter", "ConfigLoader", "ExitCodeHandler"],
+                    "tabs": [
+                        {
+                            "name": "Subcommand Catalog",
+                            "fields": ["subcommandName (string)", "arguments (list)", "flags (list)", "exitCode (integer)"],
+                            "actions": cli_actions
+                        }
+                    ],
+                    "api_endpoints": [],
+                    "validation_rules": [
+                        "CLI arguments must adhere to POSIX flag standards",
+                        "Exit codes: 0 for success, 1 for runtime error, 2 for invalid usage"
+                    ],
+                    "reasoning_graph": [{"from": actor.id, "relation": "executes", "to": "CLI Subcommand Suite"}]
+                }
+                page_spreads[actor_key] = pages
+                continue
 
             # 1. Actor Operational Dashboard
             pages.append({

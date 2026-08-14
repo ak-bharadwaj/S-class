@@ -259,7 +259,7 @@ class ProjectArchetypeDetector:
 
             if "torch" in deps_str or "transformers" in deps_str or "langchain" in deps_str or "openai" in deps_str:
                 archetypes.add(ProjectArchetype.ML_AI)
-            if "airflow" in deps_str or "dbt" in deps_str or "pyspark" in deps_str or "dagster" in deps_str:
+            if any(k in deps_str for k in ["airflow", "dbt", "pyspark", "dagster", "kafka", "pyarrow", "polars", "duckdb", "spark"]):
                 archetypes.add(ProjectArchetype.DATA_PIPELINE)
             if "fastapi" in deps_str or "django" in deps_str or "flask" in deps_str or "uvicorn" in deps_str:
                 if not any(a in [ProjectArchetype.FULLSTACK_MONOLITH, ProjectArchetype.WEB_FRONTEND] for a in archetypes):
@@ -1917,7 +1917,7 @@ class SpecSynthesisEngine:
                     threshold = self._assess_action_risk_threshold(cap, binding.raw_clause, is_primary_base=(b_idx == 0 and c_idx == 0))
                     reqs.append(SynthesizedRequirement(
                         id=f"REQ-BASE-{len(reqs)}",
-                        description=f"{binding.role.title()} — {cap.replace('_', ' ').title()}",
+                        description=f"{binding.role.title()} - {cap.replace('_', ' ').title()}",
                         type=RequirementType.EXPLICIT,
                         category=RequirementCategory.PRODUCT_REQUIREMENT,
                         action=ArtifactAction.CREATE,
@@ -2068,7 +2068,7 @@ class SpecSynthesisEngine:
 
         # 4. Compile Specification from Semantic Domain Graph
         feats = intent.all_features if hasattr(intent, 'all_features') else intent.primary_features
-        page_spreads, lld_catalog, assumption_ledger = SpecificationCompiler.compile_specification(domain_graph, feats)
+        page_spreads, lld_catalog, assumption_ledger = SpecificationCompiler.compile_specification(domain_graph, feats, archetype_strings)
 
         # 5. Requirement Synthesis
         requirements_list = self.synthesize_requirements(intent, evidence, archetypes, scope_tier)

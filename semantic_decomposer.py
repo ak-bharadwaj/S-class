@@ -64,16 +64,21 @@ class SemanticDecomposer:
     HUMAN_ACTOR_KEYWORDS = {
         "faculty", "hod", "hods", "student", "students", "instructor", "instructors",
         "admin", "administrator", "administrators", "doctor", "doctors", "patient", "patients",
-        "engineer", "engineers", "driver", "drivers", "manager", "managers", "customer", "customers",
-        "client", "clients", "operator", "operators", "researcher", "researchers", "user", "users",
-        "reviewer", "reviewers", "auditor", "auditors", "candidate", "candidates", "staff", "teller",
-        "examiner", "tenant", "landlord", "dispatcher", "mechanic"
+        "nurse", "nurses", "engineer", "engineers", "driver", "drivers", "manager", "managers",
+        "customer", "customers", "client", "clients", "operator", "operators", "researcher",
+        "researchers", "user", "users", "reviewer", "reviewers", "auditor", "auditors",
+        "candidate", "candidates", "staff", "teller", "examiner", "tenant", "landlord",
+        "dispatcher", "mechanic", "member", "members", "author", "authors", "editor", "editors",
+        "superintendent", "superintendents", "worker", "workers", "creator", "creators"
     }
 
     STOP_WORDS = {
         # Meta & Action Verbs
         "build", "create", "make", "implement", "add", "fix", "update", "delete", "manage",
-        "run", "execute", "test", "verify", "check", "ensure", "allow", "support",
+        "run", "execute", "test", "verify", "check", "ensure", "allow", "support", "reads",
+        "writes", "pushes", "pulls", "sends", "receives", "consumes", "produces", "validates",
+        "routes", "stores", "exports", "imports", "subcommands", "subcommand", "views", "view",
+        "access", "accesses", "assigned", "assign", "based", "subdomain-based",
         # Generic Software Container Words
         "system", "platform", "app", "application", "tool", "tooling", "portal", "codebase",
         "project", "feature", "features", "module", "modules", "service", "services",
@@ -81,11 +86,12 @@ class SemanticDecomposer:
         "fast", "quick", "slow", "complete", "simple", "easy", "complex", "hard", "full",
         "partial", "automated", "manual", "single", "multi", "great", "good", "new", "old",
         "best", "smart", "high", "low", "real", "time", "real-time", "realtime", "custom",
-        "standard", "seamless", "modern", "universal", "clean", "robust",
+        "standard", "seamless", "modern", "universal", "clean", "robust", "local", "remote",
         # Grammatical Connectors & Prepositions
         "and", "the", "for", "such", "etc", "that", "this", "from", "with", "into", "onto",
         "over", "under", "when", "where", "then", "their", "your", "each", "both", "all",
         "college", "school", "university", "department", "company", "enterprise", "organization",
+        "whose", "which", "within", "without", "about",
         # Generic Schema Terms
         "rate", "rates", "policies", "policy", "queues", "queue", "measurements",
         "measurement", "readings", "reading", "metrics", "metric", "alarms", "alarm",
@@ -119,6 +125,17 @@ class SemanticDecomposer:
         workflows: Set[str] = set()
         documents: Set[str] = set()
 
+        # Extract Compound Roles: e.g. "tenant admins", "medical superintendent", "tenant members"
+        compound_role_patterns = [
+            (r'\btenant\s+admins?\b', 'tenant_admin'),
+            (r'\btenant\s+members?\b', 'tenant_member'),
+            (r'\bmedical\s+superintendents?\b', 'superintendent'),
+            (r'\bsuper\s+admins?\b', 'super_admin')
+        ]
+        for pattern, role_tag in compound_role_patterns:
+            if re.search(pattern, norm_text):
+                actors.add(role_tag)
+
         # Extract Actors: Explicit human actor keywords anywhere in text
         for w in words:
             w_clean = re.sub(r'^[^\w]+|[^\w]+$', '', w)
@@ -128,6 +145,8 @@ class SemanticDecomposer:
                     continue
                 # Normalize plural to singular
                 actor_norm = w_clean[:-1] if w_clean.endswith('s') and w_clean[:-1] in cls.HUMAN_ACTOR_KEYWORDS else w_clean
+                if w_clean.endswith('es') and w_clean[:-2] in cls.HUMAN_ACTOR_KEYWORDS:
+                    actor_norm = w_clean[:-2]
                 if actor_norm == "hod":
                     actor_norm = "hod"
                 actors.add(actor_norm)
@@ -141,7 +160,8 @@ class SemanticDecomposer:
                     if r_clean in cls.HUMAN_ACTOR_KEYWORDS:
                         if r_clean in ["client", "clients"] and any(sw in norm_text for sw in ["query client", "http client", "api client", "rpc client", "arxiv query"]):
                             continue
-                        actors.add(r_clean)
+                        actor_norm = r_clean[:-1] if r_clean.endswith('s') and r_clean[:-1] in cls.HUMAN_ACTOR_KEYWORDS else r_clean
+                        actors.add(actor_norm)
 
         # Token semantic classification
         for w in words:
