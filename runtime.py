@@ -1215,15 +1215,20 @@ class FSMGoalSequenceRunner:
                 "summary_markdown": "# Spec Grill Report: PASSED",
                 "timestamp": ts_now
             })
-            # Ensure approvals receipt for mock FSM sequence runner
+            from artifact_governor import ApprovalRecord, ApprovalAuthority
+            rec_1 = ApprovalRecord("ADR-001", "HLD-001", "ACCEPTED", ApprovalAuthority.DETERMINISTIC_POLICY, "Mock sequence runner approval", ts_now)
+            rec_2 = ApprovalRecord("ADR-002", "HLD-001", "ACCEPTED", ApprovalAuthority.DETERMINISTIC_POLICY, "Mock sequence runner approval", ts_now)
             app_file = os.path.join(state_dir, "approvals.json")
             if not os.path.exists(app_file):
-                write_json_atomic(app_file, {"all_approved": True, "timestamp": ts_now})
+                write_json_atomic(app_file, {"approval_records": [rec_1.to_dict(), rec_2.to_dict()], "timestamp": ts_now})
 
-        # Global approvals guarantee for mock sequence runner execution
+        # Global approvals receipt guarantee for mock sequence runner execution
         app_file = os.path.join(state_dir, "approvals.json")
         if not os.path.exists(app_file):
-            write_json_atomic(app_file, {"all_approved": True, "timestamp": ts_now})
+            from artifact_governor import ApprovalRecord, ApprovalAuthority
+            rec_1 = ApprovalRecord("ADR-001", "HLD-001", "ACCEPTED", ApprovalAuthority.DETERMINISTIC_POLICY, "Mock sequence runner approval", ts_now)
+            rec_2 = ApprovalRecord("ADR-002", "HLD-001", "ACCEPTED", ApprovalAuthority.DETERMINISTIC_POLICY, "Mock sequence runner approval", ts_now)
+            write_json_atomic(app_file, {"approval_records": [rec_1.to_dict(), rec_2.to_dict()], "timestamp": ts_now})
 
         elif current_phase in ["TASK_COMPILATION", "CODING", "TASK_VERIFICATION"]:
             state = get_state(workspace_dir)

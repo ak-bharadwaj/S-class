@@ -74,8 +74,11 @@ def test_runtime_integration_bug_fix_shortcut(tmp_path):
             "gate_result": "PASS",
             "total_assumption_weight": 0
         }, f)
+    from artifact_governor import ApprovalRecord, ApprovalAuthority
+    rec_1 = ApprovalRecord("ADR-001", "HLD-001", "ACCEPTED", ApprovalAuthority.DETERMINISTIC_POLICY, "Test auto-approval", "2026-08-14T22:00:00Z")
+    rec_2 = ApprovalRecord("ADR-002", "HLD-001", "ACCEPTED", ApprovalAuthority.DETERMINISTIC_POLICY, "Test auto-approval", "2026-08-14T22:00:00Z")
     with open(os.path.join(agents_dir, "approvals.json"), "w", encoding="utf-8") as f:
-        json.dump({"all_approved": True}, f)
+        json.dump({"approval_records": [rec_1.to_dict(), rec_2.to_dict()]}, f)
 
     # Under BUG_FIX profile, spec_synthesized shortcuts SPECIFICATION_SYNTHESIS directly to CODING!
     runtime.dispatch_event("spec_synthesized", workspace_dir=workspace)
@@ -92,8 +95,11 @@ def test_runtime_integration_hotfix_shortcut(tmp_path):
     agents_dir = os.path.join(workspace, ".agents")
     os.makedirs(agents_dir, exist_ok=True)
     import json
+    from artifact_governor import ApprovalRecord, ApprovalAuthority
+    rec_1 = ApprovalRecord("ADR-001", "HLD-001", "ACCEPTED", ApprovalAuthority.DETERMINISTIC_POLICY, "Test auto-approval", "2026-08-14T22:00:00Z")
+    rec_2 = ApprovalRecord("ADR-002", "HLD-001", "ACCEPTED", ApprovalAuthority.DETERMINISTIC_POLICY, "Test auto-approval", "2026-08-14T22:00:00Z")
     with open(os.path.join(agents_dir, "approvals.json"), "w", encoding="utf-8") as f:
-        json.dump({"all_approved": True}, f)
+        json.dump({"approval_records": [rec_1.to_dict(), rec_2.to_dict()]}, f)
 
     # Under HOTFIX profile, triage_done jumps directly from TRIAGE to CODING!
     runtime.dispatch_event("triage_done", workspace_dir=workspace)

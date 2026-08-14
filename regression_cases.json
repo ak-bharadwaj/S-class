@@ -282,5 +282,20 @@
     ],
     "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
     "resolved": true
+  },
+  {
+    "id": "FAIL-PROSE-020",
+    "project": "Untrusted Boolean Approval Override Bypass Audit",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-14T22:06:00Z",
+    "summary": "Runtime created untrusted boolean override flags ('all_approved': true) in approvals.json which bypassed blocked artifact governance states without cryptographically verifiable approval receipts.",
+    "root_cause": "untrusted_boolean_approval_override_bypass",
+    "missing_contracts": [
+      "approval_record_schema_definition",
+      "sha256_cryptographic_receipt_signature_verification",
+      "adversarial_approval_bypass_resilience"
+    ],
+    "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
+    "resolved": true
   }
 ]

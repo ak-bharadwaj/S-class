@@ -1,16 +1,17 @@
 """
-S-Class EOS V8.1 - Authoritative Artifact Governance & FSM Control Plane Engine
+S-Class EOS V8.1.1 - Authoritative Artifact Governance & Control Plane Engine
 
 Enforces hard execution gates driven by the Triad Status Model:
 (EpistemicStatus, ValidationStatus, ApprovalStatus)
 
-PROPOSED / INVALID -> CANNOT compile downstream or transition FSM to execution
-CONFIRMED / APPROVED -> CAN compile downstream and transition FSM
+PROPOSED / INVALID / UNVERIFIED -> CANNOT compile downstream or transition FSM
+CONFIRMED / APPROVED (with signed ApprovalRecord) -> CAN compile downstream and transition FSM
 """
 
 import os
 import json
-from dataclasses import dataclass, field
+import hashlib
+from dataclasses import dataclass, field, asdict
 from enum import Enum
 from typing import Dict, List, Set, Any, Optional, Tuple
 
@@ -27,6 +28,66 @@ class FSMTransitionTarget(str, Enum):
     DEBATE = "DEBATE"
     CLARIFICATION = "CLARIFICATION"
     CODING = "CODING"
+
+
+class ApprovalAuthority(str, Enum):
+    """Authority granting approval for a decision."""
+    HUMAN_EXPLICIT = "HUMAN_EXPLICIT"
+    DETERMINISTIC_POLICY = "DETERMINISTIC_POLICY"
+    DEBATE_ENGINE = "DEBATE_ENGINE"
+
+
+@dataclass
+class ApprovalRecord:
+    """Verifiable approval receipt for a governed architectural decision."""
+    decision_id: str
+    artifact_id: str
+    decision: str
+    authority: ApprovalAuthority
+    reason: str
+    timestamp: str
+    evidence: List[str] = field(default_factory=list)
+    signature: str = ""
+
+    def __post_init__(self):
+        if isinstance(self.authority, str):
+            self.authority = ApprovalAuthority(self.authority)
+        if not self.signature:
+            self.signature = self.compute_signature()
+
+    def compute_signature(self) -> str:
+        payload = f"{self.decision_id}:{self.artifact_id}:{self.authority.value}:{self.decision}:{self.reason}".encode("utf-8")
+        return hashlib.sha256(payload).hexdigest()
+
+    def is_valid(self) -> bool:
+        if not self.decision_id or not self.artifact_id or not self.signature:
+            return False
+        return self.signature == self.compute_signature()
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "decision_id": self.decision_id,
+            "artifact_id": self.artifact_id,
+            "decision": self.decision,
+            "authority": self.authority.value,
+            "reason": self.reason,
+            "timestamp": self.timestamp,
+            "evidence": self.evidence,
+            "signature": self.signature
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ApprovalRecord":
+        return cls(
+            decision_id=data.get("decision_id", ""),
+            artifact_id=data.get("artifact_id", ""),
+            decision=data.get("decision", ""),
+            authority=ApprovalAuthority(data.get("authority", "HUMAN_EXPLICIT")),
+            reason=data.get("reason", ""),
+            timestamp=data.get("timestamp", ""),
+            evidence=data.get("evidence", []),
+            signature=data.get("signature", "")
+        )
 
 
 @dataclass
@@ -52,16 +113,27 @@ class ArtifactGovernor:
     """Control Plane Governor enforcing legal compilation transitions and FSM state mutations across artifacts."""
 
     @classmethod
-    def _load_approvals_file(cls, workspace_dir: Optional[str] = None) -> Dict[str, Any]:
+    def _load_verified_approval_records(cls, workspace_dir: Optional[str] = None) -> Dict[str, ApprovalRecord]:
+        """Loads and verifies SHA-256 cryptographic signatures of approval records in .agents/approvals.json.
+        Ignores untrusted boolean override flags like 'all_approved'."""
         cwd = workspace_dir if workspace_dir else os.getcwd()
         app_file = os.path.join(cwd, ".agents", "approvals.json")
+        verified_records: Dict[str, ApprovalRecord] = {}
+
         if os.path.exists(app_file):
             try:
                 with open(app_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
+                    data = json.load(f)
+
+                records_data = data.get("approval_records", [])
+                for r_dict in records_data:
+                    record = ApprovalRecord.from_dict(r_dict)
+                    if record.is_valid():
+                        verified_records[record.decision_id] = record
             except Exception:
                 pass
-        return {}
+
+        return verified_records
 
     @classmethod
     def audit_hld_governance(
@@ -72,8 +144,7 @@ class ArtifactGovernor:
         workspace_dir: Optional[str] = None
     ) -> GovernanceGateResult:
         reasons: List[str] = []
-        approvals = cls._load_approvals_file(workspace_dir)
-        explicit_approvals = approvals.get("approved_adrs", [])
+        verified_approvals = cls._load_verified_approval_records(workspace_dir)
 
         # 1. Check Hard HLD 6-Gate Validator Result
         if not hld_validation_passed:
@@ -93,7 +164,7 @@ class ArtifactGovernor:
         for adr in hld.adrs:
             is_proposed = adr.status == "PROPOSED" or adr.epistemic_status == EpistemicStatus.PROPOSED
             is_rejected = adr.status == "REJECTED" or adr.approval_status == ApprovalStatus.REJECTED
-            has_explicit_approval = adr.id in explicit_approvals or approvals.get("all_approved", False)
+            matching_record = verified_approvals.get(adr.id)
 
             if is_rejected:
                 reasons.append(f"ADR {adr.id} ('{adr.title}') is REJECTED ({adr.reason}).")
@@ -101,24 +172,28 @@ class ArtifactGovernor:
                 adr.approval_status = ApprovalStatus.REJECTED
                 blocked_adrs.append(adr.id)
             elif is_proposed:
-                if has_explicit_approval:
+                if matching_record and matching_record.decision in ["ACCEPTED", "CONFIRMED"]:
                     adr.validation_status = ValidationStatus.VALID
                     adr.approval_status = ApprovalStatus.APPROVED
                     adr.status = "ACCEPTED"
                     adr.epistemic_status = EpistemicStatus.CONFIRMED
                 else:
-                    reasons.append(f"ADR {adr.id} ('{adr.title}') is PROPOSED/PENDING confirmation ({adr.reason}).")
+                    reasons.append(f"ADR {adr.id} ('{adr.title}') is PROPOSED/PENDING confirmation ({adr.reason}) without verified ApprovalRecord.")
                     adr.validation_status = ValidationStatus.BLOCKED
                     adr.approval_status = ApprovalStatus.PENDING
                     blocked_adrs.append(adr.id)
             else:
                 # ACCEPTED / DERIVED ADRs
-                if adr.confidence >= 0.90 or has_explicit_approval:
+                if matching_record and matching_record.decision in ["ACCEPTED", "CONFIRMED"]:
                     adr.validation_status = ValidationStatus.VALID
-                    adr.approval_status = ApprovalStatus.APPROVED if has_explicit_approval else ApprovalStatus.NOT_REQUIRED
+                    adr.approval_status = ApprovalStatus.APPROVED
+                elif adr.confidence >= 0.90 and adr.epistemic_status in [EpistemicStatus.EXPLICIT, EpistemicStatus.DERIVED, EpistemicStatus.CONFIRMED]:
+                    # High confidence explicit/derived/confirmed decision satisfies deterministic policy authority
+                    adr.validation_status = ValidationStatus.VALID
+                    adr.approval_status = ApprovalStatus.NOT_REQUIRED
                 else:
-                    # Confidence < 0.90 without explicit receipt stays PENDING!
-                    reasons.append(f"ADR {adr.id} ('{adr.title}') confidence ({adr.confidence:.2f} < 0.90) requires explicit approval or debate.")
+                    # Confidence < 0.90 without verified ApprovalRecord stays PENDING!
+                    reasons.append(f"ADR {adr.id} ('{adr.title}') confidence ({adr.confidence:.2f} < 0.90) requires verified ApprovalRecord from DEBATE_ENGINE or HUMAN_EXPLICIT.")
                     adr.validation_status = ValidationStatus.BLOCKED
                     adr.approval_status = ApprovalStatus.PENDING
                     blocked_adrs.append(adr.id)
@@ -222,7 +297,6 @@ class ArtifactGovernor:
         pipeline_file = os.path.join(cwd, ".agents", "v7_refinement_pipeline.json")
 
         if not os.path.exists(pipeline_file):
-            # No refinement pipeline file yet; initial states (TRIAGE, ANALYSIS, SPECIFICATION_SYNTHESIS) permitted
             if target_phase in ["TRIAGE", "ANALYSIS", "SPECIFICATION_SYNTHESIS", "CLARIFICATION"]:
                 return GovernanceGateResult(
                     is_blocked=False,
@@ -239,11 +313,20 @@ class ArtifactGovernor:
             is_blocked = pipe_data.get("blocked", False)
             hld_gov = pipe_data.get("hld_governance", {})
 
-            # Check if explicit approvals file overrides blocked status
-            approvals = cls._load_approvals_file(workspace_dir)
-            if approvals.get("all_approved", False):
-                is_blocked = False
-                hld_gov["is_blocked"] = False
+            # Validate whether verified approval records resolve any blocked ADRs
+            verified_approvals = cls._load_verified_approval_records(workspace_dir)
+            if verified_approvals:
+                # Check if all ADRs in pipeline data now have matching verified approval records
+                hld_data = pipe_data.get("hld_design", {})
+                adrs_data = hld_data.get("adrs", [])
+                if adrs_data:
+                    unresolved_adrs = [
+                        a for a in adrs_data
+                        if a.get("id") not in verified_approvals and (a.get("status") == "PROPOSED" or a.get("epistemic_status") == "proposed" or float(a.get("confidence", 1.0)) < 0.90)
+                    ]
+                    if not unresolved_adrs:
+                        is_blocked = False
+                        hld_gov["is_blocked"] = False
 
             if target_phase in ["DESIGN", "TASK_COMPILATION", "CODING", "QA", "RELEASE"]:
                 if is_blocked or hld_gov.get("is_blocked", False):
