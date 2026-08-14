@@ -100,5 +100,20 @@
     ],
     "skeptic_rule_id": "SKEPTIC-NON-ENTITY-API",
     "resolved": true
+  },
+  {
+    "id": "FAIL-DOC-008",
+    "project": "CSE Department ERP Master Architecture Ingestion",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-14T08:45:00Z",
+    "summary": "Spec synthesis parsed documentation file path tokens into domain entities (GET /api/architecture.mds) and dropped explicit architectural amendments (§6.17.E batch advance endpoints)",
+    "root_cause": "unfiltered_filepath_tokens_and_ignored_doc_contracts",
+    "missing_contracts": [
+      "filepath_extension_token_filtering",
+      "preserve_explicit_markdown_api_routes",
+      "rbac_table_role_preservation"
+    ],
+    "skeptic_rule_id": "SKEPTIC-SOURCE-DECISION-PRESERVATION",
+    "resolved": true
   }
 ]

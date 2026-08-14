@@ -10,6 +10,7 @@ Every single active rule in this class maps 1:1 to an empirical entry in regress
 - SKEPTIC-ROLE-ROUTE-GUARD (FAIL-PORTAL-005)
 - SKEPTIC-ROLE-EXTRACTION-SANITY (FAIL-PORTAL-006)
 - SKEPTIC-NON-ENTITY-API (FAIL-SYNTH-007)
+- SKEPTIC-SOURCE-DECISION-PRESERVATION (FAIL-DOC-008)
 """
 
 from typing import Dict, List, Set, Any, Optional, Tuple
@@ -20,7 +21,8 @@ INVALID_ENTITY_NAMES = {
     "partial", "automated", "manual", "single", "multi", "great", "good", "new", "old",
     "best", "smart", "high", "low", "real", "time", "custom", "tool", "portal", "system",
     "platform", "app", "application", "codebase", "make", "build", "add", "item", "items",
-    "reads", "writes", "pushes", "pulls", "views", "view", "access", "accesses"
+    "reads", "writes", "pushes", "pulls", "views", "view", "access", "accesses",
+    "doc", "docs", "documentation", "spec", "specs", "specification", "architecture"
 }
 
 INVALID_ROLE_NAMES = {
@@ -42,7 +44,8 @@ class PracticalSkeptic:
         "SKEPTIC-FRONTEND-LEAKAGE-IN-BACKEND",
         "SKEPTIC-ROLE-ROUTE-GUARD",
         "SKEPTIC-ROLE-EXTRACTION-SANITY",
-        "SKEPTIC-NON-ENTITY-API"
+        "SKEPTIC-NON-ENTITY-API",
+        "SKEPTIC-SOURCE-DECISION-PRESERVATION"
     }
 
     @classmethod
@@ -165,5 +168,40 @@ class PracticalSkeptic:
                         "severity": "INFO",
                         "message": "Specify async DB session injection and Pydantic response models on API endpoints."
                     })
+
+        # 8. SKEPTIC-SOURCE-DECISION-PRESERVATION (Preserve explicit decisions & routes from source docs)
+        for lld_key, lld in low_level_designs.items():
+            for ep in lld.get("api_endpoints", []):
+                # Check for file extension leakage in routes
+                if any(ext in ep.lower() for ext in [".md", ".markdown", ".json", ".ts", ".py", ".prisma"]):
+                    warnings.append(f"[SKEPTIC-SOURCE-DECISION-PRESERVATION] API endpoint '{ep}' contains leaked documentation file extension.")
+                    checks.append({
+                        "rule_id": "SKEPTIC-SOURCE-DECISION-PRESERVATION",
+                        "severity": "BLOCKING",
+                        "message": f"Remove file-extension artifact from endpoint '{ep}'."
+                    })
+                    passed = False
+
+        if workspace_evidence and getattr(workspace_evidence, "api_routes", None):
+            all_spec_apis = []
+            for lld in low_level_designs.values():
+                all_spec_apis.extend(lld.get("api_endpoints", []))
+            all_spec_api_str = " ".join(all_spec_apis)
+
+            # Check if any explicit architecture routes are completely dropped
+            explicit_routes = getattr(workspace_evidence, "api_routes", [])
+            missing_critical = []
+            for er in explicit_routes[:10]:
+                er_path = er.get("path", "")
+                if er_path and er_path not in all_spec_api_str:
+                    missing_critical.append(er_path)
+
+            if len(missing_critical) > 5:
+                warnings.append(f"[SKEPTIC-SOURCE-DECISION-PRESERVATION] Specification dropped {len(missing_critical)} explicit API routes documented in workspace architecture files.")
+                checks.append({
+                    "rule_id": "SKEPTIC-SOURCE-DECISION-PRESERVATION",
+                    "severity": "WARNING",
+                    "message": f"Incorporate documented API routes: {missing_critical[:3]}"
+                })
 
         return passed, warnings, checks

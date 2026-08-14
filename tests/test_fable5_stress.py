@@ -111,3 +111,62 @@ def test_healthcare_emergency_override_tokens(temp_workspace):
     assert "superintendent" in target_roles
     # Ensure no duplicates like 'doctors' and 'doctor'
     assert "doctors" not in target_roles
+
+
+def test_master_architecture_doc_decision_preservation(temp_workspace):
+    """Case 9: Deep architecture document ingestion with §6.17 explicit decision preservation."""
+    docs_dir = os.path.join(temp_workspace, "docs")
+    os.makedirs(docs_dir, exist_ok=True)
+    doc_text = """
+    # Architecture Specification
+    ### 6.17 Amendments
+    - Multi-batch semester lifecycle: PATCH /batches/{id}/advance-semester
+    - Student enrollment history: GET /students/{id}/section-history
+    - Public vs Private profile split: GET /students/{id}/profile/private
+
+    ### Roles & RBAC Matrix
+    | Student | View results and profile |
+    | Faculty | Manage allocations and own publications |
+    | HOD | Department oversight and semester approvals |
+    | Data Entry Operator | Data entry and result imports |
+    | Super Admin | System configuration |
+    """
+    with open(os.path.join(docs_dir, "architecture.md"), "w", encoding="utf-8") as f:
+        f.write(doc_text)
+
+    pkg_json = os.path.join(temp_workspace, "package.json")
+    with open(pkg_json, "w", encoding="utf-8") as f:
+        json.dump({"name": "cse-erp", "dependencies": {"next": "15.0.0", "prisma": "6.0.0"}}, f)
+
+    engine = SpecSynthesisEngine()
+    prompt = "Implement the CSE Department ERP according to docs/architecture.md, supporting multi-batch semester advancement, section enrollments, faculty workload, and alumni spotlight"
+    spec = engine.run_synthesis(prompt, temp_workspace)
+
+    # 1. Verify all explicit roles preserved from RBAC table
+    roles = list(spec.page_spreads.keys())
+    assert "student" in roles
+    assert "faculty" in roles
+    assert "hod" in roles
+    assert any("operator" in r for r in roles)
+
+    # 2. Verify no file-extension entities hallucinated
+    for lld in spec.low_level_designs.values():
+        for ep in lld.get("api_endpoints", []):
+            assert ".md" not in ep
+            assert "architecture" not in ep
+
+    # 3. Verify §6.17 explicit routes preserved in LLDs
+    all_apis = " ".join([ep for lld in spec.low_level_designs.values() for ep in lld.get("api_endpoints", [])])
+    assert "advance-semester" in all_apis or "batches" in all_apis
+    assert "section-history" in all_apis or "profile" in all_apis
+
+    # 4. Practical Skeptic passes with 0 warnings
+    passed, warns, _ = PracticalSkeptic.audit_specification({
+        "low_level_designs": spec.low_level_designs,
+        "page_spreads": spec.page_spreads,
+        "requirements": spec.requirements
+    }, workspace_evidence=engine.discover_project(temp_workspace), archetypes=spec.archetypes)
+
+    assert passed is True
+    assert not any("SOURCE-DECISION-PRESERVATION" in w for w in warns)
+

@@ -570,27 +570,19 @@ class DerivedInferenceEngine:
                     assumption_type=rule.assumption_type
                 ))
 
-        # Rule 8: API Route conflict detection
+        # Rule 8: Documented API Route binding (evidence-supported implementation)
         for existing_route in evidence.api_routes:
             existing_path = existing_route.get("path", "")
             if existing_path:
                 for r in requirements:
-                    if "api" in r.description.lower() and existing_path in r.description:
-                        inferred.append(SynthesizedRequirement(
-                            id=f"REQ-INF-CONFLICT-{existing_path.replace('/', '_')}",
-                            description=f"Potential conflict: new requirement overlaps with existing API route '{existing_path}' ({existing_route.get('method', '?')})",
-                            type=RequirementType.CONFLICT,
-                            category=RequirementCategory.ARCHITECTURAL_CONSTRAINT,
-                            action=ArtifactAction.MODIFY,
-                            decision_threshold=DecisionThreshold.MUST_STOP,
-                            evidence=[EvidenceReference(
-                                source_file=existing_route.get("source", "unknown"),
-                                reference_text=f"Existing route: {existing_route.get('method', '?')} {existing_path}"
-                            )],
-                            why_chain=["New requirement overlaps existing API route", "Conflict must be resolved before design"],
-                            affects=["backend"],
-                            assumption_type="api"
+                    if existing_path in r.description:
+                        r.type = RequirementType.SUPPORTED
+                        r.action = ArtifactAction.EXTEND
+                        r.evidence.append(EvidenceReference(
+                            source_file=existing_route.get("source", "docs/architecture.md"),
+                            reference_text=f"Documented route: {existing_route.get('method', '?')} {existing_path}"
                         ))
+                        r.why_chain.append(f"Bound directly to documented workspace API contract: {existing_path}")
 
         return inferred
 
@@ -899,6 +891,40 @@ class WorkspaceDocumentScanner:
             pass
 
     @classmethod
+    def parse_markdown_deep_contracts(cls, filepath: str, evidence: ProjectEvidence) -> None:
+        try:
+            with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+
+            # 1. Parse explicit REST routes: e.g. "PATCH /batches/{id}/advance-semester" or "GET /students/{id}/section-history"
+            # 1. Parse explicit REST routes anywhere in markdown (bullets, tables, paragraphs)
+            routes = re.findall(r'\b(GET|POST|PUT|PATCH|DELETE)\s+([\/][a-zA-Z0-9_\-\/\{\}:]+)', content)
+            for method, path in routes:
+                if not any(r.get("path") == path and r.get("method") == method for r in evidence.api_routes):
+                    evidence.api_routes.append({"method": method, "path": path, "source": os.path.basename(filepath)})
+
+            # 2. Parse declared roles from RBAC headers/tables
+            for line in content.split('\n'):
+                if line.strip().startswith('|'):
+                    cells = [c.strip() for c in line.split('|') if c.strip()]
+                    if cells:
+                        first_cell = cells[0].lower()
+                        for role_kw in ["student", "faculty", "hod", "operator", "admin", "super_admin", "super admin", "data operator", "data entry operator", "doctor", "nurse", "patient", "manager", "instructor", "tenant", "member"]:
+                            if role_kw == first_cell or first_cell.startswith(role_kw) or role_kw in first_cell:
+                                clean_r = first_cell.strip().replace(' ', '_')
+                                if clean_r not in evidence.auth_permissions:
+                                    evidence.auth_permissions.append(clean_r)
+
+            # 3. Parse declared database models from markdown headers/bullets
+            model_bullets = re.findall(r'[\*\-]\s*\*\*`?([a-zA-Z0-9_]+)`?\*\*\s*[:\(]', content)
+            for m in model_bullets:
+                if len(m) > 2 and not any(e.get("name") == m for e in evidence.db_entities):
+                    evidence.db_entities.append({"name": m, "fields": [], "source": os.path.basename(filepath)})
+
+        except Exception as e:
+            logger.debug(f"[WorkspaceDocumentScanner] Markdown deep contracts error in {filepath}: {e}")
+
+    @classmethod
     def full_document_discovery(cls, workspace_dir: str) -> ProjectEvidence:
         evidence = ProjectEvidence()
 
@@ -906,6 +932,7 @@ class WorkspaceDocumentScanner:
         md_files = cls._find_files(workspace_dir, ('.md', '.markdown'))
         for md in md_files:
             cls.parse_markdown_tables(md, evidence)
+            cls.parse_markdown_deep_contracts(md, evidence)
             cls.parse_sql_blocks(md, evidence)
 
         # 2. Scan SQL files (*.sql)
@@ -2068,7 +2095,7 @@ class SpecSynthesisEngine:
 
         # 4. Compile Specification from Semantic Domain Graph
         feats = intent.all_features if hasattr(intent, 'all_features') else intent.primary_features
-        page_spreads, lld_catalog, assumption_ledger = SpecificationCompiler.compile_specification(domain_graph, feats, archetype_strings)
+        page_spreads, lld_catalog, assumption_ledger = SpecificationCompiler.compile_specification(domain_graph, feats, archetype_strings, evidence)
 
         # 5. Requirement Synthesis
         requirements_list = self.synthesize_requirements(intent, evidence, archetypes, scope_tier)

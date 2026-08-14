@@ -79,9 +79,12 @@ class SemanticDecomposer:
         "writes", "pushes", "pulls", "sends", "receives", "consumes", "produces", "validates",
         "routes", "stores", "exports", "imports", "subcommands", "subcommand", "views", "view",
         "access", "accesses", "assigned", "assign", "based", "subdomain-based",
-        # Generic Software Container Words
+        # Generic Software Container & Documentation Words
         "system", "platform", "app", "application", "tool", "tooling", "portal", "codebase",
         "project", "feature", "features", "module", "modules", "service", "services",
+        "doc", "docs", "documentation", "spec", "specs", "specification", "architecture",
+        "according", "guidelines", "design", "blueprint", "master", "appendix", "section",
+        "chapter", "diagram", "table", "schema", "model", "models",
         # Adjectives & Modifiers (MUST NEVER BECOME ENTITIES)
         "fast", "quick", "slow", "complete", "simple", "easy", "complex", "hard", "full",
         "partial", "automated", "manual", "single", "multi", "great", "good", "new", "old",
@@ -102,6 +105,11 @@ class SemanticDecomposer:
     @classmethod
     def normalize_text(cls, text: str) -> str:
         t = text.lower()
+        # Strip file extensions and paths (e.g. docs/architecture.md -> "")
+        t = re.sub(r'\b[a-zA-Z0-9_\-\/]+\.(?:md|markdown|json|ts|tsx|js|jsx|py|prisma|sql|yaml|yml|toml|html|css)\b', ' ', t)
+        # Strip section numbers (e.g. §6.17.E, section 6.17)
+        t = re.sub(r'§\s*[0-9]+(?:\.[0-9a-zA-Z]+)*', ' ', t)
+        t = re.sub(r'\bsection\s+[0-9]+(?:\.[0-9a-zA-Z]+)*\b', ' ', t)
         t = re.sub(r'[\r\n\t]+', ' ', t)
         t = re.sub(r'[^\w\s\-_,.]', ' ', t)
         return t.strip()
@@ -173,18 +181,26 @@ class SemanticDecomposer:
             if w_clean in cls.HUMAN_ACTOR_KEYWORDS or (w_clean.endswith('s') and w_clean[:-1] in cls.HUMAN_ACTOR_KEYWORDS):
                 continue
 
+            def _matches_marker(word: str, markers: List[str]) -> bool:
+                for m in markers:
+                    if word == m or word == m + 's' or word == m + 'es':
+                        return True
+                    if len(m) >= 5 and word.startswith(m) and len(word) <= len(m) + 3:
+                        return True
+                return False
+
             # 1. Functional primitive markers take precedence over generic stop words
-            if any(m in w_clean for m in cls.MEASUREMENT_MARKERS):
+            if _matches_marker(w_clean, cls.MEASUREMENT_MARKERS):
                 measurements.add(w_clean)
-            elif any(p in w_clean for p in cls.POLICY_MARKERS):
+            elif _matches_marker(w_clean, cls.POLICY_MARKERS):
                 policies.add(w_clean)
-            elif any(e in w_clean for e in cls.EVENT_MARKERS):
+            elif _matches_marker(w_clean, cls.EVENT_MARKERS):
                 events.add(w_clean)
-            elif any(wf in w_clean for wf in cls.WORKFLOW_MARKERS):
+            elif _matches_marker(w_clean, cls.WORKFLOW_MARKERS):
                 workflows.add(w_clean)
-            elif any(d in w_clean for d in cls.DOCUMENT_MARKERS):
+            elif _matches_marker(w_clean, cls.DOCUMENT_MARKERS):
                 documents.add(w_clean)
-            elif any(res in w_clean for res in cls.RESOURCE_MARKERS):
+            elif _matches_marker(w_clean, cls.RESOURCE_MARKERS):
                 resources.add(w_clean)
             else:
                 # 2. General entity candidate: must not be an adjective/verb/stop word

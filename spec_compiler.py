@@ -7,6 +7,7 @@ Operates over the SemanticDomainGraph to:
 3. Compute structured reasoning graphs (why_graph) for every inferred item.
 """
 
+import re
 from typing import Dict, List, Set, Any, Optional, Tuple
 from domain_primitives import (
     DomainPrimitiveType,
@@ -270,15 +271,34 @@ class SpecificationCompiler:
         cls,
         graph: SemanticDomainGraph,
         intent_features: List[str],
-        archetypes: Optional[List[str]] = None
+        archetypes: Optional[List[str]] = None,
+        evidence: Optional[Any] = None
     ) -> Tuple[Dict[str, List[Dict[str, Any]]], Dict[str, Dict[str, Any]], List[Dict[str, Any]]]:
         capabilities, assumptions = GraphInferenceEngine.infer_domain_capabilities(graph)
+
+        # Merge any explicit roles from workspace evidence
+        if evidence and getattr(evidence, "auth_permissions", None):
+            for perm in evidence.auth_permissions:
+                if perm and perm not in ["operator"]:
+                    node_id = f"actor_{perm.lower()}"
+                    if not graph.get_node(node_id):
+                        graph.add_node(DomainNode(
+                            id=node_id,
+                            name=perm.replace('_', ' ').title(),
+                            primitive_type=DomainPrimitiveType.ACTOR,
+                            provenance=ProvenanceType.EXPLICIT,
+                            description=f"Explicit workspace actor: {perm}"
+                        ))
+
         actors = graph.get_nodes_by_type(DomainPrimitiveType.ACTOR)
 
         page_spreads: Dict[str, List[Dict[str, Any]]] = {}
         low_level_designs: Dict[str, Dict[str, Any]] = {}
 
         is_pure_cli = bool(archetypes and "cli_tool" in archetypes and not any(a in ["fullstack", "web_frontend", "mobile_hybrid"] for a in archetypes))
+
+        # Build lookup of explicit routes from workspace evidence
+        explicit_routes = getattr(evidence, "api_routes", []) if evidence else []
 
         for actor in actors:
             actor_key = actor.name.lower().replace(' ', '_')
@@ -337,6 +357,18 @@ class SpecificationCompiler:
                     "description": f"Domain interface for {cap['title']}"
                 })
 
+                # Merge explicit routes matching capability module_key
+                endpoints = list(cap["api_endpoints"])
+                mod_stem = cap['module_key'].replace('entity_', '').replace('wf_', '').replace('doc_', '').replace('resource_', '').lower()
+                for er in explicit_routes:
+                    path = er.get("path", "")
+                    method = er.get("method", "")
+                    path_tokens = [t.lower() for t in re.split(r'[/_\-]', path) if t and not t.startswith('{') and not t.startswith(':')]
+                    if mod_stem in path_tokens or any(t.startswith(mod_stem) or mod_stem.startswith(t) for t in path_tokens if len(t) >= 4):
+                        ep_str = f"{method} {path}"
+                        if ep_str not in endpoints:
+                            endpoints.append(ep_str)
+
                 # Register in LLD Catalog
                 lld_key = f"{actor_key}:{route_path}"
                 low_level_designs[lld_key] = {
@@ -346,7 +378,7 @@ class SpecificationCompiler:
                     "layout": cap["layout"],
                     "sub_components": cap["sub_components"],
                     "tabs": cap["tabs"],
-                    "api_endpoints": cap["api_endpoints"],
+                    "api_endpoints": endpoints,
                     "validation_rules": cap["validation_rules"],
                     "reasoning_graph": cap.get("reasoning_graph", [])
                 }
@@ -368,12 +400,7 @@ class SpecificationCompiler:
                     {
                         "name": "Personal Details",
                         "fields": ["fullName (string)", "emailAddress (email)", "contactPhone (tel)", "roleDesignation (string, read-only)"],
-                        "actions": ["Update Profile Info", "Upload Avatar Image"]
-                    },
-                    {
-                        "name": "Security Credentials",
-                        "fields": ["currentPassword (password)", "newPassword (password)", "twoFactorAuth (boolean)"],
-                        "actions": ["Change Password", "Revoke Active Sessions"]
+                        "actions": ["Update Profile", "Change Password", "Terminate Active Sessions"]
                     }
                 ],
                 "api_endpoints": [
@@ -382,12 +409,52 @@ class SpecificationCompiler:
                     "PUT /api/auth/password"
                 ],
                 "validation_rules": [
-                    "Password must meet complexity requirements"
+                    "Email must be verified before self-update",
+                    "Password update requires current password verification"
                 ],
-                "reasoning_graph": [{"from": actor.id, "relation": "requires", "to": "Identity & Security"}]
+                "reasoning_graph": [{"from": actor.id, "relation": "owns", "to": "Personal Profile & Security"}]
             }
 
             page_spreads[actor_key] = pages
+
+        # 4. Guarantee preservation of all explicit documented route groups from workspace
+        if not is_pure_cli and explicit_routes and actors:
+            for er in explicit_routes:
+                path = er.get("path", "")
+                method = er.get("method", "")
+                tokens = [t.lower() for t in re.split(r'[/_\-]', path) if t and not t.startswith('{') and not t.startswith(':')]
+                if tokens:
+                    primary_entity = tokens[0]
+                    if primary_entity not in ["api", "v1", "v2", "public", "account", "auth"]:
+                        route_path = f"/{primary_entity}"
+                        for actor in actors:
+                            actor_key = actor.name.lower().replace(' ', '_')
+                            lld_key = f"{actor_key}:{route_path}"
+                            if lld_key not in low_level_designs:
+                                title = f"{primary_entity.replace('_', ' ').title()} Domain Workspace"
+                                low_level_designs[lld_key] = {
+                                    "role": actor_key,
+                                    "page_name": title,
+                                    "route": route_path,
+                                    "layout": "master_detail_grid",
+                                    "sub_components": [f"{primary_entity.title()}DataGrid", f"{primary_entity.title()}Inspector"],
+                                    "tabs": [{"name": "Overview", "fields": ["id (string)"], "actions": ["Manage"]}],
+                                    "api_endpoints": [f"{method} {path}"],
+                                    "validation_rules": [f"Validate {primary_entity} authorization contracts"],
+                                    "reasoning_graph": [{"from": actor.id, "relation": "manages", "to": primary_entity}]
+                                }
+                                pages = page_spreads.get(actor_key, [])
+                                if not any(p.get("route") == route_path for p in pages):
+                                    pages.append({
+                                        "route": route_path,
+                                        "page_name": title,
+                                        "module_key": primary_entity,
+                                        "description": f"Domain interface for {primary_entity}"
+                                    })
+                            else:
+                                ep_str = f"{method} {path}"
+                                if ep_str not in low_level_designs[lld_key]["api_endpoints"]:
+                                    low_level_designs[lld_key]["api_endpoints"].append(ep_str)
 
         return page_spreads, low_level_designs, [a.to_dict() for a in assumptions]
 
