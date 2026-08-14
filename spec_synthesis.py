@@ -1032,7 +1032,15 @@ class DynamicLinguisticExtractor:
             for match in re.findall(pat, raw_request, re.IGNORECASE):
                 role = match.lower().strip()
                 if len(role) > 2 and role not in cls.COMMON_ENGLISH_STOPWORDS:
-                    target_roles.add(role)
+                    norm_role = role
+                    if role.endswith('ies') and len(role) > 4:
+                        norm_role = role[:-3] + 'y'
+                    elif role.endswith('es') and len(role) > 4 and role[:-2].endswith(('s', 'x', 'z', 'ch', 'sh')):
+                        norm_role = role[:-2]
+                    elif role.endswith('s') and len(role) > 3 and not role.endswith('ss'):
+                        norm_role = role[:-1]
+                    if norm_role not in cls.COMMON_ENGLISH_STOPWORDS:
+                        target_roles.add(norm_role)
 
         if workspace_vocab and "roles" in workspace_vocab:
             for w_role in workspace_vocab["roles"]:
@@ -1206,20 +1214,35 @@ class StructuredPromptParser:
                 if matched_clause:
                     break
 
-        # Extract explicit role enumeration clauses: e.g. "for customers, sellers, and admins", "roles: HR, employee, finance, manager"
+        NON_ROLE_STOP_WORDS = {
+            'system', 'app', 'application', 'platform', 'management', 'portal', 'interface',
+            'module', 'page', 'view', 'screen', 'console', 'hub', 'dashboard', 'feature',
+            'service', 'tool', 'workflow', 'process', 'solution', 'software', 'database',
+            'table', 'field', 'data', 'record', 'entry', 'list', 'item', 'details', 'info',
+            'information', 'type', 'status', 'action', 'role', 'roles', 'user', 'users',
+            'actor', 'actors', 'with', 'for', 'and', 'including', 'featuring', 'such', 'like'
+        }
+
+        # Generic linguistic role extraction from list clauses ("for X, Y, Z", "roles: X, Y, Z")
         role_enum_matches = re.findall(
-            r'\b(?:roles?|for|actors?|users?)\s*[:=]?\s*([a-zA-Z0-9_\-\s,&\/]+?)(?:\.|\n|;|\bwith\b|\bincluding\b|$)',
+            r'\b(?:roles?|for|actors?|users?)\s*[:=]?\s*([a-zA-Z0-9_\-\s,&\/]+?)(?:\.|\n|;|\bwith\b|\bincluding\b|\bwhere\b|\bcan\b|\bmust\b|\bshould\b|\bwill\b|\bto\b|\bonly\b|\bthat\b|$)',
             normalized_request,
             re.IGNORECASE
         )
         for enum_chunk in role_enum_matches:
-            items = re.split(r',|\band\b|\b&\b|\bor\b', enum_chunk)
+            items = re.split(r',|\band\b|\b&\b|\bor\b|\bwhere\b|\bcan\b|\bmust\b|\bshould\b|\bwill\b|\bto\b|\bonly\b|\bthat\b', enum_chunk, flags=re.IGNORECASE)
             for item in items:
-                clean_item = cls._clean_token(item)
-                if clean_item and len(clean_item) >= 2 and clean_item not in cls.QUALIFIER_WORDS:
-                    if clean_item in SemanticDecomposer.HUMAN_ACTOR_KEYWORDS or (clean_item.endswith('s') and clean_item[:-1] in SemanticDecomposer.HUMAN_ACTOR_KEYWORDS) or any(clean_item.endswith(sfx) for sfx in ['or', 'er', 'ant', 'ent', 'ist', 'ian', 'ee', 'man', 'staff', 'team', 'hr', 'finance']):
-                        norm_r = clean_item[:-1] if clean_item.endswith('s') and clean_item[:-1] in SemanticDecomposer.HUMAN_ACTOR_KEYWORDS else clean_item
-                        seen_roles.add(norm_r)
+                sub_words = item.strip().split()
+                for sub in sub_words:
+                    clean_item = cls._clean_token(sub)
+                    if clean_item and len(clean_item) >= 2 and clean_item not in cls.QUALIFIER_WORDS and clean_item not in NON_ROLE_STOP_WORDS:
+                        norm_r = clean_item
+                        if clean_item.endswith('ies') and len(clean_item) > 4:
+                            norm_r = clean_item[:-3] + 'y'
+                        elif clean_item.endswith('s') and len(clean_item) > 3 and not clean_item.endswith('ss'):
+                            norm_r = clean_item[:-1]
+                        if norm_r not in NON_ROLE_STOP_WORDS and norm_r not in cls.QUALIFIER_WORDS:
+                            seen_roles.add(norm_r)
 
         fallback_intent = DynamicLinguisticExtractor.extract_intent(normalized_request, workspace_vocab)
 
@@ -2112,7 +2135,7 @@ class SpecSynthesisEngine:
 
         # 4. Compile Specification from Semantic Domain Graph
         feats = intent.all_features if hasattr(intent, 'all_features') else intent.primary_features
-        page_spreads, lld_catalog, assumption_ledger = SpecificationCompiler.compile_specification(domain_graph, feats, archetype_strings, evidence)
+        page_spreads, lld_catalog, assumption_ledger = SpecificationCompiler.compile_specification(domain_graph, feats, archetype_strings, evidence, intent=intent)
 
         # 5. Requirement Synthesis
         requirements_list = self.synthesize_requirements(intent, evidence, archetypes, scope_tier)

@@ -173,9 +173,13 @@ class SemanticDecomposer:
         # Extract Actors: Explicit human actor keywords anywhere in text
         for w in words:
             w_clean = re.sub(r'^[^\w]+|[^\w]+$', '', w)
-            w_norm = w_clean[:-1] if (w_clean.endswith('s') and w_clean[:-1] in cls.HUMAN_ACTOR_KEYWORDS) else w_clean
-            if w_clean.endswith('es') and w_clean[:-2] in cls.HUMAN_ACTOR_KEYWORDS:
+            w_norm = w_clean
+            if w_clean.endswith('ies') and len(w_clean) > 4:
+                w_norm = w_clean[:-3] + 'y'
+            elif w_clean.endswith('es') and len(w_clean) > 4 and w_clean[:-2].endswith(('s', 'x', 'z', 'ch', 'sh')):
                 w_norm = w_clean[:-2]
+            elif w_clean.endswith('s') and len(w_clean) > 3 and not w_clean.endswith('ss'):
+                w_norm = w_clean[:-1]
             if w_clean in cls.HUMAN_ACTOR_KEYWORDS or w_norm in cls.HUMAN_ACTOR_KEYWORDS:
                 # Exclude software client (e.g. "query client", "api client", "arxiv client")
                 if w_norm in ["client", "clients"] and any(sw in norm_text for sw in ["query client", "http client", "api client", "rpc client", "arxiv query", "client library"]):

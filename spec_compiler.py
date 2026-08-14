@@ -294,9 +294,24 @@ class SpecificationCompiler:
         graph: SemanticDomainGraph,
         intent_features: List[str],
         archetypes: Optional[List[str]] = None,
-        evidence: Optional[Any] = None
+        evidence: Optional[Any] = None,
+        intent: Optional[Any] = None
     ) -> Tuple[Dict[str, List[Dict[str, Any]]], Dict[str, Dict[str, Any]], List[Dict[str, Any]]]:
         capabilities, assumptions = GraphInferenceEngine.infer_domain_capabilities(graph)
+
+        # Merge target roles from intent extraction into domain graph actors
+        if intent and getattr(intent, "target_roles", None):
+            for role_name in intent.target_roles:
+                if role_name and role_name not in ["operator"]:
+                    node_id = f"actor_{role_name.lower().replace(' ', '_')}"
+                    if not graph.get_node(node_id):
+                        graph.add_node(DomainNode(
+                            id=node_id,
+                            name=role_name.replace('_', ' ').title(),
+                            primitive_type=DomainPrimitiveType.ACTOR,
+                            provenance=ProvenanceType.EXPLICIT,
+                            description=f"Extracted target role: {role_name}"
+                        ))
 
         # Merge any explicit roles from workspace evidence
         if evidence and getattr(evidence, "auth_permissions", None):

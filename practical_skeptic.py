@@ -269,18 +269,40 @@ class PracticalSkeptic:
         intent_summary = spec_dict.get("intent_summary", "").lower()
         if intent_summary and page_spreads:
             active_spread_roles = {r.lower() for r in page_spreads.keys()}
-            prompt_words = re.findall(r'\b[a-zA-Z]{2,}\b', intent_summary)
-            for w in prompt_words:
-                w_lower = w.lower()
-                w_norm = w_lower[:-1] if w_lower.endswith('s') and len(w_lower) > 3 else w_lower
-                if w_norm in ["seller", "trainer", "supervisor", "warden", "maintenance", "employee", "finance", "hr", "agent", "librarian"]:
-                    if not any(w_norm in r or r in w_norm for r in active_spread_roles):
-                        warnings.append(f"[SKEPTIC-ACTOR-COMPLETENESS] Named human role '{w}' in prompt was omitted from synthesized sitemap.")
-                        checks.append({
-                            "rule_id": "SKEPTIC-ACTOR-COMPLETENESS",
-                            "severity": "BLOCKING",
-                            "message": f"Synthesize dedicated workspace page spread for named role '{w}'."
-                        })
-                        passed = False
+            non_role_stops = {
+                'system', 'app', 'application', 'platform', 'management', 'portal', 'interface',
+                'module', 'page', 'view', 'screen', 'console', 'hub', 'dashboard', 'feature',
+                'service', 'tool', 'workflow', 'process', 'solution', 'software', 'database',
+                'table', 'field', 'data', 'record', 'entry', 'list', 'item', 'details', 'info',
+                'information', 'type', 'status', 'action', 'role', 'roles', 'user', 'users',
+                'actor', 'actors', 'with', 'for', 'and', 'including', 'featuring', 'such', 'like', 'real'
+            }
+            candidate_roles = set()
+            role_enum_matches = re.findall(
+                r'\b(?:roles?|for|actors?|users?)\s*[:=]?\s*([a-zA-Z0-9_\-\s,&\/]+?)(?:\.|\n|;|\bwith\b|\bincluding\b|$)',
+                intent_summary,
+                re.IGNORECASE
+            )
+            for enum_chunk in role_enum_matches:
+                items = re.split(r',|\band\b|\b&\b|\bor\b', enum_chunk)
+                for item in items:
+                    clean_item = item.strip().lower()
+                    clean_item = re.sub(r'^[^\w]+|[^\w]+$', '', clean_item)
+                    if clean_item and len(clean_item) >= 2 and clean_item not in non_role_stops:
+                        norm_r = clean_item[:-1] if (clean_item.endswith('s') and len(clean_item) > 3 and not clean_item.endswith('ss')) else clean_item
+                        if clean_item.endswith('es') and len(clean_item) > 4:
+                            norm_r = clean_item[:-2]
+                        if norm_r not in non_role_stops:
+                            candidate_roles.add(norm_r)
+
+            for w_norm in candidate_roles:
+                if not any(w_norm in r or r in w_norm for r in active_spread_roles):
+                    warnings.append(f"[SKEPTIC-ACTOR-COMPLETENESS] Named human role '{w_norm}' in prompt was omitted from synthesized sitemap.")
+                    checks.append({
+                        "rule_id": "SKEPTIC-ACTOR-COMPLETENESS",
+                        "severity": "BLOCKING",
+                        "message": f"Synthesize dedicated workspace page spread for named role '{w_norm}'."
+                    })
+                    passed = False
 
         return passed, warnings, checks
