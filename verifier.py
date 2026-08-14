@@ -477,6 +477,21 @@ class EvidenceVerifier:
         artifacts: List[EvidenceArtifact] = []
         errors: List[str] = []
 
+        # Production Execution Mode Synthetic Receipt Isolation Guard
+        exec_mode = os.getenv("SCLASS_EXECUTION_MODE", "TEST")
+        if exec_mode == "PRODUCTION":
+            for fn in ["design_blueprint.json", "role_interaction_matrix.json", "grill_report.json", "synthesized_spec.json"]:
+                fp = os.path.join(state_dir, fn)
+                if os.path.exists(fp):
+                    try:
+                        with open(fp, "r", encoding="utf-8") as rf:
+                            r_data = json.load(rf)
+                        prov = r_data.get("provenance_metadata", {}) if isinstance(r_data, dict) else {}
+                        if prov.get("synthetic") or prov.get("mode") == "SIMULATION":
+                            errors.append(f"PRODUCTION EXECUTION GATE FAILURE: Synthetic simulation receipt '{fn}' detected in PRODUCTION execution mode.")
+                    except Exception:
+                        pass
+
         if current_phase == "TRIAGE":
             has_config = os.path.exists(config_file)
             has_state = os.path.exists(state_file)

@@ -2130,20 +2130,33 @@ class SpecSynthesisEngine:
         scope_tier = ScopeClassifier.classify(raw_request, intent)
         archetype_strings = [a.value for a in archetypes]
 
+        # Incorporate Clarification Answers Upfront
+        if not clarification_answers and os.path.exists(os.path.join(agents_dir, "clarification_answers.json")):
+            clarification_answers = load_json(os.path.join(agents_dir, "clarification_answers.json"))
+
+        effective_request = raw_request
+        if clarification_answers and isinstance(clarification_answers, dict):
+            clarified_str = " ".join(str(v) for v in clarification_answers.values())
+            effective_request = f"{raw_request} [CLARIFICATIONS: {clarified_str}]"
+
         # 3. Construct Semantic Domain Graph
-        domain_graph = SemanticDecomposer.decompose_intent(raw_request, evidence)
+        domain_graph = SemanticDecomposer.decompose_intent(effective_request, evidence)
 
-        # 4. Compile Specification & V7 Refinement Compiler Pipeline as Authoritative Path
+        # 4. Authoritative Refinement Compiler Pipeline Execution (Single Source of Truth)
         feats = intent.all_features if hasattr(intent, 'all_features') else intent.primary_features
-        page_spreads, lld_catalog, assumption_ledger = SpecificationCompiler.compile_specification(domain_graph, feats, archetype_strings, evidence, intent=intent)
-
-        # Authoritative V7 Refinement Pipeline Execution
         v7_pipeline = SpecificationCompiler.compile_v7_refinement_pipeline(
             graph=domain_graph,
             intent_features=feats,
-            raw_request=raw_request,
-            archetypes=archetype_strings
+            raw_request=effective_request,
+            archetypes=archetype_strings,
+            workspace_dir=workspace_dir
         )
+
+        # Non-authoritative candidate inference fallback
+        try:
+            page_spreads, lld_catalog, assumption_ledger = SpecificationCompiler.compile_specification(domain_graph, feats, archetype_strings, evidence, intent=intent)
+        except Exception as e_leg:
+            logger.info(f"[SpecSynthesis] Candidate inference fallback note: {e_leg}")
 
         # 5. Requirement Synthesis
         requirements_list = self.synthesize_requirements(intent, evidence, archetypes, scope_tier)

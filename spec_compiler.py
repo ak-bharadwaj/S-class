@@ -535,11 +535,12 @@ class SpecificationCompiler:
         graph: SemanticDomainGraph,
         intent_features: List[str],
         raw_request: str = "",
-        archetypes: Optional[List[str]] = None
+        archetypes: Optional[List[str]] = None,
+        workspace_dir: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Full V7 Refinement Compiler Pipeline:
-        Grounded BehaviorGraph -> RequirementGraph (IR) -> HLDDesign (with ADRs & Gate Validation) -> LLDComponents -> TaskRecords.
+        V7/V9 Authoritative Architecture Refinement Pipeline:
+        Semantic Domain -> Behavior Graph -> Requirement IR -> HLD + ADRs -> V9 Debate -> Artifact Governance -> LLD -> Tasks
         """
         from behavior_graph import BehaviorGraphEngine
         from requirement_ir import RequirementGraph
@@ -562,11 +563,11 @@ class SpecificationCompiler:
 
         # 4b. V9 Architecture Debate & Decision Intelligence Engine Audit
         from architecture_debate import ArchitectureDebateEngine
-        debate_result = ArchitectureDebateEngine.run_debate_cycle(hld, r_graph, b_graph, raw_request=raw_request)
+        debate_result = ArchitectureDebateEngine.run_debate_cycle(hld, r_graph, b_graph, raw_request=raw_request, workspace_dir=workspace_dir)
 
         # 4c. Artifact Governor HLD Control Plane Audit (Hard Execution Gate)
         from artifact_governor import ArtifactGovernor
-        hld_gov = ArtifactGovernor.audit_hld_governance(hld, passed_hld, hld_errors)
+        hld_gov = ArtifactGovernor.audit_hld_governance(hld, passed_hld, hld_errors, workspace_dir=workspace_dir)
 
         if hld_gov.is_blocked:
             # HARD EXECUTION GATE: Stop compilation immediately! Do NOT invent LLD or tasks on blocked/invalid HLD!

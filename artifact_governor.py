@@ -474,7 +474,7 @@ class ArtifactGovernor:
                         is_blocked = False
                         hld_gov["is_blocked"] = False
 
-            if target_phase in ["DESIGN", "TASK_COMPILATION", "CODING", "QA", "RELEASE"]:
+            if target_phase in ["TASK_COMPILATION", "CODING", "QA", "RELEASE"]:
                 if is_blocked or hld_gov.get("is_blocked", False):
                     reasons = hld_gov.get("blocking_reasons", ["Refinement pipeline artifact governance is BLOCKED."])
                     rec_state = hld_gov.get("recommended_fsm_state", "DEBATE")

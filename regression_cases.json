@@ -426,5 +426,20 @@
     ],
     "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
     "resolved": true
+  },
+  {
+    "id": "FAIL-PROSE-029",
+    "project": "FSM Debate Overwrite & Dual Specification Compiler Authority Drift",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-14T23:18:00Z",
+    "summary": "FSM goal sequence runner rerun ArchitectureDebateEngine with empty requirement/behavior graphs and overwrote blocked=False, while SpecSynthesisEngine ran legacy specification compiler alongside V7/V9 pipeline.",
+    "root_cause": "fsm_debate_overwrite_and_dual_specification_compiler_authority_drift",
+    "missing_contracts": [
+      "single_source_of_truth_v7_refinement_pipeline",
+      "immutable_governed_artifact_consumption_in_fsm",
+      "production_simulation_evidence_isolation"
+    ],
+    "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
+    "resolved": true
   }
 ]
