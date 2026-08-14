@@ -95,11 +95,12 @@ class SemanticDecomposer:
         "over", "under", "when", "where", "then", "their", "your", "each", "both", "all",
         "college", "school", "university", "department", "company", "enterprise", "organization",
         "whose", "which", "within", "without", "about",
-        # Generic Schema Terms
+        # Generic Schema Terms & Abstract Action Nominalizations
         "rate", "rates", "policies", "policy", "queues", "queue", "measurements",
         "measurement", "readings", "reading", "metrics", "metric", "alarms", "alarm",
         "events", "event", "items", "item", "assurance", "management", "quality",
-        "observability"
+        "observability", "advancement", "advancements", "spotlight", "spotlights",
+        "workload", "workloads", "enrollment", "enrollments", "advancing"
     }
 
     @classmethod

@@ -45,7 +45,8 @@ class PracticalSkeptic:
         "SKEPTIC-ROLE-ROUTE-GUARD",
         "SKEPTIC-ROLE-EXTRACTION-SANITY",
         "SKEPTIC-NON-ENTITY-API",
-        "SKEPTIC-SOURCE-DECISION-PRESERVATION"
+        "SKEPTIC-SOURCE-DECISION-PRESERVATION",
+        "SKEPTIC-PROSE-CRUD-DUPLICATION"
     }
 
     @classmethod
@@ -205,5 +206,39 @@ class PracticalSkeptic:
                     "severity": "WARNING",
                     "message": f"Incorporate documented API routes: {missing_critical[:3]}"
                 })
+
+        # 9. SKEPTIC-PROSE-CRUD-DUPLICATION (Detects generic CRUD duplication & broken irregular plurals)
+        invalid_plurals = ["alumnis", "datas", "staffs", "equipments", "telemetrys", "categorys", "facultys"]
+        for lld_key, lld in low_level_designs.items():
+            apis = lld.get("api_endpoints", [])
+            for ep in apis:
+                url_path = ep.split()[1] if len(ep.split()) > 1 else ep
+                for inv_p in invalid_plurals:
+                    if f"/{inv_p}" in url_path.lower():
+                        warnings.append(f"[SKEPTIC-PROSE-CRUD-DUPLICATION] API endpoint '{ep}' contains invalid irregular pluralization '{inv_p}'.")
+                        checks.append({
+                            "rule_id": "SKEPTIC-PROSE-CRUD-DUPLICATION",
+                            "severity": "BLOCKING",
+                            "message": f"Fix pluralization for '{inv_p}' in endpoint '{ep}'."
+                        })
+                        passed = False
+
+        all_apis_flat = [ep.split()[1] if len(ep.split()) > 1 else ep for lld in low_level_designs.values() for ep in lld.get("api_endpoints", [])]
+        for ep in all_apis_flat:
+            if ep.startswith("/api/"):
+                entity_name = ep.replace("/api/", "").split("/")[0]
+                if entity_name and len(entity_name) > 3 and not entity_name.startswith("{") and entity_name not in ["auth", "account", "user", "users"]:
+                    # Check if explicit non-/api/ route exists for same concept (e.g. /api/advancements vs /batches/{id}/advance-semester)
+                    has_explicit_override = any(
+                        not other.startswith("/api/") and entity_name.rstrip('s') in other
+                        for other in all_apis_flat
+                    )
+                    if has_explicit_override:
+                        warnings.append(f"[SKEPTIC-PROSE-CRUD-DUPLICATION] Generic CRUD route '{ep}' duplicates explicit documented domain route.")
+                        checks.append({
+                            "rule_id": "SKEPTIC-PROSE-CRUD-DUPLICATION",
+                            "severity": "WARNING",
+                            "message": f"Suppress generic fallback endpoint '{ep}' in favor of documented explicit route."
+                        })
 
         return passed, warnings, checks

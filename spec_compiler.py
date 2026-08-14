@@ -19,8 +19,30 @@ from domain_primitives import (
     AssumptionRecord
 )
 
+UNCOUNTABLE_OR_PLURAL = {
+    "alumni": "alumni",
+    "alumnus": "alumni",
+    "data": "data",
+    "equipment": "equipment",
+    "staff": "staff",
+    "telemetry": "telemetry",
+    "metadata": "metadata",
+    "media": "media",
+    "criteria": "criteria",
+    "info": "info",
+    "information": "information",
+    "content": "content",
+    "feedback": "feedback",
+    "research": "research",
+    "person": "people"
+}
+
 def _plural(name: str) -> str:
     cleaned = name.strip().lower()
+    if cleaned in UNCOUNTABLE_OR_PLURAL:
+        return UNCOUNTABLE_OR_PLURAL[cleaned]
+    if cleaned.endswith('y') and len(cleaned) > 2 and cleaned[-2] not in 'aeiou':
+        return f"{cleaned[:-1]}ies"
     if cleaned.endswith('s') or cleaned.endswith('x') or cleaned.endswith('z') or cleaned.endswith('ch') or cleaned.endswith('sh'):
         if cleaned.endswith('s'):
             return cleaned
@@ -357,8 +379,8 @@ class SpecificationCompiler:
                     "description": f"Domain interface for {cap['title']}"
                 })
 
-                # Merge explicit routes matching capability module_key
-                endpoints = list(cap["api_endpoints"])
+                # Match explicit routes matching capability module_key
+                explicit_matching = []
                 mod_stem = cap['module_key'].replace('entity_', '').replace('wf_', '').replace('doc_', '').replace('resource_', '').lower()
                 for er in explicit_routes:
                     path = er.get("path", "")
@@ -366,8 +388,13 @@ class SpecificationCompiler:
                     path_tokens = [t.lower() for t in re.split(r'[/_\-]', path) if t and not t.startswith('{') and not t.startswith(':')]
                     if mod_stem in path_tokens or any(t.startswith(mod_stem) or mod_stem.startswith(t) for t in path_tokens if len(t) >= 4):
                         ep_str = f"{method} {path}"
-                        if ep_str not in endpoints:
-                            endpoints.append(ep_str)
+                        if ep_str not in explicit_matching:
+                            explicit_matching.append(ep_str)
+
+                if explicit_matching:
+                    endpoints = explicit_matching
+                else:
+                    endpoints = list(cap["api_endpoints"])
 
                 # Register in LLD Catalog
                 lld_key = f"{actor_key}:{route_path}"

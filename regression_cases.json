@@ -115,5 +115,20 @@
     ],
     "skeptic_rule_id": "SKEPTIC-SOURCE-DECISION-PRESERVATION",
     "resolved": true
+  },
+  {
+    "id": "FAIL-DOC-009",
+    "project": "CSE Department ERP Master Architecture Ingestion",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-14T14:35:00Z",
+    "summary": "Spec synthesis generated generic CRUD fallback endpoints (/api/advancements, /api/alumnis, /api/workloads) from prose concepts alongside explicit documented routes and produced broken pluralization (/api/alumnis)",
+    "root_cause": "prose_concept_crud_synthesis_and_naive_pluralization",
+    "missing_contracts": [
+      "suppress_generic_crud_when_explicit_routes_exist",
+      "irregular_pluralization_dictionary",
+      "prose_action_noun_filter"
+    ],
+    "skeptic_rule_id": "SKEPTIC-PROSE-CRUD-DUPLICATION",
+    "resolved": true
   }
 ]

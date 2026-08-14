@@ -69,7 +69,9 @@ def test_context_compression_engine():
     assert tri_memory.compression_ratio < 1.0
 
 
-def test_resource_aware_scheduler():
+def test_resource_aware_scheduler(monkeypatch):
+    monkeypatch.setattr(ResourceAwareScheduler, "_measure_cpu_utilization", staticmethod(lambda: 10.0))
+    monkeypatch.setattr(ResourceAwareScheduler, "_measure_ram_utilization", staticmethod(lambda: 20.0))
     scheduler = ResourceAwareScheduler()
     assert scheduler.can_dispatch_builder(2) is True
     assert scheduler.can_dispatch_builder(4) is False
