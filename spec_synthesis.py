@@ -2266,10 +2266,19 @@ class SpecSynthesisEngine:
         try:
             write_json_atomic(json_path, spec.__dict__)
             write_json_atomic(os.path.join(agents_dir, "v7_refinement_pipeline.json"), {
+                "behavior_graph": v7_pipeline["behavior_graph"].to_dict(),
+                "requirement_graph": v7_pipeline["requirement_graph"].to_dict(),
+                "dependency_holes": v7_pipeline["dependency_holes"],
                 "hld_design": v7_pipeline["hld_design"].to_dict(),
                 "hld_validation": v7_pipeline["hld_validation"],
+                "hld_governance": v7_pipeline.get("hld_governance", {}),
+                "debate_result": v7_pipeline.get("debate_result", {}),
                 "lld_components": [c.to_dict() for c in v7_pipeline["lld_components"]],
-                "tasks": [t.to_dict() for t in v7_pipeline["tasks"]]
+                "lld_governance": v7_pipeline.get("lld_governance", {}),
+                "tasks": [t.to_dict() for t in v7_pipeline["tasks"]],
+                "task_governance": v7_pipeline.get("task_governance", {}),
+                "blocked": v7_pipeline.get("blocked", False),
+                "target_fsm_state": v7_pipeline.get("target_fsm_state", "CODING")
             })
 
             from intent_contract import IntentContract

@@ -252,5 +252,20 @@
     ],
     "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
     "resolved": true
+  },
+  {
+    "id": "FAIL-PROSE-018",
+    "project": "Un-gated Downstream Compilation & Conflated Artifact Triad Status Audit",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-14T21:59:00Z",
+    "summary": "Compiler compiled LLD components and tasks despite HLD validation errors or PROPOSED/PENDING ADRs, and conflated EpistemicStatus, ValidationStatus, and ApprovalStatus into single string properties.",
+    "root_cause": "ungated_downstream_compilation_and_conflated_triad_status_model",
+    "missing_contracts": [
+      "triad_status_model_separation",
+      "artifact_governor_hard_execution_gates",
+      "complete_upstream_lineage_graph_persistence"
+    ],
+    "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
+    "resolved": true
   }
 ]

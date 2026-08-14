@@ -18,6 +18,22 @@ from behavior_graph import BehaviorGraph, BehaviorNodeType, BehaviorRelationType
 from requirement_ir import RequirementGraph, RequirementNode, RequirementKind, NFRCategory
 
 
+class ValidationStatus(str, Enum):
+    """Artifact validation status."""
+    UNVALIDATED = "UNVALIDATED"
+    VALID = "VALID"
+    INVALID = "INVALID"
+    BLOCKED = "BLOCKED"
+
+
+class ApprovalStatus(str, Enum):
+    """Artifact governance approval status."""
+    NOT_REQUIRED = "NOT_REQUIRED"
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
 @dataclass
 class ADRRecord:
     """Architecture Decision Record (ADR) capturing technical choices, alternatives, and rationale."""
@@ -29,8 +45,11 @@ class ADRRecord:
     affected_modules: List[str]
     rejected_options: List[str]
     reason: str
-    status: str = "ACCEPTED"  # ACCEPTED or PROPOSED
+    status: str = "ACCEPTED"  # ACCEPTED, PROPOSED, REJECTED
     confidence: float = 1.0
+    epistemic_status: EpistemicStatus = EpistemicStatus.DERIVED
+    validation_status: ValidationStatus = ValidationStatus.UNVALIDATED
+    approval_status: ApprovalStatus = ApprovalStatus.NOT_REQUIRED
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -43,7 +62,10 @@ class ADRRecord:
             "rejected_options": self.rejected_options,
             "reason": self.reason,
             "status": self.status,
-            "confidence": self.confidence
+            "confidence": self.confidence,
+            "epistemic_status": self.epistemic_status.value if isinstance(self.epistemic_status, EpistemicStatus) else str(self.epistemic_status),
+            "validation_status": self.validation_status.value if isinstance(self.validation_status, ValidationStatus) else str(self.validation_status),
+            "approval_status": self.approval_status.value if isinstance(self.approval_status, ApprovalStatus) else str(self.approval_status)
         }
 
     @classmethod
@@ -58,7 +80,10 @@ class ADRRecord:
             rejected_options=data.get("rejected_options", []),
             reason=data.get("reason", ""),
             status=data.get("status", "ACCEPTED"),
-            confidence=data.get("confidence", 1.0)
+            confidence=data.get("confidence", 1.0),
+            epistemic_status=EpistemicStatus(data.get("epistemic_status", "derived")),
+            validation_status=ValidationStatus(data.get("validation_status", "UNVALIDATED")),
+            approval_status=ApprovalStatus(data.get("approval_status", "NOT_REQUIRED"))
         )
 
 
@@ -139,7 +164,10 @@ class ADRReasoningEngine:
                 rejected_options=["Modular Monolith"],
                 reason="System scale or explicit workspace evidence requires independent service deployment and event-driven decoupling.",
                 status="ACCEPTED",
-                confidence=0.95
+                confidence=0.95,
+                epistemic_status=EpistemicStatus.DERIVED,
+                validation_status=ValidationStatus.VALID,
+                approval_status=ApprovalStatus.NOT_REQUIRED
             )
         else:
             # Emits Modular Monolith as PROPOSED candidate if evidence is ambiguous
@@ -153,7 +181,10 @@ class ADRReasoningEngine:
                 rejected_options=[],
                 reason="Plausible default topology for transactional consistency; marked PROPOSED for human/DEBATE confirmation.",
                 status="PROPOSED",
-                confidence=0.50
+                confidence=0.50,
+                epistemic_status=EpistemicStatus.PROPOSED,
+                validation_status=ValidationStatus.BLOCKED,
+                approval_status=ApprovalStatus.PENDING
             )
 
 

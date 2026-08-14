@@ -564,11 +564,52 @@ class SpecificationCompiler:
         from architecture_debate import ArchitectureDebateEngine
         debate_result = ArchitectureDebateEngine.debate_hld_adrs(hld, r_graph, b_graph, raw_request=raw_request)
 
+        # 4c. Artifact Governor HLD Control Plane Audit (Hard Execution Gate)
+        from artifact_governor import ArtifactGovernor
+        hld_gov = ArtifactGovernor.audit_hld_governance(hld, passed_hld, hld_errors)
+
+        if hld_gov.is_blocked:
+            # HARD EXECUTION GATE: Stop compilation immediately! Do NOT invent LLD or tasks on blocked/invalid HLD!
+            return {
+                "behavior_graph": b_graph,
+                "requirement_graph": r_graph,
+                "dependency_holes": dep_holes,
+                "hld_design": hld,
+                "hld_validation": {"passed": passed_hld, "errors": hld_errors},
+                "debate_result": debate_result.to_dict(),
+                "hld_governance": hld_gov.to_dict(),
+                "lld_components": [],
+                "lld_governance": {"is_blocked": True, "blocking_reasons": ["HLD compilation blocked by Artifact Governor"]},
+                "tasks": [],
+                "task_governance": {"is_blocked": True, "blocking_reasons": ["HLD compilation blocked by Artifact Governor"]},
+                "blocked": True,
+                "target_fsm_state": hld_gov.recommended_fsm_state.value
+            }
+
         # 5. Low-Level Design (LLD) Refinement Compilation
         lld_components = LLDCompiler.compile_lld(hld, r_graph, b_graph, archetypes=archetypes)
+        lld_gov = ArtifactGovernor.audit_lld_governance(lld_components, hld)
+
+        if lld_gov.is_blocked:
+            return {
+                "behavior_graph": b_graph,
+                "requirement_graph": r_graph,
+                "dependency_holes": dep_holes,
+                "hld_design": hld,
+                "hld_validation": {"passed": passed_hld, "errors": hld_errors},
+                "debate_result": debate_result.to_dict(),
+                "hld_governance": hld_gov.to_dict(),
+                "lld_components": lld_components,
+                "lld_governance": lld_gov.to_dict(),
+                "tasks": [],
+                "task_governance": {"is_blocked": True, "blocking_reasons": ["LLD compilation blocked by Artifact Governor"]},
+                "blocked": True,
+                "target_fsm_state": lld_gov.recommended_fsm_state.value
+            }
 
         # 6. Task Compilation with Full Lineage and BDD Contracts
         tasks = TaskCompiler.compile_tasks(lld_components, r_graph=r_graph, b_graph=b_graph)
+        task_gov = ArtifactGovernor.audit_task_governance(tasks, r_graph)
 
         return {
             "behavior_graph": b_graph,
@@ -577,8 +618,13 @@ class SpecificationCompiler:
             "hld_design": hld,
             "hld_validation": {"passed": passed_hld, "errors": hld_errors},
             "debate_result": debate_result.to_dict(),
+            "hld_governance": hld_gov.to_dict(),
             "lld_components": lld_components,
-            "tasks": tasks
+            "lld_governance": lld_gov.to_dict(),
+            "tasks": tasks,
+            "task_governance": task_gov.to_dict(),
+            "blocked": task_gov.is_blocked,
+            "target_fsm_state": task_gov.recommended_fsm_state.value
         }
 
     @classmethod
