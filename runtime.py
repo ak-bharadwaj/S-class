@@ -152,17 +152,40 @@ def _resolve_paths(workspace_dir: Optional[str] = None) -> tuple:
 def load_json(path):
     if not os.path.exists(path):
         raise FileNotFoundError(f"Required configuration file missing: {path}")
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    max_retries = 5
+    for attempt in range(max_retries):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (PermissionError, json.JSONDecodeError) as e:
+            if attempt == max_retries - 1:
+                raise
+            time.sleep(0.05 * (attempt + 1))
 
 def write_json_atomic(path, data):
-    tmp_path = path + ".tmp"
+    tmp_path = path + f".{uuid.uuid4().hex[:8]}.tmp"
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
         f.flush()
         os.fsync(f.fileno())
-    os.replace(tmp_path, path)
+    
+    max_retries = 5
+    for attempt in range(max_retries):
+        try:
+            os.replace(tmp_path, path)
+            return
+        except (PermissionError, OSError):
+            if attempt == max_retries - 1:
+                # Direct write fallback if atomic replace is blocked
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2)
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
+                return
+            time.sleep(0.05 * (attempt + 1))
 
 def _validate_schema_value(value: Any, schema: Dict[str, Any], path: str = ""):
     expected_type = schema.get("type")

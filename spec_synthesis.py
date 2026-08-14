@@ -19,6 +19,7 @@ from domain_primitives import (
 from semantic_decomposer import SemanticDecomposer
 from spec_compiler import GraphInferenceEngine, SpecificationCompiler
 from adversarial_skeptic import AdversarialSkeptic
+from practical_skeptic import PracticalSkeptic
 
 try:
     from runtime import write_json_atomic, load_json
@@ -2132,6 +2133,15 @@ class SpecSynthesisEngine:
         dependency_holes = AdversarialSkeptic.detect_dependency_holes(domain_graph)
         for hole in dependency_holes:
             questions.append(hole["question"])
+
+        # Practical Skeptic Checklist (Empirical Real-World Failures)
+        practical_pass, practical_warns, practical_checks = PracticalSkeptic.audit_specification({
+            "low_level_designs": lld_catalog,
+            "page_spreads": page_spreads,
+            "requirements": requirements_list
+        }, evidence)
+        for warn in practical_warns:
+            logger.info(f"[PracticalSkeptic] {warn}")
 
         acceptance_criteria = self.generate_acceptance_criteria(intent, requirements_list)
 

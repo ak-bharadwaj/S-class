@@ -1,0 +1,49 @@
+[
+  {
+    "id": "FAIL-SGDA-001",
+    "project": "SriGuruDrivingAcademy (SGDA)",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-10T14:30:00Z",
+    "summary": "19-feature gap audit: UI generated generic mockup cards instead of binding to real Prisma schema and driving curriculum models",
+    "root_cause": "vibecoded_ui_scaffolding",
+    "missing_contracts": [
+      "student_lesson_progress_tracker",
+      "instructor_vehicle_live_assignment",
+      "rto_test_readiness_scorecard",
+      "slot_conflict_prevention_matrix",
+      "payment_receipt_ledger_binding"
+    ],
+    "skeptic_rule_id": "SKEPTIC-PRISMA-SCHEMA-GROUNDING",
+    "resolved": true
+  },
+  {
+    "id": "FAIL-AMISRU-002",
+    "project": "AMIS-RU Research Tooling",
+    "stack": "fastapi_python",
+    "date_logged": "2026-08-12T10:15:00Z",
+    "summary": "FastAPI endpoint specs omitted async session commit lifecycle and Pydantic response models",
+    "root_cause": "shallow_api_scaffolding",
+    "missing_contracts": [
+      "async_db_session_dependency",
+      "pydantic_v2_response_model_typing",
+      "http_exception_handler_paths"
+    ],
+    "skeptic_rule_id": "SKEPTIC-FASTAPI-ASYNC-TYPING",
+    "resolved": true
+  },
+  {
+    "id": "FAIL-PORTAL-003",
+    "project": "Student / College Department Portal",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-13T16:00:00Z",
+    "summary": "Role spreading generated flat standalone pages without role-scoped permission checks on dynamic routes",
+    "root_cause": "unscoped_route_spread",
+    "missing_contracts": [
+      "role_guard_middleware_binding",
+      "student_self_profile_security_tab",
+      "admin_verification_action_drawer"
+    ],
+    "skeptic_rule_id": "SKEPTIC-ROLE-ROUTE-GUARD",
+    "resolved": true
+  }
+]
