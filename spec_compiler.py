@@ -530,6 +530,52 @@ class SpecificationCompiler:
         return page_spreads, low_level_designs, [a.to_dict() for a in assumptions]
 
     @classmethod
+    def compile_v7_refinement_pipeline(
+        cls,
+        graph: SemanticDomainGraph,
+        intent_features: List[str],
+        raw_request: str = ""
+    ) -> Dict[str, Any]:
+        """
+        Full V7 Refinement Compiler Pipeline:
+        Grounded BehaviorGraph -> RequirementGraph (IR) -> HLDDesign (with ADRs & Gate Validation) -> LLDComponents -> TaskRecords.
+        """
+        from behavior_graph import BehaviorGraphEngine
+        from requirement_ir import RequirementGraph
+        from hld_compiler import HLDCompiler, HLDValidator
+        from lld_compiler import LLDCompiler
+        from task_compiler import TaskCompiler
+
+        # 1. Behavior Graph Construction
+        b_graph = BehaviorGraphEngine.build_behavior_graph(graph, raw_request or " ".join(intent_features))
+
+        # 2. Requirement IR Graph Construction
+        r_graph = RequirementGraph.compile_from_behavior_graph(b_graph)
+        dep_holes = r_graph.detect_dependency_holes()
+
+        # 3. High-Level Design (HLD) & ADR Compilation
+        hld = HLDCompiler.compile_hld(r_graph, b_graph)
+
+        # 4. HLD Validation Gate
+        passed_hld, hld_errors = HLDValidator.validate_hld(hld, r_graph, b_graph)
+
+        # 5. Low-Level Design (LLD) Refinement Compilation
+        lld_components = LLDCompiler.compile_lld(hld, r_graph, b_graph)
+
+        # 6. Task Compilation with Full Lineage
+        tasks = TaskCompiler.compile_tasks(lld_components)
+
+        return {
+            "behavior_graph": b_graph,
+            "requirement_graph": r_graph,
+            "dependency_holes": dep_holes,
+            "hld_design": hld,
+            "hld_validation": {"passed": passed_hld, "errors": hld_errors},
+            "lld_components": lld_components,
+            "tasks": tasks
+        }
+
+    @classmethod
     def synthesize_compiled_lld_requirements(cls, lld_catalog: Dict[str, Dict[str, Any]]) -> List[Any]:
         """
         Converts compiled Low-Level Design (LLD) catalog into explicit/derived SynthesizedRequirements.
