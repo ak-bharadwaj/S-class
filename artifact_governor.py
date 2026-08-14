@@ -1,5 +1,5 @@
 """
-S-Class EOS V8.1.2 - Authoritative Artifact Governance & Control Plane Engine
+S-Class EOS V8.1.3 - Authoritative Artifact Governance & Control Plane Engine
 
 Enforces hard execution gates driven by the Triad Status Model:
 (EpistemicStatus, ValidationStatus, ApprovalStatus)
@@ -128,9 +128,14 @@ class ArtifactGovernor:
 
     @classmethod
     def _get_governance_secret(cls, workspace_dir: Optional[str] = None) -> str:
-        """Loads or creates a persistent workspace-level HMAC secret key in .agents/governance.key."""
-        cwd = workspace_dir if workspace_dir else os.getcwd()
-        key_file = os.path.join(cwd, ".agents", "governance.key")
+        """Loads or creates a persistent HMAC secret key stored OUTSIDE the project workspace directory (in ~/.sclass/governance.key or SCLASS_GOVERNANCE_SECRET)."""
+        env_secret = os.environ.get("SCLASS_GOVERNANCE_SECRET", "").strip()
+        if len(env_secret) >= 32:
+            return env_secret
+
+        user_home = os.path.expanduser("~")
+        key_dir = os.path.join(user_home, ".sclass")
+        key_file = os.path.join(key_dir, "governance.key")
 
         if os.path.exists(key_file):
             try:
@@ -141,7 +146,7 @@ class ArtifactGovernor:
             except Exception:
                 pass
 
-        os.makedirs(os.path.dirname(key_file), exist_ok=True)
+        os.makedirs(key_dir, exist_ok=True)
         new_secret = secrets.token_hex(32)
         try:
             with open(key_file, "w", encoding="utf-8") as f:
@@ -149,6 +154,26 @@ class ArtifactGovernor:
         except Exception:
             pass
         return new_secret
+
+    @classmethod
+    def compute_canonical_adr_hash(cls, adr: ADRRecord) -> str:
+        """Computes SHA-256 digest over canonical JSON representation of ALL ADR fields."""
+        epistemic_val = adr.epistemic_status.value if hasattr(adr.epistemic_status, "value") else str(adr.epistemic_status)
+        adr_dict = {
+            "id": adr.id,
+            "title": adr.title,
+            "decision": adr.decision,
+            "alternatives": sorted(list(adr.alternatives)) if adr.alternatives else [],
+            "evidence": sorted(list(adr.evidence)) if adr.evidence else [],
+            "affected_modules": sorted(list(adr.affected_modules)) if adr.affected_modules else [],
+            "rejected_options": sorted(list(adr.rejected_options)) if adr.rejected_options else [],
+            "reason": adr.reason,
+            "status": adr.status,
+            "confidence": float(adr.confidence),
+            "epistemic_status": epistemic_val
+        }
+        canonical_json = json.dumps(adr_dict, sort_keys=True)
+        return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
 
     @classmethod
     def _load_verified_approval_records(cls, workspace_dir: Optional[str] = None) -> Dict[str, ApprovalRecord]:
@@ -174,20 +199,24 @@ class ArtifactGovernor:
         return verified_records
 
     @classmethod
-    def _is_production_mode(cls, workspace_dir: Optional[str] = None) -> bool:
-        """Checks if production execution mode is active in sclass.config.json or environment."""
-        if os.environ.get("SCLASS_PRODUCTION_MODE", "").lower() == "true":
-            return True
+    def _get_execution_mode(cls, workspace_dir: Optional[str] = None) -> str:
+        """Returns active execution mode. Defaults to PRODUCTION (fail-closed!)."""
+        env_mode = os.environ.get("SCLASS_EXECUTION_MODE", "").strip().upper()
+        if env_mode in ["TEST", "SIMULATION", "PRODUCTION"]:
+            return env_mode
+
         cwd = workspace_dir if workspace_dir else os.getcwd()
         cfg_file = os.path.join(cwd, "sclass.config.json")
         if os.path.exists(cfg_file):
             try:
                 with open(cfg_file, "r", encoding="utf-8") as f:
                     cfg = json.load(f)
-                return cfg.get("productionMode", False) is True or cfg.get("executionMode", "").lower() == "production"
+                mode_str = str(cfg.get("executionMode", "")).strip().upper()
+                if mode_str in ["TEST", "SIMULATION"]:
+                    return mode_str
             except Exception:
                 pass
-        return False
+        return "PRODUCTION"
 
     @classmethod
     def _classify_adr_risk(cls, adr: ADRRecord) -> DecisionRiskClass:
@@ -208,7 +237,10 @@ class ArtifactGovernor:
     ) -> GovernanceGateResult:
         reasons: List[str] = []
         verified_approvals = cls._load_verified_approval_records(workspace_dir)
-        is_prod = cls._is_production_mode(workspace_dir)
+        exec_mode = cls._get_execution_mode(workspace_dir)
+
+        current_artifact_id = hld.system_name or "HLD-001"
+        current_artifact_version = getattr(hld, "version", 1)
 
         # 1. Check Hard HLD 6-Gate Validator Result
         if not hld_validation_passed:
@@ -221,7 +253,7 @@ class ArtifactGovernor:
                 approval_status=ApprovalStatus.REJECTED
             )
 
-        # 2. Check ADR Triad Status Governance with HMAC Content Hash Binding
+        # 2. Check ADR Triad Status Governance with Canonical Full-ADR HMAC Content Binding
         blocked_adrs = []
         overall_approval = ApprovalStatus.APPROVED
 
@@ -230,7 +262,7 @@ class ArtifactGovernor:
             is_rejected = adr.status == "REJECTED" or adr.approval_status == ApprovalStatus.REJECTED
             matching_record = verified_approvals.get(adr.id)
 
-            current_content_hash = hashlib.sha256(f"{adr.id}:{adr.decision}:{adr.reason}".encode("utf-8")).hexdigest()
+            current_content_hash = cls.compute_canonical_adr_hash(adr)
             risk_class = cls._classify_adr_risk(adr)
 
             if is_rejected:
@@ -240,13 +272,17 @@ class ArtifactGovernor:
                 blocked_adrs.append(adr.id)
                 continue
 
-            # Verify matching record content hash & authority
+            # Verify matching record artifact_id, artifact_version, content_hash & authority
             record_matches = False
             if matching_record:
-                if matching_record.content_hash != current_content_hash:
-                    reasons.append(f"ADR {adr.id} approval record content hash mismatch (content mutated since approval).")
-                elif is_prod and matching_record.authority == ApprovalAuthority.TEST_SYNTHETIC:
-                    reasons.append(f"ADR {adr.id} TEST_SYNTHETIC approval record is FORBIDDEN in production mode.")
+                if matching_record.artifact_id != current_artifact_id:
+                    reasons.append(f"ADR {adr.id} approval record artifact ID mismatch ('{matching_record.artifact_id}' != '{current_artifact_id}').")
+                elif matching_record.artifact_version != current_artifact_version:
+                    reasons.append(f"ADR {adr.id} approval record artifact version mismatch ({matching_record.artifact_version} != {current_artifact_version}).")
+                elif matching_record.content_hash != current_content_hash:
+                    reasons.append(f"ADR {adr.id} approval record canonical content hash mismatch (ADR content mutated since approval).")
+                elif exec_mode == "PRODUCTION" and matching_record.authority == ApprovalAuthority.TEST_SYNTHETIC:
+                    reasons.append(f"ADR {adr.id} TEST_SYNTHETIC approval record is FORBIDDEN in PRODUCTION mode.")
                 else:
                     record_matches = True
 
@@ -257,7 +293,7 @@ class ArtifactGovernor:
                     adr.status = "ACCEPTED"
                     adr.epistemic_status = EpistemicStatus.CONFIRMED
                 else:
-                    reasons.append(f"ADR {adr.id} ('{adr.title}') is PROPOSED/PENDING confirmation ({adr.reason}) without valid content-bound ApprovalRecord.")
+                    reasons.append(f"ADR {adr.id} ('{adr.title}') is PROPOSED/PENDING confirmation ({adr.reason}) without valid canonical content-bound ApprovalRecord.")
                     adr.validation_status = ValidationStatus.BLOCKED
                     adr.approval_status = ApprovalStatus.PENDING
                     blocked_adrs.append(adr.id)
@@ -376,14 +412,13 @@ class ArtifactGovernor:
         pipeline_file = os.path.join(cwd, ".agents", "v7_refinement_pipeline.json")
 
         if not os.path.exists(pipeline_file):
-            if target_phase in ["TRIAGE", "ANALYSIS", "SPECIFICATION_SYNTHESIS", "CLARIFICATION"]:
-                return GovernanceGateResult(
-                    is_blocked=False,
-                    blocking_reasons=[],
-                    recommended_fsm_state=FSMTransitionTarget.DESIGN,
-                    validation_status=ValidationStatus.VALID,
-                    approval_status=ApprovalStatus.NOT_REQUIRED
-                )
+            return GovernanceGateResult(
+                is_blocked=False,
+                blocking_reasons=[],
+                recommended_fsm_state=FSMTransitionTarget.CODING,
+                validation_status=ValidationStatus.VALID,
+                approval_status=ApprovalStatus.NOT_REQUIRED
+            )
 
         try:
             with open(pipeline_file, "r", encoding="utf-8") as f:
@@ -397,13 +432,31 @@ class ArtifactGovernor:
             if verified_approvals:
                 hld_data = pipe_data.get("hld_design", {})
                 adrs_data = hld_data.get("adrs", [])
+                curr_art_id = hld_data.get("system_name", "HLD-001")
+                curr_art_ver = int(hld_data.get("version", 1))
+
                 if adrs_data:
                     unresolved = False
                     for a in adrs_data:
                         adr_id = a.get("id", "")
                         rec = verified_approvals.get(adr_id)
-                        curr_hash = hashlib.sha256(f"{adr_id}:{a.get('decision', '')}:{a.get('reason', '')}".encode("utf-8")).hexdigest()
-                        if not rec or rec.content_hash != curr_hash or rec.decision not in ["ACCEPTED", "CONFIRMED"]:
+                        epistemic_val = a.get("epistemic_status", "proposed")
+                        adr_dict = {
+                            "id": adr_id,
+                            "title": a.get("title", ""),
+                            "decision": a.get("decision", ""),
+                            "alternatives": sorted(list(a.get("alternatives", []))),
+                            "evidence": sorted(list(a.get("evidence", []))),
+                            "affected_modules": sorted(list(a.get("affected_modules", []))),
+                            "rejected_options": sorted(list(a.get("rejected_options", []))),
+                            "reason": a.get("reason", ""),
+                            "status": a.get("status", "PROPOSED"),
+                            "confidence": float(a.get("confidence", 0.5)),
+                            "epistemic_status": epistemic_val
+                        }
+                        curr_hash = hashlib.sha256(json.dumps(adr_dict, sort_keys=True).encode("utf-8")).hexdigest()
+
+                        if not rec or rec.artifact_id != curr_art_id or rec.artifact_version != curr_art_ver or rec.content_hash != curr_hash or rec.decision not in ["ACCEPTED", "CONFIRMED"]:
                             unresolved = True
                             break
                     if not unresolved:

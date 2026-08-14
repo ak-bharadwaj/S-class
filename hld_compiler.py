@@ -132,13 +132,15 @@ class HLDDesign:
     architecture_style: str
     modules: List[HLDModule] = field(default_factory=list)
     adrs: List[ADRRecord] = field(default_factory=list)
+    version: int = 1
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "system_name": self.system_name,
             "architecture_style": self.architecture_style,
             "modules": [m.to_dict() for m in self.modules],
-            "adrs": [a.to_dict() for a in self.adrs]
+            "adrs": [a.to_dict() for a in self.adrs],
+            "version": self.version
         }
 
 

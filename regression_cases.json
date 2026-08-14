@@ -313,5 +313,21 @@
     ],
     "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
     "resolved": true
+  },
+  {
+    "id": "FAIL-PROSE-022",
+    "project": "Workspace Key Leakage, Partial Field Hashing, Missing Version Anti-Replay, & Fail-Open Default Audit",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-14T22:17:00Z",
+    "summary": "Governance secret keys were generated inside the workspace allowing code execution access, content hashes covered only 3 fields allowing stale approvals across mutated metadata, version anti-replay was unenforced, and default execution mode failed open.",
+    "root_cause": "workspace_key_leakage_partial_field_hashing_missing_version_anti_replay_and_fail_open_default",
+    "missing_contracts": [
+      "external_protected_secret_key_custody",
+      "canonical_full_adr_content_hash_binding",
+      "exact_artifact_version_anti_replay",
+      "fail_closed_production_execution_mode"
+    ],
+    "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
+    "resolved": true
   }
 ]

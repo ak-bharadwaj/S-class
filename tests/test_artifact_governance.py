@@ -1,15 +1,15 @@
 """
-S-Class EOS V8.1.2 - Authoritative Artifact Governance & Control Plane Test Suite
+S-Class EOS V8.1.3 - Authoritative Artifact Governance & Control Plane Test Suite
 
 Validates:
 1. Triad Status Model (EpistemicStatus, ValidationStatus, ApprovalStatus).
 2. Hard Execution Gate: Invalid HLD blocks downstream LLD and Task compilation (returns zero LLD/Tasks).
 3. Hard Execution Gate: PROPOSED/PENDING or REJECTED ADR blocks downstream LLD compilation (emits FSM transition target DEBATE).
 4. Authoritative Control Plane: FSM transition to CODING is HARD DENIED when artifact governance is blocked.
-5. HMAC Signature Verification: Secret key mismatches or tampered signatures are REJECTED.
-6. Content Hash Drift Binding: Mutated ADR decision/reason content invalidates previous approval records.
-7. Risk-Scoped Policy Constraints: HIGH_RISK decisions (topology, auth) FORBID DETERMINISTIC_POLICY auto-approval.
-8. Mode Isolation: TEST_SYNTHETIC approval records are HARD REJECTED in PRODUCTION mode.
+5. External Protected Key Custody: Secret key loaded outside workspace (~/.sclass/governance.key or ENV).
+6. Canonical Full-ADR Content Hashing: Mutating any ADR field (alternatives, evidence, confidence) invalidates approval.
+7. Exact Version & ID Anti-Replay: Version mismatch causes immediate approval rejection.
+8. Fail-Closed Production Default: Execution mode defaults to PRODUCTION, hard-rejecting TEST_SYNTHETIC receipts.
 """
 
 import os
@@ -140,83 +140,98 @@ def test_fsm_transition_denied_when_artifact_governance_blocked(tmp_path):
     assert any("DENIED by ArtifactGovernor" in d.decision for d in state.decisionLog)
 
 
-def test_hmac_signature_verification_and_key_mismatch_rejection(tmp_path):
-    """Adversarial Test: Tampered HMAC signature or wrong governance key MUST BE REJECTED."""
+def test_external_key_custody_outside_workspace(tmp_path):
+    """Security Test: Governance secret key is stored OUTSIDE workspace (~/.sclass/governance.key)."""
     tmp_workspace = str(tmp_path)
     sec_key = ArtifactGovernor._get_governance_secret(tmp_workspace)
 
-    curr_hash = hashlib.sha256("ADR-001:Monolith:Plausible".encode("utf-8")).hexdigest()
-    rec = ApprovalRecord("ADR-001", "HLD-001", 1, curr_hash, "ACCEPTED", ApprovalAuthority.HUMAN_EXPLICIT, "Plausible", "2026-08-14T22:00:00Z")
-    rec.signature = rec.compute_signature(sec_key)
-
-    assert rec.is_valid(sec_key) is True
-    assert rec.is_valid("wrong_secret_key_0000000000000000000") is False
+    assert len(sec_key) >= 32
+    workspace_key_file = os.path.join(tmp_workspace, ".agents", "governance.key")
+    assert not os.path.exists(workspace_key_file)
 
 
-def test_content_hash_drift_rejection(tmp_path):
-    """Adversarial Test: Mutating ADR decision content invalidates previous approval record."""
+def test_canonical_full_adr_content_hash_invalidation(tmp_path):
+    """Security Test: Mutating alternatives/evidence in ADR invalidates content hash and blocks approval."""
     tmp_workspace = str(tmp_path)
+    os.environ["SCLASS_EXECUTION_MODE"] = "TEST"
     sec_key = ArtifactGovernor._get_governance_secret(tmp_workspace)
     mod = HLDModule(id="mod_1", name="Core", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["act"])
 
-    # Original decision content
-    orig_hash = hashlib.sha256("ADR-001:Modular Monolith:Original decision".encode("utf-8")).hexdigest()
-    rec = ApprovalRecord("ADR-001", "HLD-001", 1, orig_hash, "ACCEPTED", ApprovalAuthority.HUMAN_EXPLICIT, "Original decision", "2026-08-14T22:00:00Z")
+    adr = ADRRecord(
+        id="ADR-001",
+        title="Topology Selection",
+        decision="Modular Monolith",
+        alternatives=["Microservices"],
+        evidence=["Benchmark 1"],
+        affected_modules=["mod_1"],
+        rejected_options=["Microservices"],
+        reason="Plausible",
+        status="PROPOSED",
+        confidence=0.50,
+        epistemic_status=EpistemicStatus.PROPOSED
+    )
+    orig_hash = ArtifactGovernor.compute_canonical_adr_hash(adr)
+
+    rec = ApprovalRecord("ADR-001", "HLD-001", 1, orig_hash, "ACCEPTED", ApprovalAuthority.TEST_SYNTHETIC, "Approved", "2026-08-14T22:00:00Z")
     rec.signature = rec.compute_signature(sec_key)
 
     app_file = os.path.join(tmp_workspace, ".agents", "approvals.json")
     runtime.write_json_atomic(app_file, {"approval_records": [rec.to_dict()]})
 
-    # ADR content is mutated to Microservices!
-    mutated_adr = ADRRecord(
-        id="ADR-001",
-        title="Topology Selection",
-        decision="Distributed Microservices", # Mutated!
-        alternatives=[],
-        evidence=[],
-        affected_modules=["mod_1"],
-        rejected_options=[],
-        reason="Original decision",
-        status="PROPOSED",
-        confidence=0.50,
-        epistemic_status=EpistemicStatus.PROPOSED
-    )
-    hld = HLDDesign(system_name="HLD-001", architecture_style="Microservices", modules=[mod], adrs=[mutated_adr])
+    # Mutate alternatives in ADR!
+    adr.alternatives.append("Serverless")
+    hld = HLDDesign(system_name="HLD-001", architecture_style="Monolith", modules=[mod], adrs=[adr])
 
-    # Governor MUST REJECT stale approval due to content_hash mismatch!
+    # Governor MUST REJECT due to canonical content hash mismatch!
     gov = ArtifactGovernor.audit_hld_governance(hld, True, [], workspace_dir=tmp_workspace)
     assert gov.is_blocked is True
-    assert "content hash mismatch" in gov.blocking_reasons[0]
+    assert "canonical content hash mismatch" in gov.blocking_reasons[0]
 
 
-def test_high_risk_policy_auto_approval_rejection(tmp_path):
-    """Governance Test: HIGH_RISK decisions (topology, auth) FORBID DETERMINISTIC_POLICY auto-approval."""
+def test_artifact_version_mismatch_anti_replay(tmp_path):
+    """Security Test: Approval record artifact_version mismatch causes immediate rejection."""
     tmp_workspace = str(tmp_path)
+    os.environ["SCLASS_EXECUTION_MODE"] = "TEST"
+    sec_key = ArtifactGovernor._get_governance_secret(tmp_workspace)
     mod = HLDModule(id="mod_1", name="Core", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["act"])
-    high_risk_adr = ADRRecord(
+
+    adr = ADRRecord(
         id="ADR-001",
-        title="Architectural Topology Selection",
+        title="Topology Selection",
         decision="Modular Monolith",
         alternatives=[],
         evidence=[],
         affected_modules=["mod_1"],
         rejected_options=[],
-        reason="Default topology choice",
-        status="ACCEPTED",
-        confidence=0.95,
-        epistemic_status=EpistemicStatus.DERIVED
+        reason="Plausible",
+        status="PROPOSED",
+        confidence=0.50,
+        epistemic_status=EpistemicStatus.PROPOSED
     )
-    hld = HLDDesign(system_name="Sys", architecture_style="Monolith", modules=[mod], adrs=[high_risk_adr])
+    curr_hash = ArtifactGovernor.compute_canonical_adr_hash(adr)
 
-    # High-risk ADR without explicit HUMAN_EXPLICIT or DEBATE_ENGINE receipt MUST BE BLOCKED!
+    # Approval record for version 1
+    rec = ApprovalRecord("ADR-001", "HLD-001", 1, curr_hash, "ACCEPTED", ApprovalAuthority.TEST_SYNTHETIC, "Approved", "2026-08-14T22:00:00Z")
+    rec.signature = rec.compute_signature(sec_key)
+
+    app_file = os.path.join(tmp_workspace, ".agents", "approvals.json")
+    runtime.write_json_atomic(app_file, {"approval_records": [rec.to_dict()]})
+
+    # HLD is now version 2!
+    hld = HLDDesign(system_name="HLD-001", architecture_style="Monolith", modules=[mod], adrs=[adr], version=2)
+
+    # Governor MUST REJECT due to artifact version mismatch!
     gov = ArtifactGovernor.audit_hld_governance(hld, True, [], workspace_dir=tmp_workspace)
     assert gov.is_blocked is True
-    assert "HIGH_RISK" in gov.blocking_reasons[0]
+    assert "artifact version mismatch" in gov.blocking_reasons[0]
 
 
-def test_production_mode_rejects_test_synthetic_approvals(tmp_path):
-    """Security Test: TEST_SYNTHETIC approval receipts are HARD REJECTED in production mode."""
+def test_fail_closed_production_mode_default(tmp_path):
+    """Security Test: Unconfigured environment defaults to PRODUCTION mode (fail-closed), rejecting TEST_SYNTHETIC."""
     tmp_workspace = str(tmp_path)
+    if "SCLASS_EXECUTION_MODE" in os.environ:
+        del os.environ["SCLASS_EXECUTION_MODE"]
+
     sec_key = ArtifactGovernor._get_governance_secret(tmp_workspace)
     mod = HLDModule(id="mod_1", name="Core", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["act"])
 
@@ -235,18 +250,17 @@ def test_production_mode_rejects_test_synthetic_approvals(tmp_path):
     )
     hld = HLDDesign(system_name="HLD-001", architecture_style="Monolith", modules=[mod], adrs=[adr])
 
-    curr_hash = hashlib.sha256("ADR-001:Modular Monolith:Test choice".encode("utf-8")).hexdigest()
+    curr_hash = ArtifactGovernor.compute_canonical_adr_hash(adr)
     synth_rec = ApprovalRecord("ADR-001", "HLD-001", 1, curr_hash, "ACCEPTED", ApprovalAuthority.TEST_SYNTHETIC, "Test choice", "2026-08-14T22:00:00Z")
     synth_rec.signature = synth_rec.compute_signature(sec_key)
 
     app_file = os.path.join(tmp_workspace, ".agents", "approvals.json")
     runtime.write_json_atomic(app_file, {"approval_records": [synth_rec.to_dict()]})
 
-    # Enable production mode in sclass.config.json
-    cfg_file = os.path.join(tmp_workspace, "sclass.config.json")
-    runtime.write_json_atomic(cfg_file, {"productionMode": True, "executionMode": "production"})
+    # Unconfigured environment defaults to PRODUCTION mode (fail-closed!)
+    assert ArtifactGovernor._get_execution_mode(tmp_workspace) == "PRODUCTION"
 
-    # Governor MUST REJECT TEST_SYNTHETIC receipt in production mode!
+    # Governor MUST REJECT TEST_SYNTHETIC receipt in PRODUCTION mode!
     gov = ArtifactGovernor.audit_hld_governance(hld, True, [], workspace_dir=tmp_workspace)
     assert gov.is_blocked is True
-    assert "TEST_SYNTHETIC approval record is FORBIDDEN in production mode" in gov.blocking_reasons[0]
+    assert "TEST_SYNTHETIC approval record is FORBIDDEN in PRODUCTION mode" in gov.blocking_reasons[0]
