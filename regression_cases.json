@@ -189,5 +189,20 @@
     ],
     "skeptic_rule_id": "SKEPTIC-EPISTEMIC-BEHAVIOR-GROUNDING",
     "resolved": true
+  },
+  {
+    "id": "FAIL-PROSE-014",
+    "project": "Compound Sentence Clause Mixing & Verb Hardcoding Audit",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-14T21:40:00Z",
+    "summary": "SVO extractor mixed subjects and objects across sentence clauses and failed on open-vocabulary domain verbs (calibrates, reconciles, escalates) while conflating PERFORMS with AUTHORIZED_FOR.",
+    "root_cause": "unscoped_sentence_svo_extraction_and_verb_whitelist_rigidity",
+    "missing_contracts": [
+      "atomic_clause_svo_parsing",
+      "open_vocabulary_predicate_extraction",
+      "performs_vs_authorized_for_separation"
+    ],
+    "skeptic_rule_id": "SKEPTIC-EPISTEMIC-BEHAVIOR-GROUNDING",
+    "resolved": true
   }
 ]

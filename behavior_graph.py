@@ -1,8 +1,8 @@
 """
-S-Class EOS V6.1 - Behavior Graph & Epistemic Grounding Infrastructure
+S-Class EOS V6.2 - Behavior Graph & Epistemic Grounding Infrastructure
 
 Defines EpistemicStatus, Behavior Graph primitives, typed behavior relationships,
-unified provenance tracking, and the BehaviorGraphEngine with SVO Triple Extraction.
+unified provenance tracking, atomic clause SVO extraction, and targeted authorization semantics.
 
 The Behavior Graph sits directly between the Semantic Domain Graph and Requirements:
 EVIDENCE → DOMAIN GRAPH → BEHAVIOR CANDIDATES → GROUNDING ENGINE → ACCEPTED BEHAVIOR GRAPH → HLD → LLD → TASKS
@@ -44,7 +44,8 @@ class BehaviorNodeType(str, Enum):
 
 class BehaviorRelationType(str, Enum):
     """Semantic relations connecting behavior nodes."""
-    AUTHORIZED_FOR = "authorized_for"   # Actor authorized to execute Command/Query
+    PERFORMS = "performs"               # Actor performs/executes Command/Action (prose assertion)
+    AUTHORIZED_FOR = "authorized_for"   # Actor explicitly authorized for Command/Query (security policy)
     TARGETS = "targets"                 # Command/Query targets Entity/Resource
     TRANSITIONS = "transitions"         # Command triggers State A -> State B transition
     REQUIRES_GUARD = "requires_guard"   # Command requires Guard Condition check
@@ -265,21 +266,64 @@ class BehaviorGraph:
 class BehaviorGraphEngine:
     """
     Constructs a grounded BehaviorGraph from SemanticDomainGraph and intent features.
-    Uses Subject-Verb-Object (SVO) Triple Extraction to avoid Cartesian over-generation.
-    Applies targeted policy binding and explicit state machine derivation.
+    Uses Atomic Clause SVO Parsing and Open-Vocabulary Action Predicate Extraction.
+    Separates PERFORMS from AUTHORIZED_FOR and demotes fallback candidates to PROPOSED.
     """
+
+    NON_VERB_STOPWORDS = {
+        "the", "a", "an", "this", "that", "these", "those", "for", "with", "and", "or",
+        "but", "if", "when", "while", "after", "before", "then", "into", "over", "under",
+        "from", "by", "to", "in", "on", "at", "system", "platform", "app", "tool", "portal"
+    }
+
+    @classmethod
+    def extract_action_predicates(cls, text: str) -> List[str]:
+        """
+        Dynamically extracts action verbs in predicate position from natural language text
+        without relying solely on a hardcoded verb list.
+        """
+        words = re.findall(r'\b[a-zA-Z]{3,}\b', text.lower())
+        verbs = []
+        for w in words:
+            if w in cls.NON_VERB_STOPWORDS:
+                continue
+            # Dynamic morphological verb indicators or standard domain action verbs
+            is_verb_form = (
+                w.endswith(('s', 'ed', 'ing', 'ize', 'ise', 'ate')) or
+                w in [
+                    "submit", "approve", "reject", "assign", "schedule", "upload",
+                    "issue", "waive", "cancel", "ground", "inspect", "prescribe",
+                    "verify", "override", "create", "delete", "sign", "dispense", "renew",
+                    "calibrate", "reconcile", "escalate", "triage", "provision", "deploy"
+                ]
+            )
+            if is_verb_form:
+                # Normalize verb form (e.g. approves -> approve, calibrates -> calibrate)
+                norm_v = w
+                if w.endswith('es') and len(w) > 4 and w[:-2].endswith(('s', 'x', 'z', 'ch', 'sh', 'r', 't', 'd', 'l', 'n')):
+                    norm_v = w[:-1] if w.endswith('es') and w[:-1] in ["approve", "calibrate", "reconcile", "triage"] else w[:-2]
+                elif w.endswith('s') and len(w) > 3 and not w.endswith('ss'):
+                    norm_v = w[:-1]
+                elif w.endswith('ed') and len(w) > 4:
+                    norm_v = w[:-2] if not w.endswith('eed') else w[:-1]
+                elif w.endswith('ing') and len(w) > 4:
+                    norm_v = w[:-3]
+                if norm_v not in cls.NON_VERB_STOPWORDS:
+                    verbs.append(norm_v)
+
+        return list(dict.fromkeys(verbs))
 
     @classmethod
     def extract_svo_triples(cls, raw_request: str, actors: List[DomainNode], entities: List[DomainNode]) -> List[Tuple[DomainNode, str, DomainNode]]:
         """
-        Parses explicit Subject-Verb-Object (SVO) propositions from source text.
-        Returns matching (Actor, Verb, Entity) triples directly grounded in prose.
+        Parses atomic clause Subject-Verb-Object (SVO) propositions from source text.
+        Splits text into atomic clauses to prevent cross-clause subject-verb-object mixing.
         """
         triples = []
-        sentences = re.split(r'[\.\n;]', raw_request)
+        # Split into atomic clause spans (conjunctions and subordinators)
+        clauses = re.split(r'[\.\n;]|\b(?:before|after|while|when|if|and\s+then|then|,)\b', raw_request, flags=re.IGNORECASE)
 
         actor_map = {a.name.lower(): a for a in actors}
-        # Add single word keys for actors (e.g. 'pilot' for 'Pilot')
         for a in actors:
             for w in a.name.lower().split():
                 if len(w) >= 3:
@@ -291,37 +335,34 @@ class BehaviorGraphEngine:
                 if len(w) >= 3:
                     entity_map[w] = e
 
-        action_verbs = [
-            "submit", "approve", "reject", "assign", "schedule", "upload",
-            "issue", "waive", "cancel", "ground", "inspect", "prescribe",
-            "verify", "override", "create", "delete", "sign", "dispense", "renew"
-        ]
+        for clause in clauses:
+            c_clean = clause.lower().strip()
+            if not c_clean:
+                continue
 
-        for s in sentences:
-            s_clean = s.lower()
             matched_actor = None
             matched_entity = None
-            matched_verb = None
 
             for a_key, a_node in actor_map.items():
-                if re.search(r'\b' + re.escape(a_key) + r's?\b', s_clean):
+                if re.search(r'\b' + re.escape(a_key) + r's?\b', c_clean):
                     matched_actor = a_node
                     break
 
             for e_key, e_node in entity_map.items():
-                if re.search(r'\b' + re.escape(e_key) + r's?\b', s_clean):
+                if re.search(r'\b' + re.escape(e_key) + r's?\b', c_clean):
                     matched_entity = e_node
                     break
 
-            for v in action_verbs:
-                if re.search(r'\b' + re.escape(v) + r'(?:s|d|ing)?\b', s_clean):
-                    matched_verb = v
-                    break
+            clause_verbs = cls.extract_action_predicates(c_clean)
 
-            if matched_actor and matched_entity and matched_verb:
-                triple = (matched_actor, matched_verb, matched_entity)
-                if triple not in triples:
-                    triples.append(triple)
+            if matched_actor and matched_entity and clause_verbs:
+                for v in clause_verbs:
+                    # Skip generic non-action stopwords
+                    if v in ["view", "inspect", "system", "user"]:
+                        continue
+                    triple = (matched_actor, v, matched_entity)
+                    if triple not in triples:
+                        triples.append(triple)
 
         return triples
 
@@ -333,20 +374,22 @@ class BehaviorGraphEngine:
         resources = domain_graph.get_nodes_by_type(DomainPrimitiveType.RESOURCE)
         policies = domain_graph.get_nodes_by_type(DomainPrimitiveType.POLICY)
         states = domain_graph.get_nodes_by_type(DomainPrimitiveType.STATE)
-        workflows = domain_graph.get_nodes_by_type(DomainPrimitiveType.WORKFLOW)
 
         target_entities = entities + resources if (entities or resources) else [DomainNode("entity_system", "System", DomainPrimitiveType.ENTITY)]
         if not actors:
             actors = [DomainNode("actor_operator", "Operator", DomainPrimitiveType.ACTOR)]
 
-        # 1. Grounded SVO Triple Extraction (EXPLICIT Behavior)
+        # 1. Grounded Atomic Clause SVO Triple Extraction (EXPLICIT Behavior)
         svo_triples = cls.extract_svo_triples(raw_request, actors, target_entities)
 
         # 2. State Machine Derivation (Draft -> Signed -> Fulfilled)
         state_names = [s.name.lower() for s in states]
         has_draft_signed = any("draft" in s for s in state_names) and any("sign" in s for s in state_names)
 
-        # Process Explicit SVO Triples
+        # Check for explicit authorization evidence in text or workspace
+        has_explicit_auth_evidence = any(kw in raw_request.lower() for kw in ["authorized to", "permitted to", "role:", "permission", "allowed to"])
+
+        # Process Grounded SVO Triples
         for actor, verb, ent in svo_triples:
             actor_name = actor.name.lower().replace(" ", "_")
             ent_name = ent.name.lower().replace(" ", "_")
@@ -364,24 +407,35 @@ class BehaviorGraphEngine:
                 epistemic_status=EpistemicStatus.EXPLICIT,
                 provenance=ProvenanceKind.EXPLICIT,
                 confidence=0.99,
-                evidence_ref="source_text_svo_match",
+                evidence_ref="source_atomic_clause_svo_match",
                 from_state=from_st,
                 to_state=to_st,
-                description=f"Explicitly grounded command: {actor.name} {verb} {ent.name}"
+                description=f"Grounded command: {actor.name} performs {verb} on {ent.name}"
             ))
 
+            # Edge 1: Actor PERFORMS Command (Prose assertion)
             b_graph.add_edge(
-                actor.id, BehaviorRelationType.AUTHORIZED_FOR, cmd_id,
+                actor.id, BehaviorRelationType.PERFORMS, cmd_id,
                 epistemic_status=EpistemicStatus.EXPLICIT, provenance=ProvenanceKind.EXPLICIT,
-                inference_rule="svo_actor_authorization"
+                inference_rule="clause_actor_performs_binding"
             )
+
+            # Edge 2: Actor AUTHORIZED_FOR Command (ONLY if explicit security/auth evidence exists)
+            if has_explicit_auth_evidence or actor.name.lower() in ["admin", "super_admin", "manager"]:
+                b_graph.add_edge(
+                    actor.id, BehaviorRelationType.AUTHORIZED_FOR, cmd_id,
+                    epistemic_status=EpistemicStatus.EXPLICIT, provenance=ProvenanceKind.EXPLICIT,
+                    inference_rule="explicit_rbac_authorization_evidence"
+                )
+
+            # Edge 3: Command TARGETS Entity
             b_graph.add_edge(
                 cmd_id, BehaviorRelationType.TARGETS, ent.id,
                 epistemic_status=EpistemicStatus.EXPLICIT, provenance=ProvenanceKind.EXPLICIT,
                 inference_rule="svo_command_target"
             )
 
-            # Targeted Policy Binding: Only attach policy if policy APPLIES_TO or EVALUATED_BY target entity
+            # Targeted Policy Binding: Only attach guard if policy APPLIES_TO target entity
             for pol in policies:
                 pol_edges = domain_graph.get_outgoing_edges(pol.id) + domain_graph.get_incoming_edges(pol.id)
                 targets_ent = any(e.target_id == ent.id or e.source_id == ent.id for e in pol_edges)
@@ -401,7 +455,7 @@ class BehaviorGraphEngine:
                     b_graph.add_edge(cmd_id, BehaviorRelationType.REQUIRES_GUARD, guard_id, inference_rule="targeted_policy_binding")
 
             # Audit Side Effect for State-Changing Commands
-            if verb in ["approve", "reject", "override", "sign", "ground", "cancel", "issue"]:
+            if verb in ["approve", "reject", "override", "sign", "ground", "cancel", "issue", "calibrate", "reconcile"]:
                 side_id = f"side_effect_{cmd_id}_audit_log"
                 b_graph.add_node(BehaviorNode(
                     id=side_id,
@@ -428,10 +482,10 @@ class BehaviorGraphEngine:
                     provenance=ProvenanceKind.EXPLICIT,
                     description=f"Explicit read query for {actor.name} to view {ent.name}"
                 ))
-                b_graph.add_edge(actor.id, BehaviorRelationType.AUTHORIZED_FOR, query_id, inference_rule="actor_query_authorization")
+                b_graph.add_edge(actor.id, BehaviorRelationType.PERFORMS, query_id, inference_rule="actor_query_performs")
                 b_graph.add_edge(query_id, BehaviorRelationType.TARGETS, ent.id, inference_rule="query_entity_target")
 
-        # 3. Fallback for un-grounded entities (DERIVED capabilities via domain graph topology)
+        # 3. Demoted Fallback Candidates (PROPOSED Epistemic Status with low confidence)
         if not svo_triples:
             for actor in actors:
                 actor_name = actor.name.lower().replace(" ", "_")
@@ -444,12 +498,12 @@ class BehaviorGraphEngine:
                         behavior_type=BehaviorNodeType.QUERY,
                         actor_id=actor.id,
                         target_entity_id=ent.id,
-                        epistemic_status=EpistemicStatus.DERIVED,
-                        provenance=ProvenanceKind.STRONGLY_DERIVED,
-                        confidence=0.85,
-                        description=f"Topological read query for {actor.name} to inspect {ent.name}"
+                        epistemic_status=EpistemicStatus.PROPOSED,      # Demoted from DERIVED to PROPOSED
+                        provenance=ProvenanceKind.SPECULATIVE,
+                        confidence=0.35,                              # Demoted confidence
+                        description=f"Un-grounded proposed candidate query for {actor.name} to inspect {ent.name}"
                     ))
-                    b_graph.add_edge(actor.id, BehaviorRelationType.AUTHORIZED_FOR, query_id, inference_rule="topological_query_derivation")
-                    b_graph.add_edge(query_id, BehaviorRelationType.TARGETS, ent.id, inference_rule="query_target_binding")
+                    b_graph.add_edge(actor.id, BehaviorRelationType.PERFORMS, query_id, epistemic_status=EpistemicStatus.PROPOSED, confidence=0.35)
+                    b_graph.add_edge(query_id, BehaviorRelationType.TARGETS, ent.id, epistemic_status=EpistemicStatus.PROPOSED, confidence=0.35)
 
         return b_graph
