@@ -908,12 +908,13 @@ class WorkspaceDocumentScanner:
                 if line.strip().startswith('|'):
                     cells = [c.strip() for c in line.split('|') if c.strip()]
                     if cells:
-                        first_cell = cells[0].lower()
-                        for role_kw in ["student", "faculty", "hod", "operator", "admin", "super_admin", "super admin", "data operator", "data entry operator", "doctor", "nurse", "patient", "manager", "instructor", "tenant", "member"]:
-                            if role_kw == first_cell or first_cell.startswith(role_kw) or role_kw in first_cell:
-                                clean_r = first_cell.strip().replace(' ', '_')
+                        first_cell = cells[0].lower().strip('`* ')
+                        for role_kw in ["super_admin", "super admin", "data entry operator", "data operator", "public visitor", "public_visitor", "student", "faculty", "hod", "operator", "admin", "doctor", "nurse", "patient", "manager", "instructor", "tenant", "member"]:
+                            if first_cell == role_kw or first_cell == role_kw + "s" or first_cell.startswith(role_kw + " ") or first_cell.startswith(role_kw + " /"):
+                                clean_r = role_kw.replace(' ', '_')
                                 if clean_r not in evidence.auth_permissions:
                                     evidence.auth_permissions.append(clean_r)
+                                break
 
             # 3. Parse declared database models from markdown headers/bullets
             model_bullets = re.findall(r'[\*\-]\s*\*\*`?([a-zA-Z0-9_]+)`?\*\*\s*[:\(]', content)

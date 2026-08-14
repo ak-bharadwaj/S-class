@@ -68,15 +68,17 @@ class PracticalSkeptic:
             apis = lld.get("api_endpoints", [])
             for ep in apis:
                 url_path = ep.split()[1] if len(ep.split()) > 1 else ep
-                tokens = [t for t in re.split(r'[/_\-]', url_path.lower()) if t and not t.startswith('{')]
-                for token in tokens:
-                    norm_tok = token[:-1] if token.endswith('s') and len(token) > 3 else token
-                    if norm_tok in INVALID_ENTITY_NAMES:
-                        warnings.append(f"[SKEPTIC-NON-ENTITY-API] Hallucinated REST API '{ep}' is derived from adjective/verb token '{token}' instead of a real domain entity.")
+                # Extract clean path segments (e.g. /api/fasts -> ['fasts'], /attendance/reports/low-attendance -> ['attendance', 'reports', 'low-attendance'])
+                segments = [s.lower() for s in url_path.split('/') if s and not s.startswith('{') and not s.startswith(':') and s not in ['api', 'v1', 'v2', 'public']]
+                if segments:
+                    primary_seg = segments[0]
+                    norm_primary = primary_seg[:-1] if primary_seg.endswith('s') and len(primary_seg) > 3 else primary_seg
+                    if norm_primary in INVALID_ENTITY_NAMES:
+                        warnings.append(f"[SKEPTIC-NON-ENTITY-API] Hallucinated REST API '{ep}' is derived from adjective/verb token '{primary_seg}' instead of a real domain entity.")
                         checks.append({
                             "rule_id": "SKEPTIC-NON-ENTITY-API",
                             "severity": "BLOCKING",
-                            "message": f"Remove hallucinated endpoint '{ep}' based on invalid token '{token}'."
+                            "message": f"Remove hallucinated endpoint '{ep}' based on invalid root entity '{primary_seg}'."
                         })
                         passed = False
 
