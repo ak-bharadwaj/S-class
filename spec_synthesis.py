@@ -172,6 +172,8 @@ class SynthesizedSpec:
     archetypes: List[str] = field(default_factory=lambda: ["fullstack"])
     scope_tier: str = "moderate"
     spec_version: int = 1
+    page_spreads: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)
+    low_level_designs: Dict[str, Dict[str, Any]] = field(default_factory=dict)
 
 # --- Classifier & Archetype Detector ---
 
@@ -1259,6 +1261,452 @@ class RoleCapabilityExpander:
         return reqs
 
 
+class CanonicalDomainOntology:
+    """
+    Canonical software domain ontology.
+    Expands high-level module concepts into complete Low-Level Design (LLD) specifications:
+    sub-components, tabs, mandatory form fields, interactive user actions, and REST API endpoints.
+    """
+
+    ONTOLOGY_TREES: Dict[str, Dict[str, Any]] = {
+        "profile": {
+            "title": "User Profile & Identity Management",
+            "layout": "tabbed_card_layout",
+            "sub_components": ["AvatarUploader", "BioHeaderCard", "PersonalDetailsTab", "AcademicInstitutionalTab", "SecurityPasswordModal", "DocumentVaultGrid"],
+            "tabs": [
+                {
+                    "name": "Personal Details",
+                    "fields": ["fullName (string)", "personalEmail (email)", "mobileNumber (tel)", "dob (date)", "gender (select)", "bloodGroup (select)", "permanentAddress (text)", "emergencyContact (tel)"],
+                    "actions": ["Update Personal Info", "Upload Avatar Image"]
+                },
+                {
+                    "name": "Institutional Information",
+                    "fields": ["rollNumber / employeeId (string, read-only)", "department (string, read-only)", "batchSection (string, read-only)", "admissionYear / joiningDate (date)", "currentSemester (number)"],
+                    "actions": ["Download ID Card PDF"]
+                },
+                {
+                    "name": "Security & Credentials",
+                    "fields": ["currentPassword (password)", "newPassword (password)", "confirmPassword (password)", "twoFactorAuthToggle (boolean)"],
+                    "actions": ["Change Password", "Revoke Active Sessions"]
+                }
+            ],
+            "api_endpoints": [
+                "GET /api/profile",
+                "PUT /api/profile",
+                "POST /api/profile/avatar",
+                "PUT /api/auth/password"
+            ],
+            "validation_rules": [
+                "Avatar file must be image/jpeg or image/png under 2MB",
+                "Mobile number must match 10-digit format",
+                "New password must contain at least 8 characters with number and symbol"
+            ]
+        },
+        "gradebook": {
+            "title": "Academic Gradebook & Examination Results",
+            "layout": "master_detail_gradebook",
+            "sub_components": ["SgpaCgpaSummaryCard", "SemesterPickerTabs", "SubjectResultTable", "MarksBreakdownDrawer", "TranscriptExporter", "RevaluationRequestModal"],
+            "tabs": [
+                {
+                    "name": "Semester Results",
+                    "fields": ["semesterId (select)", "academicYear (string)", "sgpa (number)", "cgpa (number)", "totalCreditsEarned (number)", "resultStatus (badge)"],
+                    "actions": ["Filter Semester", "Export Official Transcript PDF", "Request Revaluation"]
+                },
+                {
+                    "name": "Subject Breakdown",
+                    "fields": ["subjectCode (string)", "subjectName (string)", "credits (number)", "grade (string)", "gradePoint (number)", "internalMarks (number)", "externalMarks (number)", "totalMarks (number)"],
+                    "actions": ["View Score Breakdown Modal"]
+                }
+            ],
+            "api_endpoints": [
+                "GET /api/results",
+                "GET /api/results/{semesterId}",
+                "POST /api/results/revaluation",
+                "GET /api/results/transcript-pdf"
+            ],
+            "validation_rules": [
+                "SGPA and CGPA must be computed to 2 decimal places",
+                "Revaluation request only permitted within 14 days of publication"
+            ]
+        },
+        "subjects": {
+            "title": "Curriculum & Enrolled Subjects",
+            "layout": "roster_grid",
+            "sub_components": ["SubjectRosterTable", "SyllabusViewerModal", "FacultyInchargeBadge", "AttendanceProgressBar", "SubjectCreditSummary"],
+            "tabs": [
+                {
+                    "name": "Enrolled Courses",
+                    "fields": ["courseCode (string)", "courseTitle (string)", "department (string)", "credits (number)", "facultyInchargeName (string)", "attendancePercent (progress)", "syllabusUrl (url)"],
+                    "actions": ["Download Syllabus PDF", "View Course Schedule"]
+                }
+            ],
+            "api_endpoints": [
+                "GET /api/subjects",
+                "GET /api/subjects/{id}/syllabus",
+                "GET /api/subjects/{id}/attendance"
+            ],
+            "validation_rules": [
+                "Total registered credits must not exceed semester maximum quota"
+            ]
+        },
+        "allocations": {
+            "title": "Subject Allocation & Faculty Matrix",
+            "layout": "data_grid_matrix",
+            "sub_components": ["FacultyPicker", "SubjectPicker", "SectionPicker", "AllocationMatrixTable", "CapacityWarningPill", "CsvBatchImporter"],
+            "tabs": [
+                {
+                    "name": "Allocation Matrix",
+                    "fields": ["facultyId (select)", "subjectId (select)", "sectionId (select)", "semesterId (select)", "hoursPerWeek (number)", "sectionCapacity (number)", "enrolledCount (number)"],
+                    "actions": ["Assign Subject", "Batch CSV Import", "Verify Checksum", "Auto-Balance Sections"]
+                }
+            ],
+            "api_endpoints": [
+                "GET /api/allocations",
+                "POST /api/allocations",
+                "POST /api/allocations/import-csv",
+                "DELETE /api/allocations/{id}"
+            ],
+            "validation_rules": [
+                "CSV import must compute SHA-256 checksum and flag capacity overages"
+            ]
+        },
+        "internships": {
+            "title": "Student Industrial Internships & NOC Lifecycle",
+            "layout": "form_wizard_and_tracker",
+            "sub_components": ["NocApplicationWizard", "EligibilityGuardPill", "CompanyMentorForm", "OfferLetterUploadBox", "CreditConversionCard"],
+            "tabs": [
+                {
+                    "name": "NOC Application",
+                    "fields": ["companyName (string)", "internshipType (select)", "stipendMonthlyInr (number)", "startDate (date)", "endDate (date)", "companyMentorName (string)", "companyMentorEmail (email)", "offerLetterDoc (file)"],
+                    "actions": ["Submit NOC Request", "Upload Offer Letter", "Download Issued NOC"]
+                },
+                {
+                    "name": "Credit Conversion",
+                    "fields": ["weeklyHours (number)", "mentorFeedbackScore (number)", "facultySupervisorScore (number)", "creditsApproved (number)"],
+                    "actions": ["Convert to Academic Credits"]
+                }
+            ],
+            "api_endpoints": [
+                "GET /api/internships",
+                "POST /api/internships/noc-request",
+                "PATCH /api/internships/{id}/approve-noc",
+                "PATCH /api/internships/{id}/convert-credits"
+            ],
+            "validation_rules": [
+                "Student must have CGPA >= 6.5 and 0 active backlogs for NOC approval"
+            ]
+        },
+        "capstone": {
+            "title": "Capstone Projects & Thesis Defense",
+            "layout": "project_lifecycle_board",
+            "sub_components": ["TeamRegistrationForm", "GuideAllocationPicker", "PlagiarismScorePill", "JuryScorecardDrawer", "MilestoneProgressTracker"],
+            "tabs": [
+                {
+                    "name": "Project Workspace",
+                    "fields": ["projectTitle (string)", "technicalDomain (select)", "guideFacultyId (select)", "teamMemberRollNumbers (array)", "teamLeadRollNumber (string)", "plagiarismSimilarityPercent (number)", "phase1Score (number)", "phase2Score (number)", "githubRepoUrl (url)", "demoVideoUrl (url)"],
+                    "actions": ["Submit Proposal", "Run Plagiarism Scan", "Submit Milestone Demo", "Record Jury Score"]
+                }
+            ],
+            "api_endpoints": [
+                "GET /api/capstones",
+                "POST /api/capstones",
+                "PATCH /api/capstones/{id}/scores",
+                "POST /api/capstones/{id}/plagiarism-check"
+            ],
+            "validation_rules": [
+                "Max 4 students per team",
+                "Plagiarism similarity must remain under 15% threshold"
+            ]
+        },
+        "onboarding": {
+            "title": "Student Onboarding & Multi-Stage Verification Queue",
+            "layout": "multi_stage_queue",
+            "sub_components": ["Stage1DocumentReview", "Stage2AcademicEligibility", "Stage3HodVerification", "VerificationActionDrawer", "BatchApproveBar"],
+            "tabs": [
+                {
+                    "name": "Verification Queue",
+                    "fields": ["studentRollNumber (string)", "currentStage (select)", "aadhaarVerified (boolean)", "marksheetsVerified (boolean)", "verificationNotes (text)", "onboardingStatus (badge)"],
+                    "actions": ["Approve Stage", "Reject with Reason", "Batch Sign-Off"]
+                }
+            ],
+            "api_endpoints": [
+                "GET /api/onboarding/queue",
+                "POST /api/onboarding/{id}/advance-stage",
+                "POST /api/onboarding/{id}/reject"
+            ],
+            "validation_rules": [
+                "Stage 3 requires HOD role authorization"
+            ]
+        },
+        "documents": {
+            "title": "Institutional Document Vault & File Manager",
+            "layout": "document_vault",
+            "sub_components": ["FileUploadZone", "VirusScanStatusPill", "CategoryFolderTabs", "DocumentPreviewModal", "AccessControlPicker"],
+            "tabs": [
+                {
+                    "name": "Document Vault",
+                    "fields": ["fileName (string)", "fileSizeBytes (number)", "fileCategory (select)", "uploadedBy (string)", "virusScanStatus (badge)", "isPublic (boolean)"],
+                    "actions": ["Upload Document", "Scan for Viruses", "Download Document", "Delete Document"]
+                }
+            ],
+            "api_endpoints": [
+                "GET /api/documents",
+                "POST /api/documents/upload",
+                "DELETE /api/documents/{id}"
+            ],
+            "validation_rules": [
+                "ClamAV scan must verify file is clean before storage"
+            ]
+        },
+        "dashboard": {
+            "title": "Role-Aware Operational Dashboard",
+            "layout": "metrics_grid",
+            "sub_components": ["MetricStatCardGrid", "UpcomingEventsTimeline", "QuickActionShortcuts", "RecentActivityFeed", "NotificationDrawer"],
+            "tabs": [
+                {
+                    "name": "Overview",
+                    "fields": ["kpiMetrics (object)", "announcements (array)", "pendingTasksCount (number)", "recentEvents (array)"],
+                    "actions": ["Refresh Real-Time Metrics", "Acknowledge Notification", "Trigger Quick Action"]
+                }
+            ],
+            "api_endpoints": [
+                "GET /api/dashboard/metrics",
+                "GET /api/dashboard/announcements",
+                "GET /api/notifications"
+            ],
+            "validation_rules": [
+                "Metrics must reflect real store data with zero mock placeholders"
+            ]
+        },
+        "system_admin": {
+            "title": "System Governance, Audit Trails & Master Data",
+            "layout": "governance_console",
+            "sub_components": ["UserAccountTable", "MasterDataLookupEditor", "AuditTrailViewer", "SemesterAdvancementBar", "SystemConfigForm"],
+            "tabs": [
+                {
+                    "name": "User Governance",
+                    "fields": ["username (string)", "email (email)", "role (select)", "isActive (boolean)", "lastLoginAt (date)"],
+                    "actions": ["Create User Account", "Toggle Active Status", "Reset Password"]
+                },
+                {
+                    "name": "Semester Advancement",
+                    "fields": ["currentAcademicYear (string)", "activeSemester (select)", "graduatingBatchId (select)"],
+                    "actions": ["Execute Batch Semester Advancement", "Trigger Auto-Graduation"]
+                },
+                {
+                    "name": "Audit Trail",
+                    "fields": ["timestamp (date)", "userId (string)", "actionType (string)", "resource (string)", "ipAddress (string)"],
+                    "actions": ["Export Immutable Audit Log CSV"]
+                }
+            ],
+            "api_endpoints": [
+                "GET /api/admin/users",
+                "POST /api/admin/users",
+                "POST /api/admin/semester-advance",
+                "GET /api/admin/audit-logs"
+            ],
+            "validation_rules": [
+                "Super Admin role required for all governance actions"
+            ]
+        }
+    }
+
+    @classmethod
+    def match_module(cls, keyword: str) -> Optional[Dict[str, Any]]:
+        kw_clean = keyword.lower().replace('-', '_').replace(' ', '_')
+        for key, defn in cls.ONTOLOGY_TREES.items():
+            if key in kw_clean or kw_clean in key:
+                return defn
+        # Fuzzy keyword matching
+        if any(w in kw_clean for w in ['profile', 'user', 'bio', 'student_self', 'faculty_self']):
+            return cls.ONTOLOGY_TREES["profile"]
+        if any(w in kw_clean for w in ['result', 'grade', 'mark', 'sgpa', 'cgpa', 'transcript']):
+            return cls.ONTOLOGY_TREES["gradebook"]
+        if any(w in kw_clean for w in ['subject', 'course', 'curriculum', 'syllabus']):
+            return cls.ONTOLOGY_TREES["subjects"]
+        if any(w in kw_clean for w in ['allocat', 'faculty_assign', 'timetable']):
+            return cls.ONTOLOGY_TREES["allocations"]
+        if any(w in kw_clean for w in ['intern', 'noc', 'industry', 'placement']):
+            return cls.ONTOLOGY_TREES["internships"]
+        if any(w in kw_clean for w in ['capstone', 'project', 'thesis', 'defense']):
+            return cls.ONTOLOGY_TREES["capstone"]
+        if any(w in kw_clean for w in ['onboard', 'verify', 'verification', 'stage']):
+            return cls.ONTOLOGY_TREES["onboarding"]
+        if any(w in kw_clean for w in ['doc', 'file', 'vault', 'upload', 'clamav']):
+            return cls.ONTOLOGY_TREES["documents"]
+        if any(w in kw_clean for w in ['dash', 'overview', 'home', 'stat', 'kpi']):
+            return cls.ONTOLOGY_TREES["dashboard"]
+        if any(w in kw_clean for w in ['admin', 'govern', 'audit', 'master_data', 'advancement']):
+            return cls.ONTOLOGY_TREES["system_admin"]
+        return None
+
+
+class RolePageSpreadEngine:
+    """
+    Generates canonical frontend route sitemaps and page spreads per role.
+    Ensures that for any multi-role application, every role has a dedicated,
+    permission-scoped sitemap with full component hierarchies.
+    """
+
+    CANONICAL_ROLE_SPREADS: Dict[str, List[Dict[str, Any]]] = {
+        "student": [
+            {"route": "/dashboard", "page_name": "Student Dashboard", "module_key": "dashboard", "description": "Academic metrics overview, upcoming exams, and announcements"},
+            {"route": "/profile", "page_name": "Student Self-Profile", "module_key": "profile", "description": "Personal bio, academic details, and security credential editor"},
+            {"route": "/subjects", "page_name": "Course & Syllabus View", "module_key": "subjects", "description": "Registered subjects, syllabus downloads, and faculty assignments"},
+            {"route": "/results", "page_name": "Semester Gradebook", "module_key": "gradebook", "description": "SGPA/CGPA transcript viewer, marks breakdown, and revaluation requests"},
+            {"route": "/internships", "page_name": "Industrial NOC Hub", "module_key": "internships", "description": "Internship NOC applications, mentor logging, and credit conversion"},
+            {"route": "/capstone", "page_name": "Capstone Project Board", "module_key": "capstone", "description": "Team leader registration, proposal submission, and plagiarism score"},
+            {"route": "/documents", "page_name": "Student Document Vault", "module_key": "documents", "description": "Uploaded certificates, verified ID proofs, and digital receipts"}
+        ],
+        "faculty": [
+            {"route": "/dashboard", "page_name": "Faculty Dashboard", "module_key": "dashboard", "description": "Assigned courses, active student count, and pending evaluations"},
+            {"route": "/faculty-profile", "page_name": "Faculty Profile Editor", "module_key": "profile", "description": "Public bio editor, specializations, and research interest areas"},
+            {"route": "/allocations", "page_name": "Subject Allocation Matrix", "module_key": "allocations", "description": "Assigned subjects, class sections, and weekly teaching hours"},
+            {"route": "/capstone/evaluations", "page_name": "Capstone Jury Defense", "module_key": "capstone", "description": "Jury scorecard evaluations for Phase-1 & Phase-2 projects"},
+            {"route": "/documents", "page_name": "Faculty Document Vault", "module_key": "documents", "description": "Course materials, lesson plans, and research documents"}
+        ],
+        "admin": [
+            {"route": "/dashboard", "page_name": "Admin Control Center", "module_key": "dashboard", "description": "System-wide KPIs, department stats, and operational alerts"},
+            {"route": "/admin/onboarding", "page_name": "Student Verification Queue", "module_key": "onboarding", "description": "Stage 1-3 onboarding review, document validation, and student approvals"},
+            {"route": "/admin/allocations/import", "page_name": "CSV Allocation Importer", "module_key": "allocations", "description": "Batch CSV subject allocation importer with SHA-256 checksums"},
+            {"route": "/admin/results/import", "page_name": "CSV University Results Importer", "module_key": "gradebook", "description": "Batch CSV results importer with SGPA engine and auto-graduation"},
+            {"route": "/admin/documents", "page_name": "Institutional Document Vault", "module_key": "documents", "description": "Document management with automated ClamAV virus scanning"}
+        ],
+        "hod": [
+            {"route": "/dashboard", "page_name": "HOD Department Analytics", "module_key": "dashboard", "description": "Department KPIs, faculty workload balancing, and student progression"},
+            {"route": "/hod/verification-queue", "page_name": "Stage 3 Final Sign-Off Queue", "module_key": "onboarding", "description": "Final stage student onboarding verification and institutional approvals"},
+            {"route": "/allocations", "page_name": "Department Allocation Overview", "module_key": "allocations", "description": "Full department subject-faculty mapping and section capacity monitor"}
+        ],
+        "super_admin": [
+            {"route": "/admin/governance", "page_name": "System Governance Console", "module_key": "system_admin", "description": "User account management, global roles, and security configuration"},
+            {"route": "/admin/semester-advancement", "page_name": "Batch Semester Advancement", "module_key": "system_admin", "description": "Batch semester advancement engine and auto-graduation trigger"},
+            {"route": "/admin/audit-logs", "page_name": "Immutable System Audit Trail", "module_key": "system_admin", "description": "Comprehensive security audit trail and compliance log exporter"}
+        ],
+        "visitor": [
+            {"route": "/", "page_name": "Institutional Public Portal", "module_key": "dashboard", "description": "Public overview, department vision, announcements, and quick links"},
+            {"route": "/degrees", "page_name": "Academic Degree Programs", "module_key": "subjects", "description": "Curriculum overview, degree options, and admission requirements"},
+            {"route": "/faculty", "page_name": "Faculty Directory Roster", "module_key": "profile", "description": "Public faculty directory with research profiles and contact information"},
+            {"route": "/placements", "page_name": "Placement & Career Center", "module_key": "internships", "description": "Placement statistics, recruiter spotlight, and alumni achievements"}
+        ]
+    }
+
+    @classmethod
+    def generate_spread(cls, roles: List[str]) -> Dict[str, List[Dict[str, Any]]]:
+        spread = {}
+        for role in roles:
+            role_clean = role.lower().strip()
+            matched = False
+            for canonical_role, pages in cls.CANONICAL_ROLE_SPREADS.items():
+                if canonical_role in role_clean or role_clean in canonical_role:
+                    spread[role] = pages
+                    matched = True
+                    break
+            if not matched:
+                spread[role] = [
+                    {"route": "/dashboard", "page_name": f"{role.title()} Dashboard", "module_key": "dashboard", "description": f"Main workspace for {role}"},
+                    {"route": "/profile", "page_name": f"{role.title()} Profile", "module_key": "profile", "description": f"Account profile and settings for {role}"},
+                    {"route": "/documents", "page_name": f"{role.title()} Documents", "module_key": "documents", "description": f"Document manager for {role}"}
+                ]
+        return spread
+
+
+class LowLevelDesignSynthesizer:
+    """
+    Synthesizes rich Low-Level Design (LLD) requirements for every page and module in the application.
+    Generates granular requirements for form field sets, UI sub-components, user action triggers, and REST APIs.
+    """
+
+    @classmethod
+    def synthesize_lld_requirements(cls, page_spreads: Dict[str, List[Dict[str, Any]]]) -> Tuple[List[SynthesizedRequirement], Dict[str, Dict[str, Any]]]:
+        lld_reqs = []
+        lld_catalog = {}
+        seen_modules = set()
+
+        for role, pages in page_spreads.items():
+            for page in pages:
+                mod_key = page.get("module_key", "")
+                page_route = page.get("route", "")
+                page_name = page.get("page_name", "")
+
+                onto = CanonicalDomainOntology.match_module(mod_key) or CanonicalDomainOntology.match_module(page_name)
+                if not onto:
+                    continue
+
+                catalog_key = f"{role}:{page_route}"
+                lld_catalog[catalog_key] = {
+                    "role": role,
+                    "page_name": page_name,
+                    "route": page_route,
+                    "layout": onto.get("layout", "standard"),
+                    "sub_components": onto.get("sub_components", []),
+                    "tabs": onto.get("tabs", []),
+                    "api_endpoints": onto.get("api_endpoints", []),
+                    "validation_rules": onto.get("validation_rules", [])
+                }
+
+                dedup_key = f"{role}_{mod_key}_{page_name}".lower()
+                if dedup_key not in seen_modules:
+                    seen_modules.add(dedup_key)
+
+                    components_str = ", ".join(onto.get("sub_components", [])[:4])
+                    lld_reqs.append(SynthesizedRequirement(
+                        id=f"REQ-LLD-COMP-{len(lld_reqs) + 1}",
+                        description=f"[{role.upper()}] {page_name} — UI Component Hierarchy: {components_str}",
+                        type=RequirementType.DERIVED,
+                        category=RequirementCategory.UX_DERIVATION,
+                        action=ArtifactAction.CREATE,
+                        decision_threshold=DecisionThreshold.AUTO_DECIDE,
+                        evidence=[EvidenceReference(source_file="canonical_domain_ontology", reference_text=f"UI hierarchy for {page_name}")],
+                        why_chain=[
+                            f"Canonical Low-Level Design expansion for {page_name} ({page_route})",
+                            f"Layout type: {onto.get('layout')}",
+                            f"Composed components: {components_str}"
+                        ],
+                        affects=["frontend"],
+                        assumption_type="ux"
+                    ))
+
+                    for tab in onto.get("tabs", []):
+                        tab_name = tab.get("name", "Main")
+                        fields_str = ", ".join(tab.get("fields", [])[:5])
+                        actions_str = ", ".join(tab.get("actions", [])[:3])
+                        lld_reqs.append(SynthesizedRequirement(
+                            id=f"REQ-LLD-FIELDS-{len(lld_reqs) + 1}",
+                            description=f"[{role.upper()}] {page_name} ({tab_name}) — Form Fields: {fields_str} | Actions: {actions_str}",
+                            type=RequirementType.DERIVED,
+                            category=RequirementCategory.PRODUCT_REQUIREMENT,
+                            action=ArtifactAction.CREATE,
+                            decision_threshold=DecisionThreshold.AUTO_DECIDE,
+                            evidence=[EvidenceReference(source_file="canonical_domain_ontology", reference_text=f"Fields for {page_name} -> {tab_name}")],
+                            why_chain=[
+                                f"Mandatory field definitions for {page_name} -> {tab_name}",
+                                f"Input fields: {fields_str}",
+                                f"Actions: {actions_str}"
+                            ],
+                            affects=["frontend", "backend"],
+                            assumption_type="data"
+                        ))
+
+                    endpoints_str = ", ".join(onto.get("api_endpoints", [])[:3])
+                    lld_reqs.append(SynthesizedRequirement(
+                        id=f"REQ-LLD-API-{len(lld_reqs) + 1}",
+                        description=f"[{role.upper()}] {page_name} — Backing REST APIs: {endpoints_str}",
+                        type=RequirementType.DERIVED,
+                        category=RequirementCategory.ARCHITECTURAL_CONSTRAINT,
+                        action=ArtifactAction.CREATE,
+                        decision_threshold=DecisionThreshold.AUTO_DECIDE,
+                        evidence=[EvidenceReference(source_file="canonical_domain_ontology", reference_text=f"REST endpoints for {page_name}")],
+                        why_chain=[
+                            f"REST API contract for {page_name}",
+                            f"Endpoints: {endpoints_str}"
+                        ],
+                        affects=["backend"],
+                        assumption_type="api"
+                    ))
+
+        return lld_reqs, lld_catalog
+
+
 class SpecSynthesisEngine:
     """Full 6-step orchestrator saving spec output."""
 
@@ -1306,6 +1754,7 @@ class SpecSynthesisEngine:
     def synthesize_requirements(self, intent: IntentExtraction, evidence: ProjectEvidence, archetypes: List[ProjectArchetype], scope_tier: Optional[ScopeTier] = None) -> List[SynthesizedRequirement]:
         reqs = []
 
+        # 1. Explicit Base Requirements
         if isinstance(intent, StructuredIntent) and intent.role_bindings:
             for b_idx, binding in enumerate(intent.role_bindings):
                 for c_idx, cap in enumerate(binding.capabilities):
@@ -1334,10 +1783,16 @@ class SpecSynthesisEngine:
                     affects=["frontend", "backend"]
                 ))
 
-        # Targeted expansion using RoleCapabilityExpander
+        # 2. Targeted Role-Capability & Discovered Page Expansion
         expanded_reqs = RoleCapabilityExpander.expand(intent if isinstance(intent, StructuredIntent) else StructuredIntent(raw_request=intent.raw_request, primary_features=intent.primary_features, target_roles=intent.target_roles), evidence, archetypes)
         reqs.extend(expanded_reqs)
 
+        # 3. Canonical Low-Level Design (LLD) & Role Page Spread Synthesis
+        page_spreads = RolePageSpreadEngine.generate_spread(intent.target_roles)
+        lld_reqs, _ = LowLevelDesignSynthesizer.synthesize_lld_requirements(page_spreads)
+        reqs.extend(lld_reqs)
+
+        # 4. Universal Archetype Inferences
         inferred_reqs = self.inference_engine.apply_rules(reqs, evidence, archetypes, scope_tier)
         reqs.extend(inferred_reqs)
 
@@ -1454,6 +1909,10 @@ class SpecSynthesisEngine:
         # 3. Requirement Synthesis
         requirements_list = self.synthesize_requirements(intent, evidence, archetypes, scope_tier)
 
+        # 4. Generate Role Page Spreads & LLD Catalog
+        page_spreads = RolePageSpreadEngine.generate_spread(intent.target_roles)
+        _, lld_catalog = LowLevelDesignSynthesizer.synthesize_lld_requirements(page_spreads)
+
         # Incorporate Clarification Answers
         if not clarification_answers and os.path.exists(os.path.join(agents_dir, "clarification_answers.json")):
             clarification_answers = load_json(os.path.join(agents_dir, "clarification_answers.json"))
@@ -1466,7 +1925,7 @@ class SpecSynthesisEngine:
                     req.type = RequirementType.SUPPORTED
                     req.description += f" [CLARIFIED: {answer}]"
 
-        # 4. Graph & Dependency Wiring
+        # 5. Graph & Dependency Wiring
         graph = RequirementGraph()
         for req in requirements_list:
             graph.add_node(req)
@@ -1494,7 +1953,7 @@ class SpecSynthesisEngine:
             if conflict not in requirements_list:
                 requirements_list.append(conflict)
 
-        # 5. Semantic Gate Evaluation V4.0 with Dynamic Budget Scaling
+        # 6. Semantic Gate Evaluation with Dynamic Budget Scaling
         gate_result_enum, total_weight = self.gate.evaluate(requirements_list, evidence, archetypes, scope_tier=scope_tier)
 
         questions = self._generate_clarifying_questions(requirements_list, intent)
@@ -1518,7 +1977,9 @@ class SpecSynthesisEngine:
             total_assumption_weight=total_weight,
             archetypes=archetype_strings,
             scope_tier=scope_tier.value,
-            spec_version=current_version
+            spec_version=current_version,
+            page_spreads=page_spreads,
+            low_level_designs=lld_catalog
         )
 
         md_path = os.path.join(agents_dir, "synthesized_spec.md")
@@ -1540,10 +2001,10 @@ class SpecSynthesisEngine:
 
         # Save Markdown output
         try:
-            md_content = "# Synthesized Specification V3.0\n\n"
+            md_content = "# Synthesized Specification V4.0 (Production-Grade LLD)\n\n"
             md_content += f"**Intent**: {spec.intent_summary}\n"
             md_content += f"**Archetypes**: {', '.join(spec.archetypes)} | **Scope**: {spec.scope_tier.upper()}\n"
-            md_content += f"**Gate Result**: {spec.gate_result} (Assumption Weight: {spec.total_assumption_weight}/40)\n"
+            md_content += f"**Gate Result**: {spec.gate_result} (Assumption Weight: {spec.total_assumption_weight}/150)\n"
             md_content += f"**Total Requirements**: {sum(len(v) for v in spec.requirements.values())} | **Version**: v{spec.spec_version}\n\n"
 
             if spec.questions_for_human:
@@ -1551,6 +2012,34 @@ class SpecSynthesisEngine:
                 for i, q in enumerate(spec.questions_for_human, 1):
                     md_content += f"{i}. {q}\n"
                 md_content += "\n"
+
+            # Render Role-Based Page Spreading Sitemap
+            if spec.page_spreads:
+                md_content += "## 🗺️ Role-Based Page Spreads & Frontend Sitemap\n\n"
+                for role, pages in spec.page_spreads.items():
+                    md_content += f"### Role: {role.upper()} ({len(pages)} Pages)\n\n"
+                    md_content += "| Route Path | Page Name | Module Scope | Description |\n"
+                    md_content += "|---|---|---|---|\n"
+                    for p in pages:
+                        md_content += f"| `{p['route']}` | **{p['page_name']}** | `{p['module_key']}` | {p['description']} |\n"
+                    md_content += "\n"
+
+            # Render Low-Level Design Component & Field Specifications
+            if spec.low_level_designs:
+                md_content += "## 📐 Canonical Low-Level Design (LLD) Specifications\n\n"
+                for key, lld in spec.low_level_designs.items():
+                    md_content += f"### [{lld['role'].upper()}] {lld['page_name']} (`{lld['route']}`)\n\n"
+                    md_content += f"- **Layout**: `{lld['layout']}`\n"
+                    md_content += f"- **Composed Sub-Components**: {', '.join(f'`{c}`' for c in lld['sub_components'])}\n"
+                    md_content += f"- **Backing REST Endpoints**: {', '.join(f'`{e}`' for e in lld['api_endpoints'])}\n"
+                    if lld.get("validation_rules"):
+                        md_content += f"- **Validation Rules**: {'; '.join(lld['validation_rules'])}\n"
+
+                    md_content += "\n**Tab & Form Field Breakdown**:\n\n"
+                    for tab in lld.get("tabs", []):
+                        md_content += f"**Tab: {tab['name']}**\n"
+                        md_content += f"- *Fields*: {', '.join(tab.get('fields', []))}\n"
+                        md_content += f"- *User Actions*: {', '.join(tab.get('actions', []))}\n\n"
 
             md_content += "## Acceptance Criteria\n\n"
             for ac in spec.acceptance_criteria:
@@ -1576,5 +2065,5 @@ class SpecSynthesisEngine:
         except Exception as e:
             logger.error(f"Failed to write MD output: {e}")
 
-        logger.info(f"Synthesis V3.0 completed (v{spec.spec_version}). {sum(len(v) for v in spec.requirements.values())} requirements, gate={spec.gate_result}")
+        logger.info(f"Synthesis V4.0 completed (v{spec.spec_version}). {sum(len(v) for v in spec.requirements.values())} requirements, gate={spec.gate_result}")
         return spec
