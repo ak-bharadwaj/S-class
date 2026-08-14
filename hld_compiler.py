@@ -228,27 +228,35 @@ class HLDCompiler:
             if req.capability not in capability_clusters[context_key]["owned_capabilities"]:
                 capability_clusters[context_key]["owned_capabilities"].append(req.capability)
 
+        if not capability_clusters and b_graph and b_graph.nodes:
+            for b_node in b_graph.nodes.values():
+                target_ent = getattr(b_node, "target_entity_id", "core") or "core"
+                target_ent = target_ent.replace("entity_", "").replace("resource_", "").replace("wf_", "")
+                context_key = f"ctx_{target_ent.lower()}_management"
+                context_name = f"{target_ent.capitalize()} Management Context"
+                if context_key not in capability_clusters:
+                    capability_clusters[context_key] = {
+                        "id": context_key,
+                        "name": context_name,
+                        "owned_entities": set(),
+                        "owned_capabilities": []
+                    }
+                capability_clusters[context_key]["owned_entities"].add(target_ent)
+                if b_node.id not in capability_clusters[context_key]["owned_capabilities"]:
+                    capability_clusters[context_key]["owned_capabilities"].append(b_node.id)
+
         modules = [
             HLDModule(
                 id=data["id"],
                 name=data["name"],
                 system_boundary=f"Bounded Context: {data['name']}",
-                owned_entities=list(data["owned_entities"]),
-                owned_capabilities=data["owned_capabilities"]
+                owned_entities=sorted(list(data["owned_entities"])),
+                owned_capabilities=sorted(list(data["owned_capabilities"]))
             )
-            for data in capability_clusters.values()
+            for data in sorted(capability_clusters.values(), key=lambda x: x["id"])
         ]
 
-        if not modules:
-            req_words = [w for w in raw_request.lower().split() if len(w) > 3 and w not in ["build", "system", "platform", "create", "manage", "with", "from", "for"]]
-            domain_name = req_words[0].capitalize() if req_words else "Domain"
-            modules.append(HLDModule(
-                id=f"ctx_{domain_name.lower()}_management",
-                name=f"{domain_name} Management Context",
-                system_boundary=f"Bounded Context: {domain_name} Management",
-                owned_entities=[domain_name.lower()],
-                owned_capabilities=[f"{domain_name.lower()}_operations"]
-            ))
+
 
         # 2. Evaluate ADRs conditionally
         adr_topology = ADRReasoningEngine.evaluate_architecture_topology(r_graph, raw_request)

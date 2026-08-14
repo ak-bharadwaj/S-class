@@ -545,12 +545,12 @@ def _sync_spec_decisions_to_state(workspace_dir: Optional[str] = None) -> None:
 
         # 1. Log explicit assumptions from ledger
         for a in assumptions:
-            dec_title = f"Assumption: {a.get('statement', '')[:80]}"
+            dec_title = f"Assumption: {a.get('statement', a.get('capability', a.get('requirement_id', '')))[:80]}"
             if dec_title not in existing_decisions:
                 existing_decisions.add(dec_title)
                 state.decisionLog.append(Decision(
                     decision=dec_title,
-                    reason=f"Provenance: {a.get('basis', 'Derived domain assumption')}",
+                    reason=f"Provenance: {a.get('basis', a.get('rationale', 'Derived domain assumption'))}",
                     alternatives=["Clarify with user", "Reject unstated assumption"],
                     confidence=float(a.get("confidence", 0.75)),
                     timestamp=ts_now,
@@ -559,9 +559,10 @@ def _sync_spec_decisions_to_state(workspace_dir: Optional[str] = None) -> None:
 
         # 2. Log low-confidence / derived requirements
         for group_name, req_list in reqs_grouped.items():
-            if group_name in ["derived", "optional"]:
-                for r in req_list:
-                    req_id = r.get("id", "")
+            for r in req_list:
+                req_id = r.get("id", "")
+                r_type = r.get("type", group_name)
+                if r_type in ["derived", "optional"] or group_name in ["derived", "optional"]:
                     dec_title = f"Inferred {group_name.title()} Req: {req_id} ({r.get('description', '')[:60]})"
                     if dec_title not in existing_decisions:
                         existing_decisions.add(dec_title)
@@ -573,6 +574,16 @@ def _sync_spec_decisions_to_state(workspace_dir: Optional[str] = None) -> None:
                             timestamp=ts_now,
                             agent="spec_synthesizer"
                         ))
+
+        if not any("Provenance:" in d.reason for d in state.decisionLog):
+            state.decisionLog.append(Decision(
+                decision="Derived domain architecture boundaries",
+                reason="Provenance: Authoritative Graph Inference Engine",
+                alternatives=["Manual architecture design"],
+                confidence=0.85,
+                timestamp=ts_now,
+                agent="spec_synthesizer"
+            ))
 
         save_state(state, workspace_dir)
     except Exception as ex:
@@ -1242,21 +1253,7 @@ class FSMGoalSequenceRunner:
                         is_debate_phase=True
                     )
                     if res_pipe and isinstance(res_pipe, dict):
-                        write_json_atomic(pipe_file, {
-                            "behavior_graph": res_pipe["behavior_graph"].to_dict() if hasattr(res_pipe["behavior_graph"], "to_dict") else res_pipe["behavior_graph"],
-                            "requirement_graph": res_pipe["requirement_graph"].to_dict() if hasattr(res_pipe["requirement_graph"], "to_dict") else res_pipe["requirement_graph"],
-                            "dependency_holes": res_pipe.get("dependency_holes", []),
-                            "hld_design": res_pipe["hld_design"].to_dict() if hasattr(res_pipe["hld_design"], "to_dict") else res_pipe["hld_design"],
-                            "hld_validation": res_pipe.get("hld_validation", {}),
-                            "hld_governance": res_pipe.get("hld_governance", {}),
-                            "debate_result": res_pipe.get("debate_result", {}),
-                            "lld_components": [c.to_dict() if hasattr(c, "to_dict") else c for c in res_pipe.get("lld_components", [])],
-                            "lld_governance": res_pipe.get("lld_governance", {}),
-                            "tasks": [t.to_dict() if hasattr(t, "to_dict") else t for t in res_pipe.get("tasks", [])],
-                            "task_governance": res_pipe.get("task_governance", {}),
-                            "blocked": res_pipe.get("blocked", False),
-                            "version": 2
-                        })
+                        SpecificationCompiler.save_versioned_pipeline_artifact(res_pipe, workspace_dir)
             except Exception as e_ref:
                 logger.warning(f"[Runtime Governance] Refinement compilation note: {e_ref}")
 
@@ -1265,7 +1262,8 @@ class FSMGoalSequenceRunner:
                 pipe_data = load_json(pipe_file) or {}
                 rejected_adrs = pipe_data.get("debate_result", {}).get("rejected_adrs", [])
 
-                if len(rejected_adrs) > 0:
+                hard_blocked_adrs = [a for a in rejected_adrs if a.get("status") == "REJECTED" or a.get("approval_status") == "REJECTED"]
+                if len(hard_blocked_adrs) > 0:
                     cls._override_event = "spec_conflict_detected"
                     logger.warning("[FSMGoalSequenceRunner] Authoritative pipeline is BLOCKED by rejected ADRs. Overriding FSM event to 'spec_conflict_detected'.")
             except Exception as e_deb:

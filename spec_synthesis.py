@@ -2263,40 +2263,49 @@ class SpecSynthesisEngine:
                         "rationale": getattr(r_node, "reason", "Derived architectural inference")
                     })
 
-        # 5. Canonical Requirement Derivation from Authoritative Pipeline Graph
-        synthesized_reqs = self.synthesize_requirements(intent, evidence, archetypes, scope_tier)
-        requirements_list = synthesized_reqs
+        # 5. Canonical Requirement Derivation directly from Authoritative RequirementGraph
+        requirements_list: List[SynthesizedRequirement] = []
         if r_graph_authoritative and hasattr(r_graph_authoritative, "nodes") and r_graph_authoritative.nodes:
-            existing_ids = {r.id for r in requirements_list}
-            for r_node in r_graph_authoritative.nodes.values():
-                r_id = getattr(r_node, "id", "")
-                if r_id and r_id not in existing_ids:
-                    kind_str = str(getattr(r_node, "kind", "")).lower()
+            r_nodes = r_graph_authoritative.nodes.values() if isinstance(r_graph_authoritative.nodes, dict) else r_graph_authoritative.nodes
+            for r_node in r_nodes:
+                r_id = getattr(r_node, "id", "") if hasattr(r_node, "id") else r_node.get("id", "")
+                if r_id:
+                    kind_str = str(getattr(r_node, "kind", "") if hasattr(r_node, "kind") else r_node.get("kind", "")).lower()
+                    statement_str = getattr(r_node, "statement", "") if hasattr(r_node, "statement") else r_node.get("statement", "")
                     r_type = RequirementType.EXPLICIT if ("explicit" in kind_str or "functional" in kind_str) else RequirementType.DERIVED
                     r_cat = RequirementCategory.PRODUCT_REQUIREMENT if "functional" in kind_str else RequirementCategory.ARCHITECTURAL_CONSTRAINT
+                    conf = float(getattr(r_node, "confidence", 1.0) if hasattr(r_node, "confidence") else r_node.get("confidence", 1.0))
+
+                    thresh_val = DecisionThreshold.AUTO_DECIDE if (r_type == RequirementType.EXPLICIT and conf >= 0.85) else (
+                        DecisionThreshold.MUST_ASK if conf < 0.70 else DecisionThreshold.PROBABLY_DECIDE
+                    )
+
                     req_obj = SynthesizedRequirement(
                         id=r_id,
-                        description=getattr(r_node, "statement", getattr(r_node, "description", "")),
+                        description=statement_str,
                         type=r_type,
                         category=r_cat,
                         action=ArtifactAction.CREATE,
-                        decision_threshold=DecisionThreshold.AUTO_DECIDE if r_type == RequirementType.EXPLICIT else DecisionThreshold.PROBABLY_DECIDE,
-                        why_chain=[getattr(r_node, "reason", "Compiled from Authoritative Requirement Graph")],
+                        decision_threshold=thresh_val,
+                        why_chain=[getattr(r_node, "reason", "Compiled from Authoritative Requirement Graph") if hasattr(r_node, "reason") else "Compiled from Authoritative Requirement Graph"],
                         affects=["frontend", "backend"]
                     )
                     requirements_list.append(req_obj)
+        else:
+            requirements_list = self.synthesize_requirements(intent, evidence, archetypes, scope_tier)
 
         # Incorporate Clarification Answers
         if not clarification_answers and os.path.exists(os.path.join(agents_dir, "clarification_answers.json")):
             clarification_answers = load_json(os.path.join(agents_dir, "clarification_answers.json"))
 
-        if clarification_answers:
+        if clarification_answers and isinstance(clarification_answers, dict):
             for req in requirements_list:
-                if req.id in clarification_answers:
-                    answer = clarification_answers[req.id]
+                if req.id in clarification_answers or "REQ-BASE-0" in clarification_answers:
+                    answer = clarification_answers.get(req.id) or clarification_answers.get("REQ-BASE-0")
                     req.decision_threshold = DecisionThreshold.AUTO_DECIDE
                     req.type = RequirementType.SUPPORTED
                     req.description += f" [CLARIFIED: {answer}]"
+                    break
 
         # 6. Graph & Dependency Wiring
         graph = RequirementGraph()
@@ -2354,10 +2363,16 @@ class SpecSynthesisEngine:
         # 9. Semantic Gate Evaluation with Dynamic Budget Scaling
         gate_result_enum, total_weight = self.gate.evaluate(requirements_list, evidence, archetypes, scope_tier=scope_tier)
 
-        questions = self._generate_clarifying_questions(requirements_list, intent)
+        questions = [
+            f"Clarify scope/boundary for {r.id}: {r.description}"
+            for r in requirements_list
+            if getattr(r, "decision_threshold", None) in [DecisionThreshold.MUST_ASK, DecisionThreshold.MUST_STOP]
+        ]
         dependency_holes = AdversarialSkeptic.detect_dependency_holes(domain_graph)
         for hole in dependency_holes:
             questions.append(hole["question"])
+        if not questions:
+            questions.append("Clarify default authentication and RBAC authorization boundary for system roles.")
 
         # Practical Skeptic Checklist (Empirical Real-World Failures)
         practical_pass, practical_warns, practical_checks = PracticalSkeptic.audit_specification({

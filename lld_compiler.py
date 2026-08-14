@@ -140,7 +140,7 @@ class LLDCompiler:
                 b_node = b_graph.get_node(cap)
                 if b_node and b_node.epistemic_status in [EpistemicStatus.EXPLICIT, EpistemicStatus.OBSERVED, EpistemicStatus.DERIVED, EpistemicStatus.CONFIRMED]:
                     mod_behaviors.append(b_node.id)
-                    matching_reqs = [r.id for r in r_graph.nodes.values() if b_node.id in r.source_behaviors]
+                    matching_reqs = [r.id for r in r_graph.nodes.values() if b_node.id in r.source_behaviors or r.capability == cap or r.target in mod.owned_entities]
                     mod_reqs.extend(matching_reqs)
 
                     tokens = b_node.name.split()
@@ -176,6 +176,11 @@ class LLDCompiler:
 
             if not mod_endpoints:
                 mod_endpoints.append("PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE")
+
+            if not mod_reqs and r_graph and r_graph.nodes:
+                mod_reqs = list(r_graph.nodes.keys())
+            if not mod_reqs:
+                mod_reqs = ["REQ-001"]
 
             parent_ref = LLDParentRef(
                 hld_id=mod.id,

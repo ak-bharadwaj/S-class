@@ -53,11 +53,13 @@ class AdversarialSkeptic:
         domain_tailored_components = 0
 
         for lld in low_level_designs.values():
-            name = lld.get("name", "") if isinstance(lld, dict) else getattr(lld, "name", "")
+            name = (lld.get("page_name") or lld.get("name") or "") if isinstance(lld, dict) else getattr(lld, "page_name", getattr(lld, "name", ""))
             sub_comps = lld.get("sub_components", []) if isinstance(lld, dict) else getattr(lld, "sub_components", [])
             apis = lld.get("api_endpoints", []) if isinstance(lld, dict) else getattr(lld, "api_endpoints", [])
+            tabs = lld.get("tabs", []) if isinstance(lld, dict) else getattr(lld, "tabs", [])
+            tab_fields = [f for t in tabs for f in (t.get("fields", []) if isinstance(t, dict) else getattr(t, "fields", []))] if isinstance(tabs, list) else []
 
-            items_to_check = ([name] if name else []) + (sub_comps or []) + (apis or [])
+            items_to_check = ([name] if name else []) + (sub_comps or []) + (apis or []) + tab_fields
             for c in items_to_check:
                 if not c:
                     continue

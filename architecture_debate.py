@@ -577,9 +577,9 @@ class GenericDebateEvaluator:
         actual_auth_edges = [e for e in b_graph.edges if e.relation == BehaviorRelationType.AUTHORIZED_FOR]
         has_auth_guard_design = any(k in ev for ev in ev_list_lower for k in ["capability guard", "epistemic guard", "policy engine", "rbac guard", "jwt guard"])
 
-        has_security_arch_mechanism = bool(actual_auth_edges and (actual_actors or has_auth_guard_design)) or ("rbac" in adr.decision.lower() and is_debate_phase)
+        has_security_arch_mechanism = bool(actual_auth_edges and (actual_actors or has_auth_guard_design))
 
-        if (has_security_req or is_debate_phase) and has_security_arch_mechanism:
+        if has_security_req and has_security_arch_mechanism:
             dim2_arch_ev.append("Protected boundary + domain actors + explicit AUTHORIZED_FOR edges present in behavior graph")
             dim2_status = "PASS"
         elif has_security_req and not has_security_arch_mechanism:
@@ -626,9 +626,9 @@ class GenericDebateEvaluator:
         has_consistency_arch_mechanism = any(
             k in raw_clean or any(k in ev for ev in ev_list_lower)
             for k in ["postgres", "mysql", "acid database", "saga coordinator", "eventual consistency handler", "2pc", "relational schema", "transactional", "acid"]
-        ) or (is_debate_phase and ("transactional" in str(adr.evidence).lower() or "transactional" in adr.reason.lower()))
+        )
 
-        if (has_consistency_req or is_debate_phase) and has_consistency_arch_mechanism:
+        if has_consistency_req and has_consistency_arch_mechanism:
             dim3_arch_ev.append("Explicit relational/ACID database or saga coordinator design mechanism present")
             dim3_status = "PASS"
         elif has_consistency_req:
@@ -659,7 +659,7 @@ class GenericDebateEvaluator:
             for k in ["circuit breaker design", "retry mechanism", "fallback handler", "active-passive failover", "exponential backoff"]
         )
 
-        if (has_resilience_req and has_resilience_arch_mechanism) or is_debate_phase:
+        if has_resilience_req and has_resilience_arch_mechanism:
             dim4_arch_ev.append("Explicit circuit breaker / retry policy / failover design mechanism present")
             dim4_status = "PASS"
         elif has_resilience_req:
@@ -746,14 +746,14 @@ class DecisionSufficiencyGate:
 
         # 1. Evidence Quality Check
         ev_records = claim.evidence_quality_records
-        has_no_evidence = (not is_debate_phase) and any(e.evidence_state == EvidenceState.NO_EVIDENCE for e in ev_records)
+        has_no_evidence = any(e.evidence_state == EvidenceState.NO_EVIDENCE for e in ev_records)
         avg_ev_quality = sum(e.quality_score for e in ev_records) / max(1, len(ev_records))
-        evidence_sufficient = is_debate_phase or ((not has_no_evidence) and (avg_ev_quality >= 0.50 or any(e.source == "EXPLICIT_PROMPT" for e in ev_records)))
+        evidence_sufficient = (not has_no_evidence) and (avg_ev_quality >= 0.50 or any(e.source == "EXPLICIT_PROMPT" for e in ev_records))
 
-        # 2. Grounded Alternatives Check (Synthetic fallbacks EXCLUDED outside debate phase; require non-empty comparison rationales!)
+        # 2. Grounded Alternatives Check (Require non-empty comparison rationales!)
         grounded_alts = [a for a in alternatives if not a.is_synthetic]
         tradeoff_complete_alts = [a for a in grounded_alts if a.comparison_rationale]
-        alternatives_explored = (len(tradeoff_complete_alts) >= 1) or (is_debate_phase and len(alternatives) >= 1)
+        alternatives_explored = len(tradeoff_complete_alts) >= 1
 
         # 3. Blast Radius Safety Check
         blast_radius_acceptable = blast_analysis.get("blast_radius_score", 0.5) < 0.85
@@ -984,7 +984,7 @@ class ArchitectureDebateEngine:
                 adr.confidence = 0.50
                 adr.epistemic_status = EpistemicStatus.PROPOSED
                 adr.approval_status = ApprovalStatus.PENDING
-                accepted_adrs.append(adr)
+                rejected_adrs.append(adr)
 
                 med_sev = [c for c in challenges if c.severity == "MEDIUM"]
                 for c in med_sev:
