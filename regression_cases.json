@@ -236,5 +236,21 @@
     ],
     "skeptic_rule_id": "SKEPTIC-EPISTEMIC-BEHAVIOR-GROUNDING",
     "resolved": true
+  },
+  {
+    "id": "FAIL-PROSE-017",
+    "project": "Undebated Architectural Claims & Lexical Scale Triggers Audit",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-14T21:56:00Z",
+    "summary": "Architecture decisions were passed downstream to coding agents without formal challenge/evidence auditing, allowing invalid monolith proposals for 50k req/sec systems or unbacked microservice proposals for simple monoliths to go unchallenged.",
+    "root_cause": "undebated_architectural_claims_and_missing_claim_evidence_ledger",
+    "missing_contracts": [
+      "claim_evidence_challenge_debate_engine",
+      "scale_throughput_invariant_audit",
+      "epistemic_architectural_decision_ledger",
+      "end_to_end_pipeline_fault_injection_verification"
+    ],
+    "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
+    "resolved": true
   }
 ]

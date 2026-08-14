@@ -557,8 +557,12 @@ class SpecificationCompiler:
         # 3. High-Level Design (HLD) & ADR Compilation
         hld = HLDCompiler.compile_hld(r_graph, b_graph, raw_request=raw_request)
 
-        # 4. HLD Validation Gate
+        # 4a. HLD Validation Gate
         passed_hld, hld_errors = HLDValidator.validate_hld(hld, r_graph, b_graph)
+
+        # 4b. Architecture Debate Engine Audit
+        from architecture_debate import ArchitectureDebateEngine
+        debate_result = ArchitectureDebateEngine.debate_hld_adrs(hld, r_graph, b_graph, raw_request=raw_request)
 
         # 5. Low-Level Design (LLD) Refinement Compilation
         lld_components = LLDCompiler.compile_lld(hld, r_graph, b_graph, archetypes=archetypes)
@@ -572,6 +576,7 @@ class SpecificationCompiler:
             "dependency_holes": dep_holes,
             "hld_design": hld,
             "hld_validation": {"passed": passed_hld, "errors": hld_errors},
+            "debate_result": debate_result.to_dict(),
             "lld_components": lld_components,
             "tasks": tasks
         }
