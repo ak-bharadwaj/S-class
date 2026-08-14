@@ -1104,6 +1104,8 @@ class StructuredPromptParser:
         t = token.strip().lower()
         t = re.sub(r'^[^\w]+|[^\w]+$', '', t)
         t = re.sub(r'^(?:build|create|make|implement|add|setup)\s+(?:a|an|the)?\s*', '', t)
+        t = re.sub(r'^(?:a|an|the)\s+', '', t)
+        t = re.sub(r'^n\s+', '', t)
         return t.strip()
 
     @classmethod
@@ -1316,32 +1318,153 @@ class ScopeBoundaryGuard:
         return in_scope, out_of_scope, questions
 
 
-class CanonicalDomainOntology:
+class UniversalViewArchetype(str, Enum):
+    """Universal UI Architecture primitives applicable to any software industry domain."""
+    DASHBOARD_METRICS = "metrics_grid"
+    CALENDAR_SCHEDULE_DISPATCH = "calendar_dispatch_grid"
+    WORKFLOW_QUEUE_VERIFICATION = "multi_stage_queue"
+    DATA_GRID_MASTER_DETAIL = "master_detail_grid"
+    TRANSACTION_LEDGER_RESULTS = "transaction_ledger"
+    PROFILE_IDENTITY_SECURITY = "tabbed_card_layout"
+    PROJECT_LIFECYCLE_BOARD = "project_lifecycle_board"
+    DOCUMENT_VAULT_MANAGER = "document_vault"
+    SYSTEM_GOVERNANCE_AUDIT = "governance_console"
+
+
+class UniversalDomainOntology:
     """
-    Canonical software domain ontology.
-    Expands high-level module concepts into complete Low-Level Design (LLD) specifications:
-    sub-components, tabs, mandatory form fields, interactive user actions, and REST API endpoints.
+    Universal domain ontology & dynamic semantic decomposer.
+    Supports Multi-Industry primitives (Service/Booking, Healthcare, Logistics, FinTech, Academic ERP, IoT, SaaS)
+    plus dynamic linguistic first-principles decomposition for novel unseen industries.
     """
 
-    ONTOLOGY_TREES: Dict[str, Dict[str, Any]] = {
+    MULTI_INDUSTRY_DOMAINS: Dict[str, Dict[str, Any]] = {
+        # 1. Booking & Service Scheduling (Driving School, Clinics, Salons, Consultations, Rentals)
+        "booking": {
+            "title": "Service Scheduling & Appointment Booking",
+            "layout": UniversalViewArchetype.CALENDAR_SCHEDULE_DISPATCH.value,
+            "sub_components": ["CalendarScheduleGrid", "TimeSlotPickerMatrix", "ResourceStaffSelector", "BookingSummaryModal", "RescheduleDrawer", "ConflictWarningBadge"],
+            "tabs": [
+                {
+                    "name": "Appointment Booking",
+                    "fields": ["serviceTypeId (select)", "resourceStaffId (select)", "bookingDate (date)", "timeSlot (select)", "clientFullName (string)", "clientPhone (tel)", "clientEmail (email)", "specialNotes (text)"],
+                    "actions": ["Confirm Booking", "Check Availability", "Cancel Reservation"]
+                },
+                {
+                    "name": "Reschedule & History",
+                    "fields": ["bookingReference (string)", "originalDateTime (date)", "newDateTime (date)", "rescheduleReason (text)", "bookingStatus (badge)"],
+                    "actions": ["Submit Reschedule Request", "Download Receipt PDF"]
+                }
+            ],
+            "api_endpoints": [
+                "GET /api/bookings/available-slots",
+                "POST /api/bookings",
+                "PATCH /api/bookings/{id}/reschedule",
+                "DELETE /api/bookings/{id}"
+            ],
+            "validation_rules": [
+                "Slot must not have overlapping confirmed bookings",
+                "Client phone number must be valid 10-digit format",
+                "Cancellation must occur at least 2 hours prior to scheduled time"
+            ]
+        },
+
+        # 2. Healthcare & Clinical Patient Management
+        "healthcare": {
+            "title": "Patient Clinical Records & Consultation Workflow",
+            "layout": UniversalViewArchetype.DATA_GRID_MASTER_DETAIL.value,
+            "sub_components": ["PatientRosterTable", "VitalsTimelineCard", "PrescriptionDrawer", "ClinicalNotesEditor", "MedicalHistoryVault"],
+            "tabs": [
+                {
+                    "name": "Patient Clinical Profile",
+                    "fields": ["patientId (string)", "fullName (string)", "dob (date)", "gender (select)", "bloodGroup (select)", "allergies (tags)", "emergencyContact (tel)"],
+                    "actions": ["Update Patient Record", "Record Vitals Measurement"]
+                },
+                {
+                    "name": "Consultation & Prescription",
+                    "fields": ["doctorSpecialty (string)", "chiefComplaints (text)", "diagnosis (text)", "medicationList (array)", "dosageInstructions (text)", "followUpDate (date)"],
+                    "actions": ["Generate Digital Prescription PDF", "Order Lab Diagnostic"]
+                }
+            ],
+            "api_endpoints": [
+                "GET /api/patients",
+                "POST /api/patients",
+                "GET /api/patients/{id}/vitals",
+                "POST /api/patients/{id}/prescriptions"
+            ],
+            "validation_rules": [
+                "Patient ID and emergency contact are mandatory",
+                "Prescription requires certified medical practitioner signature"
+            ]
+        },
+
+        # 3. Logistics, Fleet & Dispatch Tracking
+        "logistics": {
+            "title": "Fleet Operations & Dispatch Management",
+            "layout": UniversalViewArchetype.CALENDAR_SCHEDULE_DISPATCH.value,
+            "sub_components": ["LiveVehicleFleetGrid", "DispatchAssignmentMatrix", "RouteManifestCard", "FuelOdometerTracker", "PreTripInspectionDrawer"],
+            "tabs": [
+                {
+                    "name": "Fleet Dispatch Roster",
+                    "fields": ["vehicleId (string)", "licensePlate (string)", "assignedDriverId (select)", "dispatchRoute (string)", "startOdometer (number)", "fuelLevelPercent (number)", "tripStatus (badge)"],
+                    "actions": ["Assign Driver & Route", "Complete Pre-Trip Checklist", "Log Fuel Entry"]
+                }
+            ],
+            "api_endpoints": [
+                "GET /api/fleet/vehicles",
+                "POST /api/fleet/dispatch",
+                "PATCH /api/fleet/trips/{id}/complete",
+                "POST /api/fleet/fuel-logs"
+            ],
+            "validation_rules": [
+                "Vehicle inspection checklist must pass before trip dispatch",
+                "Driver must hold valid commercial license category"
+            ]
+        },
+
+        # 4. FinTech, Invoicing & Financial Ledgers
+        "fintech": {
+            "title": "Commercial Invoicing & Transaction Ledger",
+            "layout": UniversalViewArchetype.TRANSACTION_LEDGER_RESULTS.value,
+            "sub_components": ["InvoiceLedgerTable", "AgingSummaryCards", "LineItemMatrixEditor", "TaxCalculatorDrawer", "PaymentStatusBadge"],
+            "tabs": [
+                {
+                    "name": "Invoice Details",
+                    "fields": ["invoiceNumber (string)", "counterpartyName (string)", "issueDate (date)", "dueDate (date)", "subtotalAmount (currency)", "taxRatePercent (number)", "totalAmount (currency)", "paymentStatus (badge)"],
+                    "actions": ["Generate Invoice PDF", "Record Offline Settlement", "Send Payment Reminder"]
+                }
+            ],
+            "api_endpoints": [
+                "GET /api/invoices",
+                "POST /api/invoices",
+                "GET /api/invoices/{id}",
+                "POST /api/invoices/{id}/settlement"
+            ],
+            "validation_rules": [
+                "Invoice subtotal plus tax must balance exactly to total amount",
+                "Immutable transaction record created upon final status transition"
+            ]
+        },
+
+        # 5. User Profile & Identity Management (Universal)
         "profile": {
             "title": "User Profile & Identity Management",
-            "layout": "tabbed_card_layout",
-            "sub_components": ["AvatarUploader", "BioHeaderCard", "PersonalDetailsTab", "AcademicInstitutionalTab", "SecurityPasswordModal", "DocumentVaultGrid"],
+            "layout": UniversalViewArchetype.PROFILE_IDENTITY_SECURITY.value,
+            "sub_components": ["AvatarUploader", "BioHeaderCard", "PersonalDetailsTab", "OrganizationalCredentialsTab", "SecurityPasswordModal"],
             "tabs": [
                 {
                     "name": "Personal Details",
-                    "fields": ["fullName (string)", "personalEmail (email)", "mobileNumber (tel)", "dob (date)", "gender (select)", "bloodGroup (select)", "permanentAddress (text)", "emergencyContact (tel)"],
+                    "fields": ["fullName (string)", "personalEmail (email)", "mobileNumber (tel)", "dob (date)", "gender (select)", "permanentAddress (text)", "emergencyContact (tel)"],
                     "actions": ["Update Personal Info", "Upload Avatar Image"]
                 },
                 {
-                    "name": "Institutional Information",
-                    "fields": ["rollNumber / employeeId (string, read-only)", "department (string, read-only)", "batchSection (string, read-only)", "admissionYear / joiningDate (date)", "currentSemester (number)"],
-                    "actions": ["Download ID Card PDF"]
+                    "name": "Organizational Credentials",
+                    "fields": ["identifierCode (string, read-only)", "departmentUnit (string, read-only)", "roleTitle (string, read-only)", "onboardingDate (date)"],
+                    "actions": ["Download Digital ID Card"]
                 },
                 {
-                    "name": "Security & Credentials",
-                    "fields": ["currentPassword (password)", "newPassword (password)", "confirmPassword (password)", "twoFactorAuthToggle (boolean)"],
+                    "name": "Security & Authentication",
+                    "fields": ["currentPassword (password)", "newPassword (password)", "confirmPassword (password)", "twoFactorToggle (boolean)"],
                     "actions": ["Change Password", "Revoke Active Sessions"]
                 }
             ],
@@ -1353,14 +1476,16 @@ class CanonicalDomainOntology:
             ],
             "validation_rules": [
                 "Avatar file must be image/jpeg or image/png under 2MB",
-                "Mobile number must match 10-digit format",
+                "Mobile number must match standard telephone format",
                 "New password must contain at least 8 characters with number and symbol"
             ]
         },
+
+        # 6. Academic Examination & Gradebook
         "gradebook": {
             "title": "Academic Gradebook & Examination Results",
-            "layout": "master_detail_gradebook",
-            "sub_components": ["SgpaCgpaSummaryCard", "SemesterPickerTabs", "SubjectResultTable", "MarksBreakdownDrawer", "TranscriptExporter", "RevaluationRequestModal"],
+            "layout": UniversalViewArchetype.TRANSACTION_LEDGER_RESULTS.value,
+            "sub_components": ["SgpaCgpaSummaryCard", "SemesterPickerTabs", "SubjectResultTable", "MarksBreakdownDrawer", "TranscriptExporter"],
             "tabs": [
                 {
                     "name": "Semester Results",
@@ -1384,124 +1509,39 @@ class CanonicalDomainOntology:
                 "Revaluation request only permitted within 14 days of publication"
             ]
         },
-        "subjects": {
-            "title": "Curriculum & Enrolled Subjects",
-            "layout": "roster_grid",
-            "sub_components": ["SubjectRosterTable", "SyllabusViewerModal", "FacultyInchargeBadge", "AttendanceProgressBar", "SubjectCreditSummary"],
-            "tabs": [
-                {
-                    "name": "Enrolled Courses",
-                    "fields": ["courseCode (string)", "courseTitle (string)", "department (string)", "credits (number)", "facultyInchargeName (string)", "attendancePercent (progress)", "syllabusUrl (url)"],
-                    "actions": ["Download Syllabus PDF", "View Course Schedule"]
-                }
-            ],
-            "api_endpoints": [
-                "GET /api/subjects",
-                "GET /api/subjects/{id}/syllabus",
-                "GET /api/subjects/{id}/attendance"
-            ],
-            "validation_rules": [
-                "Total registered credits must not exceed semester maximum quota"
-            ]
-        },
-        "allocations": {
-            "title": "Subject Allocation & Faculty Matrix",
-            "layout": "data_grid_matrix",
-            "sub_components": ["FacultyPicker", "SubjectPicker", "SectionPicker", "AllocationMatrixTable", "CapacityWarningPill", "CsvBatchImporter"],
-            "tabs": [
-                {
-                    "name": "Allocation Matrix",
-                    "fields": ["facultyId (select)", "subjectId (select)", "sectionId (select)", "semesterId (select)", "hoursPerWeek (number)", "sectionCapacity (number)", "enrolledCount (number)"],
-                    "actions": ["Assign Subject", "Batch CSV Import", "Verify Checksum", "Auto-Balance Sections"]
-                }
-            ],
-            "api_endpoints": [
-                "GET /api/allocations",
-                "POST /api/allocations",
-                "POST /api/allocations/import-csv",
-                "DELETE /api/allocations/{id}"
-            ],
-            "validation_rules": [
-                "CSV import must compute SHA-256 checksum and flag capacity overages"
-            ]
-        },
-        "internships": {
-            "title": "Student Industrial Internships & NOC Lifecycle",
-            "layout": "form_wizard_and_tracker",
-            "sub_components": ["NocApplicationWizard", "EligibilityGuardPill", "CompanyMentorForm", "OfferLetterUploadBox", "CreditConversionCard"],
-            "tabs": [
-                {
-                    "name": "NOC Application",
-                    "fields": ["companyName (string)", "internshipType (select)", "stipendMonthlyInr (number)", "startDate (date)", "endDate (date)", "companyMentorName (string)", "companyMentorEmail (email)", "offerLetterDoc (file)"],
-                    "actions": ["Submit NOC Request", "Upload Offer Letter", "Download Issued NOC"]
-                },
-                {
-                    "name": "Credit Conversion",
-                    "fields": ["weeklyHours (number)", "mentorFeedbackScore (number)", "facultySupervisorScore (number)", "creditsApproved (number)"],
-                    "actions": ["Convert to Academic Credits"]
-                }
-            ],
-            "api_endpoints": [
-                "GET /api/internships",
-                "POST /api/internships/noc-request",
-                "PATCH /api/internships/{id}/approve-noc",
-                "PATCH /api/internships/{id}/convert-credits"
-            ],
-            "validation_rules": [
-                "Student must have CGPA >= 6.5 and 0 active backlogs for NOC approval"
-            ]
-        },
-        "capstone": {
-            "title": "Capstone Projects & Thesis Defense",
-            "layout": "project_lifecycle_board",
-            "sub_components": ["TeamRegistrationForm", "GuideAllocationPicker", "PlagiarismScorePill", "JuryScorecardDrawer", "MilestoneProgressTracker"],
-            "tabs": [
-                {
-                    "name": "Project Workspace",
-                    "fields": ["projectTitle (string)", "technicalDomain (select)", "guideFacultyId (select)", "teamMemberRollNumbers (array)", "teamLeadRollNumber (string)", "plagiarismSimilarityPercent (number)", "phase1Score (number)", "phase2Score (number)", "githubRepoUrl (url)", "demoVideoUrl (url)"],
-                    "actions": ["Submit Proposal", "Run Plagiarism Scan", "Submit Milestone Demo", "Record Jury Score"]
-                }
-            ],
-            "api_endpoints": [
-                "GET /api/capstones",
-                "POST /api/capstones",
-                "PATCH /api/capstones/{id}/scores",
-                "POST /api/capstones/{id}/plagiarism-check"
-            ],
-            "validation_rules": [
-                "Max 4 students per team",
-                "Plagiarism similarity must remain under 15% threshold"
-            ]
-        },
+
+        # 7. Multi-Stage Workflow & Verification Queue (Universal)
         "onboarding": {
-            "title": "Student Onboarding & Multi-Stage Verification Queue",
-            "layout": "multi_stage_queue",
-            "sub_components": ["Stage1DocumentReview", "Stage2AcademicEligibility", "Stage3HodVerification", "VerificationActionDrawer", "BatchApproveBar"],
+            "title": "Multi-Stage Verification & Approval Queue",
+            "layout": UniversalViewArchetype.WORKFLOW_QUEUE_VERIFICATION.value,
+            "sub_components": ["StageProgressionStepper", "DocumentChecklistCard", "VerificationActionDrawer", "AuditNotesBox", "BatchSignOffBar"],
             "tabs": [
                 {
                     "name": "Verification Queue",
-                    "fields": ["studentRollNumber (string)", "currentStage (select)", "aadhaarVerified (boolean)", "marksheetsVerified (boolean)", "verificationNotes (text)", "onboardingStatus (badge)"],
+                    "fields": ["applicantId (string)", "currentStage (select)", "identityVerified (boolean)", "credentialsVerified (boolean)", "reviewerNotes (text)", "status (badge)"],
                     "actions": ["Approve Stage", "Reject with Reason", "Batch Sign-Off"]
                 }
             ],
             "api_endpoints": [
-                "GET /api/onboarding/queue",
-                "POST /api/onboarding/{id}/advance-stage",
-                "POST /api/onboarding/{id}/reject"
+                "GET /api/workflow/queue",
+                "POST /api/workflow/{id}/advance-stage",
+                "POST /api/workflow/{id}/reject"
             ],
             "validation_rules": [
-                "Stage 3 requires HOD role authorization"
+                "Stage advancement requires authorized role credential check"
             ]
         },
+
+        # 8. Document Vault & File Repository (Universal)
         "documents": {
-            "title": "Institutional Document Vault & File Manager",
-            "layout": "document_vault",
+            "title": "Document Vault & File Manager",
+            "layout": UniversalViewArchetype.DOCUMENT_VAULT_MANAGER.value,
             "sub_components": ["FileUploadZone", "VirusScanStatusPill", "CategoryFolderTabs", "DocumentPreviewModal", "AccessControlPicker"],
             "tabs": [
                 {
                     "name": "Document Vault",
-                    "fields": ["fileName (string)", "fileSizeBytes (number)", "fileCategory (select)", "uploadedBy (string)", "virusScanStatus (badge)", "isPublic (boolean)"],
-                    "actions": ["Upload Document", "Scan for Viruses", "Download Document", "Delete Document"]
+                    "fields": ["fileName (string)", "fileSizeBytes (number)", "fileCategory (select)", "uploadedBy (string)", "securityScanStatus (badge)", "isPublic (boolean)"],
+                    "actions": ["Upload Document", "Download Document", "Delete Document"]
                 }
             ],
             "api_endpoints": [
@@ -1510,12 +1550,14 @@ class CanonicalDomainOntology:
                 "DELETE /api/documents/{id}"
             ],
             "validation_rules": [
-                "ClamAV scan must verify file is clean before storage"
+                "File security scan must verify file is clean before storage"
             ]
         },
+
+        # 9. Operational & Executive Dashboard (Universal)
         "dashboard": {
             "title": "Role-Aware Operational Dashboard",
-            "layout": "metrics_grid",
+            "layout": UniversalViewArchetype.DASHBOARD_METRICS.value,
             "sub_components": ["MetricStatCardGrid", "UpcomingEventsTimeline", "QuickActionShortcuts", "RecentActivityFeed", "NotificationDrawer"],
             "tabs": [
                 {
@@ -1533,20 +1575,17 @@ class CanonicalDomainOntology:
                 "Metrics must reflect real store data with zero mock placeholders"
             ]
         },
+
+        # 10. System Governance & Audit Trail (Universal)
         "system_admin": {
             "title": "System Governance, Audit Trails & Master Data",
-            "layout": "governance_console",
-            "sub_components": ["UserAccountTable", "MasterDataLookupEditor", "AuditTrailViewer", "SemesterAdvancementBar", "SystemConfigForm"],
+            "layout": UniversalViewArchetype.SYSTEM_GOVERNANCE_AUDIT.value,
+            "sub_components": ["UserAccountTable", "MasterDataLookupEditor", "AuditTrailViewer", "SystemConfigForm"],
             "tabs": [
                 {
                     "name": "User Governance",
                     "fields": ["username (string)", "email (email)", "role (select)", "isActive (boolean)", "lastLoginAt (date)"],
                     "actions": ["Create User Account", "Toggle Active Status", "Reset Password"]
-                },
-                {
-                    "name": "Semester Advancement",
-                    "fields": ["currentAcademicYear (string)", "activeSemester (select)", "graduatingBatchId (select)"],
-                    "actions": ["Execute Batch Semester Advancement", "Trigger Auto-Graduation"]
                 },
                 {
                     "name": "Audit Trail",
@@ -1557,7 +1596,6 @@ class CanonicalDomainOntology:
             "api_endpoints": [
                 "GET /api/admin/users",
                 "POST /api/admin/users",
-                "POST /api/admin/semester-advance",
                 "GET /api/admin/audit-logs"
             ],
             "validation_rules": [
@@ -1569,99 +1607,132 @@ class CanonicalDomainOntology:
     @classmethod
     def match_module(cls, keyword: str) -> Optional[Dict[str, Any]]:
         kw_clean = keyword.lower().replace('-', '_').replace(' ', '_')
-        for key, defn in cls.ONTOLOGY_TREES.items():
+        for key, defn in cls.MULTI_INDUSTRY_DOMAINS.items():
             if key in kw_clean or kw_clean in key:
                 return defn
-        # Fuzzy keyword matching
-        if any(w in kw_clean for w in ['profile', 'user', 'bio', 'student_self', 'faculty_self']):
-            return cls.ONTOLOGY_TREES["profile"]
+
+        # Fuzzy Multi-Industry keyword router
+        if any(w in kw_clean for w in ['book', 'schedul', 'slot', 'appoint', 'lesson', 'reserv', 'dispatch', 'calendar']):
+            return cls.MULTI_INDUSTRY_DOMAINS["booking"]
+        if any(w in kw_clean for w in ['patient', 'doctor', 'clinic', 'health', 'vital', 'prescript', 'medic']):
+            return cls.MULTI_INDUSTRY_DOMAINS["healthcare"]
+        if any(w in kw_clean for w in ['fleet', 'vehicle', 'van', 'truck', 'driver', 'route', 'shipment', 'trip']):
+            return cls.MULTI_INDUSTRY_DOMAINS["logistics"]
+        if any(w in kw_clean for w in ['invoice', 'ledger', 'bill', 'financ', 'accounting', 'settle', 'tax']):
+            return cls.MULTI_INDUSTRY_DOMAINS["fintech"]
+        if any(w in kw_clean for w in ['profile', 'user', 'bio', 'account', 'self']):
+            return cls.MULTI_INDUSTRY_DOMAINS["profile"]
         if any(w in kw_clean for w in ['result', 'grade', 'mark', 'sgpa', 'cgpa', 'transcript']):
-            return cls.ONTOLOGY_TREES["gradebook"]
-        if any(w in kw_clean for w in ['subject', 'course', 'curriculum', 'syllabus']):
-            return cls.ONTOLOGY_TREES["subjects"]
-        if any(w in kw_clean for w in ['allocat', 'faculty_assign', 'timetable']):
-            return cls.ONTOLOGY_TREES["allocations"]
-        if any(w in kw_clean for w in ['intern', 'noc', 'industry', 'placement']):
-            return cls.ONTOLOGY_TREES["internships"]
-        if any(w in kw_clean for w in ['capstone', 'project', 'thesis', 'defense']):
-            return cls.ONTOLOGY_TREES["capstone"]
-        if any(w in kw_clean for w in ['onboard', 'verify', 'verification', 'stage']):
-            return cls.ONTOLOGY_TREES["onboarding"]
-        if any(w in kw_clean for w in ['doc', 'file', 'vault', 'upload', 'clamav']):
-            return cls.ONTOLOGY_TREES["documents"]
+            return cls.MULTI_INDUSTRY_DOMAINS["gradebook"]
+        if any(w in kw_clean for w in ['onboard', 'verify', 'verification', 'stage', 'queue', 'review']):
+            return cls.MULTI_INDUSTRY_DOMAINS["onboarding"]
+        if any(w in kw_clean for w in ['doc', 'file', 'vault', 'upload', 'receipt']):
+            return cls.MULTI_INDUSTRY_DOMAINS["documents"]
         if any(w in kw_clean for w in ['dash', 'overview', 'home', 'stat', 'kpi']):
-            return cls.ONTOLOGY_TREES["dashboard"]
-        if any(w in kw_clean for w in ['admin', 'govern', 'audit', 'master_data', 'advancement']):
-            return cls.ONTOLOGY_TREES["system_admin"]
-        return None
+            return cls.MULTI_INDUSTRY_DOMAINS["dashboard"]
+        if any(w in kw_clean for w in ['admin', 'govern', 'audit', 'master_data', 'config']):
+            return cls.MULTI_INDUSTRY_DOMAINS["system_admin"]
+
+        # Universal Dynamic First-Principles Decomposition (Handles ANY arbitrary software domain)
+        entity_name = kw_clean.replace('_', ' ').title()
+        plural_entity = kw_clean if kw_clean.endswith('s') else f"{kw_clean}s"
+        return {
+            "title": f"{entity_name} Management & Operations",
+            "layout": UniversalViewArchetype.DATA_GRID_MASTER_DETAIL.value,
+            "sub_components": [f"{entity_name.replace(' ', '')}DataGrid", "SearchFilterBar", "DetailInspectorDrawer", "CreateEntityModal", "ExportCsvButton"],
+            "tabs": [
+                {
+                    "name": f"{entity_name} Directory",
+                    "fields": [f"{kw_clean}Id (string)", "title / name (string)", "status (badge)", "categoryType (select)", "assignedTo (string)", "createdDate (date)", "notes (text)"],
+                    "actions": [f"Create {entity_name}", f"Edit {entity_name}", f"Archive {entity_name}", "Export CSV"]
+                }
+            ],
+            "api_endpoints": [
+                f"GET /api/{plural_entity}",
+                f"POST /api/{plural_entity}",
+                f"GET /api/{plural_entity}/{{id}}",
+                f"PUT /api/{plural_entity}/{{id}}",
+                f"DELETE /api/{plural_entity}/{{id}}"
+            ],
+            "validation_rules": [
+                f"{entity_name} title/name must be non-empty",
+                "Status changes must follow standard operational workflow"
+            ]
+        }
 
 
 class RolePageSpreadEngine:
     """
-    Generates canonical frontend route sitemaps and page spreads per role.
-    Ensures that for any multi-role application, every role has a dedicated,
-    permission-scoped sitemap with full component hierarchies.
+    Universal frontend sitemap and route spread engine.
+    Dynamically generates permission-scoped page structures and component hierarchies for ANY role in ANY industry.
     """
 
-    CANONICAL_ROLE_SPREADS: Dict[str, List[Dict[str, Any]]] = {
-        "student": [
-            {"route": "/dashboard", "page_name": "Student Dashboard", "module_key": "dashboard", "description": "Academic metrics overview, upcoming exams, and announcements"},
-            {"route": "/profile", "page_name": "Student Self-Profile", "module_key": "profile", "description": "Personal bio, academic details, and security credential editor"},
-            {"route": "/subjects", "page_name": "Course & Syllabus View", "module_key": "subjects", "description": "Registered subjects, syllabus downloads, and faculty assignments"},
-            {"route": "/results", "page_name": "Semester Gradebook", "module_key": "gradebook", "description": "SGPA/CGPA transcript viewer, marks breakdown, and revaluation requests"},
-            {"route": "/internships", "page_name": "Industrial NOC Hub", "module_key": "internships", "description": "Internship NOC applications, mentor logging, and credit conversion"},
-            {"route": "/capstone", "page_name": "Capstone Project Board", "module_key": "capstone", "description": "Team leader registration, proposal submission, and plagiarism score"},
-            {"route": "/documents", "page_name": "Student Document Vault", "module_key": "documents", "description": "Uploaded certificates, verified ID proofs, and digital receipts"}
-        ],
-        "faculty": [
-            {"route": "/dashboard", "page_name": "Faculty Dashboard", "module_key": "dashboard", "description": "Assigned courses, active student count, and pending evaluations"},
-            {"route": "/faculty-profile", "page_name": "Faculty Profile Editor", "module_key": "profile", "description": "Public bio editor, specializations, and research interest areas"},
-            {"route": "/allocations", "page_name": "Subject Allocation Matrix", "module_key": "allocations", "description": "Assigned subjects, class sections, and weekly teaching hours"},
-            {"route": "/capstone/evaluations", "page_name": "Capstone Jury Defense", "module_key": "capstone", "description": "Jury scorecard evaluations for Phase-1 & Phase-2 projects"},
-            {"route": "/documents", "page_name": "Faculty Document Vault", "module_key": "documents", "description": "Course materials, lesson plans, and research documents"}
-        ],
-        "admin": [
-            {"route": "/dashboard", "page_name": "Admin Control Center", "module_key": "dashboard", "description": "System-wide KPIs, department stats, and operational alerts"},
-            {"route": "/admin/onboarding", "page_name": "Student Verification Queue", "module_key": "onboarding", "description": "Stage 1-3 onboarding review, document validation, and student approvals"},
-            {"route": "/admin/allocations/import", "page_name": "CSV Allocation Importer", "module_key": "allocations", "description": "Batch CSV subject allocation importer with SHA-256 checksums"},
-            {"route": "/admin/results/import", "page_name": "CSV University Results Importer", "module_key": "gradebook", "description": "Batch CSV results importer with SGPA engine and auto-graduation"},
-            {"route": "/admin/documents", "page_name": "Institutional Document Vault", "module_key": "documents", "description": "Document management with automated ClamAV virus scanning"}
-        ],
-        "hod": [
-            {"route": "/dashboard", "page_name": "HOD Department Analytics", "module_key": "dashboard", "description": "Department KPIs, faculty workload balancing, and student progression"},
-            {"route": "/hod/verification-queue", "page_name": "Stage 3 Final Sign-Off Queue", "module_key": "onboarding", "description": "Final stage student onboarding verification and institutional approvals"},
-            {"route": "/allocations", "page_name": "Department Allocation Overview", "module_key": "allocations", "description": "Full department subject-faculty mapping and section capacity monitor"}
-        ],
-        "super_admin": [
-            {"route": "/admin/governance", "page_name": "System Governance Console", "module_key": "system_admin", "description": "User account management, global roles, and security configuration"},
-            {"route": "/admin/semester-advancement", "page_name": "Batch Semester Advancement", "module_key": "system_admin", "description": "Batch semester advancement engine and auto-graduation trigger"},
-            {"route": "/admin/audit-logs", "page_name": "Immutable System Audit Trail", "module_key": "system_admin", "description": "Comprehensive security audit trail and compliance log exporter"}
-        ],
-        "visitor": [
-            {"route": "/", "page_name": "Institutional Public Portal", "module_key": "dashboard", "description": "Public overview, department vision, announcements, and quick links"},
-            {"route": "/degrees", "page_name": "Academic Degree Programs", "module_key": "subjects", "description": "Curriculum overview, degree options, and admission requirements"},
-            {"route": "/faculty", "page_name": "Faculty Directory Roster", "module_key": "profile", "description": "Public faculty directory with research profiles and contact information"},
-            {"route": "/placements", "page_name": "Placement & Career Center", "module_key": "internships", "description": "Placement statistics, recruiter spotlight, and alumni achievements"}
-        ]
-    }
-
     @classmethod
-    def generate_spread(cls, roles: List[str]) -> Dict[str, List[Dict[str, Any]]]:
+    def generate_spread(cls, roles: List[str], intent_features: Optional[List[str]] = None) -> Dict[str, List[Dict[str, Any]]]:
         spread = {}
+        intent_features = intent_features or []
+
         for role in roles:
             role_clean = role.lower().strip()
-            matched = False
-            for canonical_role, pages in cls.CANONICAL_ROLE_SPREADS.items():
-                if canonical_role in role_clean or role_clean in canonical_role:
-                    spread[role] = pages
-                    matched = True
-                    break
-            if not matched:
-                spread[role] = [
-                    {"route": "/dashboard", "page_name": f"{role.title()} Dashboard", "module_key": "dashboard", "description": f"Main workspace for {role}"},
-                    {"route": "/profile", "page_name": f"{role.title()} Profile", "module_key": "profile", "description": f"Account profile and settings for {role}"},
-                    {"route": "/documents", "page_name": f"{role.title()} Documents", "module_key": "documents", "description": f"Document manager for {role}"}
-                ]
+            pages = []
+
+            # 1. Operational Dashboard / Overview
+            pages.append({
+                "route": "/dashboard",
+                "page_name": f"{role.title()} Dashboard",
+                "module_key": "dashboard",
+                "description": f"Operational metrics, tasks, and real-time updates for {role}"
+            })
+
+            # 2. Self-Profile & Credentials
+            pages.append({
+                "route": "/profile",
+                "page_name": f"{role.title()} Self-Profile",
+                "module_key": "profile",
+                "description": f"Account profile, contact details, and credentials for {role}"
+            })
+
+            # 3. Dynamic Domain Pages inferred from intent capabilities
+            for feat in intent_features:
+                feat_clean = feat.lower().replace(' ', '-').replace('_', '-')
+                if any(w in feat_clean for w in ['dashboard', 'profile', 'login', 'register', 'auth']):
+                    continue
+                page_title = feat.replace('_', ' ').replace('-', ' ').title()
+                pages.append({
+                    "route": f"/{feat_clean}",
+                    "page_name": f"{page_title} Workspace",
+                    "module_key": feat_clean,
+                    "description": f"Manage and interact with {page_title}"
+                })
+
+            # 4. Role-Specific Archetype Fallbacks
+            if any(adm in role_clean for adm in ['admin', 'manager', 'coordinator', 'supervisor', 'hod']):
+                if not any(p["route"] == "/audit-logs" for p in pages):
+                    pages.append({
+                        "route": "/admin/audit-logs",
+                        "page_name": "Security Audit Trail",
+                        "module_key": "system_admin",
+                        "description": "System activity logs and access compliance records"
+                    })
+                if not any(p["route"] == "/approvals" for p in pages):
+                    pages.append({
+                        "route": "/admin/verification-queue",
+                        "page_name": "Verification & Approvals",
+                        "module_key": "onboarding",
+                        "description": "Multi-stage verification and sign-off queue"
+                    })
+
+            # 5. Shared Document Vault
+            if not any("doc" in p["module_key"] for p in pages):
+                pages.append({
+                    "route": "/documents",
+                    "page_name": f"{role.title()} Document Vault",
+                    "module_key": "documents",
+                    "description": f"File uploads, records, and digital receipts for {role}"
+                })
+
+            spread[role] = pages
+
         return spread
 
 
@@ -1683,7 +1754,7 @@ class LowLevelDesignSynthesizer:
                 page_route = page.get("route", "")
                 page_name = page.get("page_name", "")
 
-                onto = CanonicalDomainOntology.match_module(mod_key) or CanonicalDomainOntology.match_module(page_name)
+                onto = UniversalDomainOntology.match_module(mod_key) or UniversalDomainOntology.match_module(page_name)
                 if not onto:
                     continue
 
@@ -1692,7 +1763,7 @@ class LowLevelDesignSynthesizer:
                     "role": role,
                     "page_name": page_name,
                     "route": page_route,
-                    "layout": onto.get("layout", "standard"),
+                    "layout": onto.get("layout", UniversalViewArchetype.DATA_GRID_MASTER_DETAIL.value),
                     "sub_components": onto.get("sub_components", []),
                     "tabs": onto.get("tabs", []),
                     "api_endpoints": onto.get("api_endpoints", []),
@@ -1843,7 +1914,8 @@ class SpecSynthesisEngine:
         reqs.extend(expanded_reqs)
 
         # 3. Canonical Low-Level Design (LLD) & Role Page Spread Synthesis
-        page_spreads = RolePageSpreadEngine.generate_spread(intent.target_roles)
+        feats = intent.all_features if hasattr(intent, 'all_features') else intent.primary_features
+        page_spreads = RolePageSpreadEngine.generate_spread(intent.target_roles, feats)
         lld_reqs, _ = LowLevelDesignSynthesizer.synthesize_lld_requirements(page_spreads)
         reqs.extend(lld_reqs)
 
@@ -1965,7 +2037,8 @@ class SpecSynthesisEngine:
         requirements_list = self.synthesize_requirements(intent, evidence, archetypes, scope_tier)
 
         # 4. Generate Role Page Spreads & LLD Catalog
-        page_spreads = RolePageSpreadEngine.generate_spread(intent.target_roles)
+        feats = intent.all_features if hasattr(intent, 'all_features') else intent.primary_features
+        page_spreads = RolePageSpreadEngine.generate_spread(intent.target_roles, feats)
         _, lld_catalog = LowLevelDesignSynthesizer.synthesize_lld_requirements(page_spreads)
 
         # Incorporate Clarification Answers
