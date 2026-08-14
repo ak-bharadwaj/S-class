@@ -7,6 +7,7 @@ Operates over the SemanticDomainGraph to:
 3. Compute structured reasoning graphs (why_graph) for every inferred item.
 """
 
+import os
 import re
 from typing import Dict, List, Set, Any, Optional, Tuple
 from domain_primitives import (
@@ -536,7 +537,8 @@ class SpecificationCompiler:
         intent_features: List[str],
         raw_request: str = "",
         archetypes: Optional[List[str]] = None,
-        workspace_dir: Optional[str] = None
+        workspace_dir: Optional[str] = None,
+        is_debate_phase: bool = False
     ) -> Dict[str, Any]:
         """
         V7/V9 Authoritative Architecture Refinement Pipeline:
@@ -563,14 +565,24 @@ class SpecificationCompiler:
 
         # 4b. V9 Architecture Debate & Decision Intelligence Engine Audit
         from architecture_debate import ArchitectureDebateEngine
-        debate_result = ArchitectureDebateEngine.run_debate_cycle(hld, r_graph, b_graph, raw_request=raw_request, workspace_dir=workspace_dir)
+        debate_result = ArchitectureDebateEngine.run_debate_cycle(hld, r_graph, b_graph, raw_request=raw_request, workspace_dir=workspace_dir, is_debate_phase=is_debate_phase)
 
         # 4c. Artifact Governor HLD Control Plane Audit (Hard Execution Gate)
         from artifact_governor import ArtifactGovernor
         hld_gov = ArtifactGovernor.audit_hld_governance(hld, passed_hld, hld_errors, workspace_dir=workspace_dir)
 
+        # 5. Low-Level Design (LLD) Refinement Compilation
+        lld_components = LLDCompiler.compile_lld(hld, r_graph, b_graph, archetypes=archetypes)
+        if workspace_dir and os.path.exists(workspace_dir):
+            from spec_synthesis import WorkspaceDocumentScanner
+            ev_disc = WorkspaceDocumentScanner.full_document_discovery(workspace_dir)
+            if ev_disc and ev_disc.api_routes:
+                for r_item in ev_disc.api_routes:
+                    r_ep = f"{r_item.get('method', 'GET')} {r_item.get('path', '')}"
+                    if lld_components and r_ep not in lld_components[0].api_endpoints:
+                        lld_components[0].api_endpoints.append(r_ep)
+
         if hld_gov.is_blocked:
-            # HARD EXECUTION GATE: Stop compilation immediately! Do NOT invent LLD or tasks on blocked/invalid HLD!
             return {
                 "behavior_graph": b_graph,
                 "requirement_graph": r_graph,
@@ -586,8 +598,6 @@ class SpecificationCompiler:
                 "blocked": True,
                 "target_fsm_state": hld_gov.recommended_fsm_state.value
             }
-
-        # 5. Low-Level Design (LLD) Refinement Compilation
         lld_components = LLDCompiler.compile_lld(hld, r_graph, b_graph, archetypes=archetypes)
         lld_gov = ArtifactGovernor.audit_lld_governance(lld_components, hld)
 

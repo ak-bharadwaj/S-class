@@ -159,8 +159,9 @@ class PracticalSkeptic:
         # 6. SKEPTIC-ROLE-ROUTE-GUARD (Missing /profile and self-security routes)
         if not (archetypes and any(a in ["cli_tool", "backend_api", "data_pipeline"] for a in archetypes)):
             for role, pages in page_spreads.items():
-                routes = [p.get("route", "") for p in pages]
-                if "/profile" not in routes:
+                page_list = pages.get("pages", [pages]) if isinstance(pages, dict) else (pages if isinstance(pages, list) else [])
+                routes = [p.get("route", "") for p in page_list if isinstance(p, dict)]
+                if "/profile" not in routes and role.lower() not in ["system", "admin"]:
                     warnings.append(f"[SKEPTIC-ROLE-ROUTE-GUARD] Role '{role}' is missing self-profile and security management routes.")
                     checks.append({
                         "rule_id": "SKEPTIC-ROLE-ROUTE-GUARD",
@@ -318,11 +319,13 @@ class PracticalSkeptic:
 
             valid_stems = set()
             if spreads_map:
-                for r_key, page_list in spreads_map.items():
+                for r_key, pages in spreads_map.items():
+                    page_list = pages.get("pages", [pages]) if isinstance(pages, dict) else (pages if isinstance(pages, list) else [])
                     for p in page_list:
-                        mod_k = p.get("module_key", "").lower().replace("entity_", "").replace("wf_", "").replace("doc_", "").replace("resource_", "")
-                        if mod_k:
-                            valid_stems.add(mod_k)
+                        if isinstance(p, dict):
+                            mod_k = p.get("module_key", p.get("page_name", "")).lower().replace("entity_", "").replace("wf_", "").replace("doc_", "").replace("resource_", "")
+                            if mod_k:
+                                valid_stems.add(mod_k)
 
             unsupported_endpoints = []
             for lld_key, lld in lld_cat.items():

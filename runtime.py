@@ -1228,17 +1228,14 @@ class FSMGoalSequenceRunner:
             pipe_file_deb = os.path.join(state_dir, "v7_refinement_pipeline.json")
             if os.path.exists(pipe_file_deb):
                 try:
-                    from architecture_debate import ArchitectureDebateEngine
-                    from hld_compiler import HLDDesign, ADRRecord, HLDModule
-                    from requirement_ir import RequirementGraph
-                    from behavior_graph import BehaviorGraph
-
                     pipe_data_deb = load_json(pipe_file_deb) or {}
                     hld_dict = pipe_data_deb.get("hld_design", {})
-                    r_dict = pipe_data_deb.get("requirement_graph", {})
-                    b_dict = pipe_data_deb.get("behavior_graph", {})
-
                     if hld_dict:
+                        from architecture_debate import ArchitectureDebateEngine
+                        from hld_compiler import HLDDesign, ADRRecord, HLDModule
+                        from requirement_ir import RequirementGraph
+                        from behavior_graph import BehaviorGraph
+
                         hld_obj = HLDDesign(
                             system_name=hld_dict.get("system_name", "HLD-001"),
                             architecture_style=hld_dict.get("architecture_style", "Modular Monolith"),
@@ -1246,12 +1243,14 @@ class FSMGoalSequenceRunner:
                             adrs=[ADRRecord.from_dict(a) for a in hld_dict.get("adrs", [])],
                             version=int(hld_dict.get("version", 1))
                         )
+                        r_dict = pipe_data_deb.get("requirement_graph", {})
+                        b_dict = pipe_data_deb.get("behavior_graph", {})
                         r_graph = RequirementGraph.from_dict(r_dict) if hasattr(RequirementGraph, "from_dict") and r_dict else RequirementGraph()
                         b_graph = BehaviorGraph.from_dict(b_dict) if hasattr(BehaviorGraph, "from_dict") and b_dict else BehaviorGraph()
                         state_deb = get_state(workspace_dir)
                         goal_text_deb = getattr(state_deb, "goal", "") or ""
 
-                        deb_res = ArchitectureDebateEngine.run_debate_cycle(hld_obj, r_graph, b_graph, raw_request=goal_text_deb, workspace_dir=workspace_dir)
+                        deb_res = ArchitectureDebateEngine.run_debate_cycle(hld_obj, r_graph, b_graph, raw_request=goal_text_deb, workspace_dir=workspace_dir, is_debate_phase=True)
                         pipe_data_deb["hld_design"] = hld_obj.to_dict()
                         pipe_data_deb["debate_result"] = deb_res.to_dict()
                         if not deb_res.rejected_adrs:

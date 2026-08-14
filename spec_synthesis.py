@@ -1225,7 +1225,7 @@ class StructuredPromptParser:
 
         # Generic linguistic role extraction from list clauses ("for X, Y, Z", "roles: X, Y, Z")
         role_enum_matches = re.findall(
-            r'\b(?:roles?|for|actors?|users?)\s*[:=]?\s*([a-zA-Z0-9_\-\s,&\/]+?)(?:\.|\n|;|\bwith\b|\bincluding\b|\bwhere\b|\bcan\b|\bmust\b|\bshould\b|\bwill\b|\bto\b|\bonly\b|\bthat\b|$)',
+            r'\b(?:roles?|for|actors?|users?|by|approved by)\s*[:=]?\s*([a-zA-Z0-9_\-\s,&\/]+?)(?:\.|\n|;|\bwith\b|\bincluding\b|\bwhere\b|\bcan\b|\bmust\b|\bshould\b|\bwill\b|\bto\b|\bonly\b|\bthat\b|$)',
             normalized_request,
             re.IGNORECASE
         )
@@ -1243,6 +1243,16 @@ class StructuredPromptParser:
                             norm_r = clean_item[:-1]
                         if norm_r not in NON_ROLE_STOP_WORDS and norm_r not in cls.QUALIFIER_WORDS:
                             seen_roles.add(norm_r)
+
+        # Domain actor role vocabulary check
+        role_keywords = [
+            'doctor', 'nurse', 'superintendent', 'librarian', 'student', 'faculty', 'hod',
+            'warden', 'customer', 'seller', 'admin', 'member', 'trainer', 'staff', 'agent',
+            'supervisor', 'employee', 'manager', 'finance', 'hr', 'operator', 'tenant'
+        ]
+        for r_kw in role_keywords:
+            if re.search(rf'\b{r_kw}s?\b', normalized_request, re.IGNORECASE):
+                seen_roles.add(r_kw)
 
         fallback_intent = DynamicLinguisticExtractor.extract_intent(normalized_request, workspace_vocab)
 
@@ -2116,8 +2126,11 @@ class SpecSynthesisEngine:
                 shutil.copy2(json_path, os.path.join(agents_dir, f"synthesized_spec_v{prev_v}.json"))
                 if os.path.exists(md_path):
                     shutil.copy2(md_path, os.path.join(agents_dir, f"synthesized_spec_v{prev_v}.md"))
+                pipe_path = os.path.join(agents_dir, "v7_refinement_pipeline.json")
                 if os.path.exists(ic_path):
                     shutil.copy2(ic_path, os.path.join(agents_dir, f"intent_contract_v{prev_v}.json"))
+                if os.path.exists(pipe_path):
+                    shutil.copy2(pipe_path, os.path.join(agents_dir, f"v7_refinement_pipeline_v{prev_v}.json"))
             except Exception as e:
                 logger.warning(f"[SpecSynthesis] Backup archive warning: {e}")
 
@@ -2144,19 +2157,71 @@ class SpecSynthesisEngine:
 
         # 4. Authoritative Refinement Compiler Pipeline Execution (Single Source of Truth)
         feats = intent.all_features if hasattr(intent, 'all_features') else intent.primary_features
+        is_deb = os.getenv("SCLASS_DEBATE_PHASE") == "TRUE" or (clarification_answers is not None)
         v7_pipeline = SpecificationCompiler.compile_v7_refinement_pipeline(
             graph=domain_graph,
             intent_features=feats,
             raw_request=effective_request,
             archetypes=archetype_strings,
-            workspace_dir=workspace_dir
+            workspace_dir=workspace_dir,
+            is_debate_phase=is_deb
         )
 
-        # Non-authoritative candidate inference fallback
-        try:
-            page_spreads, lld_catalog, assumption_ledger = SpecificationCompiler.compile_specification(domain_graph, feats, archetype_strings, evidence, intent=intent)
-        except Exception as e_leg:
-            logger.info(f"[SpecSynthesis] Candidate inference fallback note: {e_leg}")
+        # Derive Low-Level Designs, Page Spreads, and Assumption Ledger solely from Authoritative Pipeline
+        lld_components = v7_pipeline.get("lld_components", [])
+        hld_obj = v7_pipeline.get("hld_design")
+        r_graph_authoritative = v7_pipeline.get("requirement_graph")
+        b_graph_authoritative = v7_pipeline.get("behavior_graph")
+
+        if not lld_components and hld_obj and r_graph_authoritative and b_graph_authoritative:
+            from lld_compiler import LLDCompiler
+            lld_components = LLDCompiler.compile_lld(hld_obj, r_graph_authoritative, b_graph_authoritative, archetypes=archetype_strings)
+
+        lld_catalog = {c.id if hasattr(c, "id") else (c.get("id") if isinstance(c, dict) else f"LLD-{idx}"): (c.to_dict() if hasattr(c, "to_dict") else c) for idx, c in enumerate(lld_components)}
+        if evidence and getattr(evidence, "api_routes", None):
+            for route_item in evidence.api_routes:
+                r_ep = f"{route_item.get('method', 'GET')} {route_item.get('path', '')}"
+                for lld_dict in lld_catalog.values():
+                    apis = lld_dict.get("api_endpoints", [])
+                    if r_ep not in apis:
+                        apis.append(r_ep)
+        feats = intent.all_features if hasattr(intent, 'all_features') else intent.primary_features
+        roles_to_spread = set(intent.target_roles)
+        if evidence and getattr(evidence, "auth_permissions", None):
+            for perm in evidence.auth_permissions:
+                roles_to_spread.add(perm.lower().replace(" ", "_"))
+        page_spreads = RolePageSpreadEngine.generate_spread(list(roles_to_spread), feats)
+        if hld_obj:
+            modules_list = hld_obj.modules if hasattr(hld_obj, "modules") else hld_obj.get("modules", [])
+            style = getattr(hld_obj, "architecture_style", None) or (hld_obj.get("architecture_style") if isinstance(hld_obj, dict) else "Modular Monolith")
+            for role_k, p_list in page_spreads.items():
+                for mod in modules_list:
+                    m_name = mod.name if hasattr(mod, "name") else mod.get("name", "Module")
+                    m_caps = mod.owned_capabilities if hasattr(mod, "owned_capabilities") else mod.get("owned_capabilities", [])
+                    m_ents = mod.owned_entities if hasattr(mod, "owned_entities") else mod.get("owned_entities", [])
+                    p_list.append({
+                        "page_name": f"{role_k.capitalize()} {m_name}",
+                        "route": f"/{role_k.lower()}/{m_name.lower().replace(' ', '_')}",
+                        "owned_capabilities": m_caps,
+                        "owned_entities": m_ents,
+                        "module_key": m_name,
+                        "description": f"{m_name} management workspace for {role_k}",
+                        "architecture_style": style
+                    })
+
+        r_graph_authoritative = v7_pipeline.get("requirement_graph")
+        assumption_ledger = []
+        if r_graph_authoritative and hasattr(r_graph_authoritative, "nodes"):
+            for r_node in r_graph_authoritative.nodes.values():
+                r_kind_str = str(getattr(r_node, "kind", "")).upper()
+                if "DERIVED" in r_kind_str or "NON_FUNCTIONAL" in r_kind_str:
+                    assumption_ledger.append({
+                        "requirement_id": getattr(r_node, "id", "REQ-ASM"),
+                        "capability": getattr(r_node, "capability", "capability"),
+                        "assumption_type": "derived_inference",
+                        "weight": 2 if "DERIVED" in r_kind_str else 5,
+                        "rationale": getattr(r_node, "reason", "Derived architectural inference")
+                    })
 
         # 5. Requirement Synthesis
         requirements_list = self.synthesize_requirements(intent, evidence, archetypes, scope_tier)
@@ -2346,14 +2411,19 @@ class SpecSynthesisEngine:
                     md_content += "| Route Path | Page Name | Module Scope | Description |\n"
                     md_content += "|---|---|---|---|\n"
                     for p in pages:
-                        md_content += f"| `{p['route']}` | **{p['page_name']}** | `{p['module_key']}` | {p['description']} |\n"
+                        mod_k = p.get('module_key') or p.get('architecture_style') or 'core'
+                        desc = p.get('description') or p.get('page_name') or 'Page'
+                        md_content += f"| `{p.get('route', '/')}` | **{p.get('page_name', 'Page')}** | `{mod_k}` | {desc} |\n"
                     md_content += "\n"
 
             # Render Low-Level Design Component & Field Specifications
             if spec.low_level_designs:
                 md_content += "## 📐 Low-Level Design (LLD) Specifications & Reasoning Graphs\n\n"
                 for key, lld in spec.low_level_designs.items():
-                    md_content += f"### [{lld['role'].upper()}] {lld['page_name']} (`{lld['route']}`)\n\n"
+                    p_name = lld.get('page_name') or lld.get('name') or key
+                    role_str = lld.get('role') or lld.get('component_type') or 'component'
+                    route_str = lld.get('route') or 'N/A'
+                    md_content += f"### [{role_str.upper()}] {p_name} (`{route_str}`)\n\n"
                     md_content += f"- **Layout**: `{lld['layout']}`\n"
                     md_content += f"- **Composed Sub-Components**: {', '.join(f'`{c}`' for c in lld['sub_components'])}\n"
                     md_content += f"- **Backing REST Endpoints**: {', '.join(f'`{e}`' for e in lld['api_endpoints'])}\n"

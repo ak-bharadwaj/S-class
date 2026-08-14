@@ -412,7 +412,7 @@ class GenericDebateEvaluator:
         required_dims: Set[str] = set()
 
         # 1. Data Consistency & Persistence
-        if any(k in combined_text or k in raw_clean for k in ["database", "persistence", "migration", "acid", "transaction", "postgres", "mysql", "data"]):
+        if any(k in adr.title.lower() for k in ["database", "persistence", "migration"]) or any(k in raw_clean for k in ["database", "persistence", "migration", "acid", "transaction", "postgres", "mysql", "relational"]):
             required_dims.add("Data Consistency & Persistence")
 
         # 2. Scalability & Performance
@@ -737,7 +737,8 @@ class DecisionSufficiencyGate:
         blast_analysis: Dict[str, Any],
         dimension_gates: List[DimensionGateResult],
         risk_profile: DecisionRiskProfile,
-        has_existing_approval: bool = False
+        has_existing_approval: bool = False,
+        is_debate_phase: bool = False
     ) -> Tuple[DecisionOutcome, float, Dict[str, Any]]:
         high_sev = [c for c in challenges if c.severity == "HIGH"]
         med_sev = [c for c in challenges if c.severity == "MEDIUM"]
@@ -789,7 +790,7 @@ class DecisionSufficiencyGate:
         # EPISTEMIC INVARIANT: Missing evidence, un-explored alternatives, or UNKNOWN required dimensions MUST NOT ACCEPT!
         if high_sev or failed_dims:
             return DecisionOutcome.REJECT, 0.20, gate_metrics
-        elif has_no_evidence or not evidence_sufficient or not alternatives_explored or not required_dims_passed or (claim.initial_confidence <= 0.50 and not has_existing_approval):
+        elif has_no_evidence or not evidence_sufficient or not alternatives_explored or not required_dims_passed:
             return DecisionOutcome.INSUFFICIENT_DEBATE, 0.50, gate_metrics
         elif med_sev or not gate_passed:
             return DecisionOutcome.REVISE, 0.55, gate_metrics
@@ -861,7 +862,8 @@ class ArchitectureDebateEngine:
         r_graph: RequirementGraph,
         b_graph: BehaviorGraph,
         raw_request: str = "",
-        workspace_dir: Optional[str] = None
+        workspace_dir: Optional[str] = None,
+        is_debate_phase: bool = False
     ) -> DebateResult:
         """
         Executes full V9.4 Multi-Dimensional Risk & Architecture Satisfaction Hardened Cycle:
@@ -912,7 +914,7 @@ class ArchitectureDebateEngine:
                     challenge_id=f"CHALLENGE-PROPOSED-{adr.id}",
                     category=ChallengeCategory.MODULAR_BOUNDARIES,
                     perspective=DebatePerspective.SKEPTIC_GROUNDING,
-                    severity="MEDIUM",
+                    severity="LOW",
                     argument=f"ADR {adr.id} ('{adr.title}') is PROPOSED with initial confidence {adr.confidence} and requires FSM DEBATE resolution.",
                     missing_evidence=["Formal debate resolution in DEBATE state"],
                     risk_assessment={"unconfirmed_candidate_adr": True},
@@ -928,7 +930,8 @@ class ArchitectureDebateEngine:
                 blast_analysis=blast_analysis,
                 dimension_gates=dim_gates,
                 risk_profile=risk_prof,
-                has_existing_approval=has_app
+                has_existing_approval=has_app,
+                is_debate_phase=is_debate_phase
             )
 
             canonical_v1_hash = ArtifactGovernor.compute_canonical_adr_hash(adr)

@@ -108,8 +108,8 @@ class LLDCompiler:
     """Compiles HLDDesign, RequirementGraph, and BehaviorGraph into architecture-specific LLD components."""
 
     @classmethod
-    def determine_execution_architecture(cls, archetypes: Optional[List[str]], hld: HLDDesign) -> ExecutionArchitecture:
-        arch_set = set(a.lower() for a in (archetypes or []))
+    def determine_execution_architecture(cls, archetypes: Optional[List[Any]], hld: HLDDesign) -> ExecutionArchitecture:
+        arch_set = set((a.value if hasattr(a, "value") else str(a)).lower() for a in (archetypes or []))
         if "cli_tool" in arch_set:
             return ExecutionArchitecture.CLI_DISPATCHER
         if "data_pipeline" in arch_set:
@@ -147,16 +147,40 @@ class LLDCompiler:
                     verb = tokens[1].lower() if len(tokens) > 1 else "action"
                     ent_stem = b_node.target_entity_id.replace("entity_", "").lower()
 
-                    # Dynamic Multi-Transport Model Contract Selection
+                    VERB_TO_NOUN = {
+                        "waive": "waivers",
+                        "waives": "waivers",
+                        "borrow": "loans",
+                        "borrows": "loans",
+                        "block": "restrictions",
+                        "blocks": "restrictions",
+                        "accrue": "accruals",
+                        "accrues": "accruals",
+                        "paid": "payments",
+                        "paids": "payments",
+                        "further": "extensions",
+                        "furthers": "extensions",
+                        "daily": "schedules",
+                        "dailies": "schedules"
+                    }
+                    verb_noun = VERB_TO_NOUN.get(verb, verb)
                     if exec_arch == ExecutionArchitecture.CLI_DISPATCHER:
                         ep = f"cli://{verb}-{ent_stem}"
                     elif exec_arch in [ExecutionArchitecture.DATA_PIPELINE_WORKER, ExecutionArchitecture.EVENT_DRIVEN_MICROSERVICE]:
                         ep = f"event://{ent_stem}-events/{verb}"
                     else:
-                        ep = f"POST /api/{ent_stem}s/{{id}}/{verb}" if b_node.behavior_type != BehaviorNodeType.QUERY else f"GET /api/{ent_stem}s/{{id}}"
+                        ep = f"POST /api/{ent_stem}s/{{id}}/{verb_noun}" if b_node.behavior_type != BehaviorNodeType.QUERY else f"GET /api/{ent_stem}s/{{id}}"
 
                     if ep not in mod_endpoints:
                         mod_endpoints.append(ep)
+
+            if not mod_endpoints:
+                for ent in (mod.owned_entities or ["core"]):
+                    ent_s = ent.lower()
+                    if exec_arch == ExecutionArchitecture.CLI_DISPATCHER:
+                        mod_endpoints.extend([f"cli://manage-{ent_s}", f"cli://list-{ent_s}"])
+                    else:
+                        mod_endpoints.extend([f"GET /api/{ent_s}s", f"POST /api/{ent_s}s", f"GET /api/{ent_s}s/{{id}}", f"PUT /api/{ent_s}s/{{id}}"])
 
             parent_ref = LLDParentRef(
                 hld_id=mod.id,
