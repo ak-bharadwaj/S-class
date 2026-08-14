@@ -55,7 +55,7 @@ def test_skeptic_rules_are_100_percent_grounded_in_failure_log():
 
     # 3. Exact bidirectional set equality
     assert active_skeptic_rules == logged_rule_ids
-    assert len(active_skeptic_rules) == 10
+    assert len(active_skeptic_rules) == 11
 
 
 def test_practical_skeptic_catches_vibecoded_mockup_fields():
@@ -181,4 +181,37 @@ def test_plain_prose_library_system_role_and_entity_preservation(temp_workspace)
     # 3. Practical Skeptic audit pass
     passed, warnings, checks = PracticalSkeptic.audit_specification(spec_data, archetypes=["fullstack"])
     assert passed is True, f"PracticalSkeptic failed on plain prose library spec! Warnings: {warnings}"
+
+
+def test_5_domain_matrix_role_completeness(temp_workspace):
+    """Verify FAIL-PROSE-011: 5-domain matrix (E-commerce, Fitness, Helpdesk, Hostel, Payroll) preserves 100% of named human roles without silent role loss."""
+    from spec_synthesis import SpecSynthesisEngine
+    from practical_skeptic import PracticalSkeptic
+
+    domain_prompts = [
+        ("E-commerce", "E-commerce platform for customers, sellers, and admins. Sellers upload products, customers buy, admins moderate.", ["customer", "seller", "admin"]),
+        ("Fitness App", "Gym membership app for members, trainers, and staff. Trainers schedule classes, staff check in members.", ["member", "trainer", "staff"]),
+        ("Helpdesk", "Helpdesk portal for customers, agents, and supervisors. Agents respond to tickets, supervisors escalate issues.", ["customer", "agent", "supervisor"]),
+        ("Hostel Management", "Hostel management system for wardens, students, and maintenance staff. Wardens assign rooms, maintenance handles repairs.", ["warden", "student", "maintenance"]),
+        ("Payroll", "Payroll management system for HR, employees, managers, and finance team. HR creates records, managers approve, finance disburses pay.", ["hr", "employee", "manager", "finance"])
+    ]
+
+    engine = SpecSynthesisEngine()
+
+    for domain_name, prompt, expected_roles in domain_prompts:
+        ws = os.path.join(temp_workspace, domain_name.replace(" ", "_"))
+        os.makedirs(ws, exist_ok=True)
+        spec = engine.run_synthesis(prompt, ws)
+
+        extracted_roles = list(spec.page_spreads.keys())
+        for r in expected_roles:
+            assert any(r in er or er in r for er in extracted_roles), f"[{domain_name}] Missing role '{r}'! Found roles in page_spreads: {extracted_roles}"
+
+        spec_json_path = os.path.join(ws, ".agents", "synthesized_spec.json")
+        with open(spec_json_path, 'r', encoding='utf-8') as f:
+            spec_data = json.load(f)
+
+        passed, warnings, checks = PracticalSkeptic.audit_specification(spec_data, archetypes=["fullstack"])
+        assert passed is True, f"[{domain_name}] PracticalSkeptic failed audit! Warnings: {warnings}"
+
 

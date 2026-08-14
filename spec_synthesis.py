@@ -1206,6 +1206,21 @@ class StructuredPromptParser:
                 if matched_clause:
                     break
 
+        # Extract explicit role enumeration clauses: e.g. "for customers, sellers, and admins", "roles: HR, employee, finance, manager"
+        role_enum_matches = re.findall(
+            r'\b(?:roles?|for|actors?|users?)\s*[:=]?\s*([a-zA-Z0-9_\-\s,&\/]+?)(?:\.|\n|;|\bwith\b|\bincluding\b|$)',
+            normalized_request,
+            re.IGNORECASE
+        )
+        for enum_chunk in role_enum_matches:
+            items = re.split(r',|\band\b|\b&\b|\bor\b', enum_chunk)
+            for item in items:
+                clean_item = cls._clean_token(item)
+                if clean_item and len(clean_item) >= 2 and clean_item not in cls.QUALIFIER_WORDS:
+                    if clean_item in SemanticDecomposer.HUMAN_ACTOR_KEYWORDS or (clean_item.endswith('s') and clean_item[:-1] in SemanticDecomposer.HUMAN_ACTOR_KEYWORDS) or any(clean_item.endswith(sfx) for sfx in ['or', 'er', 'ant', 'ent', 'ist', 'ian', 'ee', 'man', 'staff', 'team', 'hr', 'finance']):
+                        norm_r = clean_item[:-1] if clean_item.endswith('s') and clean_item[:-1] in SemanticDecomposer.HUMAN_ACTOR_KEYWORDS else clean_item
+                        seen_roles.add(norm_r)
+
         fallback_intent = DynamicLinguisticExtractor.extract_intent(normalized_request, workspace_vocab)
 
         if workspace_vocab and "roles" in workspace_vocab:
@@ -1213,6 +1228,7 @@ class StructuredPromptParser:
                 w_role_clean = w_role.lower()
                 if w_role_clean in raw_request.lower() and w_role_clean not in seen_roles:
                     seen_roles.add(w_role_clean)
+
         all_extracted_roles = list(dict.fromkeys(list(seen_roles) + fallback_intent.target_roles))
         final_roles = all_extracted_roles if all_extracted_roles else ["operator"]
 

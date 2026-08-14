@@ -145,5 +145,20 @@
     ],
     "skeptic_rule_id": "SKEPTIC-NON-NOUN-API",
     "resolved": true
+  },
+  {
+    "id": "FAIL-PROSE-011",
+    "project": "5-Domain Matrix Prose Role Extraction",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-14T21:22:00Z",
+    "summary": "Spec synthesis dropped 1-3 named human roles across 5 novel domains (e-commerce seller/admin, fitness trainer, helpdesk agent/supervisor, hostel warden/maintenance, payroll HR/employee/finance).",
+    "root_cause": "incomplete_actor_keyword_dictionary_and_missing_actor_completeness_audit_rule",
+    "missing_contracts": [
+      "role_enumeration_clause_parser",
+      "comprehensive_domain_actor_dictionary",
+      "actor_completeness_skeptic_rule"
+    ],
+    "skeptic_rule_id": "SKEPTIC-ACTOR-COMPLETENESS",
+    "resolved": true
   }
 ]

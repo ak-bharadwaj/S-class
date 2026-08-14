@@ -47,7 +47,8 @@ class PracticalSkeptic:
         "SKEPTIC-NON-ENTITY-API",
         "SKEPTIC-SOURCE-DECISION-PRESERVATION",
         "SKEPTIC-PROSE-CRUD-DUPLICATION",
-        "SKEPTIC-NON-NOUN-API"
+        "SKEPTIC-NON-NOUN-API",
+        "SKEPTIC-ACTOR-COMPLETENESS"
     }
 
     @classmethod
@@ -263,5 +264,23 @@ class PracticalSkeptic:
                         "message": f"Eliminate non-noun API resource '{nn}' in endpoint '{ep}'."
                     })
                     passed = False
+
+        # 11. SKEPTIC-ACTOR-COMPLETENESS (Audits for dropped human roles named in prompt)
+        intent_summary = spec_dict.get("intent_summary", "").lower()
+        if intent_summary and page_spreads:
+            active_spread_roles = {r.lower() for r in page_spreads.keys()}
+            prompt_words = re.findall(r'\b[a-zA-Z]{2,}\b', intent_summary)
+            for w in prompt_words:
+                w_lower = w.lower()
+                w_norm = w_lower[:-1] if w_lower.endswith('s') and len(w_lower) > 3 else w_lower
+                if w_norm in ["seller", "trainer", "supervisor", "warden", "maintenance", "employee", "finance", "hr", "agent", "librarian"]:
+                    if not any(w_norm in r or r in w_norm for r in active_spread_roles):
+                        warnings.append(f"[SKEPTIC-ACTOR-COMPLETENESS] Named human role '{w}' in prompt was omitted from synthesized sitemap.")
+                        checks.append({
+                            "rule_id": "SKEPTIC-ACTOR-COMPLETENESS",
+                            "severity": "BLOCKING",
+                            "message": f"Synthesize dedicated workspace page spread for named role '{w}'."
+                        })
+                        passed = False
 
         return passed, warnings, checks

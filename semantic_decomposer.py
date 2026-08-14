@@ -73,7 +73,20 @@ class SemanticDecomposer:
         "librarian", "librarians", "patron", "patrons", "borrower", "borrowers", "officer", "officers",
         "cashier", "cashiers", "custodian", "custodians", "technician", "technicians",
         "analyst", "analysts", "accountant", "accountants", "assistant", "assistants",
-        "steward", "stewards", "clerk", "clerks", "guest", "guests", "visitor", "visitors"
+        "steward", "stewards", "clerk", "clerks", "guest", "guests", "visitor", "visitors",
+        # E-Commerce & Marketplace Actors
+        "seller", "sellers", "merchant", "merchants", "vendor", "vendors", "buyer", "buyers",
+        # Fitness & Sports Actors
+        "trainer", "trainers", "coach", "coaches", "trainee", "trainees",
+        # Helpdesk & Customer Support Actors
+        "agent", "agents", "supervisor", "supervisors", "representative", "representatives",
+        # Hostel & Housing Actors
+        "warden", "wardens", "resident", "residents", "occupant", "occupants", "caretaker", "caretakers",
+        # Payroll, HR & Finance Actors
+        "hr", "employee", "employees", "payroll", "finance", "accounting", "treasurer", "treasurers",
+        "executive", "executives", "director", "directors", "contractor", "contractors",
+        # Operations & Maintenance Actors
+        "maintenance", "janitor", "janitors", "cleaner", "cleaners", "guard", "guards", "security"
     }
 
     STOP_WORDS = {
@@ -160,17 +173,14 @@ class SemanticDecomposer:
         # Extract Actors: Explicit human actor keywords anywhere in text
         for w in words:
             w_clean = re.sub(r'^[^\w]+|[^\w]+$', '', w)
-            if w_clean in cls.HUMAN_ACTOR_KEYWORDS:
+            w_norm = w_clean[:-1] if (w_clean.endswith('s') and w_clean[:-1] in cls.HUMAN_ACTOR_KEYWORDS) else w_clean
+            if w_clean.endswith('es') and w_clean[:-2] in cls.HUMAN_ACTOR_KEYWORDS:
+                w_norm = w_clean[:-2]
+            if w_clean in cls.HUMAN_ACTOR_KEYWORDS or w_norm in cls.HUMAN_ACTOR_KEYWORDS:
                 # Exclude software client (e.g. "query client", "api client", "arxiv client")
-                if w_clean in ["client", "clients"] and any(sw in norm_text for sw in ["query client", "http client", "api client", "rpc client", "arxiv query", "client library"]):
+                if w_norm in ["client", "clients"] and any(sw in norm_text for sw in ["query client", "http client", "api client", "rpc client", "arxiv query", "client library"]):
                     continue
-                # Normalize plural to singular
-                actor_norm = w_clean[:-1] if w_clean.endswith('s') and w_clean[:-1] in cls.HUMAN_ACTOR_KEYWORDS else w_clean
-                if w_clean.endswith('es') and w_clean[:-2] in cls.HUMAN_ACTOR_KEYWORDS:
-                    actor_norm = w_clean[:-2]
-                if actor_norm == "hod":
-                    actor_norm = "hod"
-                actors.add(actor_norm)
+                actors.add(w_norm)
 
         # Contextual role extraction: e.g. "for <actor>"
         role_matches = re.findall(r'\b(?:for|as|by|role|actor|user)\s+([a-zA-Z0-9_\-]+(?:\s+(?:and|&)\s+[a-zA-Z0-9_\-]+)?)', norm_text)
