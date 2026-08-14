@@ -146,6 +146,31 @@ class TestV953EpistemicRigor(unittest.TestCase):
         v_files = [f for f in os.listdir(state_dir) if f.startswith("v7_refinement_pipeline_v") and f.endswith(".json")]
         self.assertEqual(len(v_files), 1, f"Expected 1 version file after duplicate save attempt, found {v_files}")
 
+    def test_concurrent_same_content_deduplication(self):
+        """Invariant: 8 concurrent workers saving the exact SAME content produce exactly 1 version file (v1.json)."""
+        from concurrent.futures import ThreadPoolExecutor
+
+        state_dir = os.path.join(self.test_dir, ".agents")
+        num_threads = 8
+
+        # Compile single shared payload
+        single_pipe = SpecificationCompiler.compile_v7_refinement_pipeline(
+            raw_request="Concurrent Same Content Build Request", workspace_dir=None, is_debate_phase=False
+        )
+
+        def worker_save(thread_idx: int):
+            return SpecificationCompiler.save_versioned_pipeline_artifact(single_pipe, self.test_dir)
+
+        with ThreadPoolExecutor(max_workers=num_threads) as executor:
+            futures = [executor.submit(worker_save, i) for i in range(num_threads)]
+            saved_paths = [f.result() for f in futures]
+
+        v_files = sorted([f for f in os.listdir(state_dir) if f.startswith("v7_refinement_pipeline_v") and f.endswith(".json")])
+        self.assertEqual(len(v_files), 1, f"Concurrent identical save attempts must produce exactly 1 version file, found {v_files}")
+        v1_file = os.path.join(state_dir, "v7_refinement_pipeline_v1.json")
+        for p in saved_paths:
+            self.assertEqual(p, v1_file, "All concurrent workers saving identical content must receive v1.json path")
+
     def test_concurrent_pipeline_version_allocation(self):
         """Invariant: Concurrent save_versioned_pipeline_artifact calls allocate version numbers atomically with FileLock."""
         from concurrent.futures import ThreadPoolExecutor
@@ -186,6 +211,47 @@ class TestV953EpistemicRigor(unittest.TestCase):
                 expected_parent_hash = hashlib.sha256(pf.read()).hexdigest()
             self.assertEqual(curr_data.get("parent_version"), v_num - 1)
             self.assertEqual(curr_data.get("parent_hash"), expected_parent_hash, f"v{v_num} parent_hash must strictly match SHA-256 digest of v{v_num - 1}")
+
+    def test_long_held_lock_live_owner_protection(self):
+        """Invariant: A live lock owner holding FileLock beyond stale_ttl is NEVER evicted by competing workers."""
+        from runtime import FileLock
+        import time, threading
+
+        state_dir = os.path.join(self.test_dir, ".agents")
+        os.makedirs(state_dir, exist_ok=True)
+        lock_path = os.path.join(state_dir, ".pipeline_version.lock")
+
+        acquired_event = threading.Event()
+        competer_blocked = [True]
+
+        def long_holding_owner():
+            # Set a very short stale_ttl (0.1s) so age immediately exceeds stale_ttl
+            with FileLock(lock_path, stale_ttl=0.1):
+                acquired_event.set()
+                time.sleep(0.4) # Hold lock past stale_ttl while process (current thread/PID) is ALIVE
+
+        def competing_worker():
+            acquired_event.wait(timeout=2.0)
+            # Try to acquire lock with short timeout (0.15s)
+            start_compete = time.time()
+            try:
+                with FileLock(lock_path, timeout=0.15, stale_ttl=0.1):
+                    competer_blocked[0] = False
+            except TimeoutError:
+                competer_blocked[0] = True
+
+        t_owner = threading.Thread(target=long_holding_owner)
+        t_competer = threading.Thread(target=competing_worker)
+
+        t_owner.start()
+        t_competer.start()
+
+        t_owner.join()
+        t_competer.join()
+
+        # Competer MUST have timed out and failed to steal the lock from the live owner
+        self.assertTrue(competer_blocked[0], "Competing worker must NOT steal FileLock from live owner even if lock age > stale_ttl")
+        self.assertFalse(os.path.exists(lock_path), "Lock file must be released cleanly after live owner completes")
 
 
 if __name__ == "__main__":

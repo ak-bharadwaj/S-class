@@ -126,30 +126,15 @@ class FileLock:
                     lock_mtime = os.path.getmtime(self.lock_path)
                     lock_age = time.time() - lock_mtime
 
-                    # 1. Stale TTL lease expiration (crashed or abandoned lock held > stale_ttl)
-                    if lock_age > self.stale_ttl:
-                        logger.warning(f"Stale lock TTL expired ({lock_age:.1f}s > {self.stale_ttl}s). Recovering: {self.lock_path}")
-                        try:
-                            os.unlink(self.lock_path)
-                        except OSError:
-                            pass
-                        continue
-
-                    # 2. Inspect PID in lock file
+                    # 1. Inspect PID in lock file FIRST
                     pid_str = ""
-                    with open(self.lock_path, "r", encoding="utf-8") as f:
-                        pid_str = f.read().strip()
+                    try:
+                        with open(self.lock_path, "r", encoding="utf-8") as f:
+                            pid_str = f.read().strip()
+                    except Exception:
+                        pass
 
-                    # 3. Empty/corrupt lock file cleanup
-                    if not pid_str and lock_age > 0.5:
-                        logger.warning(f"Empty/corrupt lock file detected. Recovering: {self.lock_path}")
-                        try:
-                            os.unlink(self.lock_path)
-                        except OSError:
-                            pass
-                        continue
-
-                    # 4. Dead process check
+                    # 2. Dead process check — if PID is alive, NEVER steal lock based on age
                     if pid_str.isdigit():
                         pid = int(pid_str)
                         if not _process_exists(pid):
@@ -159,6 +144,17 @@ class FileLock:
                             except OSError:
                                 pass
                             continue
+                        else:
+                            # Live process holds lock — keep waiting regardless of lock_age
+                            pass
+                    elif not pid_str and lock_age > 0.5:
+                        # Empty/corrupt lock file cleanup
+                        logger.warning(f"Empty/corrupt lock file detected. Recovering: {self.lock_path}")
+                        try:
+                            os.unlink(self.lock_path)
+                        except OSError:
+                            pass
+                        continue
                 except (FileNotFoundError, OSError):
                     # Lock was released by other process in the meantime
                     continue
@@ -172,7 +168,16 @@ class FileLock:
     def __exit__(self, exc_type, exc_val, exc_tb):
         try:
             if os.path.exists(self.lock_path):
-                os.unlink(self.lock_path)
+                # Verify we are releasing OUR OWN lock file (PID check)
+                try:
+                    with open(self.lock_path, "r", encoding="utf-8") as f:
+                        pid_str = f.read().strip()
+                    if pid_str.isdigit() and int(pid_str) == os.getpid():
+                        os.unlink(self.lock_path)
+                except Exception:
+                    pass
+        except OSError:
+            pass
         except OSError:
             pass
 
