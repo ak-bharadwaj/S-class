@@ -675,96 +675,98 @@ class SpecificationCompiler:
         Saves pipeline result into an immutable versioned artifact (v7_refinement_pipeline_v{ver}.json)
         with parent lineage version and hash tracking. Deduplicates identical content so serializing the
         same pipeline state twice does NOT increment version or create duplicate artifact files.
+        Enforces hardware mutual exclusion (FileLock) for atomic, concurrency-safe version allocation.
         """
         state_dir = os.path.join(workspace_dir, ".agents")
         os.makedirs(state_dir, exist_ok=True)
+        lock_file = os.path.join(state_dir, ".pipeline_version.lock")
 
-        existing_versions = []
-        if os.path.exists(state_dir):
-            for fname in os.listdir(state_dir):
-                if fname.startswith("v7_refinement_pipeline_v") and fname.endswith(".json"):
+        from runtime import FileLock
+        with FileLock(lock_file):
+            existing_versions = []
+            if os.path.exists(state_dir):
+                for fname in os.listdir(state_dir):
+                    if fname.startswith("v7_refinement_pipeline_v") and fname.endswith(".json"):
+                        try:
+                            v_num = int(fname.replace("v7_refinement_pipeline_v", "").replace(".json", ""))
+                            existing_versions.append(v_num)
+                        except ValueError:
+                            pass
+
+            current_ver = max(existing_versions) if existing_versions else 0
+
+            # Construct normalized content payload for hashing and comparison
+            content_payload = {
+                "behavior_graph": res_pipe["behavior_graph"].to_dict() if hasattr(res_pipe["behavior_graph"], "to_dict") else res_pipe["behavior_graph"],
+                "requirement_graph": res_pipe["requirement_graph"].to_dict() if hasattr(res_pipe["requirement_graph"], "to_dict") else res_pipe["requirement_graph"],
+                "dependency_holes": res_pipe.get("dependency_holes", []),
+                "hld_design": res_pipe["hld_design"].to_dict() if hasattr(res_pipe["hld_design"], "to_dict") else res_pipe["hld_design"],
+                "hld_validation": res_pipe.get("hld_validation", {}),
+                "hld_governance": res_pipe.get("hld_governance", {}),
+                "debate_result": res_pipe.get("debate_result", {}),
+                "lld_components": [c.to_dict() if hasattr(c, "to_dict") else c for c in res_pipe.get("lld_components", [])],
+                "lld_governance": res_pipe.get("lld_governance", {}),
+                "tasks": [t.to_dict() if hasattr(t, "to_dict") else t for t in res_pipe.get("tasks", [])],
+                "task_governance": res_pipe.get("task_governance", {}),
+                "blocked": res_pipe.get("blocked", False)
+            }
+
+            new_content_json = json.dumps(content_payload, sort_keys=True)
+            new_content_hash = hashlib.sha256(new_content_json.encode("utf-8")).hexdigest()
+
+            # Check if current version file exists and has identical content hash
+            if current_ver > 0:
+                current_file = os.path.join(state_dir, f"v7_refinement_pipeline_v{current_ver}.json")
+                if os.path.exists(current_file):
                     try:
-                        v_num = int(fname.replace("v7_refinement_pipeline_v", "").replace(".json", ""))
-                        existing_versions.append(v_num)
-                    except ValueError:
+                        with open(current_file, "r", encoding="utf-8") as f:
+                            curr_data = json.load(f)
+                        curr_content = {k: v for k, v in curr_data.items() if k not in ["version", "parent_version", "parent_hash", "version_file"]}
+                        curr_content_json = json.dumps(curr_content, sort_keys=True)
+                        curr_content_hash = hashlib.sha256(curr_content_json.encode("utf-8")).hexdigest()
+                        if new_content_hash == curr_content_hash:
+                            # Deduplication hit — skip creating duplicate version file
+                            return current_file
+                    except Exception:
                         pass
 
-        current_ver = max(existing_versions) if existing_versions else 0
+            next_ver = current_ver + 1
+            parent_ver = current_ver if current_ver > 0 else None
+            parent_hash = None
+            if parent_ver:
+                parent_file = os.path.join(state_dir, f"v7_refinement_pipeline_v{parent_ver}.json")
+                if os.path.exists(parent_file):
+                    try:
+                        with open(parent_file, "rb") as pf:
+                            parent_hash = hashlib.sha256(pf.read()).hexdigest()
+                    except Exception:
+                        pass
 
-        # Construct normalized content payload for hashing and comparison
-        content_payload = {
-            "behavior_graph": res_pipe["behavior_graph"].to_dict() if hasattr(res_pipe["behavior_graph"], "to_dict") else res_pipe["behavior_graph"],
-            "requirement_graph": res_pipe["requirement_graph"].to_dict() if hasattr(res_pipe["requirement_graph"], "to_dict") else res_pipe["requirement_graph"],
-            "dependency_holes": res_pipe.get("dependency_holes", []),
-            "hld_design": res_pipe["hld_design"].to_dict() if hasattr(res_pipe["hld_design"], "to_dict") else res_pipe["hld_design"],
-            "hld_validation": res_pipe.get("hld_validation", {}),
-            "hld_governance": res_pipe.get("hld_governance", {}),
-            "debate_result": res_pipe.get("debate_result", {}),
-            "lld_components": [c.to_dict() if hasattr(c, "to_dict") else c for c in res_pipe.get("lld_components", [])],
-            "lld_governance": res_pipe.get("lld_governance", {}),
-            "tasks": [t.to_dict() if hasattr(t, "to_dict") else t for t in res_pipe.get("tasks", [])],
-            "task_governance": res_pipe.get("task_governance", {}),
-            "blocked": res_pipe.get("blocked", False)
-        }
+            payload = dict(content_payload)
+            payload["version"] = next_ver
+            payload["parent_version"] = parent_ver
+            payload["parent_hash"] = parent_hash
 
-        new_content_json = json.dumps(content_payload, sort_keys=True)
-        new_content_hash = hashlib.sha256(new_content_json.encode("utf-8")).hexdigest()
+            # 1. Immutable versioned successor artifact
+            versioned_file = os.path.join(state_dir, f"v7_refinement_pipeline_v{next_ver}.json")
+            write_json_atomic(versioned_file, payload)
 
-        # Check if current version file exists and has identical content hash
-        if current_ver > 0:
-            current_file = os.path.join(state_dir, f"v7_refinement_pipeline_v{current_ver}.json")
-            if os.path.exists(current_file):
-                try:
-                    with open(current_file, "r", encoding="utf-8") as f:
-                        curr_data = json.load(f)
-                    curr_content = {k: v for k, v in curr_data.items() if k not in ["version", "parent_version", "parent_hash", "version_file"]}
-                    curr_content_json = json.dumps(curr_content, sort_keys=True)
-                    curr_content_hash = hashlib.sha256(curr_content_json.encode("utf-8")).hexdigest()
-                    if new_content_hash == curr_content_hash:
-                        # Deduplication hit — skip creating duplicate version file
-                        return current_file
-                except Exception:
-                    pass
+            # 2. Latest version pointer alias
+            alias_file = os.path.join(state_dir, "v7_refinement_pipeline.json")
+            payload["version_file"] = f"v7_refinement_pipeline_v{next_ver}.json"
+            write_json_atomic(alias_file, payload)
 
-        next_ver = current_ver + 1
-        parent_ver = current_ver if current_ver > 0 else None
-        parent_hash = None
-        if parent_ver:
-            parent_file = os.path.join(state_dir, f"v7_refinement_pipeline_v{parent_ver}.json")
-            if os.path.exists(parent_file):
-                try:
-                    with open(parent_file, "rb") as pf:
-                        parent_hash = hashlib.sha256(pf.read()).hexdigest()
-                except Exception:
-                    pass
+            # 3. Update FSM state version tracking
+            try:
+                from sclass_state import get_state, save_state
+                state = get_state(workspace_dir)
+                setattr(state, "currentSpecVersion", next_ver)
+                setattr(state, "currentDebateVersion", next_ver)
+                save_state(state, workspace_dir)
+            except Exception:
+                pass
 
-        payload = dict(content_payload)
-        payload["version"] = next_ver
-        payload["parent_version"] = parent_ver
-        payload["parent_hash"] = parent_hash
-
-        # 1. Immutable versioned successor artifact
-        versioned_file = os.path.join(state_dir, f"v7_refinement_pipeline_v{next_ver}.json")
-        write_json_atomic(versioned_file, payload)
-
-        # 2. Latest version pointer alias
-        alias_file = os.path.join(state_dir, "v7_refinement_pipeline.json")
-        payload["version_file"] = f"v7_refinement_pipeline_v{next_ver}.json"
-        write_json_atomic(alias_file, payload)
-
-        # 3. Update FSM state version tracking
-        try:
-            from sclass_state import get_state, save_state
-            state = get_state(workspace_dir)
-            setattr(state, "currentSpecVersion", next_ver)
-            setattr(state, "currentDebateVersion", next_ver)
-            save_state(state, workspace_dir)
-        except Exception:
-            pass
-
-        return versioned_file
-
-        return versioned_file
+            return versioned_file
 
     @classmethod
     def synthesize_compiled_lld_requirements(cls, lld_catalog: Dict[str, Dict[str, Any]]) -> List[Any]:

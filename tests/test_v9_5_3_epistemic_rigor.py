@@ -146,6 +146,47 @@ class TestV953EpistemicRigor(unittest.TestCase):
         v_files = [f for f in os.listdir(state_dir) if f.startswith("v7_refinement_pipeline_v") and f.endswith(".json")]
         self.assertEqual(len(v_files), 1, f"Expected 1 version file after duplicate save attempt, found {v_files}")
 
+    def test_concurrent_pipeline_version_allocation(self):
+        """Invariant: Concurrent save_versioned_pipeline_artifact calls allocate version numbers atomically with FileLock."""
+        from concurrent.futures import ThreadPoolExecutor
+        import hashlib
+
+        state_dir = os.path.join(self.test_dir, ".agents")
+        num_threads = 8
+
+        # Prepare 8 distinct pipeline payloads upfront without saving
+        res_pipes = [
+            SpecificationCompiler.compile_v7_refinement_pipeline(
+                raw_request=f"Concurrent System Build Request Thread #{i} with microservice {i}",
+                workspace_dir=None,
+                is_debate_phase=False
+            )
+            for i in range(num_threads)
+        ]
+
+        def worker_save(thread_idx: int):
+            return SpecificationCompiler.save_versioned_pipeline_artifact(res_pipes[thread_idx], self.test_dir)
+
+        with ThreadPoolExecutor(max_workers=num_threads) as executor:
+            futures = [executor.submit(worker_save, i) for i in range(num_threads)]
+            saved_paths = [f.result() for f in futures]
+
+        v_files = sorted([f for f in os.listdir(state_dir) if f.startswith("v7_refinement_pipeline_v") and f.endswith(".json")])
+
+        # Verify no version collisions occurred (all version files v1..vN exist sequentially)
+        version_numbers = sorted([int(f.replace("v7_refinement_pipeline_v", "").replace(".json", "")) for f in v_files])
+        self.assertEqual(version_numbers, list(range(1, len(version_numbers) + 1)), "Version numbers must be strictly sequential without collisions or skips")
+
+        # Verify parent lineage integrity for every file v2..vN
+        for v_num in range(2, len(version_numbers) + 1):
+            curr_file = os.path.join(state_dir, f"v7_refinement_pipeline_v{v_num}.json")
+            parent_file = os.path.join(state_dir, f"v7_refinement_pipeline_v{v_num - 1}.json")
+            curr_data = load_json(curr_file)
+            with open(parent_file, "rb") as pf:
+                expected_parent_hash = hashlib.sha256(pf.read()).hexdigest()
+            self.assertEqual(curr_data.get("parent_version"), v_num - 1)
+            self.assertEqual(curr_data.get("parent_hash"), expected_parent_hash, f"v{v_num} parent_hash must strictly match SHA-256 digest of v{v_num - 1}")
+
 
 if __name__ == "__main__":
     unittest.main()
