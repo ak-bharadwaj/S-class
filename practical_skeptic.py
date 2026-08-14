@@ -1,13 +1,29 @@
 """
 S-Class Practical Skeptic (Real-World Project Failure Checklist)
 
-Enforces empirical quality checks derived directly from recorded real-world failures
-(e.g. SGDA 19-feature gap audit, vibecoded UI prevention, Next.js/Prisma schema grounding,
-FastAPI async dependency typing).
+Enforces empirical quality checks derived directly from recorded real-world failures:
+- SKEPTIC-PRISMA-SCHEMA-GROUNDING & SKEPTIC-NO-VIBECODE-UI (SGDA 19-feature gap)
+- SKEPTIC-19-FEATURE-GAP-PREVENTION (Workflow vs shallow CRUD)
+- SKEPTIC-ROLE-ROUTE-GUARD (Role-scoped sitemaps and profile security)
+- SKEPTIC-NON-ENTITY-API (Detects adjectives/verbs hallucinated into REST endpoints)
+- SKEPTIC-FRONTEND-LEAKAGE-IN-BACKEND (Detects UI components hallucinated into pure CLI/FastAPI backends)
+- SKEPTIC-ROLE-EXTRACTION-SANITY (Detects non-actor nouns like 'college' extracted as roles)
 """
 
 from typing import Dict, List, Set, Any, Optional, Tuple
 import re
+
+INVALID_ENTITY_NAMES = {
+    "fast", "quick", "slow", "complete", "simple", "easy", "complex", "hard", "full",
+    "partial", "automated", "manual", "single", "multi", "great", "good", "new", "old",
+    "best", "smart", "high", "low", "real", "time", "custom", "tool", "portal", "system",
+    "platform", "app", "application", "codebase", "make", "build", "add", "item", "items"
+}
+
+INVALID_ROLE_NAMES = {
+    "college", "school", "university", "department", "company", "enterprise", "organization",
+    "system", "platform", "app", "application", "tool", "portal", "codebase"
+}
 
 
 class PracticalSkeptic:
@@ -20,12 +36,9 @@ class PracticalSkeptic:
     def audit_specification(
         cls,
         spec_dict: Dict[str, Any],
-        workspace_evidence: Optional[Any] = None
+        workspace_evidence: Optional[Any] = None,
+        archetypes: Optional[List[str]] = None
     ) -> Tuple[bool, List[str], List[Dict[str, Any]]]:
-        """
-        Runs the 5 practical checklist rules.
-        Returns: (passed: bool, warnings: List[str], actionable_checks: List[Dict])
-        """
         warnings = []
         checks = []
         passed = True
@@ -34,11 +47,53 @@ class PracticalSkeptic:
         page_spreads = spec_dict.get("page_spreads", {})
         requirements = spec_dict.get("requirements", {})
 
-        # Rule 1: SKEPTIC-PRISMA-SCHEMA-GROUNDING & NO-VIBECODE-UI
-        # Ensures UI forms & API endpoints use real schema fields, not generic boilerplate
+        # 1. SKEPTIC-NON-ENTITY-API (Adjectives/Verbs hallucinated into REST APIs)
+        for lld_key, lld in low_level_designs.items():
+            apis = lld.get("api_endpoints", [])
+            for ep in apis:
+                # Split endpoint into discrete path tokens
+                url_path = ep.split()[1] if len(ep.split()) > 1 else ep
+                tokens = [t for t in re.split(r'[/_\-]', url_path.lower()) if t and not t.startswith('{')]
+                for token in tokens:
+                    norm_tok = token[:-1] if token.endswith('s') and len(token) > 3 else token
+                    if norm_tok in INVALID_ENTITY_NAMES:
+                        warnings.append(f"[SKEPTIC-NON-ENTITY-API] Hallucinated REST API '{ep}' is derived from adjective/verb token '{token}' instead of a real domain entity.")
+                        checks.append({
+                            "rule_id": "SKEPTIC-NON-ENTITY-API",
+                            "severity": "BLOCKING",
+                            "message": f"Remove hallucinated endpoint '{ep}' based on invalid token '{token}'."
+                        })
+                        passed = False
+
+        # 2. SKEPTIC-ROLE-EXTRACTION-SANITY (Non-actor nouns parsed as roles)
+        for role in page_spreads.keys():
+            if role.lower() in INVALID_ROLE_NAMES:
+                warnings.append(f"[SKEPTIC-ROLE-EXTRACTION-SANITY] Extracted role '{role}' is an organization/container, not a human actor.")
+                checks.append({
+                    "rule_id": "SKEPTIC-ROLE-EXTRACTION-SANITY",
+                    "severity": "BLOCKING",
+                    "message": f"Fix role extraction: '{role}' is a container noun. Expected human actors (e.g. faculty, hod, student, admin)."
+                })
+                passed = False
+
+        # 3. SKEPTIC-FRONTEND-LEAKAGE-IN-BACKEND
+        if archetypes and any(a in ["cli_tool", "backend_api", "library_package"] for a in archetypes) and not any(a in ["fullstack", "web_frontend", "mobile_hybrid"] for a in archetypes):
+            ui_count = 0
+            for lld in low_level_designs.values():
+                for comp in lld.get("sub_components", []):
+                    if any(ui_kw in comp.lower() for ui_kw in ["matrix", "drawer", "modal", "badge", "chart", "table", "uploader"]):
+                        ui_count += 1
+            if ui_count > 5:
+                warnings.append(f"[SKEPTIC-FRONTEND-LEAKAGE-IN-BACKEND] Pure backend/CLI project has {ui_count} hallucinated UI components in specification.")
+                checks.append({
+                    "rule_id": "SKEPTIC-FRONTEND-LEAKAGE-IN-BACKEND",
+                    "severity": "WARNING",
+                    "message": "Pure backend project should specify API contracts and schemas, not frontend UI components."
+                })
+
+        # 4. SKEPTIC-PRISMA-SCHEMA-GROUNDING & NO-VIBECODE-UI
         generic_field_count = 0
         total_field_count = 0
-
         for lld_key, lld in low_level_designs.items():
             for tab in lld.get("tabs", []):
                 for f in tab.get("fields", []):
@@ -54,12 +109,7 @@ class PracticalSkeptic:
                 "message": "Eliminate vibecoded placeholder fields; bind UI directly to domain attributes."
             })
 
-        # Rule 2: SKEPTIC-19-FEATURE-GAP-PREVENTION (Workflow vs Shallow CRUD)
-        # In multi-role portals, ensure assignment, verification, and progress tracking exist
-        all_routes = []
-        for role, pages in page_spreads.items():
-            all_routes.extend([p.get("route", "") for p in pages])
-
+        # 5. SKEPTIC-19-FEATURE-GAP-PREVENTION (Workflow vs Shallow CRUD)
         all_actions = []
         for lld in low_level_designs.values():
             for tab in lld.get("tabs", []):
@@ -76,19 +126,19 @@ class PracticalSkeptic:
             checks.append({
                 "rule_id": "SKEPTIC-19-FEATURE-GAP",
                 "severity": "WARNING",
-                "message": "Add explicit operational workflows (e.g. slot scheduling, instructor assignment, progress scorecard) to prevent shallow CRUD gap."
+                "message": "Add explicit operational workflows to prevent shallow CRUD gap."
             })
 
-        # Rule 3: SKEPTIC-ROLE-ROUTE-GUARD (Grounding: FAIL-PORTAL-003)
-        # Ensures multi-role portals have distinct role-scoped sitemaps and profile/security tabs
-        for role, pages in page_spreads.items():
-            routes = [p.get("route", "") for p in pages]
-            if "/profile" not in routes:
-                warnings.append(f"[SKEPTIC-ROLE-ROUTE-GUARD] Role '{role}' is missing self-profile and security management routes.")
-                checks.append({
-                    "rule_id": "SKEPTIC-ROLE-ROUTE-GUARD",
-                    "severity": "INFO",
-                    "message": f"Add /profile to {role} sitemap."
-                })
+        # 6. SKEPTIC-ROLE-ROUTE-GUARD
+        if not (archetypes and any(a in ["cli_tool", "backend_api"] for a in archetypes)):
+            for role, pages in page_spreads.items():
+                routes = [p.get("route", "") for p in pages]
+                if "/profile" not in routes:
+                    warnings.append(f"[SKEPTIC-ROLE-ROUTE-GUARD] Role '{role}' is missing self-profile and security management routes.")
+                    checks.append({
+                        "rule_id": "SKEPTIC-ROLE-ROUTE-GUARD",
+                        "severity": "INFO",
+                        "message": f"Add /profile to {role} sitemap."
+                    })
 
         return passed, warnings, checks

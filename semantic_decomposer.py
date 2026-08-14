@@ -27,7 +27,7 @@ class SemanticDecomposer:
     MEASUREMENT_MARKERS = [
         "temperature", "vibration", "humidity", "pressure", "reading", "sensor",
         "telemetry", "metric", "latency", "throughput", "voltage", "current",
-        "soil_moisture", "flow_rate", "odometer", "fuel", "heart_rate", "blood_pressure",
+        "soil_moisture", "moisture", "flow_rate", "odometer", "fuel", "heart_rate", "blood_pressure",
         "speed", "rpm", "error_rate", "cpu_usage", "memory_usage", "bandwidth",
         "power", "generation", "irradiance", "flight_hours", "defect_rate"
     ]
@@ -61,20 +61,43 @@ class SemanticDecomposer:
         "aircraft", "sensor", "slot", "room", "bed", "equipment", "server"
     ]
 
+    HUMAN_ACTOR_KEYWORDS = {
+        "faculty", "hod", "hods", "student", "students", "instructor", "instructors",
+        "admin", "administrator", "administrators", "doctor", "doctors", "patient", "patients",
+        "engineer", "engineers", "driver", "drivers", "manager", "managers", "customer", "customers",
+        "client", "clients", "operator", "operators", "researcher", "researchers", "user", "users",
+        "reviewer", "reviewers", "auditor", "auditors", "candidate", "candidates", "staff", "teller",
+        "examiner", "tenant", "landlord", "dispatcher", "mechanic"
+    }
+
     STOP_WORDS = {
-        "build", "create", "make", "implement", "with", "from", "system", "platform",
-        "app", "application", "tool", "and", "the", "for", "such", "etc", "that",
-        "this", "rate", "rates", "policies", "policy", "queues", "queue", "measurements",
+        # Meta & Action Verbs
+        "build", "create", "make", "implement", "add", "fix", "update", "delete", "manage",
+        "run", "execute", "test", "verify", "check", "ensure", "allow", "support",
+        # Generic Software Container Words
+        "system", "platform", "app", "application", "tool", "tooling", "portal", "codebase",
+        "project", "feature", "features", "module", "modules", "service", "services",
+        # Adjectives & Modifiers (MUST NEVER BECOME ENTITIES)
+        "fast", "quick", "slow", "complete", "simple", "easy", "complex", "hard", "full",
+        "partial", "automated", "manual", "single", "multi", "great", "good", "new", "old",
+        "best", "smart", "high", "low", "real", "time", "real-time", "realtime", "custom",
+        "standard", "seamless", "modern", "universal", "clean", "robust",
+        # Grammatical Connectors & Prepositions
+        "and", "the", "for", "such", "etc", "that", "this", "from", "with", "into", "onto",
+        "over", "under", "when", "where", "then", "their", "your", "each", "both", "all",
+        "college", "school", "university", "department", "company", "enterprise", "organization",
+        # Generic Schema Terms
+        "rate", "rates", "policies", "policy", "queues", "queue", "measurements",
         "measurement", "readings", "reading", "metrics", "metric", "alarms", "alarm",
         "events", "event", "items", "item", "assurance", "management", "quality",
-        "observability", "platform", "system"
+        "observability"
     }
 
     @classmethod
     def normalize_text(cls, text: str) -> str:
         t = text.lower()
         t = re.sub(r'[\r\n\t]+', ' ', t)
-        t = re.sub(r'[^\w\s\-_,.]', '', t)
+        t = re.sub(r'[^\w\s\-_,.]', ' ', t)
         return t.strip()
 
     @classmethod
@@ -87,7 +110,6 @@ class SemanticDecomposer:
         words = norm_text.split()
 
         # 1. Extract Core Entities & Actors
-        # Identify noun phrases and actors
         actors: Set[str] = set()
         entities: Set[str] = set()
         resources: Set[str] = set()
@@ -97,11 +119,29 @@ class SemanticDecomposer:
         workflows: Set[str] = set()
         documents: Set[str] = set()
 
-        # Extract Actors from role patterns
-        role_matches = re.findall(r'\b(?:for|as|by|role|actor|user)\s+([a-zA-Z0-9_\-]+)', norm_text)
-        for r in role_matches:
-            if r not in ['a', 'an', 'the', 'all', 'each', 'this', 'that', 'system', 'app', 'platform']:
-                actors.add(r)
+        # Extract Actors: Explicit human actor keywords anywhere in text
+        for w in words:
+            w_clean = re.sub(r'^[^\w]+|[^\w]+$', '', w)
+            if w_clean in cls.HUMAN_ACTOR_KEYWORDS:
+                # Exclude software client (e.g. "query client", "api client", "arxiv client")
+                if w_clean in ["client", "clients"] and any(sw in norm_text for sw in ["query client", "http client", "api client", "rpc client", "arxiv query", "client library"]):
+                    continue
+                # Normalize plural to singular
+                actor_norm = w_clean[:-1] if w_clean.endswith('s') and w_clean[:-1] in cls.HUMAN_ACTOR_KEYWORDS else w_clean
+                if actor_norm == "hod":
+                    actor_norm = "hod"
+                actors.add(actor_norm)
+
+        # Contextual role extraction: e.g. "for <actor>"
+        role_matches = re.findall(r'\b(?:for|as|by|role|actor|user)\s+([a-zA-Z0-9_\-]+(?:\s+(?:and|&)\s+[a-zA-Z0-9_\-]+)?)', norm_text)
+        for r_group in role_matches:
+            for r in re.split(r'\s+(?:and|&)\s+', r_group):
+                r_clean = r.strip()
+                if r_clean and r_clean not in cls.STOP_WORDS and len(r_clean) >= 3:
+                    if r_clean in cls.HUMAN_ACTOR_KEYWORDS:
+                        if r_clean in ["client", "clients"] and any(sw in norm_text for sw in ["query client", "http client", "api client", "rpc client", "arxiv query"]):
+                            continue
+                        actors.add(r_clean)
 
         # Token semantic classification
         for w in words:
@@ -109,6 +149,11 @@ class SemanticDecomposer:
             if not w_clean or len(w_clean) < 3:
                 continue
 
+            # Don't classify human actors as domain entities/resources
+            if w_clean in cls.HUMAN_ACTOR_KEYWORDS or (w_clean.endswith('s') and w_clean[:-1] in cls.HUMAN_ACTOR_KEYWORDS):
+                continue
+
+            # 1. Functional primitive markers take precedence over generic stop words
             if any(m in w_clean for m in cls.MEASUREMENT_MARKERS):
                 measurements.add(w_clean)
             elif any(p in w_clean for p in cls.POLICY_MARKERS):
@@ -121,8 +166,12 @@ class SemanticDecomposer:
                 documents.add(w_clean)
             elif any(res in w_clean for res in cls.RESOURCE_MARKERS):
                 resources.add(w_clean)
-            elif w_clean not in cls.STOP_WORDS:
-                # Potential domain entity
+            else:
+                # 2. General entity candidate: must not be an adjective/verb/stop word
+                if w_clean in cls.STOP_WORDS:
+                    continue
+                if '-' in w_clean and any(part in cls.STOP_WORDS for part in w_clean.split('-')):
+                    continue
                 if len(w_clean) >= 4 and not w_clean.endswith('ing'):
                     entities.add(w_clean)
 

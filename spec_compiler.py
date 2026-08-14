@@ -143,7 +143,7 @@ class GraphInferenceEngine:
                 "layout": "document_vault",
                 "sub_components": [
                     f"{doc_clean}LifecycleBoard",
-                    f"{doc_clean}ClauseDiffViewer",
+                    f"{doc_clean}VersionDiffViewer",
                     f"{doc_clean}RecordSignatoryModal",
                     "DocumentSecurityBadge",
                     "DigitalProofExporter"
@@ -181,7 +181,7 @@ class GraphInferenceEngine:
                 "layout": "resource_matrix",
                 "sub_components": [
                     f"{res_clean}StatusMatrix",
-                    f"{res_clean}AirworthinessBadge",
+                    f"{res_clean}OperationalBadge",
                     f"{res_clean}TelemetryChart",
                     f"{res_clean}MaintenanceTimeline",
                     "AssetLocationDrawer"

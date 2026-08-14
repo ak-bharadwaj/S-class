@@ -242,14 +242,26 @@ class ProjectArchetypeDetector:
         # 3. Python manifests
         if os.path.exists(req_txt) or os.path.exists(pyproject):
             deps_str = ""
+            if os.path.exists(pyproject):
+                try:
+                    with open(pyproject, 'r', encoding='utf-8', errors='ignore') as f:
+                        deps_str += " " + f.read().lower()
+                except Exception:
+                    pass
+            if os.path.exists(req_txt):
+                try:
+                    with open(req_txt, 'r', encoding='utf-8', errors='ignore') as f:
+                        deps_str += " " + f.read().lower()
+                except Exception:
+                    pass
             if evidence:
-                deps_str = " ".join(evidence.dependencies).lower()
+                deps_str += " " + " ".join(evidence.dependencies).lower()
 
             if "torch" in deps_str or "transformers" in deps_str or "langchain" in deps_str or "openai" in deps_str:
                 archetypes.add(ProjectArchetype.ML_AI)
             if "airflow" in deps_str or "dbt" in deps_str or "pyspark" in deps_str or "dagster" in deps_str:
                 archetypes.add(ProjectArchetype.DATA_PIPELINE)
-            if "fastapi" in deps_str or "django" in deps_str or "flask" in deps_str:
+            if "fastapi" in deps_str or "django" in deps_str or "flask" in deps_str or "uvicorn" in deps_str:
                 if not any(a in [ProjectArchetype.FULLSTACK_MONOLITH, ProjectArchetype.WEB_FRONTEND] for a in archetypes):
                     archetypes.add(ProjectArchetype.BACKEND_API)
             if "click" in deps_str or "typer" in deps_str or "argparse" in deps_str:
