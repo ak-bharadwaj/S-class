@@ -50,6 +50,8 @@ class ADRRecord:
     epistemic_status: EpistemicStatus = EpistemicStatus.DERIVED
     validation_status: ValidationStatus = ValidationStatus.UNVALIDATED
     approval_status: ApprovalStatus = ApprovalStatus.NOT_REQUIRED
+    version: int = 1
+    previous_version_hash: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -65,7 +67,9 @@ class ADRRecord:
             "confidence": self.confidence,
             "epistemic_status": self.epistemic_status.value if isinstance(self.epistemic_status, EpistemicStatus) else str(self.epistemic_status),
             "validation_status": self.validation_status.value if isinstance(self.validation_status, ValidationStatus) else str(self.validation_status),
-            "approval_status": self.approval_status.value if isinstance(self.approval_status, ApprovalStatus) else str(self.approval_status)
+            "approval_status": self.approval_status.value if isinstance(self.approval_status, ApprovalStatus) else str(self.approval_status),
+            "version": self.version,
+            "previous_version_hash": self.previous_version_hash
         }
 
     @classmethod
@@ -83,7 +87,9 @@ class ADRRecord:
             confidence=data.get("confidence", 1.0),
             epistemic_status=EpistemicStatus(data.get("epistemic_status", "derived")),
             validation_status=ValidationStatus(data.get("validation_status", "UNVALIDATED")),
-            approval_status=ApprovalStatus(data.get("approval_status", "NOT_REQUIRED"))
+            approval_status=ApprovalStatus(data.get("approval_status", "NOT_REQUIRED")),
+            version=data.get("version", 1),
+            previous_version_hash=data.get("previous_version_hash", None)
         )
 
 

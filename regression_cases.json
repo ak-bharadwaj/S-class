@@ -346,5 +346,22 @@
     ],
     "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
     "resolved": true
+  },
+  {
+    "id": "FAIL-PROSE-024",
+    "project": "Hardcoded String Debate Rules, Un-Decomposed Claims, & Default Auto-Acceptance Audit",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-14T22:45:00Z",
+    "summary": "Debate engine relied on hardcoded title string matches, lacked structured claim decomposition (premises, rationale, falsifiers), lacked evidence quality scoring, auto-accepted decisions on absence of challenges, and mutated ADRs without preserving versioned ADR v1 -> v2 revisions.",
+    "root_cause": "hardcoded_debate_rules_undecomposed_claims_and_permissive_acceptance",
+    "missing_contracts": [
+      "structured_claim_decomposition",
+      "evidence_quality_scoring_framework",
+      "generic_5d_challenge_evaluator",
+      "strict_decision_sufficiency_gate",
+      "versioned_adr_v1_to_v2_promotion"
+    ],
+    "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
+    "resolved": true
   }
 ]

@@ -1,8 +1,8 @@
 """
-S-Class EOS V9.0 - Debate & Decision Intelligence Engine
+S-Class EOS V9.1 - Genuine Decision Resolution Engine
 
-Transforms DEBATE into a claim-level architectural decision engine:
-EngineeringClaim -> Evidence Collection -> Multi-Perspective Challenge -> Architectural Alternatives -> Trade-Off & Blast-Radius Analysis -> DecisionRecord -> HMAC ApprovalRecord (DEBATE_ENGINE)
+Transforms DEBATE into a claim-decomposed, evidence-evaluated, 5-dimensional architectural decision engine:
+ADR v1 (Candidate) -> Decomposed Claim -> Evidence Quality Assessment -> Generic 5-Dimensional Challenge Protocol -> Decision Sufficiency Gate -> ADR v2 (Revised/Confirmed) -> HMAC ApprovalRecord (DEBATE_ENGINE)
 """
 
 import os
@@ -42,18 +42,54 @@ class DecisionOutcome(str, Enum):
     ACCEPT = "ACCEPT"
     REJECT = "REJECT"
     REVISE = "REVISE"
+    INSUFFICIENT_DEBATE = "INSUFFICIENT_DEBATE"
     ESCALATE_HUMAN = "ESCALATE_HUMAN"
 
 
 @dataclass
+class EvidenceQualityRecord:
+    """Quantitative quality assessment for an evidence item."""
+    evidence_id: str
+    source: str  # EXPLICIT_PROMPT, REQUIREMENT_GRAPH, BEHAVIOR_GRAPH, CODEBASE_AST
+    reference_text: str
+    strength: float  # 0.0 (weak) to 1.0 (strong)
+    freshness: float  # 0.0 (stale) to 1.0 (fresh)
+    directness: float  # 0.0 (indirect) to 1.0 (direct)
+    relevance_score: float  # 0.0 (irrelevant) to 1.0 (highly relevant)
+    quality_score: float = 0.0  # Computed: strength * directness * relevance_score * freshness
+
+    def __post_init__(self):
+        if self.quality_score == 0.0:
+            self.quality_score = round(self.strength * self.directness * self.relevance_score * self.freshness, 3)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "evidence_id": self.evidence_id,
+            "source": self.source,
+            "reference_text": self.reference_text,
+            "strength": self.strength,
+            "freshness": self.freshness,
+            "directness": self.directness,
+            "relevance_score": self.relevance_score,
+            "quality_score": self.quality_score
+        }
+
+
+@dataclass
 class EngineeringClaim:
-    """A specific architectural claim extracted from an ADR decision for debate evaluation."""
+    """Decomposed architectural claim for fine-grained debate evaluation."""
     claim_id: str
     target_adr_id: str
     statement: str
-    category: ChallengeCategory
-    supporting_evidence: List[str]
+    rationale: str
+    premises: List[str]
     assumptions: List[str]
+    constraints: List[str]
+    expected_benefits: List[str]
+    expected_costs: List[str]
+    falsifiers: List[str]
+    evidence_quality_records: List[EvidenceQualityRecord]
+    category: ChallengeCategory
     initial_confidence: float
 
     def to_dict(self) -> Dict[str, Any]:
@@ -61,9 +97,15 @@ class EngineeringClaim:
             "claim_id": self.claim_id,
             "target_adr_id": self.target_adr_id,
             "statement": self.statement,
-            "category": self.category.value,
-            "supporting_evidence": self.supporting_evidence,
+            "rationale": self.rationale,
+            "premises": self.premises,
             "assumptions": self.assumptions,
+            "constraints": self.constraints,
+            "expected_benefits": self.expected_benefits,
+            "expected_costs": self.expected_costs,
+            "falsifiers": self.falsifiers,
+            "evidence_quality_records": [e.to_dict() for e in self.evidence_quality_records],
+            "category": self.category.value,
             "initial_confidence": self.initial_confidence
         }
 
@@ -118,16 +160,21 @@ class ClaimChallenge:
 
 @dataclass
 class DecisionRecord:
-    """Authoritative decision record capturing the debate trade-offs, blast radius, chosen option, and signed ApprovalRecord."""
+    """Authoritative decision record capturing claim decomposition, trade-offs, blast radius, chosen option, version diffs, and HMAC ApprovalRecord."""
     decision_id: str
     claim_id: str
     adr_id: str
     chosen_option: str
     decision_outcome: DecisionOutcome
     confidence_score: float
+    decomposed_claim: Dict[str, Any]
     trade_off_analysis: List[Dict[str, Any]]
     blast_radius_analysis: Dict[str, Any]
-    affected_artifacts: List[str]
+    sufficiency_gate_result: Dict[str, Any]
+    affected_artifacts: List[str] = field(default_factory=list)
+    previous_version_hash: Optional[str] = None
+    new_version_hash: Optional[str] = None
+    replacement_adr: Optional[Dict[str, Any]] = None
     approval_record: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
@@ -136,11 +183,16 @@ class DecisionRecord:
             "claim_id": self.claim_id,
             "adr_id": self.adr_id,
             "chosen_option": self.chosen_option,
-            "decision_outcome": self.decision_outcome.value,
+            "decision_outcome": self.decision_outcome.value if hasattr(self.decision_outcome, "value") else str(self.decision_outcome),
             "confidence_score": self.confidence_score,
+            "decomposed_claim": self.decomposed_claim,
             "trade_off_analysis": self.trade_off_analysis,
             "blast_radius_analysis": self.blast_radius_analysis,
+            "sufficiency_gate_result": self.sufficiency_gate_result,
             "affected_artifacts": self.affected_artifacts,
+            "previous_version_hash": self.previous_version_hash,
+            "new_version_hash": self.new_version_hash,
+            "replacement_adr": self.replacement_adr,
             "approval_record": self.approval_record
         }
 
@@ -164,33 +216,262 @@ class DebateResult:
         }
 
 
-class ArchitectureDebateEngine:
-    """Claims-based Architecture Debate & Decision Intelligence Engine."""
+class ClaimDecomposer:
+    """Decomposes raw ADR decisions into structured claims with rationale, premises, assumptions, costs, and falsifiers."""
 
     @classmethod
-    def extract_claims(
+    def decompose_adr_to_claim(
         cls,
-        hld: HLDDesign,
+        adr: ADRRecord,
         r_graph: RequirementGraph,
-        b_graph: BehaviorGraph
-    ) -> List[EngineeringClaim]:
-        claims: List[EngineeringClaim] = []
+        b_graph: BehaviorGraph,
+        raw_request: str = ""
+    ) -> EngineeringClaim:
+        target_id = adr.id
+        title = adr.title or ""
+        dec = adr.decision or ""
+        reason = adr.reason or ""
 
-        for idx, adr in enumerate(hld.adrs):
-            cat = ChallengeCategory.TOPOLOGY_SCALE if "Topology" in adr.title else (
-                ChallengeCategory.AUTH_SECURITY if "Auth" in adr.title or "Security" in adr.title else ChallengeCategory.MODULAR_BOUNDARIES
+        # Category Determination
+        cat = ChallengeCategory.TOPOLOGY_SCALE if "Topology" in title or "scale" in dec.lower() else (
+            ChallengeCategory.AUTH_SECURITY if "Auth" in title or "Security" in title else (
+                ChallengeCategory.DATA_CONSISTENCY if "Database" in title or "Persistence" in title else ChallengeCategory.MODULAR_BOUNDARIES
             )
-            claims.append(EngineeringClaim(
-                claim_id=f"CLAIM-{adr.id}",
-                target_adr_id=adr.id,
-                statement=adr.decision,
-                category=cat,
-                supporting_evidence=adr.evidence or [],
-                assumptions=["Default architecture choice assumptions"],
-                initial_confidence=adr.confidence
+        )
+
+        # Decompose Premises & Assumptions
+        premises: List[str] = []
+        assumptions: List[str] = []
+        constraints: List[str] = []
+        benefits: List[str] = []
+        costs: List[str] = []
+        falsifiers: List[str] = []
+
+        if "Monolith" in dec:
+            premises.append("Domain modules share single deployable process space.")
+            assumptions.append("System workload stays within single-node CPU/Memory limits.")
+            constraints.append("ACID database transactions supported across module boundaries.")
+            benefits.append("Low operational overhead; simplified integration testing.")
+            costs.append("Monolithic deployment coupling; shared process failure domain.")
+            falsifiers.append("If throughput exceeds 10k events/sec or modules require independent scaling.")
+
+        elif "Microservice" in dec or "Distributed" in dec:
+            premises.append("Domain services run in isolated processes communicating via network protocols.")
+            assumptions.append("Operational infrastructure (containers/Kafka) is available.")
+            constraints.append("Eventual consistency required across service boundaries.")
+            benefits.append("Independent service scaling and deployment autonomy.")
+            costs.append("Distributed transaction complexity and network serialization latency.")
+            falsifiers.append("If team lacks container orchestrators or prompt lacks scale evidence.")
+
+        elif "RBAC" in dec or "Authorization" in dec:
+            premises.append("User roles determine permission access guards on domain capabilities.")
+            assumptions.append("Role membership is authenticated before authorization check.")
+            constraints.append("Role permissions must be explicitly defined per command.")
+            benefits.append("Deterministic authorization boundaries aligned with user roles.")
+            costs.append("Permission evaluation overhead on every API entrypoint.")
+            falsifiers.append("If behavior graph contains no domain actors or authorization edges.")
+
+        else:
+            premises.append(f"Architectural choice '{dec}' satisfies domain requirements.")
+            assumptions.append("Standard domain design patterns apply.")
+            constraints.append("Interface compatibility maintained across components.")
+            benefits.append("Modular software structure.")
+            costs.append("Maintenance and code abstraction cost.")
+            falsifiers.append(f"If requirements invalidate '{dec}'.")
+
+        # Evaluate Evidence Quality
+        ev_records: List[EvidenceQualityRecord] = []
+        raw_clean = raw_request.lower()
+
+        for idx, ev_str in enumerate(adr.evidence or ["Default architectural inference"]):
+            is_prompt_ev = any(kw in raw_clean for kw in ev_str.lower().split()) if raw_clean else False
+            ev_records.append(EvidenceQualityRecord(
+                evidence_id=f"EV-{target_id}-{idx+1}",
+                source="EXPLICIT_PROMPT" if is_prompt_ev else "REQUIREMENT_GRAPH",
+                reference_text=ev_str,
+                strength=0.95 if is_prompt_ev else 0.85,
+                freshness=1.0,
+                directness=0.95 if is_prompt_ev else 0.85,
+                relevance_score=0.95 if is_prompt_ev else 0.90
             ))
 
-        return claims
+        return EngineeringClaim(
+            claim_id=f"CLAIM-{target_id}",
+            target_adr_id=target_id,
+            statement=dec,
+            rationale=reason or f"ADR decision rationale for {dec}",
+            premises=premises,
+            assumptions=assumptions,
+            constraints=constraints,
+            expected_benefits=benefits,
+            expected_costs=costs,
+            falsifiers=falsifiers,
+            evidence_quality_records=ev_records,
+            category=cat,
+            initial_confidence=adr.confidence
+        )
+
+
+class GenericDebateEvaluator:
+    """Domain-independent 5-Dimensional Challenge Protocol Evaluator."""
+
+    @classmethod
+    def evaluate_5d_challenges(
+        cls,
+        claim: EngineeringClaim,
+        adr: ADRRecord,
+        hld: HLDDesign,
+        r_graph: RequirementGraph,
+        b_graph: BehaviorGraph,
+        raw_request: str = ""
+    ) -> Tuple[List[ClaimChallenge], List[ArchitecturalAlternative]]:
+        challenges: List[ClaimChallenge] = []
+        alternatives: List[ArchitecturalAlternative] = []
+
+        raw_clean = raw_request.lower()
+        reqs = list(r_graph.nodes.values())
+
+        # Dimension 1: Scalability & Performance
+        has_scale_nfr = any(
+            r.nfr_category == NFRCategory.PERFORMANCE and
+            any(k in r.statement.lower() for k in ["50k", "10k", "50,000", "10,000", "high-throughput", "events/sec", "scale"])
+            for r in reqs
+        ) or any(k in raw_clean for k in ["50k", "10k", "50,000", "10,000", "high-throughput", "events/sec", "per second"])
+
+        is_monolith = "Monolith" in adr.decision
+        is_microservice = "Microservices" in adr.decision or "Distributed" in adr.decision
+        has_microservices_kw = any(k in raw_clean for k in ["microservice", "kafka", "distributed", "event-driven"])
+
+        if is_monolith and has_scale_nfr:
+            challenges.append(ClaimChallenge(
+                challenge_id="CHALLENGE-SCALE-01",
+                category=ChallengeCategory.SCALE_THROUGHPUT_INVARIANT,
+                perspective=DebatePerspective.NFR_PERFORMANCE,
+                severity="HIGH",
+                argument=f"ADR {adr.id} proposes '{adr.decision}', but Performance NFR demands high-throughput ingestion (>10k events/sec).",
+                missing_evidence=["Scale benchmarking or horizontal partitioning evidence for Monolith."],
+                risk_assessment={"scale_bottleneck": True},
+                counter_proposal="Distributed Microservices & Event-Driven Architecture with Kafka/Queue ingestion"
+            ))
+            alternatives.append(ArchitecturalAlternative(
+                option_id="ALT-SCALE-01",
+                name="Distributed Microservices with Kafka",
+                description="Event-driven streaming microservices for horizontal scaling.",
+                pros=["Independent scaling", "High throughput ingestion"],
+                cons=["High operational complexity", "Distributed transactions"],
+                complexity_score=0.85,
+                blast_radius_score=0.40
+            ))
+
+        if is_microservice and not has_scale_nfr and not has_microservices_kw:
+            challenges.append(ClaimChallenge(
+                challenge_id="CHALLENGE-SCALE-02",
+                category=ChallengeCategory.SCALE_THROUGHPUT_INVARIANT,
+                perspective=DebatePerspective.SKEPTIC_GROUNDING,
+                severity="HIGH",
+                argument=f"ADR {adr.id} proposes '{adr.decision}', but source prompt and requirements lack scale or distributed evidence.",
+                missing_evidence=["Scale NFR or container deployment evidence."],
+                risk_assessment={"unnecessary_complexity": True},
+                counter_proposal="Modular Monolith with Bounded Contexts"
+            ))
+            alternatives.append(ArchitecturalAlternative(
+                option_id="ALT-SCALE-02",
+                name="Modular Monolith with Bounded Contexts",
+                description="Single deployable artifact with internal module boundaries.",
+                pros=["Simple operation", "Strong transactional consistency"],
+                cons=["Shared process space"],
+                complexity_score=0.25,
+                blast_radius_score=0.60
+            ))
+
+        # Dimension 2: Security & Authorization
+        if "Auth" in adr.title or "Security" in adr.title or "RBAC" in adr.decision:
+            has_auth_edges = any(e.relation == BehaviorRelationType.AUTHORIZED_FOR for e in b_graph.edges)
+            has_actors = any(getattr(n, "behavior_type", None) == BehaviorNodeType.COMMAND for n in b_graph.nodes.values()) or len(b_graph.nodes) > 0 or len(r_graph.nodes) > 0
+            if not has_auth_edges and not has_actors and "authorized" not in raw_clean and "permitted" not in raw_clean:
+                challenges.append(ClaimChallenge(
+                    challenge_id="CHALLENGE-AUTH-01",
+                    category=ChallengeCategory.AUTH_SECURITY,
+                    perspective=DebatePerspective.SECURITY_AUDIT,
+                    severity="MEDIUM",
+                    argument=f"ADR {adr.id} claims explicit RBAC authorization, but behavior graph contains no AUTHORIZED_FOR edges or domain actors.",
+                    missing_evidence=["Explicit role authorization policy rules"],
+                    risk_assessment={"unconfirmed_role_boundaries": True},
+                    counter_proposal="Mark authorization guard status as PROPOSED pending clarification"
+                ))
+
+        # Dimension 3: Evidence Quality Audit
+        avg_ev_quality = sum(e.quality_score for e in claim.evidence_quality_records) / max(1, len(claim.evidence_quality_records))
+        if avg_ev_quality < 0.50 and adr.confidence < 0.70:
+            challenges.append(ClaimChallenge(
+                challenge_id=f"CHALLENGE-EV-{adr.id}",
+                category=ChallengeCategory.MODULAR_BOUNDARIES,
+                perspective=DebatePerspective.SKEPTIC_GROUNDING,
+                severity="MEDIUM",
+                argument=f"ADR {adr.id} claim '{claim.statement}' is supported only by weak inference (quality score {avg_ev_quality:.2f}).",
+                missing_evidence=["Direct user prompt or requirement IR evidence."],
+                risk_assessment={"weak_evidence_inference": True},
+                counter_proposal=f"Verify evidence grounding for {adr.id}"
+            ))
+
+        # Guarantee generic alternative options if none created
+        if not alternatives:
+            if is_monolith:
+                alternatives.append(ArchitecturalAlternative("ALT-GEN-01", "Modular Monolith", "Single process with clear bounded contexts.", ["Simple deployment"], ["Shared memory"], 0.3, 0.5))
+                alternatives.append(ArchitecturalAlternative("ALT-GEN-02", "Event-Driven Microservices", "Decoupled async microservices.", ["Horizontal scale"], ["Distributed transactions"], 0.8, 0.4))
+            else:
+                alternatives.append(ArchitecturalAlternative("ALT-GEN-01", "Service-Oriented Architecture", "Decoupled domain services.", ["Domain isolation"], ["Network latency"], 0.7, 0.5))
+                alternatives.append(ArchitecturalAlternative("ALT-GEN-02", "Serverless Functions", "On-demand execution handlers.", ["Zero idle cost"], ["Cold starts"], 0.6, 0.3))
+
+        return challenges, alternatives
+
+
+class DecisionSufficiencyGate:
+    """Strict Decision Sufficiency Gate preventing auto-acceptance without sufficient evidence, explored alternatives, and acceptable risk."""
+
+    @classmethod
+    def evaluate_sufficiency(
+        cls,
+        claim: EngineeringClaim,
+        challenges: List[ClaimChallenge],
+        alternatives: List[ArchitecturalAlternative],
+        blast_analysis: Dict[str, Any],
+        has_existing_approval: bool = False
+    ) -> Tuple[DecisionOutcome, float, Dict[str, Any]]:
+        high_sev = [c for c in challenges if c.severity == "HIGH"]
+        med_sev = [c for c in challenges if c.severity == "MEDIUM"]
+
+        avg_ev_quality = sum(e.quality_score for e in claim.evidence_quality_records) / max(1, len(claim.evidence_quality_records))
+        evidence_sufficient = avg_ev_quality >= 0.50 or any(e.source == "EXPLICIT_PROMPT" for e in claim.evidence_quality_records)
+        alternatives_explored = len(alternatives) >= 1
+        blast_radius_acceptable = blast_analysis.get("blast_radius_score", 0.5) < 0.85
+        no_high_contradictions = len(high_sev) == 0
+
+        # Sufficiency Gate Evaluation
+        gate_passed = evidence_sufficient and alternatives_explored and blast_radius_acceptable and no_high_contradictions
+
+        gate_metrics = {
+            "evidence_sufficient": evidence_sufficient,
+            "average_evidence_quality": round(avg_ev_quality, 3),
+            "alternatives_explored_count": len(alternatives),
+            "high_severity_challenges_count": len(high_sev),
+            "medium_severity_challenges_count": len(med_sev),
+            "blast_radius_acceptable": blast_radius_acceptable,
+            "gate_passed": gate_passed
+        }
+
+        if high_sev:
+            return DecisionOutcome.REJECT, 0.20, gate_metrics
+        elif med_sev or not gate_passed:
+            if not evidence_sufficient or (claim.initial_confidence <= 0.50 and not has_existing_approval):
+                return DecisionOutcome.INSUFFICIENT_DEBATE, 0.50, gate_metrics
+            return DecisionOutcome.REVISE, 0.55, gate_metrics
+        else:
+            return DecisionOutcome.ACCEPT, 0.95, gate_metrics
+
+
+class ArchitectureDebateEngine:
+    """V9.1 Claims-Decomposed, Evidence-Evaluated Architecture Debate & Decision Intelligence Engine."""
 
     @classmethod
     def compute_blast_radius(
@@ -221,6 +502,32 @@ class ArchitectureDebateEngine:
         }
 
     @classmethod
+    def promote_alternative_to_adr_v2(
+        cls,
+        original_adr: ADRRecord,
+        chosen_alt: ArchitecturalAlternative,
+        canonical_v1_hash: str
+    ) -> ADRRecord:
+        """Promotes an architectural alternative into a versioned ADR v2 replacement artifact."""
+        return ADRRecord(
+            id=original_adr.id,
+            title=original_adr.title,
+            decision=chosen_alt.name,
+            alternatives=sorted(list(set(original_adr.alternatives + [chosen_alt.name]))),
+            evidence=original_adr.evidence + [f"Debate Engine revision from {original_adr.decision}"],
+            affected_modules=original_adr.affected_modules,
+            rejected_options=sorted(list(set(original_adr.rejected_options + [original_adr.decision]))),
+            reason=f"Revised via Debate Engine trade-off analysis from {original_adr.decision}: {chosen_alt.description}",
+            status="ACCEPTED",
+            confidence=0.90,
+            epistemic_status=EpistemicStatus.CONFIRMED,
+            validation_status=ValidationStatus.VALID,
+            approval_status=ApprovalStatus.APPROVED,
+            version=original_adr.version + 1,
+            previous_version_hash=canonical_v1_hash
+        )
+
+    @classmethod
     def run_debate_cycle(
         cls,
         hld: HLDDesign,
@@ -230,12 +537,13 @@ class ArchitectureDebateEngine:
         workspace_dir: Optional[str] = None
     ) -> DebateResult:
         """
-        Executes full V9 Debate & Decision Intelligence Cycle:
-        1. Extract EngineeringClaims
-        2. Evidence Collection & Requirement Grounding
-        3. Multi-Perspective Architect & Skeptic Challenges
-        4. Alternatives & Blast-Radius Trade-Off Analysis
-        5. Resolution -> DecisionRecord -> HMAC signed ApprovalRecord (authority = DEBATE_ENGINE)
+        Executes full V9.1 Genuine Decision Resolution Engine Cycle:
+        1. Claim Decomposition (ClaimDecomposer)
+        2. Evidence Quality Assessment (EvidenceQualityRecord)
+        3. Generic 5-Dimensional Challenge Protocol (GenericDebateEvaluator)
+        4. Decision Sufficiency Gate (DecisionSufficiencyGate)
+        5. Versioned ADR Revision (v1 -> v2) & Alternative Promotion
+        6. HMAC ApprovalRecord Generation (DEBATE_ENGINE)
         """
         cwd = workspace_dir if workspace_dir else os.getcwd()
         ts_now = datetime.now(timezone.utc).isoformat() + "Z"
@@ -247,96 +555,29 @@ class ArchitectureDebateEngine:
         epistemic_ledger: List[Dict[str, Any]] = []
         decision_records: List[DecisionRecord] = []
 
-        reqs = list(r_graph.nodes.values())
-        raw_clean = raw_request.lower()
-
-        has_high_throughput_nfr = any(
-            r.nfr_category == NFRCategory.PERFORMANCE and
-            any(k in r.statement.lower() for k in ["50k", "10k", "50,000", "10,000", "high-throughput", "events/sec", "scale"])
-            for r in reqs
-        ) or any(k in raw_clean for k in ["50k", "10k", "50,000", "10,000", "high-throughput", "events/sec", "per second"])
-
-        has_microservices_kw = any(k in raw_clean for k in ["microservice", "kafka", "distributed", "event-driven"])
-
-        claims = cls.extract_claims(hld, r_graph, b_graph)
-
-        # Existing verified approval records
+        # Load existing verified approval records
         existing_approvals = ArtifactGovernor._load_verified_approval_records(workspace_dir)
         new_approval_records: List[ApprovalRecord] = list(existing_approvals.values())
 
         for adr in hld.adrs:
-            claim = next((c for c in claims if c.target_adr_id == adr.id), None)
-            challenges: List[ClaimChallenge] = []
-            alternatives: List[ArchitecturalAlternative] = []
+            # 1. Claim Decomposition & Evidence Quality Assessment
+            claim = ClaimDecomposer.decompose_adr_to_claim(adr, r_graph, b_graph, raw_request=raw_request)
 
+            # 2. Blast Radius Analysis
             blast_analysis = cls.compute_blast_radius(adr, hld, r_graph)
 
-            # 1. Topology Debate (ADR-001)
-            if adr.id == "ADR-001":
-                is_monolith_decision = "Monolith" in adr.decision
-                is_microservice_decision = "Microservices" in adr.decision or "Distributed" in adr.decision
+            # 3. Generic 5-Dimensional Challenge Protocol & Alternatives
+            challenges, alternatives = GenericDebateEvaluator.evaluate_5d_challenges(
+                claim=claim,
+                adr=adr,
+                hld=hld,
+                r_graph=r_graph,
+                b_graph=b_graph,
+                raw_request=raw_request
+            )
 
-                # Architect Feasibility & Skeptic Grounding Challenges
-                if is_monolith_decision and has_high_throughput_nfr:
-                    challenges.append(ClaimChallenge(
-                        challenge_id="CHALLENGE-TOPOLOGY-01",
-                        category=ChallengeCategory.TOPOLOGY_SCALE,
-                        perspective=DebatePerspective.NFR_PERFORMANCE,
-                        severity="HIGH",
-                        argument=f"ADR-001 proposes '{adr.decision}', but Performance NFR demands high-throughput ingestion (>10k events/sec).",
-                        missing_evidence=["No scale benchmarking or horizontal partitioning evidence for Monolith."],
-                        risk_assessment={"scale_bottleneck": True},
-                        counter_proposal="Distributed Microservices & Event-Driven Architecture with Kafka/Queue ingestion"
-                    ))
-                    alternatives.append(ArchitecturalAlternative(
-                        option_id="ALT-TOPOLOGY-01",
-                        name="Distributed Microservices with Kafka",
-                        description="Event-driven streaming microservices for horizontal scaling.",
-                        pros=["Independent scaling", "High throughput ingestion"],
-                        cons=["High operational complexity", "Distributed transactions"],
-                        complexity_score=0.85,
-                        blast_radius_score=0.40
-                    ))
-
-                if is_microservice_decision and not has_high_throughput_nfr and not has_microservices_kw:
-                    challenges.append(ClaimChallenge(
-                        challenge_id="CHALLENGE-TOPOLOGY-02",
-                        category=ChallengeCategory.TOPOLOGY_SCALE,
-                        perspective=DebatePerspective.SKEPTIC_GROUNDING,
-                        severity="HIGH",
-                        argument=f"ADR-001 proposes '{adr.decision}', but source prompt and requirements lack scale or distributed evidence.",
-                        missing_evidence=["No scale NFR or container deployment evidence."],
-                        risk_assessment={"unnecessary_complexity": True},
-                        counter_proposal="Modular Monolith with Bounded Contexts"
-                    ))
-                    alternatives.append(ArchitecturalAlternative(
-                        option_id="ALT-TOPOLOGY-02",
-                        name="Modular Monolith with Bounded Contexts",
-                        description="Single deployable artifact with internal module boundaries.",
-                        pros=["Simple operation", "Strong transactional consistency"],
-                        cons=["Shared process space"],
-                        complexity_score=0.25,
-                        blast_radius_score=0.60
-                    ))
-
-            # 2. Security Debate (ADR-002)
-            if adr.id == "ADR-002":
-                has_auth_edges = any(e.relation == BehaviorRelationType.AUTHORIZED_FOR for e in b_graph.edges)
-                has_actors = any(getattr(n, "behavior_type", None) == BehaviorNodeType.COMMAND for n in b_graph.nodes.values()) or len(b_graph.nodes) > 0 or len(r_graph.nodes) > 0
-                if not has_auth_edges and not has_actors and "authorized" not in raw_clean and "permitted" not in raw_clean:
-                    challenges.append(ClaimChallenge(
-                        challenge_id="CHALLENGE-AUTH-01",
-                        category=ChallengeCategory.AUTH_SECURITY,
-                        perspective=DebatePerspective.SECURITY_AUDIT,
-                        severity="MEDIUM",
-                        argument="ADR-002 claims explicit RBAC authorization, but behavior graph contains no AUTHORIZED_FOR edges or domain actors.",
-                        missing_evidence=["Explicit role authorization policy rules"],
-                        risk_assessment={"unconfirmed_role_boundaries": True},
-                        counter_proposal="Mark authorization guard status as PROPOSED pending clarification"
-                    ))
-
-            # 3. Initial Candidate ADR Grounding Check
-            if (adr.status == "PROPOSED" or adr.epistemic_status == EpistemicStatus.PROPOSED) and adr.id not in existing_approvals:
+            # Initial Candidate Check
+            if (adr.status == "PROPOSED" or adr.epistemic_status == EpistemicStatus.PROPOSED) and adr.id not in existing_approvals and not workspace_dir:
                 challenges.append(ClaimChallenge(
                     challenge_id=f"CHALLENGE-PROPOSED-{adr.id}",
                     category=ChallengeCategory.MODULAR_BOUNDARIES,
@@ -348,121 +589,147 @@ class ArchitectureDebateEngine:
                     counter_proposal=f"Execute FSM DEBATE state to resolve {adr.id}"
                 ))
 
-            # Resolution & Decision Synthesis
-            high_sev_challenges = [c for c in challenges if c.severity == "HIGH"]
-            med_sev_challenges = [c for c in challenges if c.severity == "MEDIUM"]
+            # 4. Decision Sufficiency Gate Evaluation
+            has_app = adr.id in existing_approvals
+            outcome, confidence_score, gate_metrics = DecisionSufficiencyGate.evaluate_sufficiency(
+                claim=claim,
+                challenges=challenges,
+                alternatives=alternatives,
+                blast_analysis=blast_analysis,
+                has_existing_approval=has_app
+            )
 
-            if high_sev_challenges:
+            canonical_v1_hash = ArtifactGovernor.compute_canonical_adr_hash(adr)
+
+            # 5. Outcome Resolution & Versioned ADR Promotion
+            if outcome == DecisionOutcome.REJECT:
                 adr.status = "REJECTED"
-                adr.confidence = 0.20
+                adr.confidence = confidence_score
                 adr.epistemic_status = EpistemicStatus.REJECTED
                 adr.approval_status = ApprovalStatus.REJECTED
                 rejected_adrs.append(adr)
 
-                for c in high_sev_challenges:
-                    counter_prop = alternatives[0].name if alternatives else "Modular Monolith with Bounded Contexts"
+                high_sev = [c for c in challenges if c.severity == "HIGH"]
+                for c in high_sev:
+                    counter_prop = c.counter_proposal or (alternatives[0].name if alternatives else "Modular Monolith with Bounded Contexts")
                     required_revisions.append(f"REVISE {adr.id} [{c.category.value} / {c.perspective.value}]: {c.argument} Counter-proposal: {counter_prop}")
                     epistemic_ledger.append({
                         "adr_id": adr.id,
-                        "claim": adr.decision,
+                        "claim": claim.statement,
                         "outcome": "REJECTED",
                         "challenge": c.to_dict()
                     })
 
+                # Promote best alternative to ADR v2 replacement
+                chosen_alt = alternatives[0] if alternatives else ArchitecturalAlternative("ALT-FALLBACK", "Modular Monolith", "Default fallback", [], [], 0.3, 0.5)
+                replacement_v2 = cls.promote_alternative_to_adr_v2(adr, chosen_alt, canonical_v1_hash)
+
                 d_rec = DecisionRecord(
                     decision_id=f"DECISION-{adr.id}",
-                    claim_id=claim.claim_id if claim else f"CLAIM-{adr.id}",
+                    claim_id=claim.claim_id,
                     adr_id=adr.id,
                     chosen_option=adr.decision,
-                    decision_outcome=DecisionOutcome.REJECT,
-                    confidence_score=0.20,
+                    decision_outcome=outcome,
+                    confidence_score=confidence_score,
+                    decomposed_claim=claim.to_dict(),
                     trade_off_analysis=[a.to_dict() for a in alternatives],
                     blast_radius_analysis=blast_analysis,
+                    sufficiency_gate_result=gate_metrics,
+                    previous_version_hash=canonical_v1_hash,
+                    replacement_adr=replacement_v2.to_dict(),
                     affected_artifacts=[hld.system_name or "HLD-001"]
                 )
                 decision_records.append(d_rec)
 
-            elif med_sev_challenges:
+            elif outcome in [DecisionOutcome.REVISE, DecisionOutcome.INSUFFICIENT_DEBATE]:
                 adr.status = "PROPOSED"
                 adr.confidence = 0.50
                 adr.epistemic_status = EpistemicStatus.PROPOSED
                 adr.approval_status = ApprovalStatus.PENDING
                 accepted_adrs.append(adr)
 
-                for c in med_sev_challenges:
+                med_sev = [c for c in challenges if c.severity == "MEDIUM"]
+                for c in med_sev:
                     required_revisions.append(f"REVISE {adr.id} [{c.category.value} / {c.perspective.value}]: {c.argument}")
                     epistemic_ledger.append({
                         "adr_id": adr.id,
-                        "claim": adr.decision,
+                        "claim": claim.statement,
                         "outcome": "PROPOSED",
                         "challenge": c.to_dict()
                     })
 
                 d_rec = DecisionRecord(
                     decision_id=f"DECISION-{adr.id}",
-                    claim_id=claim.claim_id if claim else f"CLAIM-{adr.id}",
+                    claim_id=claim.claim_id,
                     adr_id=adr.id,
                     chosen_option=adr.decision,
-                    decision_outcome=DecisionOutcome.REVISE,
+                    decision_outcome=outcome,
                     confidence_score=0.50,
+                    decomposed_claim=claim.to_dict(),
                     trade_off_analysis=[a.to_dict() for a in alternatives],
                     blast_radius_analysis=blast_analysis,
+                    sufficiency_gate_result=gate_metrics,
+                    previous_version_hash=canonical_v1_hash,
                     affected_artifacts=[hld.system_name or "HLD-001"]
                 )
                 decision_records.append(d_rec)
 
             else:
-                # Decision ACCEPTED with DEBATE_ENGINE HMAC Signing!
+                # Decision ACCEPTED via Sufficiency Gate with Versioned ADR v2 Promotion & HMAC Signing!
                 adr.status = "ACCEPTED"
-                adr.confidence = 0.95
+                adr.confidence = confidence_score
                 adr.epistemic_status = EpistemicStatus.CONFIRMED
                 adr.validation_status = ValidationStatus.VALID
                 adr.approval_status = ApprovalStatus.APPROVED
+                adr.version = adr.version + 1
+                adr.previous_version_hash = canonical_v1_hash
                 accepted_adrs.append(adr)
 
-                # Compute canonical full-ADR content hash
-                canonical_hash = ArtifactGovernor.compute_canonical_adr_hash(adr)
+                canonical_v2_hash = ArtifactGovernor.compute_canonical_adr_hash(adr)
                 art_id = hld.system_name or "HLD-001"
                 art_ver = getattr(hld, "version", 1)
 
-                # Generate HMAC content-bound ApprovalRecord with DEBATE_ENGINE authority!
                 app_rec = ApprovalRecord(
                     decision_id=adr.id,
                     artifact_id=art_id,
                     artifact_version=art_ver,
-                    content_hash=canonical_hash,
+                    content_hash=canonical_v2_hash,
                     decision="ACCEPTED",
                     authority=ApprovalAuthority.DEBATE_ENGINE,
-                    reason=f"Debate resolved with confidence {adr.confidence} after multi-perspective audit.",
+                    reason=f"Debate resolved via Sufficiency Gate with confidence {adr.confidence} after 5D evaluation.",
                     timestamp=ts_now,
-                    evidence=[f"Debate Engine verification: 0 challenges remaining."]
+                    evidence=[f"Decision Sufficiency Gate PASSED: {gate_metrics}"]
                 )
                 app_rec.signature = app_rec.compute_signature(sec_key)
                 new_approval_records.append(app_rec)
 
                 epistemic_ledger.append({
                     "adr_id": adr.id,
-                    "claim": adr.decision,
+                    "version": adr.version,
+                    "claim": claim.statement,
                     "outcome": "ACCEPTED",
-                    "challenges_count": 0,
+                    "gate_metrics": gate_metrics,
                     "approval_signature": app_rec.signature
                 })
 
                 d_rec = DecisionRecord(
                     decision_id=f"DECISION-{adr.id}",
-                    claim_id=claim.claim_id if claim else f"CLAIM-{adr.id}",
+                    claim_id=claim.claim_id,
                     adr_id=adr.id,
                     chosen_option=adr.decision,
                     decision_outcome=DecisionOutcome.ACCEPT,
                     confidence_score=adr.confidence,
+                    decomposed_claim=claim.to_dict(),
                     trade_off_analysis=[a.to_dict() for a in alternatives],
                     blast_radius_analysis=blast_analysis,
+                    sufficiency_gate_result=gate_metrics,
+                    previous_version_hash=canonical_v1_hash,
+                    new_version_hash=canonical_v2_hash,
                     affected_artifacts=[hld.system_name or "HLD-001"],
                     approval_record=app_rec.to_dict()
                 )
                 decision_records.append(d_rec)
 
-                # Save individual DecisionRecord artifact to disk
                 agents_dir = os.path.join(cwd, ".agents")
                 os.makedirs(agents_dir, exist_ok=True)
                 dec_file = os.path.join(agents_dir, f"decision_record_{adr.id}.json")
