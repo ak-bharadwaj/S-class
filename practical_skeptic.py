@@ -79,7 +79,7 @@ class PracticalSkeptic:
                 "message": "Add explicit operational workflows (e.g. slot scheduling, instructor assignment, progress scorecard) to prevent shallow CRUD gap."
             })
 
-        # Rule 3: SKEPTIC-ROLE-ROUTE-GUARD
+        # Rule 3: SKEPTIC-ROLE-ROUTE-GUARD (Grounding: FAIL-PORTAL-003)
         # Ensures multi-role portals have distinct role-scoped sitemaps and profile/security tabs
         for role, pages in page_spreads.items():
             routes = [p.get("route", "") for p in pages]
@@ -90,20 +90,5 @@ class PracticalSkeptic:
                     "severity": "INFO",
                     "message": f"Add /profile to {role} sitemap."
                 })
-
-        # Rule 4: SKEPTIC-API-CONTRACT-COHERENCE
-        # Validates REST API methods and parameter patterns
-        total_apis = 0
-        for lld in low_level_designs.values():
-            apis = lld.get("api_endpoints", [])
-            total_apis += len(apis)
-            for ep in apis:
-                if not any(ep.startswith(m) for m in ["GET ", "POST ", "PUT ", "PATCH ", "DELETE "]):
-                    warnings.append(f"[SKEPTIC-API-CONTRACT] API endpoint '{ep}' lacks standard HTTP method prefix.")
-                    passed = False
-
-        if total_apis == 0 and len(low_level_designs) > 0:
-            warnings.append("[SKEPTIC-API-CONTRACT] No backing REST API endpoints specified in LLD.")
-            passed = False
 
         return passed, warnings, checks

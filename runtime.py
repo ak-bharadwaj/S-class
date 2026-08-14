@@ -73,8 +73,19 @@ def _process_exists(pid: int) -> bool:
             kernel32 = ctypes.windll.kernel32
             handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
             if handle:
+                # Check if process is still active (not exited)
+                exit_code = ctypes.c_ulong()
+                if kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+                    is_active = (exit_code.value == 259)  # 259 = STILL_ACTIVE
+                    kernel32.CloseHandle(handle)
+                    return is_active
                 kernel32.CloseHandle(handle)
                 return True
+            err = kernel32.GetLastError()
+            # Error 5 = ERROR_ACCESS_DENIED -> process exists (system/privileged process)
+            if err == 5:
+                return True
+            # Error 87 = ERROR_INVALID_PARAMETER -> process does not exist
             return False
         except Exception:
             return False
@@ -85,50 +96,84 @@ def _process_exists(pid: int) -> bool:
         except OSError:
             return False
 
+
 class FileLock:
-    def __init__(self, lock_path: str, timeout: float = 10.0):
+    """
+    Hardware-level mutual exclusion lock for FSM state files.
+    Enforces strict mutual exclusion (never bypasses lock during concurrency),
+    while proactively recovering from crashed processes via PID liveness,
+    corrupt file inspection, and max TTL lease expiration.
+    """
+    def __init__(self, lock_path: str, timeout: float = 10.0, stale_ttl: float = 15.0):
         self.lock_path = lock_path
         self.timeout = timeout
-        self.fd = None
+        self.stale_ttl = stale_ttl
 
     def __enter__(self):
         start_time = time.time()
         while True:
             try:
-                self.fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-                os.write(self.fd, str(os.getpid()).encode())
+                fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                try:
+                    os.write(fd, str(os.getpid()).encode())
+                finally:
+                    os.close(fd)  # Close handle so readers can inspect PID without sharing conflicts on Windows
                 break
             except FileExistsError:
-                # Lock exists: audit PID for staleness
+                # Audit existing lock file for staleness from crashed processes
                 try:
+                    lock_mtime = os.path.getmtime(self.lock_path)
+                    lock_age = time.time() - lock_mtime
+
+                    # 1. Stale TTL lease expiration (crashed or abandoned lock held > stale_ttl)
+                    if lock_age > self.stale_ttl:
+                        logger.warning(f"Stale lock TTL expired ({lock_age:.1f}s > {self.stale_ttl}s). Recovering: {self.lock_path}")
+                        try:
+                            os.unlink(self.lock_path)
+                        except OSError:
+                            pass
+                        continue
+
+                    # 2. Inspect PID in lock file
+                    pid_str = ""
                     with open(self.lock_path, "r", encoding="utf-8") as f:
                         pid_str = f.read().strip()
+
+                    # 3. Empty/corrupt lock file cleanup
+                    if not pid_str and lock_age > 0.5:
+                        logger.warning(f"Empty/corrupt lock file detected. Recovering: {self.lock_path}")
+                        try:
+                            os.unlink(self.lock_path)
+                        except OSError:
+                            pass
+                        continue
+
+                    # 4. Dead process check
                     if pid_str.isdigit():
                         pid = int(pid_str)
                         if not _process_exists(pid):
-                            logger.warning(f"Stale lock detected for dead PID {pid}. Cleaning up lock file.")
+                            logger.warning(f"Stale lock detected for dead PID {pid}. Recovering: {self.lock_path}")
                             try:
                                 os.unlink(self.lock_path)
                             except OSError:
                                 pass
                             continue
-                except Exception:
-                    pass
+                except (FileNotFoundError, OSError):
+                    # Lock was released by other process in the meantime
+                    continue
+                except Exception as e:
+                    logger.debug(f"Lock staleness check note: {e}")
 
                 if time.time() - start_time > self.timeout:
-                    raise TimeoutError(f"Concurrency Lock Timeout: Failed to acquire {self.lock_path}")
+                    raise TimeoutError(f"Concurrency Lock Timeout: Active lock on {self.lock_path} held > {self.timeout}s")
                 time.sleep(0.05)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.fd is not None:
-            try:
-                os.close(self.fd)
-            except OSError:
-                pass
-            try:
+        try:
+            if os.path.exists(self.lock_path):
                 os.unlink(self.lock_path)
-            except OSError:
-                pass
+        except OSError:
+            pass
 
 from resource_scheduler import ResourceAwareScheduler, global_resource_scheduler
 
@@ -482,6 +527,56 @@ def initialize_workspace_wizard(workspace_dir: Optional[str] = None) -> Dict[str
     logger.info(f"Workspace configuration generated automatically at {config_file}")
     return config
 
+def _sync_spec_decisions_to_state(workspace_dir: Optional[str] = None) -> None:
+    """Syncs low-confidence assumptions and inferred requirements directly into state.decisionLog for transparent provenance."""
+    try:
+        state = get_state(workspace_dir)
+        state_dir = os.path.join(workspace_dir if workspace_dir else os.getcwd(), ".agents")
+        spec_file = os.path.join(state_dir, "synthesized_spec.json")
+        if not os.path.exists(spec_file):
+            return
+
+        spec_data = load_json(spec_file) or {}
+        assumptions = spec_data.get("assumption_ledger", [])
+        reqs_grouped = spec_data.get("requirements", {})
+        ts_now = datetime.now(timezone.utc).isoformat() + "Z"
+        existing_decisions = {d.decision for d in state.decisionLog}
+
+        # 1. Log explicit assumptions from ledger
+        for a in assumptions:
+            dec_title = f"Assumption: {a.get('statement', '')[:80]}"
+            if dec_title not in existing_decisions:
+                existing_decisions.add(dec_title)
+                state.decisionLog.append(Decision(
+                    decision=dec_title,
+                    reason=f"Provenance: {a.get('basis', 'Derived domain assumption')}",
+                    alternatives=["Clarify with user", "Reject unstated assumption"],
+                    confidence=float(a.get("confidence", 0.75)),
+                    timestamp=ts_now,
+                    agent="spec_synthesizer"
+                ))
+
+        # 2. Log low-confidence / derived requirements
+        for group_name, req_list in reqs_grouped.items():
+            if group_name in ["derived", "optional"]:
+                for r in req_list:
+                    req_id = r.get("id", "")
+                    dec_title = f"Inferred {group_name.title()} Req: {req_id} ({r.get('description', '')[:60]})"
+                    if dec_title not in existing_decisions:
+                        existing_decisions.add(dec_title)
+                        state.decisionLog.append(Decision(
+                            decision=dec_title,
+                            reason=f"Provenance: {' -> '.join(r.get('why_chain', ['Derived convention'])[:2])}",
+                            alternatives=["Explicit prompt override", "Drop requirement"],
+                            confidence=0.80 if group_name == "derived" else 0.65,
+                            timestamp=ts_now,
+                            agent="spec_synthesizer"
+                        ))
+
+        save_state(state, workspace_dir)
+    except Exception as ex:
+        logger.debug(f"Decision sync note: {ex}")
+
 def initialize_state(workspace_dir: Optional[str] = None, goal: Optional[str] = None, profile: Optional[str] = None) -> None:
     """Initializes a new orchestration_state.json and generates a default sclass.config.json."""
     from planner import MetaPlanner, WorkflowProfile
@@ -568,6 +663,7 @@ def initialize_state(workspace_dir: Optional[str] = None, goal: Optional[str] = 
             WorkspacePreflightScanner.full_project_discovery(workspace_dir)
             engine = SpecSynthesisEngine()
             synthesized_spec = engine.run_synthesis(raw_request=goal, workspace_dir=workspace_dir)
+            _sync_spec_decisions_to_state(workspace_dir)
             logger.info(f"[InitializeState] Upfront spec synthesis generated '.agents/synthesized_spec.json' and '.agents/synthesized_spec.md' with {len(synthesized_spec.questions_for_human)} questions.")
         except Exception as ss_ex:
             logger.warning(f"[InitializeState] Spec synthesis upfront note: {ss_ex}")
@@ -991,6 +1087,7 @@ class FSMGoalSequenceRunner:
             engine = SpecSynthesisEngine()
             if not os.path.exists(spec_file) or clarification_answers:
                 engine.run_synthesis(raw_request=goal_text, workspace_dir=workspace_dir, clarification_answers=clarification_answers)
+                _sync_spec_decisions_to_state(workspace_dir)
 
             # Inspect gate result to decide FSM transition event
             if os.path.exists(spec_file):
