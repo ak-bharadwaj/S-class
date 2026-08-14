@@ -221,5 +221,20 @@
     ],
     "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
     "resolved": true
+  },
+  {
+    "id": "FAIL-PROSE-016",
+    "project": "Task BDD Auth Invariance & Architecture Template Rigidity Audit",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-14T21:53:00Z",
+    "summary": "Task compiler unconditionally emitted HTTP 403 authorization assertions on un-authorized commands, LLD compiler used fixed Controller+Service templates across CLI and Data Pipeline archetypes, and REST transport was assumed universally.",
+    "root_cause": "unconditional_bdd_auth_assertion_and_fixed_execution_architecture_template",
+    "missing_contracts": [
+      "epistemic_bdd_authorization_conditionality",
+      "dynamic_execution_architecture_selection",
+      "multi_transport_interaction_models"
+    ],
+    "skeptic_rule_id": "SKEPTIC-EPISTEMIC-BEHAVIOR-GROUNDING",
+    "resolved": true
   }
 ]

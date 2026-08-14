@@ -1,9 +1,9 @@
 """
-S-Class EOS V7.0 - Upstream-Traceable Task Compiler with BDD Contract Verification
+S-Class EOS V8.0 - Epistemic Upstream-Traceable Task Compiler with Contract Verification
 
 Defines:
 1. TaskRecord (Executable coding task with full lineage: task -> lld -> hld -> req -> behavior)
-2. TaskCompiler (Compiles LLDComponents into BDD contract-derived execution tasks)
+2. TaskCompiler (Compiles LLDComponents into BDD contract-derived execution tasks, conditioning 403/audit criteria strictly on evidence)
 """
 
 from dataclasses import dataclass, field
@@ -12,7 +12,8 @@ from typing import Dict, List, Set, Any, Optional, Tuple
 import json
 
 from lld_compiler import LLDComponent, LLDComponentType
-from requirement_ir import RequirementGraph, RequirementNode
+from requirement_ir import RequirementGraph, RequirementNode, NFRCategory
+from behavior_graph import BehaviorGraph, BehaviorNodeType, BehaviorRelationType
 
 
 class TaskCategory(str, Enum):
@@ -70,7 +71,12 @@ class TaskCompiler:
     """Compiles LLDComponents and RequirementGraph into BDD contract-derived TaskRecord entries."""
 
     @classmethod
-    def compile_tasks(cls, lld_components: List[LLDComponent], r_graph: Optional[RequirementGraph] = None) -> List[TaskRecord]:
+    def compile_tasks(
+        cls,
+        lld_components: List[LLDComponent],
+        r_graph: Optional[RequirementGraph] = None,
+        b_graph: Optional[BehaviorGraph] = None
+    ) -> List[TaskRecord]:
         tasks: List[TaskRecord] = []
         task_counter = 1
 
@@ -81,78 +87,70 @@ class TaskCompiler:
             p_reqs = comp.parent.req_ids
             p_behs = comp.parent.behavior_ids
 
-            # Find requirement objects for BDD criteria synthesis
             matching_req_objs = [req_lookup[rid] for rid in p_reqs if rid in req_lookup]
 
-            if comp.component_type == LLDComponentType.CONTROLLER:
+            if comp.component_type in [LLDComponentType.CONTROLLER, LLDComponentType.SERVICE]:
                 for ep in comp.api_endpoints:
                     t_id = f"TASK-{task_counter:03d}"
                     task_counter += 1
 
-                    # Synthesize exact BDD acceptance criteria from requirement pre/post conditions
                     bdd_criteria = []
                     for req in matching_req_objs:
                         actor_str = req.actor
                         pre_str = f"Given {req.target}.status == {req.preconditions[0].split('==')[1].strip()}" if req.preconditions else f"Given {req.target} exists"
                         post_str = f"Then {req.target}.status == {req.postconditions[0].split('==')[1].strip()}" if req.postconditions else f"Then {req.capability} execution commits"
 
-                        bdd_criteria.extend([
+                        base_bdd = [
                             f"{pre_str}",
                             f"And actor == '{actor_str}'",
-                            f"When HTTP '{ep}' is invoked",
-                            f"{post_str}",
-                            f"And unauthorized actor returns HTTP 403 Forbidden",
-                            f"And audit log record is committed to persistent storage"
-                        ])
+                            f"When transport action '{ep}' is invoked",
+                            f"{post_str}"
+                        ]
+
+                        # Check if authorization evidence exists before adding 403 assertion (PERFORMS != AUTHORIZED_FOR)
+                        has_auth_evidence = False
+                        if b_graph:
+                            b_node = b_graph.get_node(req.capability)
+                            if b_node:
+                                incoming = b_graph._reverse_adjacency.get(b_node.id, [])
+                                has_auth_evidence = any(e.relation == BehaviorRelationType.AUTHORIZED_FOR for e in incoming)
+
+                        if has_auth_evidence or "role:" in (req.evidence or "").lower():
+                            base_bdd.append(f"And unauthorized actor returns HTTP 403 Forbidden")
+
+                        # Check if audit evidence exists before adding audit persistence assertion
+                        has_audit_evidence = False
+                        if b_graph:
+                            b_node = b_graph.get_node(req.capability)
+                            if b_node:
+                                outgoing = b_graph._adjacency.get(b_node.id, [])
+                                has_audit_evidence = any(e.relation == BehaviorRelationType.EMITS_SIDE_EFFECT for e in outgoing)
+                        if req.nfr_category == NFRCategory.AUDITABILITY:
+                            has_audit_evidence = True
+
+                        if has_audit_evidence:
+                            base_bdd.append("And audit log record is committed to persistent storage")
+
+                        bdd_criteria.extend(base_bdd)
 
                     if not bdd_criteria:
                         bdd_criteria = [
                             f"Given valid request payload for {ep}",
-                            f"When HTTP {ep} is invoked",
-                            "Then API returns HTTP 200/201 with structured JSON payload",
-                            "And invalid payload returns HTTP 400 Bad Request"
+                            f"When transport action {ep} is invoked",
+                            "Then handler executes successfully and returns expected payload contract"
                         ]
 
                     tasks.append(TaskRecord(
                         id=t_id,
-                        title=f"Implement REST Endpoint Contract: {ep}",
-                        description=f"Construct backend handler for {ep} in {comp.name}.",
-                        category=TaskCategory.API_ENDPOINT,
+                        title=f"Implement Component Contract: {ep}",
+                        description=f"Construct component logic for {ep} in {comp.name}.",
+                        category=TaskCategory.API_ENDPOINT if comp.component_type == LLDComponentType.CONTROLLER else TaskCategory.STATE_TRANSITION,
                         parent_lld=comp.id,
                         parent_hld=p_hld,
                         parent_reqs=p_reqs,
                         parent_behaviors=p_behs,
                         verification_criteria=list(dict.fromkeys(bdd_criteria))
                     ))
-
-            elif comp.component_type == LLDComponentType.SERVICE:
-                t_id = f"TASK-{task_counter:03d}"
-                task_counter += 1
-
-                bdd_service_criteria = []
-                for req in matching_req_objs:
-                    if req.preconditions:
-                        bdd_service_criteria.append(f"Validates precondition constraint: {req.preconditions[0]}")
-                    if req.postconditions:
-                        bdd_service_criteria.append(f"Commits postcondition transition: {req.postconditions[0]}")
-
-                if not bdd_service_criteria:
-                    bdd_service_criteria = [
-                        "Validates state machine pre-conditions prior to transition",
-                        "Persists committed state commitment atomically"
-                    ]
-
-                tasks.append(TaskRecord(
-                    id=t_id,
-                    title=f"Implement Service Logic & State Transitions: {comp.name}",
-                    description=f"Implement domain business logic and state machine transitions in {comp.name}.",
-                    category=TaskCategory.STATE_TRANSITION,
-                    parent_lld=comp.id,
-                    parent_hld=p_hld,
-                    parent_reqs=p_reqs,
-                    parent_behaviors=p_behs,
-                    verification_criteria=bdd_service_criteria
-                ))
 
             elif comp.component_type == LLDComponentType.UI_SURFACE:
                 t_id = f"TASK-{task_counter:03d}"
@@ -168,7 +166,7 @@ class TaskCompiler:
                     parent_behaviors=p_behs,
                     verification_criteria=[
                         f"Renders behavioral workflow surface at route {comp.route}",
-                        "Connects action triggers to backend REST endpoints"
+                        "Connects action triggers to backend transport contracts"
                     ]
                 ))
 

@@ -2265,6 +2265,12 @@ class SpecSynthesisEngine:
         # Save JSON output
         try:
             write_json_atomic(json_path, spec.__dict__)
+            write_json_atomic(os.path.join(agents_dir, "v7_refinement_pipeline.json"), {
+                "hld_design": v7_pipeline["hld_design"].to_dict(),
+                "hld_validation": v7_pipeline["hld_validation"],
+                "lld_components": [c.to_dict() for c in v7_pipeline["lld_components"]],
+                "tasks": [t.to_dict() for t in v7_pipeline["tasks"]]
+            })
 
             from intent_contract import IntentContract
             ic = IntentContract(

@@ -564,7 +564,7 @@ class SpecificationCompiler:
         lld_components = LLDCompiler.compile_lld(hld, r_graph, b_graph, archetypes=archetypes)
 
         # 6. Task Compilation with Full Lineage and BDD Contracts
-        tasks = TaskCompiler.compile_tasks(lld_components, r_graph=r_graph)
+        tasks = TaskCompiler.compile_tasks(lld_components, r_graph=r_graph, b_graph=b_graph)
 
         return {
             "behavior_graph": b_graph,
