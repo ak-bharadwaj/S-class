@@ -40,6 +40,7 @@ class ApprovalAuthority(str, Enum):
     DETERMINISTIC_POLICY = "DETERMINISTIC_POLICY"
     DEBATE_ENGINE = "DEBATE_ENGINE"
     TEST_SYNTHETIC = "TEST_SYNTHETIC"
+    SIMULATION_SYNTHETIC = "SIMULATION_SYNTHETIC"
 
 
 class DecisionRiskClass(str, Enum):
@@ -61,13 +62,15 @@ class ApprovalRecord:
     timestamp: str
     evidence: List[str] = field(default_factory=list)
     signature: str = ""
+    synthetic: bool = False
+    execution_mode: str = "PRODUCTION"
 
     def __post_init__(self):
         if isinstance(self.authority, str):
             self.authority = ApprovalAuthority(self.authority)
 
     def compute_signature(self, secret_key: str) -> str:
-        payload = f"{self.decision_id}:{self.artifact_id}:{self.artifact_version}:{self.content_hash}:{self.authority.value}:{self.decision}:{self.reason}".encode("utf-8")
+        payload = f"{self.decision_id}:{self.artifact_id}:{self.artifact_version}:{self.content_hash}:{self.authority.value}:{self.decision}:{self.reason}:{self.synthetic}:{self.execution_mode}".encode("utf-8")
         return hmac.new(secret_key.encode("utf-8"), payload, hashlib.sha256).hexdigest()
 
     def is_valid(self, secret_key: str) -> bool:
@@ -87,7 +90,9 @@ class ApprovalRecord:
             "reason": self.reason,
             "timestamp": self.timestamp,
             "evidence": self.evidence,
-            "signature": self.signature
+            "signature": self.signature,
+            "synthetic": self.synthetic,
+            "execution_mode": self.execution_mode
         }
 
     @classmethod
@@ -102,7 +107,9 @@ class ApprovalRecord:
             reason=data.get("reason", ""),
             timestamp=data.get("timestamp", ""),
             evidence=data.get("evidence", []),
-            signature=data.get("signature", "")
+            signature=data.get("signature", ""),
+            synthetic=bool(data.get("synthetic", False)),
+            execution_mode=data.get("execution_mode", "PRODUCTION")
         )
 
 
@@ -212,6 +219,8 @@ class ArtifactGovernor:
     ) -> ApprovalRecord:
         secret_key = cls._get_governance_secret(workspace_dir)
         ts_now = datetime.now(timezone.utc).isoformat() + "Z"
+        is_synth = authority in [ApprovalAuthority.TEST_SYNTHETIC, ApprovalAuthority.SIMULATION_SYNTHETIC]
+        exec_mode = cls._get_execution_mode(workspace_dir)
         record = ApprovalRecord(
             decision_id=decision_id,
             artifact_id=artifact_id,
@@ -221,7 +230,9 @@ class ArtifactGovernor:
             authority=authority,
             reason=notes,
             timestamp=ts_now,
-            evidence=["Auto-generated synthetic approval receipt"]
+            evidence=["Auto-generated synthetic approval receipt"],
+            synthetic=is_synth,
+            execution_mode=exec_mode
         )
         record.signature = record.compute_signature(secret_key)
         if workspace_dir:

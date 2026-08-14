@@ -169,7 +169,19 @@ class LLDCompiler:
                     elif exec_arch in [ExecutionArchitecture.DATA_PIPELINE_WORKER, ExecutionArchitecture.EVENT_DRIVEN_MICROSERVICE]:
                         ep = f"event://{ent_stem}-events/{verb}"
                     else:
-                        ep = f"POST /api/{ent_stem}s/{{id}}/{verb_noun}" if b_node.behavior_type != BehaviorNodeType.QUERY else f"GET /api/{ent_stem}s/{{id}}"
+                        IRREGULAR_PLURALS = {
+                            "alumni": "alumni", "alumnus": "alumni", "staff": "staff", "faculty": "faculty",
+                            "data": "data", "equipment": "equipment", "telemetry": "telemetry", "category": "categories"
+                        }
+                        if ent_stem in IRREGULAR_PLURALS:
+                            ent_plural = IRREGULAR_PLURALS[ent_stem]
+                        elif ent_stem.endswith('s') or ent_stem.endswith('ss'):
+                            ent_plural = ent_stem
+                        elif ent_stem.endswith('y') and len(ent_stem) > 2 and ent_stem[-2] not in 'aeiou':
+                            ent_plural = f"{ent_stem[:-1]}ies"
+                        else:
+                            ent_plural = f"{ent_stem}s"
+                        ep = f"POST /api/{ent_plural}/{{id}}/{verb_noun}" if b_node.behavior_type != BehaviorNodeType.QUERY else f"GET /api/{ent_plural}/{{id}}"
 
                     if ep not in mod_endpoints:
                         mod_endpoints.append(ep)

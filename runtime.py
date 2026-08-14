@@ -1252,8 +1252,6 @@ class FSMGoalSequenceRunner:
                         workspace_dir=workspace_dir,
                         is_debate_phase=True
                     )
-                    if res_pipe and isinstance(res_pipe, dict):
-                        SpecificationCompiler.save_versioned_pipeline_artifact(res_pipe, workspace_dir)
             except Exception as e_ref:
                 logger.warning(f"[Runtime Governance] Refinement compilation note: {e_ref}")
 

@@ -673,7 +673,8 @@ class SpecificationCompiler:
     def save_versioned_pipeline_artifact(cls, res_pipe: Dict[str, Any], workspace_dir: str) -> str:
         """
         Saves pipeline result into an immutable versioned artifact (v7_refinement_pipeline_v{ver}.json)
-        with parent lineage version and hash tracking. Never mutates previous versioned files in-place.
+        with parent lineage version and hash tracking. Deduplicates identical content so serializing the
+        same pipeline state twice does NOT increment version or create duplicate artifact files.
         """
         state_dir = os.path.join(workspace_dir, ".agents")
         os.makedirs(state_dir, exist_ok=True)
@@ -689,20 +690,9 @@ class SpecificationCompiler:
                         pass
 
         current_ver = max(existing_versions) if existing_versions else 0
-        next_ver = current_ver + 1
 
-        parent_ver = current_ver if current_ver > 0 else None
-        parent_hash = None
-        if parent_ver:
-            parent_file = os.path.join(state_dir, f"v7_refinement_pipeline_v{parent_ver}.json")
-            if os.path.exists(parent_file):
-                try:
-                    with open(parent_file, "rb") as pf:
-                        parent_hash = hashlib.sha256(pf.read()).hexdigest()
-                except Exception:
-                    pass
-
-        payload = {
+        # Construct normalized content payload for hashing and comparison
+        content_payload = {
             "behavior_graph": res_pipe["behavior_graph"].to_dict() if hasattr(res_pipe["behavior_graph"], "to_dict") else res_pipe["behavior_graph"],
             "requirement_graph": res_pipe["requirement_graph"].to_dict() if hasattr(res_pipe["requirement_graph"], "to_dict") else res_pipe["requirement_graph"],
             "dependency_holes": res_pipe.get("dependency_holes", []),
@@ -714,11 +704,44 @@ class SpecificationCompiler:
             "lld_governance": res_pipe.get("lld_governance", {}),
             "tasks": [t.to_dict() if hasattr(t, "to_dict") else t for t in res_pipe.get("tasks", [])],
             "task_governance": res_pipe.get("task_governance", {}),
-            "blocked": res_pipe.get("blocked", False),
-            "version": next_ver,
-            "parent_version": parent_ver,
-            "parent_hash": parent_hash
+            "blocked": res_pipe.get("blocked", False)
         }
+
+        new_content_json = json.dumps(content_payload, sort_keys=True)
+        new_content_hash = hashlib.sha256(new_content_json.encode("utf-8")).hexdigest()
+
+        # Check if current version file exists and has identical content hash
+        if current_ver > 0:
+            current_file = os.path.join(state_dir, f"v7_refinement_pipeline_v{current_ver}.json")
+            if os.path.exists(current_file):
+                try:
+                    with open(current_file, "r", encoding="utf-8") as f:
+                        curr_data = json.load(f)
+                    curr_content = {k: v for k, v in curr_data.items() if k not in ["version", "parent_version", "parent_hash", "version_file"]}
+                    curr_content_json = json.dumps(curr_content, sort_keys=True)
+                    curr_content_hash = hashlib.sha256(curr_content_json.encode("utf-8")).hexdigest()
+                    if new_content_hash == curr_content_hash:
+                        # Deduplication hit — skip creating duplicate version file
+                        return current_file
+                except Exception:
+                    pass
+
+        next_ver = current_ver + 1
+        parent_ver = current_ver if current_ver > 0 else None
+        parent_hash = None
+        if parent_ver:
+            parent_file = os.path.join(state_dir, f"v7_refinement_pipeline_v{parent_ver}.json")
+            if os.path.exists(parent_file):
+                try:
+                    with open(parent_file, "rb") as pf:
+                        parent_hash = hashlib.sha256(pf.read()).hexdigest()
+                except Exception:
+                    pass
+
+        payload = dict(content_payload)
+        payload["version"] = next_ver
+        payload["parent_version"] = parent_ver
+        payload["parent_hash"] = parent_hash
 
         # 1. Immutable versioned successor artifact
         versioned_file = os.path.join(state_dir, f"v7_refinement_pipeline_v{next_ver}.json")
@@ -738,6 +761,8 @@ class SpecificationCompiler:
             save_state(state, workspace_dir)
         except Exception:
             pass
+
+        return versioned_file
 
         return versioned_file
 

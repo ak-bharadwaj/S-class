@@ -331,7 +331,7 @@ class PracticalSkeptic:
             for lld_key, lld in lld_cat.items():
                 endpoints = lld.get("api_endpoints", [])
                 for ep in endpoints:
-                    if ep in explicit_routes_set or any(sys_kw in ep.lower() for sys_kw in ["/api/auth", "/api/account", "/api/session", "cli://"]):
+                    if ep in explicit_routes_set or any(er.get("path", "") in ep for er in (workspace_evidence.api_routes if workspace_evidence and getattr(workspace_evidence, "api_routes", None) else [])) or any(sys_kw in ep.lower() for sys_kw in ["/api/auth", "/api/account", "/api/session", "cli://"]):
                         continue
                     tokens = [t.lower() for t in re.split(r'[/_\-\s]', ep) if t and not t.startswith('{') and not t.startswith(':')]
                     if not any(stem in tokens or any(t.startswith(stem) or stem.startswith(t) for t in tokens if len(t) >= 4) for stem in valid_stems if stem):
