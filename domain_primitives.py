@@ -25,13 +25,17 @@ class DomainPrimitiveType(str, Enum):
     DOCUMENT = "document"             # Formally structured artifact or digital proof (e.g. PrescriptionPDF, BillOfLading)
 
 
-class ProvenanceType(str, Enum):
-    """Provenance trail of every requirement and domain node."""
-    EXPLICIT = "explicit"                     # Directly stated in user prompt
-    OBSERVED = "observed"                     # Discovered from workspace code / DB schema / routes
-    STRONGLY_DERIVED = "strongly_derived"     # Deducible from graph topology with near certainty (e.g. Resource -> Booking)
+class ProvenanceKind(str, Enum):
+    """Unified provenance trail across nodes, edges, and behavioral primitives."""
+    EXPLICIT = "explicit"                     # Directly stated in source prompt/doc
+    OBSERVED = "observed"                     # Extracted from AST code/DB schema/routes
+    STRONGLY_DERIVED = "strongly_derived"     # Deducible from graph topology with near certainty
     WEAKLY_DERIVED = "weakly_derived"         # Plausible operational standard, flagged for review
     SPECULATIVE = "speculative"               # Unbacked assumption, must be suppressed or confirmed
+
+# Backwards compatibility aliases
+ProvenanceType = ProvenanceKind
+EdgeProvenanceType = ProvenanceKind
 
 
 class RelationType(str, Enum):
@@ -87,21 +91,13 @@ class DomainNode:
         )
 
 
-class EdgeProvenanceType(str, Enum):
-    """Provenance trail of semantic relationships."""
-    EXPLICIT = "explicit"                     # Directly stated in source prompt/doc
-    OBSERVED = "observed"                     # Extracted from AST code/DB schema/routes
-    BEHAVIORAL_DERIVATION = "derived"         # Inferred via Behavior Engine state machine
-    SPECULATIVE = "speculative"               # Unbacked assumption requiring human review
-
-
 @dataclass
 class DomainEdge:
     """A directed semantic relationship between two domain nodes with first-class provenance."""
     source_id: str
     relation: RelationType
     target_id: str
-    provenance: EdgeProvenanceType = EdgeProvenanceType.BEHAVIORAL_DERIVATION
+    provenance: EdgeProvenanceType = EdgeProvenanceType.STRONGLY_DERIVED
     confidence: float = 1.0
     evidence_ref: Optional[str] = None
     inference_rule: Optional[str] = None
@@ -192,7 +188,7 @@ class SemanticDomainGraph:
         relation: RelationType,
         target_id: str,
         metadata: Optional[Dict[str, Any]] = None,
-        provenance: EdgeProvenanceType = EdgeProvenanceType.BEHAVIORAL_DERIVATION,
+        provenance: EdgeProvenanceType = EdgeProvenanceType.STRONGLY_DERIVED,
         confidence: float = 1.0,
         evidence_ref: Optional[str] = None,
         inference_rule: Optional[str] = None,

@@ -55,7 +55,7 @@ def test_skeptic_rules_are_100_percent_grounded_in_failure_log():
 
     # 3. Exact bidirectional set equality
     assert active_skeptic_rules == logged_rule_ids
-    assert len(active_skeptic_rules) == 12
+    assert len(active_skeptic_rules) == 13
 
 
 def test_practical_skeptic_catches_vibecoded_mockup_fields():

@@ -49,7 +49,8 @@ class PracticalSkeptic:
         "SKEPTIC-PROSE-CRUD-DUPLICATION",
         "SKEPTIC-NON-NOUN-API",
         "SKEPTIC-ACTOR-COMPLETENESS",
-        "SKEPTIC-STRUCTURAL-GROUNDING"
+        "SKEPTIC-STRUCTURAL-GROUNDING",
+        "SKEPTIC-EPISTEMIC-BEHAVIOR-GROUNDING"
     }
 
     @classmethod
@@ -335,5 +336,13 @@ class PracticalSkeptic:
 
             if unsupported_endpoints:
                 warnings.append(f"[SKEPTIC-STRUCTURAL-GROUNDING] Synthesized API endpoints lack structural IR grounding: {', '.join(unsupported_endpoints[:5])}")
+
+        # Rule 13: SKEPTIC-EPISTEMIC-BEHAVIOR-GROUNDING — Verify no PROPOSED or unbacked speculative behavior nodes compiled to HLD/LLD
+        if "SKEPTIC-EPISTEMIC-BEHAVIOR-GROUNDING" in cls.ACTIVE_RULES:
+            behavior_graph = spec_dict.get("behavior_graph")
+            if behavior_graph and hasattr(behavior_graph, "nodes"):
+                proposed_nodes = [n for n in behavior_graph.nodes.values() if getattr(n, "epistemic_status", None) == "proposed"]
+                if proposed_nodes:
+                    warnings.append(f"[SKEPTIC-EPISTEMIC-BEHAVIOR-GROUNDING] Gated {len(proposed_nodes)} unbacked PROPOSED behaviors from HLD/LLD compilation.")
 
         return passed, warnings, checks

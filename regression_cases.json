@@ -174,5 +174,20 @@
     ],
     "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
     "resolved": true
+  },
+  {
+    "id": "FAIL-PROSE-013",
+    "project": "Cartesian Behavior Over-Generation Audit",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-14T21:36:00Z",
+    "summary": "Behavior engine generated Cartesian product (every actor x every entity x every verb) and inferred authorization from actor existence without epistemic status gating.",
+    "root_cause": "generative_cartesian_behavior_overgeneration",
+    "missing_contracts": [
+      "svo_triple_extraction",
+      "epistemic_status_classification",
+      "epistemic_behavior_compiler_gate"
+    ],
+    "skeptic_rule_id": "SKEPTIC-EPISTEMIC-BEHAVIOR-GROUNDING",
+    "resolved": true
   }
 ]

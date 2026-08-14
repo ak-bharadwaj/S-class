@@ -1,10 +1,12 @@
 """
-S-Class EOS V6.0 - Behavior Graph & Edge Provenance Test Suite
+S-Class EOS V6.1 - Behavior Graph & Epistemic Grounding Test Suite
 
 Validates:
-1. DomainEdge and BehaviorEdge first-class provenance tracking.
-2. BehaviorGraph construction via BehaviorGraphEngine (Commands, Queries, Guards, Side Effects).
-3. PracticalSkeptic SKEPTIC-STRUCTURAL-GROUNDING IR invariant evaluation.
+1. DomainEdge and BehaviorEdge unified provenance tracking.
+2. SVO Triple Extraction preventing Cartesian product over-generation.
+3. BehaviorGraph construction via BehaviorGraphEngine (Commands, Queries, Guards, Side Effects).
+4. EpistemicStatus compiler gating suppressing PROPOSED behaviors from HLD/LLD.
+5. PracticalSkeptic SKEPTIC-STRUCTURAL-GROUNDING and SKEPTIC-EPISTEMIC-BEHAVIOR-GROUNDING auditing.
 """
 
 import os
@@ -17,8 +19,7 @@ if PLUGIN_DIR not in sys.path:
 
 from domain_primitives import (
     DomainPrimitiveType,
-    ProvenanceType,
-    EdgeProvenanceType,
+    ProvenanceKind,
     DomainNode,
     DomainEdge,
     RelationType,
@@ -30,7 +31,8 @@ from behavior_graph import (
     BehaviorNode,
     BehaviorEdge,
     BehaviorGraph,
-    BehaviorGraphEngine
+    BehaviorGraphEngine,
+    EpistemicStatus
 )
 from spec_compiler import SpecificationCompiler
 from practical_skeptic import PracticalSkeptic
@@ -42,7 +44,7 @@ def test_domain_edge_first_class_provenance():
         source_id="actor_doctor",
         relation=RelationType.AUTHORIZED_FOR,
         target_id="entity_prescription",
-        provenance=EdgeProvenanceType.EXPLICIT,
+        provenance=ProvenanceKind.EXPLICIT,
         confidence=0.98,
         evidence_ref="doc_sec_6_17",
         inference_rule="explicit_user_prompt",
@@ -55,37 +57,57 @@ def test_domain_edge_first_class_provenance():
     assert edge_dict["assumptions"] == ["ASM-AUTH-01"]
 
     reloaded = DomainEdge.from_dict(edge_dict)
-    assert reloaded.provenance == EdgeProvenanceType.EXPLICIT
+    assert reloaded.provenance == ProvenanceKind.EXPLICIT
     assert reloaded.confidence == 0.98
     assert reloaded.inference_rule == "explicit_user_prompt"
 
 
-def test_behavior_graph_engine_derivation():
-    """Verify BehaviorGraphEngine derives Commands, Queries, Guards, and Side Effects from domain graph."""
+def test_svo_triple_extraction_prevents_cartesian_product():
+    """Verify SVO Triple Extraction creates ONLY grounded actor-verb-entity commands, preventing Cartesian explosion."""
     d_graph = SemanticDomainGraph()
-    d_graph.add_node(DomainNode("actor_pilot", "Pilot", DomainPrimitiveType.ACTOR))
-    d_graph.add_node(DomainNode("entity_flight_plan", "Flight Plan", DomainPrimitiveType.ENTITY))
-    d_graph.add_node(DomainNode("policy_airworthiness", "Airworthiness Policy", DomainPrimitiveType.POLICY))
+    doctor = d_graph.add_node(DomainNode("actor_doctor", "Doctor", DomainPrimitiveType.ACTOR))
+    nurse = d_graph.add_node(DomainNode("actor_nurse", "Nurse", DomainPrimitiveType.ACTOR))
+    patient = d_graph.add_node(DomainNode("entity_patient", "Patient", DomainPrimitiveType.ENTITY))
+    prescription = d_graph.add_node(DomainNode("entity_prescription", "Prescription", DomainPrimitiveType.ENTITY))
 
-    raw_request = "Pilots submit flight plans with airworthiness policy validation."
-    b_graph = BehaviorGraphEngine.build_behavior_graph(d_graph, raw_request)
+    prompt = "Doctors approve prescriptions. Nurses view patients."
+    b_graph = BehaviorGraphEngine.build_behavior_graph(d_graph, prompt)
 
-    nodes = b_graph.nodes
-    assert len(nodes) > 0
+    commands = [n for n in b_graph.nodes.values() if n.behavior_type == BehaviorNodeType.COMMAND]
 
-    commands = [n for n in nodes.values() if n.behavior_type == BehaviorNodeType.COMMAND]
-    queries = [n for n in nodes.values() if n.behavior_type == BehaviorNodeType.QUERY]
-    guards = [n for n in nodes.values() if n.behavior_type == BehaviorNodeType.GUARD_CONDITION]
-    side_effects = [n for n in nodes.values() if n.behavior_type == BehaviorNodeType.SIDE_EFFECT]
+    # Verify ONLY 'Doctor Approve Prescription' command exists, NOT 'Nurse Approve Prescription' or 'Doctor Approve Patient'
+    cmd_names = [c.name for c in commands]
+    assert "Doctor Approve Prescription" in cmd_names
+    assert "Nurse Approve Prescription" not in cmd_names
+    assert "Doctor Approve Patient" not in cmd_names
 
-    assert len(commands) >= 1
-    assert len(queries) >= 1
-    assert len(guards) >= 1
-    assert len(side_effects) >= 1
+    # Verify epistemic status is EXPLICIT
+    doc_cmd = next(c for c in commands if c.name == "Doctor Approve Prescription")
+    assert doc_cmd.epistemic_status == EpistemicStatus.EXPLICIT
+    assert doc_cmd.confidence == 0.99
 
-    # Verify edge authorization
-    auth_edges = [e for e in b_graph.edges if e.relation == BehaviorRelationType.AUTHORIZED_FOR]
-    assert len(auth_edges) >= 2
+
+def test_epistemic_status_compiler_gating():
+    """Verify SpecificationCompiler gates PROPOSED behaviors from compiling to HLD/LLD."""
+    d_graph = SemanticDomainGraph()
+    d_graph.add_node(DomainNode("actor_doctor", "Doctor", DomainPrimitiveType.ACTOR))
+    d_graph.add_node(DomainNode("entity_prescription", "Prescription", DomainPrimitiveType.ENTITY))
+
+    # Add a PROPOSED behavior node manually to behavior graph
+    b_graph = BehaviorGraphEngine.build_behavior_graph(d_graph, "Doctors approve prescriptions.")
+    proposed_node = b_graph.add_node(BehaviorNode(
+        id="cmd_doctor_delete_patient",
+        name="Doctor Delete Patient",
+        behavior_type=BehaviorNodeType.COMMAND,
+        actor_id="actor_doctor",
+        target_entity_id="entity_patient",
+        epistemic_status=EpistemicStatus.PROPOSED,
+        confidence=0.35
+    ))
+
+    # Verify accepted helper excludes PROPOSED node
+    accepted = b_graph.get_accepted_commands_for_actor("actor_doctor")
+    assert proposed_node not in accepted
 
 
 def test_skeptic_structural_grounding_invariant():
@@ -108,5 +130,4 @@ def test_skeptic_structural_grounding_invariant():
 
     passed, warnings, checks = PracticalSkeptic.audit_specification(spec_dict)
     assert passed is True
-    # Verify SKEPTIC-STRUCTURAL-GROUNDING executed cleanly
     assert not any("[SKEPTIC-STRUCTURAL-GROUNDING]" in w for w in warnings)

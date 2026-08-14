@@ -18,6 +18,13 @@ from domain_primitives import (
     SemanticDomainGraph,
     AssumptionRecord
 )
+from behavior_graph import (
+    BehaviorGraphEngine,
+    BehaviorGraph,
+    BehaviorNodeType,
+    BehaviorRelationType,
+    EpistemicStatus
+)
 
 UNCOUNTABLE_OR_PLURAL = {
     "alumni": "alumni",
@@ -327,6 +334,10 @@ class SpecificationCompiler:
                             description=f"Explicit workspace actor: {perm}"
                         ))
 
+        # Construct BehaviorGraph and enforce Grounding Engine Epistemic Filter
+        raw_text = intent.raw_request if (intent and getattr(intent, "raw_request", None)) else " ".join(intent_features)
+        b_graph = BehaviorGraphEngine.build_behavior_graph(graph, raw_text)
+
         actors = graph.get_nodes_by_type(DomainPrimitiveType.ACTOR)
 
         page_spreads: Dict[str, List[Dict[str, Any]]] = {}
@@ -340,6 +351,10 @@ class SpecificationCompiler:
         for actor in actors:
             actor_key = actor.name.lower().replace(' ', '_')
             pages: List[Dict[str, Any]] = []
+
+            # Retrieve only ACCEPTED behavior nodes for actor (suppressing PROPOSED behaviors)
+            accepted_cmds = b_graph.get_accepted_commands_for_actor(actor.id)
+            accepted_queries = b_graph.get_accepted_queries_for_actor(actor.id)
 
             if is_pure_cli:
                 # Compile CLI Subcommand & Flag Catalog instead of Web UI
