@@ -1,9 +1,9 @@
 """
-S-Class EOS V7.0 - Upstream-Traceable Task Compiler
+S-Class EOS V7.0 - Upstream-Traceable Task Compiler with BDD Contract Verification
 
 Defines:
 1. TaskRecord (Executable coding task with full lineage: task -> lld -> hld -> req -> behavior)
-2. TaskCompiler (Compiles LLDComponents into sequential, verifiable tasks for the coding agent)
+2. TaskCompiler (Compiles LLDComponents into BDD contract-derived execution tasks)
 """
 
 from dataclasses import dataclass, field
@@ -12,6 +12,7 @@ from typing import Dict, List, Set, Any, Optional, Tuple
 import json
 
 from lld_compiler import LLDComponent, LLDComponentType
+from requirement_ir import RequirementGraph, RequirementNode
 
 
 class TaskCategory(str, Enum):
@@ -26,7 +27,7 @@ class TaskCategory(str, Enum):
 
 @dataclass
 class TaskRecord:
-    """An executable task with complete upstream architectural lineage."""
+    """An executable task with complete upstream architectural lineage and BDD acceptance criteria."""
     id: str
     title: str
     description: str
@@ -66,40 +67,81 @@ class TaskRecord:
 
 
 class TaskCompiler:
-    """Compiles LLDComponents into structured, traceable TaskRecord entries."""
+    """Compiles LLDComponents and RequirementGraph into BDD contract-derived TaskRecord entries."""
 
     @classmethod
-    def compile_tasks(cls, lld_components: List[LLDComponent]) -> List[TaskRecord]:
+    def compile_tasks(cls, lld_components: List[LLDComponent], r_graph: Optional[RequirementGraph] = None) -> List[TaskRecord]:
         tasks: List[TaskRecord] = []
         task_counter = 1
+
+        req_lookup = r_graph.nodes if r_graph else {}
 
         for comp in lld_components:
             p_hld = comp.parent.hld_id
             p_reqs = comp.parent.req_ids
             p_behs = comp.parent.behavior_ids
 
+            # Find requirement objects for BDD criteria synthesis
+            matching_req_objs = [req_lookup[rid] for rid in p_reqs if rid in req_lookup]
+
             if comp.component_type == LLDComponentType.CONTROLLER:
                 for ep in comp.api_endpoints:
                     t_id = f"TASK-{task_counter:03d}"
                     task_counter += 1
+
+                    # Synthesize exact BDD acceptance criteria from requirement pre/post conditions
+                    bdd_criteria = []
+                    for req in matching_req_objs:
+                        actor_str = req.actor
+                        pre_str = f"Given {req.target}.status == {req.preconditions[0].split('==')[1].strip()}" if req.preconditions else f"Given {req.target} exists"
+                        post_str = f"Then {req.target}.status == {req.postconditions[0].split('==')[1].strip()}" if req.postconditions else f"Then {req.capability} execution commits"
+
+                        bdd_criteria.extend([
+                            f"{pre_str}",
+                            f"And actor == '{actor_str}'",
+                            f"When HTTP '{ep}' is invoked",
+                            f"{post_str}",
+                            f"And unauthorized actor returns HTTP 403 Forbidden",
+                            f"And audit log record is committed to persistent storage"
+                        ])
+
+                    if not bdd_criteria:
+                        bdd_criteria = [
+                            f"Given valid request payload for {ep}",
+                            f"When HTTP {ep} is invoked",
+                            "Then API returns HTTP 200/201 with structured JSON payload",
+                            "And invalid payload returns HTTP 400 Bad Request"
+                        ]
+
                     tasks.append(TaskRecord(
                         id=t_id,
-                        title=f"Implement REST Endpoint: {ep}",
+                        title=f"Implement REST Endpoint Contract: {ep}",
                         description=f"Construct backend handler for {ep} in {comp.name}.",
                         category=TaskCategory.API_ENDPOINT,
                         parent_lld=comp.id,
                         parent_hld=p_hld,
                         parent_reqs=p_reqs,
                         parent_behaviors=p_behs,
-                        verification_criteria=[
-                            f"Endpoint {ep} responds with HTTP 200/201 on valid payload",
-                            "Returns structured error JSON on invalid payload"
-                        ]
+                        verification_criteria=list(dict.fromkeys(bdd_criteria))
                     ))
 
             elif comp.component_type == LLDComponentType.SERVICE:
                 t_id = f"TASK-{task_counter:03d}"
                 task_counter += 1
+
+                bdd_service_criteria = []
+                for req in matching_req_objs:
+                    if req.preconditions:
+                        bdd_service_criteria.append(f"Validates precondition constraint: {req.preconditions[0]}")
+                    if req.postconditions:
+                        bdd_service_criteria.append(f"Commits postcondition transition: {req.postconditions[0]}")
+
+                if not bdd_service_criteria:
+                    bdd_service_criteria = [
+                        "Validates state machine pre-conditions prior to transition",
+                        "Persists committed state commitment atomically"
+                    ]
+
                 tasks.append(TaskRecord(
                     id=t_id,
                     title=f"Implement Service Logic & State Transitions: {comp.name}",
@@ -109,10 +151,7 @@ class TaskCompiler:
                     parent_hld=p_hld,
                     parent_reqs=p_reqs,
                     parent_behaviors=p_behs,
-                    verification_criteria=[
-                        "Validates state machine pre-conditions prior to transition",
-                        "Persists committed state commitment atomically"
-                    ]
+                    verification_criteria=bdd_service_criteria
                 ))
 
             elif comp.component_type == LLDComponentType.UI_SURFACE:
@@ -128,7 +167,7 @@ class TaskCompiler:
                     parent_reqs=p_reqs,
                     parent_behaviors=p_behs,
                     verification_criteria=[
-                        f"Renders interface at route {comp.route}",
+                        f"Renders behavioral workflow surface at route {comp.route}",
                         "Connects action triggers to backend REST endpoints"
                     ]
                 ))

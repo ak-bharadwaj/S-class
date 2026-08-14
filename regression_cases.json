@@ -204,5 +204,22 @@
     ],
     "skeptic_rule_id": "SKEPTIC-EPISTEMIC-BEHAVIOR-GROUNDING",
     "resolved": true
+  },
+  {
+    "id": "FAIL-PROSE-015",
+    "project": "Hardcoded ADR False Positives & Noun-to-Module Leakage Audit",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-14T21:48:00Z",
+    "summary": "HLD compiler emitted unconditional Modular Monolith ADRs regardless of scale NFRs, mapped entity nouns directly to modules, hardcoded API verb routes, and leaked web UI templates into backend/CLI archetypes.",
+    "root_cause": "unconditional_adr_generation_and_noun_module_template_leakage",
+    "missing_contracts": [
+      "conditional_adr_reasoning_engine",
+      "capability_workflow_bounded_context_clustering",
+      "production_6_gate_hld_validator",
+      "archetype_based_surface_selection",
+      "bdd_contract_derived_task_criteria"
+    ],
+    "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
+    "resolved": true
   }
 ]

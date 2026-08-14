@@ -534,7 +534,8 @@ class SpecificationCompiler:
         cls,
         graph: SemanticDomainGraph,
         intent_features: List[str],
-        raw_request: str = ""
+        raw_request: str = "",
+        archetypes: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """
         Full V7 Refinement Compiler Pipeline:
@@ -554,16 +555,16 @@ class SpecificationCompiler:
         dep_holes = r_graph.detect_dependency_holes()
 
         # 3. High-Level Design (HLD) & ADR Compilation
-        hld = HLDCompiler.compile_hld(r_graph, b_graph)
+        hld = HLDCompiler.compile_hld(r_graph, b_graph, raw_request=raw_request)
 
         # 4. HLD Validation Gate
         passed_hld, hld_errors = HLDValidator.validate_hld(hld, r_graph, b_graph)
 
         # 5. Low-Level Design (LLD) Refinement Compilation
-        lld_components = LLDCompiler.compile_lld(hld, r_graph, b_graph)
+        lld_components = LLDCompiler.compile_lld(hld, r_graph, b_graph, archetypes=archetypes)
 
-        # 6. Task Compilation with Full Lineage
-        tasks = TaskCompiler.compile_tasks(lld_components)
+        # 6. Task Compilation with Full Lineage and BDD Contracts
+        tasks = TaskCompiler.compile_tasks(lld_components, r_graph=r_graph)
 
         return {
             "behavior_graph": b_graph,

@@ -2133,9 +2133,17 @@ class SpecSynthesisEngine:
         # 3. Construct Semantic Domain Graph
         domain_graph = SemanticDecomposer.decompose_intent(raw_request, evidence)
 
-        # 4. Compile Specification from Semantic Domain Graph
+        # 4. Compile Specification & V7 Refinement Compiler Pipeline as Authoritative Path
         feats = intent.all_features if hasattr(intent, 'all_features') else intent.primary_features
         page_spreads, lld_catalog, assumption_ledger = SpecificationCompiler.compile_specification(domain_graph, feats, archetype_strings, evidence, intent=intent)
+
+        # Authoritative V7 Refinement Pipeline Execution
+        v7_pipeline = SpecificationCompiler.compile_v7_refinement_pipeline(
+            graph=domain_graph,
+            intent_features=feats,
+            raw_request=raw_request,
+            archetypes=archetype_strings
+        )
 
         # 5. Requirement Synthesis
         requirements_list = self.synthesize_requirements(intent, evidence, archetypes, scope_tier)

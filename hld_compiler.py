@@ -1,11 +1,12 @@
 """
-S-Class EOS V7.0 - HLD Compiler & Architecture Decision Records (ADRs)
+S-Class EOS V7.0 - Hardened HLD Compiler & Architecture Decision Records (ADRs)
 
 Defines:
-1. ADRRecord (Architecture Decision Records with options, rationale, and evidence)
-2. HLDModule & HLDDesign (System boundaries, entity ownership, capability ownership, security boundaries)
-3. HLDCompiler (Compiles Requirements IR + Behavior Graph into HLD + ADRs)
-4. HLDValidator (Hard validation gate auditing Traceability, Ownership, Dependencies, Security, Workflow, and NFRs)
+1. ADRRecord (Architecture Decision Records with conditional epistemic status)
+2. ADRReasoningEngine (Evaluates NFRs, scale, event throughput, and evidence to decide topology)
+3. HLDModule & HLDDesign (Bounded Contexts derived from capability workflows, not entity nouns)
+4. HLDCompiler (Compiles Requirements IR + Behavior Graph into HLD + ADRs)
+5. HLDValidator (Production 6-Gate Validator auditing Traceability, Ownership, Dependencies, Security, Workflow, and NFRs)
 """
 
 from dataclasses import dataclass, field
@@ -28,7 +29,8 @@ class ADRRecord:
     affected_modules: List[str]
     rejected_options: List[str]
     reason: str
-    status: str = "ACCEPTED"
+    status: str = "ACCEPTED"  # ACCEPTED or PROPOSED
+    confidence: float = 1.0
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -40,7 +42,8 @@ class ADRRecord:
             "affected_modules": self.affected_modules,
             "rejected_options": self.rejected_options,
             "reason": self.reason,
-            "status": self.status
+            "status": self.status,
+            "confidence": self.confidence
         }
 
     @classmethod
@@ -54,13 +57,14 @@ class ADRRecord:
             affected_modules=data.get("affected_modules", []),
             rejected_options=data.get("rejected_options", []),
             reason=data.get("reason", ""),
-            status=data.get("status", "ACCEPTED")
+            status=data.get("status", "ACCEPTED"),
+            confidence=data.get("confidence", 1.0)
         )
 
 
 @dataclass
 class HLDModule:
-    """A high-level system module establishing boundaries and capability ownership."""
+    """A high-level system module establishing Bounded Contexts derived from capability workflows."""
     id: str
     name: str
     system_boundary: str
@@ -113,70 +117,122 @@ class HLDDesign:
         }
 
 
-class HLDCompiler:
-    """Compiles RequirementGraph and BehaviorGraph into an HLDDesign with ADRs."""
+class ADRReasoningEngine:
+    """Evaluates NFRs, scale indicators, and evidence to decide topology conditionally instead of hardcoding."""
 
     @classmethod
-    def compile_hld(cls, r_graph: RequirementGraph, b_graph: BehaviorGraph, system_name: str = "SClassSystem") -> HLDDesign:
-        modules_map: Dict[str, HLDModule] = {}
-        adrs: List[ADRRecord] = []
+    def evaluate_architecture_topology(cls, r_graph: RequirementGraph, raw_request: str = "") -> ADRRecord:
+        reqs = list(r_graph.nodes.values())
+        raw_clean = raw_request.lower()
 
-        # 1. Group entities and capabilities into logical system modules
+        has_microservices_evidence = any(kw in raw_clean for kw in ["microservice", "docker-compose", "kafka", "distributed", "independent scaling", "event-driven"])
+        has_high_throughput = any(r.nfr_category == NFRCategory.PERFORMANCE and ("10k" in r.statement.lower() or "scale" in r.statement.lower()) for r in reqs)
+
+        if has_microservices_evidence or has_high_throughput:
+            return ADRRecord(
+                id="ADR-001",
+                title="Architectural Topology Selection",
+                decision="Distributed Microservices & Event-Driven Architecture",
+                alternatives=["Modular Monolith", "Serverless Functions"],
+                evidence=["Explicit microservices container evidence or high-throughput performance NFR"],
+                affected_modules=[],
+                rejected_options=["Modular Monolith"],
+                reason="System scale or explicit workspace evidence requires independent service deployment and event-driven decoupling.",
+                status="ACCEPTED",
+                confidence=0.95
+            )
+        else:
+            # Emits Modular Monolith as PROPOSED candidate if evidence is ambiguous
+            return ADRRecord(
+                id="ADR-001",
+                title="Architectural Topology Selection",
+                decision="Modular Monolith with Bounded Contexts",
+                alternatives=["Distributed Microservices", "Serverless Functions"],
+                evidence=["Domain graph capability workflow cohesion"],
+                affected_modules=[],
+                rejected_options=[],
+                reason="Plausible default topology for transactional consistency; marked PROPOSED for human/DEBATE confirmation.",
+                status="PROPOSED",
+                confidence=0.50
+            )
+
+
+class HLDCompiler:
+    """Compiles RequirementGraph and BehaviorGraph into Bounded Context HLD Modules and ADRs."""
+
+    @classmethod
+    def compile_hld(cls, r_graph: RequirementGraph, b_graph: BehaviorGraph, system_name: str = "SClassSystem", raw_request: str = "") -> HLDDesign:
+        # 1. Cluster capabilities into Bounded Context modules using workflow cohesion
+        capability_clusters: Dict[str, Dict[str, Any]] = {}
+
         for req in r_graph.nodes.values():
             target_ent = req.target or "core"
-            mod_id = f"mod_{target_ent.lower().replace(' ', '_')}"
 
-            if mod_id not in modules_map:
-                modules_map[mod_id] = HLDModule(
-                    id=mod_id,
-                    name=f"{target_ent.capitalize()} Domain Module",
-                    system_boundary=f"Bounded Context: {target_ent.capitalize()}",
-                    owned_entities=[target_ent],
-                    owned_capabilities=[]
-                )
+            # Context key derived from workflow state transitions or entity domain
+            b_node = b_graph.get_node(req.source_behaviors[0]) if req.source_behaviors else b_graph.get_node(req.capability)
+            if b_node and (b_node.from_state or b_node.to_state):
+                context_key = f"ctx_{target_ent.lower()}_fulfillment"
+                context_name = f"{target_ent.capitalize()} Fulfillment Context"
+            else:
+                context_key = f"ctx_{target_ent.lower()}_management"
+                context_name = f"{target_ent.capitalize()} Management Context"
 
-            if req.capability not in modules_map[mod_id].owned_capabilities:
-                modules_map[mod_id].owned_capabilities.append(req.capability)
+            if context_key not in capability_clusters:
+                capability_clusters[context_key] = {
+                    "id": context_key,
+                    "name": context_name,
+                    "owned_entities": set(),
+                    "owned_capabilities": []
+                }
 
-        # 2. Emit Architecture Decision Records (ADRs) based on evidence
-        adrs.append(ADRRecord(
-            id="ADR-001",
-            title="Architectural Topology Selection",
-            decision="Modular Monolith with Domain-Bounded Contexts",
-            alternatives=["Microservices Architecture", "Single Monolith", "Serverless Functions"],
-            evidence=["Strong transactional consistency requirements", "Low operational deployment complexity"],
-            affected_modules=list(modules_map.keys()),
-            rejected_options=["Microservices Architecture"],
-            reason="No empirical domain evidence justifies distributed deployment overhead or event-driven saga complexity."
-        ))
+            capability_clusters[context_key]["owned_entities"].add(target_ent)
+            if req.capability not in capability_clusters[context_key]["owned_capabilities"]:
+                capability_clusters[context_key]["owned_capabilities"].append(req.capability)
 
-        adrs.append(ADRRecord(
+        modules = [
+            HLDModule(
+                id=data["id"],
+                name=data["name"],
+                system_boundary=f"Bounded Context: {data['name']}",
+                owned_entities=list(data["owned_entities"]),
+                owned_capabilities=data["owned_capabilities"]
+            )
+            for data in capability_clusters.values()
+        ]
+
+        # 2. Evaluate ADRs conditionally
+        adr_topology = ADRReasoningEngine.evaluate_architecture_topology(r_graph, raw_request)
+        adr_topology.affected_modules = [m.id for m in modules]
+
+        adr_auth = ADRRecord(
             id="ADR-002",
             title="Authentication & Authorization Architecture",
             decision="Role-Based Access Control (RBAC) with Epistemic Capability Guards",
-            alternatives=["Attribute-Based Access Control (ABAC)", "No Auth Guarding"],
-            evidence=["Explicit human roles declared in source requirements"],
-            affected_modules=list(modules_map.keys()),
+            alternatives=["Attribute-Based Access Control (ABAC)"],
+            evidence=["Source requirements capability authorization edges"],
+            affected_modules=[m.id for m in modules],
             rejected_options=["Attribute-Based Access Control (ABAC)"],
-            reason="RBAC provides deterministic security boundaries aligned with extracted domain actors."
-        ))
+            reason="RBAC provides deterministic security boundaries aligned with extracted domain actors.",
+            status="ACCEPTED",
+            confidence=0.90
+        )
 
         return HLDDesign(
             system_name=system_name,
-            architecture_style="Modular Monolith",
-            modules=list(modules_map.values()),
-            adrs=adrs
+            architecture_style=adr_topology.decision,
+            modules=modules,
+            adrs=[adr_topology, adr_auth]
         )
 
 
 class HLDValidator:
-    """Hard Validation Gate auditing HLD traceability, entity ownership, security, and NFR mitigations."""
+    """Production 6-Gate Validator auditing Traceability, Ownership, Dependencies, Security, Workflow, and NFRs."""
 
     @classmethod
     def validate_hld(cls, hld: HLDDesign, r_graph: RequirementGraph, b_graph: BehaviorGraph) -> Tuple[bool, List[str]]:
         errors = []
 
-        # 1. Traceability Check: Every requirement capability must belong to at least one module
+        # Gate 1: Traceability Check — Every functional capability maps to an HLD module
         compiled_caps = set()
         for mod in hld.modules:
             compiled_caps.update(mod.owned_capabilities)
@@ -185,7 +241,7 @@ class HLDValidator:
             if req.kind == RequirementKind.FUNCTIONAL and req.capability not in compiled_caps:
                 errors.append(f"[HLD-VAL-TRACEABILITY] Requirement {req.id} ({req.capability}) has no owner module in HLD.")
 
-        # 2. Entity Ownership Check: Every entity must be owned by exactly one primary module
+        # Gate 2: Ownership Check — Every entity owned by exactly one primary module
         entity_owners: Dict[str, List[str]] = {}
         for mod in hld.modules:
             for ent in mod.owned_entities:
@@ -197,9 +253,32 @@ class HLDValidator:
             if len(owners) > 1:
                 errors.append(f"[HLD-VAL-OWNERSHIP] Entity '{ent}' is co-owned by multiple modules: {', '.join(owners)}.")
 
-        # 3. ADR Coverage Check: Must contain at least one ADR for system topology
-        if not hld.adrs:
-            errors.append("[HLD-VAL-ADR] High-Level Design lacks mandatory Architecture Decision Records (ADRs).")
+        # Gate 3: ADR Coverage Check — Topology ADR must exist
+        if not any(a.id == "ADR-001" for a in hld.adrs):
+            errors.append("[HLD-VAL-ADR] High-Level Design lacks mandatory Topology Architecture Decision Record (ADR-001).")
+
+        # Gate 4: Security Authorization Coverage Check — State-changing commands require auth edges or policies
+        for b_node in b_graph.nodes.values():
+            if b_node.behavior_type == BehaviorNodeType.COMMAND and b_node.from_state:
+                incoming_edges = b_graph._reverse_adjacency.get(b_node.id, [])
+                has_auth = any(e.relation in [BehaviorRelationType.PERFORMS, BehaviorRelationType.AUTHORIZED_FOR] for e in incoming_edges)
+                if not has_auth:
+                    errors.append(f"[HLD-VAL-SECURITY] Command {b_node.id} ({b_node.name}) lacks actor PERFORMS/AUTHORIZED_FOR edge.")
+
+        # Gate 5: Workflow State Match Check — Pre/post states match requirement IR
+        for req in r_graph.nodes.values():
+            if req.preconditions:
+                b_node = b_graph.get_node(req.capability)
+                if b_node and b_node.from_state:
+                    expected_pre = f"{b_node.target_entity_id}.status == {b_node.from_state.upper()}"
+                    if expected_pre not in req.preconditions:
+                        errors.append(f"[HLD-VAL-WORKFLOW] Requirement {req.id} precondition mismatch for {req.capability}.")
+
+        # Gate 6: NFR Mitigation Check — Auditability NFRs must map to derived audit capability
+        for req in r_graph.nodes.values():
+            if req.kind == RequirementKind.NON_FUNCTIONAL and req.nfr_category == NFRCategory.AUDITABILITY:
+                if not any(req.capability in mod.owned_capabilities for mod in hld.modules):
+                    errors.append(f"[HLD-VAL-NFR] Auditability NFR {req.id} ({req.capability}) lacks architectural module mitigation.")
 
         passed = len(errors) == 0
         return passed, errors
