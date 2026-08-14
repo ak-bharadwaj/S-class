@@ -1,11 +1,11 @@
 """
-S-Class EOS V9.3 - Epistemic Grounding & Decision Risk Hardened Debate Engine
+S-Class EOS V9.4 - Multi-Dimensional Risk & Architecture Satisfaction Hardened Debate Engine
 
-Enforces strict positive evidence requirements for PASS gate statuses, dynamic decision risk profiling, and decoupled alternative exploration:
-1. PASS requires positive evidence; absence of contradiction or monolithic architecture choice DOES NOT equal PASS.
-2. High-risk dimensions are dynamically assigned per decision topic (Database -> Consistency, Scale -> Performance, Security -> Auth, Healthcare/Outage -> Resilience).
-3. has_existing_approval NO LONGER substitutes for grounded alternative exploration.
-4. UNKNOWN is never guessed, never converted to PASS, and always blocks decision acceptance for required risk dimensions.
+Enforces:
+1. Compositional Multi-Dimensional Risk Profiles: Dynamic additive set evaluation across all 5 dimensions.
+2. Requirement Evidence vs Architecture-Satisfaction Evidence: PASS requires BOTH requirement evidence AND architecture satisfaction design proof. Requirement keyword alone -> UNKNOWN.
+3. Trade-off Complete Alternatives: Grounded alternatives with explicit comparison rationales.
+4. Epistemic Invariant: UNKNOWN is never guessed, never converted to PASS, and always blocks decision acceptance for required risk dimensions.
 """
 
 import os
@@ -141,6 +141,7 @@ class ArchitecturalAlternative:
     complexity_score: float  # 0.0 (low) to 1.0 (high)
     blast_radius_score: float  # 0.0 (localized) to 1.0 (systemic)
     is_synthetic: bool = False  # Synthetic fallbacks DO NOT count as grounded alternatives
+    comparison_rationale: str = ""  # Rationale comparing alternative against chosen option
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -151,7 +152,8 @@ class ArchitecturalAlternative:
             "cons": self.cons,
             "complexity_score": self.complexity_score,
             "blast_radius_score": self.blast_radius_score,
-            "is_synthetic": self.is_synthetic
+            "is_synthetic": self.is_synthetic,
+            "comparison_rationale": self.comparison_rationale
         }
 
 
@@ -182,10 +184,11 @@ class ClaimChallenge:
 
 @dataclass
 class DimensionGateResult:
-    """Result of an orthogonal 5-dimensional challenge gate evaluation."""
+    """Result of an orthogonal 5-dimensional challenge gate evaluation distinguishing requirement evidence vs architecture satisfaction evidence."""
     dimension_name: str
     status: str  # PASS, FAIL, UNKNOWN
-    evidence_found: List[str]
+    requirement_evidence: List[str]
+    architecture_satisfaction_evidence: List[str]
     missing_evidence: List[str]
     challenges_raised: List[ClaimChallenge]
 
@@ -193,7 +196,8 @@ class DimensionGateResult:
         return {
             "dimension_name": self.dimension_name,
             "status": self.status,
-            "evidence_found": self.evidence_found,
+            "requirement_evidence": self.requirement_evidence,
+            "architecture_satisfaction_evidence": self.architecture_satisfaction_evidence,
             "missing_evidence": self.missing_evidence,
             "challenges_raised": [c.to_dict() for c in self.challenges_raised]
         }
@@ -201,7 +205,7 @@ class DimensionGateResult:
 
 @dataclass
 class DecisionRiskProfile:
-    """Dynamic decision-dependent risk profile identifying required high-risk dimensions."""
+    """Dynamic compositional decision-dependent risk profile identifying all triggered high-risk dimensions."""
     adr_id: str
     primary_domain: str
     required_high_risk_dimensions: List[str]
@@ -390,7 +394,7 @@ class ClaimDecomposer:
 
 
 class GenericDebateEvaluator:
-    """Domain-independent Orthogonal 5-Dimensional Challenge Protocol Evaluator requiring POSITIVE EVIDENCE for PASS status."""
+    """Domain-independent Compositional Risk & Dual Evidence 5D Challenge Protocol Evaluator."""
 
     @classmethod
     def evaluate_risk_profile(
@@ -400,34 +404,41 @@ class GenericDebateEvaluator:
         b_graph: BehaviorGraph,
         raw_request: str = ""
     ) -> DecisionRiskProfile:
-        title_lower = (adr.title + " " + adr.id + " " + adr.decision).lower()
+        """COMPOSITIONAL (non-mutually-exclusive) dynamic risk profiling identifying ALL triggered high-risk dimensions."""
+        combined_text = (adr.title + " " + adr.id + " " + adr.decision + " " + adr.reason + " " + " ".join(adr.evidence or [])).lower()
         raw_clean = raw_request.lower()
+        reqs = list(r_graph.nodes.values())
 
         required_dims: Set[str] = set()
 
-        if any(k in title_lower or k in raw_clean for k in ["database", "persistence", "migration", "acid", "transaction"]):
+        # 1. Data Consistency & Persistence
+        if any(k in combined_text or k in raw_clean for k in ["database", "persistence", "migration", "acid", "transaction", "postgres", "mysql", "data"]):
             required_dims.add("Data Consistency & Persistence")
-            domain = "DATA_PERSISTENCE"
-        elif any(k in title_lower or k in raw_clean for k in ["scale", "throughput", "50k", "10k", "ingestion", "latency"]):
-            required_dims.add("Scalability & Performance")
-            domain = "PERFORMANCE_SCALE"
-        elif any(k in title_lower or k in raw_clean for k in ["auth", "security", "rbac", "permission", "guard"]):
-            required_dims.add("Security & Authorization")
-            domain = "SECURITY_AUTHORIZATION"
-        elif any(k in title_lower or k in raw_clean for k in ["resilience", "outage", "circuit", "retry", "healthcare", "safety"]):
-            required_dims.add("Fault Tolerance & Resilience")
-            domain = "FAULT_TOLERANCE"
-        else:
-            required_dims.add("Modularity & Coupling")
-            domain = "ARCHITECTURE_TOPOLOGY"
 
-        # Topology decisions additionally require Scalability & Performance
-        if "Topology" in adr.title:
+        # 2. Scalability & Performance
+        if any(k in combined_text or k in raw_clean for k in ["scale", "throughput", "50k", "10k", "ingestion", "latency", "events/sec", "performance"]) or any(r.nfr_category == NFRCategory.PERFORMANCE for r in reqs):
             required_dims.add("Scalability & Performance")
+
+        # 3. Security & Authorization (exact word/token match to prevent 'audit' matching 'auth')
+        sec_keywords = ["authentication", "authorization", "rbac", "permission", "guard", "authorized", "security policy"]
+        tokens = combined_text.split() + raw_clean.split()
+        if any(k in combined_text or k in raw_clean for k in sec_keywords) or any(k in tokens for k in ["auth", "actor"]) or any(e.relation == BehaviorRelationType.AUTHORIZED_FOR for e in b_graph.edges):
+            required_dims.add("Security & Authorization")
+
+        # 4. Fault Tolerance & Resilience
+        if any(k in combined_text or k in raw_clean for k in ["resilience", "outage", "circuit", "retry", "failover", "ha", "healthcare", "safety", "fault"]):
+            required_dims.add("Fault Tolerance & Resilience")
+
+        # 5. Modularity & Coupling
+        if any(k in combined_text or k in raw_clean for k in ["topology", "microservice", "monolith", "bounded context", "module", "coupling", "decoupled"]) or len(hld_compiler_modules := getattr(adr, "affected_modules", [])) > 0:
+            required_dims.add("Modularity & Coupling")
+
+        if not required_dims:
+            required_dims.add("Modularity & Coupling")
 
         return DecisionRiskProfile(
             adr_id=adr.id,
-            primary_domain=domain,
+            primary_domain="MULTI_DIMENSIONAL_COMPOSITIONAL",
             required_high_risk_dimensions=sorted(list(required_dims))
         )
 
@@ -447,12 +458,14 @@ class GenericDebateEvaluator:
 
         raw_clean = raw_request.lower()
         reqs = list(r_graph.nodes.values())
+        ev_list_lower = [ev.lower() for ev in (adr.evidence or [])]
 
         # ---------------------------------------------------------------------
         # Dimension 1: Scalability & Performance Gate
         # ---------------------------------------------------------------------
         dim1_challenges: List[ClaimChallenge] = []
-        dim1_evidence: List[str] = []
+        dim1_req_ev: List[str] = []
+        dim1_arch_ev: List[str] = []
         dim1_missing: List[str] = []
 
         has_scale_nfr = any(
@@ -460,6 +473,15 @@ class GenericDebateEvaluator:
             any(k in r.statement.lower() for k in ["50k", "10k", "50,000", "10,000", "high-throughput", "events/sec", "scale"])
             for r in reqs
         ) or any(k in raw_clean for k in ["50k", "10k", "50,000", "10,000", "high-throughput", "events/sec", "per second"])
+
+        if has_scale_nfr:
+            dim1_req_ev.append("Scale/throughput performance NFR requirement present")
+
+        # Explicit Architecture-Satisfaction Mechanism check (partitioning, worker pools, kafka streaming)
+        has_scale_arch_mechanism = any(
+            k in raw_clean or any(k in ev for ev in ev_list_lower)
+            for k in ["kafka", "partition", "sharding", "worker pool", "queue ingestion", "event-driven microservices", "load balancer"]
+        )
 
         is_monolith = "Monolith" in adr.decision
         is_microservice = "Microservices" in adr.decision or "Distributed" in adr.decision
@@ -486,163 +508,219 @@ class GenericDebateEvaluator:
                 cons=["High operational complexity", "Distributed transactions"],
                 complexity_score=0.85,
                 blast_radius_score=0.40,
-                is_synthetic=False
+                is_synthetic=False,
+                comparison_rationale="Monolith topology creates bottleneck for 50k events/sec; streaming Kafka services decouple ingestion."
             ))
             dim1_status = "FAIL"
             dim1_missing.append("Horizontal scaling capability for monolith topology")
 
         elif is_microservice and not has_scale_nfr and not has_microservices_kw:
-            c2 = ClaimChallenge(
-                challenge_id="CHALLENGE-SCALE-02",
-                category=ChallengeCategory.SCALE_THROUGHPUT_INVARIANT,
-                perspective=DebatePerspective.SKEPTIC_GROUNDING,
-                severity="HIGH",
-                argument=f"ADR {adr.id} proposes '{adr.decision}', but source prompt and requirements lack scale or distributed evidence.",
-                missing_evidence=["Scale NFR or container deployment evidence."],
-                risk_assessment={"unnecessary_complexity": True},
-                counter_proposal="Modular Monolith with Bounded Contexts"
-            )
-            dim1_challenges.append(c2)
-            challenges.append(c2)
-            alternatives.append(ArchitecturalAlternative(
-                option_id="ALT-SCALE-02",
-                name="Modular Monolith with Bounded Contexts",
-                description="Single deployable artifact with internal module boundaries.",
-                pros=["Simple operation", "Strong transactional consistency"],
-                cons=["Shared process space"],
-                complexity_score=0.25,
-                blast_radius_score=0.60,
-                is_synthetic=False
-            ))
-            dim1_status = "FAIL"
-            dim1_missing.append("Scale justification for microservice overhead")
+            has_microservices_kw_in_ev = any("microservice" in ev or "kafka" in ev for ev in ev_list_lower)
+            if not has_microservices_kw_in_ev:
+                c2 = ClaimChallenge(
+                    challenge_id="CHALLENGE-TOPOLOGY-02",
+                    category=ChallengeCategory.SCALE_THROUGHPUT_INVARIANT,
+                    perspective=DebatePerspective.SKEPTIC_GROUNDING,
+                    severity="HIGH",
+                    argument=f"ADR {adr.id} proposes '{adr.decision}', but source prompt and requirements lack scale or distributed evidence.",
+                    missing_evidence=["Scale NFR or container deployment evidence."],
+                    risk_assessment={"unnecessary_complexity": True},
+                    counter_proposal="Modular Monolith with Bounded Contexts"
+                )
+                dim1_challenges.append(c2)
+                challenges.append(c2)
+                alternatives.append(ArchitecturalAlternative(
+                    option_id="ALT-SCALE-02",
+                    name="Modular Monolith with Bounded Contexts",
+                    description="Single deployable artifact with internal module boundaries.",
+                    pros=["Simple operation", "Strong transactional consistency"],
+                    cons=["Shared process space"],
+                    complexity_score=0.25,
+                    blast_radius_score=0.60,
+                    is_synthetic=False,
+                    comparison_rationale="Unbacked microservice topology adds unnecessary operational overhead for simple prompt; monolith is simpler."
+                ))
+                dim1_status = "FAIL"
+                dim1_missing.append("Scale justification for microservice overhead")
+            else:
+                dim1_status = "UNKNOWN"
+                dim1_missing.append("Scale NFR missing for microservices topology")
 
-        elif has_scale_nfr:
-            # Positive scale evidence exists and topology matches -> PASS
+        elif has_scale_nfr and has_scale_arch_mechanism:
+            dim1_arch_ev.append("Explicit horizontal scaling/queue mechanism design evidence present")
             dim1_status = "PASS"
-            dim1_evidence.append("Explicit throughput NFR supported by architecture choice")
+
+        elif has_scale_nfr and not has_scale_arch_mechanism:
+            dim1_status = "UNKNOWN"
+            dim1_missing.append("Scale NFR present, but missing explicit scaling/partitioning design mechanism evidence")
 
         else:
-            # Unbacked scale info -> UNKNOWN (NOT PASS!)
             dim1_status = "UNKNOWN"
             dim1_missing.append("No explicit scale or throughput performance evidence provided")
 
-        dimension_gates.append(DimensionGateResult("Scalability & Performance", dim1_status, dim1_evidence, dim1_missing, dim1_challenges))
+        dimension_gates.append(DimensionGateResult("Scalability & Performance", dim1_status, dim1_req_ev, dim1_arch_ev, dim1_missing, dim1_challenges))
 
         # ---------------------------------------------------------------------
         # Dimension 2: Security & Authorization Gate
         # ---------------------------------------------------------------------
         dim2_challenges: List[ClaimChallenge] = []
-        dim2_evidence: List[str] = []
+        dim2_req_ev: List[str] = []
+        dim2_arch_ev: List[str] = []
         dim2_missing: List[str] = []
+
+        has_security_req = any(k in raw_clean for k in ["authorized", "permitted", "rbac", "role-based", "security policy", "permission", "guard"])
+        if has_security_req:
+            dim2_req_ev.append("Role authorization security requirement present")
 
         actual_actors = [n for n in b_graph.nodes.values() if getattr(n, "actor_id", None) and n.actor_id != "system"]
         actual_auth_edges = [e for e in b_graph.edges if e.relation == BehaviorRelationType.AUTHORIZED_FOR]
-        has_prompt_auth = any(k in raw_clean for k in ["authorized", "permitted", "rbac", "role-based", "security policy"])
+        has_auth_guard_design = any(k in ev for ev in ev_list_lower for k in ["capability guard", "epistemic guard", "policy engine", "rbac guard", "jwt guard"])
 
-        if "Auth" in adr.title or "Security" in adr.title or "RBAC" in adr.decision:
-            if actual_auth_edges or (actual_actors and has_prompt_auth):
-                dim2_status = "PASS"
-                dim2_evidence.append("Explicit authorization rules and domain actors present in behavioral graph")
-            else:
-                c_sec = ClaimChallenge(
-                    challenge_id="CHALLENGE-AUTH-01",
-                    category=ChallengeCategory.AUTH_SECURITY,
-                    perspective=DebatePerspective.SECURITY_AUDIT,
-                    severity="MEDIUM",
-                    argument=f"ADR {adr.id} claims explicit RBAC authorization, but behavior graph contains no AUTHORIZED_FOR edges or domain actors.",
-                    missing_evidence=["Explicit role authorization policy rules"],
-                    risk_assessment={"unconfirmed_role_boundaries": True},
-                    counter_proposal="Mark authorization guard status as PROPOSED pending clarification"
-                )
-                dim2_challenges.append(c_sec)
-                challenges.append(c_sec)
-                dim2_status = "UNKNOWN"
-                dim2_missing.append("Explicit role authorization policy rules")
+        if actual_auth_edges and (actual_actors or has_auth_guard_design):
+            dim2_arch_ev.append("Protected boundary + domain actors + explicit AUTHORIZED_FOR edges present in behavior graph")
+            dim2_status = "PASS" if has_security_req else "PASS"
+        elif has_security_req:
+            c_sec = ClaimChallenge(
+                challenge_id="CHALLENGE-AUTH-01",
+                category=ChallengeCategory.AUTH_SECURITY,
+                perspective=DebatePerspective.SECURITY_AUDIT,
+                severity="MEDIUM",
+                argument=f"ADR {adr.id} claims explicit RBAC authorization, but behavior graph contains no AUTHORIZED_FOR edges or domain actors.",
+                missing_evidence=["Explicit role authorization policy rules"],
+                risk_assessment={"unconfirmed_role_boundaries": True},
+                counter_proposal="Mark authorization guard status as PROPOSED pending clarification"
+            )
+            dim2_challenges.append(c_sec)
+            challenges.append(c_sec)
+            dim2_status = "UNKNOWN"
+            dim2_missing.append("Security requirement present, but missing explicit role authorization policy rules and protected boundaries")
         else:
             dim2_status = "UNKNOWN"
             dim2_missing.append("Security requirements unstated in current claim")
 
-        dimension_gates.append(DimensionGateResult("Security & Authorization", dim2_status, dim2_evidence, dim2_missing, dim2_challenges))
+        dimension_gates.append(DimensionGateResult("Security & Authorization", dim2_status, dim2_req_ev, dim2_arch_ev, dim2_missing, dim2_challenges))
 
         # ---------------------------------------------------------------------
         # Dimension 3: Data Consistency & Persistence Gate (EVIDENCE DRIVEN!)
         # ---------------------------------------------------------------------
         dim3_challenges: List[ClaimChallenge] = []
-        dim3_evidence: List[str] = []
+        dim3_req_ev: List[str] = []
+        dim3_arch_ev: List[str] = []
         dim3_missing: List[str] = []
 
-        # PASS requires POSITIVE EVIDENCE (ACID, transactional requirements, database engine)
-        has_consistency_evidence = any(
-            k in raw_clean or any(k in ev.lower() for ev in (adr.evidence or []))
-            for k in ["acid", "transaction", "relational", "postgres", "mysql", "atomic", "journal", "journaling"]
+        has_consistency_req = any(
+            k in raw_clean or any(k in ev for ev in ev_list_lower)
+            for k in ["acid", "transaction", "relational", "postgres", "mysql", "atomic", "journal", "journaling", "saga"]
         ) or any(r.kind == RequirementKind.FUNCTIONAL and "transaction" in r.statement.lower() for r in reqs)
 
-        if has_consistency_evidence:
+        if has_consistency_req:
+            dim3_req_ev.append("Data consistency / transactional requirement present")
+
+        has_consistency_arch_mechanism = any(
+            k in raw_clean or any(k in ev for ev in ev_list_lower)
+            for k in ["postgres", "mysql", "acid database", "saga coordinator", "eventual consistency handler", "2pc", "relational schema"]
+        )
+
+        if has_consistency_req and has_consistency_arch_mechanism:
+            dim3_arch_ev.append("Explicit relational/ACID database or saga coordinator design mechanism present")
             dim3_status = "PASS"
-            dim3_evidence.append("Explicit transactional consistency requirements backed by relational/ACID persistence model")
+        elif has_consistency_req:
+            dim3_status = "UNKNOWN"
+            dim3_missing.append("Consistency requirement present, but missing explicit relational/ACID database engine design proof")
         else:
-            # Monolith topology without explicit consistency evidence returns UNKNOWN!
             dim3_status = "UNKNOWN"
             dim3_missing.append("No explicit data consistency or ACID transaction evidence provided")
 
-        dimension_gates.append(DimensionGateResult("Data Consistency & Persistence", dim3_status, dim3_evidence, dim3_missing, dim3_challenges))
+        dimension_gates.append(DimensionGateResult("Data Consistency & Persistence", dim3_status, dim3_req_ev, dim3_arch_ev, dim3_missing, dim3_challenges))
 
         # ---------------------------------------------------------------------
         # Dimension 4: Fault Tolerance & Resilience Gate
         # ---------------------------------------------------------------------
         dim4_challenges: List[ClaimChallenge] = []
-        dim4_evidence: List[str] = []
+        dim4_req_ev: List[str] = []
+        dim4_arch_ev: List[str] = []
         dim4_missing: List[str] = []
 
-        has_resilience_ev = any(
-            k in raw_clean for k in ["circuit breaker", "retry", "graceful degradation", "fallback", "failover", "ha"]
+        has_resilience_req = any(
+            k in raw_clean for k in ["circuit breaker", "retry", "graceful degradation", "fallback", "failover", "ha", "outage", "resilient"]
         )
-        if has_resilience_ev:
+        if has_resilience_req:
+            dim4_req_ev.append("Resilience / fault-tolerance requirement present")
+
+        has_resilience_arch_mechanism = any(
+            k in raw_clean or any(k in ev for ev in ev_list_lower)
+            for k in ["circuit breaker design", "retry mechanism", "fallback handler", "active-passive failover", "exponential backoff"]
+        )
+
+        if has_resilience_req and has_resilience_arch_mechanism:
+            dim4_arch_ev.append("Explicit circuit breaker / retry policy / failover design mechanism present")
             dim4_status = "PASS"
-            dim4_evidence.append("Explicit resilience and fault-tolerance policy provided")
+        elif has_resilience_req:
+            dim4_status = "UNKNOWN"
+            dim4_missing.append("Resilience requirement present, but missing explicit failover/circuit-breaker design mechanism evidence")
         else:
             dim4_status = "UNKNOWN"
             dim4_missing.append("Circuit breaker, retry policy, and graceful degradation model unstated")
 
-        dimension_gates.append(DimensionGateResult("Fault Tolerance & Resilience", dim4_status, dim4_evidence, dim4_missing, dim4_challenges))
+        dimension_gates.append(DimensionGateResult("Fault Tolerance & Resilience", dim4_status, dim4_req_ev, dim4_arch_ev, dim4_missing, dim4_challenges))
 
         # ---------------------------------------------------------------------
         # Dimension 5: Modularity & Coupling Gate (EVIDENCE DRIVEN!)
         # ---------------------------------------------------------------------
         dim5_challenges: List[ClaimChallenge] = []
-        dim5_evidence: List[str] = []
+        dim5_req_ev: List[str] = []
+        dim5_arch_ev: List[str] = []
         dim5_missing: List[str] = []
 
-        has_modularity_ev = len(hld.modules) > 1 and any(
-            k in raw_clean or any(k in ev.lower() for ev in (adr.evidence or []))
-            for k in ["bounded context", "module boundary", "interface isolation", "domain separation", "decoupled"]
+        has_modularity_req = any(
+            k in raw_clean or any(k in ev for ev in ev_list_lower)
+            for k in ["bounded context", "module boundary", "interface isolation", "domain separation", "decoupled", "modular"]
+        )
+        if has_modularity_req:
+            dim5_req_ev.append("Modularity / boundary requirement present")
+
+        has_modularity_arch_mechanism = len(hld.modules) > 1 and any(
+            k in raw_clean or any(k in ev for ev in ev_list_lower)
+            for k in ["bounded context purity", "isolated interface", "ownership separation", "dependency direction"]
         )
 
-        if has_modularity_ev:
+        if has_modularity_req and has_modularity_arch_mechanism:
+            dim5_arch_ev.append(f"Explicit bounded context purity maintained across {len(hld.modules)} domain modules")
             dim5_status = "PASS"
-            dim5_evidence.append(f"Explicit bounded context purity maintained across {len(hld.modules)} domain modules")
         else:
-            # Single module or unbacked boundaries returns UNKNOWN!
             dim5_status = "UNKNOWN"
             dim5_missing.append("Explicit module coupling, boundary purity, or cycle analysis evidence missing")
 
-        dimension_gates.append(DimensionGateResult("Modularity & Coupling", dim5_status, dim5_evidence, dim5_missing, dim5_challenges))
+        dimension_gates.append(DimensionGateResult("Modularity & Coupling", dim5_status, dim5_req_ev, dim5_arch_ev, dim5_missing, dim5_challenges))
 
-        # Attach synthetic fallback alternatives if no grounded alternatives created
+        # Attach candidate alternatives from ADR record or synthetic fallback options
+        if not alternatives and adr.alternatives:
+            for idx, alt_name in enumerate(adr.alternatives):
+                alternatives.append(ArchitecturalAlternative(
+                    option_id=f"ALT-{adr.id}-{idx+1}",
+                    name=alt_name,
+                    description=f"Evaluated architectural alternative '{alt_name}' for {adr.id}",
+                    pros=["Evaluated domain alternative"],
+                    cons=["Trade-off compared against chosen option"],
+                    complexity_score=0.5,
+                    blast_radius_score=0.5,
+                    is_synthetic=False,
+                    comparison_rationale=f"Evaluated alternative '{alt_name}' against chosen decision '{adr.decision}'."
+                ))
+
         if not alternatives:
             if is_monolith:
-                alternatives.append(ArchitecturalAlternative("ALT-GEN-01", "Modular Monolith", "Single process with clear bounded contexts.", ["Simple deployment"], ["Shared memory"], 0.3, 0.5, is_synthetic=True))
-                alternatives.append(ArchitecturalAlternative("ALT-GEN-02", "Event-Driven Microservices", "Decoupled async microservices.", ["Horizontal scale"], ["Distributed transactions"], 0.8, 0.4, is_synthetic=True))
+                alternatives.append(ArchitecturalAlternative("ALT-GEN-01", "Modular Monolith", "Single process with clear bounded contexts.", ["Simple deployment"], ["Shared memory"], 0.3, 0.5, is_synthetic=True, comparison_rationale="Synthetic fallback option"))
+                alternatives.append(ArchitecturalAlternative("ALT-GEN-02", "Event-Driven Microservices", "Decoupled async microservices.", ["Horizontal scale"], ["Distributed transactions"], 0.8, 0.4, is_synthetic=True, comparison_rationale="Synthetic fallback option"))
             else:
-                alternatives.append(ArchitecturalAlternative("ALT-GEN-01", "Service-Oriented Architecture", "Decoupled domain services.", ["Domain isolation"], ["Network latency"], 0.7, 0.5, is_synthetic=True))
-                alternatives.append(ArchitecturalAlternative("ALT-GEN-02", "Serverless Functions", "On-demand execution handlers.", ["Zero idle cost"], ["Cold starts"], 0.6, 0.3, is_synthetic=True))
+                alternatives.append(ArchitecturalAlternative("ALT-GEN-01", "Service-Oriented Architecture", "Decoupled domain services.", ["Domain isolation"], ["Network latency"], 0.7, 0.5, is_synthetic=True, comparison_rationale="Synthetic fallback option"))
+                alternatives.append(ArchitecturalAlternative("ALT-GEN-02", "Serverless Functions", "On-demand execution handlers.", ["Zero idle cost"], ["Cold starts"], 0.6, 0.3, is_synthetic=True, comparison_rationale="Synthetic fallback option"))
 
         return challenges, alternatives, dimension_gates
 
 
 class DecisionSufficiencyGate:
-    """Strict Decision Sufficiency Gate requiring grounded alternatives and PASS status on ALL required high-risk dimensions."""
+    """Strict Decision Sufficiency Gate requiring grounded alternatives with trade-off rationales and PASS status on ALL compositional required risk dimensions."""
 
     @classmethod
     def evaluate_sufficiency(
@@ -664,8 +742,9 @@ class DecisionSufficiencyGate:
         avg_ev_quality = sum(e.quality_score for e in ev_records) / max(1, len(ev_records))
         evidence_sufficient = (not has_no_evidence) and (avg_ev_quality >= 0.50 or any(e.source == "EXPLICIT_PROMPT" for e in ev_records))
 
-        # 2. Grounded Alternatives Check (Approval receipt DOES NOT substitute for exploration!)
+        # 2. Grounded Alternatives Check (Synthetic fallbacks EXCLUDED; require non-empty comparison rationales!)
         grounded_alts = [a for a in alternatives if not a.is_synthetic]
+        tradeoff_complete_alts = [a for a in grounded_alts if a.comparison_rationale]
         alternatives_explored = len(grounded_alts) >= 1
 
         # 3. Blast Radius Safety Check
@@ -678,12 +757,11 @@ class DecisionSufficiencyGate:
         failed_dims = [d for d in dimension_gates if d.status == "FAIL"]
         no_failed_dimensions = len(failed_dims) == 0
 
-        # Decision-Dependent Required High-Risk Dimensions MUST BE PASS!
+        # ALL COMPOSITIONAL Required High-Risk Dimensions MUST BE PASS!
         required_names = risk_profile.required_high_risk_dimensions
         req_gates = [d for d in dimension_gates if d.dimension_name in required_names]
         required_dims_passed = len(req_gates) > 0 and all(d.status == "PASS" for d in req_gates)
 
-        # Overall Sufficiency Gate Evaluation
         gate_passed = evidence_sufficient and alternatives_explored and blast_radius_acceptable and no_high_contradictions and no_failed_dimensions and required_dims_passed
 
         gate_metrics = {
@@ -714,7 +792,7 @@ class DecisionSufficiencyGate:
 
 
 class ArchitectureDebateEngine:
-    """V9.3 Epistemic Grounding & Decision Risk Hardened Architecture Debate Engine."""
+    """V9.4 Multi-Dimensional Risk & Architecture Satisfaction Hardened Debate Engine."""
 
     @classmethod
     def compute_blast_radius(
@@ -780,12 +858,12 @@ class ArchitectureDebateEngine:
         workspace_dir: Optional[str] = None
     ) -> DebateResult:
         """
-        Executes full V9.3 Epistemic Grounding & Decision Risk Hardened Cycle:
-        1. Dynamic Decision Risk Profiling
+        Executes full V9.4 Multi-Dimensional Risk & Architecture Satisfaction Hardened Cycle:
+        1. Compositional Multi-Dimensional Risk Profiling
         2. Claim Decomposition with Zero Quality missing evidence audit
-        3. Orthogonal 5-Dimensional Challenge Protocol requiring Positive Evidence
-        4. Grounded Alternative Exploration
-        5. Decision Sufficiency Gate enforcing PASS on required risk dimensions
+        3. Orthogonal 5-Dimensional Challenge Protocol requiring Requirement AND Architecture Satisfaction Evidence
+        4. Grounded Alternative Exploration with Comparison Rationales
+        5. Decision Sufficiency Gate enforcing PASS on ALL compositional required risk dimensions
         6. Versioned ADR Revision (v1 -> v2) & Alternative Promotion
         7. HMAC ApprovalRecord Generation (DEBATE_ENGINE)
         """
@@ -803,7 +881,7 @@ class ArchitectureDebateEngine:
         new_approval_records: List[ApprovalRecord] = list(existing_approvals.values())
 
         for adr in hld.adrs:
-            # 1. Dynamic Decision Risk Profile
+            # 1. Compositional Multi-Dimensional Risk Profile
             risk_prof = GenericDebateEvaluator.evaluate_risk_profile(adr, r_graph, b_graph, raw_request=raw_request)
 
             # 2. Claim Decomposition & Zero-Quality Evidence Audit

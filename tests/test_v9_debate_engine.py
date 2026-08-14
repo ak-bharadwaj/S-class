@@ -1,13 +1,12 @@
 """
-S-Class EOS V9.3 - Epistemic Grounding & Decision Risk Hardened Test Suite
+S-Class EOS V9.4 - Multi-Dimensional Risk & Architecture Satisfaction Hardened Test Suite
 
 Validates:
-1. Monolith topology without explicit consistency evidence MUST return UNKNOWN Data Consistency gate (NOT PASS).
-2. Single module without explicit modularity evidence MUST return UNKNOWN Modularity gate (NOT PASS).
-3. Approved decision WITHOUT grounded alternatives MUST FAIL sufficiency gate (returns INSUFFICIENT_DEBATE).
-4. Explicit consistency/ACID evidence returns PASS for Data Consistency gate.
-5. Dynamic Decision Risk Profiling assigns required high-risk dimensions based on decision topic/domain.
-6. Required UNKNOWN dimensions block decision acceptance.
+1. Compositional Multi-Dimensional Risk Profile requires ALL matching dimensions for multi-domain ADRs.
+2. Requirement presence alone WITHOUT explicit architecture-satisfaction mechanism evidence returns UNKNOWN (or FAIL on structural contradiction).
+3. Requirement presence WITH explicit architecture-satisfaction mechanism evidence returns PASS.
+4. Failover/Resilience requirement without failover design mechanism returns UNKNOWN Resilience gate.
+5. End-to-end V9.4 debate cycle enforces compositional risk gates and trade-off comparison rationales.
 """
 
 import os
@@ -43,89 +42,132 @@ from architecture_debate import (
 import runtime
 
 
-def test_monolith_without_consistency_evidence_returns_unknown_consistency_gate():
-    """Adversarial Test 1: Monolith topology without explicit consistency evidence MUST return UNKNOWN Data Consistency gate (NOT PASS!)."""
+def test_compositional_risk_profile_requires_all_matching_dimensions():
+    """Adversarial Test 1: Dynamic risk profile MUST be compositional (additive), requiring all matching dimensions for a multi-domain ADR."""
     r_graph = RequirementGraph()
     b_graph = BehaviorGraph()
-    mod = HLDModule(id="mod_1", name="Core Context", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["act"])
-    adr = ADRRecord("ADR-001", "Database Persistence Selection", "Modular Monolith", [], ["General context"], ["mod_1"], [], "Monolith choice", "PROPOSED", 0.50, EpistemicStatus.PROPOSED)
-    hld = HLDDesign(system_name="TestSys", architecture_style="Monolith", modules=[mod], adrs=[adr])
-
-    claim = ClaimDecomposer.decompose_adr_to_claim(adr, r_graph, b_graph, raw_request="Item inventory list")
-    challenges, alternatives, dim_gates = GenericDebateEvaluator.evaluate_5d_challenges(claim, adr, hld, r_graph, b_graph, raw_request="Item inventory list")
-
-    dc_gate = next(d for d in dim_gates if d.dimension_name == "Data Consistency & Persistence")
-    assert dc_gate.status == "UNKNOWN"
-    assert "No explicit data consistency or ACID transaction evidence provided" in dc_gate.missing_evidence
-
-
-def test_single_module_without_boundary_evidence_returns_unknown_modularity_gate():
-    """Adversarial Test 2: Single HLD module without explicit boundary evidence MUST return UNKNOWN Modularity gate (NOT PASS!)."""
-    r_graph = RequirementGraph()
-    b_graph = BehaviorGraph()
-    mod = HLDModule(id="mod_1", name="Core Context", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["act"])
-    adr = ADRRecord("ADR-001", "Topology Selection", "Modular Monolith", [], ["General context"], ["mod_1"], [], "Single module", "PROPOSED", 0.50, EpistemicStatus.PROPOSED)
-    hld = HLDDesign(system_name="TestSys", architecture_style="Monolith", modules=[mod], adrs=[adr])
-
-    claim = ClaimDecomposer.decompose_adr_to_claim(adr, r_graph, b_graph, raw_request="")
-    challenges, alternatives, dim_gates = GenericDebateEvaluator.evaluate_5d_challenges(claim, adr, hld, r_graph, b_graph, raw_request="")
-
-    mod_gate = next(d for d in dim_gates if d.dimension_name == "Modularity & Coupling")
-    assert mod_gate.status == "UNKNOWN"
-
-
-def test_approved_decision_without_grounded_alternatives_fails_sufficiency_gate():
-    """Adversarial Test 3: Approval receipt NO LONGER substitutes for grounded alternative exploration (returns INSUFFICIENT_DEBATE)."""
-    synth_alt = ArchitecturalAlternative("ALT-GEN-01", "Modular Monolith", "Generic fallback", [], [], 0.3, 0.5, is_synthetic=True)
-    ev_record = EvidenceQualityRecord("EV-1", EvidenceState.DIRECT_EVIDENCE, "REQUIREMENT_GRAPH", "Grounded requirement", 0.90, 1.0, 0.90, 0.90)
-    claim = EngineeringClaim("CLAIM-1", "ADR-1", "Use Monolith", "Reason", [], [], [], [], [], [], [ev_record], "scale_throughput_invariant", 0.90)
-    blast = {"blast_radius_score": 0.40}
-    risk_prof = DecisionRiskProfile("ADR-1", "DATA_PERSISTENCE", ["Data Consistency & Persistence"])
-
-    dim_gates_pass = [
-        DimensionGateResult("Data Consistency & Persistence", "PASS", ["Matched"], [], [])
-    ]
-
-    # has_existing_approval = True BUT synthetic alternatives only -> MUST RETURN INSUFFICIENT_DEBATE!
-    outcome, confidence, metrics = DecisionSufficiencyGate.evaluate_sufficiency(
-        claim=claim,
-        challenges=[],
-        alternatives=[synth_alt],
-        blast_analysis=blast,
-        dimension_gates=dim_gates_pass,
-        risk_profile=risk_prof,
-        has_existing_approval=True
+    adr = ADRRecord(
+        id="ADR-001",
+        title="Migrate payment system to event-driven microservices",
+        decision="Event-Driven Microservices with Kafka and PostgreSQL",
+        alternatives=["Modular Monolith"],
+        evidence=["High throughput 50k events/sec", "ACID payment ledger", "RBAC security guards", "Failover retry policy"],
+        affected_modules=["mod_1", "mod_2"],
+        rejected_options=[],
+        reason="Payment system migration",
+        status="PROPOSED",
+        confidence=0.50,
+        epistemic_status=EpistemicStatus.PROPOSED
     )
 
-    assert metrics["alternatives_explored"] is False
-    assert outcome == DecisionOutcome.INSUFFICIENT_DEBATE
+    prof = GenericDebateEvaluator.evaluate_risk_profile(adr, r_graph, b_graph, raw_request="Migrate payment system with 50k events/sec, RBAC security, ACID transactions, and failover retries")
+
+    assert "Data Consistency & Persistence" in prof.required_high_risk_dimensions
+    assert "Scalability & Performance" in prof.required_high_risk_dimensions
+    assert "Security & Authorization" in prof.required_high_risk_dimensions
+    assert "Fault Tolerance & Resilience" in prof.required_high_risk_dimensions
+    assert "Modularity & Coupling" in prof.required_high_risk_dimensions
 
 
-def test_explicit_consistency_evidence_returns_pass_consistency_gate():
-    """Verify explicit ACID/relational database prompt evidence produces PASS for Data Consistency gate."""
+def test_requirement_presence_without_architecture_mechanism_returns_unknown_or_fail():
+    """Adversarial Test 2: Requirement presence without architecture mechanism returns UNKNOWN (or FAIL on structural contradiction)."""
     r_graph = RequirementGraph()
     b_graph = BehaviorGraph()
     mod = HLDModule(id="mod_1", name="Core Context", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["act"])
-    adr = ADRRecord("ADR-001", "Database Persistence Selection", "PostgreSQL Relational DB", [], ["Relational schema with ACID transactions"], ["mod_1"], [], "ACID requirements", "ACCEPTED", 0.95, EpistemicStatus.CONFIRMED)
-    hld = HLDDesign(system_name="TestSys", architecture_style="Monolith", modules=[mod], adrs=[adr])
+    
+    # 1. Structural contradiction (Monolith for 50k events/sec NFR) -> FAIL
+    adr_fail = ADRRecord("ADR-001", "Performance Strategy", "Modular Monolith", [], ["High throughput 50k events/sec required"], ["mod_1"], [], "Monolith choice", "PROPOSED", 0.50, EpistemicStatus.PROPOSED)
+    hld_fail = HLDDesign(system_name="TestSys", architecture_style="Monolith", modules=[mod], adrs=[adr_fail])
 
-    claim = ClaimDecomposer.decompose_adr_to_claim(adr, r_graph, b_graph, raw_request="PostgreSQL database with ACID transactions for financial ledger")
-    challenges, alternatives, dim_gates = GenericDebateEvaluator.evaluate_5d_challenges(claim, adr, hld, r_graph, b_graph, raw_request="PostgreSQL database with ACID transactions for financial ledger")
+    claim_fail = ClaimDecomposer.decompose_adr_to_claim(adr_fail, r_graph, b_graph, raw_request="High-throughput 50k events/sec required")
+    challenges_f, alternatives_f, dim_gates_f = GenericDebateEvaluator.evaluate_5d_challenges(claim_fail, adr_fail, hld_fail, r_graph, b_graph, raw_request="High-throughput 50k events/sec required")
 
-    dc_gate = next(d for d in dim_gates if d.dimension_name == "Data Consistency & Persistence")
-    assert dc_gate.status == "PASS"
-    assert "Explicit transactional consistency requirements" in dc_gate.evidence_found[0]
+    scale_gate_f = next(d for d in dim_gates_f if d.dimension_name == "Scalability & Performance")
+    assert scale_gate_f.status == "FAIL"
+
+    # 2. Scale NFR present without scaling mechanism evidence (and no monolith contradiction) -> UNKNOWN
+    adr_unk = ADRRecord("ADR-002", "Performance Strategy", "Standard Service", [], ["Scale throughput required"], ["mod_1"], [], "Default", "PROPOSED", 0.50, EpistemicStatus.PROPOSED)
+    hld_unk = HLDDesign(system_name="TestSys", architecture_style="Service", modules=[mod], adrs=[adr_unk])
+
+    claim_unk = ClaimDecomposer.decompose_adr_to_claim(adr_unk, r_graph, b_graph, raw_request="Scale throughput required")
+    challenges_u, alternatives_u, dim_gates_u = GenericDebateEvaluator.evaluate_5d_challenges(claim_unk, adr_unk, hld_unk, r_graph, b_graph, raw_request="Scale throughput required")
+
+    scale_gate_u = next(d for d in dim_gates_u if d.dimension_name == "Scalability & Performance")
+    assert scale_gate_u.status == "UNKNOWN"
 
 
-def test_dynamic_decision_risk_profiling_assigns_domain_specific_required_dimensions():
-    """Verify evaluate_risk_profile assigns domain-specific required high-risk dimensions."""
+def test_requirement_presence_with_architecture_mechanism_returns_pass():
+    """Verify requirement presence WITH explicit architecture-satisfaction mechanism evidence returns PASS."""
     r_graph = RequirementGraph()
     b_graph = BehaviorGraph()
+    mod = HLDModule(id="mod_1", name="Core Context", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["act"])
+    adr = ADRRecord(
+        id="ADR-001",
+        title="Event-driven scale ingestion",
+        decision="Kafka Streaming Microservices",
+        alternatives=["Modular Monolith"],
+        evidence=["High throughput 50k events/sec", "Kafka queue ingestion worker pool"],
+        affected_modules=["mod_1"],
+        rejected_options=[],
+        reason="Scale streaming",
+        status="ACCEPTED",
+        confidence=0.95,
+        epistemic_status=EpistemicStatus.CONFIRMED
+    )
+    hld = HLDDesign(system_name="TestSys", architecture_style="Microservices", modules=[mod], adrs=[adr])
 
-    adr_db = ADRRecord("ADR-001", "Database Migration Strategy", "PostgreSQL", [], [], ["mod_1"], [], "DB", "PROPOSED", 0.50, EpistemicStatus.PROPOSED)
-    prof_db = GenericDebateEvaluator.evaluate_risk_profile(adr_db, r_graph, b_graph, raw_request="")
-    assert "Data Consistency & Persistence" in prof_db.required_high_risk_dimensions
+    claim = ClaimDecomposer.decompose_adr_to_claim(adr, r_graph, b_graph, raw_request="High-throughput 50k events/sec with Kafka queue ingestion worker pool")
+    challenges, alternatives, dim_gates = GenericDebateEvaluator.evaluate_5d_challenges(claim, adr, hld, r_graph, b_graph, raw_request="High-throughput 50k events/sec with Kafka queue ingestion worker pool")
 
-    adr_sec = ADRRecord("ADR-002", "Role Authorization Guard", "RBAC", [], [], ["mod_1"], [], "Auth", "PROPOSED", 0.50, EpistemicStatus.PROPOSED)
-    prof_sec = GenericDebateEvaluator.evaluate_risk_profile(adr_sec, r_graph, b_graph, raw_request="")
-    assert "Security & Authorization" in prof_sec.required_high_risk_dimensions
+    scale_gate = next(d for d in dim_gates if d.dimension_name == "Scalability & Performance")
+    assert scale_gate.status == "PASS"
+    assert len(scale_gate.requirement_evidence) >= 1
+    assert len(scale_gate.architecture_satisfaction_evidence) >= 1
+
+
+def test_failover_requirement_without_failover_design_returns_unknown_resilience():
+    """Adversarial Test 3: Failover/Resilience requirement without failover design mechanism MUST return UNKNOWN Resilience gate."""
+    r_graph = RequirementGraph()
+    b_graph = BehaviorGraph()
+    mod = HLDModule(id="mod_1", name="Core Context", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["act"])
+    adr = ADRRecord("ADR-001", "System Resilience Strategy", "Modular Monolith", [], ["System must support failover and HA"], ["mod_1"], [], "Resilience", "PROPOSED", 0.50, EpistemicStatus.PROPOSED)
+    hld = HLDDesign(system_name="TestSys", architecture_style="Monolith", modules=[mod], adrs=[adr])
+
+    claim = ClaimDecomposer.decompose_adr_to_claim(adr, r_graph, b_graph, raw_request="System must support failover and HA")
+    challenges, alternatives, dim_gates = GenericDebateEvaluator.evaluate_5d_challenges(claim, adr, hld, r_graph, b_graph, raw_request="System must support failover and HA")
+
+    res_gate = next(d for d in dim_gates if d.dimension_name == "Fault Tolerance & Resilience")
+    assert res_gate.status == "UNKNOWN"
+    assert "Resilience requirement present, but missing explicit failover/circuit-breaker design mechanism evidence" in res_gate.missing_evidence[0]
+
+
+def test_end_to_end_v9_4_debate_cycle_with_compositional_risk_gates(tmp_path):
+    """Integration Test: V9.4 debate cycle evaluates compositional risk gates and records requirement vs architecture evidence lists."""
+    tmp_workspace = str(tmp_path)
+    os.environ["SCLASS_EXECUTION_MODE"] = "TEST"
+
+    r_graph = RequirementGraph()
+    b_graph = BehaviorGraph()
+    mod_1 = HLDModule(id="mod_1", name="Payment Context", system_boundary="internal", owned_entities=["Payment"], owned_capabilities=["pay"])
+    mod_2 = HLDModule(id="mod_2", name="Audit Context", system_boundary="internal", owned_entities=["AuditLog"], owned_capabilities=["log"])
+    adr = ADRRecord(
+        id="ADR-001",
+        title="Payment persistence and audit logging",
+        decision="PostgreSQL Relational DB with ACID transactions",
+        alternatives=["MongoDB Document Store"],  # Grounded alternative provided!
+        evidence=["Relational schema with ACID transactions", "PostgreSQL ACID database", "Bounded context purity across payment and audit modules"],
+        affected_modules=["mod_1", "mod_2"],
+        rejected_options=[],
+        reason="ACID transactions",
+        status="ACCEPTED",
+        confidence=0.95,
+        epistemic_status=EpistemicStatus.CONFIRMED
+    )
+    hld = HLDDesign(system_name="HLD-001", architecture_style="Monolith", modules=[mod_1, mod_2], adrs=[adr])
+
+    res = ArchitectureDebateEngine.run_debate_cycle(hld, r_graph, b_graph, raw_request="PostgreSQL relational database with ACID transactions and bounded context purity across payment and audit modules", workspace_dir=tmp_workspace)
+
+    assert len(res.decision_records) == 1
+    d_rec = res.decision_records[0]
+    assert "Data Consistency & Persistence" in d_rec.risk_profile["required_high_risk_dimensions"]
+    assert d_rec.decision_outcome in [DecisionOutcome.ACCEPT, DecisionOutcome.REVISE]

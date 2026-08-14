@@ -396,5 +396,21 @@
     ],
     "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
     "resolved": true
+  },
+  {
+    "id": "FAIL-PROSE-027",
+    "project": "Mutually Exclusive Risk Classification Trees & Conflation of Requirement Presence with Architecture Satisfaction",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-14T23:09:00Z",
+    "summary": "Debate engine assigned only single mutually exclusive risk domains to complex multi-domain decisions, conflated requirement presence (keywords) with architectural satisfaction proof, and accepted un-compared candidate alternatives.",
+    "root_cause": "mutually_exclusive_risk_trees_and_conflation_of_requirement_presence_with_architecture_satisfaction",
+    "missing_contracts": [
+      "compositional_multi_dimensional_risk_profiling",
+      "requirement_evidence_vs_architecture_satisfaction_evidence_separation",
+      "architecture_satisfaction_mechanism_proof_for_pass_status",
+      "tradeoff_complete_alternative_comparison_rationales"
+    ],
+    "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
+    "resolved": true
   }
 ]
