@@ -329,5 +329,22 @@
     ],
     "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
     "resolved": true
+  },
+  {
+    "id": "FAIL-PROSE-023",
+    "project": "Document-Level Generic Debate & Un-Signed Decision Audit",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-14T22:36:00Z",
+    "summary": "Debate engine operated over whole documents rather than fine-grained engineering claims, lacked multi-perspective Architect and Skeptic challenge auditing, lacked trade-off and blast-radius scoring, and produced unsigned decision output.",
+    "root_cause": "document_level_generic_debate_and_unsigned_decisions",
+    "missing_contracts": [
+      "engineering_claim_extraction",
+      "multi_perspective_architect_and_skeptic_challenges",
+      "tradeoff_and_blast_radius_analysis",
+      "decision_record_creation",
+      "hmac_debate_engine_approval_signing"
+    ],
+    "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
+    "resolved": true
   }
 ]

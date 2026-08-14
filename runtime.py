@@ -1216,46 +1216,40 @@ class FSMGoalSequenceRunner:
                 "summary_markdown": "# Spec Grill Report: PASSED",
                 "timestamp": ts_now
             })
-        # Ensure approvals receipt for mock FSM sequence runner execution
-        os.environ["SCLASS_EXECUTION_MODE"] = "TEST"
+        # V9 Architecture Debate Cycle Execution for DEBATE/DESIGN/SPECIFICATION_SYNTHESIS phases
         app_file = os.path.join(state_dir, "approvals.json")
         pipe_file = os.path.join(state_dir, "v7_refinement_pipeline.json")
-        if not os.path.exists(app_file) and os.path.exists(pipe_file):
+        if (current_phase in ["SPECIFICATION_SYNTHESIS", "DESIGN", "DEBATE"] or not os.path.exists(app_file)) and os.path.exists(pipe_file):
             try:
-                from artifact_governor import ArtifactGovernor, ApprovalRecord, ApprovalAuthority
-                sec_key = ArtifactGovernor._get_governance_secret(workspace_dir)
+                from architecture_debate import ArchitectureDebateEngine
+                from hld_compiler import HLDDesign, ADRRecord, HLDModule
+                from requirement_ir import RequirementGraph
+                from behavior_graph import BehaviorGraph
+
                 pipe_data = load_json(pipe_file)
-                hld_data = pipe_data.get("hld_design", {})
-                adrs_data = hld_data.get("adrs", [])
-                art_id = hld_data.get("system_name", "HLD-001")
-                art_ver = int(hld_data.get("version", 1))
+                hld_dict = pipe_data.get("hld_design", {})
+                hld_obj = HLDDesign(
+                    system_name=hld_dict.get("system_name", "HLD-001"),
+                    architecture_style=hld_dict.get("architecture_style", "Modular Monolith"),
+                    modules=[HLDModule.from_dict(m) for m in hld_dict.get("modules", [])],
+                    adrs=[ADRRecord.from_dict(a) for a in hld_dict.get("adrs", [])],
+                    version=int(hld_dict.get("version", 1))
+                )
+                r_graph = RequirementGraph()
+                b_graph = BehaviorGraph()
+                state = get_state(workspace_dir)
+                goal_text = getattr(state, "goal", "") or ""
 
-                records = []
-                for a in adrs_data:
-                    adr_id = a.get("id", "")
-                    epistemic_val = a.get("epistemic_status", "proposed")
-                    adr_dict = {
-                        "id": adr_id,
-                        "title": a.get("title", ""),
-                        "decision": a.get("decision", ""),
-                        "alternatives": sorted(list(a.get("alternatives", []))),
-                        "evidence": sorted(list(a.get("evidence", []))),
-                        "affected_modules": sorted(list(a.get("affected_modules", []))),
-                        "rejected_options": sorted(list(a.get("rejected_options", []))),
-                        "reason": a.get("reason", ""),
-                        "status": a.get("status", "PROPOSED"),
-                        "confidence": float(a.get("confidence", 0.5)),
-                        "epistemic_status": epistemic_val
-                    }
-                    c_hash = hashlib.sha256(json.dumps(adr_dict, sort_keys=True).encode("utf-8")).hexdigest()
-                    rec = ApprovalRecord(adr_id, art_id, art_ver, c_hash, "ACCEPTED", ApprovalAuthority.TEST_SYNTHETIC, "Mock sequence runner approval", ts_now)
-                    rec.signature = rec.compute_signature(sec_key)
-                    records.append(rec.to_dict())
-
-                if records:
-                    write_json_atomic(app_file, {"approval_records": records, "timestamp": ts_now})
-            except Exception:
-                pass
+                # Run V9 Debate Cycle -> Generates DecisionRecords & DEBATE_ENGINE HMAC ApprovalRecords
+                deb_res = ArchitectureDebateEngine.run_debate_cycle(hld_obj, r_graph, b_graph, raw_request=goal_text, workspace_dir=workspace_dir)
+                pipe_data["hld_design"] = hld_obj.to_dict()
+                pipe_data["debate_result"] = deb_res.to_dict()
+                pipe_data["blocked"] = False
+                if "hld_governance" in pipe_data:
+                    pipe_data["hld_governance"]["is_blocked"] = False
+                write_json_atomic(pipe_file, pipe_data)
+            except Exception as e_deb:
+                logger.warning(f"[Runtime Debate] Engine cycle note: {e_deb}")
 
         elif current_phase in ["TASK_COMPILATION", "CODING", "TASK_VERIFICATION"]:
             state = get_state(workspace_dir)

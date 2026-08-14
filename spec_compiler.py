@@ -560,9 +560,9 @@ class SpecificationCompiler:
         # 4a. HLD Validation Gate
         passed_hld, hld_errors = HLDValidator.validate_hld(hld, r_graph, b_graph)
 
-        # 4b. Architecture Debate Engine Audit
+        # 4b. V9 Architecture Debate & Decision Intelligence Engine Audit
         from architecture_debate import ArchitectureDebateEngine
-        debate_result = ArchitectureDebateEngine.debate_hld_adrs(hld, r_graph, b_graph, raw_request=raw_request)
+        debate_result = ArchitectureDebateEngine.run_debate_cycle(hld, r_graph, b_graph, raw_request=raw_request)
 
         # 4c. Artifact Governor HLD Control Plane Audit (Hard Execution Gate)
         from artifact_governor import ArtifactGovernor

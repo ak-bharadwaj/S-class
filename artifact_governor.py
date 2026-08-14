@@ -178,7 +178,9 @@ class ArtifactGovernor:
     @classmethod
     def _load_verified_approval_records(cls, workspace_dir: Optional[str] = None) -> Dict[str, ApprovalRecord]:
         """Loads and verifies HMAC-SHA256 cryptographic signatures of approval records in .agents/approvals.json."""
-        cwd = workspace_dir if workspace_dir else os.getcwd()
+        if not workspace_dir:
+            return {}
+        cwd = workspace_dir
         secret_key = cls._get_governance_secret(workspace_dir)
         app_file = os.path.join(cwd, ".agents", "approvals.json")
         verified_records: Dict[str, ApprovalRecord] = {}
