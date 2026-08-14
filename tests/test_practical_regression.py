@@ -39,14 +39,22 @@ def test_failure_log_loading_and_recording():
 
 
 def test_skeptic_rules_are_100_percent_grounded_in_failure_log():
-    """Verify that every rule checked in PracticalSkeptic maps 1:1 to a real logged failure case."""
+    """Verify exact bidirectional 1:1 match between PracticalSkeptic rules and logged failure cases."""
     cases = FailureLogManager.load_cases()
     logged_rule_ids = {c.skeptic_rule_id for c in cases}
-    
-    # Assert all core empirical rules exist in the failure cases
-    assert "SKEPTIC-PRISMA-SCHEMA-GROUNDING" in logged_rule_ids
-    assert "SKEPTIC-ROLE-ROUTE-GUARD" in logged_rule_ids
-    assert "SKEPTIC-FASTAPI-ASYNC-TYPING" in logged_rule_ids
+    active_skeptic_rules = set(PracticalSkeptic.ACTIVE_RULES)
+
+    # 1. No unbacked skeptic rules: Every active rule MUST trace to a logged real failure case
+    unbacked_rules = active_skeptic_rules - logged_rule_ids
+    assert not unbacked_rules, f"Skeptic rules without failure log backing: {unbacked_rules}"
+
+    # 2. No phantom failure rules: Every rule referenced in failure log MUST be actively implemented
+    unimplemented_rules = logged_rule_ids - active_skeptic_rules
+    assert not unimplemented_rules, f"Logged failure rules not implemented in PracticalSkeptic: {unimplemented_rules}"
+
+    # 3. Exact bidirectional set equality
+    assert active_skeptic_rules == logged_rule_ids
+    assert len(active_skeptic_rules) == 7
 
 
 def test_practical_skeptic_catches_vibecoded_mockup_fields():

@@ -1,13 +1,15 @@
 """
 S-Class Practical Skeptic (Real-World Project Failure Checklist)
 
-Enforces empirical quality checks derived directly from recorded real-world failures:
-- SKEPTIC-PRISMA-SCHEMA-GROUNDING & SKEPTIC-NO-VIBECODE-UI (SGDA 19-feature gap)
-- SKEPTIC-19-FEATURE-GAP-PREVENTION (Workflow vs shallow CRUD)
-- SKEPTIC-ROLE-ROUTE-GUARD (Role-scoped sitemaps and profile security)
-- SKEPTIC-NON-ENTITY-API (Detects adjectives/verbs hallucinated into REST endpoints)
-- SKEPTIC-FRONTEND-LEAKAGE-IN-BACKEND (Detects UI components hallucinated into pure CLI/FastAPI backends)
-- SKEPTIC-ROLE-EXTRACTION-SANITY (Detects non-actor nouns like 'college' extracted as roles)
+Enforces empirical quality checks derived directly from recorded real-world failures.
+Every single active rule in this class maps 1:1 to an empirical entry in regression_cases.json:
+- SKEPTIC-NO-VIBECODE-UI (FAIL-SGDA-001)
+- SKEPTIC-19-FEATURE-GAP (FAIL-SGDA-GAP-002)
+- SKEPTIC-FASTAPI-ASYNC-TYPING (FAIL-AMISRU-003)
+- SKEPTIC-FRONTEND-LEAKAGE-IN-BACKEND (FAIL-AMISRU-004)
+- SKEPTIC-ROLE-ROUTE-GUARD (FAIL-PORTAL-005)
+- SKEPTIC-ROLE-EXTRACTION-SANITY (FAIL-PORTAL-006)
+- SKEPTIC-NON-ENTITY-API (FAIL-SYNTH-007)
 """
 
 from typing import Dict, List, Set, Any, Optional, Tuple
@@ -17,7 +19,8 @@ INVALID_ENTITY_NAMES = {
     "fast", "quick", "slow", "complete", "simple", "easy", "complex", "hard", "full",
     "partial", "automated", "manual", "single", "multi", "great", "good", "new", "old",
     "best", "smart", "high", "low", "real", "time", "custom", "tool", "portal", "system",
-    "platform", "app", "application", "codebase", "make", "build", "add", "item", "items"
+    "platform", "app", "application", "codebase", "make", "build", "add", "item", "items",
+    "reads", "writes", "pushes", "pulls", "views", "view", "access", "accesses"
 }
 
 INVALID_ROLE_NAMES = {
@@ -29,8 +32,18 @@ INVALID_ROLE_NAMES = {
 class PracticalSkeptic:
     """
     Practical, real-world reviewer that validates specifications against
-    empirical failure modes from actual projects (Next.js/Prisma and Python/FastAPI).
+    empirical failure modes from actual projects (Next.js/Prisma, Python/FastAPI, and CLI tools).
     """
+
+    ACTIVE_RULES: Set[str] = {
+        "SKEPTIC-NO-VIBECODE-UI",
+        "SKEPTIC-19-FEATURE-GAP",
+        "SKEPTIC-FASTAPI-ASYNC-TYPING",
+        "SKEPTIC-FRONTEND-LEAKAGE-IN-BACKEND",
+        "SKEPTIC-ROLE-ROUTE-GUARD",
+        "SKEPTIC-ROLE-EXTRACTION-SANITY",
+        "SKEPTIC-NON-ENTITY-API"
+    }
 
     @classmethod
     def audit_specification(
@@ -51,7 +64,6 @@ class PracticalSkeptic:
         for lld_key, lld in low_level_designs.items():
             apis = lld.get("api_endpoints", [])
             for ep in apis:
-                # Split endpoint into discrete path tokens
                 url_path = ep.split()[1] if len(ep.split()) > 1 else ep
                 tokens = [t for t in re.split(r'[/_\-]', url_path.lower()) if t and not t.startswith('{')]
                 for token in tokens:
@@ -65,7 +77,7 @@ class PracticalSkeptic:
                         })
                         passed = False
 
-        # 2. SKEPTIC-ROLE-EXTRACTION-SANITY (Non-actor nouns parsed as roles)
+        # 2. SKEPTIC-ROLE-EXTRACTION-SANITY (Non-actor container nouns parsed as roles)
         for role in page_spreads.keys():
             if role.lower() in INVALID_ROLE_NAMES:
                 warnings.append(f"[SKEPTIC-ROLE-EXTRACTION-SANITY] Extracted role '{role}' is an organization/container, not a human actor.")
@@ -76,8 +88,8 @@ class PracticalSkeptic:
                 })
                 passed = False
 
-        # 3. SKEPTIC-FRONTEND-LEAKAGE-IN-BACKEND
-        if archetypes and any(a in ["cli_tool", "backend_api", "library_package"] for a in archetypes) and not any(a in ["fullstack", "web_frontend", "mobile_hybrid"] for a in archetypes):
+        # 3. SKEPTIC-FRONTEND-LEAKAGE-IN-BACKEND (UI components in pure CLI/FastAPI backends)
+        if archetypes and any(a in ["cli_tool", "backend_api", "library_package", "data_pipeline"] for a in archetypes) and not any(a in ["fullstack", "web_frontend", "mobile_hybrid"] for a in archetypes):
             ui_count = 0
             for lld in low_level_designs.values():
                 for comp in lld.get("sub_components", []):
@@ -91,7 +103,7 @@ class PracticalSkeptic:
                     "message": "Pure backend project should specify API contracts and schemas, not frontend UI components."
                 })
 
-        # 4. SKEPTIC-PRISMA-SCHEMA-GROUNDING & NO-VIBECODE-UI
+        # 4. SKEPTIC-NO-VIBECODE-UI (Generic mockup placeholder fields)
         generic_field_count = 0
         total_field_count = 0
         for lld_key, lld in low_level_designs.items():
@@ -109,7 +121,7 @@ class PracticalSkeptic:
                 "message": "Eliminate vibecoded placeholder fields; bind UI directly to domain attributes."
             })
 
-        # 5. SKEPTIC-19-FEATURE-GAP-PREVENTION (Workflow vs Shallow CRUD)
+        # 5. SKEPTIC-19-FEATURE-GAP (Operational workflows vs shallow CRUD)
         all_actions = []
         for lld in low_level_designs.values():
             for tab in lld.get("tabs", []):
@@ -129,8 +141,8 @@ class PracticalSkeptic:
                 "message": "Add explicit operational workflows to prevent shallow CRUD gap."
             })
 
-        # 6. SKEPTIC-ROLE-ROUTE-GUARD
-        if not (archetypes and any(a in ["cli_tool", "backend_api"] for a in archetypes)):
+        # 6. SKEPTIC-ROLE-ROUTE-GUARD (Missing /profile and self-security routes)
+        if not (archetypes and any(a in ["cli_tool", "backend_api", "data_pipeline"] for a in archetypes)):
             for role, pages in page_spreads.items():
                 routes = [p.get("route", "") for p in pages]
                 if "/profile" not in routes:
@@ -139,6 +151,19 @@ class PracticalSkeptic:
                         "rule_id": "SKEPTIC-ROLE-ROUTE-GUARD",
                         "severity": "INFO",
                         "message": f"Add /profile to {role} sitemap."
+                    })
+
+        # 7. SKEPTIC-FASTAPI-ASYNC-TYPING (FastAPI async session & response typing)
+        if archetypes and any(a in ["backend_api", "data_pipeline"] for a in archetypes) and not any(a in ["cli_tool"] for a in archetypes):
+            for lld_key, lld in low_level_designs.items():
+                apis = lld.get("api_endpoints", [])
+                val_rules = lld.get("validation_rules", [])
+                if apis and not any("async" in r.lower() or "pydantic" in r.lower() or "schema" in r.lower() for r in val_rules):
+                    warnings.append(f"[SKEPTIC-FASTAPI-ASYNC-TYPING] Backend API '{lld_key}' is missing async session dependency and response model typing contracts.")
+                    checks.append({
+                        "rule_id": "SKEPTIC-FASTAPI-ASYNC-TYPING",
+                        "severity": "INFO",
+                        "message": "Specify async DB session injection and Pydantic response models on API endpoints."
                     })
 
         return passed, warnings, checks

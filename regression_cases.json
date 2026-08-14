@@ -4,24 +4,37 @@
     "project": "SriGuruDrivingAcademy (SGDA)",
     "stack": "nextjs_prisma",
     "date_logged": "2026-08-10T14:30:00Z",
-    "summary": "19-feature gap audit: UI generated generic mockup cards instead of binding to real Prisma schema and driving curriculum models",
+    "summary": "UI generated generic mockup cards with placeholder fields instead of binding to real Prisma schema and driving curriculum models",
     "root_cause": "vibecoded_ui_scaffolding",
     "missing_contracts": [
       "student_lesson_progress_tracker",
-      "instructor_vehicle_live_assignment",
       "rto_test_readiness_scorecard",
-      "slot_conflict_prevention_matrix",
       "payment_receipt_ledger_binding"
     ],
-    "skeptic_rule_id": "SKEPTIC-PRISMA-SCHEMA-GROUNDING",
+    "skeptic_rule_id": "SKEPTIC-NO-VIBECODE-UI",
     "resolved": true
   },
   {
-    "id": "FAIL-AMISRU-002",
+    "id": "FAIL-SGDA-GAP-002",
+    "project": "SriGuruDrivingAcademy (SGDA)",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-10T15:00:00Z",
+    "summary": "19-feature gap audit: generated shallow CRUD data tables instead of operational workflows (lesson dispatch, instructor vehicle assignment, test scheduling)",
+    "root_cause": "shallow_crud_bias",
+    "missing_contracts": [
+      "instructor_vehicle_live_assignment",
+      "slot_conflict_prevention_matrix",
+      "verification_approval_stepper"
+    ],
+    "skeptic_rule_id": "SKEPTIC-19-FEATURE-GAP",
+    "resolved": true
+  },
+  {
+    "id": "FAIL-AMISRU-003",
     "project": "AMIS-RU Research Tooling",
     "stack": "fastapi_python",
     "date_logged": "2026-08-12T10:15:00Z",
-    "summary": "FastAPI endpoint specs omitted async session commit lifecycle and Pydantic response models",
+    "summary": "FastAPI endpoint specs omitted async session commit lifecycle and Pydantic response model typing",
     "root_cause": "shallow_api_scaffolding",
     "missing_contracts": [
       "async_db_session_dependency",
@@ -32,11 +45,25 @@
     "resolved": true
   },
   {
-    "id": "FAIL-PORTAL-003",
+    "id": "FAIL-AMISRU-004",
+    "project": "AMIS-RU Research Tooling",
+    "stack": "fastapi_python",
+    "date_logged": "2026-08-14T08:15:00Z",
+    "summary": "Synthesized 16 React UI pages and aviation widgets (EmbeddingAirworthinessBadge) into pure Python/FastAPI backend research tool",
+    "root_cause": "frontend_template_leakage_in_backend",
+    "missing_contracts": [
+      "backend_only_service_spec",
+      "suppress_web_ui_layouts"
+    ],
+    "skeptic_rule_id": "SKEPTIC-FRONTEND-LEAKAGE-IN-BACKEND",
+    "resolved": true
+  },
+  {
+    "id": "FAIL-PORTAL-005",
     "project": "Student / College Department Portal",
     "stack": "nextjs_prisma",
     "date_logged": "2026-08-13T16:00:00Z",
-    "summary": "Role spreading generated flat standalone pages without role-scoped permission checks on dynamic routes",
+    "summary": "Role spreading generated flat standalone pages without role-scoped permission checks and self-profile security on dynamic routes",
     "root_cause": "unscoped_route_spread",
     "missing_contracts": [
       "role_guard_middleware_binding",
@@ -44,6 +71,34 @@
       "admin_verification_action_drawer"
     ],
     "skeptic_rule_id": "SKEPTIC-ROLE-ROUTE-GUARD",
+    "resolved": true
+  },
+  {
+    "id": "FAIL-PORTAL-006",
+    "project": "College Faculty Duty Leave Portal",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-14T08:20:00Z",
+    "summary": "Extracted organizational container noun 'college' as the actor role instead of human actors ('faculty' and 'hod')",
+    "root_cause": "container_noun_role_extraction",
+    "missing_contracts": [
+      "human_actor_keyword_extraction",
+      "multi_actor_portal_separation"
+    ],
+    "skeptic_rule_id": "SKEPTIC-ROLE-EXTRACTION-SANITY",
+    "resolved": true
+  },
+  {
+    "id": "FAIL-SYNTH-007",
+    "project": "Universal Intent Synthesizer",
+    "stack": "python_core",
+    "date_logged": "2026-08-14T08:22:00Z",
+    "summary": "Adjectives ('fast', 'complete') and verbs ('reads', 'pushes') were parsed into domain entities and REST APIs (GET /api/fasts, GET /api/readss)",
+    "root_cause": "naive_token_entity_parsing",
+    "missing_contracts": [
+      "adjective_verb_stop_word_filter",
+      "exact_path_token_boundary_validation"
+    ],
+    "skeptic_rule_id": "SKEPTIC-NON-ENTITY-API",
     "resolved": true
   }
 ]

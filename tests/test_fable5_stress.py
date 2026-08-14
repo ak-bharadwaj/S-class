@@ -74,7 +74,8 @@ def test_kafka_etl_pipeline_worker(temp_workspace):
     for lld in spec.low_level_designs.values():
         for ep in lld.get("api_endpoints", []):
             path = ep.split()[1] if len(ep.split()) > 1 else ep
-            assert not path.endswith("ss") or path.endswith("pass") or path.endswith("access")
+            if path.endswith("ss"):
+                assert path.endswith("/password") or path.endswith("/access"), f"Detected invalid double-s pluralization: {path}"
 
 
 def test_multi_tenant_monorepo_compound_roles(temp_workspace):
