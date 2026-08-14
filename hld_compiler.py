@@ -239,6 +239,17 @@ class HLDCompiler:
             for data in capability_clusters.values()
         ]
 
+        if not modules:
+            req_words = [w for w in raw_request.lower().split() if len(w) > 3 and w not in ["build", "system", "platform", "create", "manage", "with", "from", "for"]]
+            domain_name = req_words[0].capitalize() if req_words else "Domain"
+            modules.append(HLDModule(
+                id=f"ctx_{domain_name.lower()}_management",
+                name=f"{domain_name} Management Context",
+                system_boundary=f"Bounded Context: {domain_name} Management",
+                owned_entities=[domain_name.lower()],
+                owned_capabilities=[f"{domain_name.lower()}_operations"]
+            ))
+
         # 2. Evaluate ADRs conditionally
         adr_topology = ADRReasoningEngine.evaluate_architecture_topology(r_graph, raw_request)
         adr_topology.affected_modules = [m.id for m in modules]

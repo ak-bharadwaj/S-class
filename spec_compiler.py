@@ -533,8 +533,8 @@ class SpecificationCompiler:
     @classmethod
     def compile_v7_refinement_pipeline(
         cls,
-        graph: SemanticDomainGraph,
-        intent_features: List[str],
+        graph: Optional[SemanticDomainGraph] = None,
+        intent_features: Optional[List[str]] = None,
         raw_request: str = "",
         archetypes: Optional[List[str]] = None,
         workspace_dir: Optional[str] = None,
@@ -544,6 +544,10 @@ class SpecificationCompiler:
         V7/V9 Authoritative Architecture Refinement Pipeline:
         Semantic Domain -> Behavior Graph -> Requirement IR -> HLD + ADRs -> V9 Debate -> Artifact Governance -> LLD -> Tasks
         """
+        if graph is None:
+            graph = SemanticDomainGraph()
+        if intent_features is None:
+            intent_features = [raw_request] if raw_request else []
         from behavior_graph import BehaviorGraphEngine
         from requirement_ir import RequirementGraph
         from hld_compiler import HLDCompiler, HLDValidator
@@ -566,6 +570,8 @@ class SpecificationCompiler:
         # 4b. V9 Architecture Debate & Decision Intelligence Engine Audit
         from architecture_debate import ArchitectureDebateEngine
         debate_result = ArchitectureDebateEngine.run_debate_cycle(hld, r_graph, b_graph, raw_request=raw_request, workspace_dir=workspace_dir, is_debate_phase=is_debate_phase)
+        if debate_result and debate_result.accepted_adrs:
+            hld.adrs = debate_result.accepted_adrs
 
         # 4c. Artifact Governor HLD Control Plane Audit (Hard Execution Gate)
         from artifact_governor import ArtifactGovernor

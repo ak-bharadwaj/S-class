@@ -175,12 +175,7 @@ class LLDCompiler:
                         mod_endpoints.append(ep)
 
             if not mod_endpoints:
-                for ent in (mod.owned_entities or ["core"]):
-                    ent_s = ent.lower()
-                    if exec_arch == ExecutionArchitecture.CLI_DISPATCHER:
-                        mod_endpoints.extend([f"cli://manage-{ent_s}", f"cli://list-{ent_s}"])
-                    else:
-                        mod_endpoints.extend([f"GET /api/{ent_s}s", f"POST /api/{ent_s}s", f"GET /api/{ent_s}s/{{id}}", f"PUT /api/{ent_s}s/{{id}}"])
+                mod_endpoints.append("PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE")
 
             parent_ref = LLDParentRef(
                 hld_id=mod.id,
@@ -190,6 +185,7 @@ class LLDCompiler:
 
             # Execution-Architecture Specific Component Generation
             if exec_arch == ExecutionArchitecture.CLI_DISPATCHER:
+                cli_endpoints = [ep for ep in mod_endpoints if "PROPOSED_CANDIDATE" not in ep]
                 lld_components.append(LLDComponent(
                     id=f"cli_{mod.id}",
                     name=f"{mod.name} CLI Command Suite",
@@ -198,8 +194,9 @@ class LLDCompiler:
                     role="cli_dispatcher",
                     transport=InteractionTransport.CLI_COMMAND,
                     route="cli://subcommands",
+                    layout="cli_subcommand_dispatch",
                     sub_components=["ArgParser", "SubcommandRouter", "ConfigLoader", "ExitCodeHandler"],
-                    api_endpoints=mod_endpoints,
+                    api_endpoints=cli_endpoints,
                     validation_rules=["POSIX flag compliance", "Exit code 0 for success, 1 for error, 2 for usage failure"]
                 ))
 
@@ -231,6 +228,21 @@ class LLDCompiler:
 
             else:
                 # FULLSTACK_APP / BACKEND_SERVICE
+                ent_raw = mod.owned_entities[0] if mod.owned_entities else 'core'
+                p_ent = ent_raw.lower()
+                IRREGULAR_PLURALS = {
+                    "alumni": "alumni", "alumnus": "alumni", "staff": "staff", "faculty": "faculty",
+                    "data": "data", "equipment": "equipment", "telemetry": "telemetry", "category": "categories"
+                }
+                if p_ent in IRREGULAR_PLURALS:
+                    p_route = IRREGULAR_PLURALS[p_ent]
+                elif p_ent.endswith('s') or p_ent.endswith('ss'):
+                    p_route = p_ent
+                elif p_ent.endswith('y') and len(p_ent) > 2 and p_ent[-2] not in 'aeiou':
+                    p_route = f"{p_ent[:-1]}ies"
+                else:
+                    p_route = f"{p_ent}s"
+
                 lld_components.append(LLDComponent(
                     id=f"ctrl_{mod.id}",
                     name=f"{mod.name} Controller",
@@ -238,7 +250,7 @@ class LLDCompiler:
                     parent=parent_ref,
                     role="backend_controller",
                     transport=InteractionTransport.REST_HTTP,
-                    route=f"/api/{mod.owned_entities[0].lower() if mod.owned_entities else 'core'}s",
+                    route=f"/api/{p_route}",
                     api_endpoints=mod_endpoints,
                     validation_rules=["Verify actor authorization", "Validate request payload schema"]
                 ))
@@ -256,6 +268,16 @@ class LLDCompiler:
 
                 if exec_arch == ExecutionArchitecture.FULLSTACK_APP:
                     ent_stem = mod.owned_entities[0].capitalize() if mod.owned_entities else "Item"
+                    stem_clean = ent_stem.lower()
+                    if stem_clean in IRREGULAR_PLURALS:
+                        ui_route = IRREGULAR_PLURALS[stem_clean]
+                    elif stem_clean.endswith('s') or stem_clean.endswith('ss'):
+                        ui_route = stem_clean
+                    elif stem_clean.endswith('y') and len(stem_clean) > 2 and stem_clean[-2] not in 'aeiou':
+                        ui_route = f"{stem_clean[:-1]}ies"
+                    else:
+                        ui_route = f"{stem_clean}s"
+
                     lld_components.append(LLDComponent(
                         id=f"ui_{mod.id}",
                         name=f"{ent_stem} Workflow Interface",
@@ -263,7 +285,7 @@ class LLDCompiler:
                         parent=parent_ref,
                         role="frontend_interface",
                         transport=InteractionTransport.REST_HTTP,
-                        route=f"/{ent_stem.lower()}s",
+                        route=f"/{ui_route}",
                         layout="behavioral_workflow_surface",
                         sub_components=[f"{ent_stem}DetailHeader", f"{ent_stem}ActionToolbar", f"{ent_stem}AuditHistoryPanel"],
                         api_endpoints=mod_endpoints,

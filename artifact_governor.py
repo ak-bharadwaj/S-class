@@ -449,23 +449,10 @@ class ArtifactGovernor:
                 if adrs_data:
                     unresolved = False
                     for a in adrs_data:
-                        adr_id = a.get("id", "")
+                        adr_id = a.get("id", "") if isinstance(a, dict) else a.id
                         rec = verified_approvals.get(adr_id)
-                        epistemic_val = a.get("epistemic_status", "proposed")
-                        adr_dict = {
-                            "id": adr_id,
-                            "title": a.get("title", ""),
-                            "decision": a.get("decision", ""),
-                            "alternatives": sorted(list(a.get("alternatives", []))),
-                            "evidence": sorted(list(a.get("evidence", []))),
-                            "affected_modules": sorted(list(a.get("affected_modules", []))),
-                            "rejected_options": sorted(list(a.get("rejected_options", []))),
-                            "reason": a.get("reason", ""),
-                            "status": a.get("status", "PROPOSED"),
-                            "confidence": float(a.get("confidence", 0.5)),
-                            "epistemic_status": epistemic_val
-                        }
-                        curr_hash = hashlib.sha256(json.dumps(adr_dict, sort_keys=True).encode("utf-8")).hexdigest()
+                        adr_obj = ADRRecord.from_dict(a) if isinstance(a, dict) else a
+                        curr_hash = cls.compute_canonical_adr_hash(adr_obj)
 
                         if not rec or rec.artifact_id != curr_art_id or rec.artifact_version != curr_art_ver or rec.content_hash != curr_hash or rec.decision not in ["ACCEPTED", "CONFIRMED"]:
                             unresolved = True

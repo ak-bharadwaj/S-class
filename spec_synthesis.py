@@ -20,6 +20,9 @@ from semantic_decomposer import SemanticDecomposer
 from spec_compiler import GraphInferenceEngine, SpecificationCompiler
 from adversarial_skeptic import AdversarialSkeptic
 from practical_skeptic import PracticalSkeptic
+from requirement_ir import RequirementGraph
+from behavior_graph import BehaviorGraph
+from hld_compiler import HLDDesign, HLDModule, ADRRecord
 
 try:
     from runtime import write_json_atomic, load_json
@@ -1742,7 +1745,18 @@ class UniversalDomainOntology:
 
         # Universal Dynamic First-Principles Decomposition (Handles ANY arbitrary software domain)
         entity_name = kw_clean.replace('_', ' ').title()
-        plural_entity = kw_clean if kw_clean.endswith('s') else f"{kw_clean}s"
+        IRREGULAR_PLURALS = {
+            "alumni": "alumni", "alumnus": "alumni", "staff": "staff", "faculty": "faculty",
+            "data": "data", "equipment": "equipment", "telemetry": "telemetry", "category": "categories"
+        }
+        if kw_clean in IRREGULAR_PLURALS:
+            plural_entity = IRREGULAR_PLURALS[kw_clean]
+        elif kw_clean.endswith('s') or kw_clean.endswith('ss'):
+            plural_entity = kw_clean
+        elif kw_clean.endswith('y') and len(kw_clean) > 2 and kw_clean[-2] not in 'aeiou':
+            plural_entity = f"{kw_clean[:-1]}ies"
+        else:
+            plural_entity = f"{kw_clean}s"
         return {
             "title": f"{entity_name} Management & Operations",
             "layout": UniversalViewArchetype.DATA_GRID_MASTER_DETAIL.value,
@@ -2167,15 +2181,41 @@ class SpecSynthesisEngine:
             is_debate_phase=is_deb
         )
 
-        # Derive Low-Level Designs, Page Spreads, and Assumption Ledger solely from Authoritative Pipeline
         lld_components = v7_pipeline.get("lld_components", [])
         hld_obj = v7_pipeline.get("hld_design")
         r_graph_authoritative = v7_pipeline.get("requirement_graph")
         b_graph_authoritative = v7_pipeline.get("behavior_graph")
 
-        if not lld_components and hld_obj and r_graph_authoritative and b_graph_authoritative:
+        if isinstance(hld_obj, dict):
+            hld_obj = HLDDesign(
+                system_name=hld_obj.get("system_name", "HLD-001"),
+                architecture_style=hld_obj.get("architecture_style", "Modular Monolith"),
+                modules=[HLDModule.from_dict(m) if isinstance(m, dict) else m for m in hld_obj.get("modules", [])],
+                adrs=[ADRRecord.from_dict(a) if isinstance(a, dict) else a for a in hld_obj.get("adrs", [])],
+                version=int(hld_obj.get("version", 1))
+            )
+
+        if isinstance(r_graph_authoritative, dict):
+            r_graph_authoritative = RequirementGraph.from_dict(r_graph_authoritative)
+
+        if isinstance(b_graph_authoritative, dict):
+            b_graph_authoritative = BehaviorGraph.from_dict(b_graph_authoritative)
+
+        if not lld_components and hld_obj:
             from lld_compiler import LLDCompiler
-            lld_components = LLDCompiler.compile_lld(hld_obj, r_graph_authoritative, b_graph_authoritative, archetypes=archetype_strings)
+            lld_components = LLDCompiler.compile_lld(
+                hld_obj,
+                r_graph_authoritative or RequirementGraph(),
+                b_graph_authoritative or BehaviorGraph(),
+                archetypes=archetype_strings
+            )
+            v7_pipeline["lld_components"] = lld_components
+            state_dir = os.path.join(workspace_dir, ".agents") if workspace_dir else ".agents"
+            pipe_disk_path = os.path.join(state_dir, "v7_refinement_pipeline.json")
+            if os.path.exists(pipe_disk_path):
+                p_disk = load_json(pipe_disk_path) or {}
+                p_disk["lld_components"] = [c.to_dict() if hasattr(c, "to_dict") else c for c in lld_components]
+                write_json_atomic(pipe_disk_path, p_disk)
 
         lld_catalog = {c.id if hasattr(c, "id") else (c.get("id") if isinstance(c, dict) else f"LLD-{idx}"): (c.to_dict() if hasattr(c, "to_dict") else c) for idx, c in enumerate(lld_components)}
         if evidence and getattr(evidence, "api_routes", None):
@@ -2223,8 +2263,28 @@ class SpecSynthesisEngine:
                         "rationale": getattr(r_node, "reason", "Derived architectural inference")
                     })
 
-        # 5. Requirement Synthesis
-        requirements_list = self.synthesize_requirements(intent, evidence, archetypes, scope_tier)
+        # 5. Canonical Requirement Derivation from Authoritative Pipeline Graph
+        synthesized_reqs = self.synthesize_requirements(intent, evidence, archetypes, scope_tier)
+        requirements_list = synthesized_reqs
+        if r_graph_authoritative and hasattr(r_graph_authoritative, "nodes") and r_graph_authoritative.nodes:
+            existing_ids = {r.id for r in requirements_list}
+            for r_node in r_graph_authoritative.nodes.values():
+                r_id = getattr(r_node, "id", "")
+                if r_id and r_id not in existing_ids:
+                    kind_str = str(getattr(r_node, "kind", "")).lower()
+                    r_type = RequirementType.EXPLICIT if ("explicit" in kind_str or "functional" in kind_str) else RequirementType.DERIVED
+                    r_cat = RequirementCategory.PRODUCT_REQUIREMENT if "functional" in kind_str else RequirementCategory.ARCHITECTURAL_CONSTRAINT
+                    req_obj = SynthesizedRequirement(
+                        id=r_id,
+                        description=getattr(r_node, "statement", getattr(r_node, "description", "")),
+                        type=r_type,
+                        category=r_cat,
+                        action=ArtifactAction.CREATE,
+                        decision_threshold=DecisionThreshold.AUTO_DECIDE if r_type == RequirementType.EXPLICIT else DecisionThreshold.PROBABLY_DECIDE,
+                        why_chain=[getattr(r_node, "reason", "Compiled from Authoritative Requirement Graph")],
+                        affects=["frontend", "backend"]
+                    )
+                    requirements_list.append(req_obj)
 
         # Incorporate Clarification Answers
         if not clarification_answers and os.path.exists(os.path.join(agents_dir, "clarification_answers.json")):

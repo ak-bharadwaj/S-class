@@ -1224,45 +1224,42 @@ class FSMGoalSequenceRunner:
                 "provenance_metadata": sim_provenance,
             })
 
-        if current_phase in ["DEBATE", "DESIGN_REVISION"]:
-            pipe_file_deb = os.path.join(state_dir, "v7_refinement_pipeline.json")
-            if os.path.exists(pipe_file_deb):
-                try:
-                    pipe_data_deb = load_json(pipe_file_deb) or {}
-                    hld_dict = pipe_data_deb.get("hld_design", {})
-                    if hld_dict:
-                        from architecture_debate import ArchitectureDebateEngine
-                        from hld_compiler import HLDDesign, ADRRecord, HLDModule
-                        from requirement_ir import RequirementGraph
-                        from behavior_graph import BehaviorGraph
-
-                        hld_obj = HLDDesign(
-                            system_name=hld_dict.get("system_name", "HLD-001"),
-                            architecture_style=hld_dict.get("architecture_style", "Modular Monolith"),
-                            modules=[HLDModule.from_dict(m) for m in hld_dict.get("modules", [])],
-                            adrs=[ADRRecord.from_dict(a) for a in hld_dict.get("adrs", [])],
-                            version=int(hld_dict.get("version", 1))
-                        )
-                        r_dict = pipe_data_deb.get("requirement_graph", {})
-                        b_dict = pipe_data_deb.get("behavior_graph", {})
-                        r_graph = RequirementGraph.from_dict(r_dict) if hasattr(RequirementGraph, "from_dict") and r_dict else RequirementGraph()
-                        b_graph = BehaviorGraph.from_dict(b_dict) if hasattr(BehaviorGraph, "from_dict") and b_dict else BehaviorGraph()
-                        state_deb = get_state(workspace_dir)
-                        goal_text_deb = getattr(state_deb, "goal", "") or ""
-
-                        deb_res = ArchitectureDebateEngine.run_debate_cycle(hld_obj, r_graph, b_graph, raw_request=goal_text_deb, workspace_dir=workspace_dir, is_debate_phase=True)
-                        pipe_data_deb["hld_design"] = hld_obj.to_dict()
-                        pipe_data_deb["debate_result"] = deb_res.to_dict()
-                        if not deb_res.rejected_adrs:
-                            pipe_data_deb["blocked"] = False
-                            if "hld_governance" in pipe_data_deb:
-                                pipe_data_deb["hld_governance"]["is_blocked"] = False
-                        write_json_atomic(pipe_file_deb, pipe_data_deb)
-                except Exception as e_deb_phase:
-                    logger.warning(f"[Runtime Governance] DEBATE phase resolution note: {e_deb_phase}")
-
-        # V9.5 Single Source of Truth Control Plane: Inspect Authoritative v7_refinement_pipeline.json
+        # V9.5 Single Source of Truth Control Plane: Refinement Compilation on DEBATE Phase
         pipe_file = os.path.join(state_dir, "v7_refinement_pipeline.json")
+        if current_phase in ["DEBATE", "DESIGN_REVISION"] and os.path.exists(pipe_file):
+            try:
+                pipe_data = load_json(pipe_file) or {}
+                adrs = pipe_data.get("hld_design", {}).get("adrs", [])
+                has_proposed = any(a.get("status") == "PROPOSED" for a in adrs)
+                if has_proposed:
+                    # Invoke new refinement compilation producing versioned pipeline under DEBATE context
+                    from spec_compiler import SpecificationCompiler
+                    state = get_state(workspace_dir)
+                    goal_text = getattr(state, "goal", "") or ""
+                    res_pipe = SpecificationCompiler.compile_v7_refinement_pipeline(
+                        raw_request=goal_text,
+                        workspace_dir=workspace_dir,
+                        is_debate_phase=True
+                    )
+                    if res_pipe and isinstance(res_pipe, dict):
+                        write_json_atomic(pipe_file, {
+                            "behavior_graph": res_pipe["behavior_graph"].to_dict() if hasattr(res_pipe["behavior_graph"], "to_dict") else res_pipe["behavior_graph"],
+                            "requirement_graph": res_pipe["requirement_graph"].to_dict() if hasattr(res_pipe["requirement_graph"], "to_dict") else res_pipe["requirement_graph"],
+                            "dependency_holes": res_pipe.get("dependency_holes", []),
+                            "hld_design": res_pipe["hld_design"].to_dict() if hasattr(res_pipe["hld_design"], "to_dict") else res_pipe["hld_design"],
+                            "hld_validation": res_pipe.get("hld_validation", {}),
+                            "hld_governance": res_pipe.get("hld_governance", {}),
+                            "debate_result": res_pipe.get("debate_result", {}),
+                            "lld_components": [c.to_dict() if hasattr(c, "to_dict") else c for c in res_pipe.get("lld_components", [])],
+                            "lld_governance": res_pipe.get("lld_governance", {}),
+                            "tasks": [t.to_dict() if hasattr(t, "to_dict") else t for t in res_pipe.get("tasks", [])],
+                            "task_governance": res_pipe.get("task_governance", {}),
+                            "blocked": res_pipe.get("blocked", False),
+                            "version": 2
+                        })
+            except Exception as e_ref:
+                logger.warning(f"[Runtime Governance] Refinement compilation note: {e_ref}")
+
         if current_phase in ["SPECIFICATION_SYNTHESIS", "DESIGN", "DEBATE", "DESIGN_REVISION"] and os.path.exists(pipe_file):
             try:
                 pipe_data = load_json(pipe_file) or {}

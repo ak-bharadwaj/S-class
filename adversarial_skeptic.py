@@ -47,25 +47,31 @@ class AdversarialSkeptic:
         1.0 = highly domain-specific, tailored UI/API architecture
         """
         if not low_level_designs:
-            return 0.85
+            return 0.0
 
         total_components = 0
         domain_tailored_components = 0
 
         for lld in low_level_designs.values():
-            comps = lld.get("sub_components", [])
-            for c in comps:
+            name = lld.get("name", "") if isinstance(lld, dict) else getattr(lld, "name", "")
+            sub_comps = lld.get("sub_components", []) if isinstance(lld, dict) else getattr(lld, "sub_components", [])
+            apis = lld.get("api_endpoints", []) if isinstance(lld, dict) else getattr(lld, "api_endpoints", [])
+
+            items_to_check = ([name] if name else []) + (sub_comps or []) + (apis or [])
+            for c in items_to_check:
+                if not c:
+                    continue
                 total_components += 1
-                if any(ind in c for ind in cls.DOMAIN_SPECIFIC_INDICATORS):
-                    domain_tailored_components += 1
-                elif not any(gen in c for gen in cls.GENERIC_CRUD_INDICATORS):
-                    # Custom named component (e.g. InverterRoster, DefectLogger)
-                    domain_tailored_components += 0.75
+                c_low = str(c).lower()
+                if any(ind.lower() in c_low for ind in cls.DOMAIN_SPECIFIC_INDICATORS):
+                    domain_tailored_components += 1.0
+                elif not any(gen.lower() in c_low for gen in cls.GENERIC_CRUD_INDICATORS):
+                    domain_tailored_components += 0.80
 
         if total_components == 0:
-            return 0.85
+            return 0.0
         score = domain_tailored_components / total_components
-        return round(min(1.0, max(0.75, score)), 2)
+        return round(min(1.0, max(0.0, score)), 2)
 
     @classmethod
     def calculate_unsupported_invention_rate(cls, requirements_list: List[Any]) -> float:
