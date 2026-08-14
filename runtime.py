@@ -5,6 +5,7 @@ import json
 import uuid
 import time
 import logging
+import hashlib
 from datetime import datetime, timezone
 from dataclasses import dataclass, asdict, field
 from typing import List, Dict, Optional, Any
@@ -1215,9 +1216,14 @@ class FSMGoalSequenceRunner:
                 "summary_markdown": "# Spec Grill Report: PASSED",
                 "timestamp": ts_now
             })
-            from artifact_governor import ApprovalRecord, ApprovalAuthority
-            rec_1 = ApprovalRecord("ADR-001", "HLD-001", "ACCEPTED", ApprovalAuthority.DETERMINISTIC_POLICY, "Mock sequence runner approval", ts_now)
-            rec_2 = ApprovalRecord("ADR-002", "HLD-001", "ACCEPTED", ApprovalAuthority.DETERMINISTIC_POLICY, "Mock sequence runner approval", ts_now)
+            from artifact_governor import ArtifactGovernor, ApprovalRecord, ApprovalAuthority
+            sec_key = ArtifactGovernor._get_governance_secret(workspace_dir)
+            hash_1 = hashlib.sha256("ADR-001:Modular Monolith with Bounded Contexts:Plausible default topology for transactional consistency; marked PROPOSED for human/DEBATE confirmation.".encode("utf-8")).hexdigest()
+            hash_2 = hashlib.sha256("ADR-002:Role-Based Access Control (RBAC) with Epistemic Capability Guards:RBAC provides deterministic security boundaries aligned with extracted domain actors.".encode("utf-8")).hexdigest()
+            rec_1 = ApprovalRecord("ADR-001", "HLD-001", 1, hash_1, "ACCEPTED", ApprovalAuthority.TEST_SYNTHETIC, "Mock sequence runner approval", ts_now)
+            rec_1.signature = rec_1.compute_signature(sec_key)
+            rec_2 = ApprovalRecord("ADR-002", "HLD-001", 1, hash_2, "ACCEPTED", ApprovalAuthority.TEST_SYNTHETIC, "Mock sequence runner approval", ts_now)
+            rec_2.signature = rec_2.compute_signature(sec_key)
             app_file = os.path.join(state_dir, "approvals.json")
             if not os.path.exists(app_file):
                 write_json_atomic(app_file, {"approval_records": [rec_1.to_dict(), rec_2.to_dict()], "timestamp": ts_now})
@@ -1225,9 +1231,14 @@ class FSMGoalSequenceRunner:
         # Global approvals receipt guarantee for mock sequence runner execution
         app_file = os.path.join(state_dir, "approvals.json")
         if not os.path.exists(app_file):
-            from artifact_governor import ApprovalRecord, ApprovalAuthority
-            rec_1 = ApprovalRecord("ADR-001", "HLD-001", "ACCEPTED", ApprovalAuthority.DETERMINISTIC_POLICY, "Mock sequence runner approval", ts_now)
-            rec_2 = ApprovalRecord("ADR-002", "HLD-001", "ACCEPTED", ApprovalAuthority.DETERMINISTIC_POLICY, "Mock sequence runner approval", ts_now)
+            from artifact_governor import ArtifactGovernor, ApprovalRecord, ApprovalAuthority
+            sec_key = ArtifactGovernor._get_governance_secret(workspace_dir)
+            hash_1 = hashlib.sha256("ADR-001:Modular Monolith with Bounded Contexts:Plausible default topology for transactional consistency; marked PROPOSED for human/DEBATE confirmation.".encode("utf-8")).hexdigest()
+            hash_2 = hashlib.sha256("ADR-002:Role-Based Access Control (RBAC) with Epistemic Capability Guards:RBAC provides deterministic security boundaries aligned with extracted domain actors.".encode("utf-8")).hexdigest()
+            rec_1 = ApprovalRecord("ADR-001", "HLD-001", 1, hash_1, "ACCEPTED", ApprovalAuthority.TEST_SYNTHETIC, "Mock sequence runner approval", ts_now)
+            rec_1.signature = rec_1.compute_signature(sec_key)
+            rec_2 = ApprovalRecord("ADR-002", "HLD-001", 1, hash_2, "ACCEPTED", ApprovalAuthority.TEST_SYNTHETIC, "Mock sequence runner approval", ts_now)
+            rec_2.signature = rec_2.compute_signature(sec_key)
             write_json_atomic(app_file, {"approval_records": [rec_1.to_dict(), rec_2.to_dict()], "timestamp": ts_now})
 
         elif current_phase in ["TASK_COMPILATION", "CODING", "TASK_VERIFICATION"]:

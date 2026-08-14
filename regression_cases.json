@@ -297,5 +297,21 @@
     ],
     "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
     "resolved": true
+  },
+  {
+    "id": "FAIL-PROSE-021",
+    "project": "Un-keyed Digest Signatures, Stale Content Replay, & Un-scoped Policy Auto-Approval Audit",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-14T22:12:00Z",
+    "summary": "Approval signatures lacked HMAC secret keying allowing local tampering, approval receipts lacked content hash binding allowing stale approvals to be replayed across mutated ADRs, and high-risk decisions (topology, security) were auto-approved under generic deterministic policies.",
+    "root_cause": "unkeyed_digest_signatures_stale_content_replay_and_unscoped_policy_approvals",
+    "missing_contracts": [
+      "hmac_sha256_secret_key_verification",
+      "immutable_content_hash_binding",
+      "risk_scoped_policy_approval_boundaries",
+      "production_test_mode_synthetic_isolation"
+    ],
+    "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
+    "resolved": true
   }
 ]

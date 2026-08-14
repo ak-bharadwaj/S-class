@@ -1,19 +1,21 @@
 """
-S-Class EOS V8.1.1 - Authoritative Artifact Governance & Control Plane Test Suite
+S-Class EOS V8.1.2 - Authoritative Artifact Governance & Control Plane Test Suite
 
 Validates:
 1. Triad Status Model (EpistemicStatus, ValidationStatus, ApprovalStatus).
 2. Hard Execution Gate: Invalid HLD blocks downstream LLD and Task compilation (returns zero LLD/Tasks).
 3. Hard Execution Gate: PROPOSED/PENDING or REJECTED ADR blocks downstream LLD compilation (emits FSM transition target DEBATE).
 4. Authoritative Control Plane: FSM transition to CODING is HARD DENIED when artifact governance is blocked.
-5. Adversarial Governance: Fake 'all_approved: true' boolean overrides are REJECTED.
-6. Adversarial Governance: Tampered SHA-256 signatures on ApprovalRecord objects are REJECTED.
-7. Structured Verification: Valid ApprovalRecord objects signed by DEBATE_ENGINE / HUMAN_EXPLICIT unblock compilation.
+5. HMAC Signature Verification: Secret key mismatches or tampered signatures are REJECTED.
+6. Content Hash Drift Binding: Mutated ADR decision/reason content invalidates previous approval records.
+7. Risk-Scoped Policy Constraints: HIGH_RISK decisions (topology, auth) FORBID DETERMINISTIC_POLICY auto-approval.
+8. Mode Isolation: TEST_SYNTHETIC approval records are HARD REJECTED in PRODUCTION mode.
 """
 
 import os
 import sys
 import json
+import hashlib
 import pytest
 
 PLUGIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -76,18 +78,19 @@ def test_artifact_governance_allows_compilation_on_confirmed_adr():
     """Verify ArtifactGovernor permits downstream LLD compilation when ADR is CONFIRMED and HLD is VALID."""
     mod = HLDModule(id="mod_1", name="Core Context", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["action_item"])
     adr_1 = ADRRecord(
-        id="ADR-001",
-        title="Topology Selection",
-        decision="Modular Monolith",
+        id="ADR-999",
+        title="Logging Level Choice",
+        decision="JSON Structured Logs",
         alternatives=[],
         evidence=["Confirmed"],
         affected_modules=["mod_1"],
         rejected_options=[],
-        reason="Explicitly confirmed",
+        reason="Low risk logging standard choice",
         status="ACCEPTED",
         epistemic_status=EpistemicStatus.CONFIRMED,
         validation_status=ValidationStatus.VALID,
-        approval_status=ApprovalStatus.APPROVED
+        approval_status=ApprovalStatus.APPROVED,
+        confidence=1.0
     )
     hld = HLDDesign(
         system_name="TestSystem",
@@ -137,107 +140,113 @@ def test_fsm_transition_denied_when_artifact_governance_blocked(tmp_path):
     assert any("DENIED by ArtifactGovernor" in d.decision for d in state.decisionLog)
 
 
-def test_adversarial_fake_all_approved_bypass_rejected(tmp_path):
-    """Adversarial Test: Fake 'all_approved: true' flag in approvals.json MUST BE REJECTED by ArtifactGovernor."""
+def test_hmac_signature_verification_and_key_mismatch_rejection(tmp_path):
+    """Adversarial Test: Tampered HMAC signature or wrong governance key MUST BE REJECTED."""
     tmp_workspace = str(tmp_path)
-    mod = HLDModule(id="mod_1", name="Core", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["act"])
-    adr = ADRRecord(
-        id="ADR-001",
-        title="Topology",
-        decision="Monolith",
-        alternatives=[],
-        evidence=[],
-        affected_modules=["mod_1"],
-        rejected_options=[],
-        reason="Plausible",
-        status="PROPOSED",
-        confidence=0.50,
-        epistemic_status=EpistemicStatus.PROPOSED
-    )
-    hld = HLDDesign(system_name="Sys", architecture_style="Monolith", modules=[mod], adrs=[adr])
+    sec_key = ArtifactGovernor._get_governance_secret(tmp_workspace)
 
-    # Write adversarial fake approvals file
-    app_file = os.path.join(tmp_workspace, ".agents", "approvals.json")
-    runtime.write_json_atomic(app_file, {"all_approved": True, "fake_credentials": "admin"})
+    curr_hash = hashlib.sha256("ADR-001:Monolith:Plausible".encode("utf-8")).hexdigest()
+    rec = ApprovalRecord("ADR-001", "HLD-001", 1, curr_hash, "ACCEPTED", ApprovalAuthority.HUMAN_EXPLICIT, "Plausible", "2026-08-14T22:00:00Z")
+    rec.signature = rec.compute_signature(sec_key)
 
-    # Governor MUST REJECT fake all_approved flag and remain BLOCKED!
-    gov = ArtifactGovernor.audit_hld_governance(hld, True, [], workspace_dir=tmp_workspace)
-    assert gov.is_blocked is True
-    assert gov.approval_status == ApprovalStatus.PENDING
-    assert "ADR-001" in gov.blocking_reasons[0]
+    assert rec.is_valid(sec_key) is True
+    assert rec.is_valid("wrong_secret_key_0000000000000000000") is False
 
 
-def test_adversarial_invalid_signature_rejected(tmp_path):
-    """Adversarial Test: ApprovalRecord with forged/tampered SHA-256 signature MUST BE REJECTED."""
+def test_content_hash_drift_rejection(tmp_path):
+    """Adversarial Test: Mutating ADR decision content invalidates previous approval record."""
     tmp_workspace = str(tmp_path)
+    sec_key = ArtifactGovernor._get_governance_secret(tmp_workspace)
     mod = HLDModule(id="mod_1", name="Core", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["act"])
-    adr = ADRRecord(
-        id="ADR-001",
-        title="Topology",
-        decision="Monolith",
-        alternatives=[],
-        evidence=[],
-        affected_modules=["mod_1"],
-        rejected_options=[],
-        reason="Plausible",
-        status="PROPOSED",
-        confidence=0.50,
-        epistemic_status=EpistemicStatus.PROPOSED
-    )
-    hld = HLDDesign(system_name="Sys", architecture_style="Monolith", modules=[mod], adrs=[adr])
 
-    # Write record with forged signature
-    forged_rec = {
-        "decision_id": "ADR-001",
-        "artifact_id": "HLD-001",
-        "decision": "ACCEPTED",
-        "authority": "HUMAN_EXPLICIT",
-        "reason": "Forged approval",
-        "timestamp": "2026-08-14T22:00:00Z",
-        "signature": "bad_signature_00000000000000000000000000000000"
-    }
-    app_file = os.path.join(tmp_workspace, ".agents", "approvals.json")
-    runtime.write_json_atomic(app_file, {"approval_records": [forged_rec]})
+    # Original decision content
+    orig_hash = hashlib.sha256("ADR-001:Modular Monolith:Original decision".encode("utf-8")).hexdigest()
+    rec = ApprovalRecord("ADR-001", "HLD-001", 1, orig_hash, "ACCEPTED", ApprovalAuthority.HUMAN_EXPLICIT, "Original decision", "2026-08-14T22:00:00Z")
+    rec.signature = rec.compute_signature(sec_key)
 
-    # Governor MUST REJECT forged record signature and remain BLOCKED!
-    gov = ArtifactGovernor.audit_hld_governance(hld, True, [], workspace_dir=tmp_workspace)
-    assert gov.is_blocked is True
-    assert gov.approval_status == ApprovalStatus.PENDING
-
-
-def test_valid_debate_engine_approval_record_unblocks(tmp_path):
-    """Positive Verification: Valid ApprovalRecord signed by DEBATE_ENGINE successfully UNBLOCKS compilation."""
-    tmp_workspace = str(tmp_path)
-    mod = HLDModule(id="mod_1", name="Core", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["act"])
-    adr = ADRRecord(
-        id="ADR-001",
-        title="Topology",
-        decision="Monolith",
-        alternatives=[],
-        evidence=[],
-        affected_modules=["mod_1"],
-        rejected_options=[],
-        reason="Plausible",
-        status="PROPOSED",
-        confidence=0.50,
-        epistemic_status=EpistemicStatus.PROPOSED
-    )
-    hld = HLDDesign(system_name="Sys", architecture_style="Monolith", modules=[mod], adrs=[adr])
-
-    # Create valid signed ApprovalRecord
-    rec = ApprovalRecord(
-        decision_id="ADR-001",
-        artifact_id="HLD-001",
-        decision="ACCEPTED",
-        authority=ApprovalAuthority.DEBATE_ENGINE,
-        reason="Debate engine resolved claim with evidence",
-        timestamp="2026-08-14T22:00:00Z"
-    )
     app_file = os.path.join(tmp_workspace, ".agents", "approvals.json")
     runtime.write_json_atomic(app_file, {"approval_records": [rec.to_dict()]})
 
-    # Governor MUST VALIDATE signature and UNBLOCK compilation!
+    # ADR content is mutated to Microservices!
+    mutated_adr = ADRRecord(
+        id="ADR-001",
+        title="Topology Selection",
+        decision="Distributed Microservices", # Mutated!
+        alternatives=[],
+        evidence=[],
+        affected_modules=["mod_1"],
+        rejected_options=[],
+        reason="Original decision",
+        status="PROPOSED",
+        confidence=0.50,
+        epistemic_status=EpistemicStatus.PROPOSED
+    )
+    hld = HLDDesign(system_name="HLD-001", architecture_style="Microservices", modules=[mod], adrs=[mutated_adr])
+
+    # Governor MUST REJECT stale approval due to content_hash mismatch!
     gov = ArtifactGovernor.audit_hld_governance(hld, True, [], workspace_dir=tmp_workspace)
-    assert gov.is_blocked is False
-    assert adr.approval_status == ApprovalStatus.APPROVED
-    assert adr.status == "ACCEPTED"
+    assert gov.is_blocked is True
+    assert "content hash mismatch" in gov.blocking_reasons[0]
+
+
+def test_high_risk_policy_auto_approval_rejection(tmp_path):
+    """Governance Test: HIGH_RISK decisions (topology, auth) FORBID DETERMINISTIC_POLICY auto-approval."""
+    tmp_workspace = str(tmp_path)
+    mod = HLDModule(id="mod_1", name="Core", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["act"])
+    high_risk_adr = ADRRecord(
+        id="ADR-001",
+        title="Architectural Topology Selection",
+        decision="Modular Monolith",
+        alternatives=[],
+        evidence=[],
+        affected_modules=["mod_1"],
+        rejected_options=[],
+        reason="Default topology choice",
+        status="ACCEPTED",
+        confidence=0.95,
+        epistemic_status=EpistemicStatus.DERIVED
+    )
+    hld = HLDDesign(system_name="Sys", architecture_style="Monolith", modules=[mod], adrs=[high_risk_adr])
+
+    # High-risk ADR without explicit HUMAN_EXPLICIT or DEBATE_ENGINE receipt MUST BE BLOCKED!
+    gov = ArtifactGovernor.audit_hld_governance(hld, True, [], workspace_dir=tmp_workspace)
+    assert gov.is_blocked is True
+    assert "HIGH_RISK" in gov.blocking_reasons[0]
+
+
+def test_production_mode_rejects_test_synthetic_approvals(tmp_path):
+    """Security Test: TEST_SYNTHETIC approval receipts are HARD REJECTED in production mode."""
+    tmp_workspace = str(tmp_path)
+    sec_key = ArtifactGovernor._get_governance_secret(tmp_workspace)
+    mod = HLDModule(id="mod_1", name="Core", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["act"])
+
+    adr = ADRRecord(
+        id="ADR-001",
+        title="Topology Selection",
+        decision="Modular Monolith",
+        alternatives=[],
+        evidence=[],
+        affected_modules=["mod_1"],
+        rejected_options=[],
+        reason="Test choice",
+        status="PROPOSED",
+        confidence=0.50,
+        epistemic_status=EpistemicStatus.PROPOSED
+    )
+    hld = HLDDesign(system_name="HLD-001", architecture_style="Monolith", modules=[mod], adrs=[adr])
+
+    curr_hash = hashlib.sha256("ADR-001:Modular Monolith:Test choice".encode("utf-8")).hexdigest()
+    synth_rec = ApprovalRecord("ADR-001", "HLD-001", 1, curr_hash, "ACCEPTED", ApprovalAuthority.TEST_SYNTHETIC, "Test choice", "2026-08-14T22:00:00Z")
+    synth_rec.signature = synth_rec.compute_signature(sec_key)
+
+    app_file = os.path.join(tmp_workspace, ".agents", "approvals.json")
+    runtime.write_json_atomic(app_file, {"approval_records": [synth_rec.to_dict()]})
+
+    # Enable production mode in sclass.config.json
+    cfg_file = os.path.join(tmp_workspace, "sclass.config.json")
+    runtime.write_json_atomic(cfg_file, {"productionMode": True, "executionMode": "production"})
+
+    # Governor MUST REJECT TEST_SYNTHETIC receipt in production mode!
+    gov = ArtifactGovernor.audit_hld_governance(hld, True, [], workspace_dir=tmp_workspace)
+    assert gov.is_blocked is True
+    assert "TEST_SYNTHETIC approval record is FORBIDDEN in production mode" in gov.blocking_reasons[0]

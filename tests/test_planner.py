@@ -74,9 +74,15 @@ def test_runtime_integration_bug_fix_shortcut(tmp_path):
             "gate_result": "PASS",
             "total_assumption_weight": 0
         }, f)
-    from artifact_governor import ApprovalRecord, ApprovalAuthority
-    rec_1 = ApprovalRecord("ADR-001", "HLD-001", "ACCEPTED", ApprovalAuthority.DETERMINISTIC_POLICY, "Test auto-approval", "2026-08-14T22:00:00Z")
-    rec_2 = ApprovalRecord("ADR-002", "HLD-001", "ACCEPTED", ApprovalAuthority.DETERMINISTIC_POLICY, "Test auto-approval", "2026-08-14T22:00:00Z")
+    from artifact_governor import ArtifactGovernor, ApprovalRecord, ApprovalAuthority
+    import hashlib
+    sec_key = ArtifactGovernor._get_governance_secret(workspace)
+    hash_1 = hashlib.sha256("ADR-001:Modular Monolith with Bounded Contexts:Plausible default topology for transactional consistency; marked PROPOSED for human/DEBATE confirmation.".encode("utf-8")).hexdigest()
+    hash_2 = hashlib.sha256("ADR-002:Role-Based Access Control (RBAC) with Epistemic Capability Guards:RBAC provides deterministic security boundaries aligned with extracted domain actors.".encode("utf-8")).hexdigest()
+    rec_1 = ApprovalRecord("ADR-001", "HLD-001", 1, hash_1, "ACCEPTED", ApprovalAuthority.TEST_SYNTHETIC, "Test auto-approval", "2026-08-14T22:00:00Z")
+    rec_1.signature = rec_1.compute_signature(sec_key)
+    rec_2 = ApprovalRecord("ADR-002", "HLD-001", 1, hash_2, "ACCEPTED", ApprovalAuthority.TEST_SYNTHETIC, "Test auto-approval", "2026-08-14T22:00:00Z")
+    rec_2.signature = rec_2.compute_signature(sec_key)
     with open(os.path.join(agents_dir, "approvals.json"), "w", encoding="utf-8") as f:
         json.dump({"approval_records": [rec_1.to_dict(), rec_2.to_dict()]}, f)
 
@@ -95,9 +101,15 @@ def test_runtime_integration_hotfix_shortcut(tmp_path):
     agents_dir = os.path.join(workspace, ".agents")
     os.makedirs(agents_dir, exist_ok=True)
     import json
-    from artifact_governor import ApprovalRecord, ApprovalAuthority
-    rec_1 = ApprovalRecord("ADR-001", "HLD-001", "ACCEPTED", ApprovalAuthority.DETERMINISTIC_POLICY, "Test auto-approval", "2026-08-14T22:00:00Z")
-    rec_2 = ApprovalRecord("ADR-002", "HLD-001", "ACCEPTED", ApprovalAuthority.DETERMINISTIC_POLICY, "Test auto-approval", "2026-08-14T22:00:00Z")
+    from artifact_governor import ArtifactGovernor, ApprovalRecord, ApprovalAuthority
+    import hashlib
+    sec_key = ArtifactGovernor._get_governance_secret(workspace)
+    hash_1 = hashlib.sha256("ADR-001:Modular Monolith with Bounded Contexts:Plausible default topology for transactional consistency; marked PROPOSED for human/DEBATE confirmation.".encode("utf-8")).hexdigest()
+    hash_2 = hashlib.sha256("ADR-002:Role-Based Access Control (RBAC) with Epistemic Capability Guards:RBAC provides deterministic security boundaries aligned with extracted domain actors.".encode("utf-8")).hexdigest()
+    rec_1 = ApprovalRecord("ADR-001", "HLD-001", 1, hash_1, "ACCEPTED", ApprovalAuthority.TEST_SYNTHETIC, "Test auto-approval", "2026-08-14T22:00:00Z")
+    rec_1.signature = rec_1.compute_signature(sec_key)
+    rec_2 = ApprovalRecord("ADR-002", "HLD-001", 1, hash_2, "ACCEPTED", ApprovalAuthority.TEST_SYNTHETIC, "Test auto-approval", "2026-08-14T22:00:00Z")
+    rec_2.signature = rec_2.compute_signature(sec_key)
     with open(os.path.join(agents_dir, "approvals.json"), "w", encoding="utf-8") as f:
         json.dump({"approval_records": [rec_1.to_dict(), rec_2.to_dict()]}, f)
 
