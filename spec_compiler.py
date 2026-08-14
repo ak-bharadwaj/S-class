@@ -411,6 +411,24 @@ class SpecificationCompiler:
                 }
 
             # 3. Identity Profile & Security
+            actor_singular = _plural(actor_key).rstrip('s')
+            explicit_profile_matching = []
+            for er in explicit_routes:
+                path = er.get("path", "")
+                method = er.get("method", "")
+                path_lower = path.lower()
+                if "profile" in path_lower or "password" in path_lower:
+                    if actor_key in path_lower or actor_singular in path_lower or "/profile" in path_lower or "/password" in path_lower:
+                        ep_str = f"{method} {path}"
+                        if ep_str not in explicit_profile_matching:
+                            explicit_profile_matching.append(ep_str)
+
+            profile_endpoints = explicit_profile_matching if explicit_profile_matching else [
+                "GET /api/account/profile",
+                "PUT /api/account/profile",
+                "PUT /api/auth/password"
+            ]
+
             pages.append({
                 "route": "/profile",
                 "page_name": f"{actor.name} Profile & Security",
@@ -430,11 +448,7 @@ class SpecificationCompiler:
                         "actions": ["Update Profile", "Change Password", "Terminate Active Sessions"]
                     }
                 ],
-                "api_endpoints": [
-                    "GET /api/account/profile",
-                    "PUT /api/account/profile",
-                    "PUT /api/auth/password"
-                ],
+                "api_endpoints": profile_endpoints,
                 "validation_rules": [
                     "Email must be verified before self-update",
                     "Password update requires current password verification"

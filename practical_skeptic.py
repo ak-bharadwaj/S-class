@@ -132,11 +132,16 @@ class PracticalSkeptic:
         for lld in low_level_designs.values():
             for tab in lld.get("tabs", []):
                 all_actions.extend(tab.get("actions", []))
+            all_actions.extend(lld.get("api_endpoints", []))
 
         action_text = " ".join(all_actions).lower()
         has_operational_workflows = any(
             kw in action_text
-            for kw in ["assign", "verify", "schedule", "track", "progress", "advance", "approve", "reject", "complete", "sign-off"]
+            for kw in [
+                "assign", "verify", "schedule", "track", "progress", "advance", "approve",
+                "reject", "complete", "sign-off", "publish", "revise", "host", "co-author",
+                "override", "revaluation", "eligible", "spotlight", "status"
+            ]
         )
 
         if not has_operational_workflows and len(low_level_designs) > 2:
