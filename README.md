@@ -7,7 +7,7 @@
 
 [![Version](https://img.shields.io/badge/version-12.1.0-blue.svg)](https://github.com/ak-bharadwaj/S-class)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-green.svg)](https://github.com/ak-bharadwaj/S-class)
-[![Build](https://img.shields.io/badge/tests-113%2F113%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class)
+[![Build](https://img.shields.io/badge/tests-159%2F159%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class)
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 
 [Quick Start](#-quick-start) • [Architecture](#-system-architecture) • [Features](#-core-architectural-innovations) • [Python SDK](#-30-second-python-sdk-quickstart) • [Benchmark Comparison](#-framework-architectural-comparison) • [License](#-license)
@@ -177,28 +177,54 @@ print(f"Kernel Approved Mutation: '{res['previousPhase']}' ➔ '{res['currentPha
 
 ---
 
+## 🛡 PracticalSkeptic: 9 Empirically Grounded Failure Rules
+
+S-Class EOS V12.1 rejects hypothetical guidelines in favor of **100% empirical grounding**. Every rule in `PracticalSkeptic` maps 1:1 to a real logged failure case in `regression_cases.json`:
+
+| Skeptic Rule ID | Logged Failure Case | Root Cause Audited & Blocked |
+| :--- | :--- | :--- |
+| `SKEPTIC-NO-VIBECODE-UI` | `FAIL-SGDA-001` | Generic placeholder fields (`user1`, `mock_data`, `test_id`) in UI specs. |
+| `SKEPTIC-19-FEATURE-GAP` | `FAIL-SGDA-GAP-002` | Missing domain-specific operational workflows (e.g. 19 SGDA gaps). |
+| `SKEPTIC-FASTAPI-ASYNC-TYPING` | `FAIL-AMISRU-003` | Missing async session dependencies and Pydantic response models on FastAPI APIs. |
+| `SKEPTIC-FRONTEND-LEAKAGE-IN-BACKEND` | `FAIL-AMISRU-004` | Frontend routing state or UI component props leaking into backend LLD contracts. |
+| `SKEPTIC-ROLE-ROUTE-GUARD` | `FAIL-PORTAL-005` | User/Admin roles missing mandatory self-profile and security management routes. |
+| `SKEPTIC-ROLE-EXTRACTION-SANITY` | `FAIL-PORTAL-006` | Compounding single role prompt tokens into duplicate synthesized roles (`doctors` & `doctor`). |
+| `SKEPTIC-NON-ENTITY-API` | `FAIL-SYNTH-007` | Adjectives (`fast`, `complete`) or verbs (`reads`) parsed into fake REST APIs (`GET /api/fasts`). |
+| `SKEPTIC-SOURCE-DECISION-PRESERVATION` | `FAIL-DOC-008` | Leaked documentation file paths (`GET /api/architecture.mds`) or dropped architecture spec routes. |
+| `SKEPTIC-PROSE-CRUD-DUPLICATION` | `FAIL-DOC-009` | Prose concepts generating duplicate generic CRUD (`/api/advancements`, `/api/workloads`) alongside explicit routes, or broken plurals (`/api/alumnis`). |
+
+---
+
 ## 🧪 Comprehensive Automated Test Suite
 
-S-Class V12.1 contains **113 automated unit and integration tests** passing with 100% success across Python 3.10–3.14:
+S-Class V12.1 contains **159 automated unit and integration tests** passing with 100% success across Python 3.10–3.14:
 
 | Test Module File | Test Count | Functionality Tested |
 | :--- | :--- | :--- |
-| `tests/test_spec_synthesis.py` | 14 tests | Specification synthesis V2.1, evidence-driven capability expansion, conservative inference, semantic gate, assumption budget, anti-bypass verifier gate. |
-| `tests/test_global_skill_availability.py` | 1 test | 100% skill availability across S-Class and all 8 subagents 24/7 across all phases. |
-| `tests/test_subagent_registry.py` | 2 tests | Full 8 subagent concurrent dispatch, role assignment, `find-skill` capability binding. |
-| `tests/test_skill_discovery.py` | 1 test | Upfront tech/domain scanner, auto-cloning missing repos, skill discovery receipt generation. |
-| `tests/test_skill_orchestrator.py` | 4 tests | 118-skill catalog resolution, phase filtering, active skill stack receipt generation. |
-| `tests/test_v12_engines.py` | 3 tests | Automated AST dependency resolution, zero-infra DB fallbacks, port conflict resolution. |
-| `tests/test_spec_griller.py` | 2 tests | 5-vector threat audit, red-teaming report generation, critical defect detection. |
-| `tests/test_robust_qa.py` | 13 tests | Chrome DevTools DOM sanitization, user flow receipts, duplicate screenshot detection, Lighthouse audits. |
-| `tests/test_benchmarks.py` | 1 test | 50-scenario empirical quality benchmark (30% unit test vs 100% S-Class defect detection). |
+| `tests/test_spec_synthesis.py` | 23 tests | Specification synthesis V2.1, evidence-driven capability expansion, conservative inference, semantic gate, assumption budget, anti-bypass verifier gate. |
+| `tests/test_practical_regression.py` | 7 tests | Empirical failure cases (`FAIL-001` to `FAIL-009`), FileLock stale process recovery, 1:1 bidirectional grounding equality. |
+| `tests/test_fable5_stress.py` | 5 tests | Fable-5 stress scenarios: CLI dev tool, Kafka ETL pipeline, multi-tenant monorepo RBAC, healthcare emergency override, deep architecture spec decision preservation. |
+| `tests/test_adversarial_domain_synthesis.py` | 5 tests | Dynamic synthesis across novel unseen domain shapes (Precision Ag, Maritime Logistics, FinTech HFT, Aerospace, IoT). |
+| `tests/test_strict_evidence_gates.py` | 5 tests | Evidence gate verification (git conflict rejection, telemetry requirements, feedback reports). |
 | `tests/test_eos_core.py` | 15 tests | Decoupled RiskEngine/PolicyEngine, SafetyCase, Output Evidence Pack, SHA-256 tamper hashing. |
-| `tests/test_kernel.py` | 6 tests | Microkernel state mutator, event sourcing replay, tri-partite memory, resource scheduler. |
-| `tests/test_intent_contract.py` | 4 tests | Composable contracts, OutputContractSpec v2.1 serialization, typed predicates. |
-| `tests/test_planner.py` | 9 tests | Meta-Planner workflow profile selection (`FULL`, `BUG_FIX`, `RESEARCH`, `REFACTOR`, `HOTFIX`). |
+| `tests/test_robust_qa.py` | 13 tests | Chrome DevTools DOM sanitization, user flow receipts, duplicate screenshot detection, Lighthouse audits. |
 | `tests/test_runtime.py` | 9 tests | FSM state initialization, schema validation, event dispatching, FileLock hardware mutual exclusion. |
-| `tests/test_security_shield.py` | 4 tests | Secret scanning, dangerous AST pattern detection, vulnerability report generation. |
+| `tests/test_planner.py` | 9 tests | Meta-Planner workflow profile selection (`FULL`, `BUG_FIX`, `RESEARCH`, `REFACTOR`, `HOTFIX`). |
+| `tests/test_kernel.py` | 5 tests | Microkernel state mutator, event sourcing replay, tri-partite memory, resource scheduler. |
 | `tests/test_topology.py` | 5 tests | Subagent network topologies (`WorkerMeshPool`, Star, Mesh, Ring phase resolution). |
+| `tests/test_skill_orchestrator.py` | 5 tests | 118-skill catalog resolution, phase filtering, active skill stack receipt generation. |
+| `tests/test_security_shield.py` | 4 tests | Secret scanning, dangerous AST pattern detection, vulnerability report generation. |
+| `tests/test_intent_contract.py` | 4 tests | Composable contracts, OutputContractSpec v2.1 serialization, typed predicates. |
+| `tests/test_v12_engines.py` | 3 tests | Automated AST dependency resolution, zero-infra DB fallbacks, port conflict resolution. |
+| `tests/test_replay.py` | 3 tests | Transition record serialization, replay engine audit, markdown exporting. |
+| `tests/test_subagent_registry.py` | 2 tests | Full 8 subagent concurrent dispatch, role assignment, `find-skill` capability binding. |
+| `tests/test_spec_griller.py` | 2 tests | 5-vector threat audit, red-teaming report generation, critical defect detection. |
+| `tests/test_skill_discovery.py` | 2 tests | Upfront tech/domain scanner, auto-cloning missing repos, skill discovery receipt generation. |
+| `tests/test_global_skill_availability.py` | 1 test | 100% skill availability across S-Class and all 8 subagents 24/7 across all phases. |
+| `tests/test_benchmarks.py` | 1 test | 50-scenario empirical quality benchmark (30% unit test vs 100% S-Class defect detection). |
+| `tests/test_doctor.py` | 1 test | System diagnostics & environment preflight check. |
+| `tests/test_config_gc.py` | 1 test | Garbage collection for stale workspace state and locks. |
+| `tests/test_error_recovery.py` | 1 test | Failure report verification and automatic error state recovery. |
 
 ---
 
