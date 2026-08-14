@@ -1213,8 +1213,8 @@ class StructuredPromptParser:
                 w_role_clean = w_role.lower()
                 if w_role_clean in raw_request.lower() and w_role_clean not in seen_roles:
                     seen_roles.add(w_role_clean)
-
-        final_roles = list(seen_roles) if seen_roles else fallback_intent.target_roles
+        all_extracted_roles = list(dict.fromkeys(list(seen_roles) + fallback_intent.target_roles))
+        final_roles = all_extracted_roles if all_extracted_roles else ["operator"]
 
         return StructuredIntent(
             raw_request=raw_request,

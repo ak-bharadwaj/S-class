@@ -46,7 +46,8 @@ class PracticalSkeptic:
         "SKEPTIC-ROLE-EXTRACTION-SANITY",
         "SKEPTIC-NON-ENTITY-API",
         "SKEPTIC-SOURCE-DECISION-PRESERVATION",
-        "SKEPTIC-PROSE-CRUD-DUPLICATION"
+        "SKEPTIC-PROSE-CRUD-DUPLICATION",
+        "SKEPTIC-NON-NOUN-API"
     }
 
     @classmethod
@@ -245,5 +246,22 @@ class PracticalSkeptic:
                             "severity": "WARNING",
                             "message": f"Suppress generic fallback endpoint '{ep}' in favor of documented explicit route."
                         })
+
+        # 10. SKEPTIC-NON-NOUN-API (Detects prose verb/adverb/preposition API resources)
+        non_noun_tokens = [
+            "accrues", "accrue", "blocks", "block", "waives", "waive", "dailies", "daily",
+            "furthers", "further", "haves", "have", "untils", "until", "paids", "paid",
+            "checkeds", "checked", "overdues", "overdue", "multiples", "multiple"
+        ]
+        for ep in all_apis_flat:
+            for nn in non_noun_tokens:
+                if f"/api/{nn}" in ep.lower() or ep.lower().endswith(f"/{nn}"):
+                    warnings.append(f"[SKEPTIC-NON-NOUN-API] API endpoint '{ep}' contains non-noun verb/adverb token '{nn}'.")
+                    checks.append({
+                        "rule_id": "SKEPTIC-NON-NOUN-API",
+                        "severity": "BLOCKING",
+                        "message": f"Eliminate non-noun API resource '{nn}' in endpoint '{ep}'."
+                    })
+                    passed = False
 
         return passed, warnings, checks

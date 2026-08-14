@@ -130,5 +130,20 @@
     ],
     "skeptic_rule_id": "SKEPTIC-PROSE-CRUD-DUPLICATION",
     "resolved": true
+  },
+  {
+    "id": "FAIL-PROSE-010",
+    "project": "Library Management System Prose Feature Request",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-14T21:18:00Z",
+    "summary": "Spec synthesis parsed prose verbs ('accrue', 'block', 'waive'), adverbs ('daily', 'further'), prepositions ('until'), and past-participles ('checked', 'paid') into 83 fake REST resources (/api/accrues, /api/checkeds, /api/dailies, /api/untils) and dropped named human role 'librarian'.",
+    "root_cause": "naive_token_entity_parsing_and_incomplete_actor_keyword_dictionary",
+    "missing_contracts": [
+      "grammatical_pos_verb_adverb_filter",
+      "role_preservation_union",
+      "non_noun_api_skeptic_rule"
+    ],
+    "skeptic_rule_id": "SKEPTIC-NON-NOUN-API",
+    "resolved": true
   }
 ]

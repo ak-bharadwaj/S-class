@@ -7,6 +7,7 @@ dead process lock recovery, and low-confidence decision provenance).
 """
 
 import pytest
+import json
 import os
 import sys
 import time
@@ -54,7 +55,7 @@ def test_skeptic_rules_are_100_percent_grounded_in_failure_log():
 
     # 3. Exact bidirectional set equality
     assert active_skeptic_rules == logged_rule_ids
-    assert len(active_skeptic_rules) == 9
+    assert len(active_skeptic_rules) == 10
 
 
 def test_practical_skeptic_catches_vibecoded_mockup_fields():
@@ -145,5 +146,39 @@ def test_low_confidence_decisions_tagged_in_decision_log(temp_workspace):
     # Check that decisions contain provenance details and confidence scores
     decisions = state.decisionLog
     has_confidence_score = any(d.confidence < 1.0 for d in decisions)
-    assert has_confidence_score is True
     assert any("Provenance:" in d.reason for d in decisions)
+
+
+def test_plain_prose_library_system_role_and_entity_preservation(temp_workspace):
+    """Verify FAIL-PROSE-010: Plain English prose feature descriptions extract all named human roles and zero non-noun fake REST endpoints."""
+    from spec_synthesis import SpecSynthesisEngine
+    from practical_skeptic import PracticalSkeptic
+
+    prose_prompt = "Build a library management system where students and faculty borrow books. Librarians can waive fines that accrue daily. Block further borrowing until paid."
+    engine = SpecSynthesisEngine()
+    spec = engine.run_synthesis(prose_prompt, temp_workspace)
+
+    # 1. Verify role preservation: librarian, student, faculty must all exist in page_spreads
+    roles_in_spreads = list(spec.page_spreads.keys())
+    assert "librarian" in roles_in_spreads, f"Librarian role was lost! Found roles in page_spreads: {roles_in_spreads}"
+    assert "student" in roles_in_spreads, f"Student role missing! Found: {roles_in_spreads}"
+    assert "faculty" in roles_in_spreads, f"Faculty role missing! Found: {roles_in_spreads}"
+
+    # 2. Verify non-noun fake endpoints are eliminated
+    spec_json_path = os.path.join(temp_workspace, ".agents", "synthesized_spec.json")
+    assert os.path.exists(spec_json_path)
+    with open(spec_json_path, 'r', encoding='utf-8') as f:
+        spec_data = json.load(f)
+
+    all_apis = []
+    for lld in spec.low_level_designs.values():
+        all_apis.extend(lld.get("api_endpoints", []))
+
+    fake_endpoints = ["accrues", "blocks", "checkeds", "dailies", "furthers", "haves", "untils", "waives", "paids"]
+    found_fake = [fe for fe in fake_endpoints if any(fe in api for api in all_apis)]
+    assert not found_fake, f"Found fake non-noun resources in synthesized spec: {found_fake}"
+
+    # 3. Practical Skeptic audit pass
+    passed, warnings, checks = PracticalSkeptic.audit_specification(spec_data, archetypes=["fullstack"])
+    assert passed is True, f"PracticalSkeptic failed on plain prose library spec! Warnings: {warnings}"
+

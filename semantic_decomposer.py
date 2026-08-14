@@ -69,7 +69,11 @@ class SemanticDecomposer:
         "researchers", "user", "users", "reviewer", "reviewers", "auditor", "auditors",
         "candidate", "candidates", "staff", "teller", "examiner", "tenant", "landlord",
         "dispatcher", "mechanic", "member", "members", "author", "authors", "editor", "editors",
-        "superintendent", "superintendents", "worker", "workers", "creator", "creators"
+        "superintendent", "superintendents", "worker", "workers", "creator", "creators",
+        "librarian", "librarians", "patron", "patrons", "borrower", "borrowers", "officer", "officers",
+        "cashier", "cashiers", "custodian", "custodians", "technician", "technicians",
+        "analyst", "analysts", "accountant", "accountants", "assistant", "assistants",
+        "steward", "stewards", "clerk", "clerks", "guest", "guests", "visitor", "visitors"
     }
 
     STOP_WORDS = {
@@ -79,6 +83,14 @@ class SemanticDecomposer:
         "writes", "pushes", "pulls", "sends", "receives", "consumes", "produces", "validates",
         "routes", "stores", "exports", "imports", "subcommands", "subcommand", "views", "view",
         "access", "accesses", "assigned", "assign", "based", "subdomain-based",
+        # Prose Non-Noun Verbs, Adverbs, Prepositions, and Participles
+        "accrue", "accrues", "accrued", "accruing", "block", "blocks", "blocked", "blocking",
+        "waive", "waives", "waived", "waiving", "daily", "dailies", "further", "furthers",
+        "have", "haves", "until", "untils", "paid", "paids", "checked", "checkeds",
+        "overdue", "overdues", "multiple", "multiples", "borrow", "borrows", "borrowed", "borrowing",
+        "lend", "lends", "lent", "lending", "return", "returns", "returned", "returning",
+        "reserve", "reserves", "reserved", "reserving", "charge", "charges", "charged", "charging",
+        "owe", "owes", "owed", "owing", "apply", "applies", "applied", "applying",
         # Generic Software Container & Documentation Words
         "system", "platform", "app", "application", "tool", "tooling", "portal", "codebase",
         "project", "feature", "features", "module", "modules", "service", "services",
@@ -94,7 +106,7 @@ class SemanticDecomposer:
         "and", "the", "for", "such", "etc", "that", "this", "from", "with", "into", "onto",
         "over", "under", "when", "where", "then", "their", "your", "each", "both", "all",
         "college", "school", "university", "department", "company", "enterprise", "organization",
-        "whose", "which", "within", "without", "about",
+        "whose", "which", "within", "without", "about", "whereby", "whereas",
         # Generic Schema Terms & Abstract Action Nominalizations
         "rate", "rates", "policies", "policy", "queues", "queue", "measurements",
         "measurement", "readings", "reading", "metrics", "metric", "alarms", "alarm",

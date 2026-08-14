@@ -7,7 +7,7 @@
 
 [![Version](https://img.shields.io/badge/version-12.1.0-blue.svg)](https://github.com/ak-bharadwaj/S-class)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-green.svg)](https://github.com/ak-bharadwaj/S-class)
-[![Build](https://img.shields.io/badge/tests-159%2F159%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class)
+[![Build](https://img.shields.io/badge/tests-160%2F160%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class)
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 
 [Quick Start](#-quick-start) • [Architecture](#-system-architecture) • [Features](#-core-architectural-innovations) • [Python SDK](#-30-second-python-sdk-quickstart) • [Benchmark Comparison](#-framework-architectural-comparison) • [License](#-license)
@@ -177,7 +177,7 @@ print(f"Kernel Approved Mutation: '{res['previousPhase']}' ➔ '{res['currentPha
 
 ---
 
-## 🛡 PracticalSkeptic: 9 Empirically Grounded Failure Rules
+## 🛡 PracticalSkeptic: 10 Empirically Grounded Failure Rules
 
 S-Class EOS V12.1 rejects hypothetical guidelines in favor of **100% empirical grounding**. Every rule in `PracticalSkeptic` maps 1:1 to a real logged failure case in `regression_cases.json`:
 
@@ -192,17 +192,18 @@ S-Class EOS V12.1 rejects hypothetical guidelines in favor of **100% empirical g
 | `SKEPTIC-NON-ENTITY-API` | `FAIL-SYNTH-007` | Adjectives (`fast`, `complete`) or verbs (`reads`) parsed into fake REST APIs (`GET /api/fasts`). |
 | `SKEPTIC-SOURCE-DECISION-PRESERVATION` | `FAIL-DOC-008` | Leaked documentation file paths (`GET /api/architecture.mds`) or dropped architecture spec routes. |
 | `SKEPTIC-PROSE-CRUD-DUPLICATION` | `FAIL-DOC-009` | Prose concepts generating duplicate generic CRUD (`/api/advancements`, `/api/workloads`) alongside explicit routes, or broken plurals (`/api/alumnis`). |
+| `SKEPTIC-NON-NOUN-API` | `FAIL-PROSE-010` | Non-noun prose verbs (`accrue`, `block`, `waive`), adverbs (`daily`, `further`), prepositions (`until`), or past-participles (`checked`, `paid`) generated into REST APIs (`GET /api/accrues`, `GET /api/checkeds`), or named human role loss (`librarian`). |
 
 ---
 
 ## 🧪 Comprehensive Automated Test Suite
 
-S-Class V12.1 contains **159 automated unit and integration tests** passing with 100% success across Python 3.10–3.14:
+S-Class V12.1 contains **160 automated unit and integration tests** passing with 100% success across Python 3.10–3.14:
 
 | Test Module File | Test Count | Functionality Tested |
 | :--- | :--- | :--- |
 | `tests/test_spec_synthesis.py` | 23 tests | Specification synthesis V2.1, evidence-driven capability expansion, conservative inference, semantic gate, assumption budget, anti-bypass verifier gate. |
-| `tests/test_practical_regression.py` | 7 tests | Empirical failure cases (`FAIL-001` to `FAIL-009`), FileLock stale process recovery, 1:1 bidirectional grounding equality. |
+| `tests/test_practical_regression.py` | 8 tests | Empirical failure cases (`FAIL-001` to `FAIL-010`), FileLock stale process recovery, 1:1 bidirectional grounding equality, plain-prose library role preservation and non-noun endpoint elimination. |
 | `tests/test_fable5_stress.py` | 5 tests | Fable-5 stress scenarios: CLI dev tool, Kafka ETL pipeline, multi-tenant monorepo RBAC, healthcare emergency override, deep architecture spec decision preservation. |
 | `tests/test_adversarial_domain_synthesis.py` | 5 tests | Dynamic synthesis across novel unseen domain shapes (Precision Ag, Maritime Logistics, FinTech HFT, Aerospace, IoT). |
 | `tests/test_strict_evidence_gates.py` | 5 tests | Evidence gate verification (git conflict rejection, telemetry requirements, feedback reports). |
