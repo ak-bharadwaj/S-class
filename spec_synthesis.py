@@ -7,6 +7,19 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Dict, Any, Optional, Set, Tuple
 
+from domain_primitives import (
+    DomainPrimitiveType,
+    DomainNode,
+    DomainEdge,
+    RelationType,
+    ProvenanceType,
+    SemanticDomainGraph,
+    AssumptionRecord
+)
+from semantic_decomposer import SemanticDecomposer
+from spec_compiler import GraphInferenceEngine, SpecificationCompiler
+from adversarial_skeptic import AdversarialSkeptic
+
 try:
     from runtime import write_json_atomic, load_json
 except ImportError:
@@ -175,6 +188,10 @@ class SynthesizedSpec:
     page_spreads: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)
     low_level_designs: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     scope_boundaries: Dict[str, List[str]] = field(default_factory=dict)
+    domain_graph: Optional[Dict[str, Any]] = None
+    domain_specificity_score: float = 1.0
+    unsupported_invention_rate: float = 0.0
+    assumption_ledger: List[Dict[str, Any]] = field(default_factory=list)
 
 # --- Classifier & Archetype Detector ---
 
@@ -2000,7 +2017,7 @@ class SpecSynthesisEngine:
         return StructuredPromptParser.parse_request(raw_request, workspace_vocab)
 
     def run_synthesis(self, raw_request: str, workspace_dir: str, clarification_answers: Optional[Dict[str, str]] = None) -> SynthesizedSpec:
-        logger.info("Starting Specification Synthesis Pipeline V4.0 (Universal Semantic Engine)")
+        logger.info("Starting Specification Synthesis Pipeline V5.0 (Semantic Domain Graph & Compiler)")
 
         agents_dir = os.path.join(workspace_dir, ".agents")
         os.makedirs(agents_dir, exist_ok=True)
@@ -2033,13 +2050,15 @@ class SpecSynthesisEngine:
         scope_tier = ScopeClassifier.classify(raw_request, intent)
         archetype_strings = [a.value for a in archetypes]
 
-        # 3. Requirement Synthesis
-        requirements_list = self.synthesize_requirements(intent, evidence, archetypes, scope_tier)
+        # 3. Construct Semantic Domain Graph
+        domain_graph = SemanticDecomposer.decompose_intent(raw_request, evidence)
 
-        # 4. Generate Role Page Spreads & LLD Catalog
+        # 4. Compile Specification from Semantic Domain Graph
         feats = intent.all_features if hasattr(intent, 'all_features') else intent.primary_features
-        page_spreads = RolePageSpreadEngine.generate_spread(intent.target_roles, feats)
-        _, lld_catalog = LowLevelDesignSynthesizer.synthesize_lld_requirements(page_spreads)
+        page_spreads, lld_catalog, assumption_ledger = SpecificationCompiler.compile_specification(domain_graph, feats)
+
+        # 5. Requirement Synthesis
+        requirements_list = self.synthesize_requirements(intent, evidence, archetypes, scope_tier)
 
         # Incorporate Clarification Answers
         if not clarification_answers and os.path.exists(os.path.join(agents_dir, "clarification_answers.json")):
@@ -2053,7 +2072,7 @@ class SpecSynthesisEngine:
                     req.type = RequirementType.SUPPORTED
                     req.description += f" [CLARIFIED: {answer}]"
 
-        # 5. Graph & Dependency Wiring
+        # 6. Graph & Dependency Wiring
         graph = RequirementGraph()
         for req in requirements_list:
             graph.add_node(req)
@@ -2077,21 +2096,43 @@ class SpecSynthesisEngine:
         impacts = self.analyze_impact(requirements_list, archetypes)
         conflicts = self.check_conflicts(requirements_list, evidence)
 
+        # Run Adversarial Skeptic Checks
+        skeptic_contradictions = AdversarialSkeptic.detect_contradictions(domain_graph, requirements_list)
+        for s_c in skeptic_contradictions:
+            conflicts.append(SynthesizedRequirement(
+                id=s_c["id"],
+                description=s_c["description"],
+                type=RequirementType.CONFLICT,
+                category=RequirementCategory.ARCHITECTURAL_CONSTRAINT,
+                action=ArtifactAction.MODIFY,
+                decision_threshold=DecisionThreshold.MUST_STOP,
+                why_chain=["Adversarial Skeptic detected contradictory constraints"],
+                affects=["frontend", "backend"]
+            ))
+
         for conflict in conflicts:
             if conflict not in requirements_list:
                 requirements_list.append(conflict)
 
-        # 6. Scope Boundary & Anti-Bloat Audit
+        # 7. Scope Boundary & Anti-Bloat Audit
         in_scope_bounds, out_of_scope_bounds, _ = ScopeBoundaryGuard.audit_scope_boundaries(raw_request, intent.primary_features)
         scope_boundaries_dict = {
             "in_scope": in_scope_bounds,
             "out_of_scope": out_of_scope_bounds
         }
 
-        # 7. Semantic Gate Evaluation with Dynamic Budget Scaling
+        # 8. Compute Semantic Metrics
+        domain_specificity = AdversarialSkeptic.calculate_domain_specificity_score(lld_catalog)
+        unsupported_rate = AdversarialSkeptic.calculate_unsupported_invention_rate(requirements_list)
+
+        # 9. Semantic Gate Evaluation with Dynamic Budget Scaling
         gate_result_enum, total_weight = self.gate.evaluate(requirements_list, evidence, archetypes, scope_tier=scope_tier)
 
         questions = self._generate_clarifying_questions(requirements_list, intent)
+        dependency_holes = AdversarialSkeptic.detect_dependency_holes(domain_graph)
+        for hole in dependency_holes:
+            questions.append(hole["question"])
+
         acceptance_criteria = self.generate_acceptance_criteria(intent, requirements_list)
 
         grouped_reqs = {}
@@ -2115,7 +2156,11 @@ class SpecSynthesisEngine:
             spec_version=current_version,
             page_spreads=page_spreads,
             low_level_designs=lld_catalog,
-            scope_boundaries=scope_boundaries_dict
+            scope_boundaries=scope_boundaries_dict,
+            domain_graph=domain_graph.to_dict(),
+            domain_specificity_score=domain_specificity,
+            unsupported_invention_rate=unsupported_rate,
+            assumption_ledger=assumption_ledger
         )
 
         md_path = os.path.join(agents_dir, "synthesized_spec.md")
@@ -2137,14 +2182,15 @@ class SpecSynthesisEngine:
 
         # Save Markdown output
         try:
-            md_content = "# Synthesized Specification V4.1 (Production-Grade LLD & Scope-Guarded)\n\n"
+            md_content = "# Synthesized Specification V5.0 (Semantic Domain Graph & Compiler)\n\n"
             md_content += f"**Intent**: {spec.intent_summary}\n"
             md_content += f"**Archetypes**: {', '.join(spec.archetypes)} | **Scope**: {spec.scope_tier.upper()}\n"
             md_content += f"**Gate Result**: {spec.gate_result} (Assumption Weight: {spec.total_assumption_weight}/150)\n"
+            md_content += f"**Domain Specificity Score**: {spec.domain_specificity_score * 100:.0f}% | **Unsupported Invention Rate**: {spec.unsupported_invention_rate * 100:.0f}%\n"
             md_content += f"**Total Requirements**: {sum(len(v) for v in spec.requirements.values())} | **Version**: v{spec.spec_version}\n\n"
 
             if spec.questions_for_human:
-                md_content += "## ❓ Questions for Human Review\n\n"
+                md_content += "## ❓ Questions for Human Review (Dependency Holes & Clarifications)\n\n"
                 for i, q in enumerate(spec.questions_for_human, 1):
                     md_content += f"{i}. {q}\n"
                 md_content += "\n"
@@ -2155,6 +2201,17 @@ class SpecSynthesisEngine:
             for out_item in out_of_scope_bounds:
                 md_content += f"- 🚫 {out_item}\n"
             md_content += "\n"
+
+            # Render Semantic Domain Graph Nodes & Topology
+            if spec.domain_graph:
+                md_content += "## 🕸️ Semantic Domain Graph Topology\n\n"
+                md_content += f"- **Total Domain Nodes**: {len(spec.domain_graph.get('nodes', []))}\n"
+                md_content += f"- **Total Relational Edges**: {len(spec.domain_graph.get('edges', []))}\n\n"
+                md_content += "| Primitive Type | Node Name | Provenance | ID |\n"
+                md_content += "|---|---|---|---|\n"
+                for n in spec.domain_graph.get('nodes', [])[:10]:
+                    md_content += f"| `{n['primitive_type']}` | **{n['name']}** | `{n['provenance']}` | `{n['id']}` |\n"
+                md_content += "\n"
 
             # Render Role-Based Page Spreading Sitemap
             if spec.page_spreads:
@@ -2169,7 +2226,7 @@ class SpecSynthesisEngine:
 
             # Render Low-Level Design Component & Field Specifications
             if spec.low_level_designs:
-                md_content += "## 📐 Canonical Low-Level Design (LLD) Specifications\n\n"
+                md_content += "## 📐 Low-Level Design (LLD) Specifications & Reasoning Graphs\n\n"
                 for key, lld in spec.low_level_designs.items():
                     md_content += f"### [{lld['role'].upper()}] {lld['page_name']} (`{lld['route']}`)\n\n"
                     md_content += f"- **Layout**: `{lld['layout']}`\n"
@@ -2177,6 +2234,11 @@ class SpecSynthesisEngine:
                     md_content += f"- **Backing REST Endpoints**: {', '.join(f'`{e}`' for e in lld['api_endpoints'])}\n"
                     if lld.get("validation_rules"):
                         md_content += f"- **Validation Rules**: {'; '.join(lld['validation_rules'])}\n"
+
+                    if lld.get("reasoning_graph"):
+                        md_content += "- **Structured Reasoning Provenance**:\n"
+                        for step in lld["reasoning_graph"]:
+                            md_content += f"  - `({step.get('from')})` $\\xrightarrow{{\\text{{{step.get('relation')}}}}}$ `({step.get('to')})`\n"
 
                     md_content += "\n**Tab & Form Field Breakdown**:\n\n"
                     for tab in lld.get("tabs", []):
@@ -2208,5 +2270,5 @@ class SpecSynthesisEngine:
         except Exception as e:
             logger.error(f"Failed to write MD output: {e}")
 
-        logger.info(f"Synthesis V4.0 completed (v{spec.spec_version}). {sum(len(v) for v in spec.requirements.values())} requirements, gate={spec.gate_result}")
+        logger.info(f"Synthesis V5.0 completed (v{spec.spec_version}). {sum(len(v) for v in spec.requirements.values())} requirements, gate={spec.gate_result}")
         return spec
