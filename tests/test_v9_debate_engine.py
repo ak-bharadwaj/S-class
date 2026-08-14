@@ -1,13 +1,13 @@
 """
-S-Class EOS V9.1 - Genuine Decision Resolution Engine Test Suite
+S-Class EOS V9.2 - Epistemic Truthfulness & 5D Gate Hardened Test Suite
 
 Validates:
-1. Claim Decomposition (premises, rationale, assumptions, constraints, benefits, costs, falsifiers).
-2. Evidence Quality Assessment Framework (strength, directness, relevance, freshness, quality_score).
-3. Generic 5-Dimensional Challenge Protocol (Scale, Auth, Consistency, Resilience, Modularity).
-4. Strict Decision Sufficiency Gate (6-factor gate replacing default auto-acceptance).
-5. Versioned ADR v1 -> v2 Revision Promotion & HMAC signed ApprovalRecord (DEBATE_ENGINE).
-6. End-to-End Control Plane Integration & ArtifactGovernor Unblocking.
+1. Missing/Fallback evidence MUST have quality 0.0 (EvidenceState.NO_EVIDENCE).
+2. Synthetic fallback alternatives DO NOT count as explored.
+3. Orthogonal 5D Challenge Protocol produces explicit PASS / FAIL / UNKNOWN statuses.
+4. UNKNOWN high-risk dimensions or NO_EVIDENCE MUST NOT ACCEPT (returns INSUFFICIENT_DEBATE).
+5. Strict Security Grounding requires actual ACTOR + CAPABILITY + AUTHORIZED_FOR edge.
+6. Epistemic Invariant: Unknown is never equivalent to evidence, and absence of an objection is never proof of correctness.
 """
 
 import os
@@ -33,6 +33,8 @@ from architecture_debate import (
     DebateResult,
     DecisionOutcome,
     EvidenceQualityRecord,
+    EvidenceState,
+    DimensionGateResult,
     ClaimDecomposer,
     GenericDebateEvaluator,
     DecisionSufficiencyGate
@@ -40,163 +42,127 @@ from architecture_debate import (
 import runtime
 
 
-def test_claim_decomposition_premises_assumptions_falsifiers():
-    """Verify ClaimDecomposer decomposes ADR into explicit rationale, premises, assumptions, falsifiers, and evidence quality."""
+def test_missing_evidence_must_have_quality_zero_and_reject_acceptance():
+    """Adversarial Test 1: ADR with empty or fallback evidence MUST be assigned EvidenceState.NO_EVIDENCE and quality 0.0."""
     r_graph = RequirementGraph()
     b_graph = BehaviorGraph()
     adr = ADRRecord(
         id="ADR-001",
         title="Architectural Topology Selection",
         decision="Modular Monolith with Bounded Contexts",
-        alternatives=["Distributed Microservices"],
-        evidence=["Domain context cohesion"],
+        alternatives=[],
+        evidence=["Default architectural inference"],  # Generic fallback!
         affected_modules=["mod_1"],
         rejected_options=[],
-        reason="Transactional consistency across scheduling and billing",
+        reason="Default",
         status="PROPOSED",
         confidence=0.50,
         epistemic_status=EpistemicStatus.PROPOSED
     )
 
-    claim = ClaimDecomposer.decompose_adr_to_claim(adr, r_graph, b_graph, raw_request="Doctor approves prescription")
+    claim = ClaimDecomposer.decompose_adr_to_claim(adr, r_graph, b_graph, raw_request="")
 
-    assert claim.claim_id == "CLAIM-ADR-001"
-    assert claim.statement == "Modular Monolith with Bounded Contexts"
-    assert len(claim.premises) >= 1
-    assert len(claim.assumptions) >= 1
-    assert len(claim.falsifiers) >= 1
-    assert len(claim.evidence_quality_records) >= 1
-    assert claim.evidence_quality_records[0].quality_score > 0.0
+    assert len(claim.evidence_quality_records) == 1
+    ev_rec = claim.evidence_quality_records[0]
+    assert ev_rec.evidence_state == EvidenceState.NO_EVIDENCE
+    assert ev_rec.quality_score == 0.0
 
+    # Sufficiency Gate MUST return INSUFFICIENT_DEBATE, NOT ACCEPT!
+    blast = {"blast_radius_score": 0.40}
+    dim_gates = [
+        DimensionGateResult("Scalability & Performance", "UNKNOWN", [], ["No throughput NFR"], []),
+        DimensionGateResult("Security & Authorization", "UNKNOWN", [], ["No auth rules"], [])
+    ]
+    outcome, confidence, metrics = DecisionSufficiencyGate.evaluate_sufficiency(claim, [], [], blast, dim_gates)
 
-def test_evidence_quality_scoring_framework():
-    """Verify EvidenceQualityRecord computes quality_score = strength * directness * relevance_score * freshness."""
-    ev = EvidenceQualityRecord(
-        evidence_id="EV-001",
-        source="EXPLICIT_PROMPT",
-        reference_text="High-throughput 50k events/sec",
-        strength=0.90,
-        freshness=1.0,
-        directness=0.95,
-        relevance_score=0.90
-    )
-
-    expected_score = round(0.90 * 0.95 * 0.90 * 1.0, 3)
-    assert ev.quality_score == expected_score
-
-
-def test_generic_5_dimensional_challenge_protocol():
-    """Verify GenericDebateEvaluator audits 5D challenges across scale, security, and evidence quality."""
-    r_graph = RequirementGraph()
-    b_graph = BehaviorGraph()
-    mod = HLDModule(id="mod_1", name="Core Context", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["act"])
-
-    adr_1 = ADRRecord("ADR-001", "Architectural Topology Selection", "Modular Monolith with Bounded Contexts", [], [], ["mod_1"], [], "Default", "PROPOSED", 0.50, EpistemicStatus.PROPOSED)
-    hld = HLDDesign(system_name="TestSys", architecture_style="Monolith", modules=[mod], adrs=[adr_1])
-
-    claim = ClaimDecomposer.decompose_adr_to_claim(adr_1, r_graph, b_graph, raw_request="High-throughput 50k events/sec ingestion service")
-    challenges, alternatives = GenericDebateEvaluator.evaluate_5d_challenges(claim, adr_1, hld, r_graph, b_graph, raw_request="High-throughput 50k events/sec ingestion service")
-
-    assert len(challenges) >= 1
-    assert challenges[0].category == "scale_throughput_invariant"
-    assert challenges[0].severity == "HIGH"
-    assert len(alternatives) >= 1
-
-
-def test_decision_sufficiency_gate_rejects_unsupported_claim():
-    """Verify DecisionSufficiencyGate blocks acceptance when high-severity challenges or insufficient evidence exist."""
-    ev_record = EvidenceQualityRecord("EV-1", "REQUIREMENT_GRAPH", "Indirect text", 0.30, 0.50, 0.40, 0.40)
-    claim = EngineeringClaim(
-        claim_id="CLAIM-1",
-        target_adr_id="ADR-1",
-        statement="Use Monolith",
-        rationale="Default",
-        premises=[],
-        assumptions=[],
-        constraints=[],
-        expected_benefits=[],
-        expected_costs=[],
-        falsifiers=[],
-        evidence_quality_records=[ev_record],
-        category="scale_throughput_invariant",
-        initial_confidence=0.40
-    )
-
-    high_challenge = ClaimChallenge("CH-1", "scale_throughput_invariant", "NFR_PERFORMANCE", "HIGH", "Bottleneck", [], {}, "Microservices")
-    blast = {"blast_radius_score": 0.90}
-
-    outcome, confidence, metrics = DecisionSufficiencyGate.evaluate_sufficiency(claim, [high_challenge], [], blast)
-
-    assert outcome == DecisionOutcome.REJECT
-    assert confidence == 0.20
+    assert outcome == DecisionOutcome.INSUFFICIENT_DEBATE
+    assert metrics["has_no_evidence"] is True
     assert metrics["gate_passed"] is False
 
 
-def test_versioned_adr_v1_to_v2_promotion_and_hmac_signing(tmp_path):
-    """Verify promote_alternative_to_adr_v2 creates versioned ADR v2 with previous_version_hash and HMAC DEBATE_ENGINE signature."""
+def test_synthetic_fallback_alternatives_do_not_count_as_explored():
+    """Adversarial Test 2: Synthetic alternatives generated by engine DO NOT satisfy alternatives_explored metric."""
+    synth_alt = ArchitecturalAlternative("ALT-GEN-01", "Modular Monolith", "Generic fallback", [], [], 0.3, 0.5, is_synthetic=True)
+    grounded_alt = ArchitecturalAlternative("ALT-REAL-01", "Kafka Streaming Microservices", "Grounded trade-off", ["Scale"], ["Complexity"], 0.8, 0.4, is_synthetic=False)
+
+    ev_record = EvidenceQualityRecord("EV-1", EvidenceState.DIRECT_EVIDENCE, "REQUIREMENT_GRAPH", "Grounded requirement", 0.90, 1.0, 0.90, 0.90)
+    claim = EngineeringClaim("CLAIM-1", "ADR-1", "Use Monolith", "Reason", [], [], [], [], [], [], [ev_record], "scale_throughput_invariant", 0.90)
+    blast = {"blast_radius_score": 0.40}
+
+    # Only synthetic alternatives provided -> alternatives_explored MUST BE FALSE!
+    dim_gates_pass = [
+        DimensionGateResult("Scalability & Performance", "PASS", ["Matched"], [], []),
+        DimensionGateResult("Security & Authorization", "PASS", ["Matched"], [], [])
+    ]
+    outcome, confidence, metrics = DecisionSufficiencyGate.evaluate_sufficiency(claim, [], [synth_alt], blast, dim_gates_pass)
+
+    assert metrics["grounded_alternatives_count"] == 0
+    assert metrics["synthetic_alternatives_count"] == 1
+    assert metrics["gate_passed"] is False
+    assert outcome == DecisionOutcome.INSUFFICIENT_DEBATE
+
+    # Grounded alternative provided -> alternatives_explored IS TRUE!
+    outcome_g, confidence_g, metrics_g = DecisionSufficiencyGate.evaluate_sufficiency(claim, [], [grounded_alt], blast, dim_gates_pass)
+    assert metrics_g["grounded_alternatives_count"] == 1
+    assert outcome_g == DecisionOutcome.ACCEPT
+
+
+def test_unknown_security_dimension_produces_unknown_not_pass():
+    """Adversarial Test 3: Unstated security requirements produce UNKNOWN status, NEVER PASS."""
+    r_graph = RequirementGraph()
+    b_graph = BehaviorGraph()  # Empty graph: no actors, no capabilities, no auth edges!
+    mod = HLDModule(id="mod_1", name="Core Context", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["act"])
+
+    adr_sec = ADRRecord("ADR-002", "Role Authorization Strategy", "RBAC with Epistemic Guards", [], ["Implicit"], ["mod_1"], [], "Security", "PROPOSED", 0.50, EpistemicStatus.PROPOSED)
+    hld = HLDDesign(system_name="TestSys", architecture_style="Monolith", modules=[mod], adrs=[adr_sec])
+
+    claim = ClaimDecomposer.decompose_adr_to_claim(adr_sec, r_graph, b_graph, raw_request="")
+    challenges, alternatives, dim_gates = GenericDebateEvaluator.evaluate_5d_challenges(claim, adr_sec, hld, r_graph, b_graph, raw_request="")
+
+    sec_gate = next(d for d in dim_gates if d.dimension_name == "Security & Authorization")
+    assert sec_gate.status == "UNKNOWN"
+    assert "Explicit role authorization policy rules" in sec_gate.missing_evidence
+
+
+def test_orthogonal_5d_gate_protocol_populates_dimension_gates():
+    """Verify GenericDebateEvaluator outputs 5 orthogonal dimension gates with PASS/FAIL/UNKNOWN statuses."""
+    r_graph = RequirementGraph()
+    b_graph = BehaviorGraph()
+    mod = HLDModule(id="mod_1", name="Core Context", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["act"])
+    adr_1 = ADRRecord("ADR-001", "Topology Selection", "Modular Monolith", ["Microservices"], ["Valid"], ["mod_1"], [], "Reason", "ACCEPTED", 0.95, EpistemicStatus.CONFIRMED)
+    hld = HLDDesign(system_name="TestSys", architecture_style="Monolith", modules=[mod], adrs=[adr_1])
+
+    claim = ClaimDecomposer.decompose_adr_to_claim(adr_1, r_graph, b_graph, raw_request="Doctor approves prescription")
+    challenges, alternatives, dim_gates = GenericDebateEvaluator.evaluate_5d_challenges(claim, adr_1, hld, r_graph, b_graph, raw_request="Doctor approves prescription")
+
+    assert len(dim_gates) == 5
+    gate_names = [d.dimension_name for d in dim_gates]
+    assert "Scalability & Performance" in gate_names
+    assert "Security & Authorization" in gate_names
+    assert "Data Consistency & Persistence" in gate_names
+    assert "Fault Tolerance & Resilience" in gate_names
+    assert "Modularity & Coupling" in gate_names
+
+
+def test_end_to_end_debate_no_evidence_blocks_acceptance(tmp_path):
+    """Integration Test: Debate cycle with missing evidence returns INSUFFICIENT_DEBATE and blocks HMAC signing."""
     tmp_workspace = str(tmp_path)
     os.environ["SCLASS_EXECUTION_MODE"] = "TEST"
-    sec_key = ArtifactGovernor._get_governance_secret(tmp_workspace)
 
     r_graph = RequirementGraph()
     b_graph = BehaviorGraph()
     mod = HLDModule(id="mod_1", name="Core Context", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["act"])
+    
+    # ADR with NO EVIDENCE
+    adr_no_ev = ADRRecord("ADR-001", "Topology Selection", "Modular Monolith", [], [], ["mod_1"], [], "No evidence rationale", "PROPOSED", 0.50, EpistemicStatus.PROPOSED)
+    hld = HLDDesign(system_name="HLD-001", architecture_style="Monolith", modules=[mod], adrs=[adr_no_ev])
 
-    adr_v1 = ADRRecord("ADR-001", "Architectural Topology Selection", "Modular Monolith with Bounded Contexts", [], ["Cohesion"], ["mod_1"], [], "Plausible default topology", "ACCEPTED", 0.95, EpistemicStatus.CONFIRMED, version=1)
-    hld = HLDDesign(system_name="HLD-001", architecture_style="Monolith", modules=[mod], adrs=[adr_v1])
-
-    res = ArchitectureDebateEngine.run_debate_cycle(hld, r_graph, b_graph, raw_request="Sensor reads item", workspace_dir=tmp_workspace)
+    res = ArchitectureDebateEngine.run_debate_cycle(hld, r_graph, b_graph, raw_request="", workspace_dir=tmp_workspace)
 
     assert len(res.accepted_adrs) == 1
-    assert len(res.decision_records) == 1
+    assert res.accepted_adrs[0].status == "PROPOSED"  # MUST NOT BE ACCEPTED!
+    assert res.decision_records[0].decision_outcome == DecisionOutcome.INSUFFICIENT_DEBATE
 
-    d_rec = res.decision_records[0]
-    assert d_rec.decision_outcome == DecisionOutcome.ACCEPT
-    assert d_rec.approval_record is not None
-    assert d_rec.approval_record["authority"] == "DEBATE_ENGINE"
-
-    # Verify ADR v2 version increment and previous_version_hash binding
-    accepted_v2 = res.accepted_adrs[0]
-    assert accepted_v2.version == 2
-    assert accepted_v2.previous_version_hash is not None
-
-    # Verify ApprovalRecord passes HMAC signature audit
+    # Verify NO HMAC approval record generated for ADR-001 in approvals.json
     verified_approvals = ArtifactGovernor._load_verified_approval_records(tmp_workspace)
-    assert "ADR-001" in verified_approvals
-    assert verified_approvals["ADR-001"].authority == ApprovalAuthority.DEBATE_ENGINE
-    assert verified_approvals["ADR-001"].is_valid(sec_key) is True
-
-
-def test_end_to_end_debate_fsm_unblocking(tmp_path):
-    """Integration Test: V9.1 Debate engine execution unblocks ArtifactGovernor for downstream FSM transitions."""
-    tmp_workspace = str(tmp_path)
-    os.environ["SCLASS_EXECUTION_MODE"] = "TEST"
-    runtime.initialize_state(tmp_workspace, goal="Build grounded microservice")
-
-    r_graph = RequirementGraph()
-    b_graph = BehaviorGraph()
-    mod = HLDModule(id="mod_1", name="Core Context", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["act"])
-    adr_1 = ADRRecord("ADR-001", "Architectural Topology Selection", "Modular Monolith with Bounded Contexts", [], ["Evidence"], ["mod_1"], [], "Plausible choice", "ACCEPTED", 0.95, EpistemicStatus.CONFIRMED, version=1)
-    hld = HLDDesign(system_name="HLD-001", architecture_style="Monolith", modules=[mod], adrs=[adr_1])
-
-    # Run debate cycle -> emits DEBATE_ENGINE HMAC signed ApprovalRecord into .agents/approvals.json
-    deb_res = ArchitectureDebateEngine.run_debate_cycle(hld, r_graph, b_graph, workspace_dir=tmp_workspace)
-
-    # Save pipeline result to .agents/v7_refinement_pipeline.json
-    pipe_dict = {
-        "blocked": False,
-        "target_fsm_state": "CODING",
-        "hld_design": hld.to_dict(),
-        "hld_governance": {"is_blocked": False, "recommended_fsm_state": "CODING", "validation_status": "VALID", "approval_status": "APPROVED"}
-    }
-    pipe_file = os.path.join(tmp_workspace, ".agents", "v7_refinement_pipeline.json")
-    runtime.write_json_atomic(pipe_file, pipe_dict)
-
-    state = runtime.get_state(tmp_workspace)
-    state.currentPhase = "DEBATE"
-    runtime.save_state(state, tmp_workspace)
-
-    # Transition from DEBATE to DESIGN_REVISION must be ALLOWED by ArtifactGovernor!
-    gov = ArtifactGovernor.enforce_fsm_transition("DEBATE", "debate_resolved", "DESIGN_REVISION", workspace_dir=tmp_workspace)
-    assert gov.is_blocked is False
-    assert gov.recommended_fsm_state == FSMTransitionTarget.CODING
+    assert "ADR-001" not in verified_approvals

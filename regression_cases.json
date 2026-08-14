@@ -363,5 +363,22 @@
     ],
     "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
     "resolved": true
+  },
+  {
+    "id": "FAIL-PROSE-025",
+    "project": "Evidence Fabrication for Missing Evidence, Synthetic Alternative Over-counting, & Permissive UNKNOWN Gates",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-14T22:58:00Z",
+    "summary": "Debate engine assigned non-zero quality score (~0.65) to missing/fallback evidence ('Default architectural inference'), counted synthetic fallback alternatives as grounded exploration, mistook entity nodes for domain actors in security challenges, and treated UNKNOWN challenge dimensions as PASS.",
+    "root_cause": "evidence_fabrication_synthetic_alternative_overcounting_and_permissive_unknown_fallthrough",
+    "missing_contracts": [
+      "zero_quality_missing_evidence_audit",
+      "synthetic_alternative_filtering",
+      "strict_actor_capability_security_grounding",
+      "orthogonal_5d_gate_protocol_pass_fail_unknown",
+      "epistemic_invariant_unknown_is_never_evidence"
+    ],
+    "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
+    "resolved": true
   }
 ]
