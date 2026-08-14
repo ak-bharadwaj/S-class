@@ -174,6 +174,7 @@ class SynthesizedSpec:
     spec_version: int = 1
     page_spreads: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)
     low_level_designs: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    scope_boundaries: Dict[str, List[str]] = field(default_factory=dict)
 
 # --- Classifier & Archetype Detector ---
 
@@ -1261,6 +1262,60 @@ class RoleCapabilityExpander:
         return reqs
 
 
+class ScopeBoundaryGuard:
+    """
+    Guards against feature bloat, speculative over-expansion, and unrequested subsystems.
+    Explicitly enforces what is IN-SCOPE (canonical workflow completion) vs OUT-OF-SCOPE (speculative bloat).
+    Prevents silent injection of unrequested payment gateways, gamification, crypto, or AI chatbots.
+    """
+
+    SPECULATIVE_BLOAT_CATEGORIES = {
+        "payment_gateway": {
+            "keywords": ["payment", "stripe", "razorpay", "paypal", "checkout", "billing", "invoice", "pricing", "subscription", "pay", "fee"],
+            "disallowed_additions": ["Stripe Payment Gateway", "Razorpay Checkout", "Subscription Webhooks", "Credit Card Processing"],
+            "clarification_question": "Do you want to integrate an online payment gateway (e.g. Stripe/Razorpay) for paid transactions, or keep this fee-free/pay-on-arrival?"
+        },
+        "gamification": {
+            "keywords": ["gamification", "points", "badges", "leaderboard", "rewards", "streak", "level", "xp"],
+            "disallowed_additions": ["Gamification Rewards Engine", "User Badges & XP", "Global Leaderboard System"],
+            "clarification_question": "Do you want gamification elements (points, badges, leaderboards), or a standard direct workflow?"
+        },
+        "ai_chatbot": {
+            "keywords": ["ai", "chatbot", "assistant", "llm", "copilot", "chat", "bot"],
+            "disallowed_additions": ["AI Assistant Chatbot", "LLM Integration Widget"],
+            "clarification_question": "Do you want an AI assistant/chatbot widget integrated into this application?"
+        },
+        "crypto_web3": {
+            "keywords": ["crypto", "blockchain", "wallet", "web3", "nft", "token", "ethereum", "solana"],
+            "disallowed_additions": ["Crypto Wallet Connect", "Web3 Smart Contract Interaction"],
+            "clarification_question": "Do you require Web3 / crypto wallet connectivity?"
+        },
+        "social_oauth": {
+            "keywords": ["google login", "facebook login", "oauth", "sso", "social login", "google auth"],
+            "disallowed_additions": ["Third-Party Social OAuth Integrations"],
+            "clarification_question": "Should users authenticate via email/password, or require Google/Social SSO?"
+        }
+    }
+
+    @classmethod
+    def audit_scope_boundaries(cls, raw_request: str, intent_features: List[str]) -> Tuple[List[str], List[str], List[str]]:
+        req_lower = raw_request.lower()
+        all_feature_text = " ".join(intent_features).lower() + " " + req_lower
+
+        in_scope = []
+        out_of_scope = []
+        questions = []
+
+        for category, config in cls.SPECULATIVE_BLOAT_CATEGORIES.items():
+            is_requested = any(re.search(rf"\b{re.escape(kw)}\b", all_feature_text) for kw in config["keywords"])
+            if is_requested:
+                in_scope.append(f"Integration of {category.replace('_', ' ').title()} requested by user")
+            else:
+                out_of_scope.append(f"Unrequested {category.replace('_', ' ').title()} (No {' / '.join(config['disallowed_additions'][:2])})")
+
+        return in_scope, out_of_scope, questions
+
+
 class CanonicalDomainOntology:
     """
     Canonical software domain ontology.
@@ -1953,7 +2008,14 @@ class SpecSynthesisEngine:
             if conflict not in requirements_list:
                 requirements_list.append(conflict)
 
-        # 6. Semantic Gate Evaluation with Dynamic Budget Scaling
+        # 6. Scope Boundary & Anti-Bloat Audit
+        in_scope_bounds, out_of_scope_bounds, _ = ScopeBoundaryGuard.audit_scope_boundaries(raw_request, intent.primary_features)
+        scope_boundaries_dict = {
+            "in_scope": in_scope_bounds,
+            "out_of_scope": out_of_scope_bounds
+        }
+
+        # 7. Semantic Gate Evaluation with Dynamic Budget Scaling
         gate_result_enum, total_weight = self.gate.evaluate(requirements_list, evidence, archetypes, scope_tier=scope_tier)
 
         questions = self._generate_clarifying_questions(requirements_list, intent)
@@ -1979,7 +2041,8 @@ class SpecSynthesisEngine:
             scope_tier=scope_tier.value,
             spec_version=current_version,
             page_spreads=page_spreads,
-            low_level_designs=lld_catalog
+            low_level_designs=lld_catalog,
+            scope_boundaries=scope_boundaries_dict
         )
 
         md_path = os.path.join(agents_dir, "synthesized_spec.md")
@@ -1991,7 +2054,7 @@ class SpecSynthesisEngine:
             from intent_contract import IntentContract
             ic = IntentContract(
                 goal=spec.intent_summary,
-                scope_boundaries=[],
+                scope_boundaries=out_of_scope_bounds,
                 acceptance_criteria=spec.acceptance_criteria,
                 error_paths=[]
             )
@@ -2001,7 +2064,7 @@ class SpecSynthesisEngine:
 
         # Save Markdown output
         try:
-            md_content = "# Synthesized Specification V4.0 (Production-Grade LLD)\n\n"
+            md_content = "# Synthesized Specification V4.1 (Production-Grade LLD & Scope-Guarded)\n\n"
             md_content += f"**Intent**: {spec.intent_summary}\n"
             md_content += f"**Archetypes**: {', '.join(spec.archetypes)} | **Scope**: {spec.scope_tier.upper()}\n"
             md_content += f"**Gate Result**: {spec.gate_result} (Assumption Weight: {spec.total_assumption_weight}/150)\n"
@@ -2012,6 +2075,13 @@ class SpecSynthesisEngine:
                 for i, q in enumerate(spec.questions_for_human, 1):
                     md_content += f"{i}. {q}\n"
                 md_content += "\n"
+
+            # Render Scope Boundaries (Anti-Bloat Guard)
+            md_content += "## 🛡️ Scope Boundaries & Anti-Bloat Guard\n\n"
+            md_content += "### Explicitly Out-of-Scope (Unrequested Subsystems Suppressed)\n"
+            for out_item in out_of_scope_bounds:
+                md_content += f"- 🚫 {out_item}\n"
+            md_content += "\n"
 
             # Render Role-Based Page Spreading Sitemap
             if spec.page_spreads:
