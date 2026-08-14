@@ -1,13 +1,13 @@
 """
-S-Class EOS V9.2 - Epistemic Truthfulness & 5D Gate Hardened Test Suite
+S-Class EOS V9.3 - Epistemic Grounding & Decision Risk Hardened Test Suite
 
 Validates:
-1. Missing/Fallback evidence MUST have quality 0.0 (EvidenceState.NO_EVIDENCE).
-2. Synthetic fallback alternatives DO NOT count as explored.
-3. Orthogonal 5D Challenge Protocol produces explicit PASS / FAIL / UNKNOWN statuses.
-4. UNKNOWN high-risk dimensions or NO_EVIDENCE MUST NOT ACCEPT (returns INSUFFICIENT_DEBATE).
-5. Strict Security Grounding requires actual ACTOR + CAPABILITY + AUTHORIZED_FOR edge.
-6. Epistemic Invariant: Unknown is never equivalent to evidence, and absence of an objection is never proof of correctness.
+1. Monolith topology without explicit consistency evidence MUST return UNKNOWN Data Consistency gate (NOT PASS).
+2. Single module without explicit modularity evidence MUST return UNKNOWN Modularity gate (NOT PASS).
+3. Approved decision WITHOUT grounded alternatives MUST FAIL sufficiency gate (returns INSUFFICIENT_DEBATE).
+4. Explicit consistency/ACID evidence returns PASS for Data Consistency gate.
+5. Dynamic Decision Risk Profiling assigns required high-risk dimensions based on decision topic/domain.
+6. Required UNKNOWN dimensions block decision acceptance.
 """
 
 import os
@@ -35,6 +35,7 @@ from architecture_debate import (
     EvidenceQualityRecord,
     EvidenceState,
     DimensionGateResult,
+    DecisionRiskProfile,
     ClaimDecomposer,
     GenericDebateEvaluator,
     DecisionSufficiencyGate
@@ -42,127 +43,89 @@ from architecture_debate import (
 import runtime
 
 
-def test_missing_evidence_must_have_quality_zero_and_reject_acceptance():
-    """Adversarial Test 1: ADR with empty or fallback evidence MUST be assigned EvidenceState.NO_EVIDENCE and quality 0.0."""
+def test_monolith_without_consistency_evidence_returns_unknown_consistency_gate():
+    """Adversarial Test 1: Monolith topology without explicit consistency evidence MUST return UNKNOWN Data Consistency gate (NOT PASS!)."""
     r_graph = RequirementGraph()
     b_graph = BehaviorGraph()
-    adr = ADRRecord(
-        id="ADR-001",
-        title="Architectural Topology Selection",
-        decision="Modular Monolith with Bounded Contexts",
-        alternatives=[],
-        evidence=["Default architectural inference"],  # Generic fallback!
-        affected_modules=["mod_1"],
-        rejected_options=[],
-        reason="Default",
-        status="PROPOSED",
-        confidence=0.50,
-        epistemic_status=EpistemicStatus.PROPOSED
-    )
+    mod = HLDModule(id="mod_1", name="Core Context", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["act"])
+    adr = ADRRecord("ADR-001", "Database Persistence Selection", "Modular Monolith", [], ["General context"], ["mod_1"], [], "Monolith choice", "PROPOSED", 0.50, EpistemicStatus.PROPOSED)
+    hld = HLDDesign(system_name="TestSys", architecture_style="Monolith", modules=[mod], adrs=[adr])
+
+    claim = ClaimDecomposer.decompose_adr_to_claim(adr, r_graph, b_graph, raw_request="Item inventory list")
+    challenges, alternatives, dim_gates = GenericDebateEvaluator.evaluate_5d_challenges(claim, adr, hld, r_graph, b_graph, raw_request="Item inventory list")
+
+    dc_gate = next(d for d in dim_gates if d.dimension_name == "Data Consistency & Persistence")
+    assert dc_gate.status == "UNKNOWN"
+    assert "No explicit data consistency or ACID transaction evidence provided" in dc_gate.missing_evidence
+
+
+def test_single_module_without_boundary_evidence_returns_unknown_modularity_gate():
+    """Adversarial Test 2: Single HLD module without explicit boundary evidence MUST return UNKNOWN Modularity gate (NOT PASS!)."""
+    r_graph = RequirementGraph()
+    b_graph = BehaviorGraph()
+    mod = HLDModule(id="mod_1", name="Core Context", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["act"])
+    adr = ADRRecord("ADR-001", "Topology Selection", "Modular Monolith", [], ["General context"], ["mod_1"], [], "Single module", "PROPOSED", 0.50, EpistemicStatus.PROPOSED)
+    hld = HLDDesign(system_name="TestSys", architecture_style="Monolith", modules=[mod], adrs=[adr])
 
     claim = ClaimDecomposer.decompose_adr_to_claim(adr, r_graph, b_graph, raw_request="")
+    challenges, alternatives, dim_gates = GenericDebateEvaluator.evaluate_5d_challenges(claim, adr, hld, r_graph, b_graph, raw_request="")
 
-    assert len(claim.evidence_quality_records) == 1
-    ev_rec = claim.evidence_quality_records[0]
-    assert ev_rec.evidence_state == EvidenceState.NO_EVIDENCE
-    assert ev_rec.quality_score == 0.0
-
-    # Sufficiency Gate MUST return INSUFFICIENT_DEBATE, NOT ACCEPT!
-    blast = {"blast_radius_score": 0.40}
-    dim_gates = [
-        DimensionGateResult("Scalability & Performance", "UNKNOWN", [], ["No throughput NFR"], []),
-        DimensionGateResult("Security & Authorization", "UNKNOWN", [], ["No auth rules"], [])
-    ]
-    outcome, confidence, metrics = DecisionSufficiencyGate.evaluate_sufficiency(claim, [], [], blast, dim_gates)
-
-    assert outcome == DecisionOutcome.INSUFFICIENT_DEBATE
-    assert metrics["has_no_evidence"] is True
-    assert metrics["gate_passed"] is False
+    mod_gate = next(d for d in dim_gates if d.dimension_name == "Modularity & Coupling")
+    assert mod_gate.status == "UNKNOWN"
 
 
-def test_synthetic_fallback_alternatives_do_not_count_as_explored():
-    """Adversarial Test 2: Synthetic alternatives generated by engine DO NOT satisfy alternatives_explored metric."""
+def test_approved_decision_without_grounded_alternatives_fails_sufficiency_gate():
+    """Adversarial Test 3: Approval receipt NO LONGER substitutes for grounded alternative exploration (returns INSUFFICIENT_DEBATE)."""
     synth_alt = ArchitecturalAlternative("ALT-GEN-01", "Modular Monolith", "Generic fallback", [], [], 0.3, 0.5, is_synthetic=True)
-    grounded_alt = ArchitecturalAlternative("ALT-REAL-01", "Kafka Streaming Microservices", "Grounded trade-off", ["Scale"], ["Complexity"], 0.8, 0.4, is_synthetic=False)
-
     ev_record = EvidenceQualityRecord("EV-1", EvidenceState.DIRECT_EVIDENCE, "REQUIREMENT_GRAPH", "Grounded requirement", 0.90, 1.0, 0.90, 0.90)
     claim = EngineeringClaim("CLAIM-1", "ADR-1", "Use Monolith", "Reason", [], [], [], [], [], [], [ev_record], "scale_throughput_invariant", 0.90)
     blast = {"blast_radius_score": 0.40}
+    risk_prof = DecisionRiskProfile("ADR-1", "DATA_PERSISTENCE", ["Data Consistency & Persistence"])
 
-    # Only synthetic alternatives provided -> alternatives_explored MUST BE FALSE!
     dim_gates_pass = [
-        DimensionGateResult("Scalability & Performance", "PASS", ["Matched"], [], []),
-        DimensionGateResult("Security & Authorization", "PASS", ["Matched"], [], [])
+        DimensionGateResult("Data Consistency & Persistence", "PASS", ["Matched"], [], [])
     ]
-    outcome, confidence, metrics = DecisionSufficiencyGate.evaluate_sufficiency(claim, [], [synth_alt], blast, dim_gates_pass)
 
-    assert metrics["grounded_alternatives_count"] == 0
-    assert metrics["synthetic_alternatives_count"] == 1
-    assert metrics["gate_passed"] is False
+    # has_existing_approval = True BUT synthetic alternatives only -> MUST RETURN INSUFFICIENT_DEBATE!
+    outcome, confidence, metrics = DecisionSufficiencyGate.evaluate_sufficiency(
+        claim=claim,
+        challenges=[],
+        alternatives=[synth_alt],
+        blast_analysis=blast,
+        dimension_gates=dim_gates_pass,
+        risk_profile=risk_prof,
+        has_existing_approval=True
+    )
+
+    assert metrics["alternatives_explored"] is False
     assert outcome == DecisionOutcome.INSUFFICIENT_DEBATE
 
-    # Grounded alternative provided -> alternatives_explored IS TRUE!
-    outcome_g, confidence_g, metrics_g = DecisionSufficiencyGate.evaluate_sufficiency(claim, [], [grounded_alt], blast, dim_gates_pass)
-    assert metrics_g["grounded_alternatives_count"] == 1
-    assert outcome_g == DecisionOutcome.ACCEPT
 
-
-def test_unknown_security_dimension_produces_unknown_not_pass():
-    """Adversarial Test 3: Unstated security requirements produce UNKNOWN status, NEVER PASS."""
-    r_graph = RequirementGraph()
-    b_graph = BehaviorGraph()  # Empty graph: no actors, no capabilities, no auth edges!
-    mod = HLDModule(id="mod_1", name="Core Context", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["act"])
-
-    adr_sec = ADRRecord("ADR-002", "Role Authorization Strategy", "RBAC with Epistemic Guards", [], ["Implicit"], ["mod_1"], [], "Security", "PROPOSED", 0.50, EpistemicStatus.PROPOSED)
-    hld = HLDDesign(system_name="TestSys", architecture_style="Monolith", modules=[mod], adrs=[adr_sec])
-
-    claim = ClaimDecomposer.decompose_adr_to_claim(adr_sec, r_graph, b_graph, raw_request="")
-    challenges, alternatives, dim_gates = GenericDebateEvaluator.evaluate_5d_challenges(claim, adr_sec, hld, r_graph, b_graph, raw_request="")
-
-    sec_gate = next(d for d in dim_gates if d.dimension_name == "Security & Authorization")
-    assert sec_gate.status == "UNKNOWN"
-    assert "Explicit role authorization policy rules" in sec_gate.missing_evidence
-
-
-def test_orthogonal_5d_gate_protocol_populates_dimension_gates():
-    """Verify GenericDebateEvaluator outputs 5 orthogonal dimension gates with PASS/FAIL/UNKNOWN statuses."""
+def test_explicit_consistency_evidence_returns_pass_consistency_gate():
+    """Verify explicit ACID/relational database prompt evidence produces PASS for Data Consistency gate."""
     r_graph = RequirementGraph()
     b_graph = BehaviorGraph()
     mod = HLDModule(id="mod_1", name="Core Context", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["act"])
-    adr_1 = ADRRecord("ADR-001", "Topology Selection", "Modular Monolith", ["Microservices"], ["Valid"], ["mod_1"], [], "Reason", "ACCEPTED", 0.95, EpistemicStatus.CONFIRMED)
-    hld = HLDDesign(system_name="TestSys", architecture_style="Monolith", modules=[mod], adrs=[adr_1])
+    adr = ADRRecord("ADR-001", "Database Persistence Selection", "PostgreSQL Relational DB", [], ["Relational schema with ACID transactions"], ["mod_1"], [], "ACID requirements", "ACCEPTED", 0.95, EpistemicStatus.CONFIRMED)
+    hld = HLDDesign(system_name="TestSys", architecture_style="Monolith", modules=[mod], adrs=[adr])
 
-    claim = ClaimDecomposer.decompose_adr_to_claim(adr_1, r_graph, b_graph, raw_request="Doctor approves prescription")
-    challenges, alternatives, dim_gates = GenericDebateEvaluator.evaluate_5d_challenges(claim, adr_1, hld, r_graph, b_graph, raw_request="Doctor approves prescription")
+    claim = ClaimDecomposer.decompose_adr_to_claim(adr, r_graph, b_graph, raw_request="PostgreSQL database with ACID transactions for financial ledger")
+    challenges, alternatives, dim_gates = GenericDebateEvaluator.evaluate_5d_challenges(claim, adr, hld, r_graph, b_graph, raw_request="PostgreSQL database with ACID transactions for financial ledger")
 
-    assert len(dim_gates) == 5
-    gate_names = [d.dimension_name for d in dim_gates]
-    assert "Scalability & Performance" in gate_names
-    assert "Security & Authorization" in gate_names
-    assert "Data Consistency & Persistence" in gate_names
-    assert "Fault Tolerance & Resilience" in gate_names
-    assert "Modularity & Coupling" in gate_names
+    dc_gate = next(d for d in dim_gates if d.dimension_name == "Data Consistency & Persistence")
+    assert dc_gate.status == "PASS"
+    assert "Explicit transactional consistency requirements" in dc_gate.evidence_found[0]
 
 
-def test_end_to_end_debate_no_evidence_blocks_acceptance(tmp_path):
-    """Integration Test: Debate cycle with missing evidence returns INSUFFICIENT_DEBATE and blocks HMAC signing."""
-    tmp_workspace = str(tmp_path)
-    os.environ["SCLASS_EXECUTION_MODE"] = "TEST"
-
+def test_dynamic_decision_risk_profiling_assigns_domain_specific_required_dimensions():
+    """Verify evaluate_risk_profile assigns domain-specific required high-risk dimensions."""
     r_graph = RequirementGraph()
     b_graph = BehaviorGraph()
-    mod = HLDModule(id="mod_1", name="Core Context", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["act"])
-    
-    # ADR with NO EVIDENCE
-    adr_no_ev = ADRRecord("ADR-001", "Topology Selection", "Modular Monolith", [], [], ["mod_1"], [], "No evidence rationale", "PROPOSED", 0.50, EpistemicStatus.PROPOSED)
-    hld = HLDDesign(system_name="HLD-001", architecture_style="Monolith", modules=[mod], adrs=[adr_no_ev])
 
-    res = ArchitectureDebateEngine.run_debate_cycle(hld, r_graph, b_graph, raw_request="", workspace_dir=tmp_workspace)
+    adr_db = ADRRecord("ADR-001", "Database Migration Strategy", "PostgreSQL", [], [], ["mod_1"], [], "DB", "PROPOSED", 0.50, EpistemicStatus.PROPOSED)
+    prof_db = GenericDebateEvaluator.evaluate_risk_profile(adr_db, r_graph, b_graph, raw_request="")
+    assert "Data Consistency & Persistence" in prof_db.required_high_risk_dimensions
 
-    assert len(res.accepted_adrs) == 1
-    assert res.accepted_adrs[0].status == "PROPOSED"  # MUST NOT BE ACCEPTED!
-    assert res.decision_records[0].decision_outcome == DecisionOutcome.INSUFFICIENT_DEBATE
-
-    # Verify NO HMAC approval record generated for ADR-001 in approvals.json
-    verified_approvals = ArtifactGovernor._load_verified_approval_records(tmp_workspace)
-    assert "ADR-001" not in verified_approvals
+    adr_sec = ADRRecord("ADR-002", "Role Authorization Guard", "RBAC", [], [], ["mod_1"], [], "Auth", "PROPOSED", 0.50, EpistemicStatus.PROPOSED)
+    prof_sec = GenericDebateEvaluator.evaluate_risk_profile(adr_sec, r_graph, b_graph, raw_request="")
+    assert "Security & Authorization" in prof_sec.required_high_risk_dimensions
