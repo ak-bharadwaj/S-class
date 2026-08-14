@@ -267,5 +267,20 @@
     ],
     "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
     "resolved": true
+  },
+  {
+    "id": "FAIL-PROSE-019",
+    "project": "Un-enforced FSM Transition Controls & Automatic Approval Inferences Audit",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-14T22:03:00Z",
+    "summary": "19-state FSM allowed phase transitions to CODING despite blocked artifact governance, and ApprovalStatus was automatically inferred as APPROVED from absence of blocking ADRs without explicit receipts.",
+    "root_cause": "unenforced_fsm_transitions_and_inferred_approval_semantics",
+    "missing_contracts": [
+      "authoritative_fsm_transition_denial_gate",
+      "strict_approval_receipt_verification",
+      "decision_log_transition_denial_provenance"
+    ],
+    "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
+    "resolved": true
   }
 ]

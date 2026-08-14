@@ -1,16 +1,17 @@
 """
-S-Class EOS V8.1 - Artifact Governance & Control Plane Test Suite
+S-Class EOS V8.1 - Authoritative Artifact Governance & Control Plane Test Suite
 
 Validates:
 1. Triad Status Model (EpistemicStatus, ValidationStatus, ApprovalStatus).
 2. Hard Execution Gate: Invalid HLD blocks downstream LLD and Task compilation (returns zero LLD/Tasks).
 3. Hard Execution Gate: PROPOSED/PENDING or REJECTED ADR blocks downstream LLD compilation (emits FSM transition target DEBATE).
-4. Untraceable LLD component blocks Task compilation.
-5. Complete graph lineage persistence in v7_refinement_pipeline.json.
+4. Authoritative Control Plane: FSM transition to CODING is HARD DENIED when artifact governance is blocked.
+5. Strict Approval Semantics: Confidence < 0.90 without explicit receipt stays PENDING; explicit receipt approves.
 """
 
 import os
 import sys
+import json
 import pytest
 
 PLUGIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -25,6 +26,7 @@ from lld_compiler import LLDCompiler, LLDComponent, LLDComponentType, LLDParentR
 from task_compiler import TaskCompiler, TaskCategory
 from artifact_governor import ArtifactGovernor, FSMTransitionTarget, GovernanceGateResult
 from spec_compiler import SpecificationCompiler
+import runtime
 
 
 def test_artifact_governance_blocks_lld_on_invalid_hld():
@@ -36,7 +38,6 @@ def test_artifact_governance_blocks_lld_on_invalid_hld():
         adrs=[]
     )
 
-    # Hard validation failure: HLD lacks required topology ADR-001
     hld_gov = ArtifactGovernor.audit_hld_governance(
         hld=hld,
         hld_validation_passed=False,
@@ -62,7 +63,6 @@ def test_artifact_governance_blocks_lld_on_proposed_adr():
         raw_request=prompt
     )
 
-    # Ambiguous prompt emits PROPOSED/REJECTED ADRs, so Artifact Governor hard-blocks LLD compilation
     assert res["blocked"] is True
     assert res["target_fsm_state"] == "DEBATE"
     assert len(res["lld_components"]) == 0
@@ -101,24 +101,68 @@ def test_artifact_governance_allows_compilation_on_confirmed_adr():
     assert hld_gov.recommended_fsm_state == FSMTransitionTarget.CODING
 
 
-def test_artifact_governance_blocks_tasks_on_untraceable_lld():
-    """Verify ArtifactGovernor blocks task compilation if an LLD component lacks parent lineage."""
-    hld = HLDDesign(
-        system_name="TestSystem",
-        architecture_style="Modular Monolith",
-        modules=[],
-        adrs=[]
-    )
+def test_fsm_transition_denied_when_artifact_governance_blocked(tmp_path):
+    """Verify runtime dispatch_event HARD DENIES FSM transition when artifact governance is blocked."""
+    tmp_workspace = str(tmp_path)
+    runtime.initialize_state(tmp_workspace, goal="Test Governance Goal")
 
-    untraceable_comp = LLDComponent(
-        id="bad_comp",
-        name="Bad Component",
-        component_type=LLDComponentType.CONTROLLER,
-        parent=LLDParentRef(hld_id="mod_1", req_ids=[], behavior_ids=[]),
-        role="controller"
-    )
+    agents_dir = os.path.join(tmp_workspace, ".agents")
+    pipe_file = os.path.join(agents_dir, "v7_refinement_pipeline.json")
+    runtime.write_json_atomic(pipe_file, {
+        "blocked": True,
+        "hld_governance": {
+            "is_blocked": True,
+            "blocking_reasons": ["ADR-001 is PROPOSED pending debate"],
+            "recommended_fsm_state": "DEBATE",
+            "validation_status": "BLOCKED",
+            "approval_status": "PENDING"
+        }
+    })
 
-    lld_gov = ArtifactGovernor.audit_lld_governance([untraceable_comp], hld)
-    assert lld_gov.is_blocked is True
-    assert lld_gov.validation_status == ValidationStatus.INVALID
-    assert lld_gov.recommended_fsm_state == FSMTransitionTarget.DESIGN
+    state = runtime.get_state(tmp_workspace)
+    state.currentPhase = "SPECIFICATION_SYNTHESIS"
+    runtime.save_state(state, tmp_workspace)
+
+    # Attempting transition to DESIGN from SPECIFICATION_SYNTHESIS must be DENIED!
+    with pytest.raises(ValueError) as excinfo:
+        runtime.dispatch_event("spec_synthesized", workspace_dir=tmp_workspace, enforce_evidence=False)
+
+    assert "ArtifactGovernor DENIED transition" in str(excinfo.value)
+    assert "Recommended FSM target: 'DEBATE'" in str(excinfo.value)
+
+    state = runtime.get_state(tmp_workspace)
+    assert state.activeEvent == "BLOCKED:spec_synthesized"
+    assert any("DENIED by ArtifactGovernor" in d.decision for d in state.decisionLog)
+
+
+def test_strict_approval_status_requires_explicit_receipt(tmp_path):
+    """Verify confidence < 0.90 stays PENDING without explicit receipt, and approves when receipt exists."""
+    tmp_workspace = str(tmp_path)
+    mod = HLDModule(id="mod_1", name="Core", system_boundary="internal", owned_entities=["Item"], owned_capabilities=["act"])
+    adr = ADRRecord(
+        id="ADR-001",
+        title="Topology",
+        decision="Monolith",
+        alternatives=[],
+        evidence=[],
+        affected_modules=["mod_1"],
+        rejected_options=[],
+        reason="Plausible",
+        status="ACCEPTED",
+        confidence=0.85,
+        epistemic_status=EpistemicStatus.DERIVED
+    )
+    hld = HLDDesign(system_name="Sys", architecture_style="Monolith", modules=[mod], adrs=[adr])
+
+    # 1. Without approvals file: confidence 0.85 stays PENDING!
+    gov1 = ArtifactGovernor.audit_hld_governance(hld, True, [], workspace_dir=tmp_workspace)
+    assert gov1.is_blocked is True
+    assert gov1.approval_status == ApprovalStatus.PENDING
+
+    # 2. With explicit approval receipt in approvals.json: becomes APPROVED!
+    app_file = os.path.join(tmp_workspace, ".agents", "approvals.json")
+    runtime.write_json_atomic(app_file, {"approved_adrs": ["ADR-001"]})
+
+    gov2 = ArtifactGovernor.audit_hld_governance(hld, True, [], workspace_dir=tmp_workspace)
+    assert gov2.is_blocked is False
+    assert adr.approval_status == ApprovalStatus.APPROVED

@@ -61,7 +61,7 @@ def test_runtime_integration_bug_fix_shortcut(tmp_path):
     runtime.dispatch_event("context_loaded", workspace_dir=workspace)
     assert runtime.get_state(workspace).currentPhase == "SPECIFICATION_SYNTHESIS"
 
-    # Create synthesized_spec receipt file required by SPECIFICATION_SYNTHESIS gate
+    # Create synthesized_spec and approvals receipt files required by control plane
     agents_dir = os.path.join(workspace, ".agents")
     os.makedirs(agents_dir, exist_ok=True)
     import json
@@ -74,6 +74,8 @@ def test_runtime_integration_bug_fix_shortcut(tmp_path):
             "gate_result": "PASS",
             "total_assumption_weight": 0
         }, f)
+    with open(os.path.join(agents_dir, "approvals.json"), "w", encoding="utf-8") as f:
+        json.dump({"all_approved": True}, f)
 
     # Under BUG_FIX profile, spec_synthesized shortcuts SPECIFICATION_SYNTHESIS directly to CODING!
     runtime.dispatch_event("spec_synthesized", workspace_dir=workspace)
@@ -87,6 +89,12 @@ def test_runtime_integration_hotfix_shortcut(tmp_path):
     runtime.initialize_state(workspace_dir=workspace, goal="Emergency hotfix for server crash", profile="hotfix")
     assert runtime.get_state(workspace).workflowProfile == "hotfix"
     
+    agents_dir = os.path.join(workspace, ".agents")
+    os.makedirs(agents_dir, exist_ok=True)
+    import json
+    with open(os.path.join(agents_dir, "approvals.json"), "w", encoding="utf-8") as f:
+        json.dump({"all_approved": True}, f)
+
     # Under HOTFIX profile, triage_done jumps directly from TRIAGE to CODING!
     runtime.dispatch_event("triage_done", workspace_dir=workspace)
     assert runtime.get_state(workspace).currentPhase == "CODING"
