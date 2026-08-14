@@ -264,3 +264,41 @@ def test_fail_closed_production_mode_default(tmp_path):
     gov = ArtifactGovernor.audit_hld_governance(hld, True, [], workspace_dir=tmp_workspace)
     assert gov.is_blocked is True
     assert "TEST_SYNTHETIC approval record is FORBIDDEN in PRODUCTION mode" in gov.blocking_reasons[0]
+
+
+def test_missing_pipeline_artifact_blocks_downstream_execution_phase(tmp_path):
+    """Control Plane Invariant Test: Missing v7_refinement_pipeline.json when targeting downstream CODING phase MUST FAIL CLOSED."""
+    tmp_workspace = str(tmp_path)
+    gov = ArtifactGovernor.enforce_fsm_transition(
+        current_phase="SPECIFICATION_SYNTHESIS",
+        proposed_event="spec_synthesized",
+        target_phase="CODING",
+        workspace_dir=tmp_workspace
+    )
+
+    assert gov.is_blocked is True
+    assert gov.recommended_fsm_state == FSMTransitionTarget.DESIGN
+    assert "Missing mandatory refinement pipeline artifact" in gov.blocking_reasons[0]
+
+
+def test_corrupted_pipeline_artifact_fails_closed(tmp_path):
+    """Control Plane Invariant Test: Corrupted v7_refinement_pipeline.json MUST FAIL CLOSED rather than passing silently."""
+    tmp_workspace = str(tmp_path)
+    agents_dir = os.path.join(tmp_workspace, ".agents")
+    os.makedirs(agents_dir, exist_ok=True)
+    pipe_file = os.path.join(agents_dir, "v7_refinement_pipeline.json")
+
+    with open(pipe_file, "w", encoding="utf-8") as f:
+        f.write("{ CORRUPTED_INVALID_JSON ...")
+
+    gov = ArtifactGovernor.enforce_fsm_transition(
+        current_phase="DESIGN",
+        proposed_event="design_approved",
+        target_phase="CODING",
+        workspace_dir=tmp_workspace
+    )
+
+    assert gov.is_blocked is True
+    assert gov.recommended_fsm_state == FSMTransitionTarget.CLARIFICATION
+    assert "failed closed due to internal error" in gov.blocking_reasons[0]
+

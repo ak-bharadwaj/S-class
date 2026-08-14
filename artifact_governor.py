@@ -412,13 +412,22 @@ class ArtifactGovernor:
         pipeline_file = os.path.join(cwd, ".agents", "v7_refinement_pipeline.json")
 
         if not os.path.exists(pipeline_file):
-            return GovernanceGateResult(
-                is_blocked=False,
-                blocking_reasons=[],
-                recommended_fsm_state=FSMTransitionTarget.CODING,
-                validation_status=ValidationStatus.VALID,
-                approval_status=ApprovalStatus.NOT_REQUIRED
-            )
+            if target_phase in ["TRIAGE", "ANALYSIS", "SPECIFICATION_SYNTHESIS", "CLARIFICATION"]:
+                return GovernanceGateResult(
+                    is_blocked=False,
+                    blocking_reasons=[],
+                    recommended_fsm_state=FSMTransitionTarget.DESIGN,
+                    validation_status=ValidationStatus.VALID,
+                    approval_status=ApprovalStatus.NOT_REQUIRED
+                )
+            else:
+                return GovernanceGateResult(
+                    is_blocked=True,
+                    blocking_reasons=[f"Missing mandatory refinement pipeline artifact '.agents/v7_refinement_pipeline.json' for execution phase '{target_phase}'."],
+                    recommended_fsm_state=FSMTransitionTarget.DESIGN,
+                    validation_status=ValidationStatus.INVALID,
+                    approval_status=ApprovalStatus.REJECTED
+                )
 
         try:
             with open(pipeline_file, "r", encoding="utf-8") as f:
@@ -476,7 +485,13 @@ class ArtifactGovernor:
                         approval_status=ApprovalStatus(hld_gov.get("approval_status", "PENDING"))
                     )
         except Exception as e:
-            pass
+            return GovernanceGateResult(
+                is_blocked=True,
+                blocking_reasons=[f"Artifact governance evaluation failed closed due to internal error: {e}"],
+                recommended_fsm_state=FSMTransitionTarget.CLARIFICATION,
+                validation_status=ValidationStatus.BLOCKED,
+                approval_status=ApprovalStatus.PENDING
+            )
 
         return GovernanceGateResult(
             is_blocked=False,
