@@ -160,5 +160,19 @@
     ],
     "skeptic_rule_id": "SKEPTIC-ACTOR-COMPLETENESS",
     "resolved": true
+  },
+  {
+    "id": "FAIL-PROSE-012",
+    "project": "Unbacked Layout & API Inference Audit",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-14T21:30:00Z",
+    "summary": "Spec compiler inferred TelemetryTimeSeriesChart, MetricThresholdConfigDrawer, and POST /api/telemetry/ingest directly from raw entity existence without Behavior Node grounding.",
+    "root_cause": "unjustified_layout_and_api_inference_jump",
+    "missing_contracts": [
+      "behavior_graph_command_query_derivation",
+      "structural_ir_grounding_skeptic_rule"
+    ],
+    "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
+    "resolved": true
   }
 ]

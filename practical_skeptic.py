@@ -48,7 +48,8 @@ class PracticalSkeptic:
         "SKEPTIC-SOURCE-DECISION-PRESERVATION",
         "SKEPTIC-PROSE-CRUD-DUPLICATION",
         "SKEPTIC-NON-NOUN-API",
-        "SKEPTIC-ACTOR-COMPLETENESS"
+        "SKEPTIC-ACTOR-COMPLETENESS",
+        "SKEPTIC-STRUCTURAL-GROUNDING"
     }
 
     @classmethod
@@ -304,5 +305,35 @@ class PracticalSkeptic:
                         "message": f"Synthesize dedicated workspace page spread for named role '{w_norm}'."
                     })
                     passed = False
+
+        # Rule 12: SKEPTIC-STRUCTURAL-GROUNDING — Verify endpoints resolve to behavior nodes, domain primitives, or explicit routes
+        lld_cat = spec_dict.get("low_level_designs", spec_dict.get("low_level_design_catalog", {}))
+        spreads_map = spec_dict.get("page_spreads", {})
+        if "SKEPTIC-STRUCTURAL-GROUNDING" in cls.ACTIVE_RULES and lld_cat:
+            explicit_routes_set = set()
+            if workspace_evidence and getattr(workspace_evidence, "api_routes", None):
+                for er in workspace_evidence.api_routes:
+                    explicit_routes_set.add(f"{er.get('method', '').upper()} {er.get('path', '')}")
+
+            valid_stems = set()
+            if spreads_map:
+                for r_key, page_list in spreads_map.items():
+                    for p in page_list:
+                        mod_k = p.get("module_key", "").lower().replace("entity_", "").replace("wf_", "").replace("doc_", "").replace("resource_", "")
+                        if mod_k:
+                            valid_stems.add(mod_k)
+
+            unsupported_endpoints = []
+            for lld_key, lld in lld_cat.items():
+                endpoints = lld.get("api_endpoints", [])
+                for ep in endpoints:
+                    if ep in explicit_routes_set or any(sys_kw in ep.lower() for sys_kw in ["/api/auth", "/api/account", "/api/session", "cli://"]):
+                        continue
+                    tokens = [t.lower() for t in re.split(r'[/_\-\s]', ep) if t and not t.startswith('{') and not t.startswith(':')]
+                    if not any(stem in tokens or any(t.startswith(stem) or stem.startswith(t) for t in tokens if len(t) >= 4) for stem in valid_stems if stem):
+                        unsupported_endpoints.append(ep)
+
+            if unsupported_endpoints:
+                warnings.append(f"[SKEPTIC-STRUCTURAL-GROUNDING] Synthesized API endpoints lack structural IR grounding: {', '.join(unsupported_endpoints[:5])}")
 
         return passed, warnings, checks

@@ -184,5 +184,23 @@
     "description": "Fired when the user responds to clarifying questions and spec synthesis resumes.",
     "nextState": "SPECIFICATION_SYNTHESIS",
     "sideEffects": []
+  },
+  {
+    "event": "no_changes_required",
+    "description": "Fired when adversarial debate passes with 100% consensus score and zero architectural changes required.",
+    "nextState": "TASK_COMPILATION",
+    "sideEffects": []
+  },
+  {
+    "event": "revisions_required",
+    "description": "Fired when debate identifies structural architectural modifications requiring design revision.",
+    "nextState": "DESIGN_REVISION",
+    "sideEffects": ["incrementSpecVersion"]
+  },
+  {
+    "event": "unresolved_high_risk",
+    "description": "Fired when debate discovers unresolvable high-risk assumptions requiring human clarification.",
+    "nextState": "CLARIFICATION",
+    "sideEffects": []
   }
 ]

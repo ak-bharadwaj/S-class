@@ -31,6 +31,9 @@
     "DEBATE": {
       "parallelGroup": "Parallel Group #1",
       "transitions": {
+        "no_changes_required": "TASK_COMPILATION",
+        "revisions_required": "DESIGN_REVISION",
+        "unresolved_high_risk": "CLARIFICATION",
         "spec_approved": "DESIGN_REVISION",
         "debate_failed": "DESIGN"
       }

@@ -87,12 +87,25 @@ class DomainNode:
         )
 
 
+class EdgeProvenanceType(str, Enum):
+    """Provenance trail of semantic relationships."""
+    EXPLICIT = "explicit"                     # Directly stated in source prompt/doc
+    OBSERVED = "observed"                     # Extracted from AST code/DB schema/routes
+    BEHAVIORAL_DERIVATION = "derived"         # Inferred via Behavior Engine state machine
+    SPECULATIVE = "speculative"               # Unbacked assumption requiring human review
+
+
 @dataclass
 class DomainEdge:
-    """A directed semantic relationship between two domain nodes."""
+    """A directed semantic relationship between two domain nodes with first-class provenance."""
     source_id: str
     relation: RelationType
     target_id: str
+    provenance: EdgeProvenanceType = EdgeProvenanceType.BEHAVIORAL_DERIVATION
+    confidence: float = 1.0
+    evidence_ref: Optional[str] = None
+    inference_rule: Optional[str] = None
+    assumptions: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -100,15 +113,30 @@ class DomainEdge:
             "source_id": self.source_id,
             "relation": self.relation.value,
             "target_id": self.target_id,
+            "provenance": self.provenance.value,
+            "confidence": self.confidence,
+            "evidence_ref": self.evidence_ref,
+            "inference_rule": self.inference_rule,
+            "assumptions": self.assumptions,
             "metadata": self.metadata
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'DomainEdge':
+        prov_val = data.get("provenance", "derived")
+        try:
+            prov = EdgeProvenanceType(prov_val)
+        except ValueError:
+            prov = EdgeProvenanceType.BEHAVIORAL_DERIVATION
         return cls(
             source_id=data["source_id"],
             relation=RelationType(data["relation"]),
             target_id=data["target_id"],
+            provenance=prov,
+            confidence=data.get("confidence", 1.0),
+            evidence_ref=data.get("evidence_ref"),
+            inference_rule=data.get("inference_rule"),
+            assumptions=data.get("assumptions", []),
             metadata=data.get("metadata", {})
         )
 
@@ -158,13 +186,34 @@ class SemanticDomainGraph:
             self._reverse_adjacency[node.id] = []
         return node
 
-    def add_edge(self, source_id: str, relation: RelationType, target_id: str, metadata: Optional[Dict[str, Any]] = None) -> DomainEdge:
+    def add_edge(
+        self,
+        source_id: str,
+        relation: RelationType,
+        target_id: str,
+        metadata: Optional[Dict[str, Any]] = None,
+        provenance: EdgeProvenanceType = EdgeProvenanceType.BEHAVIORAL_DERIVATION,
+        confidence: float = 1.0,
+        evidence_ref: Optional[str] = None,
+        inference_rule: Optional[str] = None,
+        assumptions: Optional[List[str]] = None
+    ) -> DomainEdge:
         if source_id not in self.nodes:
             raise KeyError(f"Source node '{source_id}' does not exist in domain graph")
         if target_id not in self.nodes:
             raise KeyError(f"Target node '{target_id}' does not exist in domain graph")
 
-        edge = DomainEdge(source_id=source_id, relation=relation, target_id=target_id, metadata=metadata or {})
+        edge = DomainEdge(
+            source_id=source_id,
+            relation=relation,
+            target_id=target_id,
+            provenance=provenance,
+            confidence=confidence,
+            evidence_ref=evidence_ref,
+            inference_rule=inference_rule,
+            assumptions=assumptions or [],
+            metadata=metadata or {}
+        )
         self.edges.append(edge)
         self._adjacency[source_id].append(edge)
         self._reverse_adjacency[target_id].append(edge)
