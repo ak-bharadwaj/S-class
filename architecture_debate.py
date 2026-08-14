@@ -576,10 +576,12 @@ class GenericDebateEvaluator:
         actual_auth_edges = [e for e in b_graph.edges if e.relation == BehaviorRelationType.AUTHORIZED_FOR]
         has_auth_guard_design = any(k in ev for ev in ev_list_lower for k in ["capability guard", "epistemic guard", "policy engine", "rbac guard", "jwt guard"])
 
-        if actual_auth_edges and (actual_actors or has_auth_guard_design):
+        has_security_arch_mechanism = bool(actual_auth_edges and (actual_actors or has_auth_guard_design))
+
+        if has_security_req and has_security_arch_mechanism:
             dim2_arch_ev.append("Protected boundary + domain actors + explicit AUTHORIZED_FOR edges present in behavior graph")
-            dim2_status = "PASS" if has_security_req else "PASS"
-        elif has_security_req:
+            dim2_status = "PASS"
+        elif has_security_req and not has_security_arch_mechanism:
             c_sec = ClaimChallenge(
                 challenge_id="CHALLENGE-AUTH-01",
                 category=ChallengeCategory.AUTH_SECURITY,
@@ -594,6 +596,10 @@ class GenericDebateEvaluator:
             challenges.append(c_sec)
             dim2_status = "UNKNOWN"
             dim2_missing.append("Security requirement present, but missing explicit role authorization policy rules and protected boundaries")
+        elif not has_security_req and has_security_arch_mechanism:
+            dim2_arch_ev.append("Protected boundary + domain actors + explicit AUTHORIZED_FOR edges present in behavior graph")
+            dim2_status = "UNKNOWN"
+            dim2_missing.append("Security architecture mechanism present, but explicit security requirement unstated")
         else:
             dim2_status = "UNKNOWN"
             dim2_missing.append("Security requirements unstated in current claim")
@@ -745,7 +751,7 @@ class DecisionSufficiencyGate:
         # 2. Grounded Alternatives Check (Synthetic fallbacks EXCLUDED; require non-empty comparison rationales!)
         grounded_alts = [a for a in alternatives if not a.is_synthetic]
         tradeoff_complete_alts = [a for a in grounded_alts if a.comparison_rationale]
-        alternatives_explored = len(grounded_alts) >= 1
+        alternatives_explored = len(tradeoff_complete_alts) >= 1
 
         # 3. Blast Radius Safety Check
         blast_radius_acceptable = blast_analysis.get("blast_radius_score", 0.5) < 0.85

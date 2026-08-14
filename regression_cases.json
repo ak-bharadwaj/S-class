@@ -412,5 +412,19 @@
     ],
     "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
     "resolved": true
+  },
+  {
+    "id": "FAIL-PROSE-028",
+    "project": "Un-Evaluated Alternative Counting Bug & Security PASS Dual-Evidence Bypass",
+    "stack": "nextjs_prisma",
+    "date_logged": "2026-08-14T23:14:00Z",
+    "summary": "Debate engine counted grounded alternatives without comparison rationales as explored alternatives, and returned PASS for Security & Authorization gate even when explicit security requirements were missing.",
+    "root_cause": "un_evaluated_alternative_counting_and_security_pass_dual_evidence_bypass",
+    "missing_contracts": [
+      "tradeoff_complete_alternative_exploration_enforcement",
+      "strict_security_dual_evidence_compliance"
+    ],
+    "skeptic_rule_id": "SKEPTIC-STRUCTURAL-GROUNDING",
+    "resolved": true
   }
 ]
