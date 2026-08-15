@@ -1,0 +1,25 @@
+{
+  "task_id": "ENG-05-EXAM-LOCKDOWN-KIOSK",
+  "baseline": "B1_RAW_AGENT",
+  "timestamp": "2026-08-15T19:16:49.619497+00:00",
+  "raw_prompt": "Build an examination lockdown sandbox that restricts dual-monitor mirroring and intercepts OS clipboard paste during active exam sessions.",
+  "synthesized_requirements": [
+    "Core Operation",
+    "Helper Utility",
+    "Extra Unneeded Feature"
+  ],
+  "synthesized_code": "def check_status(): return True\n",
+  "test_harness_output": "Test failed with exit code 1:\nTraceback (most recent call last):\n  File \"<string>\", line 16, in <module>\n    test_lockdown_sandbox()\n    ~~~~~~~~~~~~~~~~~~~~~^^\n  File \"<string>\", line 7, in test_lockdown_sandbox\n    from target_module import start_exam_session, on_clipboard_paste, on_secondary_monitor_detected\nModuleNotFoundError: No module named 'target_module'",
+  "test_passed": false,
+  "must_invariants_recovered": 0,
+  "must_invariants_total": 4,
+  "must_recall": 0.0,
+  "gt_recall": 0.0,
+  "unsupported_rate": 100.0,
+  "requirement_count": 3,
+  "defects": 2,
+  "interventions": 0,
+  "rework_score": 7.5,
+  "latency_ms": 92.19,
+  "trust_score": 4.0
+}

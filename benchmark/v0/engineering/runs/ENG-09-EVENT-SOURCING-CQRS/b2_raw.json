@@ -1,0 +1,27 @@
+{
+  "task_id": "ENG-09-EVENT-SOURCING-CQRS",
+  "baseline": "B2_AGENT_WITH_TESTS",
+  "timestamp": "2026-08-15T19:16:50.797471+00:00",
+  "raw_prompt": "Build an append-only event store with optimistic concurrency version checking and asynchronous read-model CQRS projections.",
+  "synthesized_requirements": [
+    "Core Operation",
+    "Helper Utility",
+    "Regression Guard",
+    "Extra Unneeded Feature",
+    "Diagnostic UI"
+  ],
+  "synthesized_code": "def check_status(): return True\n",
+  "test_harness_output": "Test failed with exit code 1:\nTraceback (most recent call last):\n  File \"<string>\", line 20, in <module>\n    test_event_store()\n    ~~~~~~~~~~~~~~~~^^\n  File \"<string>\", line 7, in test_event_store\n    from target_module import append_event, get_events, ConcurrencyError\nModuleNotFoundError: No module named 'target_module'",
+  "test_passed": false,
+  "must_invariants_recovered": 0,
+  "must_invariants_total": 4,
+  "must_recall": 0.0,
+  "gt_recall": 14.29,
+  "unsupported_rate": 80.0,
+  "requirement_count": 5,
+  "defects": 1,
+  "interventions": 1,
+  "rework_score": 5.5,
+  "latency_ms": 1580.96,
+  "trust_score": 6.0
+}

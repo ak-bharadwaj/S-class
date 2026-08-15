@@ -1,0 +1,25 @@
+{
+  "task_id": "ENG-07-OAUTH2-TOKEN-EXCHANGE",
+  "baseline": "B1_RAW_AGENT",
+  "timestamp": "2026-08-15T19:16:50.181565+00:00",
+  "raw_prompt": "Implement RFC 8693 OAuth2 token exchange with PKCE code verification and stateless JWT verification.",
+  "synthesized_requirements": [
+    "Core Operation",
+    "Helper Utility",
+    "Extra Unneeded Feature"
+  ],
+  "synthesized_code": "def check_status(): return True\n",
+  "test_harness_output": "Test failed with exit code 1:\nTraceback (most recent call last):\n  File \"<string>\", line 12, in <module>\n    test_token_exchange()\n    ~~~~~~~~~~~~~~~~~~~^^\n  File \"<string>\", line 7, in test_token_exchange\n    from target_module import exchange_token, verify_pkce\nModuleNotFoundError: No module named 'target_module'",
+  "test_passed": false,
+  "must_invariants_recovered": 0,
+  "must_invariants_total": 4,
+  "must_recall": 0.0,
+  "gt_recall": 0.0,
+  "unsupported_rate": 100.0,
+  "requirement_count": 3,
+  "defects": 2,
+  "interventions": 0,
+  "rework_score": 7.5,
+  "latency_ms": 88.43,
+  "trust_score": 4.0
+}

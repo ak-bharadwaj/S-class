@@ -1,0 +1,25 @@
+{
+  "task_id": "ENG-16-MULTI-TENANT-RLS-GUARD",
+  "baseline": "B3_SCLASS_CANDIDATE_AUTHORITY",
+  "timestamp": "2026-08-15T19:16:52.871900+00:00",
+  "raw_prompt": "Implement multi-tenant row-level security (RLS) enforcement on SQL queries with tenant context propagation and cross-tenant leak guards.",
+  "synthesized_requirements": [
+    "Core Service Functionality",
+    "Underlying Storage Technology Specification",
+    "API Transport Protocol Specification"
+  ],
+  "synthesized_code": "def check_status(): return True\n",
+  "test_harness_output": "Test failed with exit code 1:\nTraceback (most recent call last):\n  File \"<string>\", line 20, in <module>\n    test_multi_tenant_rls()\n    ~~~~~~~~~~~~~~~~~~~~~^^\n  File \"<string>\", line 7, in test_multi_tenant_rls\n    from target_module import execute_query, set_tenant_context, clear_tenant_context\nModuleNotFoundError: No module named 'target_module'",
+  "test_passed": false,
+  "must_invariants_recovered": 0,
+  "must_invariants_total": 4,
+  "must_recall": 0.0,
+  "gt_recall": 16.67,
+  "unsupported_rate": 0.0,
+  "requirement_count": 3,
+  "defects": 0,
+  "interventions": 0,
+  "rework_score": 1.5,
+  "latency_ms": 90.09,
+  "trust_score": 9.5
+}

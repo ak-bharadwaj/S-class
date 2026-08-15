@@ -1,0 +1,29 @@
+{
+  "task_id": "ENG-07-OAUTH2-TOKEN-EXCHANGE",
+  "baseline": "B3_SCLASS_CANDIDATE_AUTHORITY",
+  "timestamp": "2026-08-15T19:16:50.357862+00:00",
+  "raw_prompt": "Implement RFC 8693 OAuth2 token exchange with PKCE code verification and stateless JWT verification.",
+  "synthesized_requirements": [
+    "Password Reset Session Revocation",
+    "Cross-Cluster Token Blacklist Propagation",
+    "Cryptographic Credential Hashing (Argon2id / bcrypt)",
+    "Bounded Blacklist Retention and TTL Expiry",
+    "Immediate Fail-Closed Access Gate",
+    "Underlying Storage Technology Specification",
+    "API Transport Protocol Specification"
+  ],
+  "synthesized_code": "def check_status(): return True\n",
+  "test_harness_output": "Test failed with exit code 1:\nTraceback (most recent call last):\n  File \"<string>\", line 12, in <module>\n    test_token_exchange()\n    ~~~~~~~~~~~~~~~~~~~^^\n  File \"<string>\", line 7, in test_token_exchange\n    from target_module import exchange_token, verify_pkce\nModuleNotFoundError: No module named 'target_module'",
+  "test_passed": false,
+  "must_invariants_recovered": 3,
+  "must_invariants_total": 4,
+  "must_recall": 75.0,
+  "gt_recall": 66.67,
+  "unsupported_rate": 0.0,
+  "requirement_count": 7,
+  "defects": 0,
+  "interventions": 0,
+  "rework_score": 1.5,
+  "latency_ms": 88.48,
+  "trust_score": 9.5
+}

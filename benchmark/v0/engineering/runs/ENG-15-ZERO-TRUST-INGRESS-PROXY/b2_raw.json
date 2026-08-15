@@ -1,0 +1,27 @@
+{
+  "task_id": "ENG-15-ZERO-TRUST-INGRESS-PROXY",
+  "baseline": "B2_AGENT_WITH_TESTS",
+  "timestamp": "2026-08-15T19:16:52.488416+00:00",
+  "raw_prompt": "Build a zero-trust reverse proxy ingress gateway that verifies mutual TLS (mTLS) certificates and validates JWT claims.",
+  "synthesized_requirements": [
+    "Core Operation",
+    "Helper Utility",
+    "Regression Guard",
+    "Extra Unneeded Feature",
+    "Diagnostic UI"
+  ],
+  "synthesized_code": "def check_status(): return True\n",
+  "test_harness_output": "Test failed with exit code 1:\nTraceback (most recent call last):\n  File \"<string>\", line 17, in <module>\n    test_ingress_proxy()\n    ~~~~~~~~~~~~~~~~~~^^\n  File \"<string>\", line 7, in test_ingress_proxy\n    from target_module import handle_ingress_request\nModuleNotFoundError: No module named 'target_module'",
+  "test_passed": false,
+  "must_invariants_recovered": 0,
+  "must_invariants_total": 4,
+  "must_recall": 0.0,
+  "gt_recall": 16.67,
+  "unsupported_rate": 80.0,
+  "requirement_count": 5,
+  "defects": 1,
+  "interventions": 1,
+  "rework_score": 5.5,
+  "latency_ms": 1587.36,
+  "trust_score": 6.0
+}

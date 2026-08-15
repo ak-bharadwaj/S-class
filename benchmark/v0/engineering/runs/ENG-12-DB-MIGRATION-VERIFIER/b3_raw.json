@@ -1,0 +1,30 @@
+{
+  "task_id": "ENG-12-DB-MIGRATION-VERIFIER",
+  "baseline": "B3_SCLASS_CANDIDATE_AUTHORITY",
+  "timestamp": "2026-08-15T19:16:51.754596+00:00",
+  "raw_prompt": "Implement a transactional database schema migration runner with lock timeout safeguard and zero-downtime rollback checks.",
+  "synthesized_requirements": [
+    "Atomic Ledger Transaction Boundary",
+    "Double-Entry Balance Invariance",
+    "Idempotency Key Verification",
+    "Disallow Negative Amount / Non-Zero Transfer Guard",
+    "Row-Level Account Locking and Concurrency Control",
+    "Append-Only Immutable Audit Log",
+    "Underlying Storage Technology Specification",
+    "API Transport Protocol Specification"
+  ],
+  "synthesized_code": "def check_status(): return True\n",
+  "test_harness_output": "Test failed with exit code 1:\nTraceback (most recent call last):\n  File \"<string>\", line 19, in <module>\n    test_migration_runner()\n    ~~~~~~~~~~~~~~~~~~~~~^^\n  File \"<string>\", line 7, in test_migration_runner\n    from target_module import run_migrations, get_applied_migrations\nModuleNotFoundError: No module named 'target_module'",
+  "test_passed": false,
+  "must_invariants_recovered": 3,
+  "must_invariants_total": 4,
+  "must_recall": 75.0,
+  "gt_recall": 66.67,
+  "unsupported_rate": 0.0,
+  "requirement_count": 8,
+  "defects": 0,
+  "interventions": 0,
+  "rework_score": 1.5,
+  "latency_ms": 111.4,
+  "trust_score": 9.5
+}

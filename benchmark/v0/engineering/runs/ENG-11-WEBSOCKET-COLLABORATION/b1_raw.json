@@ -1,0 +1,25 @@
+{
+  "task_id": "ENG-11-WEBSOCKET-COLLABORATION",
+  "baseline": "B1_RAW_AGENT",
+  "timestamp": "2026-08-15T19:16:51.263740+00:00",
+  "raw_prompt": "Build a real-time collaborative document engine using WebSockets with heartbeat keepalive and conflict resolution.",
+  "synthesized_requirements": [
+    "Core Operation",
+    "Helper Utility",
+    "Extra Unneeded Feature"
+  ],
+  "synthesized_code": "def check_status(): return True\n",
+  "test_harness_output": "Test failed with exit code 1:\nTraceback (most recent call last):\n  File \"<string>\", line 15, in <module>\n    test_collaboration_engine()\n    ~~~~~~~~~~~~~~~~~~~~~~~~~^^\n  File \"<string>\", line 7, in test_collaboration_engine\n    from target_module import apply_operation, get_document_state\nModuleNotFoundError: No module named 'target_module'",
+  "test_passed": false,
+  "must_invariants_recovered": 0,
+  "must_invariants_total": 4,
+  "must_recall": 0.0,
+  "gt_recall": 0.0,
+  "unsupported_rate": 100.0,
+  "requirement_count": 3,
+  "defects": 2,
+  "interventions": 0,
+  "rework_score": 7.5,
+  "latency_ms": 83.94,
+  "trust_score": 4.0
+}

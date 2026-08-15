@@ -1,0 +1,27 @@
+{
+  "task_id": "ENG-01-FINTECH-LEDGER",
+  "baseline": "B2_AGENT_WITH_TESTS",
+  "timestamp": "2026-08-15T19:16:48.575511+00:00",
+  "raw_prompt": "Build an atomic double-entry financial ledger transaction engine with balance invariance and idempotency check.",
+  "synthesized_requirements": [
+    "Execute Transfer",
+    "Get Balance",
+    "Disallow Negative Amount",
+    "Export CSV Ledger",
+    "Send Email Notification"
+  ],
+  "synthesized_code": "\nbalances = {'A': 0, 'B': 0}\nseen_keys = set()\ndef execute_transaction(from_acc, to_acc, amount, idem_key):\n    if amount <= 0: raise ValueError('negative amount')\n    if idem_key in seen_keys: return {'status': 'OK', 'id': idem_key}\n    seen_keys.add(idem_key)\n    balances[from_acc] -= amount\n    balances[to_acc] += amount\n    return {'status': 'OK', 'id': idem_key}\ndef get_balance(acc): return balances.get(acc, 0)\n",
+  "test_harness_output": "Test failed with exit code 1:\nTraceback (most recent call last):\n  File \"<string>\", line 19, in test_ledger_invariants\n    from target_module import execute_transaction\nModuleNotFoundError: No module named 'target_module'\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"<string>\", line 40, in <module>\n    test_ledger_invariants()\n    ~~~~~~~~~~~~~~~~~~~~~~^^\n  File \"<string>\", line 25, in test_ledger_invariants\n    if 'negative' not in str(e).lower(): assert False, f'Unexpected error: {e}'\n                                                ^^^^^\nAssertionError: Unexpected error: No module named 'target_module'",
+  "test_passed": false,
+  "must_invariants_recovered": 4,
+  "must_invariants_total": 6,
+  "must_recall": 66.67,
+  "gt_recall": 62.5,
+  "unsupported_rate": 0.0,
+  "requirement_count": 5,
+  "defects": 1,
+  "interventions": 1,
+  "rework_score": 5.5,
+  "latency_ms": 1593.94,
+  "trust_score": 6.0
+}

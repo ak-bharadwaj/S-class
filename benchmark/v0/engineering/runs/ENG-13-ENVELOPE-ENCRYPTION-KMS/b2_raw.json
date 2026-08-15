@@ -1,0 +1,27 @@
+{
+  "task_id": "ENG-13-ENVELOPE-ENCRYPTION-KMS",
+  "baseline": "B2_AGENT_WITH_TESTS",
+  "timestamp": "2026-08-15T19:16:51.927849+00:00",
+  "raw_prompt": "Build an envelope encryption library using AES-256-GCM data encryption keys wrapped with cloud KMS master keys.",
+  "synthesized_requirements": [
+    "Core Operation",
+    "Helper Utility",
+    "Regression Guard",
+    "Extra Unneeded Feature",
+    "Diagnostic UI"
+  ],
+  "synthesized_code": "def check_status(): return True\n",
+  "test_harness_output": "Test failed with exit code 1:\nTraceback (most recent call last):\n  File \"<string>\", line 17, in <module>\n    test_envelope_encryption()\n    ~~~~~~~~~~~~~~~~~~~~~~~~^^\n  File \"<string>\", line 7, in test_envelope_encryption\n    from target_module import encrypt_envelope, decrypt_envelope, TamperError\nModuleNotFoundError: No module named 'target_module'",
+  "test_passed": false,
+  "must_invariants_recovered": 0,
+  "must_invariants_total": 4,
+  "must_recall": 0.0,
+  "gt_recall": 16.67,
+  "unsupported_rate": 80.0,
+  "requirement_count": 5,
+  "defects": 1,
+  "interventions": 1,
+  "rework_score": 5.5,
+  "latency_ms": 1587.07,
+  "trust_score": 6.0
+}

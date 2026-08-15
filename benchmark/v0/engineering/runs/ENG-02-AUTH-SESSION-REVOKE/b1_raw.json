@@ -1,0 +1,25 @@
+{
+  "task_id": "ENG-02-AUTH-SESSION-REVOKE",
+  "baseline": "B1_RAW_AGENT",
+  "timestamp": "2026-08-15T19:16:48.773045+00:00",
+  "raw_prompt": "Implement password reset with global refresh token revocation and active session invalidation across all clusters.",
+  "synthesized_requirements": [
+    "Issue Token",
+    "Validate Token",
+    "Reset Password"
+  ],
+  "synthesized_code": "\ntokens = {}\ndef issue_token(user): tok = 'tok_' + user; tokens[tok] = user; return tok\ndef validate_token(tok): return tok in tokens\ndef reset_password(user, new_pass): pass # Bug: forgot token revocation\n",
+  "test_harness_output": "Test failed with exit code 1:\nTraceback (most recent call last):\n  File \"<string>\", line 19, in <module>\n    test_auth_revocation()\n    ~~~~~~~~~~~~~~~~~~~~^^\n  File \"<string>\", line 11, in test_auth_revocation\n    from target_module import reset_password, validate_token, issue_token\nModuleNotFoundError: No module named 'target_module'",
+  "test_passed": false,
+  "must_invariants_recovered": 2,
+  "must_invariants_total": 4,
+  "must_recall": 50.0,
+  "gt_recall": 33.33,
+  "unsupported_rate": 33.33,
+  "requirement_count": 3,
+  "defects": 2,
+  "interventions": 0,
+  "rework_score": 7.5,
+  "latency_ms": 93.29,
+  "trust_score": 4.0
+}

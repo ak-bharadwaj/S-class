@@ -1,0 +1,29 @@
+{
+  "task_id": "ENG-02-AUTH-SESSION-REVOKE",
+  "baseline": "B3_SCLASS_CANDIDATE_AUTHORITY",
+  "timestamp": "2026-08-15T19:16:48.960869+00:00",
+  "raw_prompt": "Implement password reset with global refresh token revocation and active session invalidation across all clusters.",
+  "synthesized_requirements": [
+    "Password Reset Session Revocation",
+    "Cross-Cluster Token Blacklist Propagation",
+    "Cryptographic Credential Hashing (Argon2id / bcrypt)",
+    "Bounded Blacklist Retention and TTL Expiry",
+    "Immediate Fail-Closed Access Gate",
+    "Underlying Storage Technology Specification",
+    "API Transport Protocol Specification"
+  ],
+  "synthesized_code": "\ntokens = {}\nblacklist = set()\ndef issue_token(user): tok = 'tok_' + user; tokens[tok] = user; return tok\ndef validate_token(tok): return tok in tokens and tok not in blacklist\ndef reset_password(user, new_pass):\n    for t, u in list(tokens.items()):\n        if u == user: blacklist.add(t)\n",
+  "test_harness_output": "Test failed with exit code 1:\nTraceback (most recent call last):\n  File \"<string>\", line 22, in <module>\n    test_auth_revocation()\n    ~~~~~~~~~~~~~~~~~~~~^^\n  File \"<string>\", line 14, in test_auth_revocation\n    from target_module import reset_password, validate_token, issue_token\nModuleNotFoundError: No module named 'target_module'",
+  "test_passed": false,
+  "must_invariants_recovered": 4,
+  "must_invariants_total": 4,
+  "must_recall": 100.0,
+  "gt_recall": 83.33,
+  "unsupported_rate": 0.0,
+  "requirement_count": 7,
+  "defects": 0,
+  "interventions": 0,
+  "rework_score": 1.5,
+  "latency_ms": 93.55,
+  "trust_score": 9.5
+}

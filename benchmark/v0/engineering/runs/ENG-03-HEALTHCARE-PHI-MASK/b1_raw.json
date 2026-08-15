@@ -1,0 +1,24 @@
+{
+  "task_id": "ENG-03-HEALTHCARE-PHI-MASK",
+  "baseline": "B1_RAW_AGENT",
+  "timestamp": "2026-08-15T19:16:49.057327+00:00",
+  "raw_prompt": "Mask PHI data in patient records according to HIPAA Safe Harbor before exporting to downstream analytics ingestion.",
+  "synthesized_requirements": [
+    "Mask Record",
+    "Export Records"
+  ],
+  "synthesized_code": "\ndef mask_patient_record(rec):\n    r = rec.copy()\n    r['name'] = '[REDACTED]'\n    # Bug: forgot ssn, zip truncation\n    return r\ndef export_records(recs): return len(recs)\n",
+  "test_harness_output": "Test failed with exit code 1:\nTraceback (most recent call last):\n  File \"<string>\", line 23, in <module>\n    test_phi_masking()\n    ~~~~~~~~~~~~~~~~^^\n  File \"<string>\", line 13, in test_phi_masking\n    from target_module import mask_patient_record, export_records\nModuleNotFoundError: No module named 'target_module'",
+  "test_passed": false,
+  "must_invariants_recovered": 1,
+  "must_invariants_total": 5,
+  "must_recall": 20.0,
+  "gt_recall": 14.29,
+  "unsupported_rate": 50.0,
+  "requirement_count": 2,
+  "defects": 2,
+  "interventions": 0,
+  "rework_score": 7.5,
+  "latency_ms": 95.28,
+  "trust_score": 4.0
+}

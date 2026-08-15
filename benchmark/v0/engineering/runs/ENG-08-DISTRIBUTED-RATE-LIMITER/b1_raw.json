@@ -1,0 +1,25 @@
+{
+  "task_id": "ENG-08-DISTRIBUTED-RATE-LIMITER",
+  "baseline": "B1_RAW_AGENT",
+  "timestamp": "2026-08-15T19:16:50.448164+00:00",
+  "raw_prompt": "Implement a distributed sliding window rate limiter with Redis atomic Lua scripts and HTTP 429 Retry-After headers.",
+  "synthesized_requirements": [
+    "Core Operation",
+    "Helper Utility",
+    "Extra Unneeded Feature"
+  ],
+  "synthesized_code": "def check_status(): return True\n",
+  "test_harness_output": "Test failed with exit code 1:\nTraceback (most recent call last):\n  File \"<string>\", line 17, in <module>\n    test_rate_limiter()\n    ~~~~~~~~~~~~~~~~~^^\n  File \"<string>\", line 7, in test_rate_limiter\n    from target_module import check_rate_limit\nModuleNotFoundError: No module named 'target_module'",
+  "test_passed": false,
+  "must_invariants_recovered": 0,
+  "must_invariants_total": 4,
+  "must_recall": 0.0,
+  "gt_recall": 0.0,
+  "unsupported_rate": 100.0,
+  "requirement_count": 3,
+  "defects": 2,
+  "interventions": 0,
+  "rework_score": 7.5,
+  "latency_ms": 89.16,
+  "trust_score": 4.0
+}

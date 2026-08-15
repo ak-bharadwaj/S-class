@@ -1,0 +1,30 @@
+{
+  "task_id": "ENG-01-FINTECH-LEDGER",
+  "baseline": "B3_SCLASS_CANDIDATE_AUTHORITY",
+  "timestamp": "2026-08-15T19:16:48.678821+00:00",
+  "raw_prompt": "Build an atomic double-entry financial ledger transaction engine with balance invariance and idempotency check.",
+  "synthesized_requirements": [
+    "Atomic Ledger Transaction Boundary",
+    "Double-Entry Balance Invariance",
+    "Idempotency Key Verification",
+    "Disallow Negative Amount / Non-Zero Transfer Guard",
+    "Row-Level Account Locking and Concurrency Control",
+    "Append-Only Immutable Audit Log",
+    "Underlying Storage Technology Specification",
+    "API Transport Protocol Specification"
+  ],
+  "synthesized_code": "\nbalances = {'A': 0, 'B': 0}\njournal = []\nseen_keys = {}\ndef execute_transaction(from_acc, to_acc, amount, idem_key):\n    if amount <= 0: raise ValueError('Amount must be positive non-zero')\n    if idem_key in seen_keys: return seen_keys[idem_key]\n    balances[from_acc] -= amount\n    balances[to_acc] += amount\n    journal.append({'from': from_acc, 'to': to_acc, 'amount': amount, 'key': idem_key})\n    res = {'status': 'OK', 'id': idem_key}\n    seen_keys[idem_key] = res\n    return res\ndef get_balance(acc): return balances.get(acc, 0)\n",
+  "test_harness_output": "Test failed with exit code 1:\nTraceback (most recent call last):\n  File \"<string>\", line 22, in test_ledger_invariants\n    from target_module import execute_transaction\nModuleNotFoundError: No module named 'target_module'\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"<string>\", line 43, in <module>\n    test_ledger_invariants()\n    ~~~~~~~~~~~~~~~~~~~~~~^^\n  File \"<string>\", line 28, in test_ledger_invariants\n    if 'negative' not in str(e).lower(): assert False, f'Unexpected error: {e}'\n                                                ^^^^^\nAssertionError: Unexpected error: No module named 'target_module'",
+  "test_passed": false,
+  "must_invariants_recovered": 6,
+  "must_invariants_total": 6,
+  "must_recall": 100.0,
+  "gt_recall": 87.5,
+  "unsupported_rate": 0.0,
+  "requirement_count": 8,
+  "defects": 0,
+  "interventions": 0,
+  "rework_score": 1.5,
+  "latency_ms": 102.47,
+  "trust_score": 9.5
+}

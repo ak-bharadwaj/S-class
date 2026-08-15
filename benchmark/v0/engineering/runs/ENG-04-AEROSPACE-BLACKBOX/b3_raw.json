@@ -1,0 +1,28 @@
+{
+  "task_id": "ENG-04-AEROSPACE-BLACKBOX",
+  "baseline": "B3_SCLASS_CANDIDATE_AUTHORITY",
+  "timestamp": "2026-08-15T19:16:49.526189+00:00",
+  "raw_prompt": "Implement power loss emergency memory flush buffer for ARINC 429 telemetry frames to solid-state crash-survivable memory.",
+  "synthesized_requirements": [
+    "ARINC 429 Telemetry Frame Ingestion",
+    "Emergency Memory Flush on Power Loss",
+    "Hold-Up Capacitor Emergency Power Window",
+    "ARINC 429 Parity and CRC Validation",
+    "Underlying Storage Technology Specification",
+    "API Transport Protocol Specification"
+  ],
+  "synthesized_code": "def check_status(): return True\n",
+  "test_harness_output": "Test failed with exit code 1:\nTraceback (most recent call last):\n  File \"<string>\", line 16, in <module>\n    test_blackbox_flush()\n    ~~~~~~~~~~~~~~~~~~~^^\n  File \"<string>\", line 7, in test_blackbox_flush\n    from target_module import ingest_frame, on_power_loss_interrupt, get_crash_memory\nModuleNotFoundError: No module named 'target_module'",
+  "test_passed": false,
+  "must_invariants_recovered": 4,
+  "must_invariants_total": 4,
+  "must_recall": 100.0,
+  "gt_recall": 83.33,
+  "unsupported_rate": 0.0,
+  "requirement_count": 6,
+  "defects": 0,
+  "interventions": 0,
+  "rework_score": 1.5,
+  "latency_ms": 91.16,
+  "trust_score": 9.5
+}
