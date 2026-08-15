@@ -71,10 +71,14 @@ class CapabilityBinding:
     source_behavior_hash: str = ""
     source_requirement_hash: str = ""
     source_hld_hash: str = ""
+    source_behavior_graph_version: str = "v1"
+    source_requirement_graph_version: str = "v1"
+    source_hld_module_id: str = ""
+    source_hld_version: int = 1
     binding_hash: str = ""
 
     def compute_hash(self) -> str:
-        """Computes deterministic SHA-256 hash over ALL security-relevant binding fields and source hashes."""
+        """Computes deterministic SHA-256 hash over ALL security-relevant binding fields, source hashes, and source version identities."""
         payload = {
             "behavior_id": self.behavior_id,
             "requirement_ids": sorted(self.requirement_ids),
@@ -86,7 +90,11 @@ class CapabilityBinding:
             "prohibited_component_roles": sorted(self.prohibited_component_roles),
             "source_behavior_hash": self.source_behavior_hash,
             "source_requirement_hash": self.source_requirement_hash,
-            "source_hld_hash": self.source_hld_hash
+            "source_hld_hash": self.source_hld_hash,
+            "source_behavior_graph_version": self.source_behavior_graph_version,
+            "source_requirement_graph_version": self.source_requirement_graph_version,
+            "source_hld_module_id": self.source_hld_module_id,
+            "source_hld_version": self.source_hld_version
         }
         canonical_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
@@ -104,6 +112,10 @@ class CapabilityBinding:
             "source_behavior_hash": self.source_behavior_hash,
             "source_requirement_hash": self.source_requirement_hash,
             "source_hld_hash": self.source_hld_hash,
+            "source_behavior_graph_version": self.source_behavior_graph_version,
+            "source_requirement_graph_version": self.source_requirement_graph_version,
+            "source_hld_module_id": self.source_hld_module_id,
+            "source_hld_version": self.source_hld_version,
             "binding_hash": self.binding_hash
         }
 
@@ -121,6 +133,10 @@ class CapabilityBinding:
             source_behavior_hash=data.get("source_behavior_hash", ""),
             source_requirement_hash=data.get("source_requirement_hash", ""),
             source_hld_hash=data.get("source_hld_hash", ""),
+            source_behavior_graph_version=data.get("source_behavior_graph_version", "v1"),
+            source_requirement_graph_version=data.get("source_requirement_graph_version", "v1"),
+            source_hld_module_id=data.get("source_hld_module_id", ""),
+            source_hld_version=int(data.get("source_hld_version", 1)),
             binding_hash=data.get("binding_hash", "")
         )
 
@@ -299,6 +315,10 @@ class LLDCompiler:
                 source_behavior_hash=source_beh_hash,
                 source_requirement_hash=source_req_hash,
                 source_hld_hash=source_hld_hash,
+                source_behavior_graph_version="v1",
+                source_requirement_graph_version="v1",
+                source_hld_module_id=mod.id,
+                source_hld_version=1,
                 binding_hash=""
             )
             b_binding.binding_hash = b_binding.compute_hash()

@@ -507,6 +507,15 @@ class ArtifactGovernor:
                 approval_status=ApprovalStatus.REJECTED
             )
 
+        if tasks and not hld_modules:
+            return GovernanceGateResult(
+                is_blocked=True,
+                blocking_reasons=["Missing mandatory canonical HLD module architecture context for task governance audit."],
+                recommended_fsm_state=FSMTransitionTarget.DESIGN,
+                validation_status=ValidationStatus.INVALID,
+                approval_status=ApprovalStatus.REJECTED
+            )
+
         req_ids = set(r_graph.nodes.keys())
         lld_map = {c.id: c for c in (lld_components or [])}
         b_map = b_graph.nodes if b_graph else {}
@@ -662,7 +671,7 @@ class ArtifactGovernor:
                                 f"Task {t.id} ({t.title}) stale/tampered source_requirement_hash in binding: expected '{expected_req_hash}', got '{binding.source_requirement_hash}'."
                             )
 
-                    # 3. HLD Module Source Hash Verification (Mandatory & Canonical)
+                    # 3. HLD Module Source Hash Verification (Mandatory & Canonical - ZERO SYNTHETIC FALLBACK!)
                     if not getattr(binding, "source_hld_hash", ""):
                         reasons.append(
                             f"Task {t.id} ({t.title}) missing mandatory source_hld_hash in CapabilityBinding."
@@ -670,20 +679,28 @@ class ArtifactGovernor:
                     else:
                         hld_mod_map = {m.id: m for m in (hld_modules or [])}
                         parent_hld_id = parent_comp.parent.hld_id if parent_comp.parent else ""
-                        if parent_hld_id in hld_mod_map:
-                            expected_hld_hash = hld_mod_map[parent_hld_id].compute_canonical_hash()
-                        else:
-                            expected_hld_hash = HLDModule(
-                                id=parent_hld_id,
-                                name=parent_comp.name,
-                                system_boundary="internal",
-                                owned_entities=list(parent_comp.owned_entities),
-                                owned_capabilities=list(parent_comp.owned_capabilities)
-                            ).compute_canonical_hash()
-                        if binding.source_hld_hash != expected_hld_hash:
+                        if not parent_hld_id or parent_hld_id not in hld_mod_map:
                             reasons.append(
-                                f"Task {t.id} ({t.title}) stale/tampered source_hld_hash in binding: expected '{expected_hld_hash}', got '{binding.source_hld_hash}'."
+                                f"Task {t.id} ({t.title}) references parent LLD '{parent_comp.id}' whose parent HLD module '{parent_hld_id}' is not found in canonical HLD module context."
                             )
+                        else:
+                            canonical_hld_mod = hld_mod_map[parent_hld_id]
+                            expected_hld_hash = canonical_hld_mod.compute_canonical_hash()
+                            if binding.source_hld_hash != expected_hld_hash:
+                                reasons.append(
+                                    f"Task {t.id} ({t.title}) stale/tampered source_hld_hash in binding: expected '{expected_hld_hash}', got '{binding.source_hld_hash}'."
+                                )
+
+                    # 4. Source HLD Module ID Identity Verification (Mandatory & Canonical)
+                    parent_hld_id = parent_comp.parent.hld_id if parent_comp.parent else ""
+                    if not getattr(binding, "source_hld_module_id", ""):
+                        reasons.append(
+                            f"Task {t.id} ({t.title}) missing mandatory source_hld_module_id in CapabilityBinding."
+                        )
+                    elif binding.source_hld_module_id != parent_hld_id:
+                        reasons.append(
+                            f"Task {t.id} ({t.title}) source_hld_module_id conflict in binding: binding designates module '{binding.source_hld_module_id}', but parent LLD references HLD module '{parent_hld_id}'."
+                        )
 
                     # F. Component Identity Binding Verification
                     if binding.lld_component_id != parent_comp.id:

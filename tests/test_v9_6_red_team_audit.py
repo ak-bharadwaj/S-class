@@ -284,7 +284,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             parent_hld=tasks[0].parent_hld, parent_reqs=[],
             parent_behaviors=tasks[0].parent_behaviors
         )
-        gov_res_missing = ArtifactGovernor.audit_task_governance([forged_missing_parent], r_graph, lld_components, b_graph)
+        gov_res_missing = ArtifactGovernor.audit_task_governance([forged_missing_parent], r_graph, lld_components, b_graph, hld_modules=hld_design.modules)
         self.assertTrue(gov_res_missing.is_blocked, "ArtifactGovernor MUST block task lacking parent references")
         self.assertEqual(gov_res_missing.validation_status, ValidationStatus.INVALID)
 
@@ -295,22 +295,24 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             parent_hld=tasks[0].parent_hld, parent_reqs=["REQ-NONEXISTENT-999"],
             parent_behaviors=tasks[0].parent_behaviors
         )
-        gov_res_nonexistent = ArtifactGovernor.audit_task_governance([forged_nonexistent_parent], r_graph, lld_components, b_graph)
+        gov_res_nonexistent = ArtifactGovernor.audit_task_governance([forged_nonexistent_parent], r_graph, lld_components, b_graph, hld_modules=hld_design.modules)
         self.assertTrue(gov_res_nonexistent.is_blocked, "ArtifactGovernor MUST block task with forged nonexistent parent references")
         self.assertEqual(gov_res_nonexistent.validation_status, ValidationStatus.INVALID)
 
         # 8. Negative Attack Vector 3: Wrong-but-existing parent reference (Cross-Domain Lineage Hijack)
         b_graph_multi = BehaviorGraph()
-        b_graph_multi.add_node(BehaviorNode(
+        b_node_veh_dispatch = BehaviorNode(
             id="cmd_dispatch", name="DispatchVehicle", behavior_type=BehaviorNodeType.COMMAND,
             actor_id="dispatcher", target_entity_id="vehicle", epistemic_status=EpistemicStatus.EXPLICIT,
             provenance=ProvenanceKind.EXPLICIT, confidence=1.0, evidence_ref="Dispatch vehicle"
-        ))
-        b_graph_multi.add_node(BehaviorNode(
+        )
+        b_node_pay_process = BehaviorNode(
             id="cmd_payment", name="ProcessPayment", behavior_type=BehaviorNodeType.COMMAND,
             actor_id="cashier", target_entity_id="payment", epistemic_status=EpistemicStatus.EXPLICIT,
             provenance=ProvenanceKind.EXPLICIT, confidence=1.0, evidence_ref="Process payment"
-        ))
+        )
+        b_graph_multi.add_node(b_node_veh_dispatch)
+        b_graph_multi.add_node(b_node_pay_process)
         r_graph_multi = RequirementGraph.compile_from_behavior_graph(b_graph_multi)
         hld_multi = HLDCompiler.compile_hld(r_graph_multi, b_graph_multi)
         lld_multi = LLDCompiler.compile_lld(hld_multi, r_graph_multi, b_graph_multi)
@@ -328,7 +330,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             parent_hld=vehicle_task.parent_hld, parent_reqs=vehicle_task.parent_reqs,
             parent_behaviors=vehicle_task.parent_behaviors
         )
-        gov_res_wrong_existing = ArtifactGovernor.audit_task_governance([hijacked_task], r_graph_multi, lld_multi, b_graph_multi)
+        gov_res_wrong_existing = ArtifactGovernor.audit_task_governance([hijacked_task], r_graph_multi, lld_multi, b_graph_multi, hld_modules=hld_multi.modules)
         self.assertTrue(gov_res_wrong_existing.is_blocked, "ArtifactGovernor MUST block task pointing to wrong but existing LLD parent component!")
         self.assertEqual(gov_res_wrong_existing.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("semantic parent mismatch" in r or "semantic entity responsibility mismatch" in r for r in gov_res_wrong_existing.blocking_reasons))
@@ -347,7 +349,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             parent_hld=vehicle_task.parent_hld, parent_reqs=[req_owned, req_unowned],
             parent_behaviors=vehicle_task.parent_behaviors
         )
-        gov_res_partial = ArtifactGovernor.audit_task_governance([partial_scope_task], r_graph_multi, lld_multi, b_graph_multi)
+        gov_res_partial = ArtifactGovernor.audit_task_governance([partial_scope_task], r_graph_multi, lld_multi, b_graph_multi, hld_modules=hld_multi.modules)
         self.assertTrue(gov_res_partial.is_blocked, "ArtifactGovernor MUST block task when requirement scope is not a strict subset of parent LLD scope!")
         self.assertEqual(gov_res_partial.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("semantic parent mismatch" in r and req_unowned in r for r in gov_res_partial.blocking_reasons))
@@ -365,7 +367,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             parent_hld=vehicle_task.parent_hld, parent_reqs=vehicle_task.parent_reqs,
             parent_behaviors=[vehicle_task.parent_behaviors[0], beh_unowned]
         )
-        gov_res_beh = ArtifactGovernor.audit_task_governance([partial_beh_task], r_graph_multi, lld_multi, b_graph_multi)
+        gov_res_beh = ArtifactGovernor.audit_task_governance([partial_beh_task], r_graph_multi, lld_multi, b_graph_multi, hld_modules=hld_multi.modules)
         self.assertTrue(gov_res_beh.is_blocked, "ArtifactGovernor MUST block task when behavior scope is not a strict subset of parent LLD behavior scope!")
         self.assertEqual(gov_res_beh.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("semantic parent mismatch" in r and beh_unowned in r for r in gov_res_beh.blocking_reasons))
@@ -388,20 +390,20 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             parent_hld=vehicle_task.parent_hld, parent_reqs=vehicle_task.parent_reqs,
             parent_behaviors=vehicle_task.parent_behaviors
         )
-        gov_res_cap_mismatch = ArtifactGovernor.audit_task_governance([mutation_task], r_graph_multi, [read_only_ui_comp], b_graph_multi)
+        gov_res_cap_mismatch = ArtifactGovernor.audit_task_governance([mutation_task], r_graph_multi, [read_only_ui_comp], b_graph_multi, hld_modules=hld_multi.modules)
         self.assertTrue(gov_res_cap_mismatch.is_blocked, "ArtifactGovernor MUST block task when mutation command is assigned to read-only UI surface!")
         self.assertEqual(gov_res_cap_mismatch.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("semantic capability mismatch" in r for r in gov_res_cap_mismatch.blocking_reasons))
 
         # 12. Negative Attack Vector 7: Missing Mandatory Canonical LLD Architecture Context at API Boundary
-        gov_res_no_lld = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, lld_components=[], b_graph=b_graph_multi)
+        gov_res_no_lld = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, lld_components=[], b_graph=b_graph_multi, hld_modules=hld_multi.modules)
         self.assertTrue(gov_res_no_lld.is_blocked, "ArtifactGovernor MUST block task governance audit when canonical LLD context is omitted or empty!")
         self.assertEqual(gov_res_no_lld.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("Missing mandatory canonical LLD component" in r for r in gov_res_no_lld.blocking_reasons))
 
         # 13. Negative Attack Vector 8: Missing Mandatory Canonical BehaviorGraph Context at API Boundary
         empty_b_graph = BehaviorGraph()
-        gov_res_no_bgraph = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, lld_multi, empty_b_graph)
+        gov_res_no_bgraph = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, lld_multi, empty_b_graph, hld_modules=hld_multi.modules)
         self.assertTrue(gov_res_no_bgraph.is_blocked, "ArtifactGovernor MUST block task governance audit when canonical BehaviorGraph context is omitted or empty!")
         self.assertEqual(gov_res_no_bgraph.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("Missing mandatory canonical BehaviorGraph context" in r for r in gov_res_no_bgraph.blocking_reasons))
@@ -436,7 +438,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             parent_hld=vehicle_task.parent_hld, parent_reqs=["REQ-VEH-QRY"],
             parent_behaviors=[query_b_node.id]
         )
-        gov_res_op_mismatch = ArtifactGovernor.audit_task_governance([mismatched_op_task], r_graph_multi, [event_worker_comp], b_graph_multi)
+        gov_res_op_mismatch = ArtifactGovernor.audit_task_governance([mismatched_op_task], r_graph_multi, [event_worker_comp], b_graph_multi, hld_modules=hld_multi.modules)
         self.assertTrue(gov_res_op_mismatch.is_blocked, "ArtifactGovernor MUST block task when operation class (READ_QUERY) is not permitted for component type (PIPELINE_WORKER)!")
         self.assertEqual(gov_res_op_mismatch.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("semantic capability responsibility mismatch" in r for r in gov_res_op_mismatch.blocking_reasons))
@@ -466,17 +468,27 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             parent_hld=vehicle_task.parent_hld, parent_reqs=["REQ-VEH-EVT"],
             parent_behaviors=[event_b_node.id]
         )
-        gov_res_evt_ui = ArtifactGovernor.audit_task_governance([event_on_ui_task], r_graph_multi, [ui_comp], b_graph_multi)
+        gov_res_evt_ui = ArtifactGovernor.audit_task_governance([event_on_ui_task], r_graph_multi, [ui_comp], b_graph_multi, hld_modules=hld_multi.modules)
         self.assertTrue(gov_res_evt_ui.is_blocked, "ArtifactGovernor MUST block task when EVENT_PROCESSING is assigned to UI_SURFACE component!")
         self.assertEqual(gov_res_evt_ui.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("semantic capability responsibility mismatch" in r for r in gov_res_evt_ui.blocking_reasons))
 
+        # Baseline valid binding for negative attack vectors
+        valid_binding = vehicle_comp.capability_bindings[0]
+
         # 16. Negative Attack Vector 11: Tampered OperationClass in CapabilityBinding
         tampered_op_binding = CapabilityBinding(
-            behavior_id=vehicle_task.parent_behaviors[0], requirement_ids=list(vehicle_task.parent_reqs),
+            behavior_id=valid_binding.behavior_id, requirement_ids=list(valid_binding.requirement_ids),
             operation_class=OperationClass.READ_QUERY, # Tampered! Canonical is COMMAND_MUTATION
-            target_entity=vehicle_comp.owned_entities[0], hld_capability=vehicle_comp.owned_capabilities[0],
-            lld_component_id="ctrl_tampered_op", allowed_component_types=[LLDComponentType.CONTROLLER, LLDComponentType.SERVICE]
+            target_entity=valid_binding.target_entity, hld_capability=valid_binding.hld_capability,
+            lld_component_id="ctrl_tampered_op", allowed_component_types=[LLDComponentType.CONTROLLER, LLDComponentType.SERVICE],
+            prohibited_component_roles=list(valid_binding.prohibited_component_roles),
+            source_behavior_hash=valid_binding.source_behavior_hash,
+            source_requirement_hash=valid_binding.source_requirement_hash,
+            source_hld_hash=valid_binding.source_hld_hash,
+            source_behavior_graph_version="v1", source_requirement_graph_version="v1",
+            source_hld_module_id=valid_binding.source_hld_module_id, source_hld_version=valid_binding.source_hld_version,
+            binding_hash=""
         )
         tampered_op_binding.binding_hash = tampered_op_binding.compute_hash()
         tampered_op_comp = LLDComponent(
@@ -491,18 +503,25 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             parent_hld=vehicle_task.parent_hld, parent_reqs=vehicle_task.parent_reqs,
             parent_behaviors=vehicle_task.parent_behaviors
         )
-        gov_res_tampered_op = ArtifactGovernor.audit_task_governance([tampered_op_task], r_graph_multi, [tampered_op_comp], b_graph_multi)
+        gov_res_tampered_op = ArtifactGovernor.audit_task_governance([tampered_op_task], r_graph_multi, [tampered_op_comp], b_graph_multi, hld_modules=hld_multi.modules)
         self.assertTrue(gov_res_tampered_op.is_blocked, "ArtifactGovernor MUST block task when CapabilityBinding operation_class is tampered against canonical BehaviorNode!")
         self.assertEqual(gov_res_tampered_op.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("tampered capability binding operation_class" in r for r in gov_res_tampered_op.blocking_reasons))
 
         # 17. Negative Attack Vector 12: Tampered Target Entity in CapabilityBinding
         tampered_ent_binding = CapabilityBinding(
-            behavior_id=vehicle_task.parent_behaviors[0], requirement_ids=list(vehicle_task.parent_reqs),
-            operation_class=OperationClass.COMMAND_MUTATION,
+            behavior_id=valid_binding.behavior_id, requirement_ids=list(valid_binding.requirement_ids),
+            operation_class=valid_binding.operation_class,
             target_entity="invoice", # Tampered! Canonical is vehicle
-            hld_capability=vehicle_comp.owned_capabilities[0], lld_component_id="ctrl_tampered_ent",
-            allowed_component_types=[LLDComponentType.CONTROLLER, LLDComponentType.SERVICE]
+            hld_capability=valid_binding.hld_capability, lld_component_id="ctrl_tampered_ent",
+            allowed_component_types=[LLDComponentType.CONTROLLER, LLDComponentType.SERVICE],
+            prohibited_component_roles=list(valid_binding.prohibited_component_roles),
+            source_behavior_hash=valid_binding.source_behavior_hash,
+            source_requirement_hash=valid_binding.source_requirement_hash,
+            source_hld_hash=valid_binding.source_hld_hash,
+            source_behavior_graph_version="v1", source_requirement_graph_version="v1",
+            source_hld_module_id=valid_binding.source_hld_module_id, source_hld_version=valid_binding.source_hld_version,
+            binding_hash=""
         )
         tampered_ent_binding.binding_hash = tampered_ent_binding.compute_hash()
         tampered_ent_comp = LLDComponent(
@@ -517,17 +536,24 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             parent_hld=vehicle_task.parent_hld, parent_reqs=vehicle_task.parent_reqs,
             parent_behaviors=vehicle_task.parent_behaviors
         )
-        gov_res_tampered_ent = ArtifactGovernor.audit_task_governance([tampered_ent_task], r_graph_multi, [tampered_ent_comp], b_graph_multi)
+        gov_res_tampered_ent = ArtifactGovernor.audit_task_governance([tampered_ent_task], r_graph_multi, [tampered_ent_comp], b_graph_multi, hld_modules=hld_multi.modules)
         self.assertTrue(gov_res_tampered_ent.is_blocked, "ArtifactGovernor MUST block task when CapabilityBinding target_entity is tampered against canonical BehaviorNode!")
         self.assertEqual(gov_res_tampered_ent.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("tampered capability binding target entity" in r for r in gov_res_tampered_ent.blocking_reasons))
 
         # 18. Negative Attack Vector 13: Tampered Requirement Lineage in CapabilityBinding
         tampered_req_binding = CapabilityBinding(
-            behavior_id=vehicle_task.parent_behaviors[0], requirement_ids=["REQ-FORGED-999"], # Tampered!
-            operation_class=OperationClass.COMMAND_MUTATION,
-            target_entity=vehicle_comp.owned_entities[0], hld_capability=vehicle_comp.owned_capabilities[0],
-            lld_component_id="ctrl_tampered_req", allowed_component_types=[LLDComponentType.CONTROLLER, LLDComponentType.SERVICE]
+            behavior_id=valid_binding.behavior_id, requirement_ids=["REQ-FORGED-999"], # Tampered!
+            operation_class=valid_binding.operation_class,
+            target_entity=valid_binding.target_entity, hld_capability=valid_binding.hld_capability,
+            lld_component_id="ctrl_tampered_req", allowed_component_types=[LLDComponentType.CONTROLLER, LLDComponentType.SERVICE],
+            prohibited_component_roles=list(valid_binding.prohibited_component_roles),
+            source_behavior_hash=valid_binding.source_behavior_hash,
+            source_requirement_hash=valid_binding.source_requirement_hash,
+            source_hld_hash=valid_binding.source_hld_hash,
+            source_behavior_graph_version="v1", source_requirement_graph_version="v1",
+            source_hld_module_id=valid_binding.source_hld_module_id, source_hld_version=valid_binding.source_hld_version,
+            binding_hash=""
         )
         tampered_req_binding.binding_hash = tampered_req_binding.compute_hash()
         tampered_req_comp = LLDComponent(
@@ -542,19 +568,25 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             parent_hld=vehicle_task.parent_hld, parent_reqs=vehicle_task.parent_reqs,
             parent_behaviors=vehicle_task.parent_behaviors
         )
-        gov_res_tampered_req = ArtifactGovernor.audit_task_governance([tampered_req_task], r_graph_multi, [tampered_req_comp], b_graph_multi)
+        gov_res_tampered_req = ArtifactGovernor.audit_task_governance([tampered_req_task], r_graph_multi, [tampered_req_comp], b_graph_multi, hld_modules=hld_multi.modules)
         self.assertTrue(gov_res_tampered_req.is_blocked, "ArtifactGovernor MUST block task when CapabilityBinding requirement lineage is tampered against RequirementGraph!")
         self.assertEqual(gov_res_tampered_req.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("tampered capability binding requirement lineage" in r for r in gov_res_tampered_req.blocking_reasons))
 
         # 19. Negative Attack Vector 14: Tampered Binding Content Hash
         tampered_hash_binding = CapabilityBinding(
-            behavior_id=vehicle_task.parent_behaviors[0], requirement_ids=list(vehicle_task.parent_reqs),
-            operation_class=OperationClass.COMMAND_MUTATION, target_entity=vehicle_comp.owned_entities[0],
-            hld_capability=vehicle_comp.owned_capabilities[0], lld_component_id="ctrl_tampered_hash",
-            allowed_component_types=[LLDComponentType.CONTROLLER, LLDComponentType.SERVICE]
+            behavior_id=valid_binding.behavior_id, requirement_ids=list(valid_binding.requirement_ids),
+            operation_class=valid_binding.operation_class, target_entity=valid_binding.target_entity,
+            hld_capability=valid_binding.hld_capability, lld_component_id="ctrl_tampered_hash",
+            allowed_component_types=[LLDComponentType.CONTROLLER, LLDComponentType.SERVICE],
+            prohibited_component_roles=list(valid_binding.prohibited_component_roles),
+            source_behavior_hash=valid_binding.source_behavior_hash,
+            source_requirement_hash=valid_binding.source_requirement_hash,
+            source_hld_hash=valid_binding.source_hld_hash,
+            source_behavior_graph_version="v1", source_requirement_graph_version="v1",
+            source_hld_module_id=valid_binding.source_hld_module_id, source_hld_version=valid_binding.source_hld_version,
+            binding_hash="corrupted_digest_12345" # Manually corrupted digest!
         )
-        tampered_hash_binding.binding_hash = "corrupted_digest_12345" # Manually corrupted digest!
         tampered_hash_comp = LLDComponent(
             id="ctrl_tampered_hash", name="Vehicle Controller Tampered Hash", component_type=LLDComponentType.CONTROLLER,
             parent=vehicle_comp.parent, role="backend_controller",
@@ -567,17 +599,24 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             parent_hld=vehicle_task.parent_hld, parent_reqs=vehicle_task.parent_reqs,
             parent_behaviors=vehicle_task.parent_behaviors
         )
-        gov_res_tampered_hash = ArtifactGovernor.audit_task_governance([tampered_hash_task], r_graph_multi, [tampered_hash_comp], b_graph_multi)
+        gov_res_tampered_hash = ArtifactGovernor.audit_task_governance([tampered_hash_task], r_graph_multi, [tampered_hash_comp], b_graph_multi, hld_modules=hld_multi.modules)
         self.assertTrue(gov_res_tampered_hash.is_blocked, "ArtifactGovernor MUST block task when CapabilityBinding hash does not match computed digest!")
         self.assertEqual(gov_res_tampered_hash.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("tampered capability binding hash" in r for r in gov_res_tampered_hash.blocking_reasons))
 
         # 20. Negative Attack Vector 15: Ungrounded HLD Capability in CapabilityBinding
         ungrounded_hld_binding = CapabilityBinding(
-            behavior_id=vehicle_task.parent_behaviors[0], requirement_ids=list(vehicle_task.parent_reqs),
-            operation_class=OperationClass.COMMAND_MUTATION, target_entity=vehicle_comp.owned_entities[0],
+            behavior_id=valid_binding.behavior_id, requirement_ids=list(valid_binding.requirement_ids),
+            operation_class=valid_binding.operation_class, target_entity=valid_binding.target_entity,
             hld_capability="", # Ungrounded empty string!
-            lld_component_id="ctrl_ungrounded_hld", allowed_component_types=[LLDComponentType.CONTROLLER, LLDComponentType.SERVICE]
+            lld_component_id="ctrl_ungrounded_hld", allowed_component_types=[LLDComponentType.CONTROLLER, LLDComponentType.SERVICE],
+            prohibited_component_roles=list(valid_binding.prohibited_component_roles),
+            source_behavior_hash=valid_binding.source_behavior_hash,
+            source_requirement_hash=valid_binding.source_requirement_hash,
+            source_hld_hash=valid_binding.source_hld_hash,
+            source_behavior_graph_version="v1", source_requirement_graph_version="v1",
+            source_hld_module_id=valid_binding.source_hld_module_id, source_hld_version=valid_binding.source_hld_version,
+            binding_hash=""
         )
         ungrounded_hld_binding.binding_hash = ungrounded_hld_binding.compute_hash()
         ungrounded_hld_comp = LLDComponent(
@@ -592,13 +631,12 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             parent_hld=vehicle_task.parent_hld, parent_reqs=vehicle_task.parent_reqs,
             parent_behaviors=vehicle_task.parent_behaviors
         )
-        gov_res_ungrounded_hld = ArtifactGovernor.audit_task_governance([ungrounded_hld_task], r_graph_multi, [ungrounded_hld_comp], b_graph_multi)
+        gov_res_ungrounded_hld = ArtifactGovernor.audit_task_governance([ungrounded_hld_task], r_graph_multi, [ungrounded_hld_comp], b_graph_multi, hld_modules=hld_multi.modules)
         self.assertTrue(gov_res_ungrounded_hld.is_blocked, "ArtifactGovernor MUST block task when CapabilityBinding hld_capability is ungrounded / empty!")
         self.assertEqual(gov_res_ungrounded_hld.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("ungrounded HLD capability in binding" in r for r in gov_res_ungrounded_hld.blocking_reasons))
 
         # 21. Negative Attack Vector 16: Mutated allowed_component_types (Hash Coverage Attack)
-        valid_binding = vehicle_comp.capability_bindings[0]
         mutated_allowed_binding = CapabilityBinding(
             behavior_id=valid_binding.behavior_id, requirement_ids=list(valid_binding.requirement_ids),
             operation_class=valid_binding.operation_class, target_entity=valid_binding.target_entity,
@@ -608,6 +646,8 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             source_behavior_hash=valid_binding.source_behavior_hash,
             source_requirement_hash=valid_binding.source_requirement_hash,
             source_hld_hash=valid_binding.source_hld_hash,
+            source_behavior_graph_version="v1", source_requirement_graph_version="v1",
+            source_hld_module_id=valid_binding.source_hld_module_id, source_hld_version=valid_binding.source_hld_version,
             binding_hash=valid_binding.binding_hash # Keep old valid hash!
         )
         mutated_allowed_comp = LLDComponent(
@@ -616,7 +656,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
             capability_bindings=[mutated_allowed_binding]
         )
-        gov_res_mutated_allowed = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [mutated_allowed_comp], b_graph_multi)
+        gov_res_mutated_allowed = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [mutated_allowed_comp], b_graph_multi, hld_modules=hld_multi.modules)
         self.assertTrue(gov_res_mutated_allowed.is_blocked, "ArtifactGovernor MUST block task when allowed_component_types is mutated because hash covers all security fields!")
         self.assertEqual(gov_res_mutated_allowed.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("tampered capability binding hash" in r for r in gov_res_mutated_allowed.blocking_reasons))
@@ -631,6 +671,8 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             source_behavior_hash=valid_binding.source_behavior_hash,
             source_requirement_hash=valid_binding.source_requirement_hash,
             source_hld_hash=valid_binding.source_hld_hash,
+            source_behavior_graph_version="v1", source_requirement_graph_version="v1",
+            source_hld_module_id=valid_binding.source_hld_module_id, source_hld_version=valid_binding.source_hld_version,
             binding_hash=valid_binding.binding_hash # Keep old valid hash!
         )
         mutated_roles_comp = LLDComponent(
@@ -639,7 +681,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
             capability_bindings=[mutated_roles_binding]
         )
-        gov_res_mutated_roles = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [mutated_roles_comp], b_graph_multi)
+        gov_res_mutated_roles = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [mutated_roles_comp], b_graph_multi, hld_modules=hld_multi.modules)
         self.assertTrue(gov_res_mutated_roles.is_blocked, "ArtifactGovernor MUST block task when prohibited_component_roles is mutated because hash covers all security fields!")
         self.assertEqual(gov_res_mutated_roles.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("tampered capability binding hash" in r for r in gov_res_mutated_roles.blocking_reasons))
@@ -654,6 +696,8 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             source_behavior_hash=valid_binding.source_behavior_hash,
             source_requirement_hash=valid_binding.source_requirement_hash,
             source_hld_hash=valid_binding.source_hld_hash,
+            source_behavior_graph_version="v1", source_requirement_graph_version="v1",
+            source_hld_module_id=valid_binding.source_hld_module_id, source_hld_version=valid_binding.source_hld_version,
             binding_hash="" # Missing hash!
         )
         missing_hash_comp = LLDComponent(
@@ -662,7 +706,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
             capability_bindings=[missing_hash_binding]
         )
-        gov_res_missing_hash = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [missing_hash_comp], b_graph_multi)
+        gov_res_missing_hash = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [missing_hash_comp], b_graph_multi, hld_modules=hld_multi.modules)
         self.assertTrue(gov_res_missing_hash.is_blocked, "ArtifactGovernor MUST block task when binding_hash is missing in CapabilityBinding!")
         self.assertEqual(gov_res_missing_hash.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("missing mandatory binding_hash" in r for r in gov_res_missing_hash.blocking_reasons))
@@ -677,6 +721,8 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             source_behavior_hash="stale_beh_digest_abc123", # Stale upstream source hash!
             source_requirement_hash=valid_binding.source_requirement_hash,
             source_hld_hash=valid_binding.source_hld_hash,
+            source_behavior_graph_version="v1", source_requirement_graph_version="v1",
+            source_hld_module_id=valid_binding.source_hld_module_id, source_hld_version=valid_binding.source_hld_version,
             binding_hash=""
         )
         stale_src_binding.binding_hash = stale_src_binding.compute_hash()
@@ -686,7 +732,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
             capability_bindings=[stale_src_binding]
         )
-        gov_res_stale_src = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [stale_src_comp], b_graph_multi)
+        gov_res_stale_src = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [stale_src_comp], b_graph_multi, hld_modules=hld_multi.modules)
         self.assertTrue(gov_res_stale_src.is_blocked, "ArtifactGovernor MUST block task when source_behavior_hash does not match canonical BehaviorNode!")
         self.assertEqual(gov_res_stale_src.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("stale/tampered source_behavior_hash" in r for r in gov_res_stale_src.blocking_reasons))
@@ -701,6 +747,8 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             source_behavior_hash="", # Missing!
             source_requirement_hash=valid_binding.source_requirement_hash,
             source_hld_hash=valid_binding.source_hld_hash,
+            source_behavior_graph_version="v1", source_requirement_graph_version="v1",
+            source_hld_module_id=valid_binding.source_hld_module_id, source_hld_version=valid_binding.source_hld_version,
             binding_hash=""
         )
         missing_beh_hash_binding.binding_hash = missing_beh_hash_binding.compute_hash()
@@ -710,7 +758,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
             capability_bindings=[missing_beh_hash_binding]
         )
-        gov_res_missing_beh = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [missing_beh_hash_comp], b_graph_multi)
+        gov_res_missing_beh = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [missing_beh_hash_comp], b_graph_multi, hld_modules=hld_multi.modules)
         self.assertTrue(gov_res_missing_beh.is_blocked, "ArtifactGovernor MUST block task when source_behavior_hash is missing!")
         self.assertEqual(gov_res_missing_beh.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("missing mandatory source_behavior_hash" in r for r in gov_res_missing_beh.blocking_reasons))
@@ -725,6 +773,8 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             source_behavior_hash=valid_binding.source_behavior_hash,
             source_requirement_hash="", # Missing!
             source_hld_hash=valid_binding.source_hld_hash,
+            source_behavior_graph_version="v1", source_requirement_graph_version="v1",
+            source_hld_module_id=valid_binding.source_hld_module_id, source_hld_version=valid_binding.source_hld_version,
             binding_hash=""
         )
         missing_req_hash_binding.binding_hash = missing_req_hash_binding.compute_hash()
@@ -734,7 +784,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
             capability_bindings=[missing_req_hash_binding]
         )
-        gov_res_missing_req = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [missing_req_hash_comp], b_graph_multi)
+        gov_res_missing_req = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [missing_req_hash_comp], b_graph_multi, hld_modules=hld_multi.modules)
         self.assertTrue(gov_res_missing_req.is_blocked, "ArtifactGovernor MUST block task when source_requirement_hash is missing!")
         self.assertEqual(gov_res_missing_req.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("missing mandatory source_requirement_hash" in r for r in gov_res_missing_req.blocking_reasons))
@@ -749,6 +799,8 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             source_behavior_hash=valid_binding.source_behavior_hash,
             source_requirement_hash=valid_binding.source_requirement_hash,
             source_hld_hash="", # Missing!
+            source_behavior_graph_version="v1", source_requirement_graph_version="v1",
+            source_hld_module_id=valid_binding.source_hld_module_id, source_hld_version=valid_binding.source_hld_version,
             binding_hash=""
         )
         missing_hld_hash_binding.binding_hash = missing_hld_hash_binding.compute_hash()
@@ -758,7 +810,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
             capability_bindings=[missing_hld_hash_binding]
         )
-        gov_res_missing_hld = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [missing_hld_hash_comp], b_graph_multi)
+        gov_res_missing_hld = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [missing_hld_hash_comp], b_graph_multi, hld_modules=hld_multi.modules)
         self.assertTrue(gov_res_missing_hld.is_blocked, "ArtifactGovernor MUST block task when source_hld_hash is missing!")
         self.assertEqual(gov_res_missing_hld.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("missing mandatory source_hld_hash" in r for r in gov_res_missing_hld.blocking_reasons))
@@ -783,7 +835,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             provenance=b_node_vehicle.provenance, confidence=0.42 # Mutated confidence!
         )
         mutated_b_graph.add_node(mutated_b_node)
-        gov_res_mutated_beh = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [vehicle_comp], mutated_b_graph)
+        gov_res_mutated_beh = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [vehicle_comp], mutated_b_graph, hld_modules=hld_multi.modules)
         self.assertTrue(gov_res_mutated_beh.is_blocked, "ArtifactGovernor MUST block task when canonical BehaviorNode has mutated semantic properties!")
         self.assertEqual(gov_res_mutated_beh.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("stale/tampered source_behavior_hash" in r for r in gov_res_mutated_beh.blocking_reasons))
@@ -796,10 +848,77 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             source_behaviors=[b_node_vehicle.id]
         )
         mutated_r_graph.add_requirement(mutated_req_node)
-        gov_res_mutated_req = ArtifactGovernor.audit_task_governance([vehicle_task], mutated_r_graph, [vehicle_comp], b_graph_multi)
+        gov_res_mutated_req = ArtifactGovernor.audit_task_governance([vehicle_task], mutated_r_graph, [vehicle_comp], b_graph_multi, hld_modules=hld_multi.modules)
         self.assertTrue(gov_res_mutated_req.is_blocked, "ArtifactGovernor MUST block task when canonical RequirementNode has mutated semantic properties!")
         self.assertEqual(gov_res_mutated_req.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("stale/tampered source_requirement_hash" in r for r in gov_res_mutated_req.blocking_reasons))
+
+        # 31. Negative Attack Vector 26: Missing Mandatory Canonical HLD Module Context at API Boundary
+        gov_res_no_hld_ctx = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, lld_multi, b_graph_multi, hld_modules=[])
+        self.assertTrue(gov_res_no_hld_ctx.is_blocked, "ArtifactGovernor MUST block task governance audit when canonical HLD context is omitted or empty!")
+        self.assertEqual(gov_res_no_hld_ctx.validation_status, ValidationStatus.INVALID)
+        self.assertTrue(any("Missing mandatory canonical HLD module" in r for r in gov_res_no_hld_ctx.blocking_reasons))
+
+        # 32. Negative Attack Vector 27: Parent HLD Module ID Nonexistent in Canonical HLD Modules Context
+        unrelated_hld_mod = HLDModule(id="mod_unrelated", name="Unrelated", system_boundary="internal", owned_entities=[], owned_capabilities=[])
+        gov_res_unrelated_hld = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [vehicle_comp], b_graph_multi, hld_modules=[unrelated_hld_mod])
+        self.assertTrue(gov_res_unrelated_hld.is_blocked, "ArtifactGovernor MUST block task when parent LLD references HLD module not present in canonical HLD module context (ZERO SYNTHESIS FALLBACK)!")
+        self.assertEqual(gov_res_unrelated_hld.validation_status, ValidationStatus.INVALID)
+        self.assertTrue(any("not found in canonical HLD module context" in r for r in gov_res_unrelated_hld.blocking_reasons))
+
+        # 33. Negative Attack Vector 28: Missing Mandatory source_hld_module_id in CapabilityBinding
+        missing_hld_id_binding = CapabilityBinding(
+            behavior_id=valid_binding.behavior_id, requirement_ids=list(valid_binding.requirement_ids),
+            operation_class=valid_binding.operation_class, target_entity=valid_binding.target_entity,
+            hld_capability=valid_binding.hld_capability, lld_component_id=valid_binding.lld_component_id,
+            allowed_component_types=list(valid_binding.allowed_component_types),
+            prohibited_component_roles=list(valid_binding.prohibited_component_roles),
+            source_behavior_hash=valid_binding.source_behavior_hash,
+            source_requirement_hash=valid_binding.source_requirement_hash,
+            source_hld_hash=valid_binding.source_hld_hash,
+            source_behavior_graph_version="v1", source_requirement_graph_version="v1",
+            source_hld_module_id="", # Missing!
+            source_hld_version=valid_binding.source_hld_version,
+            binding_hash=""
+        )
+        missing_hld_id_binding.binding_hash = missing_hld_id_binding.compute_hash()
+        missing_hld_id_comp = LLDComponent(
+            id=vehicle_comp.id, name=vehicle_comp.name, component_type=vehicle_comp.component_type,
+            parent=vehicle_comp.parent, role=vehicle_comp.role,
+            owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
+            capability_bindings=[missing_hld_id_binding]
+        )
+        gov_res_missing_hld_id = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [missing_hld_id_comp], b_graph_multi, hld_modules=hld_multi.modules)
+        self.assertTrue(gov_res_missing_hld_id.is_blocked, "ArtifactGovernor MUST block task when source_hld_module_id is missing in CapabilityBinding!")
+        self.assertEqual(gov_res_missing_hld_id.validation_status, ValidationStatus.INVALID)
+        self.assertTrue(any("missing mandatory source_hld_module_id" in r for r in gov_res_missing_hld_id.blocking_reasons))
+
+        # 34. Negative Attack Vector 29: Tampered source_hld_module_id in CapabilityBinding
+        tampered_hld_id_binding = CapabilityBinding(
+            behavior_id=valid_binding.behavior_id, requirement_ids=list(valid_binding.requirement_ids),
+            operation_class=valid_binding.operation_class, target_entity=valid_binding.target_entity,
+            hld_capability=valid_binding.hld_capability, lld_component_id=valid_binding.lld_component_id,
+            allowed_component_types=list(valid_binding.allowed_component_types),
+            prohibited_component_roles=list(valid_binding.prohibited_component_roles),
+            source_behavior_hash=valid_binding.source_behavior_hash,
+            source_requirement_hash=valid_binding.source_requirement_hash,
+            source_hld_hash=valid_binding.source_hld_hash,
+            source_behavior_graph_version="v1", source_requirement_graph_version="v1",
+            source_hld_module_id="mod_tampered_wrong", # Tampered!
+            source_hld_version=valid_binding.source_hld_version,
+            binding_hash=""
+        )
+        tampered_hld_id_binding.binding_hash = tampered_hld_id_binding.compute_hash()
+        tampered_hld_id_comp = LLDComponent(
+            id=vehicle_comp.id, name=vehicle_comp.name, component_type=vehicle_comp.component_type,
+            parent=vehicle_comp.parent, role=vehicle_comp.role,
+            owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
+            capability_bindings=[tampered_hld_id_binding]
+        )
+        gov_res_tampered_hld_id = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [tampered_hld_id_comp], b_graph_multi, hld_modules=hld_multi.modules)
+        self.assertTrue(gov_res_tampered_hld_id.is_blocked, "ArtifactGovernor MUST block task when source_hld_module_id conflicts with parent HLD module ID!")
+        self.assertEqual(gov_res_tampered_hld_id.validation_status, ValidationStatus.INVALID)
+        self.assertTrue(any("source_hld_module_id conflict in binding" in r for r in gov_res_tampered_hld_id.blocking_reasons))
 
         # 15. Invariant: LLDCompiler MUST NOT fabricate synthetic REQ-001 ancestry for ungrounded modules
         empty_r_graph = RequirementGraph()
