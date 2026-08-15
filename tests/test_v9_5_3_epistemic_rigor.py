@@ -280,6 +280,41 @@ class TestV953EpistemicRigor(unittest.TestCase):
 
         self.assertLess(time.time() - start, 1.5, "FileLock must recover PID-reused lock immediately without timing out")
 
+    def test_subprocess_crash_and_lock_recovery(self):
+        """Invariant: If a separate process acquires FileLock and is abruptly killed with proc.kill(), process B (parent) MUST detect the dead PID and cleanly recover and acquire the lock."""
+        import subprocess, sys
+        lock_path = os.path.join(self.test_dir, ".agents", "crash_test.lock")
+        os.makedirs(os.path.dirname(lock_path), exist_ok=True)
+
+        repo_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+        code = f"""
+import sys, time, os
+sys.path.insert(0, r'{repo_dir}')
+from runtime import FileLock
+with FileLock(r'{lock_path}', timeout=5.0):
+    print("ACQUIRED", flush=True)
+    time.sleep(30)
+"""
+        proc = subprocess.Popen([sys.executable, "-c", code], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            line = proc.stdout.readline()
+            self.assertIn("ACQUIRED", line, "Subprocess must acquire lock first")
+
+            # Abruptly terminate subprocess simulating a crash
+            proc.kill()
+            proc.wait()
+
+            # Parent process MUST detect dead subprocess and recover lock immediately
+            start = time.time()
+            with FileLock(lock_path, timeout=3.0):
+                self.assertTrue(os.path.exists(lock_path))
+
+            self.assertLess(time.time() - start, 2.0, "Parent process MUST recover lock from crashed subprocess without timeout")
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -160,6 +160,42 @@ class RequirementNode:
         )
 
 
+EPISTEMIC_STATUS_RANK: Dict[Any, int] = {
+    EpistemicStatus.EXPLICIT: 4,
+    EpistemicStatus.CONFIRMED: 4,
+    EpistemicStatus.OBSERVED: 3,
+    EpistemicStatus.DERIVED: 3,
+    EpistemicStatus.PROPOSED: 2,
+    EpistemicStatus.REJECTED: 1,
+}
+
+PROVENANCE_RANK: Dict[Any, int] = {
+    ProvenanceKind.EXPLICIT: 4,
+    ProvenanceKind.OBSERVED: 3,
+    ProvenanceKind.STRONGLY_DERIVED: 3,
+    ProvenanceKind.WEAKLY_DERIVED: 2,
+    ProvenanceKind.SPECULATIVE: 1,
+}
+
+def _get_epistemic_rank(status: Any) -> int:
+    if isinstance(status, EpistemicStatus):
+        return EPISTEMIC_STATUS_RANK.get(status, 1)
+    status_str = str(status).lower()
+    for k, v in EPISTEMIC_STATUS_RANK.items():
+        if k.value.lower() == status_str:
+            return v
+    return 1
+
+def _get_provenance_rank(provenance: Any) -> int:
+    if isinstance(provenance, ProvenanceKind):
+        return PROVENANCE_RANK.get(provenance, 1)
+    prov_str = str(provenance).lower()
+    for k, v in PROVENANCE_RANK.items():
+        if k.value.lower() == prov_str:
+            return v
+    return 1
+
+
 class DuplicateIDConflictError(ValueError):
     """Raised when adding a requirement with an existing ID but conflicting semantic content."""
     pass
@@ -180,7 +216,7 @@ class RequirementGraph:
     def add_requirement(self, req: RequirementNode) -> RequirementNode:
         if req.id in self.nodes:
             existing = self.nodes[req.id]
-            # Enforce semantic identity equality across core contract fields
+            # 1. Enforce semantic identity equality across core contract fields
             if existing.semantic_identity_hash() != req.semantic_identity_hash():
                 raise DuplicateIDConflictError(
                     f"Requirement ID '{req.id}' semantic identity conflict detected: "
@@ -188,10 +224,33 @@ class RequirementGraph:
                     f"New hash '{req.semantic_identity_hash()[:8]}' (actor={req.actor}, risk={req.risk}, nfr={req.nfr_category}). "
                     f"CASUAL MERGING REJECTED."
                 )
-            # Refine epistemic status/confidence if same semantic identity
-            if req.confidence > existing.confidence:
-                existing.confidence = req.confidence
+
+            # 2. Epistemic Precedence Merge Policy: Prevent lower-ranked status (PROPOSED/DERIVED) from overwriting higher-ranked status (CONFIRMED/EXPLICIT)
+            ex_ep_rank = _get_epistemic_rank(existing.epistemic_status)
+            new_ep_rank = _get_epistemic_rank(req.epistemic_status)
+
+            ex_prov_rank = _get_provenance_rank(existing.provenance)
+            new_prov_rank = _get_provenance_rank(req.provenance)
+
+            if new_ep_rank > ex_ep_rank:
+                # Upgrade epistemic status, provenance, and confidence
                 existing.epistemic_status = req.epistemic_status
+                existing.provenance = req.provenance
+                existing.confidence = req.confidence
+                if req.evidence:
+                    existing.evidence = req.evidence
+            elif new_ep_rank == ex_ep_rank:
+                if new_prov_rank > ex_prov_rank:
+                    existing.provenance = req.provenance
+                    existing.confidence = req.confidence
+                    if req.evidence:
+                        existing.evidence = req.evidence
+                elif new_prov_rank == ex_prov_rank:
+                    if req.confidence > existing.confidence:
+                        existing.confidence = req.confidence
+                        if req.evidence:
+                            existing.evidence = req.evidence
+
             return existing
 
         self.nodes[req.id] = req

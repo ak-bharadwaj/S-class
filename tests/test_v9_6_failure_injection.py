@@ -4,6 +4,7 @@ S-Class V9.6 Hardening Suite Vector 10: Fault & Failure Injection Framework
 
 import unittest
 import os
+import json
 import tempfile
 import shutil
 from runtime import FileLock
@@ -33,13 +34,17 @@ class TestV96FailureInjection(unittest.TestCase):
             self.assertTrue(os.path.exists(lock_path))
 
     def test_system_outcome_corrupt_pipeline_json_fails_closed_in_fsm_runner(self):
-        """System Outcome Chain 1: Corrupted pipeline JSON forces ArtifactGovernor BLOCK, preserves previous immutable artifact v1.json, and prevents downstream FSM transition."""
+        """System Outcome Chain 1: Corrupted pipeline JSON forces ArtifactGovernor BLOCK, preserves previous immutable artifact v1.json, and maintains EXACT pre/post FSM state snapshot equality."""
+        from dataclasses import asdict
         from runtime import initialize_state, get_state
         from spec_compiler import SpecificationCompiler
         from artifact_governor import ArtifactGovernor
 
         initialize_state(self.test_dir, goal="Test Goal")
         state_dir = os.path.join(self.test_dir, ".agents")
+
+        # Snapshot EXACT initial FSM state before any operation
+        before_state = asdict(get_state(self.test_dir))
 
         # 1. Create and persist valid v1 pipeline artifact
         dummy_pipe = {
@@ -68,18 +73,29 @@ class TestV96FailureInjection(unittest.TestCase):
             workspace_dir=self.test_dir
         )
 
+        # Snapshot EXACT FSM state after governance audit
+        after_state = asdict(get_state(self.test_dir))
+
         # Full outcome chain assertions:
         self.assertTrue(gov_res.is_blocked, "ArtifactGovernor MUST evaluate is_blocked=True on corrupted pipeline")
         self.assertTrue(os.path.exists(v1_path), "Previous immutable backup v1.json MUST remain preserved intact")
-        state = get_state(self.test_dir)
-        self.assertEqual(state.currentPhase, "TRIAGE", "FSM current state MUST remain in safe current phase without state mutation")
+        self.assertEqual(before_state, after_state, "FSM state snapshot MUST remain 100% strictly identical (zero state mutation)")
 
     def test_system_outcome_tampered_approval_signature_fails_closed(self):
-        """System Outcome Chain 2: Tampered HMAC approval signature forces verification failure, governance BLOCK, and blocks downstream CODING transition."""
+        """System Outcome Chain 2: Persisted tampered HMAC approval record fails verification on disk, forces governance BLOCK, and leaves FSM state un-mutated."""
+        from dataclasses import asdict
+        from runtime import initialize_state, get_state
         from artifact_governor import ArtifactGovernor, ApprovalRecord, ApprovalAuthority
 
+        initialize_state(self.test_dir, goal="Test Goal")
+        before_state = asdict(get_state(self.test_dir))
+
+        state_dir = os.path.join(self.test_dir, ".agents")
+        os.makedirs(state_dir, exist_ok=True)
+        approvals_file = os.path.join(state_dir, "approvals.json")
+
         tampered_record = ApprovalRecord(
-            decision_id="DEC-001",
+            decision_id="ADR-SEC-001",
             artifact_id="HLD-001",
             artifact_version=1,
             content_hash="1111111111111111111111111111111111111111111111111111111111111111",
@@ -90,17 +106,51 @@ class TestV96FailureInjection(unittest.TestCase):
             signature="TAMPERED_INVALID_HMAC_SIGNATURE"
         )
 
-        # 1. Direct record signature check evaluates to False
-        self.assertFalse(tampered_record.is_valid("secret_key_123"), "Tampered signature MUST fail validation")
+        # 1. Write pipeline containing PROPOSED HIGH_RISK ADR needing approval in PRODUCTION mode
+        pipeline_file = os.path.join(state_dir, "v7_refinement_pipeline.json")
+        pipe_data = {
+            "version": 1,
+            "blocked": True,
+            "execution_mode": "PRODUCTION",
+            "hld_governance": {
+                "is_blocked": True,
+                "blocking_reasons": ["ADR-SEC-001 is PROPOSED without valid canonical ApprovalRecord"]
+            },
+            "hld_design": {
+                "adrs": [
+                    {
+                        "id": "ADR-SEC-001",
+                        "title": "Zero Trust Token Encryption",
+                        "status": "PROPOSED",
+                        "epistemic_status": "proposed",
+                        "risk_class": "HIGH_RISK",
+                        "decision": "Use AES-256-GCM"
+                    }
+                ]
+            }
+        }
+        with open(pipeline_file, "w", encoding="utf-8") as f:
+            json.dump(pipe_data, f, indent=2)
 
-        # 2. FSM transition to CODING must be BLOCKED
+        # 2. Persist tampered approval record directly into disk storage
+        with open(approvals_file, "w", encoding="utf-8") as f:
+            json.dump({"approval_records": [tampered_record.to_dict()]}, f, indent=2)
+
+        # 3. Verify Governor rejects the persisted record during disk audit
+        loaded_verified = ArtifactGovernor._load_verified_approval_records(self.test_dir)
+        self.assertNotIn("ADR-SEC-001", loaded_verified, "Tampered approval record on disk MUST be rejected by Governor audit")
+
+        # 4. FSM transition to CODING must be BLOCKED
         gov_res = ArtifactGovernor.enforce_fsm_transition(
             current_phase="DESIGN",
             proposed_event="spec_approved",
             target_phase="CODING",
             workspace_dir=self.test_dir
         )
-        self.assertTrue(gov_res.is_blocked, "Unapproved/tampered artifact MUST block transition to CODING")
+        after_state = asdict(get_state(self.test_dir))
+
+        self.assertTrue(gov_res.is_blocked, "Unapproved/tampered artifact on disk MUST block transition to CODING")
+        self.assertEqual(before_state, after_state, "FSM state snapshot MUST remain strictly identical on governance block")
 
 
 if __name__ == "__main__":

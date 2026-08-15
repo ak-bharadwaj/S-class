@@ -148,9 +148,9 @@ _active_locks_guard = threading.Lock()
 
 class FileLock:
     """
-    Hardware-level mutual exclusion file lock with atomic owner metadata,
-    PID liveness audit, process creation timestamp validation, unique process token identity,
-    thread-safe local activation tracking, and grace-period protection.
+    Hardware-level and OS-native kernel advisory mutual exclusion file lock (msvcrt.locking / fcntl.flock)
+    with atomic owner metadata, PID liveness audit, process creation timestamp validation,
+    unique process token identity, and thread-safe local activation tracking.
     """
     def __init__(self, lock_path: str, timeout: float = 10.0, stale_ttl: float = 15.0, grace_period: float = 0.5):
         self.lock_path = os.path.abspath(lock_path)
@@ -160,6 +160,32 @@ class FileLock:
         self.token = str(uuid.uuid4())
         self.owner_pid = os.getpid()
         self.owner_proc_start = _get_process_start_time(self.owner_pid)
+        self._fd: Optional[int] = None
+
+    def _lock_handle(self, fd: int) -> bool:
+        """Acquires OS-native non-blocking kernel advisory lock."""
+        try:
+            if sys.platform == "win32":
+                import msvcrt
+                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return True
+        except (OSError, IOError):
+            return False
+
+    def _unlock_handle(self, fd: int) -> None:
+        """Releases OS-native kernel advisory lock."""
+        try:
+            if sys.platform == "win32":
+                import msvcrt
+                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(fd, fcntl.LOCK_UN)
+        except (OSError, IOError):
+            pass
 
     def __enter__(self):
         start_time = time.time()
@@ -172,24 +198,45 @@ class FileLock:
             "process_start_time": self.owner_proc_start
         }).encode("utf-8")
 
+        os.makedirs(os.path.dirname(self.lock_path), exist_ok=True)
+
         while True:
+            # Enforce local thread-safe activation tracking within same process
+            with _active_locks_guard:
+                is_locally_active = self.lock_path in _active_local_locks
+
+            if is_locally_active:
+                if time.time() - start_time >= self.timeout:
+                    raise TimeoutError(f"Local thread lock timeout after {self.timeout}s waiting for {self.lock_path}")
+                time.sleep(0.05)
+                continue
+
             try:
-                fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-                try:
-                    os.write(fd, owner_payload)
-                    os.fsync(fd)  # Flush handle atomically to disk
-                finally:
-                    os.close(fd)  # Close handle so readers can inspect payload without sharing conflicts on Windows
-                with _active_locks_guard:
-                    _active_local_locks.add(self.lock_path)
-                return self
+                # 1. Atomic creation via O_CREAT | O_EXCL
+                fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o666)
+                if self._lock_handle(fd):
+                    try:
+                        os.ftruncate(fd, 0)
+                        os.lseek(fd, 0, os.SEEK_SET)
+                        os.write(fd, owner_payload)
+                        os.fsync(fd)
+                    except Exception:
+                        self._unlock_handle(fd)
+                        os.close(fd)
+                        raise
+
+                    self._fd = fd
+                    with _active_locks_guard:
+                        _active_local_locks.add(self.lock_path)
+                    return self
+                else:
+                    os.close(fd)
             except FileExistsError:
-                # Audit existing lock file for staleness from crashed processes
+                # 2. File exists on disk — inspect owner payload and audit staleness
                 try:
                     lock_mtime = os.path.getmtime(self.lock_path)
                     lock_age = time.time() - lock_mtime
 
-                    # 1. Inspect owner payload in lock file
                     lock_data = {}
                     try:
                         with open(self.lock_path, "r", encoding="utf-8") as f:
@@ -206,10 +253,6 @@ class FileLock:
                     lock_proc_start = lock_data.get("process_start_time") or lock_data.get("start_time")
                     current_proc_start = _get_process_start_time(pid) if isinstance(pid, int) else None
 
-                    with _active_locks_guard:
-                        is_locally_active = self.lock_path in _active_local_locks
-
-                    # 2. Dead process & PID reuse check
                     if isinstance(pid, int):
                         if not _process_exists(pid):
                             logger.warning(f"Stale lock detected for dead PID {pid}. Recovering: {self.lock_path}")
@@ -219,21 +262,7 @@ class FileLock:
                                 pass
                             continue
                         elif current_proc_start and lock_proc_start and current_proc_start > lock_proc_start + 1.0:
-                            # OS reused PID after original process died!
                             logger.warning(f"PID reuse detected for PID {pid} (lock start={lock_proc_start}, proc start={current_proc_start}). Recovering stale lock: {self.lock_path}")
-                            try:
-                                os.unlink(self.lock_path)
-                            except OSError:
-                                pass
-                            continue
-                        elif is_locally_active:
-                            # Live active thread in current process holds lock — keep waiting
-                            pass
-                        elif token is None and lock_age < self.grace_period:
-                            # Fresh live lock without JSON token — keep waiting
-                            pass
-                        elif pid == self.owner_pid and not is_locally_active and lock_age >= self.grace_period:
-                            # Stale uncleaned lock file from an earlier process run
                             try:
                                 os.unlink(self.lock_path)
                             except OSError:
@@ -242,51 +271,43 @@ class FileLock:
                         else:
                             # Live process holds lock — keep waiting
                             pass
-                    else:
-                        # Empty/corrupt lock file — apply grace period before recovering
-                        if lock_age > self.grace_period:
-                            logger.warning(f"Empty/corrupt lock file detected beyond grace period ({lock_age:.2f}s > {self.grace_period}s). Recovering: {self.lock_path}")
-                            try:
-                                os.unlink(self.lock_path)
-                            except OSError:
-                                pass
-                            continue
-                except (FileNotFoundError, OSError):
-                    # Lock was released by other process in the meantime
-                    continue
+                    elif lock_age >= self.stale_ttl:
+                        # Corrupt or unowned lock older than stale_ttl
+                        try:
+                            os.unlink(self.lock_path)
+                        except OSError:
+                            pass
+                        continue
                 except Exception as e:
-                    logger.debug(f"Lock staleness check note: {e}")
+                    logger.debug(f"Lock audit note: {e}")
 
-                if time.time() - start_time > self.timeout:
-                    raise TimeoutError(f"Concurrency Lock Timeout: Active lock on {self.lock_path} held > {self.timeout}s")
-                time.sleep(0.05)
+            except OSError:
+                pass
+
+            if time.time() - start_time >= self.timeout:
+                raise TimeoutError(f"FileLock timeout after {self.timeout}s waiting for {self.lock_path}")
+
+            time.sleep(0.05)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        with _active_locks_guard:
-            _active_local_locks.discard(self.lock_path)
-
         try:
-            if os.path.exists(self.lock_path):
-                should_unlink = False
+            if self._fd is not None:
+                self._unlock_handle(self._fd)
                 try:
-                    with open(self.lock_path, "r", encoding="utf-8") as f:
-                        raw = f.read().strip()
-                        if raw.startswith("{"):
-                            data = json.loads(raw)
-                            if data.get("pid") == self.owner_pid and data.get("token") == self.token:
-                                should_unlink = True
-                        elif raw.isdigit() and int(raw) == self.owner_pid:
-                            should_unlink = True
-                except Exception:
+                    os.close(self._fd)
+                except OSError:
                     pass
+                self._fd = None
 
-                if should_unlink:
-                    try:
-                        os.unlink(self.lock_path)
-                    except OSError:
-                        pass
-        except OSError:
-            pass
+            try:
+                os.unlink(self.lock_path)
+            except OSError:
+                pass
+        finally:
+            with _active_locks_guard:
+                _active_local_locks.discard(self.lock_path)
+
+
 
 from resource_scheduler import ResourceAwareScheduler, global_resource_scheduler
 

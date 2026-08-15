@@ -131,6 +131,44 @@ class TestV96RequirementIntegrity(unittest.TestCase):
         self.assertEqual(updated.confidence, 0.95)
         self.assertEqual(updated.epistemic_status, EpistemicStatus.EXPLICIT)
 
+    def test_epistemic_precedence_policy_prevents_downgrade_of_confirmed_status(self):
+        """Invariant: Epistemic Precedence Merge Policy prevents lower-ranked PROPOSED status (even with confidence=0.99) from downgrading EXPLICIT/CONFIRMED status (confidence=0.85)."""
+        r_graph = RequirementGraph()
+
+        # Existing higher-ranked status
+        req_confirmed = RequirementNode(
+            id="REQ-CONF-001",
+            kind=RequirementKind.FUNCTIONAL,
+            statement="System must log all administrative actions.",
+            actor="admin",
+            capability="audit_log",
+            target="logs",
+            confidence=0.85,
+            epistemic_status=EpistemicStatus.EXPLICIT,
+            provenance=ProvenanceKind.EXPLICIT
+        )
+        r_graph.add_requirement(req_confirmed)
+
+        # Proposed lower-ranked requirement with higher numeric confidence
+        req_proposed = RequirementNode(
+            id="REQ-CONF-001",
+            kind=RequirementKind.FUNCTIONAL,
+            statement="System must log all administrative actions.",
+            actor="admin",
+            capability="audit_log",
+            target="logs",
+            confidence=0.99,
+            epistemic_status=EpistemicStatus.PROPOSED,
+            provenance=ProvenanceKind.SPECULATIVE
+        )
+
+        res = r_graph.add_requirement(req_proposed)
+
+        # Must NOT downgrade EXPLICIT to PROPOSED!
+        self.assertEqual(res.epistemic_status, EpistemicStatus.EXPLICIT, "EpistemicPrecedencePolicy MUST prevent EXPLICIT -> PROPOSED downgrade")
+        self.assertEqual(res.provenance, ProvenanceKind.EXPLICIT, "EpistemicPrecedencePolicy MUST prevent EXPLICIT -> SPECULATIVE downgrade")
+        self.assertEqual(res.confidence, 0.85, "Higher epistemic status confidence MUST be preserved")
+
 
 if __name__ == "__main__":
     unittest.main()
