@@ -115,11 +115,9 @@ class FileLock:
     Canonical OS-native kernel advisory mutual exclusion file lock (msvcrt.locking / fcntl.flock)
     with diagnostic owner metadata and thread-safe local activation tracking.
     """
-    def __init__(self, lock_path: str, timeout: float = 10.0, stale_ttl: float = 15.0, grace_period: float = 0.5):
+    def __init__(self, lock_path: str, timeout: float = 10.0, **_kwargs):
         self.lock_path = os.path.abspath(lock_path)
         self.timeout = timeout
-        self.stale_ttl = stale_ttl
-        self.grace_period = grace_period
         self.token = str(uuid.uuid4())
         self.owner_pid = os.getpid()
         self.owner_proc_start = _get_process_start_time(self.owner_pid)

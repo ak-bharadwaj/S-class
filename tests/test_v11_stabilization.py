@@ -35,6 +35,7 @@ class TestV11StabilizationPass(unittest.TestCase):
     """Test battery verifying all P0 stabilization hardening invariants."""
 
     def setUp(self):
+        self.plugin_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.test_dir = tempfile.mkdtemp(prefix="sclass_stab_test_")
         self.agents_dir = os.path.join(self.test_dir, ".agents")
         os.makedirs(self.agents_dir, exist_ok=True)
@@ -486,6 +487,53 @@ class TestV11StabilizationPass(unittest.TestCase):
             t.join()
 
         self.assertEqual(counter["val"], 50)
+
+    # =========================================================================
+    # P0-8: FileLock Subprocess Crash & OS Kernel Automatic Reclamation
+    # =========================================================================
+
+    def test_p0_8_filelock_subprocess_crash_and_automatic_reclamation(self):
+        """Invariant: When a lock-holding process crashes or is killed, OS kernel immediately frees the lock."""
+        import subprocess
+        from file_lock import FileLock
+
+        lock_path = os.path.join(self.test_dir, ".test_crash_recovery.lock")
+        ready_flag = os.path.join(self.test_dir, ".child_ready.flag")
+
+        child_code = f"""
+import os, time, sys
+from file_lock import FileLock
+with FileLock({repr(lock_path)}, timeout=3.0):
+    with open({repr(ready_flag)}, 'w', encoding='utf-8') as f:
+        f.write('ready')
+    time.sleep(30)
+"""
+        proc = subprocess.Popen([sys.executable, "-c", child_code], cwd=self.plugin_root)
+        try:
+            # 1. Wait for child to enter lock context and write ready flag
+            for _ in range(100):
+                if os.path.exists(ready_flag):
+                    break
+                time.sleep(0.05)
+            self.assertTrue(os.path.exists(ready_flag), "Child process failed to acquire initial lock")
+
+            # 2. Parent attempts acquisition while child holds kernel lock -> MUST time out
+            with self.assertRaises(TimeoutError):
+                with FileLock(lock_path, timeout=0.2):
+                    pass
+
+            # 3. Simulate abrupt process crash / termination without normal exit handlers
+            proc.kill()
+            proc.wait()
+
+            # 4. Parent immediately attempts acquisition -> MUST succeed because OS freed kernel lock descriptor
+            with FileLock(lock_path, timeout=1.0) as recovered_lock:
+                self.assertIsNotNone(recovered_lock._fd)
+                self.assertEqual(recovered_lock.owner_pid, os.getpid())
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait()
 
 
 if __name__ == "__main__":
