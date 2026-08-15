@@ -41,7 +41,7 @@ class NFRCategory(str, Enum):
 
 
 def normalize_evidence(val: Any) -> List["EvidenceItem"]:
-    """Authoritative evidence boundary normalizer guaranteeing List[EvidenceItem] output without character-splitting strings."""
+    """Authoritative fail-closed evidence normalizer enforcing List[EvidenceItem]. Rejects unsupported unknown types with TypeError."""
     if not val:
         return []
     if isinstance(val, EvidenceItem):
@@ -55,7 +55,7 @@ def normalize_evidence(val: Any) -> List["EvidenceItem"]:
         for item in val:
             res.extend(normalize_evidence(item))
         return res
-    return [EvidenceItem.from_dict(str(val))]
+    raise TypeError(f"Unsupported evidence boundary type: {type(val)}. Arbitrary objects cannot be converted to evidence.")
 
 
 @dataclass
@@ -71,14 +71,32 @@ class EvidenceItem:
 
     def __post_init__(self):
         import math
+        # 1. Fail-closed quality score validation (0.0 <= quality <= 1.0, reject NaN/Inf/out-of-bounds)
+        is_quality_valid = True
         try:
             val = float(self.quality)
-            if math.isnan(val) or math.isinf(val):
-                self.quality = 1.0
+            if math.isnan(val) or math.isinf(val) or val < 0.0 or val > 1.0:
+                is_quality_valid = False
             else:
-                self.quality = max(0.0, min(1.0, val))
+                self.quality = val
         except (ValueError, TypeError):
-            self.quality = 1.0
+            is_quality_valid = False
+
+        if not is_quality_valid:
+            self.quality = 0.0
+            self.provenance = ProvenanceKind.INVALID
+
+        # 2. Fail-closed provenance validation
+        if isinstance(self.provenance, str):
+            valid_vals = [p.value for p in ProvenanceKind]
+            if self.provenance not in valid_vals or self.provenance == ProvenanceKind.INVALID.value:
+                self.provenance = ProvenanceKind.INVALID
+                self.quality = 0.0
+            else:
+                self.provenance = ProvenanceKind(self.provenance)
+        elif not isinstance(self.provenance, ProvenanceKind) or self.provenance == ProvenanceKind.INVALID:
+            self.provenance = ProvenanceKind.INVALID
+            self.quality = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -107,17 +125,28 @@ class EvidenceItem:
             )
         if isinstance(data, dict):
             prov = data.get("provenance", "explicit")
-            prov_enum = ProvenanceKind(prov) if isinstance(prov, str) and prov in [p.value for p in ProvenanceKind] else ProvenanceKind.EXPLICIT
+            if isinstance(prov, str) and prov in [p.value for p in ProvenanceKind]:
+                prov_enum = ProvenanceKind(prov)
+            elif isinstance(prov, ProvenanceKind):
+                prov_enum = prov
+            else:
+                prov_enum = ProvenanceKind.INVALID
+
             return cls(
                 id=data.get("id", f"EVID-{uuid.uuid4().hex[:8]}"),
                 source_type=data.get("source_type", "PROSE"),
                 source_ref=data.get("source_ref", ""),
                 content=data.get("content", ""),
                 provenance=prov_enum,
-                quality=float(data.get("quality", 1.0)),
+                quality=data.get("quality", 1.0),
                 timestamp=data.get("timestamp", "")
             )
-        return cls(id=f"EVID-{uuid.uuid4().hex[:8]}", content=str(data))
+        return cls(
+            id=f"EVID-{uuid.uuid4().hex[:8]}",
+            content=str(data),
+            provenance=ProvenanceKind.INVALID,
+            quality=0.0
+        )
 
 
 @dataclass
@@ -138,7 +167,7 @@ class RequirementNode:
     epistemic_status: EpistemicStatus = EpistemicStatus.DERIVED
     provenance: ProvenanceKind = ProvenanceKind.STRONGLY_DERIVED
     confidence: float = 1.0
-    evidence: Any = field(default_factory=list)
+    evidence: List[EvidenceItem] = field(default_factory=list)
     source_behaviors: List[str] = field(default_factory=list)
     assumptions: List[str] = field(default_factory=list)
     dependencies: List[str] = field(default_factory=list)

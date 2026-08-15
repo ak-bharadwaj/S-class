@@ -211,18 +211,51 @@ class TestV96RequirementIntegrity(unittest.TestCase):
         self.assertEqual(len(ev_item), 1)
         self.assertEqual(ev_item[0].id, "EV-1")
 
-        # 3. Quality boundary clamping (0.0 <= quality <= 1.0)
-        invalid_q_nan = EvidenceItem(id="EV-2", quality=float("nan"))
-        self.assertEqual(invalid_q_nan.quality, 1.0)
+        # 3. Valid Quality preservation
+        valid_item = EvidenceItem(id="EV-2", quality=0.75)
+        self.assertEqual(valid_item.quality, 0.75)
 
-        invalid_q_inf = EvidenceItem(id="EV-3", quality=float("inf"))
-        self.assertEqual(invalid_q_inf.quality, 1.0)
+    def test_fail_closed_evidence_integrity_adversarial(self):
+        """Adversarial Falsification Test: Malformed/corrupted quality or provenance MUST fail closed (quality=0.0, provenance=INVALID, TypeError on unsupported objects)."""
+        from requirement_ir import EvidenceItem, normalize_evidence
+        from domain_primitives import ProvenanceKind
 
-        invalid_q_neg = EvidenceItem(id="EV-4", quality=-5.0)
-        self.assertEqual(invalid_q_neg.quality, 0.0)
+        # 1. NaN quality -> quality=0.0, provenance=INVALID
+        ev_nan = EvidenceItem(id="EV-NAN", quality=float("nan"))
+        self.assertEqual(ev_nan.quality, 0.0, "NaN quality MUST fail closed to 0.0!")
+        self.assertEqual(ev_nan.provenance, ProvenanceKind.INVALID, "NaN quality MUST convert provenance to INVALID!")
 
-        invalid_q_high = EvidenceItem(id="EV-5", quality=999.0)
-        self.assertEqual(invalid_q_high.quality, 1.0)
+        # 2. Inf quality -> quality=0.0, provenance=INVALID
+        ev_inf = EvidenceItem(id="EV-INF", quality=float("inf"))
+        self.assertEqual(ev_inf.quality, 0.0, "Inf quality MUST fail closed to 0.0!")
+        self.assertEqual(ev_inf.provenance, ProvenanceKind.INVALID)
+
+        # 3. Out-of-bounds negative quality -> quality=0.0, provenance=INVALID
+        ev_neg = EvidenceItem(id="EV-NEG", quality=-5.0)
+        self.assertEqual(ev_neg.quality, 0.0)
+        self.assertEqual(ev_neg.provenance, ProvenanceKind.INVALID)
+
+        # 4. Out-of-bounds high quality -> quality=0.0, provenance=INVALID
+        ev_high = EvidenceItem(id="EV-HIGH", quality=99.0)
+        self.assertEqual(ev_high.quality, 0.0)
+        self.assertEqual(ev_high.provenance, ProvenanceKind.INVALID)
+
+        # 5. Invalid string quality -> quality=0.0, provenance=INVALID
+        ev_str_q = EvidenceItem(id="EV-STR", quality="garbage")
+        self.assertEqual(ev_str_q.quality, 0.0)
+        self.assertEqual(ev_str_q.provenance, ProvenanceKind.INVALID)
+
+        # 6. Invalid provenance string -> provenance=INVALID, quality=0.0
+        ev_prov = EvidenceItem.from_dict({"id": "EV-PROV", "provenance": "corrupted_garbage_provenance"})
+        self.assertEqual(ev_prov.provenance, ProvenanceKind.INVALID, "Invalid provenance string MUST resolve to INVALID!")
+        self.assertEqual(ev_prov.quality, 0.0, "Invalid provenance string MUST zero out quality!")
+
+        # 7. Unsupported arbitrary object -> TypeError
+        class ArbitraryObject:
+            pass
+
+        with self.assertRaises(TypeError):
+            normalize_evidence(ArbitraryObject())
 
 
 if __name__ == "__main__":

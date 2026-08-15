@@ -427,6 +427,26 @@ time.sleep(30)
 
         self.assertTrue(os.path.exists(lock_path), "Persistent lock file MUST remain intact on disk throughout concurrent releases")
 
+    def test_lock_file_permissions_tightened_on_existing_file(self):
+        """Falsification Test: Pre-existing lock files with open permissions (0o644) MUST be explicitly tightened to 0o600 upon acquisition."""
+        import stat
+        lock_path = os.path.join(self.test_dir, ".agents", "existing_open.lock")
+        os.makedirs(os.path.dirname(lock_path), exist_ok=True)
+
+        # Pre-create file with permissive mode (0o644)
+        with open(lock_path, "w", encoding="utf-8") as f:
+            f.write("{}")
+        os.chmod(lock_path, 0o644)
+
+        # Acquire lock
+        with FileLock(lock_path, timeout=5.0):
+            # Assert file mode was explicitly tightened to 0o600 on POSIX platforms
+            if os.name == "posix":
+                mode = stat.S_IMODE(os.stat(lock_path).st_mode)
+                self.assertEqual(mode, 0o600, f"FileLock MUST tighten existing lock file mode from 0644 to 0600! Got {oct(mode)}")
+            else:
+                self.assertTrue(os.path.exists(lock_path))
+
 
 if __name__ == "__main__":
     unittest.main()

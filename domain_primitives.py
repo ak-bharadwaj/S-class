@@ -32,6 +32,7 @@ class ProvenanceKind(str, Enum):
     STRONGLY_DERIVED = "strongly_derived"     # Deducible from graph topology with near certainty
     WEAKLY_DERIVED = "weakly_derived"         # Plausible operational standard, flagged for review
     SPECULATIVE = "speculative"               # Unbacked assumption, must be suppressed or confirmed
+    INVALID = "invalid"                       # Malformed or corrupted provenance metadata
 
 # Backwards compatibility aliases
 ProvenanceType = ProvenanceKind
