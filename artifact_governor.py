@@ -1102,6 +1102,110 @@ class ArtifactGovernor:
         )
 
     @classmethod
+    def audit_repository_snapshot_governance(
+        cls,
+        snapshot: Any,
+        repo_root: Optional[str] = None
+    ) -> GovernanceGateResult:
+        """
+        V11.1 Authoritative Repository Snapshot Governance Gate:
+        Audits RepositorySnapshot for cryptographic Merkle tree integrity, canonical hashing,
+        evidence-backed file classifications, boundary separation, and live disk sync.
+        """
+        reasons: List[str] = []
+
+        if not snapshot:
+            return GovernanceGateResult(
+                is_blocked=True,
+                blocking_reasons=["Repository snapshot is None or missing."],
+                recommended_fsm_state=FSMTransitionTarget.CODING,
+                validation_status=ValidationStatus.BLOCKED,
+                approval_status=ApprovalStatus.REJECTED
+            )
+
+        from repository_snapshot import (
+            RepositorySnapshot, FileClassification, RepositorySnapshotEngine
+        )
+
+        # 1. Cryptographic Tree & Canonical Hash Verification
+        if hasattr(snapshot, "compute_tree_hash"):
+            expected_tree_hash = snapshot.compute_tree_hash()
+            if not getattr(snapshot, "tree_hash", ""):
+                reasons.append("RepositorySnapshot is missing mandatory tree_hash.")
+            elif snapshot.tree_hash != expected_tree_hash:
+                reasons.append(
+                    f"RepositorySnapshot tree_hash mismatch: computed '{expected_tree_hash[:8]}', got '{snapshot.tree_hash[:8]}'."
+                )
+
+        if hasattr(snapshot, "compute_canonical_hash"):
+            expected_canonical_hash = snapshot.compute_canonical_hash()
+            if not getattr(snapshot, "canonical_hash", ""):
+                reasons.append("RepositorySnapshot is missing mandatory canonical_hash.")
+            elif snapshot.canonical_hash != expected_canonical_hash:
+                reasons.append(
+                    f"RepositorySnapshot canonical_hash mismatch: computed '{expected_canonical_hash[:8]}', got '{snapshot.canonical_hash[:8]}'."
+                )
+
+        # 2. File Manifest Integrity & Evidence Verification
+        if not snapshot.file_manifest:
+            reasons.append("RepositorySnapshot file_manifest is empty.")
+
+        source_set = set(snapshot.boundary_manifest.source_paths)
+        locked_set = set(snapshot.boundary_manifest.locked_paths)
+        third_set = set(snapshot.boundary_manifest.third_party_paths)
+        gen_set = set(snapshot.boundary_manifest.generated_paths)
+
+        for rel_path, entry in snapshot.file_manifest.items():
+            if not entry.rel_path:
+                reasons.append("FileEntry missing rel_path.")
+            if not entry.file_hash or len(entry.file_hash) != 64:
+                reasons.append(f"FileEntry '{rel_path}' has invalid SHA-256 file_hash.")
+            if not entry.classification_reason:
+                reasons.append(f"FileEntry '{rel_path}' missing mandatory evidence-backed classification_reason.")
+
+            # Boundary Separation Verification
+            if entry.classification == FileClassification.LOCKED:
+                if not entry.is_locked:
+                    reasons.append(f"FileEntry '{rel_path}' classified as LOCKED but is_locked flag is False.")
+                if rel_path in source_set:
+                    reasons.append(f"Boundary violation: locked file '{rel_path}' present in source_paths.")
+
+            if entry.classification == FileClassification.THIRD_PARTY:
+                if not entry.is_third_party:
+                    reasons.append(f"FileEntry '{rel_path}' classified as THIRD_PARTY but is_third_party flag is False.")
+                if rel_path in source_set:
+                    reasons.append(f"Boundary violation: third-party file '{rel_path}' present in source_paths.")
+
+            if entry.classification == FileClassification.GENERATED:
+                if not entry.is_generated:
+                    reasons.append(f"FileEntry '{rel_path}' classified as GENERATED but is_generated flag is False.")
+                if rel_path in source_set:
+                    reasons.append(f"Boundary violation: generated file '{rel_path}' present in source_paths.")
+
+        # 3. Live Disk Synchronization Verification (Drift Check)
+        if repo_root:
+            is_synced, drift_errors = RepositorySnapshotEngine.verify_snapshot_integrity(snapshot, repo_root)
+            if not is_synced:
+                reasons.extend(drift_errors)
+
+        if reasons:
+            return GovernanceGateResult(
+                is_blocked=True,
+                blocking_reasons=reasons,
+                recommended_fsm_state=FSMTransitionTarget.CODING,
+                validation_status=ValidationStatus.BLOCKED,
+                approval_status=ApprovalStatus.REJECTED
+            )
+
+        return GovernanceGateResult(
+            is_blocked=False,
+            blocking_reasons=[],
+            recommended_fsm_state=FSMTransitionTarget.CODING,
+            validation_status=ValidationStatus.VALID,
+            approval_status=ApprovalStatus.APPROVED
+        )
+
+    @classmethod
     def enforce_fsm_transition(
         cls,
         current_phase: str,
