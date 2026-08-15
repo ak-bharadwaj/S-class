@@ -37,69 +37,17 @@ logger = logging.getLogger("sclass_kernel")
 
 class KernelPermissionError(PermissionError):
     """Raised when an untrusted component attempts direct state mutation without Kernel API."""
+from event_store import EventStore, EventRecord
+
+
+class KernelPermissionError(PermissionError):
+    """Raised when an untrusted component attempts direct state mutation without Kernel API."""
     pass
-
-
-class EventStore:
-    """Append-only canonical event log with Snapshot Checkpointing for O(delta) replay performance."""
-
-    @staticmethod
-    def get_store_file(workspace_dir: Optional[str] = None) -> str:
-        cwd = workspace_dir if workspace_dir else os.getcwd()
-        return os.path.join(cwd, ".agents", "event_store.jsonl")
-
-    @staticmethod
-    def get_snapshot_file(workspace_dir: Optional[str] = None) -> str:
-        cwd = workspace_dir if workspace_dir else os.getcwd()
-        return os.path.join(cwd, ".agents", "event_store_snapshot.json")
-
-    @staticmethod
-    def append_event(event_record: Dict[str, Any], workspace_dir: Optional[str] = None) -> None:
-        store_file = EventStore.get_store_file(workspace_dir)
-        os.makedirs(os.path.dirname(store_file), exist_ok=True)
-        with open(store_file, "a", encoding="utf-8") as f:
-            f.write(json.dumps(event_record) + "\n")
-
-    @staticmethod
-    def create_checkpoint(state: Dict[str, Any], event_offset: int, workspace_dir: Optional[str] = None) -> None:
-        snapshot_file = EventStore.get_snapshot_file(workspace_dir)
-        os.makedirs(os.path.dirname(snapshot_file), exist_ok=True)
-        snapshot = {
-            "snapshot_at": datetime.now(timezone.utc).isoformat() if 'datetime' in globals() else "",
-            "event_offset": event_offset,
-            "state_snapshot": state
-        }
-        with open(snapshot_file, "w", encoding="utf-8") as f:
-            json.dump(snapshot, f, indent=2)
-
-    @staticmethod
-    def read_all_events(workspace_dir: Optional[str] = None) -> List[Dict[str, Any]]:
-        store_file = EventStore.get_store_file(workspace_dir)
-        snapshot_file = EventStore.get_snapshot_file(workspace_dir)
-        events = []
-        offset = 0
-
-        if os.path.exists(snapshot_file):
-            try:
-                with open(snapshot_file, "r", encoding="utf-8") as sf:
-                    snap_data = json.load(sf)
-                    offset = snap_data.get("event_offset", 0)
-            except Exception:
-                offset = 0
-
-        if not os.path.exists(store_file):
-            return events
-
-        with open(store_file, "r", encoding="utf-8") as f:
-            for idx, line in enumerate(f):
-                if idx >= offset and line.strip():
-                    events.append(json.loads(line))
-        return events
 
 
 class MinimalDeterministicKernel:
     """
-    S-Class EOS Microkernel Engine
+    S-Class EOS Central Deterministic Orchestration Kernel
     Exclusive State Mutator exposing a formal, policy-driven Kernel API.
     """
 
@@ -108,9 +56,52 @@ class MinimalDeterministicKernel:
 
     # === Formal Kernel API Methods ===
 
-    def request_transition(self, from_state: str, event_name: str, workspace_dir: Optional[str] = None, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Formal Kernel API method for requesting state transition."""
-        return self._execute_kernel_pipeline(event_name, workspace_dir=workspace_dir, payload=payload)
+    def request_transition(
+        self,
+        event_name: Optional[str] = None,
+        from_state: Optional[str] = None,
+        workspace_dir: Optional[str] = None,
+        payload: Optional[Dict[str, Any]] = None,
+        *args,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Formal Kernel API method for requesting state transition.
+        Contract: The kernel obtains authoritative currentPhase from persisted state.
+        If caller specifies from_state (or legacy positional from_state), enforce caller_from_state == persisted.currentPhase.
+        """
+        # Robust parsing accommodating positional (from_state, event_name), (event_name), and kwargs
+        if event_name and from_state:
+            if event_name.isupper() and not from_state.isupper():
+                caller_from_state = event_name
+                actual_event = from_state
+            else:
+                caller_from_state = from_state
+                actual_event = event_name
+        elif event_name and not from_state:
+            if args:
+                if event_name.isupper():
+                    caller_from_state = event_name
+                    actual_event = args[0]
+                else:
+                    actual_event = event_name
+                    caller_from_state = args[0]
+            else:
+                actual_event = event_name
+                caller_from_state = kwargs.get("from_state")
+        else:
+            caller_from_state = from_state or kwargs.get("from_state")
+            actual_event = event_name or kwargs.get("event_name", "")
+
+        if not actual_event:
+            raise ValueError("[Kernel API] Missing mandatory 'event_name' for request_transition")
+
+        return self._execute_kernel_pipeline(
+            actual_event,
+            workspace_dir=workspace_dir,
+            payload=payload,
+            expected_from_state=caller_from_state
+        )
 
     def request_task_verification(self, task_id: str, workspace_dir: Optional[str] = None) -> Dict[str, Any]:
         """Formal Kernel API method for verifying an isolated task builder sandbox."""
@@ -155,41 +146,59 @@ class MinimalDeterministicKernel:
         transition_history = []
         tasks = []
 
-        for record in events:
-            event_type = record.get("eventType")
-            payload = record.get("payload", {})
-            meta = record.get("metadata", {})
+        seen_event_ids = set()
+        prev_state = None
 
-            if event_type == "STATE_INITIALIZED":
-                workflow_profile = payload.get("workflowProfile", "full")
-                plan_rationale = payload.get("planRationale", "")
-                current_phase = "TRIAGE"
-            elif event_type in ["PHASE_MUTATED", "MUTATION_RECORDED"]:
-                current_phase = payload.get("toPhase", payload.get("toState", current_phase))
-                active_event = payload.get("eventName", payload.get("eventFired", active_event))
-                if "specVersion" in payload:
-                    spec_version = payload["specVersion"]
-                if "debateVersion" in payload:
-                    debate_version = payload["debateVersion"]
-                if "taskVersion" in payload:
-                    task_version = payload["taskVersion"]
+        for idx, record in enumerate(events):
+            # 1. Duplicate event ID check
+            if record.event_id in seen_event_ids:
+                raise ValueError(f"[Kernel Replay] Duplicate event_id '{record.event_id}' detected in event store.")
+            seen_event_ids.add(record.event_id)
 
-            # Aggregate decision and history logs, enriching with event metadata if present
+            # 2. Sequence continuity check (1-indexed contiguous)
+            if record.event_id != idx + 1:
+                raise ValueError(f"[Kernel Replay] Event sequence discontinuity: expected event_id {idx + 1}, got {record.event_id}")
+
+            # 3. State continuity check
+            if prev_state is not None and record.from_state and record.from_state != prev_state:
+                raise ValueError(f"[Kernel Replay] State discontinuity at event {record.event_id}: previous state was '{prev_state}', but event started from '{record.from_state}'")
+
+            if record.to_state:
+                current_phase = record.to_state
+                prev_state = record.to_state
+            elif record.from_state:
+                prev_state = record.from_state
+
+            if record.event_name:
+                active_event = record.event_name
+            if record.workflow_profile:
+                workflow_profile = record.workflow_profile
+
+            payload = record.payload or {}
+            if "specVersion" in payload:
+                spec_version = payload["specVersion"]
+            if "debateVersion" in payload:
+                debate_version = payload["debateVersion"]
+            if "taskVersion" in payload:
+                task_version = payload["taskVersion"]
+
+            # Aggregate decision and history logs
             if "decision" in payload and isinstance(payload["decision"], dict):
-                dec = dict(payload["decision"])
-                if meta.get("actor") and "agent" not in dec:
-                    dec["agent"] = meta["actor"]
-                decision_log.append(dec)
+                decision_log.append(payload["decision"])
             if "transitionRecord" in payload and isinstance(payload["transitionRecord"], dict):
-                rec = dict(payload["transitionRecord"])
-                if meta.get("timestamp") and "timestamp" not in rec:
-                    rec["timestamp"] = meta["timestamp"]
-                if meta.get("actor") and "actor" not in rec:
-                    rec["actor"] = meta["actor"]
-                transition_history.append(rec)
+                transition_history.append(payload["transitionRecord"])
+            else:
+                transition_history.append({
+                    "stepIndex": record.event_id,
+                    "fromState": record.from_state,
+                    "toState": record.to_state,
+                    "eventFired": record.event_name,
+                    "workflowProfile": record.workflow_profile,
+                    "timestamp": record.timestamp
+                })
 
         state = runtime.State(
-            taskId=events[0].get("taskId", "reconstructed-task"),
+            taskId="reconstructed-task",
             currentPhase=current_phase,
             activeEvent=active_event,
             currentSpecVersion=spec_version,
@@ -217,7 +226,13 @@ class MinimalDeterministicKernel:
 
     # === Internal Pipeline Execution Core ===
 
-    def _execute_kernel_pipeline(self, event_name: str, workspace_dir: Optional[str] = None, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def _execute_kernel_pipeline(
+        self,
+        event_name: str,
+        workspace_dir: Optional[str] = None,
+        payload: Optional[Dict[str, Any]] = None,
+        expected_from_state: Optional[str] = None
+    ) -> Dict[str, Any]:
         cwd = workspace_dir if workspace_dir else os.getcwd()
         state_dir, state_file, lock_file, config_file = runtime._resolve_paths(cwd)
         payload = payload or {}
@@ -226,6 +241,12 @@ class MinimalDeterministicKernel:
         with runtime.FileLock(lock_file):
             state = runtime.get_state(cwd)
             current_phase = state.currentPhase
+
+            # Enforce caller from_state contract if supplied
+            if expected_from_state is not None and expected_from_state != current_phase:
+                raise ValueError(
+                    f"[Kernel API] State mismatch: caller claims from_state='{expected_from_state}', but authoritative persisted state is '{current_phase}'"
+                )
 
             # 2. Transition Manager: Validate FSM State Graph
             workflow = runtime.load_json(runtime.WORKFLOW_FILE)
@@ -258,18 +279,19 @@ class MinimalDeterministicKernel:
             state_dict = runtime.asdict(state)
             runtime.validate_state_types(state_dict)
 
-            # 5. Event Sourcing Store Append
+            # 5. Canonical Event Sourcing Store Append
             ts_now = runtime.datetime.now(runtime.timezone.utc).isoformat() + "Z"
-            event_record = {
-                "event_id": len(state.transitionHistory) + 1,
-                "event_name": event_name,
-                "from_state": current_phase,
-                "to_state": next_phase,
-                "workflow_profile": state.workflowProfile,
-                "payload": payload,
-                "timestamp": ts_now
-            }
-            EventStore.append_event(event_record, workspace_dir=cwd)
+            event_rec = EventRecord(
+                event_id=len(state.transitionHistory) + 1,
+                event_name=event_name,
+                from_state=current_phase,
+                to_state=next_phase,
+                timestamp=ts_now,
+                payload=payload,
+                event_type="PHASE_MUTATED",
+                workflow_profile=state.workflowProfile
+            )
+            EventStore.append_event(event_rec, workspace_dir=cwd)
 
             # 6. Replay Log Entry
             dec_entry = runtime.Decision(
@@ -278,7 +300,7 @@ class MinimalDeterministicKernel:
                 alternatives=list(valid_transitions.keys()),
                 confidence=1.0,
                 timestamp=ts_now,
-                agent="minimal_kernel"
+                agent="central_kernel"
             )
             state.decisionLog.append(dec_entry)
 
@@ -291,7 +313,7 @@ class MinimalDeterministicKernel:
                 evidenceVerified=[asdict(art) for art in v_res.artifacts],
                 decision=asdict(dec_entry),
                 timestamp=ts_now,
-                agent="minimal_kernel"
+                agent="central_kernel"
             )
             state.transitionHistory.append(t_rec.to_dict())
 

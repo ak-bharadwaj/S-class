@@ -57,14 +57,16 @@ class SkillDiscoveryEngine:
         for keyword, (skill_id, repo_key) in domain_skill_triggers.items():
             if re.search(r"\b" + re.escape(keyword) + r"\b", goal_lower):
                 discovered_skills.append(skill_id)
-                # Verify if external repo is installed
+                # Verify if local approved capability plugin is present
                 if repo_key != "builtin":
                     repo_dir = os.path.join(capability_plugins_dir, repo_key)
-                    if not os.path.exists(repo_dir):
-                        logger.info(f"[SkillDiscovery] Auto-installing missing skill repository: {repo_key}")
-                        success = cls._clone_skill_repo(cls.KNOWN_SKILL_REPOS[repo_key], repo_dir)
-                        if success:
-                            installed_repos.append(repo_key)
+                    if os.path.exists(repo_dir):
+                        installed_repos.append(repo_key)
+                    else:
+                        logger.info(
+                            f"[SkillDiscovery] External plugin repository '{repo_key}' not present locally. "
+                            f"Dynamic runtime cloning is disabled under supply-chain boundary policy."
+                        )
 
         # 2. Auto-connect all workspace SKILL.md files into S-Class
         cls.auto_connect_workspace_skills(workspace_dir=cwd)
@@ -98,21 +100,6 @@ class SkillDiscoveryEngine:
 
         logger.info(f"[SkillDiscovery] Discovered and bound {len(discovered_skills)} skills for goal.")
         return receipt
-
-    @classmethod
-    def _clone_skill_repo(cls, repo_url: str, target_dir: str) -> bool:
-        """Clones a missing skill repository synchronously."""
-        try:
-            res = subprocess.run(
-                ["git", "clone", "--depth", "1", repo_url, target_dir],
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-            return res.returncode == 0
-        except Exception as e:
-            logger.error(f"[SkillDiscovery] Error cloning skill repo {repo_url}: {e}")
-            return False
 
     @classmethod
     def auto_connect_workspace_skills(cls, workspace_dir: Optional[str] = None) -> Dict[str, Any]:

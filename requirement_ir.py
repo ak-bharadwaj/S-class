@@ -30,6 +30,12 @@ class RequirementKind(str, Enum):
     NON_FUNCTIONAL = "non_functional"
 
 
+class ConstraintClass(str, Enum):
+    """Epistemic classification separating authoritative hard invariants from aesthetic/stylistic preferences."""
+    HARD_CONSTRAINT = "hard_constraint"  # Security, accessibility, correctness, API contract, data integrity, tests
+    PREFERENCE = "preference"            # Typography, animation style, glassmorphism, visual density, layout flavor
+
+
 class NFRCategory(str, Enum):
     """Category of non-functional requirements."""
     SECURITY = "security"
@@ -158,6 +164,7 @@ class RequirementNode:
     actor: str
     capability: str
     target: str
+    constraint_class: ConstraintClass = ConstraintClass.HARD_CONSTRAINT
     nfr_category: Optional[NFRCategory] = None
     preconditions: List[str] = field(default_factory=list)
     postconditions: List[str] = field(default_factory=list)
@@ -175,6 +182,8 @@ class RequirementNode:
     def __post_init__(self):
         # Authoritative normalization boundary enforcing List[EvidenceItem] on all construction paths
         self.evidence = normalize_evidence(self.evidence)
+        if isinstance(self.constraint_class, str):
+            self.constraint_class = ConstraintClass(self.constraint_class)
 
     def semantic_identity_hash(self) -> str:
         """Computes a SHA-256 digest over core domain/contract identity fields (excluding evolving epistemic metadata like confidence)."""
@@ -182,6 +191,7 @@ class RequirementNode:
         payload = {
             "id": self.id,
             "kind": self.kind.value if isinstance(self.kind, RequirementKind) else str(self.kind),
+            "constraint_class": self.constraint_class.value if isinstance(self.constraint_class, ConstraintClass) else str(self.constraint_class),
             "statement": self.statement,
             "actor": self.actor,
             "capability": self.capability,
@@ -197,12 +207,13 @@ class RequirementNode:
         return hashlib.sha256(json_bytes).hexdigest()
 
     def canonical_hash(self) -> str:
-        """Computes a SHA-256 canonical hash over ALL 16 fields of the requirement node (including epistemic metadata)."""
+        """Computes a SHA-256 canonical hash over ALL fields of the requirement node (including epistemic metadata)."""
         import hashlib
         serialized_evidence = [e.to_dict() if isinstance(e, EvidenceItem) else EvidenceItem.from_dict(e).to_dict() for e in (self.evidence or [])]
         payload = {
             "id": self.id,
             "kind": self.kind.value if isinstance(self.kind, RequirementKind) else str(self.kind),
+            "constraint_class": self.constraint_class.value if isinstance(self.constraint_class, ConstraintClass) else str(self.constraint_class),
             "statement": self.statement,
             "actor": self.actor,
             "capability": self.capability,
@@ -232,6 +243,7 @@ class RequirementNode:
         return {
             "id": self.id,
             "kind": self.kind.value,
+            "constraint_class": self.constraint_class.value if isinstance(self.constraint_class, ConstraintClass) else str(self.constraint_class),
             "statement": self.statement,
             "actor": self.actor,
             "capability": self.capability,
@@ -270,6 +282,7 @@ class RequirementNode:
             actor=data.get("actor", "operator"),
             capability=data.get("capability", "manage"),
             target=data.get("target", "system"),
+            constraint_class=ConstraintClass(data.get("constraint_class", "hard_constraint")),
             nfr_category=NFRCategory(data["nfr_category"]) if data.get("nfr_category") else None,
             preconditions=data.get("preconditions", []),
             postconditions=data.get("postconditions", []),

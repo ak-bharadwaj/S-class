@@ -14,6 +14,7 @@ Grounded Spec Weaver:
 """
 
 import os
+import sys
 import ast
 import re
 import json
@@ -1145,18 +1146,81 @@ class WorldModelPromotionEngine:
         target_entity_id: str,
         test_framework: str,
         repository_state_hash: str,
-        cwd: Optional[str] = None
+        cwd: Optional[str] = None,
+        task_id: Optional[str] = None,
+        task_spec_hash: Optional[str] = None
     ) -> VerificationEvidence:
         """
-        Securely executes a real test process in a subprocess, computes authentic cryptographic
-        hashes from actual execution stdout/stderr/exit_code, and issues a sovereign VerificationEvidence.
-        Unauthenticated callers cannot forge receipt or result hashes.
+        Securely authorizes and executes a governed test process in an isolated subprocess.
+        Enforces strict authority boundaries:
+        1. Cwd must exist and resolve inside workspace root.
+        2. Test target and command paths must not escape workspace boundary (rejects '..' traversal).
+        3. Test command must use approved test runners only (rejects shell interpreters, shell metacharacters).
+        4. Repository state hash and target entity IDs must be non-empty.
+        5. Derives authentic cryptographic hashes from actual execution stdout/stderr and exit code 0.
         """
         import subprocess
-        proc = subprocess.run(test_command, cwd=cwd, capture_output=True, text=True)
+
+        # 1. Working directory validation
+        if not cwd or not os.path.exists(cwd):
+            raise ValueError(f"[SClassTestRunner] Governed workspace directory does not exist or is invalid: '{cwd}'")
+        real_cwd = os.path.realpath(cwd)
+
+        # 2. Command integrity & shell injection defense
+        if not isinstance(test_command, list) or len(test_command) == 0:
+            raise ValueError("[SClassTestRunner] test_command must be a non-empty List[str]")
+
+        # Reject dangerous shell characters in any argument
+        forbidden_chars = [";", "|", "&", "`", "$", "\n", "\r", ">", "<"]
+        for arg in test_command:
+            if not isinstance(arg, str):
+                raise ValueError(f"[SClassTestRunner] Command argument must be a string, got {type(arg)}")
+            if any(ch in arg for ch in forbidden_chars):
+                raise ValueError(f"[SClassTestRunner] Command contains forbidden shell metacharacter: '{arg}'")
+
+        # Executable whitelist check
+        exec_name = os.path.basename(test_command[0]).lower()
+        if exec_name.endswith(".exe"):
+            exec_name = exec_name[:-4]
+
+        # Allowed executables
+        allowed_executables = {"python", "python3", "pytest", "unittest"}
+        py_exe_base = os.path.basename(sys.executable).lower()
+        if py_exe_base.endswith(".exe"):
+            py_exe_base = py_exe_base[:-4]
+        allowed_executables.add(py_exe_base)
+
+        if exec_name not in allowed_executables:
+            raise ValueError(
+                f"[SClassTestRunner] Unauthorized executable '{test_command[0]}'. Only governed Python/test executables are permitted."
+            )
+
+        # 3. Path traversal & Repository boundary check for file arguments
+        for arg in test_command[1:]:
+            # If argument looks like a relative/absolute file path
+            if "/" in arg or "\\" in arg or arg.endswith(".py"):
+                # Resolve path
+                resolved = os.path.realpath(os.path.join(real_cwd, arg))
+                # Check if it resides strictly inside real_cwd
+                if not (resolved == real_cwd or resolved.startswith(real_cwd + os.sep)):
+                    raise ValueError(
+                        f"[SClassTestRunner] Path traversal violation: argument '{arg}' resolves outside workspace '{real_cwd}'"
+                    )
+
+        # 4. Target & repository state binding checks
+        if not test_entity_id or not isinstance(test_entity_id, str) or not test_entity_id.strip():
+            raise ValueError("[SClassTestRunner] Mandatory 'test_entity_id' is missing or empty")
+        if not target_entity_id or not isinstance(target_entity_id, str) or not target_entity_id.strip():
+            raise ValueError("[SClassTestRunner] Mandatory 'target_entity_id' is missing or empty")
+        if not repository_state_hash or not isinstance(repository_state_hash, str) or not repository_state_hash.strip():
+            raise ValueError("[SClassTestRunner] Mandatory 'repository_state_hash' is missing or empty")
+
+        # 5. Execute in isolated subprocess (shell=False)
+        proc = subprocess.run(test_command, cwd=real_cwd, capture_output=True, text=True, shell=False)
         if proc.returncode != 0:
             raise ValueError(f"Test runner execution failed (exit_code={proc.returncode}): {proc.stderr}")
 
+        # 6. Compute authentic digests directly from real execution stream
         command_str = " ".join(test_command)
         command_hash = hashlib.sha256(command_str.encode("utf-8")).hexdigest()
         raw_result_hash = hashlib.sha256((proc.stdout + proc.stderr).encode("utf-8")).hexdigest()

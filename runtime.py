@@ -1014,17 +1014,18 @@ def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce
 
         # Event Sourcing Append
         try:
-            from sclass_kernel import EventStore
-            EventStore.append_event({
-                "event_id": len(state.transitionHistory) + 1,
-                "eventType": "PHASE_MUTATED",
-                "event_name": event_name,
-                "from_state": current_phase,
-                "to_state": next_phase,
-                "workflow_profile": state.workflowProfile,
-                "payload": {"eventName": event_name, "fromPhase": current_phase, "toPhase": next_phase},
-                "timestamp": ts_now
-            }, workspace_dir=workspace_dir)
+            from event_store import EventStore, EventRecord
+            event_rec = EventRecord(
+                event_id=len(state.transitionHistory) + 1,
+                event_name=event_name,
+                from_state=current_phase,
+                to_state=next_phase,
+                timestamp=ts_now,
+                payload={"eventName": event_name, "fromPhase": current_phase, "toPhase": next_phase},
+                event_type="PHASE_MUTATED",
+                workflow_profile=state.workflowProfile
+            )
+            EventStore.append_event(event_rec, workspace_dir=workspace_dir)
         except Exception as e_ex:
             logger.warning(f"[Runtime] Event store append note: {e_ex}")
 

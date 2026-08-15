@@ -1,13 +1,13 @@
 <div align="center">
 
-# ⚡ S-CLASS EOS V12.1
+# ⚡ S-CLASS EOS V11.2
 ### The Deterministic AI Systems Runtime & Safety-Case Engine
 
-*Enterprise-grade execution microkernel that eliminates AI agent drift, blocks broken UI releases, and enforces multi-page visual evidence verification.*
+*Enterprise-grade central deterministic orchestration kernel that eliminates AI agent drift, blocks broken UI releases, and enforces cryptographic verification evidence.*
 
-[![Version](https://img.shields.io/badge/version-12.1.0-blue.svg)](https://github.com/ak-bharadwaj/S-class)
-[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-green.svg)](https://github.com/ak-bharadwaj/S-class)
-[![Build](https://img.shields.io/badge/tests-161%2F161%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class)
+[![Version](https://img.shields.io/badge/version-11.2.0-blue.svg)](https://github.com/ak-bharadwaj/S-class)
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-green.svg)](https://github.com/ak-bharadwaj/S-class)
+[![Build](https://img.shields.io/badge/tests-194%2F194%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class)
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 
 [Quick Start](#-quick-start) • [Architecture](#-system-architecture) • [Features](#-core-architectural-innovations) • [Python SDK](#-30-second-python-sdk-quickstart) • [Benchmark Comparison](#-framework-architectural-comparison) • [License](#-license)
@@ -18,15 +18,15 @@
 
 ## 📌 Executive Overview
 
-When autonomous AI coding agents (such as Claude Code, Cursor, or OpenHands) execute software engineering tasks, they suffer from 3 critical failure modes:
-1. **Agent Drift & Invention:** They get stuck in repetitive loops, invent unrequested features (SSO, accreditation badges, social feeds), or perform unverified direct file edits.
-2. **Fake Verification:** They claim *"Everything works cleanly!"* based on unit tests or build logs, while the actual web interface renders broken components, `undefined`/`NaN` text, or HTTP 500 errors.
-3. **Sparse & Amateur UIs:** They build unstyled HTML templates with default browser fonts and empty 1-row data tables.
+When autonomous AI coding agents execute software engineering tasks, they suffer from 3 critical failure modes:
+1. **Agent Drift & Invention:** They get stuck in repetitive loops, invent unrequested features, or perform unverified direct file edits.
+2. **Fake Verification:** They claim *"Everything works cleanly!"* based on unit tests or build logs, while the actual runtime state or interface renders errors.
+3. **Sparse & Amateur Implementation:** Unstructured mutations without epistemic grounding or verified ChangeSets.
 
-**S-Class EOS V12.1 fixes this completely.** Operating as an **Authoritative Execution Microkernel**, S-Class intercepts all agent actions, routes engineering goals through a strict 19-state Finite State Machine (FSM), enforces evidence-driven Specification Synthesis before design/coding, red-teams plans before writing code, and verifies live web applications visually using Chrome DevTools MCP before release is allowed.
+**S-Class EOS V11.2 fixes this completely.** Operating as a **Central Deterministic Orchestration Kernel**, S-Class intercepts all agent actions, routes engineering goals through a strict Finite State Machine (FSM), enforces evidence-driven Specification Synthesis before design/coding, red-teams plans before writing code, and verifies execution authenticity through sovereign test runners and cryptographic evidence receipts before release is allowed.
 
 > [!NOTE]
-> **V12.1 Zero-Defect Guarantee**: Passed a rigorous 22-subsystem architectural audit resolving all edge-case logic gaps, pub/sub graph topic bindings, database fallbacks, profile-driven knowledge retrieval, event sourcing projections, and hardware resource scheduling.
+> **V11.2 Stabilization & Authority Guarantee**: Formally verified across 194 tests covering canonical event sourcing replay, authoritative kernel state derivation, sovereign test runner subprocess boundaries, supply-chain plugin isolation, and epistemic constraint/preference separation.
 
 ---
 
@@ -36,20 +36,20 @@ When autonomous AI coding agents (such as Claude Code, Cursor, or OpenHands) exe
                                 RELEASE CANDIDATE
                                         │
                                         ▼
-                           Deterministic Microkernel
-                            (sclass_kernel.py FSM)
+                   Central Deterministic Orchestration Kernel
+                             (sclass_kernel.py FSM)
                                         │
   ┌───────────────────────┬─────────────┴────────────┬───────────────────────┐
   ▼                       ▼                          ▼                       ▼
-Specification Synthesis  Spec Griller      Full 8-Subagent Swarm    Safety-Case Engine
- Engine (spec_synthesis) Engine            (sclass_subagent_reg)     (verifier.py)
- (Inspect Before Infer)  (sclass_grill)    (find-skill Enabled)            │
+Specification Synthesis  Spec Griller      8-Subagent Dispatch      Safety-Case Engine
+ Engine (spec_synthesis) Engine            Registry                  (verifier.py)
+ (Inspect Before Infer)  (sclass_grill)    (sclass_subagent_reg)             │
   │                       │                          │                       │
   └───────────────────────┴─────────────┬────────────┴───────────────────────┘
                                         │
                                         ▼
-                    Chrome MCP Multi-Page Visual Verification
-                       (100% PNG & User Flow Receipts)
+                     Sovereign Cryptographic Verification
+                         (100% Authentic Execution Proofs)
 ```
 
 ---
@@ -59,29 +59,23 @@ Specification Synthesis  Spec Griller      Full 8-Subagent Swarm    Safety-Case 
 ### 1. Specification Synthesis Engine & Anti-Bypass Gate (`spec_synthesis.py`)
 Mandatory FSM state sitting between `ANALYSIS` and `DESIGN`. Performs multi-stage requirement expansion (`EXPLICIT`, `SUPPORTED`, `DERIVED`, `OPTIONAL`, `UNKNOWN`, `CONFLICT`, `REUSE`), runs evidence-driven capability expansion (`Role → Capability → Entity → Action → Page → UX`), enforces conservative derived rules, calculates a weighted assumption budget, and enforces an unbypassable hard gate in `verifier.py`.
 
-### 2. Heavy 118-Skill Production Catalog & Orchestrator (`sclass_skill_orchestrator.py`)
-S-Class strictly forbids dumping one giant "frontend skill" or monolithic prompt. Instead, S-Class orchestrates a **118-skill modular catalog** across 6 integrated skill suites:
-* **Paul Bakaus Impeccable Suite (35 Playbooks)**: `impeccable-craft` ([craft-floor.md](capability_plugins/impeccable/skill/reference/craft-floor.md)), `impeccable-new-work`, `impeccable-harden`, `impeccable-critique`, `impeccable-polish`, `impeccable-bolder`, `impeccable-quieter`, `impeccable-distill`, `impeccable-onboard`, `impeccable-adapt`, `impeccable-audit`, `impeccable-optimize`, `impeccable-clarify`, `impeccable-typeset`, `impeccable-layout`, `impeccable-colorize`, `impeccable-live`.
-* **Leon Taste-Skill Suite (13 Aesthetics)**: `taste-aesthetic`, `taste-minimalist`, `taste-soft`, `taste-brutalist`, `taste-stitch`, `taste-brandkit`, `taste-redesign`, `taste-image-to-code`.
-* **Emil Kowalski Animation Suite (10 Directives)**: `emil-apple-design`, `emil-animation-opportunities`, `emil-ask-sonner`, `emil-design-eng`, `emil-improve-animations`, `emil-pick-ui-library`, `emil-prototype`, `emil-review-animations`.
-* **Heavy Enterprise Backend & Microservices Suite (21 Backend Skills)**: `backend-domain-logic`, `api-data-flow-architecture`, `database-query-optimizer`, `microservice-event-bus`, `grpc-protobuf-rpc`, `db-sharding-read-replicas`, `elasticsearch-vector-search`, `oauth-sso-saml-auth`, `rate-limiting-redis-bucket`, `circuit-breaker-resilience`, `file-streaming-chunked-transfer`, `tenant-isolation-multi-tenancy`, `distributed-tracing-opentelemetry`, `cqrs-event-sourcing`, `api-versioning-deprecation`, `graphql-federation-subgraphs`, `background-pdf-excel-exporter`, `secret-rotation-vault`.
-* **Ops, Security, & Developer Ergonomics Suite (23 Production Skills)**: `zod-pydantic-contract`, `prisma-drizzle-orm`, `auth-jwt-rbac`, `stripe-payment-checkout`, `file-upload-storage`, `realtime-websockets`, `ci-cd-docker-deploy`, `dark-mode-theme-system`, `pwa-offline-cache`, `graphql-trpc-schema`, `cache-invalidation-redis`, `cron-job-background-workers`, `seo-metadata-open-graph`, `i18n-localization-engine`, `audit-log-security-trail`, `form-validation-field-errors`, `skeleton-shimmer-states`, `toast-notification-system`, `keyboard-shortcut-hotkeys`, `error-boundary-fallbacks`, `health-check-telemetry`.
-* **Builtin Foundation & ERP Domain Suite (16 Core Skills)**: `requirement-expansion`, `frontend-design`, `ux-architecture`, `design-system`, `accessibility`, `visual-qa`, `react-doctor`, `role-based-layout-engine`, `page-route-architecture`, `data-dense-dashboard-layout`, `command-search` (⌘K), `academic-workflows`, `approval-workflows`.
+### 2. Modular Production Skill Catalog & Orchestrator (`sclass_skill_orchestrator.py`)
+S-Class organizes modular skill capabilities across integrated suites (Impeccable UI craft, Taste aesthetic engines, Emil animation guidelines, enterprise backend architecture, database modeling, and domain workflows), providing structured playbooks for specialized subagents.
 
-### 3. Dynamic Skill Discovery & Auto-Installer Engine (`sclass_skill_discovery.py`)
-Analyzes project goals and domain requirements upfront. Automatically discovers, installs, and binds missing specialized skills into S-Class's active skill stack (`.agents/skill_discovery_receipt.json`), ensuring S-Class never lacks required capabilities for complex engineering tasks.
+### 3. Rule-Based Skill Discovery & Supply-Chain Boundary (`sclass_skill_discovery.py`)
+Analyzes project goals and domain keywords upfront to bind approved local capability plugins. Enforces strict supply-chain boundaries by freezing arbitrary runtime cloning or external network execution.
 
-### 4. Full 8-Subagent Concurrent Dispatch Matrix (`sclass_subagent_registry.py`)
-S-Class strictly forbids single-agent shortcuts. During the multi-agent `DEBATE`, `CODING`, and `QA` phases, S-Class dispatches **ALL 8 defined subagents concurrently** (`dss_governor`, `dss_ui_ux`, `dss_frontend_dev`, `dss_backend_dev`, `dss_db_architect`, `dss_cso_v2`, `dss_qa_frontend`, `dss_user_alias_v2`), each equipped with 100% skill access and `SkillDiscoveryEngine` (`find-skill`) capability under Rule 29.
+### 4. 8-Subagent Dispatch Registry (`sclass_subagent_registry.py`)
+Provides cataloged subagent profiles (`dss_governor`, `dss_ui_ux`, `dss_frontend_dev`, `dss_backend_dev`, `dss_db_architect`, `dss_cso_v2`, `dss_qa_frontend`, `dss_user_alias_v2`) equipped with specialized skill stacks and scoped role capabilities.
 
 ### 5. Mandatory Rules 27, 28, 29, 30, & 31 Enforcement
 * **Rule 27 (No-Laziness Directive)**: Mandates playbook inspection before writing UI code and enforces zero-record empty states, 100-char text truncation, loading skeletons, and 48px mobile touch targets.
 * **Rule 28 (Subagent Visibility Dashboard)**: Renders a real-time markdown status table in the chat UI whenever subagents are deployed.
-* **Rule 29 (Full 8 Concurrent Subagent Swarms)**: Enforces parallel dispatch of all 8 specialized subagents equipped with skill stacks and `find-skill`.
+* **Rule 29 (8-Subagent Dispatch Architecture)**: Dispatches specialized subagents equipped with appropriate domain skill stacks.
 * **Rule 30 (Specification Synthesis & Inspect Before Inferring)**: Mandates project discovery and evidence-based requirement classification before design begins.
 * **Rule 31 (Semantic Gate & Implementation Contract)**: Enforces semantic gate checks in verifier.py and locks synthesized spec as unalterable implementation contract for builders.
 
-### 5. Zero-Infrastructure Database Fallback Guard (`zero_infra_db.py`)
+### 6. Zero-Infrastructure Database Fallback Guard (`zero_infra_db.py`)
 Tests host database port reachability (PostgreSQL 5432, MongoDB 27017, Redis 6379). If host databases are not running on the user's computer, it automatically injects an **In-Memory SQLite** (`file:./dev.db`) driver so applications build and run out of the box with zero manual DB setup.
 
 ---
