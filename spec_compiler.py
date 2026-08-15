@@ -1,10 +1,11 @@
 """
-S-Class EOS V5.0 - Graph Inference Engine & Specification Compiler
+S-Class EOS V11.2 - Specification Compiler & Execution Authority Engine
 
 Operates over the SemanticDomainGraph to:
 1. Infer required UI components, data structures, and REST APIs from graph topology.
 2. Compile the domain graph into actor-scoped page spreads, LLD requirements, and API specs.
 3. Compute structured reasoning graphs (why_graph) for every inferred item.
+4. Establish authoritative execution epoch locks and derive lineage-bound AuthorizedChangeSets.
 """
 
 import os
