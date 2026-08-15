@@ -120,6 +120,26 @@ class ExecutionPlanCompiler:
                     validation_reasons.append(f"Task '{t.id}' has exclusively speculative/proposed behaviors.")
                     continue
 
+            # Derive operation class from component capability bindings or behavior nodes
+            op_class = "command_mutation"
+            if parent_comp := lld_map.get(t.parent_lld):
+                for b in parent_comp.capability_bindings:
+                    if b.behavior_id in t.parent_behaviors and getattr(b, "operation_class", None):
+                        op_class = b.operation_class.value if hasattr(b.operation_class, "value") else str(b.operation_class)
+                        break
+            if op_class == "command_mutation" and b_graph:
+                for bid in t.parent_behaviors:
+                    b_node = b_graph.get_node(bid)
+                    if b_node:
+                        if b_node.behavior_type == BehaviorNodeType.QUERY:
+                            op_class = "read_query"
+                            break
+                        elif b_node.behavior_type == BehaviorNodeType.STATE_TRANSITION:
+                            op_class = "state_transition"
+                            break
+            if t.category == TaskCategory.UI_COMPONENT.value:
+                op_class = "read_query"
+
             # Derive resource requirements from component and task metadata
             required_resources = cls._derive_task_resources(t, lld_map.get(t.parent_lld))
             risk_level = cls._assess_task_risk(t, lld_map.get(t.parent_lld))
@@ -131,6 +151,7 @@ class ExecutionPlanCompiler:
                 title=t.title,
                 description=t.description,
                 category=t.category.value if isinstance(t.category, TaskCategory) else str(t.category),
+                operation_class=op_class,
                 execution_mode=ExecutionMode.SERIAL,  # default, will be upgraded by scheduler
                 risk_level=risk_level,
                 status=ExecutionTaskStatus.READY,
@@ -165,7 +186,7 @@ class ExecutionPlanCompiler:
             dep_dag, rev_dag, inv_graph = {}, {}, {}
             topo_order = list(exec_tasks.keys())
 
-        # 2. Agent Capability Matching (V10.5)
+        # 2. Agent Capability Matching (V10.5 - Category, Component Type, AND Operation Class!)
         for t_id, task in exec_tasks.items():
             matched_agent = cls._match_agent_capability(task, lld_map.get(task.parent_lld_id), agent_caps)
             if matched_agent:
@@ -173,17 +194,19 @@ class ExecutionPlanCompiler:
                 task.task_hash = task.compute_canonical_hash()
             else:
                 is_valid = False
-                validation_reasons.append(f"Task '{t_id}' ({task.title}) has no capable agent assignment.")
+                validation_reasons.append(
+                    f"Task '{t_id}' ({task.title}) has no capable agent assignment supporting category '{task.category}', component '{lld_map.get(task.parent_lld_id).component_type.value if lld_map.get(task.parent_lld_id) else 'none'}', and operation class '{task.operation_class}'."
+                )
 
-        # 3. Proven Parallel Batch Scheduling (V10.6)
-        batches = cls._schedule_parallel_batches(exec_tasks, dep_dag, topo_order)
+        # 3. Proven Parallel Batch Scheduling (V10.6 - Semantic Entity State & Resource Locking)
+        batches = cls._schedule_parallel_batches(exec_tasks, dep_dag, topo_order, lld_map=lld_map, b_graph=b_graph)
 
         # 4. Checkpoint & Invalidation Scope Construction (V10.7)
         checkpoints = cls._construct_checkpoints(batches, inv_graph)
 
-        # 5. Compute Source Tasks Hash
+        # 5. Compute Source Tasks Hash (Canonical Deterministic SHA-256)
         source_tasks_payload = sorted([t.task_hash for t in tasks])
-        source_tasks_hash = hashlib.sha256(json.dumps(source_tasks_payload).encode('utf-8')).hexdigest()
+        source_tasks_hash = hashlib.sha256(json.dumps(source_tasks_payload, sort_keys=True, separators=(',', ':')).encode('utf-8')).hexdigest()
 
         # 6. Assemble ExecutionPlan & Compute Canonical Plan Hash
         plan = ExecutionPlan(
@@ -258,18 +281,20 @@ class ExecutionPlanCompiler:
         parent_comp: Optional[LLDComponent],
         agent_caps: Dict[str, AgentCapability]
     ) -> Optional[AgentAssignment]:
-        """Matches a task with a compatible agent capability specification."""
+        """Matches a task with a compatible agent capability specification verifying category, component type, and operation class."""
         comp_type_val = parent_comp.component_type.value if parent_comp else "controller"
         task_cat_val = task.category.lower()
+        task_op_class = task.operation_class.lower()
 
         for cap_id, cap in agent_caps.items():
             if (task_cat_val in [tc.lower() for tc in cap.supported_task_categories] and
-                comp_type_val in [ct.lower() for ct in cap.supported_component_types]):
+                comp_type_val in [ct.lower() for ct in cap.supported_component_types] and
+                task_op_class in [op.lower() for op in cap.supported_operation_classes]):
                 return AgentAssignment(
                     task_id=task.id,
                     agent_role=cap.agent_role,
                     agent_capability_id=cap.id,
-                    assignment_rationale=f"Agent '{cap.agent_role}' supports category '{task_cat_val}' and component '{comp_type_val}'."
+                    assignment_rationale=f"Agent '{cap.agent_role}' supports category '{task_cat_val}', component '{comp_type_val}', and operation class '{task_op_class}'."
                 )
         return None
 
@@ -278,7 +303,9 @@ class ExecutionPlanCompiler:
         cls,
         tasks: Dict[str, ExecutionTask],
         dependency_dag: Dict[str, List[str]],
-        topo_order: List[str]
+        topo_order: List[str],
+        lld_map: Optional[Dict[str, LLDComponent]] = None,
+        b_graph: Optional[BehaviorGraph] = None
     ) -> List[ExecutionBatch]:
         """
         Schedules tasks into proven conflict-free parallel batches.
@@ -286,7 +313,7 @@ class ExecutionPlanCompiler:
         Invariant: Two tasks A and B are in the same parallel batch ONLY IF:
         1. A does not depend on B and B does not depend on A.
         2. A and B have NO overlapping WRITE_EXCLUSIVE resources.
-        3. A and B have NO entity state-transition collisions.
+        3. A and B have NO canonical entity state-transition collisions.
         """
         batches: List[ExecutionBatch] = []
         completed_tasks: Set[str] = set()
@@ -313,18 +340,30 @@ class ExecutionPlanCompiler:
                     r.target_identifier for r in task.required_resources
                     if r.access_mode == ResourceAccessMode.WRITE_EXCLUSIVE
                 }
-                parent_comp_entities = set(task.parent_behavior_ids)
+
+                # Semantic State Entity derivation (Blocker 4)
+                task_state_entities: Set[str] = set()
+                if b_graph:
+                    for b_id in task.parent_behavior_ids:
+                        b_node = b_graph.get_node(b_id)
+                        if b_node and b_node.target_entity_id:
+                            if b_node.from_state or b_node.to_state or task.category == "state_transition" or task.operation_class in ["state_transition", "command_mutation"]:
+                                task_state_entities.add(b_node.target_entity_id.lower())
+                if not task_state_entities and lld_map:
+                    if parent_comp := lld_map.get(task.parent_lld_id):
+                        if task.category == "state_transition" or task.operation_class in ["state_transition", "command_mutation"]:
+                            for ent in parent_comp.owned_entities:
+                                task_state_entities.add(ent.lower())
 
                 # Parallel Collision Check
                 has_resource_collision = bool(claimed_write_resources.intersection(task_write_res))
-                has_state_collision = bool(claimed_state_entities.intersection(parent_comp_entities)) if task.category == "state_transition" else False
+                has_state_collision = bool(claimed_state_entities.intersection(task_state_entities))
 
                 if not has_resource_collision and not has_state_collision:
                     # Safe to include in parallel batch
                     current_batch_tasks.append(task)
                     claimed_write_resources.update(task_write_res)
-                    if task.category == "state_transition":
-                        claimed_state_entities.update(parent_comp_entities)
+                    claimed_state_entities.update(task_state_entities)
 
             # Determine batch execution mode and risk
             exec_mode = ExecutionMode.PARALLEL if len(current_batch_tasks) > 1 else ExecutionMode.SERIAL

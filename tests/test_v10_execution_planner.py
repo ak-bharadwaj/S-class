@@ -41,6 +41,7 @@ from lld_compiler import LLDComponent, LLDComponentType, LLDParentRef, Component
 from requirement_ir import RequirementGraph, RequirementNode, RequirementKind, EpistemicStatus, ProvenanceKind
 from behavior_graph import BehaviorGraph, BehaviorNode, BehaviorNodeType
 from hld_compiler import HLDDesign, HLDModule
+from artifact_governor import ArtifactGovernor
 
 
 class TestV10ExecutionPlanner(unittest.TestCase):
@@ -373,6 +374,164 @@ class TestV10ExecutionPlanner(unittest.TestCase):
         plan2 = ExecutionPlanCompiler.compile_execution_plan([task], [comp])
         self.assertEqual(plan1.plan_hash, plan2.plan_hash, "Identical inputs MUST produce 100% deterministic identical plan_hash digests!")
         self.assertEqual(plan1.batches[0].batch_hash, plan2.batches[0].batch_hash)
+
+    # -------------------------------------------------------------------------
+    # V10 Blocker Audits (Zero-Neglect Hardening)
+    # -------------------------------------------------------------------------
+    def test_v10_blocker_1_agent_capability_operation_class_matching_and_rejection(self):
+        """Blocker 1: Agent matching must validate operation class (e.g. read_only agent cannot do command_mutation)."""
+        comp = LLDComponent("ctrl_order", "Order Controller", LLDComponentType.CONTROLLER, LLDParentRef("mod_o", ["REQ-1"], ["cmd_order"]), "backend_controller", ComponentExecutionCapability.MUTATE, api_endpoints=["POST /api/order"])
+        comp.component_hash = comp.compute_canonical_hash()
+
+        # Task has operation_class = command_mutation
+        task = TaskRecord("TSK-601", "Create Order API", "desc", TaskCategory.API_ENDPOINT, comp.id, "mod_o", ["REQ-1"], ["cmd_order"], source_lld_hash=comp.component_hash)
+        task.task_hash = task.compute_canonical_hash()
+
+        # Custom agent capability supporting ONLY read_query
+        read_only_agent = AgentCapability(
+            id="cap_readonly",
+            agent_role="readonly_engineer",
+            supported_task_categories=["api_endpoint"],
+            supported_operation_classes=["read_query"],
+            supported_component_types=["controller"],
+            requires_exclusive_lock=False
+        )
+
+        plan = ExecutionPlanCompiler.compile_execution_plan(
+            [task], [comp], agent_capabilities={"cap_readonly": read_only_agent}
+        )
+        self.assertFalse(plan.is_valid, "Plan MUST be marked invalid when agent lacks supported operation class!")
+        self.assertTrue(any("has no capable agent assignment supporting" in r for r in plan.validation_reasons))
+
+        # Governor audit fails closed
+        gov_res = ArtifactGovernor.audit_execution_plan_governance(plan, [task], [comp])
+        self.assertTrue(gov_res.is_blocked)
+
+    def test_v10_blocker_2_execution_task_source_task_hash_reconciliation_tamper(self):
+        """Blocker 2: ExecutionTask source task hash/lld hash/binding hashes mismatch fails closed in Governor."""
+        comp = LLDComponent("ctrl_user", "User Controller", LLDComponentType.CONTROLLER, LLDParentRef("mod_u", ["REQ-1"], ["cmd_user"]), "backend_controller", ComponentExecutionCapability.MUTATE, api_endpoints=["POST /api/user"])
+        comp.component_hash = comp.compute_canonical_hash()
+        task = TaskRecord("TSK-701", "Create User", "desc", TaskCategory.API_ENDPOINT, comp.id, "mod_u", ["REQ-1"], ["cmd_user"], source_lld_hash=comp.component_hash)
+        task.task_hash = task.compute_canonical_hash()
+
+        plan = ExecutionPlanCompiler.compile_execution_plan([task], [comp])
+        gov_valid = ArtifactGovernor.audit_execution_plan_governance(plan, [task], [comp])
+        self.assertFalse(gov_valid.is_blocked)
+
+        # 1. Tamper source_task_hash on ExecutionTask
+        exec_t = plan.tasks["ETSK-701"]
+        exec_t.source_task_hash = "forged_task_hash_8888"
+        exec_t.task_hash = exec_t.compute_canonical_hash()
+        plan.plan_hash = plan.compute_canonical_hash()
+
+        gov_tampered = ArtifactGovernor.audit_execution_plan_governance(plan, [task], [comp])
+        self.assertTrue(gov_tampered.is_blocked, "Governor MUST block ExecutionTask with tampered source_task_hash!")
+        self.assertTrue(any("source_task_hash mismatch" in r for r in gov_tampered.blocking_reasons))
+
+    def test_v10_blocker_3_execution_plan_source_tasks_hash_reconciliation(self):
+        """Blocker 3: ExecutionPlan.source_tasks_hash is cryptographically verified against canonical tasks."""
+        comp = LLDComponent("ctrl_inv", "Inventory Controller", LLDComponentType.CONTROLLER, LLDParentRef("mod_i", ["REQ-1"], ["cmd_inv"]), "backend_controller", ComponentExecutionCapability.MUTATE, api_endpoints=["POST /api/inv"])
+        comp.component_hash = comp.compute_canonical_hash()
+        task = TaskRecord("TSK-801", "Inventory API", "desc", TaskCategory.API_ENDPOINT, comp.id, "mod_i", ["REQ-1"], ["cmd_inv"], source_lld_hash=comp.component_hash)
+        task.task_hash = task.compute_canonical_hash()
+
+        plan = ExecutionPlanCompiler.compile_execution_plan([task], [comp])
+
+        # Tamper source_tasks_hash while keeping plan_hash consistent
+        plan.source_tasks_hash = "forged_source_tasks_hash_9999"
+        plan.plan_hash = plan.compute_canonical_hash()
+
+        gov_res = ArtifactGovernor.audit_execution_plan_governance(plan, [task], [comp])
+        self.assertTrue(gov_res.is_blocked, "Governor MUST block ExecutionPlan with forged source_tasks_hash!")
+        self.assertTrue(any("source_tasks_hash mismatch" in r for r in gov_res.blocking_reasons))
+
+    def test_v10_blocker_4_parallel_state_conflict_semantic_entity_rejection(self):
+        """Blocker 4: Tasks mutating the same entity state machine are serialized into separate batches."""
+        b_approve = BehaviorNode("cmd_approve_invoice", "Approve Invoice", BehaviorNodeType.COMMAND, "mgr", "invoice", EpistemicStatus.EXPLICIT, ProvenanceKind.EXPLICIT, 1.0, from_state="PENDING", to_state="APPROVED")
+        b_pay = BehaviorNode("cmd_pay_invoice", "Pay Invoice", BehaviorNodeType.COMMAND, "acct", "invoice", EpistemicStatus.EXPLICIT, ProvenanceKind.EXPLICIT, 1.0, from_state="APPROVED", to_state="PAID")
+
+        b_graph = BehaviorGraph(version=1)
+        b_graph.add_node(b_approve)
+        b_graph.add_node(b_pay)
+
+        comp = LLDComponent("ctrl_inv", "Invoice Controller", LLDComponentType.CONTROLLER, LLDParentRef("mod_inv", ["REQ-1"], ["cmd_approve_invoice", "cmd_pay_invoice"]), "backend_controller", ComponentExecutionCapability.MUTATE)
+        comp.component_hash = comp.compute_canonical_hash()
+
+        t1 = TaskRecord("TSK-INV-1", "Approve Invoice", "desc", TaskCategory.STATE_TRANSITION, comp.id, "mod_inv", ["REQ-1"], ["cmd_approve_invoice"], source_lld_hash=comp.component_hash)
+        t1.task_hash = t1.compute_canonical_hash()
+        t2 = TaskRecord("TSK-INV-2", "Pay Invoice", "desc", TaskCategory.STATE_TRANSITION, comp.id, "mod_inv", ["REQ-1"], ["cmd_pay_invoice"], source_lld_hash=comp.component_hash)
+        t2.task_hash = t2.compute_canonical_hash()
+
+        plan = ExecutionPlanCompiler.compile_execution_plan([t1, t2], [comp], b_graph=b_graph)
+        self.assertTrue(plan.is_valid)
+        self.assertEqual(len(plan.batches), 2, "Tasks mutating the same entity state machine MUST be serialized into separate batches!")
+        self.assertEqual(plan.batches[0].tasks[0].id, "ETSK-INV-1")
+        self.assertEqual(plan.batches[1].tasks[0].id, "ETSK-INV-2")
+
+    def test_v10_blocker_5_unknown_dependency_fails_closed(self):
+        """Blocker 5: Declared dependency to unknown task ID fails closed immediately."""
+        task = ExecutionTask(
+            id="ETSK-901", source_task_id="TSK-901", title="Task with Ghost Dependency", description="desc",
+            category="api_endpoint", execution_mode=ExecutionMode.SERIAL, risk_level=TaskRiskLevel.LOW,
+            status=ExecutionTaskStatus.READY,
+            dependencies=[ExecutionDependency("TSK-GHOST-999", "ETSK-901", DependencyType.HARD_PREREQUISITE, "Depends on ghost task")]
+        )
+
+        with self.assertRaises(CyclicDependencyError):
+            ExecutionDependencyResolver.resolve_dependencies({"ETSK-901": task})
+
+    def test_v10_blocker_6_architectural_layer_dependency_precision(self):
+        """Blocker 6: UI surfaces depend precisely on matching backend services, not all backend tasks across module."""
+        comp_profile = LLDComponent("ctrl_profile", "Profile", LLDComponentType.CONTROLLER, LLDParentRef("mod_core", ["REQ-P"], ["cmd_profile"]), "backend_controller", ComponentExecutionCapability.MUTATE, owned_entities=["Profile"])
+        comp_profile.component_hash = comp_profile.compute_canonical_hash()
+
+        comp_payment = LLDComponent("ctrl_payment", "Payment", LLDComponentType.CONTROLLER, LLDParentRef("mod_core", ["REQ-M"], ["cmd_payment"]), "backend_controller", ComponentExecutionCapability.MUTATE, owned_entities=["Payment"])
+        comp_payment.component_hash = comp_payment.compute_canonical_hash()
+
+        comp_telemetry_be = LLDComponent("ctrl_telemetry", "Telemetry Service", LLDComponentType.CONTROLLER, LLDParentRef("mod_core", ["REQ-T"], ["query_telemetry"]), "backend_controller", ComponentExecutionCapability.READ, owned_entities=["Telemetry"])
+        comp_telemetry_be.component_hash = comp_telemetry_be.compute_canonical_hash()
+
+        comp_telemetry_ui = LLDComponent("ui_telemetry", "Telemetry Dashboard", LLDComponentType.UI_SURFACE, LLDParentRef("mod_core", ["REQ-T"], ["query_telemetry"]), "frontend_interface", interaction_capability=UIInteractionCapability.DISPLAYS_DATA, owned_entities=["Telemetry"])
+        comp_telemetry_ui.component_hash = comp_telemetry_ui.compute_canonical_hash()
+
+        t_prof = TaskRecord("TSK-PROF", "Profile API", "desc", TaskCategory.API_ENDPOINT, comp_profile.id, "mod_core", ["REQ-P"], ["cmd_profile"], source_lld_hash=comp_profile.component_hash)
+        t_prof.task_hash = t_prof.compute_canonical_hash()
+
+        t_pay = TaskRecord("TSK-PAY", "Payment API", "desc", TaskCategory.API_ENDPOINT, comp_payment.id, "mod_core", ["REQ-M"], ["cmd_payment"], source_lld_hash=comp_payment.component_hash)
+        t_pay.task_hash = t_pay.compute_canonical_hash()
+
+        t_telem_be = TaskRecord("TSK-TELEM-BE", "Telemetry API", "desc", TaskCategory.API_ENDPOINT, comp_telemetry_be.id, "mod_core", ["REQ-T"], ["query_telemetry"], source_lld_hash=comp_telemetry_be.component_hash)
+        t_telem_be.task_hash = t_telem_be.compute_canonical_hash()
+
+        t_telem_ui = TaskRecord("TSK-TELEM-UI", "Telemetry UI", "desc", TaskCategory.UI_COMPONENT, comp_telemetry_ui.id, "mod_core", ["REQ-T"], ["query_telemetry"], source_lld_hash=comp_telemetry_ui.component_hash)
+        t_telem_ui.task_hash = t_telem_ui.compute_canonical_hash()
+
+        plan = ExecutionPlanCompiler.compile_execution_plan(
+            [t_prof, t_pay, t_telem_be, t_telem_ui],
+            [comp_profile, comp_payment, comp_telemetry_be, comp_telemetry_ui]
+        )
+        self.assertTrue(plan.is_valid)
+
+        # Telemetry UI must depend ONLY on Telemetry BE, NOT on Profile or Payment!
+        ui_deps = plan.dependency_dag["ETSK-TELEM-UI"]
+        self.assertIn("ETSK-TELEM-BE", ui_deps)
+        self.assertNotIn("ETSK-PROF", ui_deps, "Telemetry UI MUST NOT depend on unrelated Profile API!")
+        self.assertNotIn("ETSK-PAY", ui_deps, "Telemetry UI MUST NOT depend on unrelated Payment API!")
+
+    def test_v10_blocker_7_checkpoint_strict_hash_verification(self):
+        """Blocker 7: ExecutionCheckpoint strict deserialization verifies checkpoint_hash."""
+        cp = ExecutionCheckpoint("CHK-001", 1, ["gate_1"], {"ETSK-1": ["ETSK-2"]})
+        cp.checkpoint_hash = cp.compute_canonical_hash()
+
+        # Valid rehydration
+        rehydrated = ExecutionCheckpoint.from_dict(cp.to_dict(), strict=True)
+        self.assertEqual(rehydrated.checkpoint_hash, cp.checkpoint_hash)
+
+        # Tampered checkpoint fails closed
+        tampered_dict = cp.to_dict()
+        tampered_dict["checkpoint_hash"] = "forged_checkpoint_hash_7777"
+        with self.assertRaises(ValueError):
+            ExecutionCheckpoint.from_dict(tampered_dict, strict=True)
 
 
 if __name__ == "__main__":

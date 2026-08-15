@@ -269,9 +269,10 @@ class ExecutionTask:
     title: str
     description: str
     category: str
-    execution_mode: ExecutionMode
-    risk_level: TaskRiskLevel
-    status: ExecutionTaskStatus
+    operation_class: str = "command_mutation"
+    execution_mode: ExecutionMode = ExecutionMode.SERIAL
+    risk_level: TaskRiskLevel = TaskRiskLevel.LOW
+    status: ExecutionTaskStatus = ExecutionTaskStatus.READY
     dependencies: List[ExecutionDependency] = field(default_factory=list)
     required_resources: List[ExecutionResource] = field(default_factory=list)
     required_agent_capability: str = "general_coding"
@@ -293,6 +294,7 @@ class ExecutionTask:
             "title": self.title,
             "description": self.description,
             "category": self.category,
+            "operation_class": self.operation_class.lower(),
             "execution_mode": self.execution_mode.value,
             "risk_level": self.risk_level.value,
             "dependencies": sorted([d.compute_canonical_hash() for d in self.dependencies]),
@@ -316,6 +318,7 @@ class ExecutionTask:
             "title": self.title,
             "description": self.description,
             "category": self.category,
+            "operation_class": self.operation_class.lower(),
             "execution_mode": self.execution_mode.value,
             "risk_level": self.risk_level.value,
             "status": self.status.value,
@@ -342,7 +345,7 @@ class ExecutionTask:
         if strict:
             mandatory_fields = [
                 "id", "source_task_id", "title", "description", "category",
-                "execution_mode", "risk_level", "status", "parent_lld_id",
+                "operation_class", "execution_mode", "risk_level", "status", "parent_lld_id",
                 "source_task_hash", "source_lld_hash", "source_binding_hashes",
                 "parent_req_ids", "parent_behavior_ids", "verification_criteria",
                 "task_hash"
@@ -357,6 +360,7 @@ class ExecutionTask:
             title=str(data.get("title", "")),
             description=str(data.get("description", "")),
             category=str(data.get("category", "")),
+            operation_class=str(data.get("operation_class", "command_mutation")),
             execution_mode=ExecutionMode(data.get("execution_mode", "serial")),
             risk_level=TaskRiskLevel(data.get("risk_level", "low")),
             status=ExecutionTaskStatus(data.get("status", "ready")),
@@ -454,14 +458,30 @@ class ExecutionCheckpoint:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'ExecutionCheckpoint':
-        return cls(
+    def from_dict(cls, data: Dict[str, Any], strict: bool = False) -> 'ExecutionCheckpoint':
+        if strict:
+            mandatory = [
+                "checkpoint_id", "after_batch_id", "verification_gates",
+                "invalidation_scope", "checkpoint_hash"
+            ]
+            for m in mandatory:
+                if m not in data or data[m] is None:
+                    raise ValueError(f"Missing mandatory '{m}' in ExecutionCheckpoint governed payload (strict mode)")
+
+        cp = cls(
             checkpoint_id=str(data.get("checkpoint_id", "")),
             after_batch_id=int(data.get("after_batch_id", 0)),
             verification_gates=list(data.get("verification_gates", [])),
             invalidation_scope=dict(data.get("invalidation_scope", {})),
             checkpoint_hash=str(data.get("checkpoint_hash", ""))
         )
+        if strict:
+            computed = cp.compute_canonical_hash()
+            if data["checkpoint_hash"] != computed:
+                raise ValueError(
+                    f"ExecutionCheckpoint '{cp.checkpoint_id}' checkpoint_hash mismatch (provided: {data['checkpoint_hash'][:8]}, computed: {computed[:8]})"
+                )
+        return cp
 
 
 @dataclass
@@ -538,7 +558,7 @@ class ExecutionPlan:
             for k, v in data.get("tasks", {}).items()
         }
         batches = [ExecutionBatch.from_dict(b, strict=strict) for b in data.get("batches", [])]
-        checkpoints = [ExecutionCheckpoint.from_dict(c) for c in data.get("checkpoints", [])]
+        checkpoints = [ExecutionCheckpoint.from_dict(c, strict=strict) for c in data.get("checkpoints", [])]
 
         plan = cls(
             plan_id=str(data.get("plan_id", "")),

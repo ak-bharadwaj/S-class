@@ -931,13 +931,26 @@ class ArtifactGovernor:
                     f"ExecutionPlan plan_hash mismatch: computed '{expected_plan_hash[:8]}', got '{plan.plan_hash[:8]}'."
                 )
 
-        # 2. Internal Validity Check
+        # 2. Source Tasks Cryptographic Reconciliation (Blocker 3)
+        expected_source_tasks_hash = hashlib.sha256(
+            json.dumps(sorted([t.task_hash for t in tasks]), sort_keys=True, separators=(',', ':')).encode('utf-8')
+        ).hexdigest()
+        if not getattr(plan, "source_tasks_hash", ""):
+            reasons.append("ExecutionPlan is missing mandatory source_tasks_hash.")
+        elif plan.source_tasks_hash != expected_source_tasks_hash:
+            reasons.append(
+                f"ExecutionPlan source_tasks_hash mismatch: expected '{expected_source_tasks_hash[:8]}', got '{plan.source_tasks_hash[:8]}'."
+            )
+
+        # 3. Internal Validity Check
         if not plan.is_valid:
             reasons.extend(plan.validation_reasons)
 
-        # 3. Task Coverage & Lineage Reconciliation (Zero Orphan, Zero Invented Tasks)
-        task_id_set = {t.id for t in tasks}
+        # 4. Task Coverage & Lineage Cryptographic Reconciliation (Blocker 2)
+        task_map = {t.id: t for t in tasks}
+        task_id_set = set(task_map.keys())
         exec_source_ids = {t.source_task_id for t in plan.tasks.values()}
+
         if exec_source_ids != task_id_set:
             missing = task_id_set - exec_source_ids
             invented = exec_source_ids - task_id_set
@@ -950,7 +963,53 @@ class ArtifactGovernor:
                     f"ExecutionPlan contains invented tasks with no upstream governed task lineage: {sorted(invented)}."
                 )
 
-        # 4. Proven Parallelism Independence Verification
+        for exec_id, exec_t in plan.tasks.items():
+            if exec_t.source_task_id not in task_map:
+                reasons.append(f"ExecutionTask '{exec_id}' references unknown source_task_id '{exec_t.source_task_id}'.")
+                continue
+
+            t_rec = task_map[exec_t.source_task_id]
+
+            # A. Source Task Hash Verification
+            expected_task_hash = t_rec.compute_canonical_hash() if hasattr(t_rec, "compute_canonical_hash") else t_rec.task_hash
+            if not exec_t.source_task_hash:
+                reasons.append(f"ExecutionTask '{exec_id}' missing mandatory source_task_hash.")
+            elif exec_t.source_task_hash != expected_task_hash:
+                reasons.append(
+                    f"ExecutionTask '{exec_id}' source_task_hash mismatch: expected '{expected_task_hash[:8]}', got '{exec_t.source_task_hash[:8]}'."
+                )
+
+            # B. Source LLD Hash Verification
+            if exec_t.source_lld_hash != t_rec.source_lld_hash:
+                reasons.append(
+                    f"ExecutionTask '{exec_id}' source_lld_hash mismatch: expected '{t_rec.source_lld_hash[:8]}', got '{exec_t.source_lld_hash[:8]}'."
+                )
+
+            # C. Source Binding Hashes Verification
+            if sorted(exec_t.source_binding_hashes) != sorted(t_rec.source_binding_hashes):
+                reasons.append(
+                    f"ExecutionTask '{exec_id}' source_binding_hashes mismatch with governed task record."
+                )
+
+            # D. Parent Requirement and Behavior Lineage Verification
+            if sorted(exec_t.parent_req_ids) != sorted(t_rec.parent_reqs):
+                reasons.append(
+                    f"ExecutionTask '{exec_id}' parent_req_ids mismatch with governed task record."
+                )
+            if sorted(exec_t.parent_behavior_ids) != sorted(t_rec.parent_behaviors):
+                reasons.append(
+                    f"ExecutionTask '{exec_id}' parent_behavior_ids mismatch with governed task record."
+                )
+
+            # E. Canonical Execution Task Hash Verification
+            if hasattr(exec_t, "compute_canonical_hash"):
+                expected_exec_hash = exec_t.compute_canonical_hash()
+                if not exec_t.task_hash or exec_t.task_hash != expected_exec_hash:
+                    reasons.append(
+                        f"ExecutionTask '{exec_id}' tampered/stale task_hash (expected '{expected_exec_hash[:8]}', got '{exec_t.task_hash[:8]}')."
+                    )
+
+        # 5. Proven Parallelism Independence Verification
         for batch in plan.batches:
             if batch.execution_mode == ExecutionMode.PARALLEL:
                 claimed_write_res: Set[str] = set()
@@ -974,10 +1033,18 @@ class ArtifactGovernor:
                         )
                     claimed_write_res.update(write_res)
 
-        # 5. Agent Assignment Coverage
+        # 6. Agent Assignment & Operation Class Compatibility Verification (Blocker 1)
         for t_id, task in plan.tasks.items():
             if not task.assigned_agent:
                 reasons.append(f"ExecutionTask '{t_id}' ({task.title}) has no capable agent assignment.")
+            else:
+                from execution_plan_compiler import DEFAULT_AGENT_CAPABILITIES
+                cap = DEFAULT_AGENT_CAPABILITIES.get(task.assigned_agent.agent_capability_id)
+                if cap:
+                    if task.operation_class.lower() not in [op.lower() for op in cap.supported_operation_classes]:
+                        reasons.append(
+                            f"ExecutionTask '{t_id}' assigned agent '{task.assigned_agent.agent_role}' does not support required operation class '{task.operation_class}' (supported: {cap.supported_operation_classes})."
+                        )
 
         if reasons:
             return GovernanceGateResult(

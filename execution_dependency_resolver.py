@@ -53,7 +53,11 @@ class ExecutionDependencyResolver:
         # 1. Existing explicit dependencies declared on tasks
         for t_id, task in tasks.items():
             for dep in task.dependencies:
-                if dep.source_task_id in tasks and dep.source_task_id != t_id:
+                if dep.source_task_id not in tasks:
+                    raise CyclicDependencyError(
+                        f"Task '{t_id}' declares dependency on unknown task '{dep.source_task_id}' not found in task graph."
+                    )
+                if dep.source_task_id != t_id:
                     dependency_dag[t_id].add(dep.source_task_id)
                     reverse_dag[dep.source_task_id].add(t_id)
 
@@ -112,25 +116,41 @@ class ExecutionDependencyResolver:
                                     ))
 
         # 4. Derive Architecture Layer Precedence:
-        # Backend API Controller/Service contracts precede UI Surfaces that bind or consume them
-        backend_tasks: Dict[str, Set[str]] = defaultdict(set) # lld_id -> set of backend task_ids
+        # Backend API Controller/Service contracts precede UI Surfaces that consume their behaviors/requirements/entities
+        backend_tasks_by_beh: Dict[str, Set[str]] = defaultdict(set)
+        backend_tasks_by_req: Dict[str, Set[str]] = defaultdict(set)
+        backend_tasks_by_entity: Dict[str, Set[str]] = defaultdict(set)
+
         for t_id, task in tasks.items():
             if task.parent_lld_id in lld_map:
                 comp = lld_map[task.parent_lld_id]
                 if comp.component_type in [LLDComponentType.CONTROLLER, LLDComponentType.SERVICE, LLDComponentType.CLI_DISPATCHER]:
-                    backend_tasks[comp.id].add(t_id)
-                    # Also register by parent HLD id
-                    if comp.parent and comp.parent.hld_id:
-                        backend_tasks[comp.parent.hld_id].add(t_id)
+                    for b_id in task.parent_behavior_ids:
+                        backend_tasks_by_beh[b_id].add(t_id)
+                    for r_id in task.parent_req_ids:
+                        backend_tasks_by_req[r_id].add(t_id)
+                    for ent in comp.owned_entities:
+                        backend_tasks_by_entity[ent.lower()].add(t_id)
 
         for t_id, task in tasks.items():
             if task.parent_lld_id in lld_map:
                 comp = lld_map[task.parent_lld_id]
                 if comp.component_type == LLDComponentType.UI_SURFACE:
-                    # UI Surface depends on backend components in the same HLD module or matching behaviors
                     matching_backend_tasks = set()
-                    if comp.parent and comp.parent.hld_id in backend_tasks:
-                        matching_backend_tasks.update(backend_tasks[comp.parent.hld_id])
+                    for b_id in task.parent_behavior_ids:
+                        matching_backend_tasks.update(backend_tasks_by_beh.get(b_id, []))
+                    for r_id in task.parent_req_ids:
+                        matching_backend_tasks.update(backend_tasks_by_req.get(r_id, []))
+                    for ent in comp.owned_entities:
+                        matching_backend_tasks.update(backend_tasks_by_entity.get(ent.lower(), []))
+
+                    if not matching_backend_tasks and comp.parent and comp.parent.hld_id:
+                        for b_t_id, b_t in tasks.items():
+                            if b_t_id != t_id and b_t.parent_lld_id in lld_map:
+                                b_comp = lld_map[b_t.parent_lld_id]
+                                if b_comp.component_type in [LLDComponentType.CONTROLLER, LLDComponentType.SERVICE, LLDComponentType.CLI_DISPATCHER]:
+                                    if b_comp.parent and b_comp.parent.hld_id == comp.parent.hld_id:
+                                        matching_backend_tasks.add(b_t_id)
 
                     for b_t in matching_backend_tasks:
                         if b_t != t_id:
