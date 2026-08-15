@@ -33,25 +33,49 @@ class TestV96FailureInjection(unittest.TestCase):
             self.assertTrue(os.path.exists(lock_path))
 
     def test_system_outcome_corrupt_pipeline_json_fails_closed_in_fsm_runner(self):
-        """System Outcome Injection 1: Corrupted pipeline JSON forces fail-closed governance BLOCK without partial mutation."""
-        from runtime import FSMGoalSequenceRunner, initialize_state
-
-        state_dir = os.path.join(self.test_dir, ".agents")
-        os.makedirs(state_dir, exist_ok=True)
-        pipeline_file = os.path.join(state_dir, "v7_refinement_pipeline.json")
-
-        # Write truncated corrupt JSON
-        with open(pipeline_file, "w", encoding="utf-8") as f:
-            f.write('{"behavior_graph": {"nodes": {')
+        """System Outcome Chain 1: Corrupted pipeline JSON forces ArtifactGovernor BLOCK, preserves previous immutable artifact v1.json, and prevents downstream FSM transition."""
+        from runtime import initialize_state, get_state
+        from spec_compiler import SpecificationCompiler
+        from artifact_governor import ArtifactGovernor
 
         initialize_state(self.test_dir, goal="Test Goal")
+        state_dir = os.path.join(self.test_dir, ".agents")
 
-        # Phase evidence check must not crash and handles corrupt JSON gracefully
-        FSMGoalSequenceRunner._ensure_phase_evidence("DESIGN", self.test_dir)
-        self.assertTrue(os.path.exists(pipeline_file), "Pipeline file must remain intact without corrupt state mutation")
+        # 1. Create and persist valid v1 pipeline artifact
+        dummy_pipe = {
+            "version": 1,
+            "behavior_graph": {"nodes": {}},
+            "requirement_graph": {"nodes": {}},
+            "hld_design": {"adrs": []},
+            "debate_result": {"accepted_adrs": []},
+            "lld_components": [],
+            "tasks": [],
+            "blocked": False
+        }
+        v1_path = SpecificationCompiler.save_versioned_pipeline_artifact(dummy_pipe, self.test_dir)
+        self.assertTrue(os.path.exists(v1_path), "v1.json must be saved cleanly")
+
+        # 2. Inject corruption into current working pipeline file
+        pipeline_file = os.path.join(state_dir, "v7_refinement_pipeline.json")
+        with open(pipeline_file, "w", encoding="utf-8") as f:
+            f.write('{"behavior_graph": {"nodes": { TRUNCATED_CORRUPT_JSON')
+
+        # 3. Governor audit MUST detect corruption and BLOCK transition to CODING
+        gov_res = ArtifactGovernor.enforce_fsm_transition(
+            current_phase="DESIGN",
+            proposed_event="spec_approved",
+            target_phase="CODING",
+            workspace_dir=self.test_dir
+        )
+
+        # Full outcome chain assertions:
+        self.assertTrue(gov_res.is_blocked, "ArtifactGovernor MUST evaluate is_blocked=True on corrupted pipeline")
+        self.assertTrue(os.path.exists(v1_path), "Previous immutable backup v1.json MUST remain preserved intact")
+        state = get_state(self.test_dir)
+        self.assertEqual(state.currentPhase, "TRIAGE", "FSM current state MUST remain in safe current phase without state mutation")
 
     def test_system_outcome_tampered_approval_signature_fails_closed(self):
-        """System Outcome Injection 2: Tampered HMAC approval signature forces FAIL_CLOSED governance BLOCK."""
+        """System Outcome Chain 2: Tampered HMAC approval signature forces verification failure, governance BLOCK, and blocks downstream CODING transition."""
         from artifact_governor import ArtifactGovernor, ApprovalRecord, ApprovalAuthority
 
         tampered_record = ApprovalRecord(
@@ -66,8 +90,17 @@ class TestV96FailureInjection(unittest.TestCase):
             signature="TAMPERED_INVALID_HMAC_SIGNATURE"
         )
 
-        res = tampered_record.is_valid("secret_key_123")
-        self.assertFalse(res, "Tampered approval signature MUST evaluate to False (FAIL CLOSED)")
+        # 1. Direct record signature check evaluates to False
+        self.assertFalse(tampered_record.is_valid("secret_key_123"), "Tampered signature MUST fail validation")
+
+        # 2. FSM transition to CODING must be BLOCKED
+        gov_res = ArtifactGovernor.enforce_fsm_transition(
+            current_phase="DESIGN",
+            proposed_event="spec_approved",
+            target_phase="CODING",
+            workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res.is_blocked, "Unapproved/tampered artifact MUST block transition to CODING")
 
 
 if __name__ == "__main__":

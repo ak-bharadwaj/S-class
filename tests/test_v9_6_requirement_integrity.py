@@ -100,6 +100,37 @@ class TestV96RequirementIntegrity(unittest.TestCase):
         with self.assertRaises(DuplicateIDConflictError):
             r_graph.add_requirement(req2)
 
+    def test_epistemic_confidence_refinement_allowed_for_identical_semantic_identity(self):
+        """Invariant: Refining confidence/epistemic status for identical semantic identity (same actor, capability, statement, risk) is ALLOWED and updates node."""
+        r_graph = RequirementGraph()
+
+        req1 = RequirementNode(
+            id="REQ-001",
+            kind=RequirementKind.FUNCTIONAL,
+            statement="System must process payment",
+            actor="operator",
+            capability="payment",
+            target="system",
+            confidence=0.6,
+            epistemic_status=EpistemicStatus.PROPOSED
+        )
+        r_graph.add_requirement(req1)
+
+        req2 = RequirementNode(
+            id="REQ-001",
+            kind=RequirementKind.FUNCTIONAL,
+            statement="System must process payment",
+            actor="operator",
+            capability="payment",
+            target="system",
+            confidence=0.95,
+            epistemic_status=EpistemicStatus.EXPLICIT
+        )
+        # Identical semantic identity -> refinement allowed without raising DuplicateIDConflictError
+        updated = r_graph.add_requirement(req2)
+        self.assertEqual(updated.confidence, 0.95)
+        self.assertEqual(updated.epistemic_status, EpistemicStatus.EXPLICIT)
+
 
 if __name__ == "__main__":
     unittest.main()

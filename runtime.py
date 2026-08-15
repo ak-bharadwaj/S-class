@@ -98,6 +98,48 @@ def _process_exists(pid: int) -> bool:
             return False
 
 
+def _get_process_start_time(pid: int) -> Optional[float]:
+    """Retrieves process creation/start timestamp (epoch seconds) for PID reuse detection."""
+    if pid <= 0:
+        return None
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            from ctypes import wintypes
+            class FILETIME(ctypes.Structure):
+                _fields_ = [("dwLowDateTime", wintypes.DWORD), ("dwHighDateTime", wintypes.DWORD)]
+
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+            if handle:
+                create_time = FILETIME()
+                exit_time = FILETIME()
+                kernel_time = FILETIME()
+                user_time = FILETIME()
+                res = kernel32.GetProcessTimes(
+                    handle,
+                    ctypes.byref(create_time),
+                    ctypes.byref(exit_time),
+                    ctypes.byref(kernel_time),
+                    ctypes.byref(user_time)
+                )
+                kernel32.CloseHandle(handle)
+                if res:
+                    ft64 = (create_time.dwHighDateTime << 32) + create_time.dwLowDateTime
+                    return (ft64 - 116444736000000000) / 10000000.0
+        except Exception:
+            return None
+    else:
+        try:
+            proc_path = f"/proc/{pid}"
+            if os.path.exists(proc_path):
+                return os.path.getmtime(proc_path)
+        except Exception:
+            return None
+    return None
+
+
 import threading
 
 _active_local_locks: Set[str] = set()
@@ -107,8 +149,8 @@ _active_locks_guard = threading.Lock()
 class FileLock:
     """
     Hardware-level mutual exclusion file lock with atomic owner metadata,
-    PID liveness audit, unique process token identity, thread-safe local activation tracking,
-    and grace-period protection.
+    PID liveness audit, process creation timestamp validation, unique process token identity,
+    thread-safe local activation tracking, and grace-period protection.
     """
     def __init__(self, lock_path: str, timeout: float = 10.0, stale_ttl: float = 15.0, grace_period: float = 0.5):
         self.lock_path = os.path.abspath(lock_path)
@@ -117,6 +159,7 @@ class FileLock:
         self.grace_period = grace_period
         self.token = str(uuid.uuid4())
         self.owner_pid = os.getpid()
+        self.owner_proc_start = _get_process_start_time(self.owner_pid)
 
     def __enter__(self):
         start_time = time.time()
@@ -125,7 +168,8 @@ class FileLock:
             "pid": self.owner_pid,
             "token": self.token,
             "host": socket.gethostname(),
-            "start_time": start_time
+            "start_time": start_time,
+            "process_start_time": self.owner_proc_start
         }).encode("utf-8")
 
         while True:
@@ -159,14 +203,24 @@ class FileLock:
 
                     pid = lock_data.get("pid")
                     token = lock_data.get("token")
+                    lock_proc_start = lock_data.get("process_start_time") or lock_data.get("start_time")
+                    current_proc_start = _get_process_start_time(pid) if isinstance(pid, int) else None
 
                     with _active_locks_guard:
                         is_locally_active = self.lock_path in _active_local_locks
 
-                    # 2. Dead process check — if PID is alive, NEVER steal lock based on age unless stale abandoned
+                    # 2. Dead process & PID reuse check
                     if isinstance(pid, int):
                         if not _process_exists(pid):
                             logger.warning(f"Stale lock detected for dead PID {pid}. Recovering: {self.lock_path}")
+                            try:
+                                os.unlink(self.lock_path)
+                            except OSError:
+                                pass
+                            continue
+                        elif current_proc_start and lock_proc_start and current_proc_start > lock_proc_start + 1.0:
+                            # OS reused PID after original process died!
+                            logger.warning(f"PID reuse detected for PID {pid} (lock start={lock_proc_start}, proc start={current_proc_start}). Recovering stale lock: {self.lock_path}")
                             try:
                                 os.unlink(self.lock_path)
                             except OSError:

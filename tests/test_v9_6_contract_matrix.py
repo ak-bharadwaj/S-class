@@ -66,22 +66,38 @@ class TestV96ContractMatrix(unittest.TestCase):
         self.assertEqual(is_blocked, task_gov.get("is_blocked", False), "Pipeline blocked flag must match Task Governance result")
 
     def test_contract_7_debate_to_revised_hld_alignment(self):
-        """Contract 7: Accepted ADRs in Debate result must match HLD design decision records."""
+        """Contract 7: Accepted ADRs in Debate result must match HLD design decision records in both ID AND exact semantic decision content."""
         hld = self.res_pipe["hld_design"]
         debate_dict = self.res_pipe["debate_result"]
         accepted_adrs = debate_dict.get("accepted_adrs", [])
         hld_adr_dict = {a.get("id") if isinstance(a, dict) else a.id: a for a in hld.adrs}
+
         for acc in accepted_adrs:
-            adr_id = acc.get("id")
-            self.assertIn(adr_id, hld_adr_dict, f"Accepted debate ADR '{adr_id}' must be present in revised HLD design")
+            adr_id = acc.get("id") if isinstance(acc, dict) else acc.id
+            self.assertIn(adr_id, hld_adr_dict, f"Accepted debate ADR '{adr_id}' missing from HLD design")
+            hld_adr = hld_adr_dict[adr_id]
+
+            # Compare exact decision text or choice, not just ID!
+            acc_decision = acc.get("decision") if isinstance(acc, dict) else acc.decision
+            hld_decision = hld_adr.get("decision") if isinstance(hld_adr, dict) else hld_adr.decision
+
+            self.assertEqual(
+                acc_decision, hld_decision,
+                f"Semantic content conflict for ADR '{adr_id}': Debate accepted '{acc_decision}' vs HLD recorded '{hld_decision}'"
+            )
 
     def test_contract_8_version_lineage_parent_hash_integrity(self):
-        """Contract 8: Pipeline version serialization must produce valid SHA-256 content and parent hashes."""
-        import tempfile, shutil, json
+        """Contract 8: Pipeline version serialization must produce exact SHA-256 byte digest equality for parent_hash."""
+        import tempfile, shutil, json, hashlib
         tmp = tempfile.mkdtemp()
         try:
             p1 = SpecificationCompiler.save_versioned_pipeline_artifact(self.res_pipe, tmp)
             self.assertTrue(p1.endswith("v1.json"))
+
+            # Read raw bytes of v1 artifact to compute exact SHA-256 digest
+            with open(p1, "rb") as f:
+                v1_bytes = f.read()
+            expected_v1_sha256 = hashlib.sha256(v1_bytes).hexdigest()
 
             # Mutate pipeline slightly to produce v2
             pipe2 = dict(self.res_pipe)
@@ -91,9 +107,14 @@ class TestV96ContractMatrix(unittest.TestCase):
 
             with open(p2, "r", encoding="utf-8") as f:
                 v2_data = json.load(f)
+
             self.assertEqual(v2_data.get("version"), 2)
             self.assertEqual(v2_data.get("parent_version"), 1)
-            self.assertTrue(v2_data.get("parent_hash") is not None, "v2 must track exact parent_hash of v1")
+            # Enforce exact SHA-256 equality, not just existence!
+            self.assertEqual(
+                v2_data.get("parent_hash"), expected_v1_sha256,
+                f"v2 parent_hash '{v2_data.get('parent_hash')}' must equal exact SHA-256 of v1 bytes '{expected_v1_sha256}'"
+            )
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

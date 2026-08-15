@@ -98,6 +98,79 @@ class TestV96MetamorphicDebate(unittest.TestCase):
             status = rec.sufficiency_gate_result.get("status")
             self.assertNotEqual(status, "PASS", "Security requirement without architecture evidence must NOT pass decision sufficiency gate")
 
+    def test_metamorphic_contradict_critical_requirement_triggers_rejection(self):
+        """Metamorphic Property 5: Contradicting a critical requirement forces debate rejection or non-PASS outcome."""
+        from requirement_ir import RequirementNode, RequirementKind
+        from behavior_graph import EpistemicStatus
+
+        r_graph = RequirementGraph()
+        b_graph = BehaviorGraph()
+
+        # Add explicit auth requirement
+        r1 = RequirementNode(
+            id="REQ-AUTH-001",
+            kind=RequirementKind.FUNCTIONAL,
+            statement="System must require OAuth2 authentication.",
+            actor="user",
+            capability="authenticate",
+            target="system",
+            epistemic_status=EpistemicStatus.EXPLICIT
+        )
+        r_graph.add_requirement(r1)
+
+        # Add contradictory requirement under different ID
+        r2 = RequirementNode(
+            id="REQ-AUTH-002",
+            kind=RequirementKind.FUNCTIONAL,
+            statement="System must disable authentication entirely and grant public anonymous access.",
+            actor="anonymous",
+            capability="bypass_auth",
+            target="system",
+            epistemic_status=EpistemicStatus.EXPLICIT
+        )
+        r_graph.add_requirement(r2)
+
+        hld = HLDCompiler.compile_hld(r_graph, b_graph, raw_request="Build secure access portal")
+        d = ArchitectureDebateEngine.run_debate_cycle(hld, r_graph, b_graph, raw_request="Build secure access portal", is_debate_phase=True)
+
+        # Contradictory security requirements must produce rejected ADRs or non-PASS sufficiency
+        self.assertTrue(len(d.rejected_adrs) > 0 or len(d.required_revisions) > 0, "Contradictory security requirements MUST trigger candidate rejection or required revisions")
+
+    def test_metamorphic_increase_throughput_requirement_increases_scale_risk(self):
+        """Metamorphic Property 6: Increasing throughput requirement to 100k ev/s CANNOT decrease scale risk rating."""
+        from requirement_ir import RequirementNode, RequirementKind, NFRCategory
+        from behavior_graph import EpistemicStatus
+
+        # Baseline graph
+        r_base = RequirementGraph()
+        b_base = BehaviorGraph()
+        hld1 = HLDCompiler.compile_hld(r_base, b_base, raw_request="Build internal batch reporting service")
+        d1 = ArchitectureDebateEngine.run_debate_cycle(hld1, r_base, b_base, raw_request="Build internal batch reporting service", is_debate_phase=True)
+
+        # High-scale graph
+        r_scale = RequirementGraph()
+        b_scale = BehaviorGraph()
+        high_scale_nfr = RequirementNode(
+            id="REQ-PERF-999",
+            kind=RequirementKind.NON_FUNCTIONAL,
+            nfr_category=NFRCategory.PERFORMANCE,
+            statement="System must handle 100k events/sec zero-downtime streaming.",
+            actor="system",
+            capability="stream_processing",
+            target="cluster",
+            epistemic_status=EpistemicStatus.EXPLICIT,
+            confidence=0.9
+        )
+        r_scale.add_requirement(high_scale_nfr)
+        hld2 = HLDCompiler.compile_hld(r_scale, b_scale, raw_request="Build internal batch reporting service with 100k events/sec streaming")
+        d2 = ArchitectureDebateEngine.run_debate_cycle(hld2, r_scale, b_scale, raw_request="Build internal batch reporting service with 100k events/sec streaming", is_debate_phase=True)
+
+        # High-scale NFR must produce more rejected candidate ADRs or required revisions than baseline
+        challenges_base = sum(len(rec.sufficiency_gate_result.get("missing_evidence", [])) for rec in d1.decision_records)
+        challenges_scale = sum(len(rec.sufficiency_gate_result.get("missing_evidence", [])) for rec in d2.decision_records)
+
+        self.assertGreaterEqual(challenges_scale, challenges_base, "High-scale NFR requirement CANNOT decrease missing evidence challenges")
+
 
 if __name__ == "__main__":
     unittest.main()

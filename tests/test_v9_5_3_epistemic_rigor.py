@@ -3,6 +3,7 @@ S-Class V9.5.3 Verification Suite: Epistemic Rigor, Immutable Versioning & SSOT 
 """
 
 import os
+import time
 import json
 import shutil
 import tempfile
@@ -14,6 +15,7 @@ from requirement_ir import RequirementGraph, RequirementNode, RequirementKind
 from behavior_graph import BehaviorGraph
 from architecture_debate import ArchitectureDebateEngine, DecisionOutcome
 from artifact_governor import ArtifactGovernor
+from runtime import FileLock
 
 def load_json(path: str):
     with open(path, "r", encoding="utf-8") as f:
@@ -252,6 +254,31 @@ class TestV953EpistemicRigor(unittest.TestCase):
         # Competer MUST have timed out and failed to steal the lock from the live owner
         self.assertTrue(competer_blocked[0], "Competing worker must NOT steal FileLock from live owner even if lock age > stale_ttl")
         self.assertFalse(os.path.exists(lock_path), "Lock file must be released cleanly after live owner completes")
+
+    def test_pid_reuse_detection_recovers_stale_lock(self):
+        """Invariant: If an old process created a lock under PID X and died, and OS reuses PID X (process_start_time > lock_start_time), FileLock MUST detect PID reuse and recover stale lock."""
+        lock_path = os.path.join(self.test_dir, ".agents", "pid_reuse.lock")
+        os.makedirs(os.path.dirname(lock_path), exist_ok=True)
+
+        # Write lock payload simulating an old process that ran under current PID 2 hours ago
+        old_proc_start = time.time() - 7200.0  # 2 hours ago
+        payload = json.dumps({
+            "pid": os.getpid(),
+            "token": "old_dead_process_token_123",
+            "host": "localhost",
+            "start_time": old_proc_start,
+            "process_start_time": old_proc_start
+        })
+        with open(lock_path, "w", encoding="utf-8") as f:
+            f.write(payload)
+
+        # New FileLock call under current PID (with current process_start_time > old_proc_start + 1.0)
+        # Must detect PID reuse and successfully acquire the lock
+        start = time.time()
+        with FileLock(lock_path, timeout=2.0):
+            self.assertTrue(os.path.exists(lock_path))
+
+        self.assertLess(time.time() - start, 1.5, "FileLock must recover PID-reused lock immediately without timing out")
 
 
 if __name__ == "__main__":

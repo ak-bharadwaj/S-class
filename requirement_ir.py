@@ -63,8 +63,28 @@ class RequirementNode:
     assumptions: List[str] = field(default_factory=list)
     dependencies: List[str] = field(default_factory=list)
 
+    def semantic_identity_hash(self) -> str:
+        """Computes a SHA-256 digest over core domain/contract identity fields (excluding evolving epistemic metadata like confidence)."""
+        import hashlib
+        payload = {
+            "id": self.id,
+            "kind": self.kind.value if isinstance(self.kind, RequirementKind) else str(self.kind),
+            "statement": self.statement,
+            "actor": self.actor,
+            "capability": self.capability,
+            "target": self.target,
+            "nfr_category": self.nfr_category.value if isinstance(self.nfr_category, NFRCategory) else (str(self.nfr_category) if self.nfr_category else None),
+            "preconditions": sorted(self.preconditions),
+            "postconditions": sorted(self.postconditions),
+            "constraints": sorted(self.constraints),
+            "priority": self.priority,
+            "risk": self.risk
+        }
+        json_bytes = json.dumps(payload, sort_keys=True).encode("utf-8")
+        return hashlib.sha256(json_bytes).hexdigest()
+
     def canonical_hash(self) -> str:
-        """Computes a SHA-256 canonical hash over ALL 16 semantic fields of the requirement node."""
+        """Computes a SHA-256 canonical hash over ALL 16 fields of the requirement node (including epistemic metadata)."""
         import hashlib
         payload = {
             "id": self.id,
@@ -111,6 +131,7 @@ class RequirementNode:
             "source_behaviors": self.source_behaviors,
             "assumptions": self.assumptions,
             "dependencies": self.dependencies,
+            "semantic_hash": self.semantic_identity_hash(),
             "canonical_hash": self.canonical_hash()
         }
 
@@ -159,14 +180,18 @@ class RequirementGraph:
     def add_requirement(self, req: RequirementNode) -> RequirementNode:
         if req.id in self.nodes:
             existing = self.nodes[req.id]
-            # Enforce full 16-field canonical semantic hash equality
-            if existing.canonical_hash() != req.canonical_hash():
+            # Enforce semantic identity equality across core contract fields
+            if existing.semantic_identity_hash() != req.semantic_identity_hash():
                 raise DuplicateIDConflictError(
-                    f"Requirement ID '{req.id}' semantic conflict detected: "
-                    f"Existing hash '{existing.canonical_hash()[:8]}' (actor={existing.actor}, risk={existing.risk}, nfr={existing.nfr_category}) vs "
-                    f"New hash '{req.canonical_hash()[:8]}' (actor={req.actor}, risk={req.risk}, nfr={req.nfr_category}). "
+                    f"Requirement ID '{req.id}' semantic identity conflict detected: "
+                    f"Existing hash '{existing.semantic_identity_hash()[:8]}' (actor={existing.actor}, risk={existing.risk}, nfr={existing.nfr_category}) vs "
+                    f"New hash '{req.semantic_identity_hash()[:8]}' (actor={req.actor}, risk={req.risk}, nfr={req.nfr_category}). "
                     f"CASUAL MERGING REJECTED."
                 )
+            # Refine epistemic status/confidence if same semantic identity
+            if req.confidence > existing.confidence:
+                existing.confidence = req.confidence
+                existing.epistemic_status = req.epistemic_status
             return existing
 
         self.nodes[req.id] = req
