@@ -653,6 +653,29 @@ class SpecificationCompiler:
         tasks = TaskCompiler.compile_tasks(lld_components, r_graph=r_graph, b_graph=b_graph)
         task_gov = ArtifactGovernor.audit_task_governance(tasks, r_graph, lld_components, b_graph, hld_modules=hld.modules)
 
+        # 7. V10 Execution Plan Compilation & Governance Audit
+        from execution_plan_compiler import ExecutionPlanCompiler
+        execution_plan = None
+        plan_gov = None
+        if not task_gov.is_blocked and tasks:
+            execution_plan = ExecutionPlanCompiler.compile_execution_plan(
+                tasks,
+                lld_components=lld_components,
+                r_graph=r_graph,
+                b_graph=b_graph,
+                hld=hld
+            )
+            plan_gov = ArtifactGovernor.audit_execution_plan_governance(
+                execution_plan,
+                tasks,
+                lld_components=lld_components,
+                r_graph=r_graph,
+                b_graph=b_graph
+            )
+
+        final_blocked = task_gov.is_blocked or (plan_gov.is_blocked if plan_gov else False)
+        recommended_target = task_gov.recommended_fsm_state.value if not plan_gov or not plan_gov.is_blocked else plan_gov.recommended_fsm_state.value
+
         res_dict = {
             "behavior_graph": b_graph,
             "requirement_graph": r_graph,
@@ -665,11 +688,15 @@ class SpecificationCompiler:
             "lld_governance": lld_gov.to_dict(),
             "tasks": tasks,
             "task_governance": task_gov.to_dict(),
-            "blocked": task_gov.is_blocked,
-            "target_fsm_state": task_gov.recommended_fsm_state.value
+            "execution_plan": execution_plan.to_dict() if execution_plan else None,
+            "execution_plan_governance": plan_gov.to_dict() if plan_gov else {},
+            "blocked": final_blocked,
+            "target_fsm_state": recommended_target
         }
         if workspace_dir:
             cls.save_versioned_pipeline_artifact(res_dict, workspace_dir)
+            if execution_plan:
+                ExecutionPlanCompiler.save_execution_plan(execution_plan, workspace_dir)
         return res_dict
 
     @classmethod

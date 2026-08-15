@@ -31,6 +31,13 @@ from lld_compiler import (
     CapabilityBinding
 )
 from task_compiler import TaskRecord
+from execution_ir import (
+    ExecutionPlan,
+    ExecutionBatch,
+    ExecutionTask,
+    ExecutionMode,
+    ResourceAccessMode
+)
 
 
 class FSMTransitionTarget(str, Enum):
@@ -38,6 +45,7 @@ class FSMTransitionTarget(str, Enum):
     DESIGN = "DESIGN"
     DEBATE = "DEBATE"
     CLARIFICATION = "CLARIFICATION"
+    TASK_COMPILATION = "TASK_COMPILATION"
     CODING = "CODING"
 
 
@@ -886,6 +894,97 @@ class ArtifactGovernor:
                 blocking_reasons=reasons,
                 recommended_fsm_state=FSMTransitionTarget.DESIGN,
                 validation_status=ValidationStatus.INVALID,
+                approval_status=ApprovalStatus.REJECTED
+            )
+
+        return GovernanceGateResult(
+            is_blocked=False,
+            blocking_reasons=[],
+            recommended_fsm_state=FSMTransitionTarget.CODING,
+            validation_status=ValidationStatus.VALID,
+            approval_status=ApprovalStatus.APPROVED
+        )
+
+    @classmethod
+    def audit_execution_plan_governance(
+        cls,
+        plan: ExecutionPlan,
+        tasks: List[TaskRecord],
+        lld_components: Optional[List[LLDComponent]] = None,
+        r_graph: Optional[RequirementGraph] = None,
+        b_graph: Optional[BehaviorGraph] = None
+    ) -> GovernanceGateResult:
+        """
+        V10 Authoritative Execution Plan Governance Gate:
+        Audits ExecutionPlan for canonical hash integrity, zero-orphan task coverage,
+        proven parallelism (no write or state conflicts), and full agent assignment coverage.
+        """
+        reasons: List[str] = []
+
+        # 1. Canonical Plan Hash Integrity Verification
+        if hasattr(plan, "compute_canonical_hash"):
+            expected_plan_hash = plan.compute_canonical_hash()
+            if not getattr(plan, "plan_hash", ""):
+                reasons.append("ExecutionPlan is missing mandatory canonical plan_hash.")
+            elif plan.plan_hash != expected_plan_hash:
+                reasons.append(
+                    f"ExecutionPlan plan_hash mismatch: computed '{expected_plan_hash[:8]}', got '{plan.plan_hash[:8]}'."
+                )
+
+        # 2. Internal Validity Check
+        if not plan.is_valid:
+            reasons.extend(plan.validation_reasons)
+
+        # 3. Task Coverage & Lineage Reconciliation (Zero Orphan, Zero Invented Tasks)
+        task_id_set = {t.id for t in tasks}
+        exec_source_ids = {t.source_task_id for t in plan.tasks.values()}
+        if exec_source_ids != task_id_set:
+            missing = task_id_set - exec_source_ids
+            invented = exec_source_ids - task_id_set
+            if missing:
+                reasons.append(
+                    f"ExecutionPlan is incomplete: missing execution tasks for governed tasks {sorted(missing)}."
+                )
+            if invented:
+                reasons.append(
+                    f"ExecutionPlan contains invented tasks with no upstream governed task lineage: {sorted(invented)}."
+                )
+
+        # 4. Proven Parallelism Independence Verification
+        for batch in plan.batches:
+            if batch.execution_mode == ExecutionMode.PARALLEL:
+                claimed_write_res: Set[str] = set()
+                batch_task_ids = {t.id for t in batch.tasks}
+                for t in batch.tasks:
+                    # No intra-batch dependencies
+                    for dep in t.dependencies:
+                        if dep.source_task_id in batch_task_ids:
+                            reasons.append(
+                                f"Batch {batch.batch_id} marked PARALLEL contains intra-batch dependent task '{t.id}' depending on '{dep.source_task_id}'."
+                            )
+                    # No write resource collisions
+                    write_res = {
+                        r.target_identifier for r in t.required_resources
+                        if r.access_mode == ResourceAccessMode.WRITE_EXCLUSIVE
+                    }
+                    overlap = claimed_write_res.intersection(write_res)
+                    if overlap:
+                        reasons.append(
+                            f"Batch {batch.batch_id} marked PARALLEL has write collision on resource(s) {sorted(overlap)} between tasks."
+                        )
+                    claimed_write_res.update(write_res)
+
+        # 5. Agent Assignment Coverage
+        for t_id, task in plan.tasks.items():
+            if not task.assigned_agent:
+                reasons.append(f"ExecutionTask '{t_id}' ({task.title}) has no capable agent assignment.")
+
+        if reasons:
+            return GovernanceGateResult(
+                is_blocked=True,
+                blocking_reasons=reasons,
+                recommended_fsm_state=FSMTransitionTarget.TASK_COMPILATION,
+                validation_status=ValidationStatus.BLOCKED,
                 approval_status=ApprovalStatus.REJECTED
             )
 
