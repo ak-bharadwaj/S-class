@@ -13,7 +13,7 @@ import hashlib
 import json
 
 from lld_compiler import LLDComponent, LLDComponentType
-from requirement_ir import RequirementGraph, RequirementNode, NFRCategory
+from requirement_ir import RequirementGraph, RequirementNode, NFRCategory, EpistemicStatus, ProvenanceKind
 from behavior_graph import BehaviorGraph, BehaviorNodeType, BehaviorRelationType
 
 
@@ -178,12 +178,29 @@ class TaskCompiler:
             matching_req_objs = [req_lookup[rid] for rid in p_reqs if rid in req_lookup]
 
             source_lld_hash = comp.component_hash
-            source_binding_hashes = [b.binding_hash for b in comp.capability_bindings if b.behavior_id in p_behs]
+            source_binding_hashes = sorted(list(set(
+                b.binding_hash for b in comp.capability_bindings if b.behavior_id in p_behs
+            )))
             if not source_binding_hashes and comp.capability_bindings:
-                source_binding_hashes = [b.binding_hash for b in comp.capability_bindings]
+                source_binding_hashes = sorted(list(set(b.binding_hash for b in comp.capability_bindings)))
+
+            # PROPOSED_CANDIDATE & Speculative Epistemic Barrier:
+            # Skip compiling executable tasks if parent behaviors are exclusively ungrounded PROPOSED/SPECULATIVE
+            if b_graph and p_behs:
+                beh_objs = [b_graph.get_node(b_id) for b_id in p_behs if b_graph.get_node(b_id)]
+                if beh_objs and all(
+                    getattr(b, "epistemic_status", None) == EpistemicStatus.PROPOSED or
+                    getattr(b, "provenance", None) == ProvenanceKind.SPECULATIVE
+                    for b in beh_objs
+                ):
+                    continue
 
             if comp.component_type in [LLDComponentType.CONTROLLER, LLDComponentType.SERVICE]:
-                for ep in comp.api_endpoints:
+                valid_endpoints = [ep for ep in comp.api_endpoints if "PROPOSED_CANDIDATE" not in ep]
+                if not valid_endpoints:
+                    continue
+
+                for ep in valid_endpoints:
                     t_id = f"TASK-{task_counter:03d}"
                     task_counter += 1
 
@@ -249,6 +266,18 @@ class TaskCompiler:
                     ))
 
             elif comp.component_type == LLDComponentType.UI_SURFACE:
+                if not p_reqs or not matching_req_objs:
+                    continue
+
+                if b_graph and p_behs:
+                    beh_objs = [b_graph.get_node(b_id) for b_id in p_behs if b_graph.get_node(b_id)]
+                    if beh_objs and all(
+                        getattr(b, "epistemic_status", None) == EpistemicStatus.PROPOSED or
+                        getattr(b, "provenance", None) == ProvenanceKind.SPECULATIVE
+                        for b in beh_objs
+                    ):
+                        continue
+
                 t_id = f"TASK-{task_counter:03d}"
                 task_counter += 1
                 tasks.append(TaskRecord(

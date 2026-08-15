@@ -20,7 +20,7 @@ from enum import Enum
 from typing import Dict, List, Set, Any, Optional, Tuple
 
 from behavior_graph import BehaviorGraph, BehaviorNodeType, EpistemicStatus
-from requirement_ir import RequirementGraph, RequirementNode
+from requirement_ir import RequirementGraph, RequirementNode, ProvenanceKind
 from hld_compiler import HLDDesign, HLDModule, ADRRecord, ValidationStatus, ApprovalStatus
 from lld_compiler import (
     LLDComponent,
@@ -548,6 +548,44 @@ class ArtifactGovernor:
                 if expected_lld_hash and actual_source_lld_hash and actual_source_lld_hash != expected_lld_hash:
                     reasons.append(
                         f"Task {t.id} ({t.title}) source_lld_hash mismatch with parent LLD '{parent_comp.id}' (task claims {actual_source_lld_hash[:8]}, parent component has {expected_lld_hash[:8]})!"
+                    )
+
+                # Source Capability Binding Hashes Exact Upstream Lineage Verification
+                parent_binding_hashes = {b.binding_hash for b in getattr(parent_comp, "capability_bindings", [])}
+                task_binding_hashes = set(getattr(t, "source_binding_hashes", []))
+
+                # A. Check for forged binding hashes claimed by the task that do not exist on parent LLD component
+                forged_hashes = task_binding_hashes - parent_binding_hashes
+                if forged_hashes:
+                    reasons.append(
+                        f"Task {t.id} ({t.title}) claims source_binding_hashes not present on parent LLD '{parent_comp.id}': {[h[:8] for h in forged_hashes]}!"
+                    )
+
+                # B. Check that required binding hashes for the task's parent behaviors are present
+                relevant_parent_binding_hashes = {
+                    b.binding_hash for b in getattr(parent_comp, "capability_bindings", []) if b.behavior_id in t.parent_behaviors
+                }
+                if relevant_parent_binding_hashes and not relevant_parent_binding_hashes.issubset(task_binding_hashes):
+                    missing_hashes = relevant_parent_binding_hashes - task_binding_hashes
+                    reasons.append(
+                        f"Task {t.id} ({t.title}) is missing required source_binding_hashes for behaviors {t.parent_behaviors} from parent LLD '{parent_comp.id}': {[h[:8] for h in missing_hashes]}!"
+                    )
+
+            # Unresolved / PROPOSED Candidate Execution Barrier
+            if "PROPOSED_CANDIDATE" in t.title or "PROPOSED_CANDIDATE" in t.description or any("PROPOSED_CANDIDATE" in c for c in getattr(t, "verification_criteria", [])):
+                reasons.append(
+                    f"Task {t.id} ({t.title}) cannot be executed because it is derived from an ungrounded PROPOSED_CANDIDATE."
+                )
+
+            if t.parent_behaviors and b_map:
+                beh_objs = [b_map[b_id] for b_id in t.parent_behaviors if b_id in b_map]
+                if beh_objs and all(
+                    getattr(b, "epistemic_status", None) == EpistemicStatus.PROPOSED or
+                    getattr(b, "provenance", None) == ProvenanceKind.SPECULATIVE
+                    for b in beh_objs
+                ):
+                    reasons.append(
+                        f"Task {t.id} ({t.title}) cannot be executed because all its upstream behaviors are ungrounded PROPOSED/SPECULATIVE candidates."
                     )
 
             # 1. Referential integrity: parent_lld, parent_reqs, parent_behaviors

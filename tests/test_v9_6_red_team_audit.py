@@ -1314,6 +1314,55 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         hash2 = comp_with_reasoning.compute_canonical_hash()
         self.assertNotEqual(hash1, hash2, "Modifying reasoning_graph MUST change LLDComponent.compute_canonical_hash()!")
 
+        # 43i. Upstream Source Binding Hashes Exact Provenance: Forged Binding Hash is BLOCKED
+        forged_binding_task = TaskRecord(
+            id="TSK-FORGED-BINDING", title=vehicle_task.title, description=vehicle_task.description,
+            category=vehicle_task.category, parent_lld=vehicle_comp.id, parent_hld=vehicle_task.parent_hld,
+            parent_reqs=vehicle_task.parent_reqs, parent_behaviors=vehicle_task.parent_behaviors,
+            source_lld_hash=vehicle_comp.component_hash,
+            source_binding_hashes=["forged_binding_hash_99999999"] # Forged!
+        )
+        gov_res_forged_binding = ArtifactGovernor.audit_task_governance([forged_binding_task], r_graph_multi, [vehicle_comp], b_graph_multi, hld_modules=hld_multi.modules)
+        self.assertTrue(gov_res_forged_binding.is_blocked, "ArtifactGovernor MUST block task claiming forged source_binding_hashes!")
+        self.assertTrue(any("claims source_binding_hashes not present on parent LLD" in r for r in gov_res_forged_binding.blocking_reasons))
+
+        # 43j. Upstream Source Binding Hashes Exact Provenance: Missing Required Binding Hash is BLOCKED
+        missing_binding_task = TaskRecord(
+            id="TSK-MISSING-BINDING", title=vehicle_task.title, description=vehicle_task.description,
+            category=vehicle_task.category, parent_lld=vehicle_comp.id, parent_hld=vehicle_task.parent_hld,
+            parent_reqs=vehicle_task.parent_reqs, parent_behaviors=vehicle_task.parent_behaviors,
+            source_lld_hash=vehicle_comp.component_hash,
+            source_binding_hashes=[] # Empty when parent component has bindings for the behavior!
+        )
+        gov_res_missing_binding = ArtifactGovernor.audit_task_governance([missing_binding_task], r_graph_multi, [vehicle_comp], b_graph_multi, hld_modules=hld_multi.modules)
+        self.assertTrue(gov_res_missing_binding.is_blocked, "ArtifactGovernor MUST block task missing required source_binding_hashes!")
+        self.assertTrue(any("missing required source_binding_hashes" in r for r in gov_res_missing_binding.blocking_reasons))
+
+        # 43k. PROPOSED / Speculative Candidate Execution Barrier
+        proposed_b_node = BehaviorNode(
+            id="cmd_speculative_action", name="Speculative Action",
+            behavior_type=BehaviorNodeType.COMMAND, actor_id="actor_spec", target_entity_id="entity_spec",
+            epistemic_status=EpistemicStatus.PROPOSED, provenance=ProvenanceKind.SPECULATIVE, confidence=0.35, description="Speculative"
+        )
+        b_graph_spec = BehaviorGraph(version=1)
+        b_graph_spec.add_node(proposed_b_node)
+        r_graph_spec = RequirementGraph.compile_from_behavior_graph(b_graph_spec)
+        hld_spec = HLDCompiler.compile_hld(r_graph_spec, b_graph_spec)
+        lld_spec = LLDCompiler.compile_lld(hld_spec, r_graph_spec, b_graph_spec)
+        tasks_spec = TaskCompiler.compile_tasks(lld_spec, r_graph=r_graph_spec, b_graph=b_graph_spec)
+        self.assertEqual(len(tasks_spec), 0, "TaskCompiler MUST NOT compile executable tasks for unconfirmed PROPOSED/SPECULATIVE behaviors!")
+
+        # Forged task derived from PROPOSED_CANDIDATE is blocked by Governor
+        forged_proposed_task = TaskRecord(
+            id="TSK-PROPOSED-CANDIDATE", title="Implement Component Contract: PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE",
+            description="desc", category=TaskCategory.API_ENDPOINT, parent_lld=vehicle_comp.id,
+            parent_hld=vehicle_task.parent_hld, parent_reqs=vehicle_task.parent_reqs, parent_behaviors=vehicle_task.parent_behaviors,
+            source_lld_hash=vehicle_comp.component_hash, source_binding_hashes=[b.binding_hash for b in vehicle_comp.capability_bindings]
+        )
+        gov_res_prop_task = ArtifactGovernor.audit_task_governance([forged_proposed_task], r_graph_multi, [vehicle_comp], b_graph_multi, hld_modules=hld_multi.modules)
+        self.assertTrue(gov_res_prop_task.is_blocked, "ArtifactGovernor MUST block task derived from PROPOSED_CANDIDATE!")
+        self.assertTrue(any("cannot be executed because it is derived from an ungrounded PROPOSED_CANDIDATE" in r for r in gov_res_prop_task.blocking_reasons))
+
         # 44. Negative Attack Vector 39: Strict Positive Integer Graph Version Validation (Reject Non-Positive / Boolean / Missing in Strict Mode)
         with self.assertRaises(ValueError):
             BehaviorGraph(version=0)
@@ -1589,6 +1638,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             parent_hld="mod_core", parent_reqs=["REQ-001"], parent_behaviors=["cmd_manage_session"],
             source_lld_hash=valid_lld_comp.component_hash, source_binding_hashes=[valid_binding.binding_hash]
         )
+        valid_task.task_hash = valid_task.compute_canonical_hash()
         pipe_path = os.path.join(self.agents_dir, "v7_refinement_pipeline.json")
         write_json_atomic(pipe_path, {
             "version": 1,
