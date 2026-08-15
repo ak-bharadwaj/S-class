@@ -648,7 +648,7 @@ class SpecificationCompiler:
 
         # 6. Task Compilation with Full Lineage and BDD Contracts
         tasks = TaskCompiler.compile_tasks(lld_components, r_graph=r_graph, b_graph=b_graph)
-        task_gov = ArtifactGovernor.audit_task_governance(tasks, r_graph)
+        task_gov = ArtifactGovernor.audit_task_governance(tasks, r_graph, lld_components, b_graph)
 
         res_dict = {
             "behavior_graph": b_graph,

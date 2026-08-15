@@ -343,12 +343,52 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             parent_hld=vehicle_task.parent_hld, parent_reqs=[req_owned, req_unowned],
             parent_behaviors=vehicle_task.parent_behaviors
         )
-        gov_res_partial = ArtifactGovernor.audit_task_governance([partial_scope_task], r_graph_multi, lld_multi)
+        gov_res_partial = ArtifactGovernor.audit_task_governance([partial_scope_task], r_graph_multi, lld_multi, b_graph_multi)
         self.assertTrue(gov_res_partial.is_blocked, "ArtifactGovernor MUST block task when requirement scope is not a strict subset of parent LLD scope!")
         self.assertEqual(gov_res_partial.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("semantic parent mismatch" in r and req_unowned in r for r in gov_res_partial.blocking_reasons))
 
-        # 10. Invariant: LLDCompiler MUST NOT fabricate synthetic REQ-001 ancestry for ungrounded modules
+        # 10. Negative Attack Vector 5: Behavior-ID Scope Lineage Attack ({BEH-A, BEH-UNOWNED} vs {BEH-A})
+        beh_unowned = "cmd_unowned_999"
+        b_graph_multi.add_node(BehaviorNode(
+            id=beh_unowned, name="UnownedBehavior", behavior_type=BehaviorNodeType.COMMAND,
+            actor_id="admin", target_entity_id="unrelated", epistemic_status=EpistemicStatus.EXPLICIT,
+            provenance=ProvenanceKind.EXPLICIT, confidence=1.0, evidence_ref="Unowned behavior"
+        ))
+        partial_beh_task = TaskRecord(
+            id="TSK-BEH-PARTIAL", title="Partial Behavior Task", description="desc",
+            category=TaskCategory.API_ENDPOINT, parent_lld=vehicle_comp.id,
+            parent_hld=vehicle_task.parent_hld, parent_reqs=vehicle_task.parent_reqs,
+            parent_behaviors=[vehicle_task.parent_behaviors[0], beh_unowned]
+        )
+        gov_res_beh = ArtifactGovernor.audit_task_governance([partial_beh_task], r_graph_multi, lld_multi, b_graph_multi)
+        self.assertTrue(gov_res_beh.is_blocked, "ArtifactGovernor MUST block task when behavior scope is not a strict subset of parent LLD behavior scope!")
+        self.assertEqual(gov_res_beh.validation_status, ValidationStatus.INVALID)
+        self.assertTrue(any("semantic parent mismatch" in r and beh_unowned in r for r in gov_res_beh.blocking_reasons))
+
+        # 11. Negative Attack Vector 6: Semantic Capability Mismatch (Mutation Command -> Read-Only Surface)
+        read_only_ui_comp = LLDComponent(
+            id="ui_read_only", name="Vehicle Read-Only View", component_type=LLDComponentType.UI_SURFACE,
+            parent=vehicle_comp.parent, role="frontend_interface", layout="read_only"
+        )
+        mutation_task = TaskRecord(
+            id="TSK-MUTATION-MISMATCH", title="Execute Vehicle Mutation", description="desc",
+            category=TaskCategory.API_ENDPOINT, parent_lld=read_only_ui_comp.id,
+            parent_hld=vehicle_task.parent_hld, parent_reqs=vehicle_task.parent_reqs,
+            parent_behaviors=vehicle_task.parent_behaviors
+        )
+        gov_res_cap_mismatch = ArtifactGovernor.audit_task_governance([mutation_task], r_graph_multi, [read_only_ui_comp], b_graph_multi)
+        self.assertTrue(gov_res_cap_mismatch.is_blocked, "ArtifactGovernor MUST block task when mutation command is assigned to read-only UI surface!")
+        self.assertEqual(gov_res_cap_mismatch.validation_status, ValidationStatus.INVALID)
+        self.assertTrue(any("semantic capability mismatch" in r for r in gov_res_cap_mismatch.blocking_reasons))
+
+        # 12. Negative Attack Vector 7: Missing Mandatory Canonical LLD Architecture Context at API Boundary
+        gov_res_no_lld = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, lld_components=[])
+        self.assertTrue(gov_res_no_lld.is_blocked, "ArtifactGovernor MUST block task governance audit when canonical LLD context is omitted or empty!")
+        self.assertEqual(gov_res_no_lld.validation_status, ValidationStatus.INVALID)
+        self.assertTrue(any("Missing mandatory canonical LLD component" in r for r in gov_res_no_lld.blocking_reasons))
+
+        # 13. Invariant: LLDCompiler MUST NOT fabricate synthetic REQ-001 ancestry for ungrounded modules
         empty_r_graph = RequirementGraph()
         synthetic_mod = HLDModule(id="mod_synth", name="Synthetic", system_boundary="internal", owned_entities=["X"], owned_capabilities=["nonexistent_cap"])
         synthetic_hld = HLDDesign(system_name="HLD-001", architecture_style="Modular Monolith", modules=[synthetic_mod], adrs=[], version=1)

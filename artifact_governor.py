@@ -484,16 +484,28 @@ class ArtifactGovernor:
         cls,
         tasks: List[TaskRecord],
         r_graph: RequirementGraph,
-        lld_components: Optional[List[LLDComponent]] = None
+        lld_components: List[LLDComponent],
+        b_graph: Optional[BehaviorGraph] = None
     ) -> GovernanceGateResult:
         reasons: List[str] = []
+        if tasks and not lld_components:
+            return GovernanceGateResult(
+                is_blocked=True,
+                blocking_reasons=["Missing mandatory canonical LLD component architecture context for task governance audit."],
+                recommended_fsm_state=FSMTransitionTarget.DESIGN,
+                validation_status=ValidationStatus.INVALID,
+                approval_status=ApprovalStatus.REJECTED
+            )
+
         req_ids = set(r_graph.nodes.keys())
-        lld_map = {c.id: c for c in lld_components} if lld_components else {}
+        lld_map = {c.id: c for c in (lld_components or [])}
+        b_map = b_graph.nodes if b_graph else {}
 
         for t in tasks:
+            # 1. Referential integrity: parent_lld, parent_reqs, parent_behaviors
             if not t.parent_lld:
                 reasons.append(f"Task {t.id} ({t.title}) lacks parent LLD component reference.")
-            elif lld_map and t.parent_lld not in lld_map:
+            elif t.parent_lld not in lld_map:
                 reasons.append(f"Task {t.id} ({t.title}) references nonexistent parent LLD component '{t.parent_lld}'.")
 
             if not t.parent_reqs:
@@ -502,14 +514,22 @@ class ArtifactGovernor:
                 invalid_reqs = [r for r in t.parent_reqs if r not in req_ids]
                 reasons.append(f"Task {t.id} ({t.title}) references nonexistent upstream Requirement IDs: {invalid_reqs}.")
 
-            # Semantic Parent Compatibility (Wrong-but-existing parent detection & strict subset requirement scope)
-            if lld_map and t.parent_lld in lld_map:
+            if not t.parent_behaviors:
+                reasons.append(f"Task {t.id} ({t.title}) has no upstream Behavior Graph lineage.")
+            elif b_map and not set(t.parent_behaviors).issubset(set(b_map.keys())):
+                invalid_beh = [b for b in t.parent_behaviors if b not in b_map]
+                reasons.append(f"Task {t.id} ({t.title}) references nonexistent upstream Behavior IDs: {invalid_beh}.")
+
+            # 2. Semantic Parent Compatibility (HLD alignment, strict requirement subset, strict behavior subset)
+            if t.parent_lld in lld_map:
                 parent_comp = lld_map[t.parent_lld]
                 if t.parent_hld and parent_comp.parent and parent_comp.parent.hld_id:
                     if t.parent_hld != parent_comp.parent.hld_id:
                         reasons.append(
                             f"Task {t.id} ({t.title}) semantic parent mismatch: parent_hld '{t.parent_hld}' conflicts with parent LLD '{t.parent_lld}' HLD module '{parent_comp.parent.hld_id}'."
                         )
+
+                # Strict Requirement Subset Scoping
                 if parent_comp.parent and parent_comp.parent.req_ids and t.parent_reqs:
                     comp_reqs = set(parent_comp.parent.req_ids)
                     task_reqs = set(t.parent_reqs)
@@ -522,6 +542,42 @@ class ArtifactGovernor:
                     reasons.append(
                         f"Task {t.id} ({t.title}) references ungrounded parent LLD '{t.parent_lld}' with zero requirement coverage."
                     )
+
+                # Strict Behavior Subset Scoping (Symmetric with Requirement Scoping!)
+                if parent_comp.parent and parent_comp.parent.behavior_ids and t.parent_behaviors:
+                    comp_behaviors = set(parent_comp.parent.behavior_ids)
+                    task_behaviors = set(t.parent_behaviors)
+                    if not task_behaviors.issubset(comp_behaviors):
+                        uncovered_beh = sorted(list(task_behaviors - comp_behaviors))
+                        reasons.append(
+                            f"Task {t.id} ({t.title}) semantic parent mismatch: task behaviors {uncovered_beh} are not covered by parent LLD '{t.parent_lld}' behavior scope {sorted(list(comp_behaviors))}."
+                        )
+                elif parent_comp.parent and not parent_comp.parent.behavior_ids:
+                    reasons.append(
+                        f"Task {t.id} ({t.title}) references ungrounded parent LLD '{t.parent_lld}' with zero behavior coverage."
+                    )
+
+                # 3. Capability-Level Semantic Compatibility (Task ↔ LLD Component Responsibility)
+                if b_map:
+                    for beh_id in t.parent_behaviors:
+                        if beh_id in b_map:
+                            beh_node = b_map[beh_id]
+                            # Check mutation command vs read-only UI surface / query-only service
+                            if beh_node.behavior_type == BehaviorNodeType.COMMAND:
+                                if parent_comp.component_type.value == "ui_surface" and parent_comp.layout == "read_only":
+                                    reasons.append(
+                                        f"Task {t.id} ({t.title}) semantic capability mismatch: mutation command '{beh_node.name}' cannot be implemented by read-only UI surface '{parent_comp.id}'."
+                                    )
+                            # Check target entity domain alignment between task/behavior and LLD component
+                            target_ent = getattr(beh_node, "target_entity_id", "")
+                            if target_ent:
+                                ent_stem = target_ent.replace("entity_", "").replace("resource_", "").replace("wf_", "").lower()
+                                if ent_stem and ent_stem not in parent_comp.id.lower() and ent_stem not in parent_comp.name.lower() and ent_stem not in (parent_comp.route or "").lower():
+                                    comp_tokens = [tok.lower() for tok in parent_comp.name.split() if len(tok) > 3]
+                                    if comp_tokens and not any(tok in ent_stem or ent_stem in tok for tok in comp_tokens):
+                                        reasons.append(
+                                            f"Task {t.id} ({t.title}) semantic domain mismatch: task entity '{ent_stem}' conflicts with parent LLD '{parent_comp.id}' domain ({parent_comp.name})."
+                                        )
 
         if reasons:
             return GovernanceGateResult(
