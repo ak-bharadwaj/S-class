@@ -123,14 +123,16 @@ def test_filelock_enforces_mutual_exclusion_and_timeout(temp_workspace):
     lock_file = os.path.join(temp_workspace, ".agents", "state.lock")
     os.makedirs(os.path.dirname(lock_file), exist_ok=True)
 
-    # Write CURRENT live process's PID
-    with open(lock_file, "w", encoding="utf-8") as f:
-        f.write(str(os.getpid()))
-
-    # Attempting to acquire lock with 0.3s timeout must raise TimeoutError (not bypass!)
-    with pytest.raises(TimeoutError):
-        with runtime.FileLock(lock_file, timeout=0.3):
-            pass
+    # Hold lock with lock1
+    lock1 = runtime.FileLock(lock_file, timeout=5.0)
+    lock1.__enter__()
+    try:
+        # Attempting to acquire lock with 0.3s timeout must raise TimeoutError (not bypass!)
+        with pytest.raises(TimeoutError):
+            with runtime.FileLock(lock_file, timeout=0.3):
+                pass
+    finally:
+        lock1.__exit__(None, None, None)
 
     # Cleanup
     if os.path.exists(lock_file):

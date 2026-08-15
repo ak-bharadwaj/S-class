@@ -253,7 +253,10 @@ class TestV953EpistemicRigor(unittest.TestCase):
 
         # Competer MUST have timed out and failed to steal the lock from the live owner
         self.assertTrue(competer_blocked[0], "Competing worker must NOT steal FileLock from live owner even if lock age > stale_ttl")
-        self.assertFalse(os.path.exists(lock_path), "Lock file must be released cleanly after live owner completes")
+        self.assertTrue(os.path.exists(lock_path), "Lock file remains as persistent lock file after live owner completes")
+        # Verify subsequent worker can re-acquire lock cleanly on persistent file
+        with FileLock(lock_path, timeout=1.0):
+            pass
 
     def test_pid_reuse_detection_recovers_stale_lock(self):
         """Invariant: If an old process created a lock under PID X and died, and OS reuses PID X (process_start_time > lock_start_time), FileLock MUST detect PID reuse and recover stale lock."""
@@ -359,6 +362,47 @@ time.sleep(30)
         finally:
             if proc.poll() is None:
                 proc.kill()
+
+    def test_persistent_lock_file_no_detached_inode_race(self):
+        """Falsification Test: Verify persistent lock file is NEVER unlinked on release, eliminating detached-inode races across rapid serial & concurrent releases/acquisitions."""
+        import concurrent.futures, json
+        lock_path = os.path.join(self.test_dir, ".agents", "persistent_race.lock")
+
+        # 1. Acquire and release lock
+        with FileLock(lock_path, timeout=5.0):
+            self.assertTrue(os.path.exists(lock_path))
+
+        # 2. Assert lock file PERMANENTLY exists after release (NOT unlinked)
+        self.assertTrue(os.path.exists(lock_path), "FileLock MUST use a persistent lock file and MUST NOT unlink lock_path on release!")
+
+        # Verify metadata payload shows 'released' status
+        with open(lock_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            self.assertEqual(data.get("status"), "released")
+
+        # 3. Process B acquires lock immediately on existing persistent lock file
+        with FileLock(lock_path, timeout=5.0) as b_lock:
+            os.lseek(b_lock._fd, 0, os.SEEK_SET)
+            raw = os.read(b_lock._fd, 4096).decode("utf-8")
+            data2 = json.loads(raw)
+            self.assertNotIn("status", data2)
+            self.assertEqual(data2.get("pid"), os.getpid())
+
+        # 4. Concurrent acquisition race: 5 threads attempting acquisition simultaneously on persistent file
+        acquired_owners = []
+
+        def worker_task(worker_id):
+            with FileLock(lock_path, timeout=5.0):
+                acquired_owners.append(worker_id)
+                time.sleep(0.01)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            futures = [executor.submit(worker_task, i) for i in range(5)]
+            for f in concurrent.futures.as_completed(futures):
+                f.result()
+
+        self.assertEqual(len(acquired_owners), 5, "All 5 concurrent workers MUST acquire lock in serial order without deadlocking or failing")
+        self.assertTrue(os.path.exists(lock_path), "Persistent lock file MUST remain intact on disk throughout concurrent releases")
 
 
 if __name__ == "__main__":

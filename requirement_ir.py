@@ -237,19 +237,18 @@ class RequirementGraph:
                 existing.epistemic_status = req.epistemic_status
                 existing.provenance = req.provenance
                 existing.confidence = req.confidence
-                if req.evidence:
-                    existing.evidence = req.evidence
             elif new_ep_rank == ex_ep_rank:
                 if new_prov_rank > ex_prov_rank:
                     existing.provenance = req.provenance
                     existing.confidence = req.confidence
-                    if req.evidence:
-                        existing.evidence = req.evidence
                 elif new_prov_rank == ex_prov_rank:
                     if req.confidence > existing.confidence:
                         existing.confidence = req.confidence
-                        if req.evidence:
-                            existing.evidence = req.evidence
+
+            # Evidence Safeguard: preserve and accumulate grounded evidence items without losing prior evidence
+            if req.evidence:
+                combined_evidence = list(dict.fromkeys((existing.evidence or []) + req.evidence))
+                existing.evidence = combined_evidence
 
             return existing
 

@@ -112,9 +112,9 @@ def test_stale_lock_recovery(tmp_path):
     with open(lock_file, "w", encoding="utf-8") as f:
         f.write(str(dead_pid))
         
-    # Attempting initialization should recover stale lock file successfully
+    # Attempting initialization should recover stale lock file successfully and leave persistent lock file
     runtime.initialize_state(workspace)
-    assert not os.path.exists(lock_file)  # Lock file is cleaned up after block exit
+    assert os.path.exists(lock_file)  # Persistent lock file remains intact after block exit
 
 def test_memory_manager(tmp_path):
     workspace = str(tmp_path)
