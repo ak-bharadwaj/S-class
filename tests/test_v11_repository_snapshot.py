@@ -428,6 +428,105 @@ class TestV11RepositorySnapshot(unittest.TestCase):
         # Structured canonical JSON prevents cross-field boundary leakage
         self.assertNotEqual(hash1, hash2)
 
+    # -------------------------------------------------------------------------
+    # V11.10: Control Plane & FSM Execution Boundary Integration Tests
+    # -------------------------------------------------------------------------
+    def test_v11_fsm_transition_to_coding_blocked_when_snapshot_missing(self):
+        """Control Plane: Transitioning to CODING without a RepositorySnapshot MUST fail closed."""
+        agents_dir = os.path.join(self.test_dir, ".agents")
+        os.makedirs(agents_dir, exist_ok=True)
+        pipe_file = os.path.join(agents_dir, "v7_refinement_pipeline.json")
+
+        import json
+        with open(pipe_file, "w", encoding="utf-8") as f:
+            json.dump({
+                "version": 1,
+                "hld_design": {"system_name": "S", "architecture_style": "Modular Monolith", "modules": [], "adrs": []},
+                "behavior_graph": {"nodes": {}, "edges": []},
+                "requirement_graph": {"nodes": {}, "edges": []},
+                "lld_components": [],
+                "tasks": [],
+                "blocked": False,
+                "hld_governance": {"is_blocked": False}
+            }, f)
+
+        gov_res = ArtifactGovernor.enforce_fsm_transition(
+            current_phase="DESIGN",
+            proposed_event="spec_approved",
+            target_phase="CODING",
+            workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("MANDATORY_REPOSITORY_SNAPSHOT_MISSING" in r for r in gov_res.blocking_reasons))
+
+    def test_v11_fsm_transition_to_coding_blocked_on_live_disk_drift(self):
+        """Control Plane: Transitioning to CODING when live disk has drifted from planned snapshot MUST fail closed."""
+        self._create_file("src/app.py", "pass")
+        snap = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        agents_dir = os.path.join(self.test_dir, ".agents")
+        os.makedirs(agents_dir, exist_ok=True)
+        pipe_file = os.path.join(agents_dir, "v7_refinement_pipeline.json")
+
+        import json
+        with open(pipe_file, "w", encoding="utf-8") as f:
+            json.dump({
+                "version": 1,
+                "hld_design": {"system_name": "S", "architecture_style": "Modular Monolith", "modules": [], "adrs": []},
+                "behavior_graph": {"nodes": {}, "edges": []},
+                "requirement_graph": {"nodes": {}, "edges": []},
+                "lld_components": [],
+                "tasks": [],
+                "repository_snapshot": snap.to_dict(),
+                "blocked": False,
+                "hld_governance": {"is_blocked": False}
+            }, f)
+
+        # DRIFT ATTACK: Untracked file added on disk after snapshot was taken
+        self._create_file("src/untracked_drift.py", "malicious_content = True")
+
+        gov_res = ArtifactGovernor.enforce_fsm_transition(
+            current_phase="DESIGN",
+            proposed_event="spec_approved",
+            target_phase="CODING",
+            workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("untracked added files" in r or "drift detected" in r for r in gov_res.blocking_reasons))
+
+    def test_v11_fsm_transition_to_coding_permitted_when_snapshot_matches_live_disk(self):
+        """Control Plane: Transitioning to CODING when snapshot matches live disk is permitted."""
+        self._create_file("src/app.py", "pass")
+        snap = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        agents_dir = os.path.join(self.test_dir, ".agents")
+        os.makedirs(agents_dir, exist_ok=True)
+        pipe_file = os.path.join(agents_dir, "v7_refinement_pipeline.json")
+
+        import json
+        from behavior_graph import BehaviorGraph
+        from requirement_ir import RequirementGraph
+        with open(pipe_file, "w", encoding="utf-8") as f:
+            json.dump({
+                "version": 1,
+                "hld_design": {"system_name": "S", "architecture_style": "Modular Monolith", "modules": [], "adrs": [], "version": 1},
+                "behavior_graph": BehaviorGraph(version=1).to_dict(),
+                "requirement_graph": RequirementGraph(version=1).to_dict(),
+                "lld_components": [],
+                "tasks": [],
+                "repository_snapshot": snap.to_dict(),
+                "blocked": False,
+                "hld_governance": {"is_blocked": False}
+            }, f)
+
+        gov_res = ArtifactGovernor.enforce_fsm_transition(
+            current_phase="DESIGN",
+            proposed_event="spec_approved",
+            target_phase="CODING",
+            workspace_dir=self.test_dir
+        )
+        self.assertFalse(gov_res.is_blocked, msg=f"Reasons: {gov_res.blocking_reasons}")
+
 
 if __name__ == "__main__":
     unittest.main()

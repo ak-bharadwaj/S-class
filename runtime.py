@@ -1418,7 +1418,20 @@ class FSMGoalSequenceRunner:
             except Exception as e_deb:
                 logger.warning(f"[Runtime Governance] Authoritative pipeline inspection note: {e_deb}")
 
-        elif current_phase in ["TASK_COMPILATION", "CODING", "TASK_VERIFICATION"]:
+        elif current_phase in ["TASK_COMPILATION", "CODING", "TASK_VERIFICATION", "INTEGRATION"]:
+            # Ensure repository snapshot is captured & saved.
+            # Post-coding phases (TASK_VERIFICATION, INTEGRATION) refresh the governed snapshot
+            # to capture legitimate code mutations before transitioning to QA/RELEASE.
+            snap_file = os.path.join(state_dir, "repo_snapshot.json")
+            if workspace_dir:
+                try:
+                    from repository_snapshot import RepositorySnapshotEngine
+                    if current_phase in ["TASK_VERIFICATION", "INTEGRATION"] or not os.path.exists(snap_file):
+                        snap = RepositorySnapshotEngine.capture_snapshot(workspace_dir)
+                        RepositorySnapshotEngine.save_snapshot(snap, snap_file)
+                except Exception as e_snap:
+                    logger.warning(f"[Runtime Governance] Snapshot capture note: {e_snap}")
+
             state = get_state(workspace_dir)
             completed_tasks = [t for t in state.tasks if str(t.status).lower() in ["completed", "verified", "done"]]
             if not completed_tasks:

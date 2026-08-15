@@ -676,10 +676,10 @@ class EvidenceVerifier:
                 from zero_infra_db import ZeroInfraDbEngine
                 dep_res = ASTDependencyResolver.resolve_workspace_dependencies(workspace_dir=cwd)
                 db_res = ZeroInfraDbEngine.audit_and_fallback_database(workspace_dir=cwd)
-                if dep_res.get("npm_packages_injected"):
-                    logger.info(f"[Verifier] Auto-injected missing NPM packages: {dep_res['npm_packages_injected']}")
-                if db_res.get("fallbacks_applied"):
-                    logger.info(f"[Verifier] Auto-injected Zero-Infra DB fallbacks: {db_res['fallbacks_applied']}")
+                if dep_res.get("npm_packages_injected") or db_res.get("fallbacks_applied"):
+                    from repository_snapshot import RepositorySnapshotEngine
+                    snap = RepositorySnapshotEngine.capture_snapshot(cwd)
+                    RepositorySnapshotEngine.save_snapshot(snap, os.path.join(cwd, ".agents", "repo_snapshot.json"))
             except Exception as ex:
                 logger.warning(f"[Verifier] S-Class V12 resolution engine warning: {ex}")
 

@@ -718,7 +718,7 @@ class RepositorySnapshotEngine:
     Produces deterministic snapshots and verifies live disk trees against historical snapshots.
     """
 
-    DEFAULT_IGNORE_DIRS = {".git"}
+    DEFAULT_IGNORE_DIRS = {".git", ".agents", ".gemini", "__pycache__", ".pytest_cache"}
 
     @classmethod
     def get_git_commit(cls, repo_root: str) -> str:

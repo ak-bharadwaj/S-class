@@ -78,10 +78,15 @@ def test_runtime_integration_bug_fix_shortcut(tmp_path):
     from artifact_governor import ArtifactGovernor, ApprovalRecord, ApprovalAuthority
     from domain_primitives import SemanticDomainGraph
     from spec_compiler import SpecificationCompiler
+    from repository_snapshot import RepositorySnapshotEngine
     sec_key = ArtifactGovernor._get_governance_secret(workspace)
     
+    # Save governed repository snapshot
+    repo_snap = RepositorySnapshotEngine.capture_snapshot(workspace)
+    RepositorySnapshotEngine.save_snapshot(repo_snap, os.path.join(agents_dir, "repo_snapshot.json"))
+
     d_graph = SemanticDomainGraph()
-    pipe_res = SpecificationCompiler.compile_v7_refinement_pipeline(graph=d_graph, intent_features=["fix"], raw_request="Fix CSS brace")
+    pipe_res = SpecificationCompiler.compile_v7_refinement_pipeline(graph=d_graph, intent_features=["fix"], raw_request="Fix CSS brace", workspace_dir=workspace)
     hld = pipe_res["hld_design"]
     pipe_dict = {
         "version": 1,
@@ -94,7 +99,8 @@ def test_runtime_integration_bug_fix_shortcut(tmp_path):
         "behavior_graph": pipe_res["behavior_graph"].to_dict(),
         "requirement_graph": pipe_res["requirement_graph"].to_dict(),
         "lld_components": [c.to_dict() for c in pipe_res.get("lld_components", [])],
-        "tasks": [t.to_dict() for t in pipe_res.get("tasks", [])]
+        "tasks": [t.to_dict() for t in pipe_res.get("tasks", [])],
+        "repository_snapshot": repo_snap.to_dict()
     }
     pipe_file = os.path.join(agents_dir, "v7_refinement_pipeline.json")
     with open(pipe_file, "w", encoding="utf-8") as f:
@@ -129,10 +135,15 @@ def test_runtime_integration_hotfix_shortcut(tmp_path):
     from artifact_governor import ArtifactGovernor, ApprovalRecord, ApprovalAuthority
     from domain_primitives import SemanticDomainGraph
     from spec_compiler import SpecificationCompiler
+    from repository_snapshot import RepositorySnapshotEngine
     sec_key = ArtifactGovernor._get_governance_secret(workspace)
 
+    # Save governed repository snapshot
+    repo_snap = RepositorySnapshotEngine.capture_snapshot(workspace)
+    RepositorySnapshotEngine.save_snapshot(repo_snap, os.path.join(agents_dir, "repo_snapshot.json"))
+
     d_graph = SemanticDomainGraph()
-    pipe_res = SpecificationCompiler.compile_v7_refinement_pipeline(graph=d_graph, intent_features=["hotfix"], raw_request="Emergency hotfix")
+    pipe_res = SpecificationCompiler.compile_v7_refinement_pipeline(graph=d_graph, intent_features=["hotfix"], raw_request="Emergency hotfix", workspace_dir=workspace)
     hld = pipe_res["hld_design"]
     pipe_dict = {
         "version": 1,
@@ -145,7 +156,8 @@ def test_runtime_integration_hotfix_shortcut(tmp_path):
         "behavior_graph": pipe_res["behavior_graph"].to_dict(),
         "requirement_graph": pipe_res["requirement_graph"].to_dict(),
         "lld_components": [c.to_dict() for c in pipe_res.get("lld_components", [])],
-        "tasks": [t.to_dict() for t in pipe_res.get("tasks", [])]
+        "tasks": [t.to_dict() for t in pipe_res.get("tasks", [])],
+        "repository_snapshot": repo_snap.to_dict()
     }
     pipe_file = os.path.join(agents_dir, "v7_refinement_pipeline.json")
     with open(pipe_file, "w", encoding="utf-8") as f:

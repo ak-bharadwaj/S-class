@@ -1369,16 +1369,64 @@ class ArtifactGovernor:
                             "recommended_fsm_state": "DESIGN"
                         }
 
-                if is_blocked or hld_gov.get("is_blocked", False) or task_gov.get("is_blocked", False):
+                # V11.1 Authoritative Repository Snapshot Control-Plane Enforcement
+                snap_gov_dict = {}
+                if target_phase in ["CODING", "QA", "RELEASE"]:
+                    snap_data = None
+                    if workspace_dir:
+                        disk_snap_path = os.path.join(workspace_dir, ".agents", "repo_snapshot.json")
+                        if os.path.exists(disk_snap_path):
+                            try:
+                                with open(disk_snap_path, "r", encoding="utf-8") as sf:
+                                    snap_data = json.load(sf)
+                            except Exception:
+                                pass
+                    if not snap_data:
+                        snap_data = pipe_data.get("repository_snapshot")
+
+                    if not snap_data:
+                        is_blocked = True
+                        snap_gov_dict = {
+                            "is_blocked": True,
+                            "blocking_reasons": [
+                                f"MANDATORY_REPOSITORY_SNAPSHOT_MISSING: Persisted pipeline and workspace are missing mandatory RepositorySnapshot required for execution phase '{target_phase}'."
+                            ],
+                            "validation_status": "BLOCKED",
+                            "approval_status": "REJECTED",
+                            "recommended_fsm_state": "DESIGN"
+                        }
+                    else:
+                        try:
+                            from repository_snapshot import RepositorySnapshot
+                            snap_obj = RepositorySnapshot.from_governed_dict(snap_data)
+                            snap_gov_dynamic = cls.audit_repository_snapshot_governance(
+                                snap_obj,
+                                repo_root=workspace_dir
+                            )
+                            if snap_gov_dynamic.is_blocked:
+                                is_blocked = True
+                            snap_gov_dict = snap_gov_dynamic.to_dict()
+                        except Exception as e:
+                            is_blocked = True
+                            snap_gov_dict = {
+                                "is_blocked": True,
+                                "blocking_reasons": [f"GOVERNANCE_AUDIT_ERROR: Dynamic repository snapshot governance rehydration failed closed due to error: {e}"],
+                                "validation_status": "BLOCKED",
+                                "approval_status": "REJECTED",
+                                "recommended_fsm_state": "DESIGN"
+                            }
+
+                if is_blocked or hld_gov.get("is_blocked", False) or task_gov.get("is_blocked", False) or snap_gov_dict.get("is_blocked", False):
                     reasons = []
                     reasons.extend(hld_gov.get("blocking_reasons", []))
                     reasons.extend(task_gov.get("blocking_reasons", []))
+                    reasons.extend(snap_gov_dict.get("blocking_reasons", []))
                     if not reasons:
                         reasons = ["Refinement pipeline artifact governance is BLOCKED."]
                     if hld_gov.get("is_blocked") and hld_gov.get("recommended_fsm_state") == "DEBATE":
                         rec_state = "DEBATE"
                     else:
-                        rec_state = task_gov.get("recommended_fsm_state") or hld_gov.get("recommended_fsm_state") or "DESIGN"
+                        rec_state = snap_gov_dict.get("recommended_fsm_state") or task_gov.get("recommended_fsm_state") or hld_gov.get("recommended_fsm_state") or "DESIGN"
                     target_enum = FSMTransitionTarget.DEBATE if rec_state == "DEBATE" else FSMTransitionTarget.DESIGN
                     return GovernanceGateResult(
                         is_blocked=True,

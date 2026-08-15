@@ -1639,6 +1639,11 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             source_lld_hash=valid_lld_comp.component_hash, source_binding_hashes=[valid_binding.binding_hash]
         )
         valid_task.task_hash = valid_task.compute_canonical_hash()
+        from repository_snapshot import RepositorySnapshotEngine
+        repo_snap_init = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+        snap_path_init = os.path.join(self.agents_dir, "repo_snapshot.json")
+        RepositorySnapshotEngine.save_snapshot(repo_snap_init, snap_path_init)
+
         pipe_path = os.path.join(self.agents_dir, "v7_refinement_pipeline.json")
         write_json_atomic(pipe_path, {
             "version": 1,
@@ -1647,6 +1652,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             "requirement_graph": r_graph_init.to_dict(),
             "lld_components": [valid_lld_comp.to_dict()],
             "tasks": [valid_task.to_dict()],
+            "repository_snapshot": repo_snap_init.to_dict(),
             "blocked": False,
             "hld_governance": {"is_blocked": False}
         })

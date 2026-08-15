@@ -673,8 +673,22 @@ class SpecificationCompiler:
                 b_graph=b_graph
             )
 
-        final_blocked = task_gov.is_blocked or (plan_gov.is_blocked if plan_gov else False)
-        recommended_target = task_gov.recommended_fsm_state.value if not plan_gov or not plan_gov.is_blocked else plan_gov.recommended_fsm_state.value
+        repo_snapshot = None
+        snap_gov = None
+        if workspace_dir:
+            from repository_snapshot import RepositorySnapshotEngine
+            repo_snapshot = RepositorySnapshotEngine.capture_snapshot(workspace_dir)
+            snap_gov = ArtifactGovernor.audit_repository_snapshot_governance(repo_snapshot, repo_root=workspace_dir)
+            snap_path = os.path.join(workspace_dir, ".agents", "repo_snapshot.json")
+            RepositorySnapshotEngine.save_snapshot(repo_snapshot, snap_path)
+
+        final_blocked = task_gov.is_blocked or (plan_gov.is_blocked if plan_gov else False) or (snap_gov.is_blocked if snap_gov else False)
+        if snap_gov and snap_gov.is_blocked:
+            recommended_target = snap_gov.recommended_fsm_state.value
+        elif plan_gov and plan_gov.is_blocked:
+            recommended_target = plan_gov.recommended_fsm_state.value
+        else:
+            recommended_target = task_gov.recommended_fsm_state.value
 
         res_dict = {
             "behavior_graph": b_graph,
@@ -690,6 +704,8 @@ class SpecificationCompiler:
             "task_governance": task_gov.to_dict(),
             "execution_plan": execution_plan.to_dict() if execution_plan else None,
             "execution_plan_governance": plan_gov.to_dict() if plan_gov else {},
+            "repository_snapshot": repo_snapshot.to_dict() if repo_snapshot else None,
+            "repository_snapshot_governance": snap_gov.to_dict() if snap_gov else {},
             "blocked": final_blocked,
             "target_fsm_state": recommended_target
         }
@@ -738,6 +754,8 @@ class SpecificationCompiler:
                 "lld_governance": res_pipe.get("lld_governance", {}),
                 "tasks": [t.to_dict() if hasattr(t, "to_dict") else t for t in res_pipe.get("tasks", [])],
                 "task_governance": res_pipe.get("task_governance", {}),
+                "repository_snapshot": res_pipe.get("repository_snapshot"),
+                "repository_snapshot_governance": res_pipe.get("repository_snapshot_governance", {}),
                 "blocked": res_pipe.get("blocked", False)
             }
 
