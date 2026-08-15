@@ -438,10 +438,10 @@ class ExecutionPlanCompiler:
                     claimed_write_resources.update(task_write_res)
                     claimed_state_entities.update(task_state_entities)
 
-            # Determine batch execution mode and risk
             exec_mode = ExecutionMode.PARALLEL if len(current_batch_tasks) > 1 else ExecutionMode.SERIAL
             for t in current_batch_tasks:
                 t.execution_mode = exec_mode
+                t.task_hash = t.compute_canonical_hash()
 
             max_risk = TaskRiskLevel.LOW
             for t in current_batch_tasks:

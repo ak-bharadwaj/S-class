@@ -1303,38 +1303,62 @@ class ArtifactGovernor:
                 f"does not match recomputed canonical hash '{recomputed_cs_hash[:8]}'."
             )
 
-        # 4. Authoritative Upstream Lineage & Exact Task-Set Reconciliation
+        # 4. Authoritative Upstream Lineage & Exact Task-Set Reconciliation (Strict Governed Rehydration)
         if workspace_dir:
             pipe_path = os.path.join(workspace_dir, ".agents", "v7_refinement_pipeline.json")
-            if os.path.exists(pipe_path):
+            if not os.path.exists(pipe_path):
+                reasons.append(
+                    "CHANGESET_LINEAGE_SOURCE_MISSING: Persisted refinement pipeline '.agents/v7_refinement_pipeline.json' "
+                    "missing from workspace; cannot verify upstream execution plan and task lineage."
+                )
+            else:
                 try:
                     with open(pipe_path, "r", encoding="utf-8") as pf:
                         pipe_data = json.load(pf)
 
-                    # Upstream ExecutionPlan Hash Reconciliation
-                    exec_plan_data = pipe_data.get("execution_plan")
-                    if exec_plan_data and isinstance(exec_plan_data, dict):
-                        governed_plan_hash = exec_plan_data.get("plan_hash")
-                        if not governed_plan_hash:
-                            reasons.append("GOVERNED_PLAN_INTEGRITY_MISSING: Governed ExecutionPlan in pipeline missing plan_hash.")
-                        elif changeset.source_execution_plan_hash != governed_plan_hash:
-                            reasons.append(
-                                f"CHANGESET_EXECUTION_PLAN_LINEAGE_MISMATCH: ChangeSet source_execution_plan_hash "
-                                f"'{changeset.source_execution_plan_hash[:8]}' does not match governed ExecutionPlan plan_hash '{governed_plan_hash[:8]}'."
-                            )
+                    if not isinstance(pipe_data, dict):
+                        reasons.append("UPSTREAM_PIPELINE_STRUCTURE_INVALID: Persisted refinement pipeline is not a valid dictionary.")
+                    else:
+                        from execution_ir import ExecutionPlan
+                        from task_compiler import TaskRecord
 
-                    # Upstream Governed Tasks & Exact Task-Set Equality Reconciliation
-                    governed_tasks_list = pipe_data.get("tasks", [])
-                    if governed_tasks_list and isinstance(governed_tasks_list, list):
-                        governed_tasks_dict = {}
-                        for gt in governed_tasks_list:
-                            if isinstance(gt, dict) and gt.get("id"):
-                                governed_tasks_dict[gt["id"]] = gt.get("task_hash", "")
+                        # 4a. Governed ExecutionPlan Deserialization & Integrity Verification
+                        exec_plan_data = pipe_data.get("execution_plan")
+                        if not exec_plan_data or not isinstance(exec_plan_data, dict):
+                            reasons.append("GOVERNED_PLAN_INTEGRITY_MISSING: Governed refinement pipeline missing execution_plan structure.")
+                        else:
+                            try:
+                                governed_plan = ExecutionPlan.from_governed_dict(exec_plan_data)
+                                governed_plan_hash = governed_plan.plan_hash
+                                if changeset.source_execution_plan_hash != governed_plan_hash:
+                                    reasons.append(
+                                        f"CHANGESET_EXECUTION_PLAN_LINEAGE_MISMATCH: ChangeSet source_execution_plan_hash "
+                                        f"'{changeset.source_execution_plan_hash[:8]}' does not match governed ExecutionPlan plan_hash '{governed_plan_hash[:8]}'."
+                                    )
+                            except Exception as ex:
+                                reasons.append(f"UPSTREAM_PLAN_INTEGRITY_FAILED: Governed ExecutionPlan deserialization/validation failed closed: {ex}")
 
+                        # 4b. Governed Tasks Deserialization & Exact Task-Set Equality Reconciliation
+                        governed_tasks_list = pipe_data.get("tasks")
+                        if governed_tasks_list is None or not isinstance(governed_tasks_list, list):
+                            reasons.append("GOVERNED_TASKS_STRUCTURE_INVALID: Governed refinement pipeline missing 'tasks' list.")
+                            governed_tasks_dict = {}
+                        else:
+                            governed_tasks_dict = {}
+                            for idx, gt in enumerate(governed_tasks_list):
+                                if not isinstance(gt, dict):
+                                    reasons.append(f"GOVERNED_TASK_INTEGRITY_FAILED: Task at index {idx} is not a valid dictionary.")
+                                    continue
+                                try:
+                                    task_record = TaskRecord.from_governed_dict(gt)
+                                    governed_tasks_dict[task_record.id] = task_record.task_hash
+                                except Exception as ex:
+                                    reasons.append(f"GOVERNED_TASK_INTEGRITY_FAILED: Task at index {idx} failed governed validation: {ex}")
+
+                        # Exact Task-Set Equality Check (ALWAYS executed, even when governed_tasks_dict is empty)
                         changeset_task_ids = set(changeset.source_task_hashes.keys()) if changeset.source_task_hashes else set()
                         governed_task_ids = set(governed_tasks_dict.keys())
 
-                        # Exact Set Equality Check
                         if changeset_task_ids != governed_task_ids:
                             reasons.append(
                                 f"CHANGESET_TASK_SET_MISMATCH: ChangeSet tasks {sorted(changeset_task_ids)} "
@@ -1345,15 +1369,15 @@ class ArtifactGovernor:
                         for t_id, expected_th in governed_tasks_dict.items():
                             if t_id in changeset.source_task_hashes:
                                 actual_th = changeset.source_task_hashes[t_id]
-                                if not expected_th:
-                                    reasons.append(f"GOVERNED_TASK_INTEGRITY_MISSING: Governed TaskRecord '{t_id}' in pipeline missing task_hash.")
-                                elif actual_th != expected_th:
+                                if actual_th != expected_th:
                                     reasons.append(
                                         f"CHANGESET_TASK_HASH_LINEAGE_MISMATCH: ChangeSet task '{t_id}' hash "
                                         f"'{actual_th[:8]}' does not match governed TaskRecord task_hash '{expected_th[:8]}'."
                                     )
                 except Exception as e:
                     reasons.append(f"UPSTREAM_PIPELINE_LOAD_ERROR: Failed to load upstream pipeline for lineage reconciliation: {e}")
+        else:
+            reasons.append("CHANGESET_WORKSPACE_CONTEXT_MISSING: Cannot perform authoritative ChangeSet reconciliation without workspace context.")
 
         # 5. Perform Algebraic Reconciliation
         recon_res = RepositorySnapshotEngine.reconcile_changeset(anchor_snapshot, result_snapshot, changeset)

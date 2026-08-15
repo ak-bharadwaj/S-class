@@ -1,5 +1,5 @@
 """
-S-Class EOS V11.1 — Adversarial ChangeSet & Reconciliation Governance Test Suite (test_v11_changeset_governance.py)
+S-Class EOS V11.1/V11.2 — Adversarial ChangeSet & Reconciliation Governance Test Suite (test_v11_changeset_governance.py)
 
 Comprehensive red-team and invariant validation testing:
 1. Planning Snapshot Anchor Immutability & Tampering Detection
@@ -9,6 +9,12 @@ Comprehensive red-team and invariant validation testing:
 5. Stale Baseline / Anchor Mismatch Rejection (STALE_CHANGESET_SOURCE_ANCHOR)
 6. Legitimate Authorized ChangeSet Reconciliation & Promotion to Trusted Baseline
 7. Post-Verification Mutation & Drift Detection (Live Drift Blocks Transition)
+8. Missing Refinement Pipeline Artifact Fails Closed (CHANGESET_LINEAGE_SOURCE_MISSING)
+9. Missing Workspace Context Fails Closed (CHANGESET_WORKSPACE_CONTEXT_MISSING)
+10. Empty Governed Tasks with Non-Empty ChangeSet Fails Closed (CHANGESET_TASK_SET_MISMATCH)
+11. Tampered ExecutionPlan in Pipeline Fails Closed (UPSTREAM_PLAN_INTEGRITY_FAILED)
+12. Tampered TaskRecord in Pipeline Fails Closed (GOVERNED_TASK_INTEGRITY_FAILED)
+13. Signer Capability Comprehensive Adversarial Boundary Matrix
 """
 
 import os
@@ -16,6 +22,7 @@ import shutil
 import tempfile
 import unittest
 import json
+import hashlib
 
 from repository_snapshot import (
     RepositorySnapshot,
@@ -34,8 +41,24 @@ from artifact_governor import (
     FSMTransitionTarget,
     ValidationStatus
 )
-from behavior_graph import BehaviorGraph
-from requirement_ir import RequirementGraph
+from behavior_graph import BehaviorGraph, BehaviorNode, BehaviorNodeType, EpistemicStatus
+from requirement_ir import RequirementGraph, RequirementNode, RequirementKind
+from hld_compiler import HLDDesign, HLDModule
+from lld_compiler import (
+    LLDComponent,
+    LLDComponentType,
+    LLDParentRef,
+    ComponentExecutionCapability,
+    CapabilityBinding,
+    OperationClass
+)
+from task_compiler import TaskRecord, TaskCategory
+from execution_ir import ExecutionPlan
+from execution_plan_compiler import ExecutionPlanCompiler
+from world_model import (
+    SovereignCryptoAuthority,
+    SovereignSigningCapability
+)
 
 
 class TestV11ChangeSetGovernance(unittest.TestCase):
@@ -45,6 +68,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
         self.agents_dir = os.path.join(self.test_dir, ".agents")
         os.makedirs(self.agents_dir, exist_ok=True)
         os.environ["SCLASS_EXECUTION_MODE"] = "TEST"
+        SovereignCryptoAuthority.reset_authority()
 
     def tearDown(self):
         if os.path.exists(self.test_dir):
@@ -60,16 +84,135 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             f.write(content)
         return full_path
 
-    def _write_mock_pipeline(self, anchor_snap, changeset):
+    def _create_governed_task(self, task_id: str = "TASK-001", file_path: str = "src/app.py", lld_hash: str = "", binding_hashes: list = None) -> TaskRecord:
+        t = TaskRecord(
+            id=task_id,
+            title=f"Task {task_id}",
+            description=f"Description for {task_id}",
+            category=TaskCategory.API_ENDPOINT,
+            parent_lld="LLD-001",
+            parent_hld="HLD-001",
+            parent_reqs=["REQ-001"],
+            parent_behaviors=["BEH-001"],
+            verification_criteria=["Test verification criteria"],
+            source_lld_hash=lld_hash or "lld_hash_123",
+            source_binding_hashes=binding_hashes or ["binding_hash_123"]
+        )
+        return t
+
+    def _create_governed_plan(self, tasks: list) -> ExecutionPlan:
+        return ExecutionPlanCompiler.compile_execution_plan(tasks)
+
+    def _write_mock_pipeline(self, anchor_snap, changeset, tasks=None, plan=None):
+        if tasks is None:
+            tasks = [self._create_governed_task(tid) for tid in changeset.source_task_hashes.keys()]
+
+        # Construct valid BehaviorGraph
+        b_graph = BehaviorGraph(version=1)
+        beh_node = BehaviorNode(
+            id="BEH-001",
+            name="ProcessData",
+            behavior_type=BehaviorNodeType.COMMAND,
+            actor_id="User",
+            target_entity_id="Data",
+            epistemic_status=EpistemicStatus.OBSERVED
+        )
+        b_graph.add_node(beh_node)
+        beh_hash = beh_node.compute_canonical_hash()
+
+        # Construct valid RequirementGraph
+        r_graph = RequirementGraph(version=1)
+        req_node = RequirementNode(
+            id="REQ-001",
+            kind=RequirementKind.FUNCTIONAL,
+            statement="System shall process data",
+            actor="User",
+            capability="ProcessData",
+            target="System",
+            source_behaviors=["BEH-001"]
+        )
+        r_graph.add_requirement(req_node)
+
+        req_payload = {
+            "behavior_id": beh_node.id,
+            "requirement_hashes": [req_node.canonical_hash()]
+        }
+        req_hash = hashlib.sha256(json.dumps(req_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+        # Construct valid HLDDesign
+        hld_mod = HLDModule(
+            id="HLD-001",
+            name="AuthModule",
+            system_boundary="Core",
+            owned_entities=["Data"],
+            owned_capabilities=["ProcessData"]
+        )
+        hld_hash = hld_mod.compute_canonical_hash()
+        hld = HLDDesign(
+            system_name="S",
+            architecture_style="Modular Monolith",
+            modules=[hld_mod],
+            adrs=[],
+            version=1
+        )
+
+        # Construct valid CapabilityBinding
+        binding = CapabilityBinding(
+            behavior_id="BEH-001",
+            requirement_ids=["REQ-001"],
+            operation_class=OperationClass.COMMAND_MUTATION,
+            target_entity="Data",
+            hld_capability="ProcessData",
+            lld_component_id="LLD-001",
+            allowed_component_types=[LLDComponentType.SERVICE],
+            source_behavior_hash=beh_hash,
+            source_requirement_hash=req_hash,
+            source_hld_hash=hld_hash,
+            source_behavior_graph_version=str(b_graph.version),
+            source_requirement_graph_version=str(r_graph.version),
+            source_hld_module_id="HLD-001",
+            source_hld_version=1
+        )
+        binding.binding_hash = binding.compute_hash()
+
+        # Construct valid LLDComponent
+        lld_comp = LLDComponent(
+            id="LLD-001",
+            name="AuthComponent",
+            component_type=LLDComponentType.SERVICE,
+            parent=LLDParentRef(
+                hld_id="HLD-001",
+                req_ids=["REQ-001"],
+                behavior_ids=["BEH-001"]
+            ),
+            role="backend_service",
+            execution_capability=ComponentExecutionCapability.MUTATE,
+            capability_bindings=[binding]
+        )
+        lld_comp.component_hash = lld_comp.compute_canonical_hash()
+        lld_hash = lld_comp.component_hash
+
+        for t in tasks:
+            t.source_lld_hash = lld_hash
+            t.source_binding_hashes = [binding.binding_hash]
+            t.task_hash = t.compute_canonical_hash()
+
+        if plan is None:
+            plan = self._create_governed_plan(tasks)
+        changeset.source_execution_plan_hash = plan.plan_hash
+        changeset.source_task_hashes = {t.id: t.task_hash for t in tasks}
+        changeset.changeset_hash = changeset.compute_canonical_hash()
+
         pipe_path = os.path.join(self.agents_dir, "v7_refinement_pipeline.json")
         with open(pipe_path, "w", encoding="utf-8") as f:
             json.dump({
                 "version": 1,
-                "hld_design": {"system_name": "S", "architecture_style": "Modular Monolith", "modules": [], "adrs": [], "version": 1},
-                "behavior_graph": BehaviorGraph(version=1).to_dict(),
-                "requirement_graph": RequirementGraph(version=1).to_dict(),
-                "lld_components": [],
-                "tasks": [],
+                "hld_design": hld.to_dict(),
+                "behavior_graph": b_graph.to_dict(),
+                "requirement_graph": r_graph.to_dict(),
+                "lld_components": [lld_comp.to_dict()],
+                "tasks": [t.to_dict() for t in tasks],
+                "execution_plan": plan.to_dict(),
                 "planning_snapshot": anchor_snap.to_dict(),
                 "authorized_changeset": changeset.to_dict(),
                 "repository_snapshot": anchor_snap.to_dict(),
@@ -85,17 +228,22 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
         self._create_file("src/app.py", "def app(): pass")
         anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
 
+        task = self._create_governed_task("TASK-001")
+        plan = self._create_governed_plan([task])
+
         changeset = AuthorizedChangeSet(
             changeset_id="CS-001",
             source_repository_state_hash=anchor.repository_state_hash,
-            source_execution_plan_hash="plan_hash_001",
-            source_task_hashes={"TASK-001": "task_hash_001"}
+            source_execution_plan_hash=plan.plan_hash,
+            source_task_hashes={task.id: task.task_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
             operation=FileMutationOp.MODIFY,
             authorized_by_tasks=["TASK-001"]
         ))
+
+        self._write_mock_pipeline(anchor, changeset, tasks=[task], plan=plan)
 
         # Perform valid change on disk
         self._create_file("src/app.py", "def app(): return True")
@@ -120,12 +268,14 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
         self._create_file("src/security.py", "ALLOW_ALL = False")
         anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
 
-        # ChangeSet ONLY authorizes editing src/app.py
+        task = self._create_governed_task("TASK-001")
+        plan = self._create_governed_plan([task])
+
         changeset = AuthorizedChangeSet(
             changeset_id="CS-002",
             source_repository_state_hash=anchor.repository_state_hash,
-            source_execution_plan_hash="plan_hash_002",
-            source_task_hashes={"TASK-001": "task_hash_001"}
+            source_execution_plan_hash=plan.plan_hash,
+            source_task_hashes={task.id: task.task_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -133,13 +283,12 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             authorized_by_tasks=["TASK-001"]
         ))
 
-        self._write_mock_pipeline(anchor, changeset)
+        self._write_mock_pipeline(anchor, changeset, tasks=[task], plan=plan)
 
         # EXECUTION ATTACK: Agent edits src/app.py AND mutates src/security.py
         self._create_file("src/app.py", "def app(): return True")
         self._create_file("src/security.py", "ALLOW_ALL = True  # ATTACK")
 
-        # Governor FSM transition to QA must catch unauthorized modification and BLOCK
         gov_res = ArtifactGovernor.enforce_fsm_transition(
             current_phase="INTEGRATION",
             proposed_event="integration_passed",
@@ -157,12 +306,14 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
         self._create_file("src/app.py", "def app(): pass")
         anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
 
-        # ChangeSet ONLY authorizes creating src/button.py
+        task = self._create_governed_task("TASK-001")
+        plan = self._create_governed_plan([task])
+
         changeset = AuthorizedChangeSet(
             changeset_id="CS-003",
             source_repository_state_hash=anchor.repository_state_hash,
-            source_execution_plan_hash="plan_hash_003",
-            source_task_hashes={"TASK-001": "task_hash_001"}
+            source_execution_plan_hash=plan.plan_hash,
+            source_task_hashes={task.id: task.task_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/button.py",
@@ -170,7 +321,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             authorized_by_tasks=["TASK-001"]
         ))
 
-        self._write_mock_pipeline(anchor, changeset)
+        self._write_mock_pipeline(anchor, changeset, tasks=[task], plan=plan)
 
         # EXECUTION ATTACK: Agent creates src/button.py AND untracked backdoor src/backdoor.py
         self._create_file("src/button.py", "def button(): pass")
@@ -194,11 +345,14 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
         self._create_file("src/critical_config.py", "CONFIG = 1")
         anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
 
+        task = self._create_governed_task("TASK-001")
+        plan = self._create_governed_plan([task])
+
         changeset = AuthorizedChangeSet(
             changeset_id="CS-004",
             source_repository_state_hash=anchor.repository_state_hash,
-            source_execution_plan_hash="plan_hash_004",
-            source_task_hashes={"TASK-001": "task_hash_001"}
+            source_execution_plan_hash=plan.plan_hash,
+            source_task_hashes={task.id: task.task_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -206,7 +360,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             authorized_by_tasks=["TASK-001"]
         ))
 
-        self._write_mock_pipeline(anchor, changeset)
+        self._write_mock_pipeline(anchor, changeset, tasks=[task], plan=plan)
 
         # EXECUTION ATTACK: Agent deletes src/critical_config.py
         os.remove(os.path.join(self.test_dir, "src/critical_config.py"))
@@ -228,12 +382,14 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
         self._create_file("src/app.py", "pass")
         anchor_A = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
 
-        # ChangeSet compiled against Snapshot A
+        task = self._create_governed_task("TASK-001")
+        plan = self._create_governed_plan([task])
+
         changeset = AuthorizedChangeSet(
             changeset_id="CS-005",
             source_repository_state_hash=anchor_A.repository_state_hash,
-            source_execution_plan_hash="plan_hash_005",
-            source_task_hashes={"TASK-001": "task_hash_001"}
+            source_execution_plan_hash=plan.plan_hash,
+            source_task_hashes={task.id: task.task_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -245,7 +401,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
         self._create_file("src/other.py", "other = 1")
         anchor_B = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
 
-        self._write_mock_pipeline(anchor_B, changeset)
+        self._write_mock_pipeline(anchor_B, changeset, tasks=[task], plan=plan)
 
         gov_res = ArtifactGovernor.enforce_fsm_transition(
             current_phase="INTEGRATION",
@@ -264,12 +420,15 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
         self._create_file("src/app.py", "def app(): pass")
         anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
 
-        # Authorize modifying app.py and creating helper.py
+        t1 = self._create_governed_task("TASK-001")
+        t2 = self._create_governed_task("TASK-002")
+        plan = self._create_governed_plan([t1, t2])
+
         changeset = AuthorizedChangeSet(
             changeset_id="CS-006",
             source_repository_state_hash=anchor.repository_state_hash,
-            source_execution_plan_hash="plan_hash_006",
-            source_task_hashes={"TASK-001": "task_hash_001", "TASK-002": "task_hash_002"}
+            source_execution_plan_hash=plan.plan_hash,
+            source_task_hashes={t1.id: t1.task_hash, t2.id: t2.task_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -282,7 +441,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             authorized_by_tasks=["TASK-002"]
         ))
 
-        self._write_mock_pipeline(anchor, changeset)
+        self._write_mock_pipeline(anchor, changeset, tasks=[t1, t2], plan=plan)
 
         # Legitimate Execution
         self._create_file("src/app.py", "def app(): return 'authorized'")
@@ -314,11 +473,14 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
         self._create_file("src/app.py", "def app(): pass")
         anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
 
+        task = self._create_governed_task("TASK-001")
+        plan = self._create_governed_plan([task])
+
         changeset = AuthorizedChangeSet(
             changeset_id="CS-007",
             source_repository_state_hash=anchor.repository_state_hash,
-            source_execution_plan_hash="plan_hash_007",
-            source_task_hashes={"TASK-001": "task_hash_001"}
+            source_execution_plan_hash=plan.plan_hash,
+            source_task_hashes={task.id: task.task_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -326,7 +488,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             authorized_by_tasks=["TASK-001"]
         ))
 
-        self._write_mock_pipeline(anchor, changeset)
+        self._write_mock_pipeline(anchor, changeset, tasks=[task], plan=plan)
 
         # Legitimate execution
         self._create_file("src/app.py", "def app(): return 'authorized'")
@@ -343,6 +505,261 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
         gov_res = ArtifactGovernor.audit_repository_snapshot_governance(result, repo_root=self.test_dir)
         self.assertTrue(gov_res.is_blocked)
         self.assertTrue(any("drift detected" in r or "file_hash drift" in r for r in gov_res.blocking_reasons))
+
+    # -------------------------------------------------------------------------
+    # Test 8: Missing Refinement Pipeline Artifact Fails Closed
+    # -------------------------------------------------------------------------
+    def test_v11_missing_pipeline_file_fails_closed(self):
+        """Invariant: If v7_refinement_pipeline.json is missing, ChangeSet reconciliation fails closed."""
+        self._create_file("src/app.py", "def app(): pass")
+        anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+        self._create_file("src/app.py", "def app(): return True")
+        result = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        task = self._create_governed_task("TASK-001")
+        plan = self._create_governed_plan([task])
+
+        changeset = AuthorizedChangeSet(
+            changeset_id="CS-008",
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash=plan.plan_hash,
+            source_task_hashes={task.id: task.task_hash}
+        )
+        changeset.add_change(AuthorizedFileChange(
+            file_path="src/app.py",
+            operation=FileMutationOp.MODIFY,
+            authorized_by_tasks=["TASK-001"]
+        ))
+
+        # Ensure pipeline artifact is ABSENT from .agents/
+        pipe_path = os.path.join(self.agents_dir, "v7_refinement_pipeline.json")
+        if os.path.exists(pipe_path):
+            os.remove(pipe_path)
+
+        gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
+            anchor, result, changeset, workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("CHANGESET_LINEAGE_SOURCE_MISSING" in r for r in gov_res.blocking_reasons))
+
+    # -------------------------------------------------------------------------
+    # Test 9: Missing Workspace Context Fails Closed
+    # -------------------------------------------------------------------------
+    def test_v11_missing_workspace_dir_fails_closed(self):
+        """Invariant: Attempting ChangeSet reconciliation without workspace context fails closed."""
+        self._create_file("src/app.py", "def app(): pass")
+        anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+        self._create_file("src/app.py", "def app(): return True")
+        result = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        task = self._create_governed_task("TASK-001")
+        plan = self._create_governed_plan([task])
+
+        changeset = AuthorizedChangeSet(
+            changeset_id="CS-009",
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash=plan.plan_hash,
+            source_task_hashes={task.id: task.task_hash}
+        )
+        changeset.add_change(AuthorizedFileChange(
+            file_path="src/app.py",
+            operation=FileMutationOp.MODIFY,
+            authorized_by_tasks=["TASK-001"]
+        ))
+
+        gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
+            anchor, result, changeset, workspace_dir=None
+        )
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("CHANGESET_WORKSPACE_CONTEXT_MISSING" in r for r in gov_res.blocking_reasons))
+
+    # -------------------------------------------------------------------------
+    # Test 10: Empty Governed Tasks in Pipeline with Non-Empty ChangeSet Fails Closed
+    # -------------------------------------------------------------------------
+    def test_v11_empty_governed_tasks_in_pipeline_fails_closed(self):
+        """Invariant: Storing tasks=[] in pipeline while ChangeSet has tasks fails closed."""
+        self._create_file("src/app.py", "def app(): pass")
+        anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+        self._create_file("src/app.py", "def app(): return True")
+        result = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        task = self._create_governed_task("TASK-001")
+        plan = self._create_governed_plan([task])
+
+        changeset = AuthorizedChangeSet(
+            changeset_id="CS-010",
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash=plan.plan_hash,
+            source_task_hashes={task.id: task.task_hash}
+        )
+        changeset.add_change(AuthorizedFileChange(
+            file_path="src/app.py",
+            operation=FileMutationOp.MODIFY,
+            authorized_by_tasks=["TASK-001"]
+        ))
+
+        # ATTACK: Pipeline contains empty tasks list
+        pipe_path = os.path.join(self.agents_dir, "v7_refinement_pipeline.json")
+        with open(pipe_path, "w", encoding="utf-8") as f:
+            json.dump({
+                "version": 1,
+                "execution_plan": plan.to_dict(),
+                "tasks": []  # Empty!
+            }, f)
+
+        gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
+            anchor, result, changeset, workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("CHANGESET_TASK_SET_MISMATCH" in r for r in gov_res.blocking_reasons))
+
+    # -------------------------------------------------------------------------
+    # Test 11: Tampered ExecutionPlan in Pipeline Fails Closed
+    # -------------------------------------------------------------------------
+    def test_v11_tampered_execution_plan_in_pipeline_fails_closed(self):
+        """Invariant: Tampering ExecutionPlan payload in pipeline fails strict governed deserialization."""
+        self._create_file("src/app.py", "def app(): pass")
+        anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+        self._create_file("src/app.py", "def app(): return True")
+        result = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        task = self._create_governed_task("TASK-001")
+        plan = self._create_governed_plan([task])
+
+        changeset = AuthorizedChangeSet(
+            changeset_id="CS-011",
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash=plan.plan_hash,
+            source_task_hashes={task.id: task.task_hash}
+        )
+        changeset.add_change(AuthorizedFileChange(
+            file_path="src/app.py",
+            operation=FileMutationOp.MODIFY,
+            authorized_by_tasks=["TASK-001"]
+        ))
+
+        # ATTACK: Mutate plan structure without valid hash
+        tampered_plan_dict = plan.to_dict()
+        tampered_plan_dict["version"] = 999  # Invalidates hash
+
+        pipe_path = os.path.join(self.agents_dir, "v7_refinement_pipeline.json")
+        with open(pipe_path, "w", encoding="utf-8") as f:
+            json.dump({
+                "version": 1,
+                "execution_plan": tampered_plan_dict,
+                "tasks": [task.to_dict()]
+            }, f)
+
+        gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
+            anchor, result, changeset, workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("UPSTREAM_PLAN_INTEGRITY_FAILED" in r for r in gov_res.blocking_reasons))
+
+    # -------------------------------------------------------------------------
+    # Test 12: Tampered TaskRecord in Pipeline Fails Closed
+    # -------------------------------------------------------------------------
+    def test_v11_tampered_task_record_in_pipeline_fails_closed(self):
+        """Invariant: Tampering TaskRecord payload in pipeline fails strict governed deserialization."""
+        self._create_file("src/app.py", "def app(): pass")
+        anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+        self._create_file("src/app.py", "def app(): return True")
+        result = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        task = self._create_governed_task("TASK-001")
+        plan = self._create_governed_plan([task])
+
+        changeset = AuthorizedChangeSet(
+            changeset_id="CS-012",
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash=plan.plan_hash,
+            source_task_hashes={task.id: task.task_hash}
+        )
+        changeset.add_change(AuthorizedFileChange(
+            file_path="src/app.py",
+            operation=FileMutationOp.MODIFY,
+            authorized_by_tasks=["TASK-001"]
+        ))
+
+        # ATTACK: Mutate task description without valid hash
+        tampered_task_dict = task.to_dict()
+        tampered_task_dict["description"] = "Tampered description injected"
+
+        pipe_path = os.path.join(self.agents_dir, "v7_refinement_pipeline.json")
+        with open(pipe_path, "w", encoding="utf-8") as f:
+            json.dump({
+                "version": 1,
+                "execution_plan": plan.to_dict(),
+                "tasks": [tampered_task_dict]
+            }, f)
+
+        gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
+            anchor, result, changeset, workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("GOVERNED_TASK_INTEGRITY_FAILED" in r or "CHANGESET_TASK_SET_MISMATCH" in r for r in gov_res.blocking_reasons))
+
+    # -------------------------------------------------------------------------
+    # Test 13: Signer Capability Comprehensive Adversarial Boundary Matrix
+    # -------------------------------------------------------------------------
+    def test_v11_signer_capability_adversarial_matrix(self):
+        """Invariant: All adversarial capability issuance, forgery, revocation, and pairing attacks are rejected."""
+        # 1. Rogue subsystem requesting capability
+        with self.assertRaises(PermissionError) as ctx1:
+            SovereignCryptoAuthority.issue_signing_capability("UNTRUSTED_AGENT_OR_TOOL")
+        self.assertIn("UNAUTHORIZED_SUBSYSTEM", str(ctx1.exception))
+
+        # 2. Forged capability object (wrong secret / fake class)
+        class RogueFakeCapability:
+            def validate(self, secret, subsystem):
+                return True
+
+        with self.assertRaises(PermissionError) as ctx2:
+            SovereignCryptoAuthority.sign(
+                capability=RogueFakeCapability(),
+                artifact_type="IMPLEMENTATION_EVIDENCE",
+                issuer_id="SCLASS_PROMOTION_ENGINE",
+                evidence_id="EV-FAKE",
+                evidence_hash="abcdef" * 10
+            )
+        self.assertIn("UNAUTHORIZED_SIGNING_ATTEMPT", str(ctx2.exception))
+
+        # 3. Forged SovereignSigningCapability with bad secret
+        forged_cap = SovereignSigningCapability(b"bad_forged_secret_00000000000000", "SCLASS_PROMOTION_ENGINE")
+        with self.assertRaises(PermissionError) as ctx3:
+            SovereignCryptoAuthority.sign(
+                capability=forged_cap,
+                artifact_type="IMPLEMENTATION_EVIDENCE",
+                issuer_id="SCLASS_PROMOTION_ENGINE",
+                evidence_id="EV-FORGED",
+                evidence_hash="abcdef" * 10
+            )
+        self.assertIn("UNAUTHORIZED_SIGNING_ATTEMPT", str(ctx3.exception))
+
+        # 4. Revoked capability
+        valid_cap = SovereignCryptoAuthority.issue_signing_capability("SCLASS_PROMOTION_ENGINE")
+        valid_cap.revoke()
+        with self.assertRaises(PermissionError) as ctx4:
+            SovereignCryptoAuthority.sign(
+                capability=valid_cap,
+                artifact_type="IMPLEMENTATION_EVIDENCE",
+                issuer_id="SCLASS_PROMOTION_ENGINE",
+                evidence_id="EV-REVOKED",
+                evidence_hash="abcdef" * 10
+            )
+        self.assertIn("UNAUTHORIZED_SIGNING_ATTEMPT", str(ctx4.exception))
+
+        # 5. Wrong issuer / capability pairing (TestRunner capability used for PromotionEngine)
+        test_runner_cap = SovereignCryptoAuthority.issue_signing_capability("SCLASS_TEST_RUNNER")
+        with self.assertRaises(PermissionError) as ctx5:
+            SovereignCryptoAuthority.sign(
+                capability=test_runner_cap,
+                artifact_type="IMPLEMENTATION_EVIDENCE",
+                issuer_id="SCLASS_PROMOTION_ENGINE",
+                evidence_id="EV-PAIRING-ATTACK",
+                evidence_hash="abcdef" * 10
+            )
+        self.assertIn("UNAUTHORIZED_SIGNING_ATTEMPT", str(ctx5.exception))
 
 
 if __name__ == "__main__":

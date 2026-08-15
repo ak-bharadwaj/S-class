@@ -83,6 +83,9 @@ from changeset_ir import (
     FileMutationOp
 )
 from artifact_governor import ArtifactGovernor
+from task_compiler import TaskRecord, TaskCategory
+from execution_ir import ExecutionPlan
+from execution_plan_compiler import ExecutionPlanCompiler
 
 
 class TestV11EngineeringWorldModel(unittest.TestCase):
@@ -106,6 +109,24 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
         with open(full_path, "w", encoding="utf-8") as f:
             f.write(content)
         return full_path
+
+    def _create_governed_task(self, task_id: str = "TASK-001") -> TaskRecord:
+        return TaskRecord(
+            id=task_id,
+            title=f"Task {task_id}",
+            description=f"Description for {task_id}",
+            category=TaskCategory.API_ENDPOINT,
+            parent_lld="LLD-001",
+            parent_hld="HLD-001",
+            parent_reqs=["REQ-001"],
+            parent_behaviors=["BEH-001"],
+            verification_criteria=["Test verification criteria"],
+            source_lld_hash="lld_hash_123",
+            source_binding_hashes=["binding_hash_123"]
+        )
+
+    def _create_governed_plan(self, tasks: list) -> ExecutionPlan:
+        return ExecutionPlanCompiler.compile_execution_plan(tasks)
 
     # -------------------------------------------------------------------------
     # Test 1: Truth Ontology & Strict Provenance Records
@@ -1179,14 +1200,14 @@ test('UserService returns user', async () => {
         self._create_file("src/service.py", "def run(): return 1")
         result = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
 
+        task = self._create_governed_task("TASK-001")
+        plan = self._create_governed_plan([task])
+
         # Write mock pipeline into workspace .agents/
         pipeline_data = {
-            "execution_plan": {
-                "plan_hash": "authoritative_plan_hash_REAL"
-            },
-            "tasks": [
-                {"id": "TASK-001", "task_hash": "authoritative_task_hash_REAL"}
-            ]
+            "version": 1,
+            "execution_plan": plan.to_dict(),
+            "tasks": [task.to_dict()]
         }
         with open(os.path.join(self.agents_dir, "v7_refinement_pipeline.json"), "w", encoding="utf-8") as pf:
             json.dump(pipeline_data, pf)
@@ -1196,12 +1217,12 @@ test('UserService returns user', async () => {
             changeset_id="CS-ATTACK-01",
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash="fake_forged_plan_hash_FAKE",
-            source_task_hashes={"TASK-001": "authoritative_task_hash_REAL"}
+            source_task_hashes={task.id: task.task_hash}
         )
         attacker_changeset.add_change(AuthorizedFileChange(
             file_path="src/service.py",
             operation=FileMutationOp.MODIFY,
-            authorized_by_tasks=["TASK-001"]
+            authorized_by_tasks=[task.id]
         ))
 
         gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
@@ -1220,15 +1241,15 @@ test('UserService returns user', async () => {
         self._create_file("src/service.py", "def run(): return 1")
         result = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
 
+        task_a = self._create_governed_task("TASK-A")
+        task_b = self._create_governed_task("TASK-B")
+        plan = self._create_governed_plan([task_a, task_b])
+
         # Governed pipeline declares tasks TASK-A and TASK-B
         pipeline_data = {
-            "execution_plan": {
-                "plan_hash": "plan_hash_123"
-            },
-            "tasks": [
-                {"id": "TASK-A", "task_hash": "hash_A"},
-                {"id": "TASK-B", "task_hash": "hash_B"}
-            ]
+            "version": 1,
+            "execution_plan": plan.to_dict(),
+            "tasks": [task_a.to_dict(), task_b.to_dict()]
         }
         with open(os.path.join(self.agents_dir, "v7_refinement_pipeline.json"), "w", encoding="utf-8") as pf:
             json.dump(pipeline_data, pf)
@@ -1237,8 +1258,8 @@ test('UserService returns user', async () => {
         dropped_task_cs = AuthorizedChangeSet(
             changeset_id="CS-DROP",
             source_repository_state_hash=anchor.repository_state_hash,
-            source_execution_plan_hash="plan_hash_123",
-            source_task_hashes={"TASK-A": "hash_A"}  # Dropped TASK-B
+            source_execution_plan_hash=plan.plan_hash,
+            source_task_hashes={"TASK-A": task_a.task_hash}  # Dropped TASK-B
         )
         dropped_task_cs.add_change(AuthorizedFileChange(
             file_path="src/service.py",
@@ -1262,13 +1283,13 @@ test('UserService returns user', async () => {
         self._create_file("src/service.py", "def run(): return 1")
         result = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
 
+        task_a = self._create_governed_task("TASK-A")
+        plan = self._create_governed_plan([task_a])
+
         pipeline_data = {
-            "execution_plan": {
-                "plan_hash": "plan_hash_123"
-            },
-            "tasks": [
-                {"id": "TASK-A", "task_hash": "authentic_hash_A"}
-            ]
+            "version": 1,
+            "execution_plan": plan.to_dict(),
+            "tasks": [task_a.to_dict()]
         }
         with open(os.path.join(self.agents_dir, "v7_refinement_pipeline.json"), "w", encoding="utf-8") as pf:
             json.dump(pipeline_data, pf)
@@ -1277,7 +1298,7 @@ test('UserService returns user', async () => {
         tampered_task_cs = AuthorizedChangeSet(
             changeset_id="CS-TAMPERED-TASK",
             source_repository_state_hash=anchor.repository_state_hash,
-            source_execution_plan_hash="plan_hash_123",
+            source_execution_plan_hash=plan.plan_hash,
             source_task_hashes={"TASK-A": "tampered_hash_A_fake"}
         )
         tampered_task_cs.add_change(AuthorizedFileChange(
