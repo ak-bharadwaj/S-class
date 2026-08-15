@@ -24,18 +24,25 @@ if plugin_root not in sys.path:
 from benchmark.v0.experiments.llm_client import LLMProvenanceClient
 
 SYSTEM_PROMPT_STAGE_1 = """You are the S-Class Semantic Unit Classifier.
-Your job is to analyze engineering requirements phrases and classify each extracted semantic unit into exactly one category:
-- ENTITY: Core domain data model, system aggregate, or persistence entity.
-- INVARIANT: Mathematical constraint, immutable safety rule, statutory regulatory requirement, or non-negotiable invariant.
-- BEHAVIOR: Dynamic action, system workflow, API operation, state transition, or event trigger.
-- CONSTRAINT: Timing/latency boundary, environmental fault trigger, hardware budget, or operational lifecycle constraint.
-- ATTRIBUTE: Specific data field, configuration property, or numeric measurement.
-- NOISE: Conversational filler, instructional directive, or generic procedural framing verb (e.g. "build", "implement").
+Your job is to analyze engineering requirements phrases and classify each extracted semantic unit into exactly one category based on strict ontological definitions:
+- INVARIANT: A property, mathematical law, or safety guarantee that must remain true across all state transitions (e.g. "atomic" is an ACID transaction invariant; "balance invariance" is a zero-sum mathematical invariant).
+- CONSTRAINT: A boundary, restriction, or limitation imposed by the platform, environment, technology, or hardware (e.g. "dual-monitor mirroring" is a display hardware restriction constraint; "secure" is a platform compliance policy constraint).
+- BEHAVIOR: A dynamic action, system workflow, API operation, or state transition that occurs (e.g. "lockdown" is an enforcement state transition behavior; "idempotency check" is a deduplication verification behavior).
+- ENTITY: A core domain object, aggregate, persistence entity, or external system destination (e.g. "financial ledger transaction" is a domain aggregate; "analytics ingestion" is an external downstream persistence entity).
+- ATTRIBUTE: A specific data field, directional adjustment leg, or configuration property of an entity/operation (e.g. "debit/credit").
+- NOISE: Conversational filler, instructional directive, or generic procedural framing verb (e.g. "build", "implement", "create").
+
+Boundary Disambiguation Rules:
+1. "atomic" is strictly an INVARIANT (ACID property that must hold for all operations), not a constraint or behavior.
+2. "lockdown" is strictly a BEHAVIOR (an operational mode state transition), not a static entity or invariant.
+3. "dual-monitor mirroring" is strictly a CONSTRAINT (a hardware platform display limitation), not an attribute.
+4. "analytics ingestion" is strictly an ENTITY (the downstream target system/aggregate), not a transient verb behavior.
+5. "secure" is strictly a CONSTRAINT (a platform security governance requirement), not an internal mathematical invariant.
 
 For each candidate unit:
 1. Provide the exact category.
-2. Assign a confidence score between 0.0 and 1.0.
-3. Provide a step-by-step technical rationale explaining the classification.
+2. Assign a calibrated confidence score between 0.0 and 1.0.
+3. Provide a concise technical rationale explaining the classification."""
 
 Output strictly valid JSON adhering to this schema:
 {

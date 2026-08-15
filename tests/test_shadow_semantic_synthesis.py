@@ -39,6 +39,55 @@ def test_stage1_semantic_classifier_epistemic_policy():
     assert processed[1]["epistemic_class"] == "INVARIANT"
 
 
+def test_stage1_disambiguation_regression_cases():
+    """Validates the 5 Stage 1 boundary regression cases from Gate 1.4 forensic analysis."""
+    # 1. "atomic" -> INVARIANT
+    u1 = Stage1SemanticClassifier.extract_and_classify_units("atomic financial ledger transaction")
+    assert any(u["unit"] == "atomic" and u["class"] == "INVARIANT" for u in u1)
+
+    # 2. "analytics ingestion" -> ENTITY
+    u2 = Stage1SemanticClassifier.extract_and_classify_units("export patient records to analytics ingestion")
+    assert any(u["unit"] == "analytics ingestion" and u["class"] == "ENTITY" for u in u2)
+
+    # 3. "lockdown" -> BEHAVIOR
+    u3 = Stage1SemanticClassifier.extract_and_classify_units("enforce exam lockdown on secondary displays")
+    assert any(u["unit"] == "lockdown" and u["class"] == "BEHAVIOR" for u in u3)
+
+    # 4. "dual-monitor mirroring" -> CONSTRAINT
+    u4 = Stage1SemanticClassifier.extract_and_classify_units("restrict dual-monitor mirroring during test")
+    assert any(u["unit"] == "dual-monitor mirroring" and u["class"] == "CONSTRAINT" for u in u4)
+
+    # 5. "secure" -> CONSTRAINT
+    u5 = Stage1SemanticClassifier.extract_and_classify_units("implement secure payment processing service")
+    assert any(u["unit"] == "secure" and u["class"] == "CONSTRAINT" for u in u5)
+
+
+def test_stage2_deterministic_coverage_checks():
+    """Validates the 3 Stage 2 coverage checks (Pre/Post Duality, Action Completeness, Conditional Tree)."""
+    # 1. Pre/Post Duality Check on Ledger (Precondition Non-Zero Guard + Postcondition Balance Invariance)
+    reqs_t1, _, _, _ = Stage2IterativeGroundedInference.synthesize_iterative(
+        "Build an atomic double-entry financial ledger transaction engine with balance invariance and idempotency check."
+    )
+    t1_titles = {r.title for r in reqs_t1}
+    assert "Disallow Negative Amount / Non-Zero Transfer Guard" in t1_titles
+    assert "Double-Entry Balance Invariance" in t1_titles
+
+    # 2. Action / Egress Completeness Check on PHI Export
+    reqs_t3, _, _, _ = Stage2IterativeGroundedInference.synthesize_iterative(
+        "Mask PHI data in patient records according to HIPAA Safe Harbor before exporting to downstream analytics ingestion."
+    )
+    t3_titles = {r.title for r in reqs_t3}
+    assert "Export Patient Diagnostic Records to Analytics" in t3_titles
+    assert "Strip 18 HIPAA Safe Harbor Direct Identifiers" in t3_titles
+
+    # 3. Conditional Invariant Tree on Ambiguous Auth
+    reqs_t7, _, _, _ = Stage2IterativeGroundedInference.synthesize_iterative(
+        "We need an authentication platform with token revocation."
+    )
+    t7_titles = {r.title for r in reqs_t7}
+    assert "Cryptographic Credential Hashing (Argon2id / bcrypt)" in t7_titles
+
+
 def test_stage2_iterative_grounded_inference_structure():
     prompt = "Implement power loss memory flush buffer for ARINC 429 telemetry."
     reqs, history, conv_state, conv_rat = Stage2IterativeGroundedInference.synthesize_iterative(prompt)

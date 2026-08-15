@@ -1,0 +1,174 @@
+{
+  "gate": "GATE 1.5 CERTIFICATION",
+  "gate_status": "PASS",
+  "metrics": {
+    "stage1_classification_accuracy": 100.0,
+    "micro_must_recall": 100.0,
+    "macro_must_recall": 100.0,
+    "micro_gt_recall": 89.36,
+    "macro_gt_recall": 89.71,
+    "unsupported_inference_rate": 0.0,
+    "epistemic_unknown_rate": 32.56,
+    "average_stability_score": 0.9324,
+    "high_severity_must_misses": 0,
+    "downstream_regressions": 0
+  },
+  "stage1_confusion_matrix": {
+    "ENTITY": {
+      "ENTITY": 14,
+      "INVARIANT": 0,
+      "BEHAVIOR": 0,
+      "CONSTRAINT": 0,
+      "ATTRIBUTE": 0,
+      "NOISE": 0
+    },
+    "INVARIANT": {
+      "ENTITY": 0,
+      "INVARIANT": 4,
+      "BEHAVIOR": 0,
+      "CONSTRAINT": 0,
+      "ATTRIBUTE": 0,
+      "NOISE": 0
+    },
+    "BEHAVIOR": {
+      "ENTITY": 0,
+      "INVARIANT": 0,
+      "BEHAVIOR": 13,
+      "CONSTRAINT": 0,
+      "ATTRIBUTE": 0,
+      "NOISE": 0
+    },
+    "CONSTRAINT": {
+      "ENTITY": 0,
+      "INVARIANT": 0,
+      "BEHAVIOR": 0,
+      "CONSTRAINT": 6,
+      "ATTRIBUTE": 0,
+      "NOISE": 0
+    },
+    "ATTRIBUTE": {
+      "ENTITY": 0,
+      "INVARIANT": 0,
+      "BEHAVIOR": 0,
+      "CONSTRAINT": 0,
+      "ATTRIBUTE": 1,
+      "NOISE": 0
+    },
+    "NOISE": {
+      "ENTITY": 0,
+      "INVARIANT": 0,
+      "BEHAVIOR": 0,
+      "CONSTRAINT": 0,
+      "ATTRIBUTE": 0,
+      "NOISE": 7
+    }
+  },
+  "stage1_mismatches": [],
+  "task_results": [
+    {
+      "task_id": "TASK-01-FINTECH-LEDGER",
+      "domain": "fintech_banking",
+      "gt_count": 7,
+      "must_count": 6,
+      "shadow_reqs_count": 8,
+      "recovered_gt": 7,
+      "recovered_must": 6,
+      "gt_recall": 100.0,
+      "must_recall": 100.0,
+      "stability_score": 0.9571,
+      "convergence_state": "CONVERGED",
+      "scope_explosion_delta": 95,
+      "hallucinated_pages_delta": 48
+    },
+    {
+      "task_id": "TASK-02-AUTH-SESSION-REVOKE",
+      "domain": "auth_identity",
+      "gt_count": 6,
+      "must_count": 3,
+      "shadow_reqs_count": 7,
+      "recovered_gt": 6,
+      "recovered_must": 3,
+      "gt_recall": 100.0,
+      "must_recall": 100.0,
+      "stability_score": 0.95,
+      "convergence_state": "CONVERGED",
+      "scope_explosion_delta": 89,
+      "hallucinated_pages_delta": 23
+    },
+    {
+      "task_id": "TASK-03-HEALTHCARE-PHI-MASK",
+      "domain": "healthcare_privacy",
+      "gt_count": 7,
+      "must_count": 5,
+      "shadow_reqs_count": 6,
+      "recovered_gt": 5,
+      "recovered_must": 5,
+      "gt_recall": 71.43,
+      "must_recall": 100.0,
+      "stability_score": 0.94,
+      "convergence_state": "CONVERGED",
+      "scope_explosion_delta": 70,
+      "hallucinated_pages_delta": 24
+    },
+    {
+      "task_id": "TASK-04-AEROSPACE-BLACKBOX-TELEMETRY",
+      "domain": "aerospace_avionics",
+      "gt_count": 6,
+      "must_count": 4,
+      "shadow_reqs_count": 6,
+      "recovered_gt": 5,
+      "recovered_must": 4,
+      "gt_recall": 83.33,
+      "must_recall": 100.0,
+      "stability_score": 0.94,
+      "convergence_state": "CONVERGED",
+      "scope_explosion_delta": 57,
+      "hallucinated_pages_delta": 24
+    },
+    {
+      "task_id": "TASK-05-EXAM-BROWSER-SANDBOX",
+      "domain": "edtech_security",
+      "gt_count": 6,
+      "must_count": 4,
+      "shadow_reqs_count": 6,
+      "recovered_gt": 6,
+      "recovered_must": 4,
+      "gt_recall": 100.0,
+      "must_recall": 100.0,
+      "stability_score": 0.94,
+      "convergence_state": "CONVERGED",
+      "scope_explosion_delta": 60,
+      "hallucinated_pages_delta": 25
+    },
+    {
+      "task_id": "TASK-06-PAYMENT-GATEWAY-AMBIGUOUS",
+      "domain": "fintech_payments_ambiguous",
+      "gt_count": 7,
+      "must_count": 3,
+      "shadow_reqs_count": 3,
+      "recovered_gt": 6,
+      "recovered_must": 3,
+      "gt_recall": 85.71,
+      "must_recall": 100.0,
+      "stability_score": 0.85,
+      "convergence_state": "STABILIZING",
+      "scope_explosion_delta": 42,
+      "hallucinated_pages_delta": 8
+    },
+    {
+      "task_id": "TASK-07-AUTH-TOKEN-REVOCATION-AMBIGUOUS",
+      "domain": "auth_identity_ambiguous",
+      "gt_count": 8,
+      "must_count": 3,
+      "shadow_reqs_count": 7,
+      "recovered_gt": 7,
+      "recovered_must": 3,
+      "gt_recall": 87.5,
+      "must_recall": 100.0,
+      "stability_score": 0.95,
+      "convergence_state": "CONVERGED",
+      "scope_explosion_delta": 40,
+      "hallucinated_pages_delta": 18
+    }
+  ]
+}
