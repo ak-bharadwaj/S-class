@@ -180,6 +180,24 @@ class ProvenanceRecord:
         )
 
 
+import hmac
+
+_SOVEREIGN_ENGINE_SECRET = b"sclass_sovereign_v11_secret_key_8f3a9e2c1b4d7e6f"
+
+
+def compute_sovereign_evidence_signature(evidence_hash: str, secret: bytes = _SOVEREIGN_ENGINE_SECRET) -> str:
+    """Computes HMAC-SHA256 signature for evidence authenticity within process boundary."""
+    return hmac.new(secret, evidence_hash.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def verify_sovereign_evidence_signature(evidence_hash: str, signature: str, secret: bytes = _SOVEREIGN_ENGINE_SECRET) -> bool:
+    """Verifies HMAC-SHA256 signature against sovereign engine key."""
+    if not signature or not evidence_hash:
+        return False
+    expected = compute_sovereign_evidence_signature(evidence_hash, secret)
+    return hmac.compare_digest(expected, signature)
+
+
 # -----------------------------------------------------------------------------
 # Cryptographic Sovereign Evidence Records
 # -----------------------------------------------------------------------------
@@ -201,10 +219,13 @@ class ImplementationEvidence:
     evidence_id: str = field(default_factory=lambda: f"impl_ev_{uuid.uuid4().hex[:12]}")
     issuer_subsystem: str = "SCLASS_PROMOTION_ENGINE"
     evidence_hash: str = ""
+    evidence_signature: str = ""
 
     def __post_init__(self):
         if not self.evidence_hash:
             self.evidence_hash = self.compute_evidence_hash()
+        if not self.evidence_signature:
+            self.evidence_signature = compute_sovereign_evidence_signature(self.evidence_hash)
 
     def compute_evidence_hash(self) -> str:
         payload = {
@@ -240,7 +261,8 @@ class ImplementationEvidence:
             "observed_delta_hash": self.observed_delta_hash,
             "execution_record_id": self.execution_record_id,
             "timestamp": self.timestamp,
-            "evidence_hash": self.evidence_hash or self.compute_evidence_hash()
+            "evidence_hash": self.evidence_hash or self.compute_evidence_hash(),
+            "evidence_signature": self.evidence_signature or compute_sovereign_evidence_signature(self.evidence_hash or self.compute_evidence_hash())
         }
 
     @classmethod
@@ -267,7 +289,8 @@ class ImplementationEvidence:
             observed_delta_hash=d["observed_delta_hash"],
             execution_record_id=d["execution_record_id"],
             timestamp=d["timestamp"],
-            evidence_hash=d.get("evidence_hash", "")
+            evidence_hash=d.get("evidence_hash", ""),
+            evidence_signature=d.get("evidence_signature", "")
         )
 
 
@@ -287,10 +310,13 @@ class VerificationEvidence:
     evidence_id: str = field(default_factory=lambda: f"verif_ev_{uuid.uuid4().hex[:12]}")
     issuer_subsystem: str = "SCLASS_TEST_RUNNER"
     evidence_hash: str = ""
+    evidence_signature: str = ""
 
     def __post_init__(self):
         if not self.evidence_hash:
             self.evidence_hash = self.compute_evidence_hash()
+        if not self.evidence_signature:
+            self.evidence_signature = compute_sovereign_evidence_signature(self.evidence_hash)
 
     def compute_evidence_hash(self) -> str:
         payload = {
@@ -324,7 +350,8 @@ class VerificationEvidence:
             "exit_code": self.exit_code,
             "execution_receipt_hash": self.execution_receipt_hash,
             "timestamp": self.timestamp,
-            "evidence_hash": self.evidence_hash or self.compute_evidence_hash()
+            "evidence_hash": self.evidence_hash or self.compute_evidence_hash(),
+            "evidence_signature": self.evidence_signature or compute_sovereign_evidence_signature(self.evidence_hash or self.compute_evidence_hash())
         }
 
     @classmethod
@@ -345,7 +372,8 @@ class VerificationEvidence:
             exit_code=int(d["exit_code"]),
             execution_receipt_hash=d["execution_receipt_hash"],
             timestamp=d["timestamp"],
-            evidence_hash=d.get("evidence_hash", "")
+            evidence_hash=d.get("evidence_hash", ""),
+            evidence_signature=d.get("evidence_signature", "")
         )
 
 

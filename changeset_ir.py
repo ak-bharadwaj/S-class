@@ -90,6 +90,8 @@ class AuthorizedChangeSet:
     changeset_id: str
     source_repository_state_hash: str  # Must strictly match planning snapshot repository_state_hash
     authorized_changes: Dict[str, AuthorizedFileChange] = field(default_factory=dict)
+    source_execution_plan_hash: str = "DEFAULT_EXEC_PLAN"
+    source_task_hashes: Dict[str, str] = field(default_factory=dict)
     source_snapshot_id: Optional[str] = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat() + "Z")
     changeset_hash: str = ""
@@ -111,9 +113,12 @@ class AuthorizedChangeSet:
             {"path": k, "change_hash": self.authorized_changes[k].compute_canonical_hash()}
             for k in sorted_keys
         ]
+        sorted_task_hashes = {k: self.source_task_hashes[k] for k in sorted(self.source_task_hashes.keys())}
         payload = {
             "changeset_id": self.changeset_id,
             "source_repository_state_hash": self.source_repository_state_hash,
+            "source_execution_plan_hash": self.source_execution_plan_hash,
+            "source_task_hashes": sorted_task_hashes,
             "source_snapshot_id": self.source_snapshot_id or "",
             "changes": change_hashes
         }
@@ -124,6 +129,8 @@ class AuthorizedChangeSet:
         return {
             "changeset_id": self.changeset_id,
             "source_repository_state_hash": self.source_repository_state_hash,
+            "source_execution_plan_hash": self.source_execution_plan_hash,
+            "source_task_hashes": {k: self.source_task_hashes[k] for k in sorted(self.source_task_hashes.keys())},
             "source_snapshot_id": self.source_snapshot_id,
             "created_at": self.created_at,
             "changeset_hash": self.changeset_hash or self.compute_canonical_hash(),
@@ -144,6 +151,8 @@ class AuthorizedChangeSet:
             changeset_id=d["changeset_id"],
             source_repository_state_hash=d["source_repository_state_hash"],
             authorized_changes=changes,
+            source_execution_plan_hash=d.get("source_execution_plan_hash", "DEFAULT_EXEC_PLAN"),
+            source_task_hashes=dict(d.get("source_task_hashes", {})),
             source_snapshot_id=d.get("source_snapshot_id"),
             created_at=d.get("created_at", datetime.now(timezone.utc).isoformat() + "Z"),
             changeset_hash=d.get("changeset_hash", "")
@@ -161,11 +170,15 @@ class AuthorizedChangeSet:
             if req not in d:
                 raise ValueError(f"Governed AuthorizedChangeSet missing mandatory field '{req}'")
 
+        if strict_governance:
+            if "changeset_hash" not in d or not d["changeset_hash"]:
+                raise ValueError("Governed AuthorizedChangeSet missing mandatory 'changeset_hash'")
+
         obj = cls.from_dict(d)
         if strict_governance:
             recomputed = obj.compute_canonical_hash()
             stored = d.get("changeset_hash", "")
-            if stored and stored != recomputed:
+            if stored != recomputed:
                 raise ValueError(
                     f"AuthorizedChangeSet integrity violation: stored changeset_hash '{stored}' "
                     f"does not match recomputed canonical hash '{recomputed}'"

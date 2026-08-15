@@ -58,6 +58,7 @@ from world_model import (
     TruthLevel,
     ResolutionKind,
     ProvenanceRecord,
+    verify_sovereign_evidence_signature,
     RelationType
 )
 
@@ -1081,9 +1082,11 @@ class WorldModelPromotionEngine:
         if target_rel.status != ImplementationStatus.TARGETED:
             raise ValueError(f"Cannot promote relation with status '{target_rel.status.value}', expected TARGETED.")
 
-        # 1. Verify Sovereign Issuer
+        # 1. Verify Sovereign Issuer & Signature
         if evidence.issuer_subsystem != "SCLASS_PROMOTION_ENGINE":
             raise ValueError(f"ImplementationEvidence issuer_subsystem must be 'SCLASS_PROMOTION_ENGINE', got '{evidence.issuer_subsystem}'.")
+        if not getattr(evidence, "evidence_signature", None) or not verify_sovereign_evidence_signature(evidence.evidence_hash, evidence.evidence_signature):
+            raise ValueError("ImplementationEvidence lacks valid sovereign engine HMAC signature.")
 
         # 2. Verify Evidence Hash Integrity
         expected_hash = evidence.compute_evidence_hash()
@@ -1133,9 +1136,11 @@ class WorldModelPromotionEngine:
         if impl_rel.status != ImplementationStatus.IMPLEMENTED:
             raise ValueError(f"Cannot promote relation with status '{impl_rel.status.value}', expected IMPLEMENTED.")
 
-        # 1. Verify Sovereign Issuer
+        # 1. Verify Sovereign Issuer & Signature
         if evidence.issuer_subsystem != "SCLASS_TEST_RUNNER":
             raise ValueError(f"VerificationEvidence issuer_subsystem must be 'SCLASS_TEST_RUNNER', got '{evidence.issuer_subsystem}'.")
+        if not getattr(evidence, "evidence_signature", None) or not verify_sovereign_evidence_signature(evidence.evidence_hash, evidence.evidence_signature):
+            raise ValueError("VerificationEvidence lacks valid sovereign engine HMAC signature.")
 
         # 2. Verify Evidence Hash Integrity
         expected_hash = evidence.compute_evidence_hash()

@@ -832,6 +832,61 @@ test('UserService returns user', async () => {
         self.assertIn("test://tests/test_service.py#test_compute", impact["affected_tests"])
         self.assertIn("mod://src/service.py", impact["affected_modules"])
 
+    # -------------------------------------------------------------------------
+    # Test 23: Forged HMAC Signature Fails Closed
+    # -------------------------------------------------------------------------
+    def test_v11_world_model_forged_hmac_signature_fails_closed(self):
+        """Invariant: Evidence with forged/tampered HMAC signature is rejected by Governor and PromotionEngine."""
+        self._create_file("src/service.py", "def run(): pass")
+        world_model = WorldModelEngine.build_world_model(self.test_dir)
+
+        mock_evidence = ImplementationEvidence(
+            issuer_subsystem="SCLASS_PROMOTION_ENGINE",
+            source_task_id="TASK-001",
+            source_task_hash="task_hash_123",
+            source_changeset_hash="cs_hash_123",
+            before_repository_state_hash="before_123",
+            after_repository_state_hash=world_model.repository_state_hash,
+            target_symbol_id="sym://src/service.py#run",
+            target_symbol_revision="rev_123",
+            mutation_op="MODIFY",
+            observed_delta_hash="delta_hash_123",
+            execution_record_id="exec_123",
+            timestamp=datetime.now(timezone.utc).isoformat() + "Z",
+            evidence_signature="forged_bad_hmac_signature_abc123"
+        )
+
+        world_model.add_relation(ImplementationRelation(
+            symbol_id="sym://src/service.py#run",
+            task_id="TASK-001",
+            status=ImplementationStatus.IMPLEMENTED,
+            provenance=ProvenanceRecord(
+                truth_level=TruthLevel.OBSERVED,
+                source="AUTHORIZED_EXECUTION_ENGINE",
+                confidence=1.0,
+                evidence="Executed change"
+            ),
+            evidence=mock_evidence
+        ))
+
+        gov_res = ArtifactGovernor.audit_world_model_governance(world_model, self.test_dir)
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("UNAUTHENTICATED_EVIDENCE_SIGNATURE" in r for r in gov_res.blocking_reasons))
+
+    # -------------------------------------------------------------------------
+    # Test 24: ChangeSet Missing changeset_hash Fails Closed
+    # -------------------------------------------------------------------------
+    def test_v11_world_model_changeset_governance_missing_changeset_hash_fails_closed(self):
+        """Invariant: AuthorizedChangeSet missing changeset_hash during governed deserialization raises ValueError."""
+        raw_cs = {
+            "changeset_id": "CS-TEST",
+            "source_repository_state_hash": "hash_123",
+            "authorized_changes": {}
+        }
+        with self.assertRaises(ValueError) as ctx:
+            AuthorizedChangeSet.from_governed_dict(raw_cs, strict_governance=True)
+        self.assertIn("missing mandatory 'changeset_hash'", str(ctx.exception))
+
 
 if __name__ == "__main__":
     unittest.main()
