@@ -1,0 +1,97 @@
+{
+  "task_id": "TASK-04-AEROSPACE-BLACKBOX-TELEMETRY",
+  "adjudication_version": "1.0",
+  "reviewer": "independent_avionics_evaluator",
+  "review_date": "2026-08-15",
+  "adjudication_notes": "Adjudicated strictly against frozen ground_truth_labels.json (6 canonical requirements).",
+  "items": {
+    "REQ-FDR-001": {
+      "candidate_id": "REQ-FDR-001",
+      "candidate_title": "Real-Time ARINC 429 Telemetry Frame Ingestion to Buffer",
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-EXP-01",
+      "is_derived_proposal": false,
+      "reason": "Directly matches canonical ground-truth requirement REQ-EXP-01 (Ingest and Buffer ARINC 429 Telemetry Frames)."
+    },
+    "REQ-FDR-002": {
+      "candidate_id": "REQ-FDR-002",
+      "candidate_title": "Emergency Telemetry Flush to Solid-State Crash-Survivable Memory on Power Loss",
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-EXP-02",
+      "is_derived_proposal": false,
+      "reason": "Directly matches canonical ground-truth requirement REQ-EXP-02 (Emergency Flush to Crash-Survivable Memory on Power Loss)."
+    },
+    "REQ-FDR-003": {
+      "candidate_id": "REQ-FDR-003",
+      "candidate_title": "DO-178C Static Memory Pre-Allocation",
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-SUP-01",
+      "is_derived_proposal": true,
+      "reason": "Directly matches canonical ground-truth requirement REQ-SUP-01 (DO-178C Level A Deterministic Static Memory Allocation)."
+    },
+    "REQ-FDR-004": {
+      "candidate_id": "REQ-FDR-004",
+      "candidate_title": "Ingestion into Deterministic Ring Buffer",
+      "label": "VALID_DERIVATION",
+      "ground_truth_id": null,
+      "is_derived_proposal": true,
+      "reason": "Valid aerospace systems derivation: lock-free ring buffer decouples high-frequency RX interrupt routines from slower non-volatile write routines."
+    },
+    "REQ-FDR-005": {
+      "candidate_id": "REQ-FDR-005",
+      "candidate_title": "Emergency Flush on Power Loss Interrupt",
+      "label": "VALID_DERIVATION",
+      "ground_truth_id": null,
+      "is_derived_proposal": true,
+      "reason": "Valid hardware survivability derivation: dedicated NMI/PFI handler triggers emergency flush without software polling delays."
+    },
+    "REQ-FDR-006": {
+      "candidate_id": "REQ-FDR-006",
+      "candidate_title": "Hold-Up Capacitor Energy Budget Time Window Enforcement (<=50ms Flush Deadline)",
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-DER-02",
+      "is_derived_proposal": true,
+      "reason": "Directly matches canonical ground-truth derived requirement REQ-DER-02 (Hold-Up Capacitor Bounded Execution Window Enforcement)."
+    },
+    "REQ-FDR-007": {
+      "candidate_id": "REQ-FDR-007",
+      "candidate_title": "ARINC 429 Parity and CRC Verification",
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-DER-03",
+      "is_derived_proposal": true,
+      "reason": "Directly matches canonical ground-truth derived requirement REQ-DER-03 (ARINC 429 Parity and Word Integrity Verification)."
+    },
+    "REQ-FDR-008": {
+      "candidate_id": "REQ-FDR-008",
+      "candidate_title": "Non-Volatile Flash Wear-Leveling and Circular Overwrite",
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-DER-01",
+      "is_derived_proposal": true,
+      "reason": "Directly matches canonical ground-truth derived requirement REQ-DER-01 (Non-Volatile Flash Wear-Leveling and Circular Ring Overwrite)."
+    },
+    "REQ-FDR-009": {
+      "candidate_id": "REQ-FDR-009",
+      "candidate_title": "Crash-Survivable Memory Physical Protection Compliance",
+      "label": "SUPPORTED_BUT_OUTSIDE_GT",
+      "ground_truth_id": null,
+      "is_derived_proposal": true,
+      "reason": "Supported hardware specification referencing ED-112A / TSO-C124b physical shock standards."
+    },
+    "REQ-FDR-010": {
+      "candidate_id": "REQ-FDR-010",
+      "candidate_title": "ARINC 429 Channel Transmission Bit Rate",
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "is_derived_proposal": false,
+      "reason": "Correctly flags unstated bus speed (12.5 kbps vs 100 kbps) as UNKNOWN rather than guessing."
+    },
+    "REQ-FDR-011": {
+      "candidate_id": "REQ-FDR-011",
+      "candidate_title": "Non-Volatile Storage At-Rest Encryption Cipher",
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "is_derived_proposal": false,
+      "reason": "Correctly flags unstated at-rest encryption parameters as UNKNOWN."
+    }
+  }
+}

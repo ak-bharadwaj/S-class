@@ -1,0 +1,54 @@
+{
+  "experiment": "EXPERIMENT B — Controlled Semantic Unit Classification (Task 05)",
+  "task_id": "TASK-05-EXAM-BROWSER-SANDBOX",
+  "classifications": [
+    {
+      "unit": "examination lockdown sandbox",
+      "class": "ENTITY",
+      "confidence": 0.98,
+      "rationale": "Represents the core domain entity and aggregate root—the secure desktop sandbox environment managing the lifecycle, runtime configuration, and security posture of the exam."
+    },
+    {
+      "unit": "lockdown",
+      "class": "BEHAVIOR",
+      "confidence": 0.95,
+      "rationale": "Specifies process isolation and system privilege restriction action."
+    },
+    {
+      "unit": "restricts",
+      "class": "BEHAVIOR",
+      "confidence": 0.96,
+      "rationale": "Denotes an active functional operation and runtime policy enforcement mechanism that dynamically prevents unauthorized display configurations."
+    },
+    {
+      "unit": "dual-monitor mirroring",
+      "class": "CONSTRAINT",
+      "confidence": 0.93,
+      "rationale": "Hardware display configuration constraint prohibited during proctored exams."
+    },
+    {
+      "unit": "intercepts",
+      "class": "BEHAVIOR",
+      "confidence": 0.98,
+      "rationale": "Represents a dynamic action and event-hooking workflow that captures OS clipboard paste operations before data insertion occurs."
+    },
+    {
+      "unit": "OS clipboard paste",
+      "class": "BEHAVIOR",
+      "confidence": 0.94,
+      "rationale": "System clipboard transfer operation to be intercepted and sanitized/blocked."
+    },
+    {
+      "unit": "during active exam sessions",
+      "class": "CONSTRAINT",
+      "confidence": 0.97,
+      "rationale": "Defines a temporal operational state and lifecycle boundary constraint that restricts the scope and activation window of sandbox enforcement rules."
+    },
+    {
+      "unit": "build",
+      "class": "NOISE",
+      "confidence": 0.99,
+      "rationale": "An imperative prompt verb serving as conversational instruction with no domain semantic significance in the target system model."
+    }
+  ]
+}

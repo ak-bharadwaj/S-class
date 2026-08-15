@@ -1,0 +1,54 @@
+{
+  "experiment": "EXPERIMENT B — Controlled Semantic Unit Classification (Task 04)",
+  "task_id": "TASK-04-AEROSPACE-BLACKBOX-TELEMETRY",
+  "classifications": [
+    {
+      "unit": "flight data recorder",
+      "class": "ENTITY",
+      "confidence": 0.98,
+      "rationale": "Represents the primary physical/logical domain system aggregate responsible for capturing, processing, and preserving airborne telemetry."
+    },
+    {
+      "unit": "buffer synchronization",
+      "class": "BEHAVIOR",
+      "confidence": 0.95,
+      "rationale": "Describes a dynamic coordination workflow and state management process that aligns volatile memory buffers with persistent storage."
+    },
+    {
+      "unit": "flushes",
+      "class": "BEHAVIOR",
+      "confidence": 0.99,
+      "rationale": "An operational action verb and state transition representing the physical/logical commit and writing of in-memory telemetry frames to non-volatile medium."
+    },
+    {
+      "unit": "ARINC 429 bus frames",
+      "class": "ENTITY",
+      "confidence": 0.97,
+      "rationale": "Defines the core avionics domain data model and standardized 32-bit protocol transmission payload aggregate."
+    },
+    {
+      "unit": "solid-state crash-survivable memory",
+      "class": "ENTITY",
+      "confidence": 0.98,
+      "rationale": "Identifies the Crash-Survivable Memory Unit (CSMU) storage target aggregate engineered to withstand extreme mechanical impact and thermal shock."
+    },
+    {
+      "unit": "on power loss",
+      "class": "CONSTRAINT",
+      "confidence": 0.96,
+      "rationale": "Specifies a critical hardware trigger boundary and environmental fault condition governing the exact execution window for emergency non-volatile write routines."
+    },
+    {
+      "unit": "real-time",
+      "class": "CONSTRAINT",
+      "confidence": 0.95,
+      "rationale": "Imposes a strict deterministic latency, timing, and SLA execution boundary ensuring bounded worst-case execution time within avionics deadlines."
+    },
+    {
+      "unit": "implement",
+      "class": "NOISE",
+      "confidence": 1.0,
+      "rationale": "Constitutes conversational prompt framing and imperative directive filler devoid of avionics domain semantics or architectural constraints."
+    }
+  ]
+}

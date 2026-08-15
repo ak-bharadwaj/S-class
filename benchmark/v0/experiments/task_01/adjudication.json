@@ -1,0 +1,89 @@
+{
+  "task_id": "TASK-01-FINTECH-LEDGER",
+  "adjudication_version": "1.0",
+  "reviewer": "independent_domain_evaluator",
+  "review_date": "2026-08-15",
+  "adjudication_notes": "Adjudicated strictly against frozen ground_truth_labels.json (7 canonical requirements).",
+  "items": {
+    "REQ-01": {
+      "candidate_id": "REQ-01",
+      "candidate_title": "Double-Entry Debit and Credit Balance Invariance",
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-EXP-02",
+      "is_derived_proposal": false,
+      "reason": "Directly matches canonical ground-truth requirement REQ-EXP-02 (Validate Debit Equal Credit Balance Invariance)."
+    },
+    "REQ-02": {
+      "candidate_id": "REQ-02",
+      "candidate_title": "Atomic Execution and Failure Rollback Boundary",
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-EXP-01",
+      "is_derived_proposal": false,
+      "reason": "Directly matches canonical ground-truth requirement REQ-EXP-01 (Post Double-Entry Transaction) and atomic transaction boundary."
+    },
+    "REQ-03": {
+      "candidate_id": "REQ-03",
+      "candidate_title": "Idempotency Key Deduplication and Replay Prevention",
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-EXP-03",
+      "is_derived_proposal": false,
+      "reason": "Directly matches canonical ground-truth requirement REQ-EXP-03 (Idempotency Key Deduplication Check)."
+    },
+    "REQ-04": {
+      "candidate_id": "REQ-04",
+      "candidate_title": "Row-Level Account Balance Locking Under Concurrency",
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-DER-01",
+      "is_derived_proposal": true,
+      "reason": "Directly matches canonical ground-truth derived requirement REQ-DER-01 (Row-Level Account Balance Locking)."
+    },
+    "REQ-05": {
+      "candidate_id": "REQ-05",
+      "candidate_title": "Strictly Positive Transfer Amount Validation",
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-DER-02",
+      "is_derived_proposal": true,
+      "reason": "Directly matches canonical ground-truth derived requirement REQ-DER-02 (Disallow Negative Amount / Non-Zero Transfer Guard)."
+    },
+    "REQ-06": {
+      "candidate_id": "REQ-06",
+      "candidate_title": "Immutable Append-Only Ledger History",
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-DER-03",
+      "is_derived_proposal": true,
+      "reason": "Directly matches canonical ground-truth derived requirement REQ-DER-03 (Append-Only Immutable Audit Trail)."
+    },
+    "REQ-07": {
+      "candidate_id": "REQ-07",
+      "candidate_title": "Account Balance Solvency and Overdraft Protection",
+      "label": "VALID_DERIVATION",
+      "ground_truth_id": null,
+      "is_derived_proposal": true,
+      "reason": "Independently verified financial domain rule (solvency check before debit mutation); valid technical derivation not explicitly enumerated in 7-item GT."
+    },
+    "REQ-08": {
+      "candidate_id": "REQ-08",
+      "candidate_title": "Exact Precision Fixed-Point / Minor-Unit Representation",
+      "label": "SUPPORTED_BUT_OUTSIDE_GT",
+      "ground_truth_id": null,
+      "is_derived_proposal": true,
+      "reason": "Architectural prerequisite to avoid IEEE 754 floating point rounding drift during balance checks; valid supported constraint outside GT."
+    },
+    "REQ-09": {
+      "candidate_id": "REQ-09",
+      "candidate_title": "ACID Database Rollback on Execution Exception",
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-INV-01",
+      "is_derived_proposal": true,
+      "reason": "Directly matches canonical ground-truth requirement REQ-INV-01 (Atomic Database Transaction Rollback on Failure)."
+    },
+    "REQ-10": {
+      "candidate_id": "REQ-10",
+      "candidate_title": "Underspecified Domain Schema and Multi-Currency Rules",
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "is_derived_proposal": false,
+      "reason": "Correctly identifies unstated multi-currency and Chart of Accounts parameters as UNKNOWN rather than hallucinating behavior."
+    }
+  }
+}

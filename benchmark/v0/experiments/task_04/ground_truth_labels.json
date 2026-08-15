@@ -1,0 +1,83 @@
+{
+  "task_id": "TASK-04-AEROSPACE-BLACKBOX-TELEMETRY",
+  "domain": "aerospace_avionics",
+  "raw_prompt": "Implement real-time flight data recorder buffer synchronization that flushes ARINC 429 bus frames to solid-state crash-survivable memory on power loss.",
+  "canonical_semantic_units": {
+    "flight data recorder": {
+      "ground_truth_class": "ENTITY",
+      "rationale": "Avionics system aggregate responsible for persisting flight telemetry."
+    },
+    "buffer synchronization": {
+      "ground_truth_class": "BEHAVIOR",
+      "rationale": "Dynamic state synchronization between volatile telemetry buffer and storage."
+    },
+    "flushes": {
+      "ground_truth_class": "BEHAVIOR",
+      "rationale": "Atomic I/O transfer operation writing memory buffer to non-volatile storage."
+    },
+    "ARINC 429 bus frames": {
+      "ground_truth_class": "ENTITY",
+      "rationale": "Standard avionics 32-bit data word / frame protocol payload."
+    },
+    "solid-state crash-survivable memory": {
+      "ground_truth_class": "ENTITY",
+      "rationale": "Hardened non-volatile solid-state memory module (SSMM)."
+    },
+    "on power loss": {
+      "ground_truth_class": "CONSTRAINT",
+      "rationale": "Environmental hardware interrupt / trigger condition defining the critical execution window."
+    },
+    "real-time": {
+      "ground_truth_class": "CONSTRAINT",
+      "rationale": "Deterministic bounded latency timing constraint for avionics data processing."
+    },
+    "implement": {
+      "ground_truth_class": "NOISE",
+      "rationale": "Imperative prompt command."
+    }
+  },
+  "canonical_domain_requirements": {
+    "REQ-EXP-01": {
+      "title": "Ingest and Buffer ARINC 429 Telemetry Frames",
+      "expected_type": "EXPLICIT",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT"
+    },
+    "REQ-EXP-02": {
+      "title": "Emergency Flush to Crash-Survivable Memory on Power Loss",
+      "expected_type": "EXPLICIT",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT"
+    },
+    "REQ-DER-01": {
+      "title": "Non-Volatile Flash Wear-Leveling and Circular Ring Overwrite",
+      "expected_type": "DERIVED_JUSTIFIED",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "AVIONICS_STORAGE_INTEGRITY"
+    },
+    "REQ-DER-02": {
+      "title": "Hold-Up Capacitor Bounded Execution Window Enforcement (<=50ms)",
+      "expected_type": "DERIVED_JUSTIFIED",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "HARDWARE_SURVIVABILITY"
+    },
+    "REQ-DER-03": {
+      "title": "ARINC 429 Parity and Word Integrity Verification",
+      "expected_type": "DERIVED_JUSTIFIED",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "AVIONICS_PROTOCOL"
+    },
+    "REQ-SUP-01": {
+      "title": "DO-178C Level A Deterministic Static Memory Allocation",
+      "expected_type": "SUPPORTED",
+      "epistemic_status": "SUPPORTED",
+      "provenance": "SAFETY_CRITICAL_STANDARD"
+    }
+  },
+  "forbidden_hallucinations": [
+    "Pilot HUD flight display UI",
+    "Flight route booking website",
+    "Air traffic control voice transcoding",
+    "4K video streaming portal"
+  ]
+}

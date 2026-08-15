@@ -1,0 +1,5663 @@
+{
+  "experiment": "EXPERIMENT A \u2014 Current Baseline (Task 04)",
+  "raw_prompt": "Implement real-time flight data recorder buffer synchronization that flushes ARINC 429 bus frames to solid-state crash-survivable memory on power loss.",
+  "gate_result": "PASS_WITH_DECISIONS",
+  "total_assumption_weight": 38,
+  "scope_tier": "major",
+  "archetypes": [
+    "greenfield"
+  ],
+  "total_requirements_count": 63,
+  "requirements_by_category": {
+    "explicit": 10,
+    "derived": 53
+  },
+  "flattened_requirements": [
+    {
+      "category": "explicit",
+      "title": "Unknown",
+      "type": "explicit",
+      "action": "create",
+      "why_chain": [],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "explicit",
+      "title": "Unknown",
+      "type": "explicit",
+      "action": "create",
+      "why_chain": [],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "explicit",
+      "title": "Unknown",
+      "type": "explicit",
+      "action": "create",
+      "why_chain": [],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "explicit",
+      "title": "Unknown",
+      "type": "explicit",
+      "action": "create",
+      "why_chain": [],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "explicit",
+      "title": "Unknown",
+      "type": "explicit",
+      "action": "create",
+      "why_chain": [],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "explicit",
+      "title": "Unknown",
+      "type": "explicit",
+      "action": "create",
+      "why_chain": [],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "explicit",
+      "title": "Unknown",
+      "type": "explicit",
+      "action": "create",
+      "why_chain": [],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "explicit",
+      "title": "Unknown",
+      "type": "explicit",
+      "action": "create",
+      "why_chain": [],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "explicit",
+      "title": "Unknown",
+      "type": "explicit",
+      "action": "create",
+      "why_chain": [],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "explicit",
+      "title": "Unknown",
+      "type": "explicit",
+      "action": "create",
+      "why_chain": [],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'solid' to action 'generic_action'",
+        "Step 3: Feature 'real-time' requires module 'real-time_generic_action'",
+        "Step 4: Derived requirement for user to generic_action on real-time"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'solid' to action 'generic_action'",
+        "Step 3: Feature 'flight' requires module 'flight_generic_action'",
+        "Step 4: Derived requirement for user to generic_action on flight"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'solid' to action 'generic_action'",
+        "Step 3: Feature 'data' requires module 'data_generic_action'",
+        "Step 4: Derived requirement for user to generic_action on data"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'solid' to action 'generic_action'",
+        "Step 3: Feature 'recorder' requires module 'recorder_generic_action'",
+        "Step 4: Derived requirement for user to generic_action on recorder"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'solid' to action 'generic_action'",
+        "Step 3: Feature 'buffer' requires module 'buffer_generic_action'",
+        "Step 4: Derived requirement for user to generic_action on buffer"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'solid' to action 'generic_action'",
+        "Step 3: Feature 'synchronization' requires module 'synchronization_generic_action'",
+        "Step 4: Derived requirement for user to generic_action on synchronization"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'solid' to action 'generic_action'",
+        "Step 3: Feature 'flushes' requires module 'flushes_generic_action'",
+        "Step 4: Derived requirement for user to generic_action on flushes"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'solid' to action 'generic_action'",
+        "Step 3: Feature 'arinc' requires module 'arinc_generic_action'",
+        "Step 4: Derived requirement for user to generic_action on arinc"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'solid' to action 'generic_action'",
+        "Step 3: Feature '429' requires module '429_generic_action'",
+        "Step 4: Derived requirement for user to generic_action on 429"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'solid' to action 'generic_action'",
+        "Step 3: Feature 'bus' requires module 'bus_generic_action'",
+        "Step 4: Derived requirement for user to generic_action on bus"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for User Dashboard (/dashboard)",
+        "Layout type: metrics_grid",
+        "Composed components: MetricStatCardGrid, UpcomingEventsTimeline, QuickActionShortcuts, RecentActivityFeed"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for User Dashboard -> Overview",
+        "Input fields: kpiMetrics (object), announcements (array), pendingTasksCount (number), recentEvents (array)",
+        "Actions: Refresh Real-Time Metrics, Acknowledge Notification, Trigger Quick Action"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for User Dashboard",
+        "Endpoints: GET /api/dashboard/metrics, GET /api/dashboard/announcements, GET /api/notifications"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for User Self-Profile (/profile)",
+        "Layout type: tabbed_card_layout",
+        "Composed components: AvatarUploader, BioHeaderCard, PersonalDetailsTab, OrganizationalCredentialsTab"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for User Self-Profile -> Personal Details",
+        "Input fields: fullName (string), personalEmail (email), mobileNumber (tel), dob (date), gender (select)",
+        "Actions: Update Personal Info, Upload Avatar Image"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for User Self-Profile -> Organizational Credentials",
+        "Input fields: identifierCode (string, read-only), departmentUnit (string, read-only), roleTitle (string, read-only), onboardingDate (date)",
+        "Actions: Download Digital ID Card"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for User Self-Profile -> Security & Authentication",
+        "Input fields: currentPassword (password), newPassword (password), confirmPassword (password), twoFactorToggle (boolean)",
+        "Actions: Change Password, Revoke Active Sessions"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for User Self-Profile",
+        "Endpoints: GET /api/profile, PUT /api/profile, POST /api/profile/avatar"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for Flight Workspace (/flight)",
+        "Layout type: master_detail_grid",
+        "Composed components: FlightDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for Flight Workspace -> Flight Directory",
+        "Input fields: flightId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+        "Actions: Create Flight, Edit Flight, Archive Flight"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for Flight Workspace",
+        "Endpoints: GET /api/flights, POST /api/flights, GET /api/flights/{id}"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for Data Workspace (/data)",
+        "Layout type: master_detail_grid",
+        "Composed components: DataDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for Data Workspace -> Data Directory",
+        "Input fields: dataId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+        "Actions: Create Data, Edit Data, Archive Data"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for Data Workspace",
+        "Endpoints: GET /api/data, POST /api/data, GET /api/data/{id}"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for Recorder Workspace (/recorder)",
+        "Layout type: master_detail_grid",
+        "Composed components: RecorderDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for Recorder Workspace -> Recorder Directory",
+        "Input fields: recorderId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+        "Actions: Create Recorder, Edit Recorder, Archive Recorder"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for Recorder Workspace",
+        "Endpoints: GET /api/recorders, POST /api/recorders, GET /api/recorders/{id}"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for Buffer Workspace (/buffer)",
+        "Layout type: master_detail_grid",
+        "Composed components: BufferDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for Buffer Workspace -> Buffer Directory",
+        "Input fields: bufferId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+        "Actions: Create Buffer, Edit Buffer, Archive Buffer"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for Buffer Workspace",
+        "Endpoints: GET /api/buffers, POST /api/buffers, GET /api/buffers/{id}"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for Synchronization Workspace (/synchronization)",
+        "Layout type: master_detail_grid",
+        "Composed components: SynchronizationDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for Synchronization Workspace -> Synchronization Directory",
+        "Input fields: synchronizationId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+        "Actions: Create Synchronization, Edit Synchronization, Archive Synchronization"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for Synchronization Workspace",
+        "Endpoints: GET /api/synchronizations, POST /api/synchronizations, GET /api/synchronizations/{id}"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for Flushes Workspace (/flushes)",
+        "Layout type: master_detail_grid",
+        "Composed components: FlushesDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for Flushes Workspace -> Flushes Directory",
+        "Input fields: flushesId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+        "Actions: Create Flushes, Edit Flushes, Archive Flushes"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for Flushes Workspace",
+        "Endpoints: GET /api/flushes, POST /api/flushes, GET /api/flushes/{id}"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for Arinc Workspace (/arinc)",
+        "Layout type: master_detail_grid",
+        "Composed components: ArincDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for Arinc Workspace -> Arinc Directory",
+        "Input fields: arincId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+        "Actions: Create Arinc, Edit Arinc, Archive Arinc"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for Arinc Workspace",
+        "Endpoints: GET /api/arincs, POST /api/arincs, GET /api/arincs/{id}"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for 429 Workspace (/429)",
+        "Layout type: master_detail_grid",
+        "Composed components: 429DataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for 429 Workspace -> 429 Directory",
+        "Input fields: 429Id (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+        "Actions: Create 429, Edit 429, Archive 429"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for 429 Workspace",
+        "Endpoints: GET /api/429s, POST /api/429s, GET /api/429s/{id}"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for Bus Workspace (/bus)",
+        "Layout type: master_detail_grid",
+        "Composed components: BusDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for Bus Workspace -> Bus Directory",
+        "Input fields: busId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+        "Actions: Create Bus, Edit Bus, Archive Bus"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for Bus Workspace",
+        "Endpoints: GET /api/bus, POST /api/bus, GET /api/bus/{id}"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for User Document Vault (/documents)",
+        "Layout type: document_vault",
+        "Composed components: FileUploadZone, VirusScanStatusPill, CategoryFolderTabs, DocumentPreviewModal"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for User Document Vault -> Document Vault",
+        "Input fields: fileName (string), fileSizeBytes (number), fileCategory (select), uploadedBy (string), securityScanStatus (badge)",
+        "Actions: Upload Document, Download Document, Delete Document"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for User Document Vault",
+        "Endpoints: GET /api/documents, POST /api/documents/upload, DELETE /api/documents/{id}"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "All non-trivial projects require structured logging for debugging"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Input sanitization protects against injection and validation defects"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Unhandled exceptions lead to process crashes or blank UI screens"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Automated tests guarantee regressions are caught during CI"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Hardcoded secrets/config violate 12-Factor app methodology"
+      ],
+      "provenance": "UNKNOWN"
+    }
+  ],
+  "page_spreads_count": 24,
+  "low_level_designs_count": 36,
+  "scope_boundaries": {
+    "in_scope": [],
+    "out_of_scope": [
+      "Unrequested Payment Gateway (No Stripe Payment Gateway / Razorpay Checkout)",
+      "Unrequested Gamification (No Gamification Rewards Engine / User Badges & XP)",
+      "Unrequested Ai Chatbot (No AI Assistant Chatbot / LLM Integration Widget)",
+      "Unrequested Crypto Web3 (No Crypto Wallet Connect / Web3 Smart Contract Interaction)",
+      "Unrequested Social Oauth (No Third-Party Social OAuth Integrations)"
+    ]
+  },
+  "questions_for_human": [
+    "Clarify scope/boundary for REQ-BASE-0: Implement feature: real-time",
+    "Telemetry measurements were detected, but no threshold/alert policies are defined. What limits should trigger alert events?"
+  ],
+  "acceptance_criteria": [
+    "Verify that Implement feature: real-time is functioning as expected.",
+    "Verify that Implement feature: flight is functioning as expected.",
+    "Verify that Implement feature: data is functioning as expected.",
+    "Verify that Implement feature: recorder is functioning as expected.",
+    "Verify that Implement feature: buffer is functioning as expected.",
+    "Verify that Implement feature: synchronization is functioning as expected.",
+    "Verify that Implement feature: flushes is functioning as expected.",
+    "Verify that Implement feature: arinc is functioning as expected.",
+    "Verify that Implement feature: 429 is functioning as expected.",
+    "Verify that Implement feature: bus is functioning as expected.",
+    "Verify that role 'user' can access all assigned capabilities without permission errors."
+  ],
+  "raw_synthesized_spec": {
+    "intent_summary": "Implement features for roles: ['user']. Archetypes: ['greenfield']",
+    "requirements": {
+      "explicit": [
+        {
+          "id": "REQ-BASE-0",
+          "description": "Implement feature: real-time",
+          "type": "explicit",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "must_ask",
+          "evidence": [
+            {
+              "source_file": "user_request",
+              "section": null,
+              "reference_text": "real-time",
+              "line_number": null
+            }
+          ],
+          "why_chain": [],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [],
+          "consequences": [
+            "REQ-EXP-1",
+            "REQ-EXP-2",
+            "REQ-EXP-3",
+            "REQ-EXP-4",
+            "REQ-EXP-5",
+            "REQ-EXP-6",
+            "REQ-EXP-7",
+            "REQ-EXP-8",
+            "REQ-EXP-9",
+            "REQ-EXP-10",
+            "REQ-LLD-COMP-1",
+            "REQ-LLD-FIELDS-2",
+            "REQ-LLD-API-3",
+            "REQ-LLD-COMP-4",
+            "REQ-LLD-FIELDS-5",
+            "REQ-LLD-FIELDS-6",
+            "REQ-LLD-FIELDS-7",
+            "REQ-LLD-API-8",
+            "REQ-LLD-COMP-9",
+            "REQ-LLD-FIELDS-10",
+            "REQ-LLD-API-11",
+            "REQ-LLD-COMP-12",
+            "REQ-LLD-FIELDS-13",
+            "REQ-LLD-API-14",
+            "REQ-LLD-COMP-15",
+            "REQ-LLD-FIELDS-16",
+            "REQ-LLD-API-17",
+            "REQ-LLD-COMP-18",
+            "REQ-LLD-FIELDS-19",
+            "REQ-LLD-API-20",
+            "REQ-LLD-COMP-21",
+            "REQ-LLD-FIELDS-22",
+            "REQ-LLD-API-23",
+            "REQ-LLD-COMP-24",
+            "REQ-LLD-FIELDS-25",
+            "REQ-LLD-API-26",
+            "REQ-LLD-COMP-27",
+            "REQ-LLD-FIELDS-28",
+            "REQ-LLD-API-29",
+            "REQ-LLD-COMP-30",
+            "REQ-LLD-FIELDS-31",
+            "REQ-LLD-API-32",
+            "REQ-LLD-COMP-33",
+            "REQ-LLD-FIELDS-34",
+            "REQ-LLD-API-35",
+            "REQ-LLD-COMP-36",
+            "REQ-LLD-FIELDS-37",
+            "REQ-LLD-API-38",
+            "REQ-INF-UNI-001",
+            "REQ-INF-UNI-002",
+            "REQ-INF-UNI-003",
+            "REQ-INF-UNI-004",
+            "REQ-INF-UNI-005"
+          ],
+          "assumption_type": null
+        },
+        {
+          "id": "REQ-BASE-1",
+          "description": "Implement feature: flight",
+          "type": "explicit",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "user_request",
+              "section": null,
+              "reference_text": "flight",
+              "line_number": null
+            }
+          ],
+          "why_chain": [],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [],
+          "consequences": [
+            "REQ-EXP-1",
+            "REQ-EXP-2",
+            "REQ-EXP-3",
+            "REQ-EXP-4",
+            "REQ-EXP-5",
+            "REQ-EXP-6",
+            "REQ-EXP-7",
+            "REQ-EXP-8",
+            "REQ-EXP-9",
+            "REQ-EXP-10",
+            "REQ-LLD-COMP-1",
+            "REQ-LLD-FIELDS-2",
+            "REQ-LLD-API-3",
+            "REQ-LLD-COMP-4",
+            "REQ-LLD-FIELDS-5",
+            "REQ-LLD-FIELDS-6",
+            "REQ-LLD-FIELDS-7",
+            "REQ-LLD-API-8",
+            "REQ-LLD-COMP-9",
+            "REQ-LLD-FIELDS-10",
+            "REQ-LLD-API-11",
+            "REQ-LLD-COMP-12",
+            "REQ-LLD-FIELDS-13",
+            "REQ-LLD-API-14",
+            "REQ-LLD-COMP-15",
+            "REQ-LLD-FIELDS-16",
+            "REQ-LLD-API-17",
+            "REQ-LLD-COMP-18",
+            "REQ-LLD-FIELDS-19",
+            "REQ-LLD-API-20",
+            "REQ-LLD-COMP-21",
+            "REQ-LLD-FIELDS-22",
+            "REQ-LLD-API-23",
+            "REQ-LLD-COMP-24",
+            "REQ-LLD-FIELDS-25",
+            "REQ-LLD-API-26",
+            "REQ-LLD-COMP-27",
+            "REQ-LLD-FIELDS-28",
+            "REQ-LLD-API-29",
+            "REQ-LLD-COMP-30",
+            "REQ-LLD-FIELDS-31",
+            "REQ-LLD-API-32",
+            "REQ-LLD-COMP-33",
+            "REQ-LLD-FIELDS-34",
+            "REQ-LLD-API-35",
+            "REQ-LLD-COMP-36",
+            "REQ-LLD-FIELDS-37",
+            "REQ-LLD-API-38",
+            "REQ-INF-UNI-001",
+            "REQ-INF-UNI-002",
+            "REQ-INF-UNI-003",
+            "REQ-INF-UNI-004",
+            "REQ-INF-UNI-005"
+          ],
+          "assumption_type": null
+        },
+        {
+          "id": "REQ-BASE-2",
+          "description": "Implement feature: data",
+          "type": "explicit",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "user_request",
+              "section": null,
+              "reference_text": "data",
+              "line_number": null
+            }
+          ],
+          "why_chain": [],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [],
+          "consequences": [
+            "REQ-EXP-1",
+            "REQ-EXP-2",
+            "REQ-EXP-3",
+            "REQ-EXP-4",
+            "REQ-EXP-5",
+            "REQ-EXP-6",
+            "REQ-EXP-7",
+            "REQ-EXP-8",
+            "REQ-EXP-9",
+            "REQ-EXP-10",
+            "REQ-LLD-COMP-1",
+            "REQ-LLD-FIELDS-2",
+            "REQ-LLD-API-3",
+            "REQ-LLD-COMP-4",
+            "REQ-LLD-FIELDS-5",
+            "REQ-LLD-FIELDS-6",
+            "REQ-LLD-FIELDS-7",
+            "REQ-LLD-API-8",
+            "REQ-LLD-COMP-9",
+            "REQ-LLD-FIELDS-10",
+            "REQ-LLD-API-11",
+            "REQ-LLD-COMP-12",
+            "REQ-LLD-FIELDS-13",
+            "REQ-LLD-API-14",
+            "REQ-LLD-COMP-15",
+            "REQ-LLD-FIELDS-16",
+            "REQ-LLD-API-17",
+            "REQ-LLD-COMP-18",
+            "REQ-LLD-FIELDS-19",
+            "REQ-LLD-API-20",
+            "REQ-LLD-COMP-21",
+            "REQ-LLD-FIELDS-22",
+            "REQ-LLD-API-23",
+            "REQ-LLD-COMP-24",
+            "REQ-LLD-FIELDS-25",
+            "REQ-LLD-API-26",
+            "REQ-LLD-COMP-27",
+            "REQ-LLD-FIELDS-28",
+            "REQ-LLD-API-29",
+            "REQ-LLD-COMP-30",
+            "REQ-LLD-FIELDS-31",
+            "REQ-LLD-API-32",
+            "REQ-LLD-COMP-33",
+            "REQ-LLD-FIELDS-34",
+            "REQ-LLD-API-35",
+            "REQ-LLD-COMP-36",
+            "REQ-LLD-FIELDS-37",
+            "REQ-LLD-API-38",
+            "REQ-INF-UNI-001",
+            "REQ-INF-UNI-002",
+            "REQ-INF-UNI-003",
+            "REQ-INF-UNI-004",
+            "REQ-INF-UNI-005"
+          ],
+          "assumption_type": null
+        },
+        {
+          "id": "REQ-BASE-3",
+          "description": "Implement feature: recorder",
+          "type": "explicit",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "user_request",
+              "section": null,
+              "reference_text": "recorder",
+              "line_number": null
+            }
+          ],
+          "why_chain": [],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [],
+          "consequences": [
+            "REQ-EXP-1",
+            "REQ-EXP-2",
+            "REQ-EXP-3",
+            "REQ-EXP-4",
+            "REQ-EXP-5",
+            "REQ-EXP-6",
+            "REQ-EXP-7",
+            "REQ-EXP-8",
+            "REQ-EXP-9",
+            "REQ-EXP-10",
+            "REQ-LLD-COMP-1",
+            "REQ-LLD-FIELDS-2",
+            "REQ-LLD-API-3",
+            "REQ-LLD-COMP-4",
+            "REQ-LLD-FIELDS-5",
+            "REQ-LLD-FIELDS-6",
+            "REQ-LLD-FIELDS-7",
+            "REQ-LLD-API-8",
+            "REQ-LLD-COMP-9",
+            "REQ-LLD-FIELDS-10",
+            "REQ-LLD-API-11",
+            "REQ-LLD-COMP-12",
+            "REQ-LLD-FIELDS-13",
+            "REQ-LLD-API-14",
+            "REQ-LLD-COMP-15",
+            "REQ-LLD-FIELDS-16",
+            "REQ-LLD-API-17",
+            "REQ-LLD-COMP-18",
+            "REQ-LLD-FIELDS-19",
+            "REQ-LLD-API-20",
+            "REQ-LLD-COMP-21",
+            "REQ-LLD-FIELDS-22",
+            "REQ-LLD-API-23",
+            "REQ-LLD-COMP-24",
+            "REQ-LLD-FIELDS-25",
+            "REQ-LLD-API-26",
+            "REQ-LLD-COMP-27",
+            "REQ-LLD-FIELDS-28",
+            "REQ-LLD-API-29",
+            "REQ-LLD-COMP-30",
+            "REQ-LLD-FIELDS-31",
+            "REQ-LLD-API-32",
+            "REQ-LLD-COMP-33",
+            "REQ-LLD-FIELDS-34",
+            "REQ-LLD-API-35",
+            "REQ-LLD-COMP-36",
+            "REQ-LLD-FIELDS-37",
+            "REQ-LLD-API-38",
+            "REQ-INF-UNI-001",
+            "REQ-INF-UNI-002",
+            "REQ-INF-UNI-003",
+            "REQ-INF-UNI-004",
+            "REQ-INF-UNI-005"
+          ],
+          "assumption_type": null
+        },
+        {
+          "id": "REQ-BASE-4",
+          "description": "Implement feature: buffer",
+          "type": "explicit",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "user_request",
+              "section": null,
+              "reference_text": "buffer",
+              "line_number": null
+            }
+          ],
+          "why_chain": [],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [],
+          "consequences": [
+            "REQ-EXP-1",
+            "REQ-EXP-2",
+            "REQ-EXP-3",
+            "REQ-EXP-4",
+            "REQ-EXP-5",
+            "REQ-EXP-6",
+            "REQ-EXP-7",
+            "REQ-EXP-8",
+            "REQ-EXP-9",
+            "REQ-EXP-10",
+            "REQ-LLD-COMP-1",
+            "REQ-LLD-FIELDS-2",
+            "REQ-LLD-API-3",
+            "REQ-LLD-COMP-4",
+            "REQ-LLD-FIELDS-5",
+            "REQ-LLD-FIELDS-6",
+            "REQ-LLD-FIELDS-7",
+            "REQ-LLD-API-8",
+            "REQ-LLD-COMP-9",
+            "REQ-LLD-FIELDS-10",
+            "REQ-LLD-API-11",
+            "REQ-LLD-COMP-12",
+            "REQ-LLD-FIELDS-13",
+            "REQ-LLD-API-14",
+            "REQ-LLD-COMP-15",
+            "REQ-LLD-FIELDS-16",
+            "REQ-LLD-API-17",
+            "REQ-LLD-COMP-18",
+            "REQ-LLD-FIELDS-19",
+            "REQ-LLD-API-20",
+            "REQ-LLD-COMP-21",
+            "REQ-LLD-FIELDS-22",
+            "REQ-LLD-API-23",
+            "REQ-LLD-COMP-24",
+            "REQ-LLD-FIELDS-25",
+            "REQ-LLD-API-26",
+            "REQ-LLD-COMP-27",
+            "REQ-LLD-FIELDS-28",
+            "REQ-LLD-API-29",
+            "REQ-LLD-COMP-30",
+            "REQ-LLD-FIELDS-31",
+            "REQ-LLD-API-32",
+            "REQ-LLD-COMP-33",
+            "REQ-LLD-FIELDS-34",
+            "REQ-LLD-API-35",
+            "REQ-LLD-COMP-36",
+            "REQ-LLD-FIELDS-37",
+            "REQ-LLD-API-38",
+            "REQ-INF-UNI-001",
+            "REQ-INF-UNI-002",
+            "REQ-INF-UNI-003",
+            "REQ-INF-UNI-004",
+            "REQ-INF-UNI-005"
+          ],
+          "assumption_type": null
+        },
+        {
+          "id": "REQ-BASE-5",
+          "description": "Implement feature: synchronization",
+          "type": "explicit",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "user_request",
+              "section": null,
+              "reference_text": "synchronization",
+              "line_number": null
+            }
+          ],
+          "why_chain": [],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [],
+          "consequences": [
+            "REQ-EXP-1",
+            "REQ-EXP-2",
+            "REQ-EXP-3",
+            "REQ-EXP-4",
+            "REQ-EXP-5",
+            "REQ-EXP-6",
+            "REQ-EXP-7",
+            "REQ-EXP-8",
+            "REQ-EXP-9",
+            "REQ-EXP-10",
+            "REQ-LLD-COMP-1",
+            "REQ-LLD-FIELDS-2",
+            "REQ-LLD-API-3",
+            "REQ-LLD-COMP-4",
+            "REQ-LLD-FIELDS-5",
+            "REQ-LLD-FIELDS-6",
+            "REQ-LLD-FIELDS-7",
+            "REQ-LLD-API-8",
+            "REQ-LLD-COMP-9",
+            "REQ-LLD-FIELDS-10",
+            "REQ-LLD-API-11",
+            "REQ-LLD-COMP-12",
+            "REQ-LLD-FIELDS-13",
+            "REQ-LLD-API-14",
+            "REQ-LLD-COMP-15",
+            "REQ-LLD-FIELDS-16",
+            "REQ-LLD-API-17",
+            "REQ-LLD-COMP-18",
+            "REQ-LLD-FIELDS-19",
+            "REQ-LLD-API-20",
+            "REQ-LLD-COMP-21",
+            "REQ-LLD-FIELDS-22",
+            "REQ-LLD-API-23",
+            "REQ-LLD-COMP-24",
+            "REQ-LLD-FIELDS-25",
+            "REQ-LLD-API-26",
+            "REQ-LLD-COMP-27",
+            "REQ-LLD-FIELDS-28",
+            "REQ-LLD-API-29",
+            "REQ-LLD-COMP-30",
+            "REQ-LLD-FIELDS-31",
+            "REQ-LLD-API-32",
+            "REQ-LLD-COMP-33",
+            "REQ-LLD-FIELDS-34",
+            "REQ-LLD-API-35",
+            "REQ-LLD-COMP-36",
+            "REQ-LLD-FIELDS-37",
+            "REQ-LLD-API-38",
+            "REQ-INF-UNI-001",
+            "REQ-INF-UNI-002",
+            "REQ-INF-UNI-003",
+            "REQ-INF-UNI-004",
+            "REQ-INF-UNI-005"
+          ],
+          "assumption_type": null
+        },
+        {
+          "id": "REQ-BASE-6",
+          "description": "Implement feature: flushes",
+          "type": "explicit",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "user_request",
+              "section": null,
+              "reference_text": "flushes",
+              "line_number": null
+            }
+          ],
+          "why_chain": [],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [],
+          "consequences": [
+            "REQ-EXP-1",
+            "REQ-EXP-2",
+            "REQ-EXP-3",
+            "REQ-EXP-4",
+            "REQ-EXP-5",
+            "REQ-EXP-6",
+            "REQ-EXP-7",
+            "REQ-EXP-8",
+            "REQ-EXP-9",
+            "REQ-EXP-10",
+            "REQ-LLD-COMP-1",
+            "REQ-LLD-FIELDS-2",
+            "REQ-LLD-API-3",
+            "REQ-LLD-COMP-4",
+            "REQ-LLD-FIELDS-5",
+            "REQ-LLD-FIELDS-6",
+            "REQ-LLD-FIELDS-7",
+            "REQ-LLD-API-8",
+            "REQ-LLD-COMP-9",
+            "REQ-LLD-FIELDS-10",
+            "REQ-LLD-API-11",
+            "REQ-LLD-COMP-12",
+            "REQ-LLD-FIELDS-13",
+            "REQ-LLD-API-14",
+            "REQ-LLD-COMP-15",
+            "REQ-LLD-FIELDS-16",
+            "REQ-LLD-API-17",
+            "REQ-LLD-COMP-18",
+            "REQ-LLD-FIELDS-19",
+            "REQ-LLD-API-20",
+            "REQ-LLD-COMP-21",
+            "REQ-LLD-FIELDS-22",
+            "REQ-LLD-API-23",
+            "REQ-LLD-COMP-24",
+            "REQ-LLD-FIELDS-25",
+            "REQ-LLD-API-26",
+            "REQ-LLD-COMP-27",
+            "REQ-LLD-FIELDS-28",
+            "REQ-LLD-API-29",
+            "REQ-LLD-COMP-30",
+            "REQ-LLD-FIELDS-31",
+            "REQ-LLD-API-32",
+            "REQ-LLD-COMP-33",
+            "REQ-LLD-FIELDS-34",
+            "REQ-LLD-API-35",
+            "REQ-LLD-COMP-36",
+            "REQ-LLD-FIELDS-37",
+            "REQ-LLD-API-38",
+            "REQ-INF-UNI-001",
+            "REQ-INF-UNI-002",
+            "REQ-INF-UNI-003",
+            "REQ-INF-UNI-004",
+            "REQ-INF-UNI-005"
+          ],
+          "assumption_type": null
+        },
+        {
+          "id": "REQ-BASE-7",
+          "description": "Implement feature: arinc",
+          "type": "explicit",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "user_request",
+              "section": null,
+              "reference_text": "arinc",
+              "line_number": null
+            }
+          ],
+          "why_chain": [],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [],
+          "consequences": [
+            "REQ-EXP-1",
+            "REQ-EXP-2",
+            "REQ-EXP-3",
+            "REQ-EXP-4",
+            "REQ-EXP-5",
+            "REQ-EXP-6",
+            "REQ-EXP-7",
+            "REQ-EXP-8",
+            "REQ-EXP-9",
+            "REQ-EXP-10",
+            "REQ-LLD-COMP-1",
+            "REQ-LLD-FIELDS-2",
+            "REQ-LLD-API-3",
+            "REQ-LLD-COMP-4",
+            "REQ-LLD-FIELDS-5",
+            "REQ-LLD-FIELDS-6",
+            "REQ-LLD-FIELDS-7",
+            "REQ-LLD-API-8",
+            "REQ-LLD-COMP-9",
+            "REQ-LLD-FIELDS-10",
+            "REQ-LLD-API-11",
+            "REQ-LLD-COMP-12",
+            "REQ-LLD-FIELDS-13",
+            "REQ-LLD-API-14",
+            "REQ-LLD-COMP-15",
+            "REQ-LLD-FIELDS-16",
+            "REQ-LLD-API-17",
+            "REQ-LLD-COMP-18",
+            "REQ-LLD-FIELDS-19",
+            "REQ-LLD-API-20",
+            "REQ-LLD-COMP-21",
+            "REQ-LLD-FIELDS-22",
+            "REQ-LLD-API-23",
+            "REQ-LLD-COMP-24",
+            "REQ-LLD-FIELDS-25",
+            "REQ-LLD-API-26",
+            "REQ-LLD-COMP-27",
+            "REQ-LLD-FIELDS-28",
+            "REQ-LLD-API-29",
+            "REQ-LLD-COMP-30",
+            "REQ-LLD-FIELDS-31",
+            "REQ-LLD-API-32",
+            "REQ-LLD-COMP-33",
+            "REQ-LLD-FIELDS-34",
+            "REQ-LLD-API-35",
+            "REQ-LLD-COMP-36",
+            "REQ-LLD-FIELDS-37",
+            "REQ-LLD-API-38",
+            "REQ-INF-UNI-001",
+            "REQ-INF-UNI-002",
+            "REQ-INF-UNI-003",
+            "REQ-INF-UNI-004",
+            "REQ-INF-UNI-005"
+          ],
+          "assumption_type": null
+        },
+        {
+          "id": "REQ-BASE-8",
+          "description": "Implement feature: 429",
+          "type": "explicit",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "user_request",
+              "section": null,
+              "reference_text": "429",
+              "line_number": null
+            }
+          ],
+          "why_chain": [],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [],
+          "consequences": [
+            "REQ-EXP-1",
+            "REQ-EXP-2",
+            "REQ-EXP-3",
+            "REQ-EXP-4",
+            "REQ-EXP-5",
+            "REQ-EXP-6",
+            "REQ-EXP-7",
+            "REQ-EXP-8",
+            "REQ-EXP-9",
+            "REQ-EXP-10",
+            "REQ-LLD-COMP-1",
+            "REQ-LLD-FIELDS-2",
+            "REQ-LLD-API-3",
+            "REQ-LLD-COMP-4",
+            "REQ-LLD-FIELDS-5",
+            "REQ-LLD-FIELDS-6",
+            "REQ-LLD-FIELDS-7",
+            "REQ-LLD-API-8",
+            "REQ-LLD-COMP-9",
+            "REQ-LLD-FIELDS-10",
+            "REQ-LLD-API-11",
+            "REQ-LLD-COMP-12",
+            "REQ-LLD-FIELDS-13",
+            "REQ-LLD-API-14",
+            "REQ-LLD-COMP-15",
+            "REQ-LLD-FIELDS-16",
+            "REQ-LLD-API-17",
+            "REQ-LLD-COMP-18",
+            "REQ-LLD-FIELDS-19",
+            "REQ-LLD-API-20",
+            "REQ-LLD-COMP-21",
+            "REQ-LLD-FIELDS-22",
+            "REQ-LLD-API-23",
+            "REQ-LLD-COMP-24",
+            "REQ-LLD-FIELDS-25",
+            "REQ-LLD-API-26",
+            "REQ-LLD-COMP-27",
+            "REQ-LLD-FIELDS-28",
+            "REQ-LLD-API-29",
+            "REQ-LLD-COMP-30",
+            "REQ-LLD-FIELDS-31",
+            "REQ-LLD-API-32",
+            "REQ-LLD-COMP-33",
+            "REQ-LLD-FIELDS-34",
+            "REQ-LLD-API-35",
+            "REQ-LLD-COMP-36",
+            "REQ-LLD-FIELDS-37",
+            "REQ-LLD-API-38",
+            "REQ-INF-UNI-001",
+            "REQ-INF-UNI-002",
+            "REQ-INF-UNI-003",
+            "REQ-INF-UNI-004",
+            "REQ-INF-UNI-005"
+          ],
+          "assumption_type": null
+        },
+        {
+          "id": "REQ-BASE-9",
+          "description": "Implement feature: bus",
+          "type": "explicit",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "user_request",
+              "section": null,
+              "reference_text": "bus",
+              "line_number": null
+            }
+          ],
+          "why_chain": [],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [],
+          "consequences": [
+            "REQ-EXP-1",
+            "REQ-EXP-2",
+            "REQ-EXP-3",
+            "REQ-EXP-4",
+            "REQ-EXP-5",
+            "REQ-EXP-6",
+            "REQ-EXP-7",
+            "REQ-EXP-8",
+            "REQ-EXP-9",
+            "REQ-EXP-10",
+            "REQ-LLD-COMP-1",
+            "REQ-LLD-FIELDS-2",
+            "REQ-LLD-API-3",
+            "REQ-LLD-COMP-4",
+            "REQ-LLD-FIELDS-5",
+            "REQ-LLD-FIELDS-6",
+            "REQ-LLD-FIELDS-7",
+            "REQ-LLD-API-8",
+            "REQ-LLD-COMP-9",
+            "REQ-LLD-FIELDS-10",
+            "REQ-LLD-API-11",
+            "REQ-LLD-COMP-12",
+            "REQ-LLD-FIELDS-13",
+            "REQ-LLD-API-14",
+            "REQ-LLD-COMP-15",
+            "REQ-LLD-FIELDS-16",
+            "REQ-LLD-API-17",
+            "REQ-LLD-COMP-18",
+            "REQ-LLD-FIELDS-19",
+            "REQ-LLD-API-20",
+            "REQ-LLD-COMP-21",
+            "REQ-LLD-FIELDS-22",
+            "REQ-LLD-API-23",
+            "REQ-LLD-COMP-24",
+            "REQ-LLD-FIELDS-25",
+            "REQ-LLD-API-26",
+            "REQ-LLD-COMP-27",
+            "REQ-LLD-FIELDS-28",
+            "REQ-LLD-API-29",
+            "REQ-LLD-COMP-30",
+            "REQ-LLD-FIELDS-31",
+            "REQ-LLD-API-32",
+            "REQ-LLD-COMP-33",
+            "REQ-LLD-FIELDS-34",
+            "REQ-LLD-API-35",
+            "REQ-LLD-COMP-36",
+            "REQ-LLD-FIELDS-37",
+            "REQ-LLD-API-38",
+            "REQ-INF-UNI-001",
+            "REQ-INF-UNI-002",
+            "REQ-INF-UNI-003",
+            "REQ-INF-UNI-004",
+            "REQ-INF-UNI-005"
+          ],
+          "assumption_type": null
+        }
+      ],
+      "derived": [
+        {
+          "id": "REQ-EXP-1",
+          "description": "Role 'user' needs generic_action capability for real-time",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'solid' to action 'generic_action'",
+            "Step 3: Feature 'real-time' requires module 'real-time_generic_action'",
+            "Step 4: Derived requirement for user to generic_action on real-time"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-EXP-2",
+          "description": "Role 'user' needs generic_action capability for flight",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'solid' to action 'generic_action'",
+            "Step 3: Feature 'flight' requires module 'flight_generic_action'",
+            "Step 4: Derived requirement for user to generic_action on flight"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-EXP-3",
+          "description": "Role 'user' needs generic_action capability for data",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'solid' to action 'generic_action'",
+            "Step 3: Feature 'data' requires module 'data_generic_action'",
+            "Step 4: Derived requirement for user to generic_action on data"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-EXP-4",
+          "description": "Role 'user' needs generic_action capability for recorder",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'solid' to action 'generic_action'",
+            "Step 3: Feature 'recorder' requires module 'recorder_generic_action'",
+            "Step 4: Derived requirement for user to generic_action on recorder"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-EXP-5",
+          "description": "Role 'user' needs generic_action capability for buffer",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'solid' to action 'generic_action'",
+            "Step 3: Feature 'buffer' requires module 'buffer_generic_action'",
+            "Step 4: Derived requirement for user to generic_action on buffer"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-EXP-6",
+          "description": "Role 'user' needs generic_action capability for synchronization",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'solid' to action 'generic_action'",
+            "Step 3: Feature 'synchronization' requires module 'synchronization_generic_action'",
+            "Step 4: Derived requirement for user to generic_action on synchronization"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-EXP-7",
+          "description": "Role 'user' needs generic_action capability for flushes",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'solid' to action 'generic_action'",
+            "Step 3: Feature 'flushes' requires module 'flushes_generic_action'",
+            "Step 4: Derived requirement for user to generic_action on flushes"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-EXP-8",
+          "description": "Role 'user' needs generic_action capability for arinc",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'solid' to action 'generic_action'",
+            "Step 3: Feature 'arinc' requires module 'arinc_generic_action'",
+            "Step 4: Derived requirement for user to generic_action on arinc"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-EXP-9",
+          "description": "Role 'user' needs generic_action capability for 429",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'solid' to action 'generic_action'",
+            "Step 3: Feature '429' requires module '429_generic_action'",
+            "Step 4: Derived requirement for user to generic_action on 429"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-EXP-10",
+          "description": "Role 'user' needs generic_action capability for bus",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'solid' to action 'generic_action'",
+            "Step 3: Feature 'bus' requires module 'bus_generic_action'",
+            "Step 4: Derived requirement for user to generic_action on bus"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-LLD-COMP-1",
+          "description": "[USER] User Dashboard \u2014 UI Component Hierarchy: MetricStatCardGrid, UpcomingEventsTimeline, QuickActionShortcuts, RecentActivityFeed",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for User Dashboard",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for User Dashboard (/dashboard)",
+            "Layout type: metrics_grid",
+            "Composed components: MetricStatCardGrid, UpcomingEventsTimeline, QuickActionShortcuts, RecentActivityFeed"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-2",
+          "description": "[USER] User Dashboard (Overview) \u2014 Form Fields: kpiMetrics (object), announcements (array), pendingTasksCount (number), recentEvents (array) | Actions: Refresh Real-Time Metrics, Acknowledge Notification, Trigger Quick Action",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for User Dashboard -> Overview",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for User Dashboard -> Overview",
+            "Input fields: kpiMetrics (object), announcements (array), pendingTasksCount (number), recentEvents (array)",
+            "Actions: Refresh Real-Time Metrics, Acknowledge Notification, Trigger Quick Action"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-3",
+          "description": "[USER] User Dashboard \u2014 Backing REST APIs: GET /api/dashboard/metrics, GET /api/dashboard/announcements, GET /api/notifications",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for User Dashboard",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for User Dashboard",
+            "Endpoints: GET /api/dashboard/metrics, GET /api/dashboard/announcements, GET /api/notifications"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-4",
+          "description": "[USER] User Self-Profile \u2014 UI Component Hierarchy: AvatarUploader, BioHeaderCard, PersonalDetailsTab, OrganizationalCredentialsTab",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for User Self-Profile",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for User Self-Profile (/profile)",
+            "Layout type: tabbed_card_layout",
+            "Composed components: AvatarUploader, BioHeaderCard, PersonalDetailsTab, OrganizationalCredentialsTab"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-5",
+          "description": "[USER] User Self-Profile (Personal Details) \u2014 Form Fields: fullName (string), personalEmail (email), mobileNumber (tel), dob (date), gender (select) | Actions: Update Personal Info, Upload Avatar Image",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for User Self-Profile -> Personal Details",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for User Self-Profile -> Personal Details",
+            "Input fields: fullName (string), personalEmail (email), mobileNumber (tel), dob (date), gender (select)",
+            "Actions: Update Personal Info, Upload Avatar Image"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-6",
+          "description": "[USER] User Self-Profile (Organizational Credentials) \u2014 Form Fields: identifierCode (string, read-only), departmentUnit (string, read-only), roleTitle (string, read-only), onboardingDate (date) | Actions: Download Digital ID Card",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for User Self-Profile -> Organizational Credentials",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for User Self-Profile -> Organizational Credentials",
+            "Input fields: identifierCode (string, read-only), departmentUnit (string, read-only), roleTitle (string, read-only), onboardingDate (date)",
+            "Actions: Download Digital ID Card"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-7",
+          "description": "[USER] User Self-Profile (Security & Authentication) \u2014 Form Fields: currentPassword (password), newPassword (password), confirmPassword (password), twoFactorToggle (boolean) | Actions: Change Password, Revoke Active Sessions",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for User Self-Profile -> Security & Authentication",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for User Self-Profile -> Security & Authentication",
+            "Input fields: currentPassword (password), newPassword (password), confirmPassword (password), twoFactorToggle (boolean)",
+            "Actions: Change Password, Revoke Active Sessions"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-8",
+          "description": "[USER] User Self-Profile \u2014 Backing REST APIs: GET /api/profile, PUT /api/profile, POST /api/profile/avatar",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for User Self-Profile",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for User Self-Profile",
+            "Endpoints: GET /api/profile, PUT /api/profile, POST /api/profile/avatar"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-9",
+          "description": "[USER] Flight Workspace \u2014 UI Component Hierarchy: FlightDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for Flight Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for Flight Workspace (/flight)",
+            "Layout type: master_detail_grid",
+            "Composed components: FlightDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-10",
+          "description": "[USER] Flight Workspace (Flight Directory) \u2014 Form Fields: flightId (string), title / name (string), status (badge), categoryType (select), assignedTo (string) | Actions: Create Flight, Edit Flight, Archive Flight",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for Flight Workspace -> Flight Directory",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for Flight Workspace -> Flight Directory",
+            "Input fields: flightId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+            "Actions: Create Flight, Edit Flight, Archive Flight"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-11",
+          "description": "[USER] Flight Workspace \u2014 Backing REST APIs: GET /api/flights, POST /api/flights, GET /api/flights/{id}",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for Flight Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for Flight Workspace",
+            "Endpoints: GET /api/flights, POST /api/flights, GET /api/flights/{id}"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-12",
+          "description": "[USER] Data Workspace \u2014 UI Component Hierarchy: DataDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for Data Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for Data Workspace (/data)",
+            "Layout type: master_detail_grid",
+            "Composed components: DataDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-13",
+          "description": "[USER] Data Workspace (Data Directory) \u2014 Form Fields: dataId (string), title / name (string), status (badge), categoryType (select), assignedTo (string) | Actions: Create Data, Edit Data, Archive Data",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for Data Workspace -> Data Directory",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for Data Workspace -> Data Directory",
+            "Input fields: dataId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+            "Actions: Create Data, Edit Data, Archive Data"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-14",
+          "description": "[USER] Data Workspace \u2014 Backing REST APIs: GET /api/data, POST /api/data, GET /api/data/{id}",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for Data Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for Data Workspace",
+            "Endpoints: GET /api/data, POST /api/data, GET /api/data/{id}"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-15",
+          "description": "[USER] Recorder Workspace \u2014 UI Component Hierarchy: RecorderDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for Recorder Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for Recorder Workspace (/recorder)",
+            "Layout type: master_detail_grid",
+            "Composed components: RecorderDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-16",
+          "description": "[USER] Recorder Workspace (Recorder Directory) \u2014 Form Fields: recorderId (string), title / name (string), status (badge), categoryType (select), assignedTo (string) | Actions: Create Recorder, Edit Recorder, Archive Recorder",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for Recorder Workspace -> Recorder Directory",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for Recorder Workspace -> Recorder Directory",
+            "Input fields: recorderId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+            "Actions: Create Recorder, Edit Recorder, Archive Recorder"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-17",
+          "description": "[USER] Recorder Workspace \u2014 Backing REST APIs: GET /api/recorders, POST /api/recorders, GET /api/recorders/{id}",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for Recorder Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for Recorder Workspace",
+            "Endpoints: GET /api/recorders, POST /api/recorders, GET /api/recorders/{id}"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-18",
+          "description": "[USER] Buffer Workspace \u2014 UI Component Hierarchy: BufferDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for Buffer Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for Buffer Workspace (/buffer)",
+            "Layout type: master_detail_grid",
+            "Composed components: BufferDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-19",
+          "description": "[USER] Buffer Workspace (Buffer Directory) \u2014 Form Fields: bufferId (string), title / name (string), status (badge), categoryType (select), assignedTo (string) | Actions: Create Buffer, Edit Buffer, Archive Buffer",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for Buffer Workspace -> Buffer Directory",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for Buffer Workspace -> Buffer Directory",
+            "Input fields: bufferId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+            "Actions: Create Buffer, Edit Buffer, Archive Buffer"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-20",
+          "description": "[USER] Buffer Workspace \u2014 Backing REST APIs: GET /api/buffers, POST /api/buffers, GET /api/buffers/{id}",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for Buffer Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for Buffer Workspace",
+            "Endpoints: GET /api/buffers, POST /api/buffers, GET /api/buffers/{id}"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-21",
+          "description": "[USER] Synchronization Workspace \u2014 UI Component Hierarchy: SynchronizationDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for Synchronization Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for Synchronization Workspace (/synchronization)",
+            "Layout type: master_detail_grid",
+            "Composed components: SynchronizationDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-22",
+          "description": "[USER] Synchronization Workspace (Synchronization Directory) \u2014 Form Fields: synchronizationId (string), title / name (string), status (badge), categoryType (select), assignedTo (string) | Actions: Create Synchronization, Edit Synchronization, Archive Synchronization",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for Synchronization Workspace -> Synchronization Directory",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for Synchronization Workspace -> Synchronization Directory",
+            "Input fields: synchronizationId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+            "Actions: Create Synchronization, Edit Synchronization, Archive Synchronization"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-23",
+          "description": "[USER] Synchronization Workspace \u2014 Backing REST APIs: GET /api/synchronizations, POST /api/synchronizations, GET /api/synchronizations/{id}",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for Synchronization Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for Synchronization Workspace",
+            "Endpoints: GET /api/synchronizations, POST /api/synchronizations, GET /api/synchronizations/{id}"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-24",
+          "description": "[USER] Flushes Workspace \u2014 UI Component Hierarchy: FlushesDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for Flushes Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for Flushes Workspace (/flushes)",
+            "Layout type: master_detail_grid",
+            "Composed components: FlushesDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-25",
+          "description": "[USER] Flushes Workspace (Flushes Directory) \u2014 Form Fields: flushesId (string), title / name (string), status (badge), categoryType (select), assignedTo (string) | Actions: Create Flushes, Edit Flushes, Archive Flushes",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for Flushes Workspace -> Flushes Directory",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for Flushes Workspace -> Flushes Directory",
+            "Input fields: flushesId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+            "Actions: Create Flushes, Edit Flushes, Archive Flushes"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-26",
+          "description": "[USER] Flushes Workspace \u2014 Backing REST APIs: GET /api/flushes, POST /api/flushes, GET /api/flushes/{id}",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for Flushes Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for Flushes Workspace",
+            "Endpoints: GET /api/flushes, POST /api/flushes, GET /api/flushes/{id}"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-27",
+          "description": "[USER] Arinc Workspace \u2014 UI Component Hierarchy: ArincDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for Arinc Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for Arinc Workspace (/arinc)",
+            "Layout type: master_detail_grid",
+            "Composed components: ArincDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-28",
+          "description": "[USER] Arinc Workspace (Arinc Directory) \u2014 Form Fields: arincId (string), title / name (string), status (badge), categoryType (select), assignedTo (string) | Actions: Create Arinc, Edit Arinc, Archive Arinc",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for Arinc Workspace -> Arinc Directory",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for Arinc Workspace -> Arinc Directory",
+            "Input fields: arincId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+            "Actions: Create Arinc, Edit Arinc, Archive Arinc"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-29",
+          "description": "[USER] Arinc Workspace \u2014 Backing REST APIs: GET /api/arincs, POST /api/arincs, GET /api/arincs/{id}",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for Arinc Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for Arinc Workspace",
+            "Endpoints: GET /api/arincs, POST /api/arincs, GET /api/arincs/{id}"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-30",
+          "description": "[USER] 429 Workspace \u2014 UI Component Hierarchy: 429DataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for 429 Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for 429 Workspace (/429)",
+            "Layout type: master_detail_grid",
+            "Composed components: 429DataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-31",
+          "description": "[USER] 429 Workspace (429 Directory) \u2014 Form Fields: 429Id (string), title / name (string), status (badge), categoryType (select), assignedTo (string) | Actions: Create 429, Edit 429, Archive 429",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for 429 Workspace -> 429 Directory",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for 429 Workspace -> 429 Directory",
+            "Input fields: 429Id (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+            "Actions: Create 429, Edit 429, Archive 429"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-32",
+          "description": "[USER] 429 Workspace \u2014 Backing REST APIs: GET /api/429s, POST /api/429s, GET /api/429s/{id}",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for 429 Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for 429 Workspace",
+            "Endpoints: GET /api/429s, POST /api/429s, GET /api/429s/{id}"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-33",
+          "description": "[USER] Bus Workspace \u2014 UI Component Hierarchy: BusDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for Bus Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for Bus Workspace (/bus)",
+            "Layout type: master_detail_grid",
+            "Composed components: BusDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-34",
+          "description": "[USER] Bus Workspace (Bus Directory) \u2014 Form Fields: busId (string), title / name (string), status (badge), categoryType (select), assignedTo (string) | Actions: Create Bus, Edit Bus, Archive Bus",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for Bus Workspace -> Bus Directory",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for Bus Workspace -> Bus Directory",
+            "Input fields: busId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+            "Actions: Create Bus, Edit Bus, Archive Bus"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-35",
+          "description": "[USER] Bus Workspace \u2014 Backing REST APIs: GET /api/bus, POST /api/bus, GET /api/bus/{id}",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for Bus Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for Bus Workspace",
+            "Endpoints: GET /api/bus, POST /api/bus, GET /api/bus/{id}"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-36",
+          "description": "[USER] User Document Vault \u2014 UI Component Hierarchy: FileUploadZone, VirusScanStatusPill, CategoryFolderTabs, DocumentPreviewModal",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for User Document Vault",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for User Document Vault (/documents)",
+            "Layout type: document_vault",
+            "Composed components: FileUploadZone, VirusScanStatusPill, CategoryFolderTabs, DocumentPreviewModal"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-37",
+          "description": "[USER] User Document Vault (Document Vault) \u2014 Form Fields: fileName (string), fileSizeBytes (number), fileCategory (select), uploadedBy (string), securityScanStatus (badge) | Actions: Upload Document, Download Document, Delete Document",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for User Document Vault -> Document Vault",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for User Document Vault -> Document Vault",
+            "Input fields: fileName (string), fileSizeBytes (number), fileCategory (select), uploadedBy (string), securityScanStatus (badge)",
+            "Actions: Upload Document, Download Document, Delete Document"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-38",
+          "description": "[USER] User Document Vault \u2014 Backing REST APIs: GET /api/documents, POST /api/documents/upload, DELETE /api/documents/{id}",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for User Document Vault",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for User Document Vault",
+            "Endpoints: GET /api/documents, POST /api/documents/upload, DELETE /api/documents/{id}"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-INF-UNI-001",
+          "description": "Implement structured JSON logging across all execution paths",
+          "type": "derived",
+          "category": "system_invariant",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "All non-trivial projects require structured logging for debugging"
+          ],
+          "affects": [
+            "backend",
+            "observability"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "architecture"
+        },
+        {
+          "id": "REQ-INF-UNI-002",
+          "description": "Sanitize and validate all external inputs at system boundaries",
+          "type": "derived",
+          "category": "system_invariant",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Input sanitization protects against injection and validation defects"
+          ],
+          "affects": [
+            "backend",
+            "validation"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "permission"
+        },
+        {
+          "id": "REQ-INF-UNI-003",
+          "description": "Catch unhandled exceptions and return structured error envelopes",
+          "type": "derived",
+          "category": "system_invariant",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Unhandled exceptions lead to process crashes or blank UI screens"
+          ],
+          "affects": [
+            "backend",
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-INF-UNI-004",
+          "description": "Maintain unit and integration test coverage for primary workflows",
+          "type": "derived",
+          "category": "system_invariant",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Automated tests guarantee regressions are caught during CI"
+          ],
+          "affects": [
+            "tests",
+            "backend",
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-INF-UNI-005",
+          "description": "Decouple configuration from code using environment variables",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Hardcoded secrets/config violate 12-Factor app methodology"
+          ],
+          "affects": [
+            "config",
+            "backend",
+            "infrastructure"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3",
+            "REQ-BASE-4",
+            "REQ-BASE-5",
+            "REQ-BASE-6",
+            "REQ-BASE-7",
+            "REQ-BASE-8",
+            "REQ-BASE-9"
+          ],
+          "consequences": [],
+          "assumption_type": "architecture"
+        }
+      ]
+    },
+    "affected_systems": {
+      "frontend": [
+        "REQ-BASE-0",
+        "REQ-BASE-1",
+        "REQ-BASE-2",
+        "REQ-BASE-3",
+        "REQ-BASE-4",
+        "REQ-BASE-5",
+        "REQ-BASE-6",
+        "REQ-BASE-7",
+        "REQ-BASE-8",
+        "REQ-BASE-9",
+        "REQ-EXP-1",
+        "REQ-EXP-2",
+        "REQ-EXP-3",
+        "REQ-EXP-4",
+        "REQ-EXP-5",
+        "REQ-EXP-6",
+        "REQ-EXP-7",
+        "REQ-EXP-8",
+        "REQ-EXP-9",
+        "REQ-EXP-10",
+        "REQ-LLD-COMP-1",
+        "REQ-LLD-FIELDS-2",
+        "REQ-LLD-COMP-4",
+        "REQ-LLD-FIELDS-5",
+        "REQ-LLD-FIELDS-6",
+        "REQ-LLD-FIELDS-7",
+        "REQ-LLD-COMP-9",
+        "REQ-LLD-FIELDS-10",
+        "REQ-LLD-COMP-12",
+        "REQ-LLD-FIELDS-13",
+        "REQ-LLD-COMP-15",
+        "REQ-LLD-FIELDS-16",
+        "REQ-LLD-COMP-18",
+        "REQ-LLD-FIELDS-19",
+        "REQ-LLD-COMP-21",
+        "REQ-LLD-FIELDS-22",
+        "REQ-LLD-COMP-24",
+        "REQ-LLD-FIELDS-25",
+        "REQ-LLD-COMP-27",
+        "REQ-LLD-FIELDS-28",
+        "REQ-LLD-COMP-30",
+        "REQ-LLD-FIELDS-31",
+        "REQ-LLD-COMP-33",
+        "REQ-LLD-FIELDS-34",
+        "REQ-LLD-COMP-36",
+        "REQ-LLD-FIELDS-37",
+        "REQ-INF-UNI-003",
+        "REQ-INF-UNI-004"
+      ],
+      "backend": [
+        "REQ-BASE-0",
+        "REQ-BASE-1",
+        "REQ-BASE-2",
+        "REQ-BASE-3",
+        "REQ-BASE-4",
+        "REQ-BASE-5",
+        "REQ-BASE-6",
+        "REQ-BASE-7",
+        "REQ-BASE-8",
+        "REQ-BASE-9",
+        "REQ-EXP-1",
+        "REQ-EXP-2",
+        "REQ-EXP-3",
+        "REQ-EXP-4",
+        "REQ-EXP-5",
+        "REQ-EXP-6",
+        "REQ-EXP-7",
+        "REQ-EXP-8",
+        "REQ-EXP-9",
+        "REQ-EXP-10",
+        "REQ-LLD-FIELDS-2",
+        "REQ-LLD-API-3",
+        "REQ-LLD-FIELDS-5",
+        "REQ-LLD-FIELDS-6",
+        "REQ-LLD-FIELDS-7",
+        "REQ-LLD-API-8",
+        "REQ-LLD-FIELDS-10",
+        "REQ-LLD-API-11",
+        "REQ-LLD-FIELDS-13",
+        "REQ-LLD-API-14",
+        "REQ-LLD-FIELDS-16",
+        "REQ-LLD-API-17",
+        "REQ-LLD-FIELDS-19",
+        "REQ-LLD-API-20",
+        "REQ-LLD-FIELDS-22",
+        "REQ-LLD-API-23",
+        "REQ-LLD-FIELDS-25",
+        "REQ-LLD-API-26",
+        "REQ-LLD-FIELDS-28",
+        "REQ-LLD-API-29",
+        "REQ-LLD-FIELDS-31",
+        "REQ-LLD-API-32",
+        "REQ-LLD-FIELDS-34",
+        "REQ-LLD-API-35",
+        "REQ-LLD-FIELDS-37",
+        "REQ-LLD-API-38",
+        "REQ-INF-UNI-001",
+        "REQ-INF-UNI-002",
+        "REQ-INF-UNI-003",
+        "REQ-INF-UNI-004",
+        "REQ-INF-UNI-005"
+      ],
+      "database": [],
+      "auth": [],
+      "infrastructure": [
+        "REQ-INF-UNI-005"
+      ],
+      "observability": [
+        "REQ-INF-UNI-001"
+      ],
+      "validation": [
+        "REQ-INF-UNI-002"
+      ],
+      "tests": [
+        "REQ-INF-UNI-004"
+      ],
+      "config": [
+        "REQ-INF-UNI-005"
+      ]
+    },
+    "conflicts": [],
+    "questions_for_human": [
+      "Clarify scope/boundary for REQ-BASE-0: Implement feature: real-time",
+      "Telemetry measurements were detected, but no threshold/alert policies are defined. What limits should trigger alert events?"
+    ],
+    "acceptance_criteria": [
+      "Verify that Implement feature: real-time is functioning as expected.",
+      "Verify that Implement feature: flight is functioning as expected.",
+      "Verify that Implement feature: data is functioning as expected.",
+      "Verify that Implement feature: recorder is functioning as expected.",
+      "Verify that Implement feature: buffer is functioning as expected.",
+      "Verify that Implement feature: synchronization is functioning as expected.",
+      "Verify that Implement feature: flushes is functioning as expected.",
+      "Verify that Implement feature: arinc is functioning as expected.",
+      "Verify that Implement feature: 429 is functioning as expected.",
+      "Verify that Implement feature: bus is functioning as expected.",
+      "Verify that role 'user' can access all assigned capabilities without permission errors."
+    ],
+    "gate_result": "PASS_WITH_DECISIONS",
+    "total_assumption_weight": 38,
+    "archetypes": [
+      "greenfield"
+    ],
+    "scope_tier": "major",
+    "spec_version": 1,
+    "page_spreads": {
+      "user": [
+        {
+          "route": "/dashboard",
+          "page_name": "User Dashboard",
+          "module_key": "dashboard",
+          "description": "Operational metrics, tasks, and real-time updates for user"
+        },
+        {
+          "route": "/profile",
+          "page_name": "User Self-Profile",
+          "module_key": "profile",
+          "description": "Account profile, contact details, and credentials for user"
+        },
+        {
+          "route": "/flight",
+          "page_name": "Flight Workspace",
+          "module_key": "flight",
+          "description": "Manage and interact with Flight"
+        },
+        {
+          "route": "/data",
+          "page_name": "Data Workspace",
+          "module_key": "data",
+          "description": "Manage and interact with Data"
+        },
+        {
+          "route": "/recorder",
+          "page_name": "Recorder Workspace",
+          "module_key": "recorder",
+          "description": "Manage and interact with Recorder"
+        },
+        {
+          "route": "/buffer",
+          "page_name": "Buffer Workspace",
+          "module_key": "buffer",
+          "description": "Manage and interact with Buffer"
+        },
+        {
+          "route": "/synchronization",
+          "page_name": "Synchronization Workspace",
+          "module_key": "synchronization",
+          "description": "Manage and interact with Synchronization"
+        },
+        {
+          "route": "/flushes",
+          "page_name": "Flushes Workspace",
+          "module_key": "flushes",
+          "description": "Manage and interact with Flushes"
+        },
+        {
+          "route": "/arinc",
+          "page_name": "Arinc Workspace",
+          "module_key": "arinc",
+          "description": "Manage and interact with Arinc"
+        },
+        {
+          "route": "/429",
+          "page_name": "429 Workspace",
+          "module_key": "429",
+          "description": "Manage and interact with 429"
+        },
+        {
+          "route": "/bus",
+          "page_name": "Bus Workspace",
+          "module_key": "bus",
+          "description": "Manage and interact with Bus"
+        },
+        {
+          "route": "/documents",
+          "page_name": "User Document Vault",
+          "module_key": "documents",
+          "description": "File uploads, records, and digital receipts for user"
+        },
+        {
+          "page_name": "User Arinc Management Context",
+          "route": "/user/arinc_management_context",
+          "owned_capabilities": [
+            "query_operator_inspect_arinc"
+          ],
+          "owned_entities": [
+            "arinc"
+          ],
+          "module_key": "Arinc Management Context",
+          "description": "Arinc Management Context management workspace for user",
+          "architecture_style": "Modular Monolith with Bounded Contexts"
+        },
+        {
+          "page_name": "User Buffer Management Context",
+          "route": "/user/buffer_management_context",
+          "owned_capabilities": [
+            "query_operator_inspect_buffer"
+          ],
+          "owned_entities": [
+            "buffer"
+          ],
+          "module_key": "Buffer Management Context",
+          "description": "Buffer Management Context management workspace for user",
+          "architecture_style": "Modular Monolith with Bounded Contexts"
+        },
+        {
+          "page_name": "User Crash-survivable Management Context",
+          "route": "/user/crash-survivable_management_context",
+          "owned_capabilities": [
+            "query_operator_inspect_crash-survivable"
+          ],
+          "owned_entities": [
+            "crash-survivable"
+          ],
+          "module_key": "Crash-survivable Management Context",
+          "description": "Crash-survivable Management Context management workspace for user",
+          "architecture_style": "Modular Monolith with Bounded Contexts"
+        },
+        {
+          "page_name": "User Data Management Context",
+          "route": "/user/data_management_context",
+          "owned_capabilities": [
+            "query_operator_inspect_data"
+          ],
+          "owned_entities": [
+            "data"
+          ],
+          "module_key": "Data Management Context",
+          "description": "Data Management Context management workspace for user",
+          "architecture_style": "Modular Monolith with Bounded Contexts"
+        },
+        {
+          "page_name": "User Flight Management Context",
+          "route": "/user/flight_management_context",
+          "owned_capabilities": [
+            "query_operator_inspect_flight"
+          ],
+          "owned_entities": [
+            "flight"
+          ],
+          "module_key": "Flight Management Context",
+          "description": "Flight Management Context management workspace for user",
+          "architecture_style": "Modular Monolith with Bounded Contexts"
+        },
+        {
+          "page_name": "User Flushes Management Context",
+          "route": "/user/flushes_management_context",
+          "owned_capabilities": [
+            "query_operator_inspect_flushes"
+          ],
+          "owned_entities": [
+            "flushes"
+          ],
+          "module_key": "Flushes Management Context",
+          "description": "Flushes Management Context management workspace for user",
+          "architecture_style": "Modular Monolith with Bounded Contexts"
+        },
+        {
+          "page_name": "User Frames Management Context",
+          "route": "/user/frames_management_context",
+          "owned_capabilities": [
+            "query_operator_inspect_frames"
+          ],
+          "owned_entities": [
+            "frames"
+          ],
+          "module_key": "Frames Management Context",
+          "description": "Frames Management Context management workspace for user",
+          "architecture_style": "Modular Monolith with Bounded Contexts"
+        },
+        {
+          "page_name": "User Loss Management Context",
+          "route": "/user/loss_management_context",
+          "owned_capabilities": [
+            "query_operator_inspect_loss"
+          ],
+          "owned_entities": [
+            "loss"
+          ],
+          "module_key": "Loss Management Context",
+          "description": "Loss Management Context management workspace for user",
+          "architecture_style": "Modular Monolith with Bounded Contexts"
+        },
+        {
+          "page_name": "User Memory Management Context",
+          "route": "/user/memory_management_context",
+          "owned_capabilities": [
+            "query_operator_inspect_memory"
+          ],
+          "owned_entities": [
+            "memory"
+          ],
+          "module_key": "Memory Management Context",
+          "description": "Memory Management Context management workspace for user",
+          "architecture_style": "Modular Monolith with Bounded Contexts"
+        },
+        {
+          "page_name": "User Recorder Management Context",
+          "route": "/user/recorder_management_context",
+          "owned_capabilities": [
+            "query_operator_inspect_recorder"
+          ],
+          "owned_entities": [
+            "recorder"
+          ],
+          "module_key": "Recorder Management Context",
+          "description": "Recorder Management Context management workspace for user",
+          "architecture_style": "Modular Monolith with Bounded Contexts"
+        },
+        {
+          "page_name": "User Solid-state Management Context",
+          "route": "/user/solid-state_management_context",
+          "owned_capabilities": [
+            "query_operator_inspect_solid-state"
+          ],
+          "owned_entities": [
+            "solid-state"
+          ],
+          "module_key": "Solid-state Management Context",
+          "description": "Solid-state Management Context management workspace for user",
+          "architecture_style": "Modular Monolith with Bounded Contexts"
+        },
+        {
+          "page_name": "User Synchronization Management Context",
+          "route": "/user/synchronization_management_context",
+          "owned_capabilities": [
+            "query_operator_inspect_synchronization"
+          ],
+          "owned_entities": [
+            "synchronization"
+          ],
+          "module_key": "Synchronization Management Context",
+          "description": "Synchronization Management Context management workspace for user",
+          "architecture_style": "Modular Monolith with Bounded Contexts"
+        }
+      ]
+    },
+    "low_level_designs": {
+      "ctrl_ctx_arinc_management": {
+        "id": "ctrl_ctx_arinc_management",
+        "name": "Arinc Management Context Controller",
+        "component_type": "controller",
+        "parent": {
+          "hld_id": "ctx_arinc_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "backend_controller",
+        "transport": "rest_http",
+        "route": "/api/arincs",
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "Verify actor authorization",
+          "Validate request payload schema"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "arinc"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_arinc"
+        ],
+        "capability_bindings": [],
+        "component_hash": "03fe06e9ed56787b4899ce39d6fa7883a840b3cc94f72c53e1f72e4549ba1c73"
+      },
+      "svc_ctx_arinc_management": {
+        "id": "svc_ctx_arinc_management",
+        "name": "Arinc Management Context Service Layer",
+        "component_type": "service",
+        "parent": {
+          "hld_id": "ctx_arinc_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "domain_service",
+        "transport": "internal_function",
+        "route": null,
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [
+          "Arinc Management ContextTransactionManager",
+          "Arinc Management ContextPolicyEvaluator"
+        ],
+        "api_endpoints": [],
+        "validation_rules": [
+          "Enforce state pre/post transitions",
+          "Emit audit log side effects"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "arinc"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_arinc"
+        ],
+        "capability_bindings": [],
+        "component_hash": "c78c62d8dc57628a8955893be4c866106c5ffd49bc9ce2f15d4693d3b265035a"
+      },
+      "ui_ctx_arinc_management": {
+        "id": "ui_ctx_arinc_management",
+        "name": "Arinc Workflow Interface",
+        "component_type": "ui_surface",
+        "parent": {
+          "hld_id": "ctx_arinc_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "frontend_interface",
+        "transport": "rest_http",
+        "route": "/arincs",
+        "layout": "behavioral_workflow_surface",
+        "execution_capability": null,
+        "interaction_capability": "SUBMITS_MUTATION",
+        "sub_components": [
+          "ArincDetailHeader",
+          "ArincActionToolbar",
+          "ArincAuditHistoryPanel"
+        ],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "UI actions trigger backend transport contracts"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "READ_QUERY",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "arinc"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_arinc"
+        ],
+        "capability_bindings": [],
+        "component_hash": "e5374eb96d9142f7cd842732c20510daaeb2fd285861d5d2ca9df4487505fa02"
+      },
+      "ctrl_ctx_buffer_management": {
+        "id": "ctrl_ctx_buffer_management",
+        "name": "Buffer Management Context Controller",
+        "component_type": "controller",
+        "parent": {
+          "hld_id": "ctx_buffer_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "backend_controller",
+        "transport": "rest_http",
+        "route": "/api/buffers",
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "Verify actor authorization",
+          "Validate request payload schema"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "buffer"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_buffer"
+        ],
+        "capability_bindings": [],
+        "component_hash": "b329a04018b08147a7014ebf40bb7bbfa8331c0f4aa73e7176de526c7d7d0073"
+      },
+      "svc_ctx_buffer_management": {
+        "id": "svc_ctx_buffer_management",
+        "name": "Buffer Management Context Service Layer",
+        "component_type": "service",
+        "parent": {
+          "hld_id": "ctx_buffer_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "domain_service",
+        "transport": "internal_function",
+        "route": null,
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [
+          "Buffer Management ContextTransactionManager",
+          "Buffer Management ContextPolicyEvaluator"
+        ],
+        "api_endpoints": [],
+        "validation_rules": [
+          "Enforce state pre/post transitions",
+          "Emit audit log side effects"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "buffer"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_buffer"
+        ],
+        "capability_bindings": [],
+        "component_hash": "ff252793dd49bbb07271d29f8cdddaba19c6baf848d08fe16b962c11af061c09"
+      },
+      "ui_ctx_buffer_management": {
+        "id": "ui_ctx_buffer_management",
+        "name": "Buffer Workflow Interface",
+        "component_type": "ui_surface",
+        "parent": {
+          "hld_id": "ctx_buffer_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "frontend_interface",
+        "transport": "rest_http",
+        "route": "/buffers",
+        "layout": "behavioral_workflow_surface",
+        "execution_capability": null,
+        "interaction_capability": "SUBMITS_MUTATION",
+        "sub_components": [
+          "BufferDetailHeader",
+          "BufferActionToolbar",
+          "BufferAuditHistoryPanel"
+        ],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "UI actions trigger backend transport contracts"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "READ_QUERY",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "buffer"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_buffer"
+        ],
+        "capability_bindings": [],
+        "component_hash": "a2611d57bab29836460fa68ec88ea9fec5ab8146a238a89e265978a247cb6ed5"
+      },
+      "ctrl_ctx_crash-survivable_management": {
+        "id": "ctrl_ctx_crash-survivable_management",
+        "name": "Crash-survivable Management Context Controller",
+        "component_type": "controller",
+        "parent": {
+          "hld_id": "ctx_crash-survivable_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "backend_controller",
+        "transport": "rest_http",
+        "route": "/api/crash-survivables",
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "Verify actor authorization",
+          "Validate request payload schema"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "crash-survivable"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_crash-survivable"
+        ],
+        "capability_bindings": [],
+        "component_hash": "f3beea32793505bea69f1b07312f9c3a57bfc3d53b52d806d78002303f1f2c7b"
+      },
+      "svc_ctx_crash-survivable_management": {
+        "id": "svc_ctx_crash-survivable_management",
+        "name": "Crash-survivable Management Context Service Layer",
+        "component_type": "service",
+        "parent": {
+          "hld_id": "ctx_crash-survivable_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "domain_service",
+        "transport": "internal_function",
+        "route": null,
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [
+          "Crash-survivable Management ContextTransactionManager",
+          "Crash-survivable Management ContextPolicyEvaluator"
+        ],
+        "api_endpoints": [],
+        "validation_rules": [
+          "Enforce state pre/post transitions",
+          "Emit audit log side effects"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "crash-survivable"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_crash-survivable"
+        ],
+        "capability_bindings": [],
+        "component_hash": "d39ee48fbde9392bc029bb162da547c916d42b7946820b317a882afad4c2bf38"
+      },
+      "ui_ctx_crash-survivable_management": {
+        "id": "ui_ctx_crash-survivable_management",
+        "name": "Crash-survivable Workflow Interface",
+        "component_type": "ui_surface",
+        "parent": {
+          "hld_id": "ctx_crash-survivable_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "frontend_interface",
+        "transport": "rest_http",
+        "route": "/crash-survivables",
+        "layout": "behavioral_workflow_surface",
+        "execution_capability": null,
+        "interaction_capability": "SUBMITS_MUTATION",
+        "sub_components": [
+          "Crash-survivableDetailHeader",
+          "Crash-survivableActionToolbar",
+          "Crash-survivableAuditHistoryPanel"
+        ],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "UI actions trigger backend transport contracts"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "READ_QUERY",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "crash-survivable"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_crash-survivable"
+        ],
+        "capability_bindings": [],
+        "component_hash": "362c3a35b89af9105beb4870793e6fce95d49cc219001b4f78d2c0854afb2121"
+      },
+      "ctrl_ctx_data_management": {
+        "id": "ctrl_ctx_data_management",
+        "name": "Data Management Context Controller",
+        "component_type": "controller",
+        "parent": {
+          "hld_id": "ctx_data_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "backend_controller",
+        "transport": "rest_http",
+        "route": "/api/data",
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "Verify actor authorization",
+          "Validate request payload schema"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "data"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_data"
+        ],
+        "capability_bindings": [],
+        "component_hash": "ebeed71bb6dc7545db9c218c36424688fb91066a9f8b6abf3cf4aa7f72afac01"
+      },
+      "svc_ctx_data_management": {
+        "id": "svc_ctx_data_management",
+        "name": "Data Management Context Service Layer",
+        "component_type": "service",
+        "parent": {
+          "hld_id": "ctx_data_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "domain_service",
+        "transport": "internal_function",
+        "route": null,
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [
+          "Data Management ContextTransactionManager",
+          "Data Management ContextPolicyEvaluator"
+        ],
+        "api_endpoints": [],
+        "validation_rules": [
+          "Enforce state pre/post transitions",
+          "Emit audit log side effects"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "data"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_data"
+        ],
+        "capability_bindings": [],
+        "component_hash": "ad0a8931fcc0c45295bbc2222b3029f11c26752af730ac4ad153f07edc791bed"
+      },
+      "ui_ctx_data_management": {
+        "id": "ui_ctx_data_management",
+        "name": "Data Workflow Interface",
+        "component_type": "ui_surface",
+        "parent": {
+          "hld_id": "ctx_data_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "frontend_interface",
+        "transport": "rest_http",
+        "route": "/data",
+        "layout": "behavioral_workflow_surface",
+        "execution_capability": null,
+        "interaction_capability": "SUBMITS_MUTATION",
+        "sub_components": [
+          "DataDetailHeader",
+          "DataActionToolbar",
+          "DataAuditHistoryPanel"
+        ],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "UI actions trigger backend transport contracts"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "READ_QUERY",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "data"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_data"
+        ],
+        "capability_bindings": [],
+        "component_hash": "af91d1dacf4f43771a59be8be0db511bc9cf3acc135b159b014682a60b56790b"
+      },
+      "ctrl_ctx_flight_management": {
+        "id": "ctrl_ctx_flight_management",
+        "name": "Flight Management Context Controller",
+        "component_type": "controller",
+        "parent": {
+          "hld_id": "ctx_flight_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "backend_controller",
+        "transport": "rest_http",
+        "route": "/api/flights",
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "Verify actor authorization",
+          "Validate request payload schema"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "flight"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_flight"
+        ],
+        "capability_bindings": [],
+        "component_hash": "10af69ac76c455c1df1e71fa2bf858c3330e875714ca691c84434b382ecc79ad"
+      },
+      "svc_ctx_flight_management": {
+        "id": "svc_ctx_flight_management",
+        "name": "Flight Management Context Service Layer",
+        "component_type": "service",
+        "parent": {
+          "hld_id": "ctx_flight_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "domain_service",
+        "transport": "internal_function",
+        "route": null,
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [
+          "Flight Management ContextTransactionManager",
+          "Flight Management ContextPolicyEvaluator"
+        ],
+        "api_endpoints": [],
+        "validation_rules": [
+          "Enforce state pre/post transitions",
+          "Emit audit log side effects"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "flight"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_flight"
+        ],
+        "capability_bindings": [],
+        "component_hash": "6a8835c66fcbc81de19d80eba6781808d33587ff057467d3414df55dd8e27382"
+      },
+      "ui_ctx_flight_management": {
+        "id": "ui_ctx_flight_management",
+        "name": "Flight Workflow Interface",
+        "component_type": "ui_surface",
+        "parent": {
+          "hld_id": "ctx_flight_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "frontend_interface",
+        "transport": "rest_http",
+        "route": "/flights",
+        "layout": "behavioral_workflow_surface",
+        "execution_capability": null,
+        "interaction_capability": "SUBMITS_MUTATION",
+        "sub_components": [
+          "FlightDetailHeader",
+          "FlightActionToolbar",
+          "FlightAuditHistoryPanel"
+        ],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "UI actions trigger backend transport contracts"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "READ_QUERY",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "flight"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_flight"
+        ],
+        "capability_bindings": [],
+        "component_hash": "5d1f8d73641c91f3d4614dcdc7b2b0786b73afed537304b70abfeaf60fc341f2"
+      },
+      "ctrl_ctx_flushes_management": {
+        "id": "ctrl_ctx_flushes_management",
+        "name": "Flushes Management Context Controller",
+        "component_type": "controller",
+        "parent": {
+          "hld_id": "ctx_flushes_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "backend_controller",
+        "transport": "rest_http",
+        "route": "/api/flushes",
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "Verify actor authorization",
+          "Validate request payload schema"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "flushes"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_flushes"
+        ],
+        "capability_bindings": [],
+        "component_hash": "a0082a2d60fbf11720282cf95e7a705d49ac9b4dfcf252408710d6c5e983623d"
+      },
+      "svc_ctx_flushes_management": {
+        "id": "svc_ctx_flushes_management",
+        "name": "Flushes Management Context Service Layer",
+        "component_type": "service",
+        "parent": {
+          "hld_id": "ctx_flushes_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "domain_service",
+        "transport": "internal_function",
+        "route": null,
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [
+          "Flushes Management ContextTransactionManager",
+          "Flushes Management ContextPolicyEvaluator"
+        ],
+        "api_endpoints": [],
+        "validation_rules": [
+          "Enforce state pre/post transitions",
+          "Emit audit log side effects"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "flushes"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_flushes"
+        ],
+        "capability_bindings": [],
+        "component_hash": "3da8205a8ba8db374657231bf1fc6180652bee306e9ed8fac037ef07aec2bf61"
+      },
+      "ui_ctx_flushes_management": {
+        "id": "ui_ctx_flushes_management",
+        "name": "Flushes Workflow Interface",
+        "component_type": "ui_surface",
+        "parent": {
+          "hld_id": "ctx_flushes_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "frontend_interface",
+        "transport": "rest_http",
+        "route": "/flushes",
+        "layout": "behavioral_workflow_surface",
+        "execution_capability": null,
+        "interaction_capability": "SUBMITS_MUTATION",
+        "sub_components": [
+          "FlushesDetailHeader",
+          "FlushesActionToolbar",
+          "FlushesAuditHistoryPanel"
+        ],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "UI actions trigger backend transport contracts"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "READ_QUERY",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "flushes"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_flushes"
+        ],
+        "capability_bindings": [],
+        "component_hash": "935c7dd062b2b12bca2dc86e936e744a6b8b20a17ad815000691f4c4b8ba268a"
+      },
+      "ctrl_ctx_frames_management": {
+        "id": "ctrl_ctx_frames_management",
+        "name": "Frames Management Context Controller",
+        "component_type": "controller",
+        "parent": {
+          "hld_id": "ctx_frames_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "backend_controller",
+        "transport": "rest_http",
+        "route": "/api/frames",
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "Verify actor authorization",
+          "Validate request payload schema"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "frames"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_frames"
+        ],
+        "capability_bindings": [],
+        "component_hash": "9010ce98575bbc2cb6c50018853a0a095f467fc94ca4e473b1dd92d99dcc142a"
+      },
+      "svc_ctx_frames_management": {
+        "id": "svc_ctx_frames_management",
+        "name": "Frames Management Context Service Layer",
+        "component_type": "service",
+        "parent": {
+          "hld_id": "ctx_frames_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "domain_service",
+        "transport": "internal_function",
+        "route": null,
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [
+          "Frames Management ContextTransactionManager",
+          "Frames Management ContextPolicyEvaluator"
+        ],
+        "api_endpoints": [],
+        "validation_rules": [
+          "Enforce state pre/post transitions",
+          "Emit audit log side effects"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "frames"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_frames"
+        ],
+        "capability_bindings": [],
+        "component_hash": "509baf89f32f1728e06a338f4307d42e02b526868935c4f1e82ded88c54f4b23"
+      },
+      "ui_ctx_frames_management": {
+        "id": "ui_ctx_frames_management",
+        "name": "Frames Workflow Interface",
+        "component_type": "ui_surface",
+        "parent": {
+          "hld_id": "ctx_frames_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "frontend_interface",
+        "transport": "rest_http",
+        "route": "/frames",
+        "layout": "behavioral_workflow_surface",
+        "execution_capability": null,
+        "interaction_capability": "SUBMITS_MUTATION",
+        "sub_components": [
+          "FramesDetailHeader",
+          "FramesActionToolbar",
+          "FramesAuditHistoryPanel"
+        ],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "UI actions trigger backend transport contracts"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "READ_QUERY",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "frames"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_frames"
+        ],
+        "capability_bindings": [],
+        "component_hash": "afd7d43acf7232cca72f7675b4247dc45440693d80e3ff537a01ade198697b93"
+      },
+      "ctrl_ctx_loss_management": {
+        "id": "ctrl_ctx_loss_management",
+        "name": "Loss Management Context Controller",
+        "component_type": "controller",
+        "parent": {
+          "hld_id": "ctx_loss_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "backend_controller",
+        "transport": "rest_http",
+        "route": "/api/loss",
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "Verify actor authorization",
+          "Validate request payload schema"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "loss"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_loss"
+        ],
+        "capability_bindings": [],
+        "component_hash": "c706a7140115971f758648ccc643538fe85ef53f64b0d4cba0069744297ec27d"
+      },
+      "svc_ctx_loss_management": {
+        "id": "svc_ctx_loss_management",
+        "name": "Loss Management Context Service Layer",
+        "component_type": "service",
+        "parent": {
+          "hld_id": "ctx_loss_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "domain_service",
+        "transport": "internal_function",
+        "route": null,
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [
+          "Loss Management ContextTransactionManager",
+          "Loss Management ContextPolicyEvaluator"
+        ],
+        "api_endpoints": [],
+        "validation_rules": [
+          "Enforce state pre/post transitions",
+          "Emit audit log side effects"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "loss"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_loss"
+        ],
+        "capability_bindings": [],
+        "component_hash": "2f55351c8626bb28342da8add33bd67324650b187285f9eedbc0dd8e8c836b5e"
+      },
+      "ui_ctx_loss_management": {
+        "id": "ui_ctx_loss_management",
+        "name": "Loss Workflow Interface",
+        "component_type": "ui_surface",
+        "parent": {
+          "hld_id": "ctx_loss_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "frontend_interface",
+        "transport": "rest_http",
+        "route": "/loss",
+        "layout": "behavioral_workflow_surface",
+        "execution_capability": null,
+        "interaction_capability": "SUBMITS_MUTATION",
+        "sub_components": [
+          "LossDetailHeader",
+          "LossActionToolbar",
+          "LossAuditHistoryPanel"
+        ],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "UI actions trigger backend transport contracts"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "READ_QUERY",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "loss"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_loss"
+        ],
+        "capability_bindings": [],
+        "component_hash": "b3242607eabb386d83d8d843f7538f4e9a48f7187b1bfaf66ae1a0a628931042"
+      },
+      "ctrl_ctx_memory_management": {
+        "id": "ctrl_ctx_memory_management",
+        "name": "Memory Management Context Controller",
+        "component_type": "controller",
+        "parent": {
+          "hld_id": "ctx_memory_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "backend_controller",
+        "transport": "rest_http",
+        "route": "/api/memories",
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "Verify actor authorization",
+          "Validate request payload schema"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "memory"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_memory"
+        ],
+        "capability_bindings": [],
+        "component_hash": "ef165d8e38005a03e116def0fe5c2fa97a080bec1794557559d4fe8c18feb4fb"
+      },
+      "svc_ctx_memory_management": {
+        "id": "svc_ctx_memory_management",
+        "name": "Memory Management Context Service Layer",
+        "component_type": "service",
+        "parent": {
+          "hld_id": "ctx_memory_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "domain_service",
+        "transport": "internal_function",
+        "route": null,
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [
+          "Memory Management ContextTransactionManager",
+          "Memory Management ContextPolicyEvaluator"
+        ],
+        "api_endpoints": [],
+        "validation_rules": [
+          "Enforce state pre/post transitions",
+          "Emit audit log side effects"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "memory"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_memory"
+        ],
+        "capability_bindings": [],
+        "component_hash": "d6bbde4df289e7670eed1ce67fbdd072651cd3439a72d637d79c5bd579855bbe"
+      },
+      "ui_ctx_memory_management": {
+        "id": "ui_ctx_memory_management",
+        "name": "Memory Workflow Interface",
+        "component_type": "ui_surface",
+        "parent": {
+          "hld_id": "ctx_memory_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "frontend_interface",
+        "transport": "rest_http",
+        "route": "/memories",
+        "layout": "behavioral_workflow_surface",
+        "execution_capability": null,
+        "interaction_capability": "SUBMITS_MUTATION",
+        "sub_components": [
+          "MemoryDetailHeader",
+          "MemoryActionToolbar",
+          "MemoryAuditHistoryPanel"
+        ],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "UI actions trigger backend transport contracts"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "READ_QUERY",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "memory"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_memory"
+        ],
+        "capability_bindings": [],
+        "component_hash": "34376209a467b062171960b5c8b675428ad795e97f5c134828fe11fbffedf70b"
+      },
+      "ctrl_ctx_recorder_management": {
+        "id": "ctrl_ctx_recorder_management",
+        "name": "Recorder Management Context Controller",
+        "component_type": "controller",
+        "parent": {
+          "hld_id": "ctx_recorder_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "backend_controller",
+        "transport": "rest_http",
+        "route": "/api/recorders",
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "Verify actor authorization",
+          "Validate request payload schema"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "recorder"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_recorder"
+        ],
+        "capability_bindings": [],
+        "component_hash": "53f10812ad169a537e45046dbe6ad30c98c48499a034c51243e6e12660d725ed"
+      },
+      "svc_ctx_recorder_management": {
+        "id": "svc_ctx_recorder_management",
+        "name": "Recorder Management Context Service Layer",
+        "component_type": "service",
+        "parent": {
+          "hld_id": "ctx_recorder_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "domain_service",
+        "transport": "internal_function",
+        "route": null,
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [
+          "Recorder Management ContextTransactionManager",
+          "Recorder Management ContextPolicyEvaluator"
+        ],
+        "api_endpoints": [],
+        "validation_rules": [
+          "Enforce state pre/post transitions",
+          "Emit audit log side effects"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "recorder"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_recorder"
+        ],
+        "capability_bindings": [],
+        "component_hash": "8484364acbaeb2a77e0bef75c7ef095a5712c735745f817ecdd1afd54b2cd837"
+      },
+      "ui_ctx_recorder_management": {
+        "id": "ui_ctx_recorder_management",
+        "name": "Recorder Workflow Interface",
+        "component_type": "ui_surface",
+        "parent": {
+          "hld_id": "ctx_recorder_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "frontend_interface",
+        "transport": "rest_http",
+        "route": "/recorders",
+        "layout": "behavioral_workflow_surface",
+        "execution_capability": null,
+        "interaction_capability": "SUBMITS_MUTATION",
+        "sub_components": [
+          "RecorderDetailHeader",
+          "RecorderActionToolbar",
+          "RecorderAuditHistoryPanel"
+        ],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "UI actions trigger backend transport contracts"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "READ_QUERY",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "recorder"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_recorder"
+        ],
+        "capability_bindings": [],
+        "component_hash": "54b68c9500a7e362c0e407e5af619a4b60821fe379a61cf929050c6a810645aa"
+      },
+      "ctrl_ctx_solid-state_management": {
+        "id": "ctrl_ctx_solid-state_management",
+        "name": "Solid-state Management Context Controller",
+        "component_type": "controller",
+        "parent": {
+          "hld_id": "ctx_solid-state_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "backend_controller",
+        "transport": "rest_http",
+        "route": "/api/solid-states",
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "Verify actor authorization",
+          "Validate request payload schema"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "solid-state"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_solid-state"
+        ],
+        "capability_bindings": [],
+        "component_hash": "a74aae7bf3f342ec1bf8b48b1a009fb30d8234ebc4c6321476e47d889e2ac1b9"
+      },
+      "svc_ctx_solid-state_management": {
+        "id": "svc_ctx_solid-state_management",
+        "name": "Solid-state Management Context Service Layer",
+        "component_type": "service",
+        "parent": {
+          "hld_id": "ctx_solid-state_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "domain_service",
+        "transport": "internal_function",
+        "route": null,
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [
+          "Solid-state Management ContextTransactionManager",
+          "Solid-state Management ContextPolicyEvaluator"
+        ],
+        "api_endpoints": [],
+        "validation_rules": [
+          "Enforce state pre/post transitions",
+          "Emit audit log side effects"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "solid-state"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_solid-state"
+        ],
+        "capability_bindings": [],
+        "component_hash": "8ef359f5b31245d6107b8438fdef0c9158108f28d5c9113661480d6cdcb0b331"
+      },
+      "ui_ctx_solid-state_management": {
+        "id": "ui_ctx_solid-state_management",
+        "name": "Solid-state Workflow Interface",
+        "component_type": "ui_surface",
+        "parent": {
+          "hld_id": "ctx_solid-state_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "frontend_interface",
+        "transport": "rest_http",
+        "route": "/solid-states",
+        "layout": "behavioral_workflow_surface",
+        "execution_capability": null,
+        "interaction_capability": "SUBMITS_MUTATION",
+        "sub_components": [
+          "Solid-stateDetailHeader",
+          "Solid-stateActionToolbar",
+          "Solid-stateAuditHistoryPanel"
+        ],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "UI actions trigger backend transport contracts"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "READ_QUERY",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "solid-state"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_solid-state"
+        ],
+        "capability_bindings": [],
+        "component_hash": "be15194a41b6c36ed8f760e33ad9a7a458178e2dafde1645592d5e741e8fd733"
+      },
+      "ctrl_ctx_synchronization_management": {
+        "id": "ctrl_ctx_synchronization_management",
+        "name": "Synchronization Management Context Controller",
+        "component_type": "controller",
+        "parent": {
+          "hld_id": "ctx_synchronization_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "backend_controller",
+        "transport": "rest_http",
+        "route": "/api/synchronizations",
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "Verify actor authorization",
+          "Validate request payload schema"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "synchronization"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_synchronization"
+        ],
+        "capability_bindings": [],
+        "component_hash": "aceadbd1751a49e7e31d2a86083a8bea4bdd7831c7e52f8af0b8b46784e96562"
+      },
+      "svc_ctx_synchronization_management": {
+        "id": "svc_ctx_synchronization_management",
+        "name": "Synchronization Management Context Service Layer",
+        "component_type": "service",
+        "parent": {
+          "hld_id": "ctx_synchronization_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "domain_service",
+        "transport": "internal_function",
+        "route": null,
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [
+          "Synchronization Management ContextTransactionManager",
+          "Synchronization Management ContextPolicyEvaluator"
+        ],
+        "api_endpoints": [],
+        "validation_rules": [
+          "Enforce state pre/post transitions",
+          "Emit audit log side effects"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "synchronization"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_synchronization"
+        ],
+        "capability_bindings": [],
+        "component_hash": "96c55ad7d3c1f9705918539e89857b17ff61f4cb4e813651bde7a0763a3044c2"
+      },
+      "ui_ctx_synchronization_management": {
+        "id": "ui_ctx_synchronization_management",
+        "name": "Synchronization Workflow Interface",
+        "component_type": "ui_surface",
+        "parent": {
+          "hld_id": "ctx_synchronization_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "frontend_interface",
+        "transport": "rest_http",
+        "route": "/synchronizations",
+        "layout": "behavioral_workflow_surface",
+        "execution_capability": null,
+        "interaction_capability": "SUBMITS_MUTATION",
+        "sub_components": [
+          "SynchronizationDetailHeader",
+          "SynchronizationActionToolbar",
+          "SynchronizationAuditHistoryPanel"
+        ],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "UI actions trigger backend transport contracts"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "READ_QUERY",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "synchronization"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_synchronization"
+        ],
+        "capability_bindings": [],
+        "component_hash": "5ae85bdd72c37058ba5cb5d10261f78f2f3f80f6f27f3f47d7fd4af98f666127"
+      }
+    },
+    "scope_boundaries": {
+      "in_scope": [],
+      "out_of_scope": [
+        "Unrequested Payment Gateway (No Stripe Payment Gateway / Razorpay Checkout)",
+        "Unrequested Gamification (No Gamification Rewards Engine / User Badges & XP)",
+        "Unrequested Ai Chatbot (No AI Assistant Chatbot / LLM Integration Widget)",
+        "Unrequested Crypto Web3 (No Crypto Wallet Connect / Web3 Smart Contract Interaction)",
+        "Unrequested Social Oauth (No Third-Party Social OAuth Integrations)"
+      ]
+    },
+    "domain_graph": {
+      "nodes": [
+        {
+          "id": "actor_operator",
+          "name": "Operator",
+          "primitive_type": "actor",
+          "attributes": {},
+          "provenance": "explicit",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "description": "System actor: operator"
+        },
+        {
+          "id": "entity_memory",
+          "name": "Memory",
+          "primitive_type": "entity",
+          "attributes": {},
+          "provenance": "explicit",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "description": "Core domain entity: memory"
+        },
+        {
+          "id": "entity_loss",
+          "name": "Loss",
+          "primitive_type": "entity",
+          "attributes": {},
+          "provenance": "explicit",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "description": "Core domain entity: loss"
+        },
+        {
+          "id": "entity_flight",
+          "name": "Flight",
+          "primitive_type": "entity",
+          "attributes": {},
+          "provenance": "explicit",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "description": "Core domain entity: flight"
+        },
+        {
+          "id": "entity_arinc",
+          "name": "Arinc",
+          "primitive_type": "entity",
+          "attributes": {},
+          "provenance": "explicit",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "description": "Core domain entity: arinc"
+        },
+        {
+          "id": "entity_crash-survivable",
+          "name": "Crash-Survivable",
+          "primitive_type": "entity",
+          "attributes": {},
+          "provenance": "explicit",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "description": "Core domain entity: crash-survivable"
+        },
+        {
+          "id": "entity_buffer",
+          "name": "Buffer",
+          "primitive_type": "entity",
+          "attributes": {},
+          "provenance": "explicit",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "description": "Core domain entity: buffer"
+        },
+        {
+          "id": "entity_solid-state",
+          "name": "Solid-State",
+          "primitive_type": "entity",
+          "attributes": {},
+          "provenance": "explicit",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "description": "Core domain entity: solid-state"
+        },
+        {
+          "id": "entity_synchronization",
+          "name": "Synchronization",
+          "primitive_type": "entity",
+          "attributes": {},
+          "provenance": "explicit",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "description": "Core domain entity: synchronization"
+        },
+        {
+          "id": "entity_flushes",
+          "name": "Flushes",
+          "primitive_type": "entity",
+          "attributes": {},
+          "provenance": "explicit",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "description": "Core domain entity: flushes"
+        },
+        {
+          "id": "entity_data",
+          "name": "Data",
+          "primitive_type": "entity",
+          "attributes": {},
+          "provenance": "explicit",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "description": "Core domain entity: data"
+        },
+        {
+          "id": "entity_frames",
+          "name": "Frames",
+          "primitive_type": "entity",
+          "attributes": {},
+          "provenance": "explicit",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "description": "Core domain entity: frames"
+        },
+        {
+          "id": "entity_recorder",
+          "name": "Recorder",
+          "primitive_type": "entity",
+          "attributes": {},
+          "provenance": "explicit",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "description": "Core domain entity: recorder"
+        },
+        {
+          "id": "meas_power",
+          "name": "Power",
+          "primitive_type": "measurement",
+          "attributes": {},
+          "provenance": "explicit",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "description": "Telemetry/Measurement: power"
+        }
+      ],
+      "edges": [
+        {
+          "source_id": "entity_memory",
+          "relation": "produces",
+          "target_id": "meas_power",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "entity_loss",
+          "relation": "produces",
+          "target_id": "meas_power",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "entity_flight",
+          "relation": "produces",
+          "target_id": "meas_power",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "entity_arinc",
+          "relation": "produces",
+          "target_id": "meas_power",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "entity_crash-survivable",
+          "relation": "produces",
+          "target_id": "meas_power",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "entity_buffer",
+          "relation": "produces",
+          "target_id": "meas_power",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "entity_solid-state",
+          "relation": "produces",
+          "target_id": "meas_power",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "entity_synchronization",
+          "relation": "produces",
+          "target_id": "meas_power",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "entity_flushes",
+          "relation": "produces",
+          "target_id": "meas_power",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "entity_data",
+          "relation": "produces",
+          "target_id": "meas_power",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "entity_frames",
+          "relation": "produces",
+          "target_id": "meas_power",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "entity_recorder",
+          "relation": "produces",
+          "target_id": "meas_power",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "actor_operator",
+          "relation": "authorized_for",
+          "target_id": "entity_memory",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "actor_operator",
+          "relation": "authorized_for",
+          "target_id": "entity_loss",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "actor_operator",
+          "relation": "authorized_for",
+          "target_id": "entity_flight",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "actor_operator",
+          "relation": "authorized_for",
+          "target_id": "entity_arinc",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "actor_operator",
+          "relation": "authorized_for",
+          "target_id": "entity_crash-survivable",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "actor_operator",
+          "relation": "authorized_for",
+          "target_id": "entity_buffer",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "actor_operator",
+          "relation": "authorized_for",
+          "target_id": "entity_solid-state",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "actor_operator",
+          "relation": "authorized_for",
+          "target_id": "entity_synchronization",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "actor_operator",
+          "relation": "authorized_for",
+          "target_id": "entity_flushes",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "actor_operator",
+          "relation": "authorized_for",
+          "target_id": "entity_data",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "actor_operator",
+          "relation": "authorized_for",
+          "target_id": "entity_frames",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "actor_operator",
+          "relation": "authorized_for",
+          "target_id": "entity_recorder",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        }
+      ]
+    },
+    "domain_specificity_score": 0.8,
+    "unsupported_invention_rate": 0.0,
+    "assumption_ledger": []
+  }
+}

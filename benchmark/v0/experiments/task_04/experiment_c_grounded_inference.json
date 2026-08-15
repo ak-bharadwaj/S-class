@@ -1,0 +1,116 @@
+{
+  "experiment": "EXPERIMENT C — Grounded Domain Inference (Task 04)",
+  "task_id": "TASK-04-AEROSPACE-BLACKBOX-TELEMETRY",
+  "inferred_requirements": [
+    {
+      "requirement_id": "REQ-FDR-001",
+      "title": "Real-Time ARINC 429 Telemetry Frame Ingestion to Buffer",
+      "description": "The Flight Data Recorder (FDR) telemetry software shall continuously ingest 32-bit ARINC 429 bus word frames from the receiver interface into an in-memory buffer in real time.",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Directly stated in prompt: 'Implement real-time flight data recorder buffer synchronization that flushes ARINC 429 bus frames'."
+    },
+    {
+      "requirement_id": "REQ-FDR-002",
+      "title": "Emergency Telemetry Flush to Solid-State Crash-Survivable Memory on Power Loss",
+      "description": "Upon detection of an imminent primary power failure, the system shall flush pending uncommitted ARINC 429 telemetry frames from volatile memory into solid-state Crash-Survivable Memory Units (CSMU).",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Directly stated in prompt: 'flushes ARINC 429 bus frames to solid-state crash-survivable memory on power loss'."
+    },
+    {
+      "requirement_id": "REQ-FDR-003",
+      "title": "DO-178C Static Memory Pre-Allocation",
+      "description": "All telemetry buffers, ring queues, and Direct Memory Access (DMA) transfer descriptors shall be statically allocated at compile time; runtime dynamic heap allocation (e.g., malloc/free) is strictly prohibited.",
+      "type": "INVARIANT",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "AVIONICS_SAFETY",
+      "confidence": 0.99,
+      "justification": "Step 1: DO-178C Level A/B safety-critical avionics standards strictly disallow unbounded heap allocation to eliminate risks of memory fragmentation and non-deterministic execution times. -> Step 2: Unpredictable allocation latency or memory exhaustion during high-rate telemetry capture could cause catastrophic frame loss or system lockups. -> Step 3: Therefore, static pre-allocation of fixed-size data structures with bounded execution time is technically necessary to guarantee deterministic memory safety."
+    },
+    {
+      "requirement_id": "REQ-FDR-004",
+      "title": "Ingestion into Deterministic Ring Buffer",
+      "description": "Ingested ARINC 429 frames shall be queued into a deterministic, lock-free circular ring buffer using atomic head/tail index tracking to decouple high-frequency RX interrupt routines from slower non-volatile write routines.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "AVIONICS_SAFETY",
+      "confidence": 0.98,
+      "justification": "Step 1: ARINC 429 bus frames arrive asynchronously across high-speed bus lines and must be captured within strict ISR deadlines. -> Step 2: Blocking synchronization primitives (e.g., mutexes, semaphores) cause priority inversion and unbounded ISR jitter. -> Step 3: Therefore, a lock-free deterministic ring buffer is technically necessary to safely queue frames across execution contexts without race conditions or dropped frames."
+    },
+    {
+      "requirement_id": "REQ-FDR-005",
+      "title": "Emergency Flush on Power Loss Interrupt",
+      "description": "The system shall attach a dedicated top-priority Power-Fail Interrupt (PFI/NMI) handler to hardware voltage monitor lines to immediately preempt standard tasks and initiate the crash-survivable memory flush sequence.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "HARDWARE_SURVIVABILITY",
+      "confidence": 0.99,
+      "justification": "Step 1: Aircraft electrical power loss events during catastrophic incidents occur instantaneously, leaving minimal residual power. -> Step 2: Polling-based power monitoring introduces scheduling latency that risks total power collapse before write routines can start. -> Step 3: Therefore, a hardware-vectored Non-Maskable / Power-Fail Interrupt (NMI/PFI) handler is technically necessary to immediately trigger the emergency flush without software polling delays."
+    },
+    {
+      "requirement_id": "REQ-FDR-006",
+      "title": "Hold-Up Capacitor Energy Budget Time Window Enforcement (<=50ms Flush Deadline)",
+      "description": "The entire emergency volatile-to-nonvolatile buffer flush sequence shall complete within a worst-case execution time (WCET) of <= 50ms from power-fail interrupt assertion, matching the hardware hold-up capacitor power reserve budget.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "HARDWARE_SURVIVABILITY",
+      "confidence": 0.98,
+      "justification": "Step 1: Airborne solid-state recorders rely on auxiliary hold-up capacitors that provide a finite energy window (typically <= 50ms to 200ms) upon loss of main 28V DC / 115V AC aircraft power. -> Step 2: If the non-volatile write cycle exceeds this capacitor discharge window, the write will abort mid-page, resulting in uncommitted buffer loss and flash sector corruption. -> Step 3: Therefore, enforcing a strict <= 50ms flush deadline with verified WCET is technically necessary to guarantee full data persistence before capacitor energy depletion."
+    },
+    {
+      "requirement_id": "REQ-FDR-007",
+      "title": "ARINC 429 Parity and CRC Verification",
+      "description": "The receiver pipeline shall validate the parity bit (bit 32, odd/even per bus config) of each ARINC 429 word and compute block-level CRC integrity checks before committing frames to the telemetry buffer; corrupted words shall be flagged with error status.",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "PROTOCOL_SPEC",
+      "confidence": 0.97,
+      "justification": "Step 1: ARINC 429 specification mandates odd (or optionally even) parity on bit 32 to detect transmission errors caused by avionics EMI/RFI noise. -> Step 2: Committing corrupted or unverified telemetry frames to crash-survivable storage impairs post-incident crash investigation and violates data authenticity standards. -> Step 3: Therefore, validating parity and CRC prior to buffer persistence is technically necessary to ensure data integrity in the recorded flight record."
+    },
+    {
+      "requirement_id": "REQ-FDR-008",
+      "title": "Non-Volatile Flash Wear-Leveling and Circular Overwrite",
+      "description": "The solid-state crash-survivable memory management layer shall implement deterministic flash wear-leveling and circular block overwrite algorithms to evenly distribute write/erase cycles while maintaining the mandatory rolling flight duration telemetry history.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "HARDWARE_SURVIVABILITY",
+      "confidence": 0.96,
+      "justification": "Step 1: Solid-state NAND/NOR flash cells have finite physical program/erase (P/E) endurance limits. -> Step 2: Continuous flight recording writes millions of frames over operational lifetimes, which would exhaust localized flash blocks rapidly without wear-leveling. -> Step 3: Therefore, deterministic wear-leveling coupled with circular block overwrite is technically necessary to prevent physical media failure while maintaining compliant continuous rolling flight recording."
+    },
+    {
+      "requirement_id": "REQ-FDR-009",
+      "title": "Crash-Survivable Memory Physical Protection Compliance",
+      "description": "The memory storage interface shall write to solid-state memory modules rated for EUROCAE ED-112A / FAA TSO-C124b crash survivability (impact shock, penetration resistance, static crush, and high-temperature fire resistance).",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "SUPPORTED",
+      "provenance": "HARDWARE_SURVIVABILITY",
+      "confidence": 0.92,
+      "justification": "Supported by the prompt specification of 'crash-survivable memory' and standard aerospace black box certification standards (ED-112A / TSO-C124b)."
+    },
+    {
+      "requirement_id": "REQ-FDR-010",
+      "title": "ARINC 429 Channel Transmission Bit Rate",
+      "description": "Operational bit rate of the ARINC 429 input channels (Low Speed: 12.5 kbps vs High Speed: 100 kbps) and total physical receiver channel count.",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "PROTOCOL_SPEC",
+      "confidence": 0.5,
+      "justification": "The ARINC 429 standard defines two transmission speeds: 12.5 kbps and 100 kbps. The prompt leaves the target baud rate and channel multiplexing topology unstated."
+    },
+    {
+      "requirement_id": "REQ-FDR-011",
+      "title": "Non-Volatile Storage At-Rest Encryption Cipher",
+      "description": "Cryptographic algorithm and key management scheme (e.g., AES-256-GCM, hardware secure element, or unencrypted raw partition) for data stored in crash-survivable flash memory.",
+      "type": "SECURITY",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 0.5,
+      "justification": "The prompt does not state whether flight telemetry stored in crash-survivable memory must be cryptographically protected at rest or adhere to specific export-controlled airframe security profiles."
+    }
+  ]
+}

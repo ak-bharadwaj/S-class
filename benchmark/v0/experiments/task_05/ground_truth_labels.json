@@ -1,0 +1,83 @@
+{
+  "task_id": "TASK-05-EXAM-BROWSER-SANDBOX",
+  "domain": "edtech_security",
+  "raw_prompt": "Build a desktop examination lockdown sandbox that restricts dual-monitor mirroring and intercepts OS clipboard paste during active exam sessions.",
+  "canonical_semantic_units": {
+    "examination lockdown sandbox": {
+      "ground_truth_class": "ENTITY",
+      "rationale": "Desktop security sandbox application and isolated process environment."
+    },
+    "lockdown": {
+      "ground_truth_class": "BEHAVIOR",
+      "rationale": "Process isolation and system privilege restriction action."
+    },
+    "restricts": {
+      "ground_truth_class": "BEHAVIOR",
+      "rationale": "Enforcement action prohibiting multi-monitor display mirroring."
+    },
+    "dual-monitor mirroring": {
+      "ground_truth_class": "CONSTRAINT",
+      "rationale": "Hardware display configuration constraint prohibited during proctored exams."
+    },
+    "intercepts": {
+      "ground_truth_class": "BEHAVIOR",
+      "rationale": "OS-level event hooking and inspection mechanism."
+    },
+    "OS clipboard paste": {
+      "ground_truth_class": "BEHAVIOR",
+      "rationale": "System clipboard transfer operation to be intercepted and sanitized/blocked."
+    },
+    "during active exam sessions": {
+      "ground_truth_class": "CONSTRAINT",
+      "rationale": "Temporal state boundary defining when sandbox restrictions are actively enforced."
+    },
+    "build": {
+      "ground_truth_class": "NOISE",
+      "rationale": "Imperative directive command."
+    }
+  },
+  "canonical_domain_requirements": {
+    "REQ-EXP-01": {
+      "title": "Disable and Block Dual-Monitor Display Mirroring",
+      "expected_type": "EXPLICIT",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT"
+    },
+    "REQ-EXP-02": {
+      "title": "Intercept and Block OS Clipboard Paste Events",
+      "expected_type": "EXPLICIT",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT"
+    },
+    "REQ-DER-01": {
+      "title": "Suppress OS Global Keyboard Shortcuts (Alt+Tab, PrintScreen, WinKey)",
+      "expected_type": "DERIVED_JUSTIFIED",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "SANDBOX_SECURITY"
+    },
+    "REQ-DER-02": {
+      "title": "Unauthorized Background Process Enumeration and Blacklisting",
+      "expected_type": "DERIVED_JUSTIFIED",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "ANTI_CHEAT_INTEGRITY"
+    },
+    "REQ-DER-03": {
+      "title": "Security Audit Logging of Sandbox Escape Attempts",
+      "expected_type": "DERIVED_JUSTIFIED",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "AUDIT_TELEMETRY"
+    },
+    "REQ-SUP-01": {
+      "title": "Graceful Restoration of System Settings and Clipboard on Exam Exit",
+      "expected_type": "SUPPORTED",
+      "epistemic_status": "SUPPORTED",
+      "provenance": "OS_SYSTEM_CLEANUP"
+    }
+  },
+  "forbidden_hallucinations": [
+    "Student grading and gradebook UI",
+    "AI webcam face-tracking proctoring portal",
+    "Teacher classroom chat forum",
+    "Automated essay scoring engine"
+  ]
+}

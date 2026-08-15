@@ -1,74 +1,221 @@
-[
-  {
-    "task_id": "TASK-01-FINTECH-LEDGER",
-    "domain": "fintech",
-    "ground_truth_units_count": 7,
-    "ground_truth_reqs_count": 7,
-    "experiment_a": {
-      "total_requirements": 103,
-      "page_spreads": 48,
-      "explosion_factor": 14.71
-    },
-    "experiment_b": {
-      "accuracy_on_frozen_gt": 1.0,
-      "unscored_units_count": 1
-    },
-    "experiment_c": {
-      "total_inferred_requirements": 10,
-      "explosion_factor": 1.43,
-      "exact_gt_recall": 1.0,
-      "derived_inference_precision": 1.0,
-      "unsupported_inference_rate": 0.0,
-      "ambiguity_unknown_rate": 0.1,
-      "ui_hallucinations": 0
-    }
+{
+  "tasks_evaluated_count": 5,
+  "task_ids": [
+    "TASK-01-FINTECH-LEDGER",
+    "TASK-02-AUTH-SESSION-REVOKE",
+    "TASK-03-HEALTHCARE-PHI-MASK",
+    "TASK-04-AEROSPACE-BLACKBOX-TELEMETRY",
+    "TASK-05-EXAM-BROWSER-SANDBOX"
+  ],
+  "micro_metrics": {
+    "pooled_gt_units": 38,
+    "pooled_b_correct": 38,
+    "b_classification_accuracy": 1.0,
+    "pooled_gt_requirements": 32,
+    "pooled_gt_recovered": 31,
+    "exact_gt_recall": 0.9688,
+    "exact_gt_recall_fraction": "31/32",
+    "pooled_derived_proposed": 31,
+    "pooled_derived_validated": 31,
+    "derived_inference_precision": 1.0,
+    "pooled_non_unknown": 43,
+    "pooled_unsupported": 0,
+    "unsupported_inference_rate": 0.0,
+    "pooled_total_inferred": 54,
+    "pooled_unknown": 11,
+    "ambiguity_unknown_rate": 0.2037,
+    "baseline_a_explosion_factor": 12.62,
+    "exp_c_explosion_factor": 1.69
   },
-  {
-    "task_id": "TASK-02-AUTH-SESSION-REVOKE",
-    "domain": "auth_iam",
-    "ground_truth_units_count": 8,
-    "ground_truth_reqs_count": 6,
-    "experiment_a": {
-      "total_requirements": 96,
-      "page_spreads": 23,
-      "explosion_factor": 16.0
-    },
-    "experiment_b": {
-      "accuracy_on_frozen_gt": 1.0,
-      "unscored_units_count": 0
-    },
-    "experiment_c": {
-      "total_inferred_requirements": 10,
-      "explosion_factor": 1.67,
-      "exact_gt_recall": 0.8333,
-      "derived_inference_precision": 1.0,
-      "unsupported_inference_rate": 0.0,
-      "ambiguity_unknown_rate": 0.3,
-      "ui_hallucinations": 0
-    }
+  "macro_metrics": {
+    "b_classification_accuracy": 1.0,
+    "exact_gt_recall": 0.9667,
+    "derived_inference_precision": 1.0,
+    "unsupported_inference_rate": 0.0,
+    "ambiguity_unknown_rate": 0.1947,
+    "baseline_a_explosion_factor": 12.61,
+    "exp_c_explosion_factor": 1.71
   },
-  {
-    "task_id": "TASK-03-HEALTHCARE-PHI-MASK",
-    "domain": "healthcare_ehr",
-    "ground_truth_units_count": 7,
-    "ground_truth_reqs_count": 7,
-    "experiment_a": {
-      "total_requirements": 76,
-      "page_spreads": 24,
-      "explosion_factor": 10.86
+  "task_breakdown": [
+    {
+      "task_id": "TASK-01-FINTECH-LEDGER",
+      "domain": "general",
+      "adjudication_reviewer": "independent_domain_evaluator",
+      "adjudication_version": "1.0",
+      "ground_truth_units_count": 7,
+      "ground_truth_reqs_count": 7,
+      "experiment_a": {
+        "total_requirements": 103,
+        "page_spreads": 48,
+        "assumption_weight": 22,
+        "explosion_factor": 14.71
+      },
+      "experiment_b": {
+        "accuracy_on_frozen_gt": 1.0,
+        "correct_units": 7,
+        "total_gt_units": 7,
+        "unscored_units_count": 1
+      },
+      "experiment_c": {
+        "total_inferred_requirements": 10,
+        "explosion_factor": 1.43,
+        "gt_recovered_count": 7,
+        "gt_req_count": 7,
+        "exact_gt_recall": 1.0,
+        "derived_proposed_count": 6,
+        "derived_validated_count": 6,
+        "derived_inference_precision": 1.0,
+        "non_unknown_count": 9,
+        "unsupported_count": 0,
+        "unsupported_inference_rate": 0.0,
+        "unknown_count": 1,
+        "ambiguity_unknown_rate": 0.1,
+        "ui_hallucinations": 0
+      }
     },
-    "experiment_b": {
-      "accuracy_on_frozen_gt": 1.0,
-      "unscored_units_count": 0
+    {
+      "task_id": "TASK-02-AUTH-SESSION-REVOKE",
+      "domain": "auth_iam",
+      "adjudication_reviewer": "independent_security_evaluator",
+      "adjudication_version": "1.0",
+      "ground_truth_units_count": 8,
+      "ground_truth_reqs_count": 6,
+      "experiment_a": {
+        "total_requirements": 96,
+        "page_spreads": 23,
+        "assumption_weight": 98,
+        "explosion_factor": 16.0
+      },
+      "experiment_b": {
+        "accuracy_on_frozen_gt": 1.0,
+        "correct_units": 8,
+        "total_gt_units": 8,
+        "unscored_units_count": 0
+      },
+      "experiment_c": {
+        "total_inferred_requirements": 10,
+        "explosion_factor": 1.67,
+        "gt_recovered_count": 5,
+        "gt_req_count": 6,
+        "exact_gt_recall": 0.8333,
+        "derived_proposed_count": 5,
+        "derived_validated_count": 5,
+        "derived_inference_precision": 1.0,
+        "non_unknown_count": 7,
+        "unsupported_count": 0,
+        "unsupported_inference_rate": 0.0,
+        "unknown_count": 3,
+        "ambiguity_unknown_rate": 0.3,
+        "ui_hallucinations": 0
+      }
     },
-    "experiment_c": {
-      "total_inferred_requirements": 8,
-      "explosion_factor": 1.14,
-      "exact_gt_recall": 1.0,
-      "derived_inference_precision": 1.0,
-      "unsupported_inference_rate": 0.0,
-      "ambiguity_unknown_rate": 0.125,
-      "ui_hallucinations": 0
+    {
+      "task_id": "TASK-03-HEALTHCARE-PHI-MASK",
+      "domain": "healthcare_ehr",
+      "adjudication_reviewer": "independent_compliance_evaluator",
+      "adjudication_version": "1.0",
+      "ground_truth_units_count": 7,
+      "ground_truth_reqs_count": 7,
+      "experiment_a": {
+        "total_requirements": 76,
+        "page_spreads": 24,
+        "assumption_weight": 58,
+        "explosion_factor": 10.86
+      },
+      "experiment_b": {
+        "accuracy_on_frozen_gt": 1.0,
+        "correct_units": 7,
+        "total_gt_units": 7,
+        "unscored_units_count": 0
+      },
+      "experiment_c": {
+        "total_inferred_requirements": 8,
+        "explosion_factor": 1.14,
+        "gt_recovered_count": 7,
+        "gt_req_count": 7,
+        "exact_gt_recall": 1.0,
+        "derived_proposed_count": 5,
+        "derived_validated_count": 5,
+        "derived_inference_precision": 1.0,
+        "non_unknown_count": 7,
+        "unsupported_count": 0,
+        "unsupported_inference_rate": 0.0,
+        "unknown_count": 1,
+        "ambiguity_unknown_rate": 0.125,
+        "ui_hallucinations": 0
+      }
+    },
+    {
+      "task_id": "TASK-04-AEROSPACE-BLACKBOX-TELEMETRY",
+      "domain": "aerospace_avionics",
+      "adjudication_reviewer": "independent_avionics_evaluator",
+      "adjudication_version": "1.0",
+      "ground_truth_units_count": 8,
+      "ground_truth_reqs_count": 6,
+      "experiment_a": {
+        "total_requirements": 63,
+        "page_spreads": 24,
+        "assumption_weight": 38,
+        "explosion_factor": 10.5
+      },
+      "experiment_b": {
+        "accuracy_on_frozen_gt": 1.0,
+        "correct_units": 8,
+        "total_gt_units": 8,
+        "unscored_units_count": 0
+      },
+      "experiment_c": {
+        "total_inferred_requirements": 11,
+        "explosion_factor": 1.83,
+        "gt_recovered_count": 6,
+        "gt_req_count": 6,
+        "exact_gt_recall": 1.0,
+        "derived_proposed_count": 7,
+        "derived_validated_count": 7,
+        "derived_inference_precision": 1.0,
+        "non_unknown_count": 9,
+        "unsupported_count": 0,
+        "unsupported_inference_rate": 0.0,
+        "unknown_count": 2,
+        "ambiguity_unknown_rate": 0.1818,
+        "ui_hallucinations": 0
+      }
+    },
+    {
+      "task_id": "TASK-05-EXAM-BROWSER-SANDBOX",
+      "domain": "edtech_security",
+      "adjudication_reviewer": "independent_os_security_evaluator",
+      "adjudication_version": "1.0",
+      "ground_truth_units_count": 8,
+      "ground_truth_reqs_count": 6,
+      "experiment_a": {
+        "total_requirements": 66,
+        "page_spreads": 25,
+        "assumption_weight": 38,
+        "explosion_factor": 11.0
+      },
+      "experiment_b": {
+        "accuracy_on_frozen_gt": 1.0,
+        "correct_units": 8,
+        "total_gt_units": 8,
+        "unscored_units_count": 0
+      },
+      "experiment_c": {
+        "total_inferred_requirements": 15,
+        "explosion_factor": 2.5,
+        "gt_recovered_count": 6,
+        "gt_req_count": 6,
+        "exact_gt_recall": 1.0,
+        "derived_proposed_count": 8,
+        "derived_validated_count": 8,
+        "derived_inference_precision": 1.0,
+        "non_unknown_count": 11,
+        "unsupported_count": 0,
+        "unsupported_inference_rate": 0.0,
+        "unknown_count": 4,
+        "ambiguity_unknown_rate": 0.2667,
+        "ui_hallucinations": 0
+      }
     }
-  }
-]
+  ]
+}
