@@ -1124,6 +1124,7 @@ test('UserService returns user', async () => {
 
         with mock.patch("artifact_governor.ArtifactGovernor.audit_hld_governance", return_value=passing_gate), \
              mock.patch("artifact_governor.ArtifactGovernor.audit_lld_governance", return_value=passing_gate), \
+             mock.patch("artifact_governor.ArtifactGovernor.audit_task_governance", return_value=passing_gate), \
              mock.patch("task_compiler.TaskCompiler.compile_tasks", return_value=[bad_task]):
             with self.assertRaises(ValueError) as ctx1:
                 SpecificationCompiler.compile_v7_refinement_pipeline(
@@ -1132,16 +1133,16 @@ test('UserService returns user', async () => {
                 )
             self.assertIn("missing mandatory authoritative 'task_hash'", str(ctx1.exception))
 
-        # 2. Empty tasks list fails closed
+        # 2. Empty tasks list yields no synthetic changeset (zero-invention)
         with mock.patch("artifact_governor.ArtifactGovernor.audit_hld_governance", return_value=passing_gate), \
              mock.patch("artifact_governor.ArtifactGovernor.audit_lld_governance", return_value=passing_gate), \
              mock.patch("task_compiler.TaskCompiler.compile_tasks", return_value=[]):
-            with self.assertRaises(ValueError) as ctx2:
-                SpecificationCompiler.compile_v7_refinement_pipeline(
-                    raw_request="Build secure auth service",
-                    workspace_dir=self.test_dir
-                )
-            self.assertIn("tasks list is empty", str(ctx2.exception))
+            res_empty = SpecificationCompiler.compile_v7_refinement_pipeline(
+                raw_request="Build secure auth service",
+                workspace_dir=self.test_dir
+            )
+            self.assertIsNone(res_empty["authorized_changeset"])
+            self.assertEqual(res_empty["tasks"], [])
 
         # 3. Missing or empty execution_plan plan_hash fails closed
         good_task = TaskRecord(
@@ -1158,6 +1159,7 @@ test('UserService returns user', async () => {
         fake_plan.plan_hash = ""
         with mock.patch("artifact_governor.ArtifactGovernor.audit_hld_governance", return_value=passing_gate), \
              mock.patch("artifact_governor.ArtifactGovernor.audit_lld_governance", return_value=passing_gate), \
+             mock.patch("artifact_governor.ArtifactGovernor.audit_task_governance", return_value=passing_gate), \
              mock.patch("task_compiler.TaskCompiler.compile_tasks", return_value=[good_task]), \
              mock.patch("execution_plan_compiler.ExecutionPlanCompiler.compile_execution_plan", return_value=fake_plan):
             with self.assertRaises(ValueError) as ctx3:
