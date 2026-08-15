@@ -9,6 +9,7 @@ Defines:
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Set, Any, Optional, Tuple
+import hashlib
 import json
 
 from lld_compiler import LLDComponent, LLDComponentType
@@ -28,7 +29,7 @@ class TaskCategory(str, Enum):
 
 @dataclass
 class TaskRecord:
-    """An executable task with complete upstream architectural lineage and BDD acceptance criteria."""
+    """An executable task with complete upstream architectural lineage, cryptographic integrity hash, and BDD acceptance criteria."""
     id: str
     title: str
     description: str
@@ -38,33 +39,120 @@ class TaskRecord:
     parent_reqs: List[str]
     parent_behaviors: List[str]
     verification_criteria: List[str] = field(default_factory=list)
+    source_lld_hash: str = ""
+    source_binding_hashes: List[str] = field(default_factory=list)
+    task_hash: str = ""
+
+    def __post_init__(self):
+        if not self.task_hash:
+            self.task_hash = self.compute_canonical_hash()
+
+    def compute_canonical_hash(self) -> str:
+        """Computes deterministic SHA-256 hash over all task fields, upstream LLD hash, and capability binding digests."""
+        cat_val = self.category.value if hasattr(self.category, "value") else str(self.category)
+        payload = {
+            "id": self.id,
+            "title": self.title,
+            "description": self.description,
+            "category": cat_val,
+            "parent_lld": self.parent_lld,
+            "parent_hld": self.parent_hld,
+            "parent_reqs": sorted(self.parent_reqs),
+            "parent_behaviors": sorted(self.parent_behaviors),
+            "verification_criteria": sorted(self.verification_criteria),
+            "source_lld_hash": self.source_lld_hash,
+            "source_binding_hashes": sorted(self.source_binding_hashes)
+        }
+        canonical_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
 
     def to_dict(self) -> Dict[str, Any]:
+        cat_val = self.category.value if hasattr(self.category, "value") else str(self.category)
         return {
             "id": self.id,
             "title": self.title,
             "description": self.description,
-            "category": self.category.value,
+            "category": cat_val,
             "parent_lld": self.parent_lld,
             "parent_hld": self.parent_hld,
             "parent_reqs": self.parent_reqs,
             "parent_behaviors": self.parent_behaviors,
-            "verification_criteria": self.verification_criteria
+            "verification_criteria": self.verification_criteria,
+            "source_lld_hash": self.source_lld_hash,
+            "source_binding_hashes": self.source_binding_hashes,
+            "task_hash": self.task_hash
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'TaskRecord':
-        return cls(
-            id=data["id"],
-            title=data["title"],
-            description=data["description"],
-            category=TaskCategory(data["category"]),
-            parent_lld=data.get("parent_lld", ""),
-            parent_hld=data.get("parent_hld", ""),
-            parent_reqs=data.get("parent_reqs", []),
-            parent_behaviors=data.get("parent_behaviors", []),
-            verification_criteria=data.get("verification_criteria", [])
-        )
+    def from_governed_dict(cls, data: Dict[str, Any]) -> 'TaskRecord':
+        """Dedicated strict ingestion API for governed task artifacts."""
+        return cls.from_dict(data, strict=True)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any], strict: bool = False) -> 'TaskRecord':
+        if strict:
+            mandatory = [
+                "id", "title", "description", "category", "parent_lld", "parent_hld",
+                "parent_reqs", "parent_behaviors", "verification_criteria",
+                "source_lld_hash", "source_binding_hashes", "task_hash"
+            ]
+            for field_name in mandatory:
+                if field_name not in data:
+                    raise ValueError(f"Missing mandatory '{field_name}' in TaskRecord governed payload (strict mode)")
+                val = data[field_name]
+                if field_name in ["id", "title", "description", "category", "parent_lld", "parent_hld", "source_lld_hash", "task_hash"]:
+                    if not isinstance(val, str) or not val.strip():
+                        raise ValueError(f"Field '{field_name}' must be a non-empty string in TaskRecord strict ingestion, got {val!r}")
+                elif field_name in ["parent_reqs", "parent_behaviors", "verification_criteria", "source_binding_hashes"]:
+                    if not isinstance(val, list):
+                        raise ValueError(f"Field '{field_name}' must be a list in TaskRecord strict ingestion, got {type(val)}")
+
+            try:
+                cat = TaskCategory(data["category"])
+            except ValueError:
+                raise ValueError(f"Invalid TaskCategory '{data.get('category')}' in TaskRecord strict ingestion")
+
+            task = cls(
+                id=data["id"],
+                title=data["title"],
+                description=data["description"],
+                category=cat,
+                parent_lld=data["parent_lld"],
+                parent_hld=data["parent_hld"],
+                parent_reqs=data["parent_reqs"],
+                parent_behaviors=data["parent_behaviors"],
+                verification_criteria=data["verification_criteria"],
+                source_lld_hash=data["source_lld_hash"],
+                source_binding_hashes=data["source_binding_hashes"],
+                task_hash=data["task_hash"]
+            )
+
+            computed_hash = task.compute_canonical_hash()
+            if data["task_hash"] != computed_hash:
+                raise ValueError(f"TaskRecord '{task.id}' task_hash mismatch (provided: {data['task_hash'][:8]}, computed: {computed_hash[:8]})")
+
+            return task
+        else:
+            cat_raw = data.get("category", "api_endpoint")
+            try:
+                cat = TaskCategory(cat_raw)
+            except ValueError:
+                cat = TaskCategory.API_ENDPOINT
+
+            return cls(
+                id=data.get("id", ""),
+                title=data.get("title", ""),
+                description=data.get("description", ""),
+                category=cat,
+                parent_lld=data.get("parent_lld", ""),
+                parent_hld=data.get("parent_hld", ""),
+                parent_reqs=data.get("parent_reqs", []),
+                parent_behaviors=data.get("parent_behaviors", []),
+                verification_criteria=data.get("verification_criteria", []),
+                source_lld_hash=data.get("source_lld_hash", ""),
+                source_binding_hashes=data.get("source_binding_hashes", []),
+                task_hash=data.get("task_hash", "")
+            )
 
 
 class TaskCompiler:
@@ -88,6 +176,11 @@ class TaskCompiler:
             p_behs = comp.parent.behavior_ids
 
             matching_req_objs = [req_lookup[rid] for rid in p_reqs if rid in req_lookup]
+
+            source_lld_hash = comp.component_hash
+            source_binding_hashes = [b.binding_hash for b in comp.capability_bindings if b.behavior_id in p_behs]
+            if not source_binding_hashes and comp.capability_bindings:
+                source_binding_hashes = [b.binding_hash for b in comp.capability_bindings]
 
             if comp.component_type in [LLDComponentType.CONTROLLER, LLDComponentType.SERVICE]:
                 for ep in comp.api_endpoints:
@@ -150,7 +243,9 @@ class TaskCompiler:
                         parent_hld=p_hld,
                         parent_reqs=p_reqs,
                         parent_behaviors=p_behs,
-                        verification_criteria=list(dict.fromkeys(bdd_criteria))
+                        verification_criteria=list(dict.fromkeys(bdd_criteria)),
+                        source_lld_hash=source_lld_hash,
+                        source_binding_hashes=source_binding_hashes
                     ))
 
             elif comp.component_type == LLDComponentType.UI_SURFACE:
@@ -168,7 +263,9 @@ class TaskCompiler:
                     verification_criteria=[
                         f"Renders behavioral workflow surface at route {comp.route}",
                         "Connects action triggers to backend transport contracts"
-                    ]
+                    ],
+                    source_lld_hash=source_lld_hash,
+                    source_binding_hashes=source_binding_hashes
                 ))
 
         return tasks

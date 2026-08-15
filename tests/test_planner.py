@@ -84,11 +84,17 @@ def test_runtime_integration_bug_fix_shortcut(tmp_path):
     pipe_res = SpecificationCompiler.compile_v7_refinement_pipeline(graph=d_graph, intent_features=["fix"], raw_request="Fix CSS brace")
     hld = pipe_res["hld_design"]
     pipe_dict = {
+        "version": 1,
         "blocked": pipe_res["blocked"],
         "target_fsm_state": pipe_res["target_fsm_state"],
         "hld_governance": pipe_res["hld_governance"],
+        "task_governance": pipe_res["task_governance"],
         "hld_design": hld.to_dict(),
-        "hld_validation": pipe_res["hld_validation"]
+        "hld_validation": pipe_res["hld_validation"],
+        "behavior_graph": pipe_res["behavior_graph"].to_dict(),
+        "requirement_graph": pipe_res["requirement_graph"].to_dict(),
+        "lld_components": [c.to_dict() for c in pipe_res.get("lld_components", [])],
+        "tasks": [t.to_dict() for t in pipe_res.get("tasks", [])]
     }
     pipe_file = os.path.join(agents_dir, "v7_refinement_pipeline.json")
     with open(pipe_file, "w", encoding="utf-8") as f:
@@ -129,11 +135,17 @@ def test_runtime_integration_hotfix_shortcut(tmp_path):
     pipe_res = SpecificationCompiler.compile_v7_refinement_pipeline(graph=d_graph, intent_features=["hotfix"], raw_request="Emergency hotfix")
     hld = pipe_res["hld_design"]
     pipe_dict = {
+        "version": 1,
         "blocked": pipe_res["blocked"],
         "target_fsm_state": pipe_res["target_fsm_state"],
         "hld_governance": pipe_res["hld_governance"],
+        "task_governance": pipe_res["task_governance"],
         "hld_design": hld.to_dict(),
-        "hld_validation": pipe_res["hld_validation"]
+        "hld_validation": pipe_res["hld_validation"],
+        "behavior_graph": pipe_res["behavior_graph"].to_dict(),
+        "requirement_graph": pipe_res["requirement_graph"].to_dict(),
+        "lld_components": [c.to_dict() for c in pipe_res.get("lld_components", [])],
+        "tasks": [t.to_dict() for t in pipe_res.get("tasks", [])]
     }
     pipe_file = os.path.join(agents_dir, "v7_refinement_pipeline.json")
     with open(pipe_file, "w", encoding="utf-8") as f:

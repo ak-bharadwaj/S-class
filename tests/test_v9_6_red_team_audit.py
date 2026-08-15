@@ -1230,6 +1230,90 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         self.assertTrue(gov_res_exec_mismatch.is_blocked, "ArtifactGovernor MUST block COMMAND_MUTATION on backend component with execution_capability = READ!")
         self.assertTrue(any("execution capability mismatch" in r for r in gov_res_exec_mismatch.blocking_reasons))
 
+        # 43f. Authoritative READ_QUERY execution capability test: READ_QUERY on MUTATE-only service is blocked
+        query_binding = CapabilityBinding(
+            behavior_id="query_operator_view_vehicle",
+            requirement_ids=["REQ-V-001"],
+            operation_class=OperationClass.READ_QUERY,
+            target_entity="entity_vehicle",
+            hld_capability="cap_vehicle_management",
+            lld_component_id=vehicle_comp.id, # vehicle_comp has execution_capability = MUTATE!
+            allowed_component_types=[LLDComponentType.CONTROLLER, LLDComponentType.SERVICE],
+            prohibited_component_roles=[],
+            source_behavior_hash=b_graph_multi.get_node("cmd_dispatch").compute_canonical_hash(),
+            source_requirement_hash="mock_hash",
+            source_hld_hash=hld_multi.modules[0].compute_canonical_hash(),
+            source_behavior_graph_version="1",
+            source_requirement_graph_version="1",
+            source_hld_module_id="mod_fleet_operations",
+            source_hld_version=1
+        )
+        query_binding.binding_hash = query_binding.compute_hash()
+        mutate_only_comp = LLDComponent(
+            id="ctrl_mutate_only", name="Mutate Only Controller",
+            component_type=LLDComponentType.CONTROLLER,
+            parent=vehicle_comp.parent, role="backend_controller", layout="standard_view",
+            execution_capability=ComponentExecutionCapability.MUTATE,
+            owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
+            capability_bindings=[query_binding]
+        )
+        mutate_only_comp.component_hash = mutate_only_comp.compute_canonical_hash()
+        query_on_mutate_task = TaskRecord(
+            id="TSK-QUERY-ON-MUTATE", title="View Vehicle", description="desc",
+            category=TaskCategory.API_ENDPOINT, parent_lld=mutate_only_comp.id,
+            parent_hld=vehicle_task.parent_hld, parent_reqs=vehicle_task.parent_reqs,
+            parent_behaviors=["query_operator_view_vehicle"],
+            source_lld_hash=mutate_only_comp.component_hash,
+            source_binding_hashes=[query_binding.binding_hash]
+        )
+        b_node_q = BehaviorNode(
+            id="query_operator_view_vehicle", name="Operator View Vehicle",
+            behavior_type=BehaviorNodeType.QUERY, actor_id="actor_operator", target_entity_id="entity_vehicle",
+            epistemic_status=EpistemicStatus.EXPLICIT, provenance=ProvenanceKind.EXPLICIT, confidence=1.0, description="View"
+        )
+        b_graph_with_query = BehaviorGraph(version=1)
+        b_graph_with_query.add_node(b_node_q)
+        gov_res_q_mismatch = ArtifactGovernor.audit_task_governance([query_on_mutate_task], r_graph_multi, [mutate_only_comp], b_graph_with_query, hld_modules=hld_multi.modules)
+        self.assertTrue(gov_res_q_mismatch.is_blocked, "ArtifactGovernor MUST block READ_QUERY on component with execution_capability = MUTATE!")
+        self.assertTrue(any("execution capability mismatch" in r for r in gov_res_q_mismatch.blocking_reasons))
+
+        # 43g. TaskRecord Governed Deserialization & Cryptographic Integrity Checks
+        valid_task_dict = vehicle_task.to_dict()
+        task_rehydrated = TaskRecord.from_governed_dict(valid_task_dict)
+        self.assertEqual(task_rehydrated.task_hash, vehicle_task.task_hash)
+
+        # Missing task_hash in strict ingestion raises ValueError
+        bad_task_dict = dict(valid_task_dict)
+        bad_task_dict.pop("task_hash")
+        with self.assertRaises(ValueError):
+            TaskRecord.from_governed_dict(bad_task_dict)
+
+        # Corrupted task_hash in strict ingestion raises ValueError
+        corrupt_task_dict = dict(valid_task_dict)
+        corrupt_task_dict["task_hash"] = "tampered_task_hash_9999"
+        with self.assertRaises(ValueError):
+            TaskRecord.from_governed_dict(corrupt_task_dict)
+
+        # Governor catches tampered task_hash
+        tampered_hash_task = TaskRecord.from_dict(valid_task_dict)
+        tampered_hash_task.task_hash = "corrupted_task_hash_0000"
+        gov_res_task_hash_tamper = ArtifactGovernor.audit_task_governance([tampered_hash_task], r_graph_multi, [vehicle_comp], b_graph_multi, hld_modules=hld_multi.modules)
+        self.assertTrue(gov_res_task_hash_tamper.is_blocked, "ArtifactGovernor MUST block when TaskRecord task_hash is tampered!")
+        self.assertTrue(any("canonical content hash mismatch" in r for r in gov_res_task_hash_tamper.blocking_reasons))
+
+        # 43h. LLDComponent Canonical Hash Covers reasoning_graph
+        comp_with_reasoning = LLDComponent(
+            id="ctrl_reasoning_test", name="Reasoning Test",
+            component_type=LLDComponentType.CONTROLLER,
+            parent=vehicle_comp.parent, role="backend_controller",
+            execution_capability=ComponentExecutionCapability.MUTATE,
+            reasoning_graph=["ADR-001: Event Sourcing chosen for durability"]
+        )
+        hash1 = comp_with_reasoning.compute_canonical_hash()
+        comp_with_reasoning.reasoning_graph = ["ADR-001: Tampered reasoning text"]
+        hash2 = comp_with_reasoning.compute_canonical_hash()
+        self.assertNotEqual(hash1, hash2, "Modifying reasoning_graph MUST change LLDComponent.compute_canonical_hash()!")
+
         # 44. Negative Attack Vector 39: Strict Positive Integer Graph Version Validation (Reject Non-Positive / Boolean / Missing in Strict Mode)
         with self.assertRaises(ValueError):
             BehaviorGraph(version=0)
@@ -1306,7 +1390,15 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             capability_bindings=[action_form_binding]
         )
         action_form_comp.component_hash = action_form_comp.compute_canonical_hash()
-        gov_res_action_ui = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [action_form_comp], b_graph_multi, hld_modules=hld_multi.modules)
+        action_form_task = TaskRecord(
+            id=vehicle_task.id, title=vehicle_task.title, description=vehicle_task.description,
+            category=vehicle_task.category, parent_lld=action_form_comp.id,
+            parent_hld=vehicle_task.parent_hld, parent_reqs=vehicle_task.parent_reqs,
+            parent_behaviors=vehicle_task.parent_behaviors,
+            source_lld_hash=action_form_comp.component_hash,
+            source_binding_hashes=[action_form_binding.binding_hash]
+        )
+        gov_res_action_ui = ArtifactGovernor.audit_task_governance([action_form_task], r_graph_multi, [action_form_comp], b_graph_multi, hld_modules=hld_multi.modules)
         self.assertFalse(gov_res_action_ui.is_blocked, f"ArtifactGovernor MUST permit COMMAND_MUTATION on interactive action form UI surface! Reasons: {gov_res_action_ui.blocking_reasons}")
         self.assertEqual(gov_res_action_ui.validation_status, ValidationStatus.VALID)
 
@@ -1438,12 +1530,73 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         app_file = os.path.join(self.agents_dir, "approvals.json")
         write_json_atomic(app_file, {"approval_records": [rec.to_dict()]})
 
-        # 3. Initially write pipeline with blocked: False
+        # 3. Initially write pipeline with blocked: False and complete execution artifacts
         hld_initial = HLDDesign(system_name="HLD-001", architecture_style="Modular Monolith", modules=[mod], adrs=[adr], version=1)
+        b_node_init = BehaviorNode(
+            id="cmd_manage_session", name="Admin Manage Session",
+            behavior_type=BehaviorNodeType.COMMAND, actor_id="actor_admin", target_entity_id="entity_session",
+            epistemic_status=EpistemicStatus.EXPLICIT, provenance=ProvenanceKind.EXPLICIT, confidence=1.0, description="Manage session"
+        )
+        b_graph_init = BehaviorGraph(version=1)
+        b_graph_init.add_node(b_node_init)
+
+        r_node_init = RequirementNode(
+            id="REQ-001", kind=RequirementKind.FUNCTIONAL, statement="System shall manage session",
+            actor="actor_admin", capability="manage_session", target="entity_session",
+            source_behaviors=["cmd_manage_session"]
+        )
+        r_node_init.hld_module = "mod_core"
+        r_graph_init = RequirementGraph(version=1)
+        r_graph_init.add_requirement(r_node_init)
+
+        req_payload = {
+            "behavior_id": "cmd_manage_session",
+            "requirement_hashes": [r_node_init.canonical_hash()]
+        }
+        valid_binding = CapabilityBinding(
+            behavior_id="cmd_manage_session",
+            requirement_ids=["REQ-001"],
+            operation_class=OperationClass.COMMAND_MUTATION,
+            target_entity="entity_session",
+            hld_capability="manage_session",
+            lld_component_id="ctrl_mod_core",
+            allowed_component_types=[LLDComponentType.CONTROLLER, LLDComponentType.SERVICE],
+            prohibited_component_roles=[],
+            source_behavior_hash=b_node_init.compute_canonical_hash(),
+            source_requirement_hash=hashlib.sha256(json.dumps(req_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest(),
+            source_hld_hash=mod.compute_canonical_hash(),
+            source_behavior_graph_version="1",
+            source_requirement_graph_version="1",
+            source_hld_module_id="mod_core",
+            source_hld_version=1
+        )
+        valid_binding.binding_hash = valid_binding.compute_hash()
+
+        valid_lld_comp = LLDComponent(
+            id="ctrl_mod_core", name="Core Controller",
+            component_type=LLDComponentType.CONTROLLER,
+            parent=LLDParentRef(hld_id="mod_core", req_ids=["REQ-001"], behavior_ids=["cmd_manage_session"]),
+            role="backend_controller",
+            execution_capability=ComponentExecutionCapability.MUTATE,
+            owned_entities=["entity_session"],
+            owned_capabilities=["manage_session"],
+            capability_bindings=[valid_binding]
+        )
+        valid_lld_comp.component_hash = valid_lld_comp.compute_canonical_hash()
+        valid_task = TaskRecord(
+            id="TASK-001", title="Test Task", description="desc",
+            category=TaskCategory.API_ENDPOINT, parent_lld="ctrl_mod_core",
+            parent_hld="mod_core", parent_reqs=["REQ-001"], parent_behaviors=["cmd_manage_session"],
+            source_lld_hash=valid_lld_comp.component_hash, source_binding_hashes=[valid_binding.binding_hash]
+        )
         pipe_path = os.path.join(self.agents_dir, "v7_refinement_pipeline.json")
         write_json_atomic(pipe_path, {
             "version": 1,
             "hld_design": hld_initial.to_dict(),
+            "behavior_graph": b_graph_init.to_dict(),
+            "requirement_graph": r_graph_init.to_dict(),
+            "lld_components": [valid_lld_comp.to_dict()],
+            "tasks": [valid_task.to_dict()],
             "blocked": False,
             "hld_governance": {"is_blocked": False}
         })
@@ -1464,6 +1617,10 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         write_json_atomic(pipe_path, {
             "version": 1,
             "hld_design": hld_tampered.to_dict(),
+            "behavior_graph": b_graph_init.to_dict(),
+            "requirement_graph": r_graph_init.to_dict(),
+            "lld_components": [valid_lld_comp.to_dict()],
+            "tasks": [valid_task.to_dict()],
             "blocked": False,
             "hld_governance": {"is_blocked": False}
         })
@@ -1585,6 +1742,39 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             workspace_dir=self.test_dir
         )
         self.assertTrue(gov_res_rehydrate_corrupt.is_blocked, "Corrupted component_hash in persisted refinement pipeline artifact MUST fail closed during FSM transition")
+
+        # 10. Missing Persisted Execution Artifacts Fail-Closed Verification
+        # Omitted lld_components
+        write_json_atomic(pipe_path, {
+            "version": 1,
+            "hld_design": hld_initial.to_dict(),
+            "behavior_graph": BehaviorGraph(version=1).to_dict(),
+            "requirement_graph": RequirementGraph(version=1).to_dict(),
+            "tasks": [{"id": "TASK-001"}],
+            "blocked": False,
+            "hld_governance": {"is_blocked": False}
+        })
+        gov_res_missing_lld = ArtifactGovernor.enforce_fsm_transition(
+            current_phase="DESIGN", proposed_event="spec_approved", target_phase="CODING", workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res_missing_lld.is_blocked, "Missing lld_components in persisted pipeline MUST fail closed!")
+        self.assertTrue(any("MANDATORY_EXECUTION_ARTIFACT_MISSING" in r for r in gov_res_missing_lld.blocking_reasons))
+
+        # Omitted tasks
+        write_json_atomic(pipe_path, {
+            "version": 1,
+            "hld_design": hld_initial.to_dict(),
+            "behavior_graph": BehaviorGraph(version=1).to_dict(),
+            "requirement_graph": RequirementGraph(version=1).to_dict(),
+            "lld_components": [valid_lld_comp.to_dict()],
+            "blocked": False,
+            "hld_governance": {"is_blocked": False}
+        })
+        gov_res_missing_tasks = ArtifactGovernor.enforce_fsm_transition(
+            current_phase="DESIGN", proposed_event="spec_approved", target_phase="CODING", workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res_missing_tasks.is_blocked, "Missing tasks in persisted pipeline MUST fail closed!")
+        self.assertTrue(any("MANDATORY_EXECUTION_ARTIFACT_MISSING" in r for r in gov_res_missing_tasks.blocking_reasons))
 
     # -------------------------------------------------------------------------
     # Pillar 8: 19-State FSM Control Plane & Illegal Transition Rejection

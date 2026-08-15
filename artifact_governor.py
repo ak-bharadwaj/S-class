@@ -528,6 +528,28 @@ class ArtifactGovernor:
         b_map = b_graph.nodes if b_graph else {}
 
         for t in tasks:
+            # 0. Canonical Task Integrity and Upstream Lineage Verification
+            if hasattr(t, "compute_canonical_hash"):
+                expected_task_hash = t.compute_canonical_hash()
+                actual_task_hash = getattr(t, "task_hash", "")
+                if not actual_task_hash:
+                    reasons.append(
+                        f"Task {t.id} ({t.title}) is missing mandatory canonical task_hash!"
+                    )
+                elif actual_task_hash != expected_task_hash:
+                    reasons.append(
+                        f"Task {t.id} ({t.title}) canonical content hash mismatch (actual: {actual_task_hash[:8]}, computed: {expected_task_hash[:8]})!"
+                    )
+
+            if t.parent_lld in lld_map:
+                parent_comp = lld_map[t.parent_lld]
+                expected_lld_hash = getattr(parent_comp, "component_hash", "")
+                actual_source_lld_hash = getattr(t, "source_lld_hash", "")
+                if expected_lld_hash and actual_source_lld_hash and actual_source_lld_hash != expected_lld_hash:
+                    reasons.append(
+                        f"Task {t.id} ({t.title}) source_lld_hash mismatch with parent LLD '{parent_comp.id}' (task claims {actual_source_lld_hash[:8]}, parent component has {expected_lld_hash[:8]})!"
+                    )
+
             # 1. Referential integrity: parent_lld, parent_reqs, parent_behaviors
             if not t.parent_lld:
                 reasons.append(f"Task {t.id} ({t.title}) lacks parent LLD component reference.")
@@ -768,10 +790,10 @@ class ArtifactGovernor:
                             )
                         else:
                             ALLOWED_EXEC_CAPABILITIES = {
-                                OperationClass.COMMAND_MUTATION: [ComponentExecutionCapability.MUTATE, ComponentExecutionCapability.TRANSITION_STATE],
-                                OperationClass.READ_QUERY: [ComponentExecutionCapability.READ, ComponentExecutionCapability.MUTATE, ComponentExecutionCapability.TRANSITION_STATE],
-                                OperationClass.EVENT_PROCESSING: [ComponentExecutionCapability.PROCESS_EVENT, ComponentExecutionCapability.TRIGGER_WORKFLOW],
-                                OperationClass.STATE_TRANSITION: [ComponentExecutionCapability.TRANSITION_STATE, ComponentExecutionCapability.MUTATE, ComponentExecutionCapability.TRIGGER_WORKFLOW]
+                                OperationClass.COMMAND_MUTATION: [ComponentExecutionCapability.MUTATE],
+                                OperationClass.READ_QUERY: [ComponentExecutionCapability.READ],
+                                OperationClass.EVENT_PROCESSING: [ComponentExecutionCapability.PROCESS_EVENT],
+                                OperationClass.STATE_TRANSITION: [ComponentExecutionCapability.TRANSITION_STATE]
                             }
                             valid_caps = ALLOWED_EXEC_CAPABILITIES.get(binding.operation_class, [])
                             if exec_cap not in valid_caps:
@@ -901,20 +923,31 @@ class ArtifactGovernor:
                     }
 
             task_gov = pipe_data.get("task_governance", {})
-            # If transitioning to execution phases (TASK_COMPILATION, CODING, QA, RELEASE) and LLD/tasks are persisted,
-            # rehydrate via strict governed deserialization (FAIL CLOSED on missing/tampered hashes or fields!)
+            # If transitioning to execution phases (TASK_COMPILATION, CODING, QA, RELEASE),
+            # execution artifacts are MANDATORY. Rehydrate via strict governed deserialization (FAIL CLOSED on missing/tampered hashes or fields!)
             if target_phase in ["TASK_COMPILATION", "CODING", "QA", "RELEASE"]:
                 lld_list_data = pipe_data.get("lld_components")
                 tasks_list_data = pipe_data.get("tasks")
                 bg_data = pipe_data.get("behavior_graph")
                 rg_data = pipe_data.get("requirement_graph")
 
-                if lld_list_data is not None and tasks_list_data is not None:
+                if lld_list_data is None or tasks_list_data is None or bg_data is None or rg_data is None:
+                    is_blocked = True
+                    task_gov = {
+                        "is_blocked": True,
+                        "blocking_reasons": [
+                            f"MANDATORY_EXECUTION_ARTIFACT_MISSING: Persisted pipeline is missing mandatory execution artifacts (lld_components, tasks, behavior_graph, or requirement_graph) required for transition to {target_phase}."
+                        ],
+                        "validation_status": "BLOCKED",
+                        "approval_status": "REJECTED",
+                        "recommended_fsm_state": "DESIGN"
+                    }
+                else:
                     try:
-                        rehydrated_b_graph = BehaviorGraph.from_governed_dict(bg_data) if bg_data else BehaviorGraph()
-                        rehydrated_r_graph = RequirementGraph.from_governed_dict(rg_data) if rg_data else RequirementGraph()
+                        rehydrated_b_graph = BehaviorGraph.from_governed_dict(bg_data)
+                        rehydrated_r_graph = RequirementGraph.from_governed_dict(rg_data)
                         rehydrated_lld_components = [LLDComponent.from_governed_dict(c) for c in lld_list_data]
-                        rehydrated_tasks = [TaskRecord.from_dict(t) for t in tasks_list_data]
+                        rehydrated_tasks = [TaskRecord.from_governed_dict(t) for t in tasks_list_data]
 
                         hld_modules_ctx = hld_obj.modules if hld_obj else []
 
@@ -927,7 +960,7 @@ class ArtifactGovernor:
                         )
                         if task_gov_dynamic.is_blocked:
                             is_blocked = True
-                            task_gov = task_gov_dynamic.to_dict()
+                        task_gov = task_gov_dynamic.to_dict()
                     except Exception as e:
                         is_blocked = True
                         task_gov = {
@@ -944,7 +977,10 @@ class ArtifactGovernor:
                     reasons.extend(task_gov.get("blocking_reasons", []))
                     if not reasons:
                         reasons = ["Refinement pipeline artifact governance is BLOCKED."]
-                    rec_state = task_gov.get("recommended_fsm_state") or hld_gov.get("recommended_fsm_state") or "DEBATE"
+                    if hld_gov.get("is_blocked") and hld_gov.get("recommended_fsm_state") == "DEBATE":
+                        rec_state = "DEBATE"
+                    else:
+                        rec_state = task_gov.get("recommended_fsm_state") or hld_gov.get("recommended_fsm_state") or "DESIGN"
                     target_enum = FSMTransitionTarget.DEBATE if rec_state == "DEBATE" else FSMTransitionTarget.DESIGN
                     return GovernanceGateResult(
                         is_blocked=True,

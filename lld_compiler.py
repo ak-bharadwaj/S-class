@@ -275,6 +275,7 @@ class LLDComponent:
             "sub_components": sorted(self.sub_components),
             "api_endpoints": sorted(self.api_endpoints),
             "validation_rules": sorted(self.validation_rules),
+            "reasoning_graph": sorted(self.reasoning_graph) if isinstance(self.reasoning_graph, list) else [],
             "allowed_operation_classes": sorted([oc.value for oc in self.allowed_operation_classes]),
             "owned_entities": sorted(self.owned_entities),
             "owned_capabilities": sorted(self.owned_capabilities),
@@ -390,7 +391,8 @@ class LLDCompiler:
         comp_id: str,
         comp_type: LLDComponentType,
         comp_role: str,
-        comp_layout: str = "standard_view"
+        comp_layout: str = "standard_view",
+        allowed_op_classes: Optional[List[OperationClass]] = None
     ) -> List[CapabilityBinding]:
         """Derives exact, component-specific CapabilityBindings matching HLD capability semantics and allowed types."""
         bindings: List[CapabilityBinding] = []
@@ -409,6 +411,9 @@ class LLDCompiler:
                 op_class = OperationClass.STATE_TRANSITION
             else:
                 # Unknown / unclassified BehaviorNodeType -> DO NOT default to STATE_TRANSITION! Skip to fail closed.
+                continue
+
+            if allowed_op_classes is not None and op_class not in allowed_op_classes:
                 continue
 
             # Exact matching requirement IDs
@@ -678,49 +683,102 @@ class LLDCompiler:
                 else:
                     p_route = f"{p_ent}s"
 
-                ctrl_id = f"ctrl_{mod.id}"
-                ctrl_bindings = cls.build_capability_bindings_for_component(
-                    sorted_behaviors, r_graph, b_graph, mod, ctrl_id, LLDComponentType.CONTROLLER, "backend_controller"
-                )
-                lld_components.append(LLDComponent(
-                    id=ctrl_id,
-                    name=f"{mod.name} Controller",
-                    component_type=LLDComponentType.CONTROLLER,
-                    parent=parent_ref,
-                    role="backend_controller",
-                    transport=InteractionTransport.REST_HTTP,
-                    route=f"/api/{p_route}",
-                    execution_capability=ComponentExecutionCapability.MUTATE,
-                    interaction_capability=None,
-                    api_endpoints=mod_endpoints,
-                    validation_rules=["Verify actor authorization", "Validate request payload schema"],
-                    allowed_operation_classes=[OperationClass.COMMAND_MUTATION, OperationClass.READ_QUERY, OperationClass.STATE_TRANSITION],
-                    owned_entities=list(mod.owned_entities),
-                    owned_capabilities=list(mod.owned_capabilities),
-                    capability_bindings=ctrl_bindings
-                ))
+                cmd_behaviors = [b_id for b_id in sorted_behaviors if b_graph.get_node(b_id) and b_graph.get_node(b_id).behavior_type in [BehaviorNodeType.COMMAND, BehaviorNodeType.STATE_TRANSITION]]
+                query_behaviors = [b_id for b_id in sorted_behaviors if b_graph.get_node(b_id) and b_graph.get_node(b_id).behavior_type == BehaviorNodeType.QUERY]
+                event_behaviors = [b_id for b_id in sorted_behaviors if b_graph.get_node(b_id) and b_graph.get_node(b_id).behavior_type == BehaviorNodeType.SIDE_EFFECT]
 
-                svc_id = f"svc_{mod.id}"
-                svc_bindings = cls.build_capability_bindings_for_component(
-                    sorted_behaviors, r_graph, b_graph, mod, svc_id, LLDComponentType.SERVICE, "domain_service"
-                )
-                lld_components.append(LLDComponent(
-                    id=svc_id,
-                    name=f"{mod.name} Service Layer",
-                    component_type=LLDComponentType.SERVICE,
-                    parent=parent_ref,
-                    role="domain_service",
-                    transport=InteractionTransport.INTERNAL_FUNCTION,
-                    execution_capability=ComponentExecutionCapability.MUTATE,
-                    interaction_capability=None,
-                    sub_components=[f"{mod.name}TransactionManager", f"{mod.name}PolicyEvaluator"],
-                    validation_rules=["Enforce state pre/post transitions", "Emit audit log side effects"],
-                    allowed_operation_classes=[OperationClass.COMMAND_MUTATION, OperationClass.READ_QUERY, OperationClass.STATE_TRANSITION, OperationClass.EVENT_PROCESSING],
-                    owned_entities=list(mod.owned_entities),
-                    owned_capabilities=list(mod.owned_capabilities),
-                    capability_bindings=svc_bindings
-                ))
+                cmd_endpoints = [ep for ep in mod_endpoints if not ep.startswith("GET ")] or mod_endpoints
+                query_endpoints = [ep for ep in mod_endpoints if ep.startswith("GET ")] or [f"GET /api/{p_route}"]
 
+                # 1. Mutating Backend Controller & Domain Service
+                if cmd_behaviors or not query_behaviors:
+                    target_cmd_behs = cmd_behaviors or sorted_behaviors
+                    ctrl_id = f"ctrl_{mod.id}"
+                    ctrl_parent = LLDParentRef(
+                        hld_id=mod.id,
+                        req_ids=sorted_reqs,
+                        behavior_ids=target_cmd_behs
+                    )
+                    ctrl_bindings = cls.build_capability_bindings_for_component(
+                        target_cmd_behs, r_graph, b_graph, mod, ctrl_id, LLDComponentType.CONTROLLER, "backend_controller",
+                        allowed_op_classes=[OperationClass.COMMAND_MUTATION, OperationClass.STATE_TRANSITION]
+                    )
+                    lld_components.append(LLDComponent(
+                        id=ctrl_id,
+                        name=f"{mod.name} Controller",
+                        component_type=LLDComponentType.CONTROLLER,
+                        parent=ctrl_parent,
+                        role="backend_controller",
+                        transport=InteractionTransport.REST_HTTP,
+                        route=f"/api/{p_route}",
+                        execution_capability=ComponentExecutionCapability.MUTATE,
+                        interaction_capability=None,
+                        api_endpoints=cmd_endpoints,
+                        validation_rules=["Verify actor authorization", "Validate request payload schema"],
+                        allowed_operation_classes=[OperationClass.COMMAND_MUTATION, OperationClass.STATE_TRANSITION],
+                        owned_entities=list(mod.owned_entities),
+                        owned_capabilities=list(mod.owned_capabilities),
+                        capability_bindings=ctrl_bindings
+                    ))
+
+                    svc_id = f"svc_{mod.id}"
+                    svc_parent = LLDParentRef(
+                        hld_id=mod.id,
+                        req_ids=sorted_reqs,
+                        behavior_ids=target_cmd_behs
+                    )
+                    svc_bindings = cls.build_capability_bindings_for_component(
+                        target_cmd_behs, r_graph, b_graph, mod, svc_id, LLDComponentType.SERVICE, "domain_service",
+                        allowed_op_classes=[OperationClass.COMMAND_MUTATION, OperationClass.STATE_TRANSITION]
+                    )
+                    lld_components.append(LLDComponent(
+                        id=svc_id,
+                        name=f"{mod.name} Service Layer",
+                        component_type=LLDComponentType.SERVICE,
+                        parent=svc_parent,
+                        role="domain_service",
+                        transport=InteractionTransport.INTERNAL_FUNCTION,
+                        execution_capability=ComponentExecutionCapability.MUTATE,
+                        interaction_capability=None,
+                        sub_components=[f"{mod.name}TransactionManager", f"{mod.name}PolicyEvaluator"],
+                        validation_rules=["Enforce state pre/post transitions", "Emit audit log side effects"],
+                        allowed_operation_classes=[OperationClass.COMMAND_MUTATION, OperationClass.STATE_TRANSITION],
+                        owned_entities=list(mod.owned_entities),
+                        owned_capabilities=list(mod.owned_capabilities),
+                        capability_bindings=svc_bindings
+                    ))
+
+                # 2. Read-Only Query Service
+                if query_behaviors:
+                    query_id = f"query_{mod.id}"
+                    query_parent = LLDParentRef(
+                        hld_id=mod.id,
+                        req_ids=sorted_reqs,
+                        behavior_ids=query_behaviors
+                    )
+                    query_bindings = cls.build_capability_bindings_for_component(
+                        query_behaviors, r_graph, b_graph, mod, query_id, LLDComponentType.SERVICE, "query_service",
+                        allowed_op_classes=[OperationClass.READ_QUERY]
+                    )
+                    lld_components.append(LLDComponent(
+                        id=query_id,
+                        name=f"{mod.name} Query Service",
+                        component_type=LLDComponentType.SERVICE,
+                        parent=query_parent,
+                        role="query_service",
+                        transport=InteractionTransport.INTERNAL_FUNCTION,
+                        execution_capability=ComponentExecutionCapability.READ,
+                        interaction_capability=None,
+                        sub_components=[f"{mod.name}QueryHandler", f"{mod.name}ReadProjection"],
+                        api_endpoints=query_endpoints,
+                        validation_rules=["Enforce tenant isolation on read queries"],
+                        allowed_operation_classes=[OperationClass.READ_QUERY],
+                        owned_entities=list(mod.owned_entities),
+                        owned_capabilities=list(mod.owned_capabilities),
+                        capability_bindings=query_bindings
+                    ))
+
+                # 3. UI Surface
                 if exec_arch == ExecutionArchitecture.FULLSTACK_APP:
                     ent_stem = mod.owned_entities[0].capitalize() if mod.owned_entities else "Item"
                     stem_clean = ent_stem.lower()
@@ -734,6 +792,11 @@ class LLDCompiler:
                         ui_route = f"{stem_clean}s"
 
                     ui_id = f"ui_{mod.id}"
+                    ui_parent = LLDParentRef(
+                        hld_id=mod.id,
+                        req_ids=sorted_reqs,
+                        behavior_ids=sorted_behaviors
+                    )
                     ui_bindings = cls.build_capability_bindings_for_component(
                         sorted_behaviors, r_graph, b_graph, mod, ui_id, LLDComponentType.UI_SURFACE, "frontend_interface", "behavioral_workflow_surface"
                     )
@@ -741,7 +804,7 @@ class LLDCompiler:
                         id=ui_id,
                         name=f"{ent_stem} Workflow Interface",
                         component_type=LLDComponentType.UI_SURFACE,
-                        parent=parent_ref,
+                        parent=ui_parent,
                         role="frontend_interface",
                         transport=InteractionTransport.REST_HTTP,
                         route=f"/{ui_route}",
@@ -751,7 +814,7 @@ class LLDCompiler:
                         sub_components=[f"{ent_stem}DetailHeader", f"{ent_stem}ActionToolbar", f"{ent_stem}AuditHistoryPanel"],
                         api_endpoints=mod_endpoints,
                         validation_rules=["UI actions trigger backend transport contracts"],
-                        allowed_operation_classes=[OperationClass.COMMAND_MUTATION, OperationClass.READ_QUERY],
+                        allowed_operation_classes=[OperationClass.COMMAND_MUTATION, OperationClass.READ_QUERY, OperationClass.STATE_TRANSITION],
                         owned_entities=list(mod.owned_entities),
                         owned_capabilities=list(mod.owned_capabilities),
                         capability_bindings=ui_bindings
