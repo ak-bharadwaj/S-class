@@ -525,25 +525,60 @@ class BehaviorGraphEngine:
                 b_graph.add_edge(actor.id, BehaviorRelationType.PERFORMS, query_id, inference_rule="actor_query_performs")
                 b_graph.add_edge(query_id, BehaviorRelationType.TARGETS, ent.id, inference_rule="query_entity_target")
 
-        # 3. Demoted Fallback Candidates (PROPOSED Epistemic Status with low confidence)
+        # 3. Fallback Candidates: Empty prompt generates ungrounded PROPOSED; Non-empty prompt without SVO generates DERIVED management behaviors
         if not svo_triples:
-            for actor in actors:
-                actor_name = actor.name.lower().replace(" ", "_")
-                for ent in target_entities:
-                    ent_name = ent.name.lower().replace(" ", "_")
-                    query_id = f"query_{actor_name}_inspect_{ent_name}"
-                    b_graph.add_node(BehaviorNode(
-                        id=query_id,
-                        name=f"{actor.name} Inspect {ent.name}",
-                        behavior_type=BehaviorNodeType.QUERY,
-                        actor_id=actor.id,
-                        target_entity_id=ent.id,
-                        epistemic_status=EpistemicStatus.PROPOSED,      # Demoted from DERIVED to PROPOSED
-                        provenance=ProvenanceKind.SPECULATIVE,
-                        confidence=0.35,                              # Demoted confidence
-                        description=f"Un-grounded proposed candidate query for {actor.name} to inspect {ent.name}"
-                    ))
-                    b_graph.add_edge(actor.id, BehaviorRelationType.PERFORMS, query_id, epistemic_status=EpistemicStatus.PROPOSED, confidence=0.35)
-                    b_graph.add_edge(query_id, BehaviorRelationType.TARGETS, ent.id, epistemic_status=EpistemicStatus.PROPOSED, confidence=0.35)
+            if not raw_request or not raw_request.strip():
+                for actor in actors:
+                    actor_name = actor.name.lower().replace(" ", "_")
+                    for ent in target_entities:
+                        ent_name = ent.name.lower().replace(" ", "_")
+                        query_id = f"query_{actor_name}_inspect_{ent_name}"
+                        b_graph.add_node(BehaviorNode(
+                            id=query_id,
+                            name=f"{actor.name} Inspect {ent.name}",
+                            behavior_type=BehaviorNodeType.QUERY,
+                            actor_id=actor.id,
+                            target_entity_id=ent.id,
+                            epistemic_status=EpistemicStatus.PROPOSED,      # Demoted to PROPOSED for empty prompt
+                            provenance=ProvenanceKind.SPECULATIVE,
+                            confidence=0.35,                              # Demoted confidence
+                            description=f"Un-grounded proposed candidate query for {actor.name} to inspect {ent.name}"
+                        ))
+                        b_graph.add_edge(actor.id, BehaviorRelationType.PERFORMS, query_id, epistemic_status=EpistemicStatus.PROPOSED, confidence=0.35)
+                        b_graph.add_edge(query_id, BehaviorRelationType.TARGETS, ent.id, epistemic_status=EpistemicStatus.PROPOSED, confidence=0.35)
+            else:
+                for actor in actors:
+                    actor_name = actor.name.lower().replace(" ", "_")
+                    for ent in target_entities:
+                        ent_name = ent.name.lower().replace(" ", "_")
+                        cmd_id = f"cmd_{actor_name}_manage_{ent_name}"
+                        b_graph.add_node(BehaviorNode(
+                            id=cmd_id,
+                            name=f"{actor.name} Manage {ent.name}",
+                            behavior_type=BehaviorNodeType.COMMAND,
+                            actor_id=actor.id,
+                            target_entity_id=ent.id,
+                            epistemic_status=EpistemicStatus.DERIVED,
+                            provenance=ProvenanceKind.STRONGLY_DERIVED,
+                            confidence=0.90,
+                            description=f"Derived management command for {actor.name} on {ent.name}"
+                        ))
+                        b_graph.add_edge(actor.id, BehaviorRelationType.PERFORMS, cmd_id, epistemic_status=EpistemicStatus.DERIVED, provenance=ProvenanceKind.STRONGLY_DERIVED)
+                        b_graph.add_edge(cmd_id, BehaviorRelationType.TARGETS, ent.id, epistemic_status=EpistemicStatus.DERIVED, provenance=ProvenanceKind.STRONGLY_DERIVED)
+
+                        query_id = f"query_{actor_name}_view_{ent_name}"
+                        b_graph.add_node(BehaviorNode(
+                            id=query_id,
+                            name=f"{actor.name} View {ent.name}",
+                            behavior_type=BehaviorNodeType.QUERY,
+                            actor_id=actor.id,
+                            target_entity_id=ent.id,
+                            epistemic_status=EpistemicStatus.DERIVED,
+                            provenance=ProvenanceKind.STRONGLY_DERIVED,
+                            confidence=0.90,
+                            description=f"Derived read query for {actor.name} to view {ent.name}"
+                        ))
+                        b_graph.add_edge(actor.id, BehaviorRelationType.PERFORMS, query_id, epistemic_status=EpistemicStatus.DERIVED, provenance=ProvenanceKind.STRONGLY_DERIVED)
+                        b_graph.add_edge(query_id, BehaviorRelationType.TARGETS, ent.id, epistemic_status=EpistemicStatus.DERIVED, provenance=ProvenanceKind.STRONGLY_DERIVED)
 
         return b_graph

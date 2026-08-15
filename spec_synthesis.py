@@ -2280,6 +2280,44 @@ class SpecSynthesisEngine:
                         DecisionThreshold.MUST_ASK if conf < 0.70 else DecisionThreshold.PROBABLY_DECIDE
                     )
 
+                    r_ev_raw = getattr(r_node, "evidence", []) if hasattr(r_node, "evidence") else r_node.get("evidence", [])
+                    ev_refs = []
+                    if isinstance(r_ev_raw, list):
+                        for item in r_ev_raw:
+                            if isinstance(item, EvidenceReference):
+                                ev_refs.append(item)
+                            elif isinstance(item, dict):
+                                ev_refs.append(EvidenceReference(
+                                    source_file=item.get("source_file", item.get("source_ref", "workspace")),
+                                    section=item.get("section", "domain"),
+                                    reference_text=item.get("reference_text", item.get("content", str(item)))
+                                ))
+                            elif hasattr(item, "source_ref") and hasattr(item, "content"):
+                                ev_refs.append(EvidenceReference(
+                                    source_file=getattr(item, "source_ref", "workspace"),
+                                    section="domain",
+                                    reference_text=getattr(item, "content", str(item))
+                                ))
+                            elif isinstance(item, str) and item:
+                                ev_refs.append(EvidenceReference(
+                                    source_file="spec_graph",
+                                    section="domain",
+                                    reference_text=item
+                                ))
+                    elif isinstance(r_ev_raw, str) and r_ev_raw:
+                        ev_refs.append(EvidenceReference(
+                            source_file="spec_graph",
+                            section="domain",
+                            reference_text=r_ev_raw
+                        ))
+
+                    if not ev_refs:
+                        ev_refs.append(EvidenceReference(
+                            source_file="workspace_preflight",
+                            section="domain_discovery",
+                            reference_text=f"Evidence reference for {getattr(r_node, 'capability', r_id)}"
+                        ))
+
                     req_obj = SynthesizedRequirement(
                         id=r_id,
                         description=statement_str,
@@ -2287,6 +2325,7 @@ class SpecSynthesisEngine:
                         category=r_cat,
                         action=ArtifactAction.CREATE,
                         decision_threshold=thresh_val,
+                        evidence=ev_refs,
                         why_chain=[getattr(r_node, "reason", "Compiled from Authoritative Requirement Graph") if hasattr(r_node, "reason") else "Compiled from Authoritative Requirement Graph"],
                         affects=["frontend", "backend"]
                     )

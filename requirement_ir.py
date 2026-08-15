@@ -456,48 +456,49 @@ class RequirementGraph:
             if b_node.epistemic_status not in [EpistemicStatus.EXPLICIT, EpistemicStatus.OBSERVED, EpistemicStatus.DERIVED, EpistemicStatus.CONFIRMED]:
                 continue
 
-            if b_node.behavior_type == BehaviorNodeType.COMMAND:
-                req_id = f"REQ-{req_counter:03d}"
+            req_id = f"REQ-{req_counter:03d}"
+            req_counter += 1
+
+            preconds = [f"{b_node.target_entity_id}.status == {b_node.from_state.upper()}"] if b_node.from_state else []
+            postconds = [f"{b_node.target_entity_id}.status == {b_node.to_state.upper()}"] if b_node.to_state else []
+
+            r_kind = RequirementKind.FUNCTIONAL if b_node.behavior_type in [BehaviorNodeType.COMMAND, BehaviorNodeType.QUERY, BehaviorNodeType.STATE_TRANSITION] else RequirementKind.NON_FUNCTIONAL
+
+            r_graph.add_requirement(RequirementNode(
+                id=req_id,
+                kind=r_kind,
+                statement=f"The system shall allow {b_node.actor_id} to execute {b_node.name}.",
+                actor=b_node.actor_id,
+                capability=b_node.id,
+                target=b_node.target_entity_id,
+                preconditions=preconds,
+                postconditions=postconds,
+                epistemic_status=b_node.epistemic_status,
+                provenance=b_node.provenance,
+                confidence=b_node.confidence,
+                evidence=b_node.evidence_ref,
+                source_behaviors=[b_node.id]
+            ))
+
+            # Synthesize NFR Audit Log Requirement for state-changing commands
+            if b_node.behavior_type == BehaviorNodeType.COMMAND and (b_node.from_state or b_node.to_state or any(v in b_node.name.lower() for v in ["approve", "sign", "override", "reject", "ground"])):
+                nfr_id = f"REQ-{req_counter:03d}"
                 req_counter += 1
-
-                preconds = [f"{b_node.target_entity_id}.status == {b_node.from_state.upper()}"] if b_node.from_state else []
-                postconds = [f"{b_node.target_entity_id}.status == {b_node.to_state.upper()}"] if b_node.to_state else []
-
                 r_graph.add_requirement(RequirementNode(
-                    id=req_id,
-                    kind=RequirementKind.FUNCTIONAL,
-                    statement=f"The system shall allow {b_node.actor_id} to execute {b_node.name}.",
+                    id=nfr_id,
+                    kind=RequirementKind.NON_FUNCTIONAL,
+                    nfr_category=NFRCategory.AUDITABILITY,
+                    statement=f"Execution of {b_node.name} by {b_node.actor_id} must emit an immutable audit log record.",
                     actor=b_node.actor_id,
-                    capability=b_node.id,
+                    capability=f"{b_node.id}_audit_log",
                     target=b_node.target_entity_id,
-                    preconditions=preconds,
-                    postconditions=postconds,
-                    epistemic_status=b_node.epistemic_status,
-                    provenance=b_node.provenance,
-                    confidence=b_node.confidence,
-                    evidence=b_node.evidence_ref,
+                    epistemic_status=EpistemicStatus.DERIVED,
+                    provenance=ProvenanceKind.STRONGLY_DERIVED,
+                    confidence=0.95,
+                    evidence=f"Audit side effect for {b_node.id}",
                     source_behaviors=[b_node.id]
                 ))
-
-                # Synthesize NFR Audit Log Requirement for state-changing commands
-                if b_node.from_state or b_node.to_state or any(v in b_node.name.lower() for v in ["approve", "sign", "override", "reject", "ground"]):
-                    nfr_id = f"REQ-{req_counter:03d}"
-                    req_counter += 1
-                    r_graph.add_requirement(RequirementNode(
-                        id=nfr_id,
-                        kind=RequirementKind.NON_FUNCTIONAL,
-                        nfr_category=NFRCategory.AUDITABILITY,
-                        statement=f"Execution of {b_node.name} by {b_node.actor_id} must emit an immutable audit log record.",
-                        actor=b_node.actor_id,
-                        capability=f"{b_node.id}_audit_log",
-                        target=b_node.target_entity_id,
-                        epistemic_status=EpistemicStatus.DERIVED,
-                        provenance=ProvenanceKind.STRONGLY_DERIVED,
-                        confidence=0.95,
-                        evidence=f"Audit side effect for {b_node.id}",
-                        source_behaviors=[b_node.id]
-                    ))
-                    r_graph.add_dependency(nfr_id, req_id)
+                r_graph.add_dependency(nfr_id, req_id)
 
         return r_graph
 

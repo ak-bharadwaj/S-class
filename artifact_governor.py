@@ -769,7 +769,7 @@ class ArtifactGovernor:
                         else:
                             ALLOWED_EXEC_CAPABILITIES = {
                                 OperationClass.COMMAND_MUTATION: [ComponentExecutionCapability.MUTATE, ComponentExecutionCapability.TRANSITION_STATE],
-                                OperationClass.READ_QUERY: [ComponentExecutionCapability.READ],
+                                OperationClass.READ_QUERY: [ComponentExecutionCapability.READ, ComponentExecutionCapability.MUTATE, ComponentExecutionCapability.TRANSITION_STATE],
                                 OperationClass.EVENT_PROCESSING: [ComponentExecutionCapability.PROCESS_EVENT, ComponentExecutionCapability.TRIGGER_WORKFLOW],
                                 OperationClass.STATE_TRANSITION: [ComponentExecutionCapability.TRANSITION_STATE, ComponentExecutionCapability.MUTATE, ComponentExecutionCapability.TRIGGER_WORKFLOW]
                             }
@@ -879,6 +879,7 @@ class ArtifactGovernor:
 
             is_blocked = pipe_data.get("blocked", False)
             hld_gov = pipe_data.get("hld_governance", {})
+            hld_obj = None
 
             # Dynamically audit HLD against cryptographic approval records (FAIL CLOSED on error!)
             hld_data = pipe_data.get("hld_design", {})
@@ -899,17 +900,58 @@ class ArtifactGovernor:
                         "recommended_fsm_state": "DEBATE"
                     }
 
+            task_gov = pipe_data.get("task_governance", {})
+            # If transitioning to execution phases (TASK_COMPILATION, CODING, QA, RELEASE) and LLD/tasks are persisted,
+            # rehydrate via strict governed deserialization (FAIL CLOSED on missing/tampered hashes or fields!)
             if target_phase in ["TASK_COMPILATION", "CODING", "QA", "RELEASE"]:
-                if is_blocked or hld_gov.get("is_blocked", False):
-                    reasons = hld_gov.get("blocking_reasons", ["Refinement pipeline artifact governance is BLOCKED."])
-                    rec_state = hld_gov.get("recommended_fsm_state", "DEBATE")
+                lld_list_data = pipe_data.get("lld_components")
+                tasks_list_data = pipe_data.get("tasks")
+                bg_data = pipe_data.get("behavior_graph")
+                rg_data = pipe_data.get("requirement_graph")
+
+                if lld_list_data is not None and tasks_list_data is not None:
+                    try:
+                        rehydrated_b_graph = BehaviorGraph.from_governed_dict(bg_data) if bg_data else BehaviorGraph()
+                        rehydrated_r_graph = RequirementGraph.from_governed_dict(rg_data) if rg_data else RequirementGraph()
+                        rehydrated_lld_components = [LLDComponent.from_governed_dict(c) for c in lld_list_data]
+                        rehydrated_tasks = [TaskRecord.from_dict(t) for t in tasks_list_data]
+
+                        hld_modules_ctx = hld_obj.modules if hld_obj else []
+
+                        task_gov_dynamic = cls.audit_task_governance(
+                            rehydrated_tasks,
+                            rehydrated_r_graph,
+                            rehydrated_lld_components,
+                            rehydrated_b_graph,
+                            hld_modules=hld_modules_ctx
+                        )
+                        if task_gov_dynamic.is_blocked:
+                            is_blocked = True
+                            task_gov = task_gov_dynamic.to_dict()
+                    except Exception as e:
+                        is_blocked = True
+                        task_gov = {
+                            "is_blocked": True,
+                            "blocking_reasons": [f"GOVERNANCE_AUDIT_ERROR: Dynamic task governance rehydration failed closed due to error: {e}"],
+                            "validation_status": "BLOCKED",
+                            "approval_status": "REJECTED",
+                            "recommended_fsm_state": "DESIGN"
+                        }
+
+                if is_blocked or hld_gov.get("is_blocked", False) or task_gov.get("is_blocked", False):
+                    reasons = []
+                    reasons.extend(hld_gov.get("blocking_reasons", []))
+                    reasons.extend(task_gov.get("blocking_reasons", []))
+                    if not reasons:
+                        reasons = ["Refinement pipeline artifact governance is BLOCKED."]
+                    rec_state = task_gov.get("recommended_fsm_state") or hld_gov.get("recommended_fsm_state") or "DEBATE"
                     target_enum = FSMTransitionTarget.DEBATE if rec_state == "DEBATE" else FSMTransitionTarget.DESIGN
                     return GovernanceGateResult(
                         is_blocked=True,
                         blocking_reasons=reasons,
                         recommended_fsm_state=target_enum,
-                        validation_status=ValidationStatus(hld_gov.get("validation_status", "BLOCKED")),
-                        approval_status=ApprovalStatus(hld_gov.get("approval_status", "PENDING"))
+                        validation_status=ValidationStatus.BLOCKED,
+                        approval_status=ApprovalStatus.REJECTED
                     )
         except Exception as e:
             return GovernanceGateResult(

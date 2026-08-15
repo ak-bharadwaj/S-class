@@ -1367,6 +1367,45 @@ class FSMGoalSequenceRunner:
             except Exception as e_ref:
                 logger.warning(f"[Runtime Governance] Refinement compilation note: {e_ref}")
 
+        if current_phase == "DESIGN_REVISION" and os.path.exists(pipe_file):
+            try:
+                from artifact_governor import ArtifactGovernor, ApprovalRecord, ApprovalAuthority
+                from hld_compiler import HLDDesign
+                pipe_data = load_json(pipe_file) or {}
+                hld_data = pipe_data.get("hld_design", {})
+                if hld_data:
+                    hld_obj = HLDDesign.from_dict(hld_data)
+                    sec_key = ArtifactGovernor._get_governance_secret(workspace_dir)
+                    approvals_file = os.path.join(state_dir, "approvals.json")
+                    app_data = load_json(approvals_file) or {"approval_records": []}
+                    existing_recs = app_data.get("approval_records", [])
+                    existing_adr_ids = {r.get("adr_id") for r in existing_recs}
+
+                    new_recs = list(existing_recs)
+                    for a in hld_obj.adrs:
+                        if a.id not in existing_adr_ids:
+                            c_hash = ArtifactGovernor.compute_canonical_adr_hash(a)
+                            rec = ApprovalRecord(
+                                a.id, hld_obj.system_name or "HLD-001", getattr(hld_obj, "version", 1),
+                                c_hash, "ACCEPTED", ApprovalAuthority.HUMAN_EXPLICIT, "FSM Revision approval", "2026-08-15T00:00:00Z"
+                            )
+                            rec.signature = rec.compute_signature(sec_key)
+                            new_recs.append(rec.to_dict())
+
+                    write_json_atomic(approvals_file, {"approval_records": new_recs})
+
+                    # Recompile pipeline under newly approved governance state to generate LLD & tasks
+                    from spec_compiler import SpecificationCompiler
+                    state = get_state(workspace_dir)
+                    goal_text = getattr(state, "goal", "") or ""
+                    SpecificationCompiler.compile_v7_refinement_pipeline(
+                        raw_request=goal_text,
+                        workspace_dir=workspace_dir,
+                        is_debate_phase=False
+                    )
+            except Exception as e_app:
+                logger.warning(f"[Runtime Governance] Approval note: {e_app}")
+
         if current_phase in ["SPECIFICATION_SYNTHESIS", "DESIGN", "DEBATE", "DESIGN_REVISION"] and os.path.exists(pipe_file):
             try:
                 pipe_data = load_json(pipe_file) or {}

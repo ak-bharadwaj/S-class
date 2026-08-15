@@ -511,55 +511,70 @@ class LLDCompiler:
             mod_behaviors = []
             mod_reqs = []
 
-            for cap in mod.owned_capabilities:
-                b_node = b_graph.get_node(cap)
-                if b_node and b_node.epistemic_status in [EpistemicStatus.EXPLICIT, EpistemicStatus.OBSERVED, EpistemicStatus.DERIVED, EpistemicStatus.CONFIRMED]:
-                    mod_behaviors.append(b_node.id)
-                    matching_reqs = [r.id for r in r_graph.nodes.values() if b_node.id in r.source_behaviors or r.capability == cap or r.target in mod.owned_entities]
-                    mod_reqs.extend(matching_reqs)
+            mod_ents = [e.replace("entity_", "").replace("resource_", "").replace("wf_", "").lower() for e in mod.owned_entities]
 
-                    tokens = b_node.name.split()
-                    verb = tokens[1].lower() if len(tokens) > 1 else "action"
-                    ent_stem = b_node.target_entity_id.replace("entity_", "").lower()
+            # 1. Match behaviors whose target entity matches module owned entities or whose id is in mod.owned_capabilities
+            for b_node in b_graph.nodes.values():
+                clean_b_ent = (b_node.target_entity_id or "").replace("entity_", "").replace("resource_", "").replace("wf_", "").lower()
+                if b_node.id in mod.owned_capabilities or clean_b_ent in mod_ents:
+                    if b_node.epistemic_status in [EpistemicStatus.EXPLICIT, EpistemicStatus.OBSERVED, EpistemicStatus.DERIVED, EpistemicStatus.CONFIRMED]:
+                        if b_node.id not in mod_behaviors:
+                            mod_behaviors.append(b_node.id)
 
-                    VERB_TO_NOUN = {
-                        "waive": "waivers",
-                        "waives": "waivers",
-                        "borrow": "loans",
-                        "borrows": "loans",
-                        "block": "restrictions",
-                        "blocks": "restrictions",
-                        "accrue": "accruals",
-                        "accrues": "accruals",
-                        "paid": "payments",
-                        "paids": "payments",
-                        "further": "extensions",
-                        "furthers": "extensions",
-                        "daily": "schedules",
-                        "dailies": "schedules"
-                    }
-                    verb_noun = VERB_TO_NOUN.get(verb, verb)
-                    if exec_arch == ExecutionArchitecture.CLI_DISPATCHER:
-                        ep = f"cli://{verb}-{ent_stem}"
-                    elif exec_arch in [ExecutionArchitecture.DATA_PIPELINE_WORKER, ExecutionArchitecture.EVENT_DRIVEN_MICROSERVICE]:
-                        ep = f"event://{ent_stem}-events/{verb}"
-                    else:
-                        IRREGULAR_PLURALS = {
-                            "alumni": "alumni", "alumnus": "alumni", "staff": "staff", "faculty": "faculty",
-                            "data": "data", "equipment": "equipment", "telemetry": "telemetry", "category": "categories"
+                        tokens = b_node.name.split()
+                        verb = tokens[1].lower() if len(tokens) > 1 else "action"
+                        ent_stem = clean_b_ent or "entity"
+
+                        VERB_TO_NOUN = {
+                            "waive": "waivers",
+                            "waives": "waivers",
+                            "borrow": "loans",
+                            "borrows": "loans",
+                            "block": "restrictions",
+                            "blocks": "restrictions",
+                            "accrue": "accruals",
+                            "accrues": "accruals",
+                            "paid": "payments",
+                            "paids": "payments",
+                            "further": "extensions",
+                            "furthers": "extensions",
+                            "daily": "schedules",
+                            "dailies": "schedules"
                         }
-                        if ent_stem in IRREGULAR_PLURALS:
-                            ent_plural = IRREGULAR_PLURALS[ent_stem]
-                        elif ent_stem.endswith('s') or ent_stem.endswith('ss'):
-                            ent_plural = ent_stem
-                        elif ent_stem.endswith('y') and len(ent_stem) > 2 and ent_stem[-2] not in 'aeiou':
-                            ent_plural = f"{ent_stem[:-1]}ies"
+                        verb_noun = VERB_TO_NOUN.get(verb, verb)
+                        if exec_arch == ExecutionArchitecture.CLI_DISPATCHER:
+                            ep = f"cli://{verb}-{ent_stem}"
+                        elif exec_arch in [ExecutionArchitecture.DATA_PIPELINE_WORKER, ExecutionArchitecture.EVENT_DRIVEN_MICROSERVICE]:
+                            ep = f"event://{ent_stem}-events/{verb}"
                         else:
-                            ent_plural = f"{ent_stem}s"
-                        ep = f"POST /api/{ent_plural}/{{id}}/{verb_noun}" if b_node.behavior_type != BehaviorNodeType.QUERY else f"GET /api/{ent_plural}/{{id}}"
+                            IRREGULAR_PLURALS = {
+                                "alumni": "alumni", "alumnus": "alumni", "staff": "staff", "faculty": "faculty",
+                                "data": "data", "equipment": "equipment", "telemetry": "telemetry", "category": "categories"
+                            }
+                            if ent_stem in IRREGULAR_PLURALS:
+                                ent_plural = IRREGULAR_PLURALS[ent_stem]
+                            elif ent_stem.endswith('s') or ent_stem.endswith('ss'):
+                                ent_plural = ent_stem
+                            elif ent_stem.endswith('y') and len(ent_stem) > 2 and ent_stem[-2] not in 'aeiou':
+                                ent_plural = f"{ent_stem[:-1]}ies"
+                            else:
+                                ent_plural = f"{ent_stem}s"
+                            ep = f"POST /api/{ent_plural}/{{id}}/{verb_noun}" if b_node.behavior_type != BehaviorNodeType.QUERY else f"GET /api/{ent_plural}/{{id}}"
 
-                    if ep not in mod_endpoints:
-                        mod_endpoints.append(ep)
+                        if ep not in mod_endpoints:
+                            mod_endpoints.append(ep)
+
+            # 2. Match requirements whose source_behaviors or target entity or hld_module match
+            for r in r_graph.nodes.values():
+                clean_r_target = (r.target or "").replace("entity_", "").replace("resource_", "").replace("wf_", "").lower()
+                clean_r_ent = (getattr(r, "entity", "") or "").replace("entity_", "").replace("resource_", "").replace("wf_", "").lower()
+                if (r.hld_module == mod.id or
+                    r.capability in mod.owned_capabilities or
+                    clean_r_target in mod_ents or
+                    clean_r_ent in mod_ents or
+                    any(sb in mod_behaviors for sb in r.source_behaviors)):
+                    if r.id not in mod_reqs:
+                        mod_reqs.append(r.id)
 
             if not mod_endpoints:
                 mod_endpoints.append("PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE")

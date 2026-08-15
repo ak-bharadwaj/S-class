@@ -252,7 +252,8 @@ class HLDCompiler:
         capability_clusters: Dict[str, Dict[str, Any]] = {}
 
         for req in r_graph.nodes.values():
-            target_ent = req.target or "core"
+            target_ent = getattr(req, "target", None) or getattr(req, "entity", None) or "core"
+            target_ent = target_ent.replace("entity_", "").replace("resource_", "").replace("wf_", "")
 
             # Context key derived from workflow state transitions or entity domain
             b_node = b_graph.get_node(req.source_behaviors[0]) if req.source_behaviors else b_graph.get_node(req.capability)
@@ -262,6 +263,8 @@ class HLDCompiler:
             else:
                 context_key = f"ctx_{target_ent.lower()}_management"
                 context_name = f"{target_ent.capitalize()} Management Context"
+
+            req.hld_module = context_key
 
             if context_key not in capability_clusters:
                 capability_clusters[context_key] = {

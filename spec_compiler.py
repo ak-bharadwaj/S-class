@@ -560,7 +560,10 @@ class SpecificationCompiler:
         Semantic Domain -> Behavior Graph -> Requirement IR -> HLD + ADRs -> V9 Debate -> Artifact Governance -> LLD -> Tasks
         """
         if graph is None:
-            graph = SemanticDomainGraph()
+            from spec_synthesis import SemanticDecomposer, WorkspaceDocumentScanner
+            evidence = WorkspaceDocumentScanner.full_document_discovery(workspace_dir) if workspace_dir else None
+            req_text = raw_request or (" ".join(intent_features) if intent_features else "")
+            graph = SemanticDecomposer.decompose_intent(req_text, evidence) if req_text else SemanticDomainGraph()
         if intent_features is None:
             intent_features = [raw_request] if raw_request else []
         from behavior_graph import BehaviorGraphEngine

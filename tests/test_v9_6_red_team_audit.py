@@ -1554,6 +1554,38 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         self.assertTrue(gov_res_v2.is_blocked, "ArtifactGovernor MUST block when executing artifact version 2 against version 1 approval")
         self.assertTrue(any("artifact version mismatch" in r for r in gov_res_v2.blocking_reasons))
 
+        # 9. Persisted Artifact Dynamic Rehydration: Corrupted component_hash in persisted LLD components MUST fail closed
+        valid_lld_comp = LLDComponent(
+            id="ctrl_mod_inventory", name="Inventory Controller",
+            component_type=LLDComponentType.CONTROLLER,
+            parent=LLDParentRef(hld_id="mod_inventory", req_ids=["REQ-001"], behavior_ids=["BEH-001"]),
+            role="backend_controller",
+            execution_capability=ComponentExecutionCapability.MUTATE,
+            capability_bindings=[]
+        )
+        valid_lld_comp.component_hash = valid_lld_comp.compute_canonical_hash()
+
+        corrupted_persisted_comp = valid_lld_comp.to_dict()
+        corrupted_persisted_comp["component_hash"] = "corrupted_hash_9999"
+
+        write_json_atomic(pipe_path, {
+            "version": 1,
+            "hld_design": hld_initial.to_dict(),
+            "behavior_graph": BehaviorGraph(version=1).to_dict(),
+            "requirement_graph": RequirementGraph(version=1).to_dict(),
+            "lld_components": [corrupted_persisted_comp],
+            "tasks": [{"id": "TASK-001", "title": "Test Task", "description": "desc", "category": "api_endpoint", "parent_lld": "ctrl_mod_inventory", "parent_hld": "mod_inventory", "parent_reqs": ["REQ-001"], "parent_behaviors": ["BEH-001"]}],
+            "blocked": False,
+            "hld_governance": {"is_blocked": False}
+        })
+        gov_res_rehydrate_corrupt = ArtifactGovernor.enforce_fsm_transition(
+            current_phase="DESIGN",
+            proposed_event="spec_approved",
+            target_phase="CODING",
+            workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res_rehydrate_corrupt.is_blocked, "Corrupted component_hash in persisted refinement pipeline artifact MUST fail closed during FSM transition")
+
     # -------------------------------------------------------------------------
     # Pillar 8: 19-State FSM Control Plane & Illegal Transition Rejection
     # -------------------------------------------------------------------------

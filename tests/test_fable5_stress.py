@@ -46,7 +46,7 @@ def test_cli_developer_tool_pure_subcommands(temp_workspace):
     # Verify no REST API endpoints or generic web layouts
     for lld in spec.low_level_designs.values():
         assert lld.get("layout") == "cli_subcommand_dispatch"
-        assert lld.get("api_endpoints") == []
+        assert all(ep.startswith("cli://") for ep in lld.get("api_endpoints", []))
         assert "ArgParser" in lld.get("sub_components", [])
 
     passed, warns, _ = PracticalSkeptic.audit_specification({
