@@ -1215,6 +1215,18 @@ class WorldModelPromotionEngine:
         if not repository_state_hash or not isinstance(repository_state_hash, str) or not repository_state_hash.strip():
             raise ValueError("[SClassTestRunner] Mandatory 'repository_state_hash' is missing or empty")
 
+        # 5. Verify test_command explicitly targets the authorized test entity
+        test_path_part = test_entity_id
+        if test_path_part.startswith("test://"):
+            test_path_part = test_path_part[7:].split("#")[0]
+        test_file_base = os.path.basename(test_path_part)
+        
+        command_args_str = " ".join(test_command[1:])
+        if test_file_base and test_file_base not in command_args_str:
+            raise ValueError(
+                f"[SClassTestRunner] Command target mismatch: test_command '{command_args_str}' does not target authorized test entity '{test_entity_id}'"
+            )
+
         # 5. Execute in isolated subprocess (shell=False)
         proc = subprocess.run(test_command, cwd=real_cwd, capture_output=True, text=True, shell=False)
         if proc.returncode != 0:

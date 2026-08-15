@@ -448,7 +448,7 @@ class RequirementGraph:
                         r.target == req.target and any(val in post for post in r.postconditions)
                         for r in self.nodes.values()
                     )
-                    if not has_state_req and req.epistemic_status == EpistemicStatus.EXPLICIT:
+                    if not has_state_req and req.epistemic_status == EpistemicStatus.EXPLICIT and req.constraint_class == ConstraintClass.HARD_CONSTRAINT:
                         holes.append({
                             "req_id": req.id,
                             "type": "MISSING_PRECONDITION_STATE_MODEL",

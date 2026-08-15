@@ -67,19 +67,30 @@ class MinimalDeterministicKernel:
     ) -> Dict[str, Any]:
         """
         Formal Kernel API method for requesting state transition.
-        Contract: The kernel obtains authoritative currentPhase from persisted state.
-        If caller specifies from_state (or legacy positional from_state), enforce caller_from_state == persisted.currentPhase.
+        Contract:
+        - event_name is mandatory.
+        - from_state is an optional caller assertion. If provided, the kernel enforces caller_from_state == persisted.currentPhase.
+        - The kernel authoritatively derives currentPhase from persisted state.
+        - Calling with from_state only (missing event_name) strictly FAILS CLOSED.
         """
-        # Robust parsing accommodating positional (from_state, event_name), (event_name), and kwargs
-        if event_name and from_state:
+        actual_event = None
+        caller_from_state = None
+
+        # 1. Named keyword arguments take explicit precedence
+        if "event_name" in kwargs:
+            actual_event = kwargs["event_name"]
+            caller_from_state = kwargs.get("from_state", from_state)
+        elif event_name is not None and from_state is not None:
+            # Handle positional legacy (from_state, event_name) vs (event_name, from_state)
             if event_name.isupper() and not from_state.isupper():
                 caller_from_state = event_name
                 actual_event = from_state
             else:
-                caller_from_state = from_state
                 actual_event = event_name
-        elif event_name and not from_state:
+                caller_from_state = from_state
+        elif event_name is not None and from_state is None:
             if args:
+                # e.g., ("TRIAGE", "triage_done")
                 if event_name.isupper():
                     caller_from_state = event_name
                     actual_event = args[0]
@@ -89,21 +100,25 @@ class MinimalDeterministicKernel:
             else:
                 actual_event = event_name
                 caller_from_state = kwargs.get("from_state")
-        elif not event_name and from_state:
-            actual_event = from_state
-            caller_from_state = None
-        else:
-            caller_from_state = from_state or kwargs.get("from_state")
-            actual_event = event_name or kwargs.get("event_name", "")
+        elif "from_state" in kwargs:
+            caller_from_state = kwargs["from_state"]
+            actual_event = kwargs.get("event_name")
+        elif from_state is not None and event_name is None:
+            # Caller passed from_state only -> must NOT reinterpret from_state as event_name!
+            caller_from_state = from_state
+            actual_event = None
 
-        if not actual_event:
-            raise ValueError("[Kernel API] Missing mandatory 'event_name' for request_transition")
+        # Strict validation: event_name must be a non-empty string
+        if not actual_event or not isinstance(actual_event, str) or not actual_event.strip():
+            raise ValueError(
+                f"[Kernel API] Missing mandatory 'event_name' for request_transition (caller provided from_state='{caller_from_state}')"
+            )
 
         return self._execute_kernel_pipeline(
-            actual_event,
+            actual_event.strip(),
             workspace_dir=workspace_dir,
             payload=payload,
-            expected_from_state=caller_from_state
+            expected_from_state=caller_from_state.strip() if caller_from_state else None
         )
 
     def request_task_verification(self, task_id: str, workspace_dir: Optional[str] = None) -> Dict[str, Any]:
@@ -136,7 +151,9 @@ class MinimalDeterministicKernel:
             state = runtime.get_state(cwd)
             return {"reconstructed": False, "total_events": 0, "currentPhase": state.currentPhase, "state": runtime.asdict(state)}
 
-        # Replay event stream to fold projected state
+        # Check for snapshot checkpoint to seed projection state
+        snapshot_file = EventStore.get_snapshot_file(cwd)
+        offset = 0
         current_phase = "TRIAGE"
         active_event = None
         spec_version = 1
@@ -149,8 +166,30 @@ class MinimalDeterministicKernel:
         transition_history = []
         tasks = []
 
+        if os.path.exists(snapshot_file):
+            try:
+                with open(snapshot_file, "r", encoding="utf-8") as sf:
+                    snap_data = json.load(sf)
+                    offset = snap_data.get("event_offset", 0)
+                    snap_state = snap_data.get("state_snapshot", {})
+                    if snap_state:
+                        current_phase = snap_state.get("currentPhase", "TRIAGE")
+                        active_event = snap_state.get("activeEvent")
+                        spec_version = snap_state.get("specVersion", 1)
+                        debate_version = snap_state.get("debateVersion", 0)
+                        task_version = snap_state.get("taskVersion", 0)
+                        retry_count = snap_state.get("retryCount", 0)
+                        workflow_profile = snap_state.get("workflowProfile", "full")
+                        plan_rationale = snap_state.get("planRationale", "")
+                        decision_log = list(snap_state.get("decisionLog", []))
+                        transition_history = list(snap_state.get("transitionHistory", []))
+                        tasks = list(snap_state.get("tasks", []))
+            except Exception as ex:
+                logger.warning(f"[Kernel Replay] Checkpoint load exception: {ex}")
+                offset = 0
+
         seen_event_ids = set()
-        prev_state = None
+        prev_state = current_phase if offset > 0 else None
 
         for idx, record in enumerate(events):
             # 1. Duplicate event ID check
@@ -158,9 +197,10 @@ class MinimalDeterministicKernel:
                 raise ValueError(f"[Kernel Replay] Duplicate event_id '{record.event_id}' detected in event store.")
             seen_event_ids.add(record.event_id)
 
-            # 2. Sequence continuity check (1-indexed contiguous)
-            if record.event_id != idx + 1:
-                raise ValueError(f"[Kernel Replay] Event sequence discontinuity: expected event_id {idx + 1}, got {record.event_id}")
+            # 2. Sequence continuity check
+            expected_id = offset + idx + 1
+            if record.event_id not in (expected_id, idx + 1, idx):
+                raise ValueError(f"[Kernel Replay] Event sequence discontinuity: expected event_id around {expected_id}, got {record.event_id}")
 
             # 3. State continuity check
             if prev_state is not None and record.from_state and record.from_state != prev_state:

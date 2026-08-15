@@ -68,11 +68,9 @@ class EventRecord:
         )
 
     def __getitem__(self, key: str) -> Any:
-        if hasattr(self, key):
+        if key in ("event_id", "event_name", "from_state", "to_state", "timestamp", "payload", "event_type", "workflow_profile"):
             return getattr(self, key)
-        if isinstance(self.payload, dict) and key in self.payload:
-            return self.payload[key]
-        raise KeyError(key)
+        raise KeyError(f"'{key}' is not a canonical EventRecord attribute. Access payload properties via record.payload['{key}'].")
 
     def get(self, key: str, default: Any = None) -> Any:
         try:
