@@ -199,6 +199,8 @@ class BehaviorGraph:
     """Typed Multigraph for system behavior, authorization, state transitions, and audit trails."""
 
     def __init__(self, version: int = 1):
+        if not isinstance(version, int) or isinstance(version, bool) or version <= 0:
+            raise ValueError(f"BehaviorGraph version must be a positive integer, got {version}")
         self.version: int = version
         self.nodes: Dict[str, BehaviorNode] = {}
         self.edges: List[BehaviorEdge] = []
@@ -266,8 +268,18 @@ class BehaviorGraph:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'BehaviorGraph':
-        graph = cls(version=int(data.get("version", 1)))
+    def from_dict(cls, data: Dict[str, Any], strict: bool = False) -> 'BehaviorGraph':
+        if strict:
+            if "version" not in data:
+                raise ValueError("Missing mandatory 'version' in BehaviorGraph serialized data (strict mode)")
+            ver = data["version"]
+            if not isinstance(ver, int) or isinstance(ver, bool) or ver <= 0:
+                raise ValueError(f"BehaviorGraph version must be a positive integer in strict mode, got {ver}")
+        else:
+            ver = data.get("version", 1)
+            if not isinstance(ver, int) or isinstance(ver, bool) or ver <= 0:
+                ver = 1
+        graph = cls(version=ver)
         for node_data in data.get("nodes", []):
             graph.add_node(BehaviorNode.from_dict(node_data))
         for edge_data in data.get("edges", []):

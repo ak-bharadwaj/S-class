@@ -336,6 +336,8 @@ class RequirementGraph:
     """Graph of machine-verifiable requirements, tracking dependencies and detecting holes."""
 
     def __init__(self, version: int = 1):
+        if not isinstance(version, int) or isinstance(version, bool) or version <= 0:
+            raise ValueError(f"RequirementGraph version must be a positive integer, got {version}")
         self.version: int = version
         self.nodes: Dict[str, RequirementNode] = {}
         self.edges: List[Tuple[str, str, str]] = []  # (source_id, relation, target_id)
@@ -507,8 +509,18 @@ class RequirementGraph:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'RequirementGraph':
-        graph = cls(version=int(data.get("version", 1)))
+    def from_dict(cls, data: Dict[str, Any], strict: bool = False) -> 'RequirementGraph':
+        if strict:
+            if "version" not in data:
+                raise ValueError("Missing mandatory 'version' in RequirementGraph serialized data (strict mode)")
+            ver = data["version"]
+            if not isinstance(ver, int) or isinstance(ver, bool) or ver <= 0:
+                raise ValueError(f"RequirementGraph version must be a positive integer in strict mode, got {ver}")
+        else:
+            ver = data.get("version", 1)
+            if not isinstance(ver, int) or isinstance(ver, bool) or ver <= 0:
+                ver = 1
+        graph = cls(version=ver)
         for node_data in data.get("nodes", []):
             graph.add_requirement(RequirementNode.from_dict(node_data))
         for edge_data in data.get("edges", []):

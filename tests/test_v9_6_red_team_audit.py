@@ -1109,6 +1109,110 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         self.assertEqual(deserialized_missing_binding.source_hld_module_id, "")
         self.assertEqual(deserialized_missing_binding.source_hld_version, 0)
 
+        # 42. Negative Attack Vector 37: CapabilityBinding.from_dict REJECTS Missing or Invalid operation_class (Zero READ_QUERY default invention)
+        with self.assertRaises(ValueError):
+            CapabilityBinding.from_dict({
+                "behavior_id": "cmd_dispatch",
+                "lld_component_id": "comp_dispatch"
+                # Missing operation_class!
+            })
+        with self.assertRaises(ValueError):
+            CapabilityBinding.from_dict({
+                "behavior_id": "cmd_dispatch",
+                "lld_component_id": "comp_dispatch",
+                "operation_class": "INVALID_CLASS"
+            })
+
+        # 43. Negative Attack Vector 38: CapabilityBinding.from_dict Strict Mode Rejects Missing Critical Identity Fields
+        with self.assertRaises(ValueError):
+            CapabilityBinding.from_dict({
+                "lld_component_id": "comp_dispatch",
+                "operation_class": "COMMAND_MUTATION"
+                # Missing behavior_id!
+            }, strict=True)
+        with self.assertRaises(ValueError):
+            CapabilityBinding.from_dict({
+                "behavior_id": "cmd_dispatch",
+                "operation_class": "COMMAND_MUTATION"
+                # Missing lld_component_id!
+            }, strict=True)
+
+        # 44. Negative Attack Vector 39: Strict Positive Integer Graph Version Validation (Reject Non-Positive / Boolean / Missing in Strict Mode)
+        with self.assertRaises(ValueError):
+            BehaviorGraph(version=0)
+        with self.assertRaises(ValueError):
+            BehaviorGraph(version=-1)
+        with self.assertRaises(ValueError):
+            BehaviorGraph(version=True) # type(True) is bool!
+        with self.assertRaises(ValueError):
+            RequirementGraph(version=0)
+        with self.assertRaises(ValueError):
+            RequirementGraph(version=-1)
+        with self.assertRaises(ValueError):
+            RequirementGraph(version=False)
+
+        with self.assertRaises(ValueError):
+            BehaviorGraph.from_dict({"nodes": [], "edges": []}, strict=True)
+        with self.assertRaises(ValueError):
+            RequirementGraph.from_dict({"nodes": [], "edges": []}, strict=True)
+
+        # 45. Negative Attack Vector 40: Passive UI Surfaces (dashboard_view / inspector_view) Prohibited from COMMAND_MUTATION
+        passive_dashboard_binding = CapabilityBinding(
+            behavior_id=valid_binding.behavior_id, requirement_ids=list(valid_binding.requirement_ids),
+            operation_class=valid_binding.operation_class, target_entity=valid_binding.target_entity,
+            hld_capability=valid_binding.hld_capability, lld_component_id=vehicle_comp.id,
+            allowed_component_types=list(valid_binding.allowed_component_types),
+            prohibited_component_roles=list(valid_binding.prohibited_component_roles),
+            source_behavior_hash=valid_binding.source_behavior_hash,
+            source_requirement_hash=valid_binding.source_requirement_hash,
+            source_hld_hash=valid_binding.source_hld_hash,
+            source_behavior_graph_version=valid_binding.source_behavior_graph_version,
+            source_requirement_graph_version=valid_binding.source_requirement_graph_version,
+            source_hld_module_id=valid_binding.source_hld_module_id,
+            source_hld_version=valid_binding.source_hld_version,
+            binding_hash=""
+        )
+        passive_dashboard_binding.binding_hash = passive_dashboard_binding.compute_hash()
+        passive_dashboard_comp = LLDComponent(
+            id=vehicle_comp.id, name="Fleet Passive Dashboard",
+            component_type=LLDComponentType.UI_SURFACE,
+            parent=vehicle_comp.parent, role="dashboard_viewer", layout="dashboard_view",
+            owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
+            capability_bindings=[passive_dashboard_binding]
+        )
+        gov_res_passive_ui = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [passive_dashboard_comp], b_graph_multi, hld_modules=hld_multi.modules)
+        self.assertTrue(gov_res_passive_ui.is_blocked, "ArtifactGovernor MUST block COMMAND_MUTATION mapped to passive dashboard_view UI surface!")
+        self.assertEqual(gov_res_passive_ui.validation_status, ValidationStatus.INVALID)
+        self.assertTrue(any("is prohibited on component role" in r for r in gov_res_passive_ui.blocking_reasons))
+
+        # 46. Positive Vector 41: Actionable Interactive UI Surfaces (workflow_form / action_modal) Permitted for COMMAND_MUTATION
+        action_form_binding = CapabilityBinding(
+            behavior_id=valid_binding.behavior_id, requirement_ids=list(valid_binding.requirement_ids),
+            operation_class=valid_binding.operation_class, target_entity=valid_binding.target_entity,
+            hld_capability=valid_binding.hld_capability, lld_component_id=vehicle_comp.id,
+            allowed_component_types=list(valid_binding.allowed_component_types),
+            prohibited_component_roles=list(valid_binding.prohibited_component_roles),
+            source_behavior_hash=valid_binding.source_behavior_hash,
+            source_requirement_hash=valid_binding.source_requirement_hash,
+            source_hld_hash=valid_binding.source_hld_hash,
+            source_behavior_graph_version=valid_binding.source_behavior_graph_version,
+            source_requirement_graph_version=valid_binding.source_requirement_graph_version,
+            source_hld_module_id=valid_binding.source_hld_module_id,
+            source_hld_version=valid_binding.source_hld_version,
+            binding_hash=""
+        )
+        action_form_binding.binding_hash = action_form_binding.compute_hash()
+        action_form_comp = LLDComponent(
+            id=vehicle_comp.id, name="Fleet Dispatch Action Modal",
+            component_type=LLDComponentType.UI_SURFACE,
+            parent=vehicle_comp.parent, role="frontend_interface", layout="form_modal",
+            owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
+            capability_bindings=[action_form_binding]
+        )
+        gov_res_action_ui = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [action_form_comp], b_graph_multi, hld_modules=hld_multi.modules)
+        self.assertFalse(gov_res_action_ui.is_blocked, f"ArtifactGovernor MUST permit COMMAND_MUTATION on interactive action form UI surface! Reasons: {gov_res_action_ui.blocking_reasons}")
+        self.assertEqual(gov_res_action_ui.validation_status, ValidationStatus.VALID)
+
         # 42. End-to-End Production Compiler Lineage Verification: SpecCompiler -> LLD -> Tasks -> Governor PASS
         e2e_b_graph = BehaviorGraph(version=1)
         e2e_b_node = BehaviorNode(

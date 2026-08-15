@@ -120,11 +120,27 @@ class CapabilityBinding:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'CapabilityBinding':
+    def from_dict(cls, data: Dict[str, Any], strict: bool = True) -> 'CapabilityBinding':
+        if strict:
+            if not data.get("behavior_id"):
+                raise ValueError("Missing mandatory 'behavior_id' in CapabilityBinding serialized data")
+            if not data.get("lld_component_id"):
+                raise ValueError("Missing mandatory 'lld_component_id' in CapabilityBinding serialized data")
+            if "operation_class" not in data or not data["operation_class"]:
+                raise ValueError("Missing mandatory 'operation_class' in CapabilityBinding serialized data (ZERO DEFAULT TOLERATED)")
+
+        op_raw = data.get("operation_class")
+        if not op_raw:
+            raise ValueError("Missing mandatory 'operation_class' in CapabilityBinding serialized data")
+        try:
+            op_cls = OperationClass(op_raw)
+        except (ValueError, KeyError):
+            raise ValueError(f"Invalid 'operation_class' '{op_raw}' in CapabilityBinding serialized data")
+
         return cls(
             behavior_id=data.get("behavior_id", ""),
             requirement_ids=list(data.get("requirement_ids", [])),
-            operation_class=OperationClass(data["operation_class"]) if "operation_class" in data else OperationClass.READ_QUERY,
+            operation_class=op_cls,
             target_entity=data.get("target_entity", ""),
             hld_capability=data.get("hld_capability", ""),
             lld_component_id=data.get("lld_component_id", ""),
@@ -287,9 +303,11 @@ class LLDCompiler:
                 allowed_types = [LLDComponentType.SERVICE, LLDComponentType.EVENT_HANDLER, LLDComponentType.CONTROLLER, LLDComponentType.CLI_DISPATCHER, LLDComponentType.PIPELINE_WORKER]
                 prohibited_roles = ["read_only_view", "read_model", "query_service", "audit_viewer"]
 
-            # If UI surface has layout == "read_only", it is prohibited from COMMAND_MUTATION
-            if comp_type == LLDComponentType.UI_SURFACE and comp_layout == "read_only" and op_class == OperationClass.COMMAND_MUTATION:
-                prohibited_roles.append("frontend_interface")
+            # If UI surface has a passive/read-only layout or role, it is prohibited from COMMAND_MUTATION
+            passive_layouts = {"read_only", "query_view", "dashboard_view", "telemetry_view", "inspector_view", "viewer"}
+            passive_roles = {"read_only_view", "read_model", "dashboard_viewer", "audit_viewer", "telemetry_viewer", "query_service"}
+            if comp_type == LLDComponentType.UI_SURFACE and op_class == OperationClass.COMMAND_MUTATION and (comp_layout in passive_layouts or comp_role in passive_roles):
+                prohibited_roles.append(comp_role or "frontend_interface")
 
             # Source artifact / graph integrity hashes establishing upstream provenance
             source_beh_hash = b_node.compute_canonical_hash()
