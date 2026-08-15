@@ -32,7 +32,7 @@ from execution_ir import (
 )
 from execution_dependency_resolver import ExecutionDependencyResolver, CyclicDependencyError
 from task_compiler import TaskRecord, TaskCategory
-from lld_compiler import LLDComponent, LLDComponentType, UIInteractionCapability
+from lld_compiler import LLDComponent, LLDComponentType, UIInteractionCapability, ComponentExecutionCapability
 from requirement_ir import RequirementGraph, RequirementNode
 from behavior_graph import BehaviorGraph, BehaviorNodeType, EpistemicStatus, ProvenanceKind
 from hld_compiler import HLDDesign, HLDModule
@@ -79,6 +79,102 @@ class ExecutionPlanCompiler:
     """Compiles governed TaskRecords into verified ExecutionPlans with proven parallelism."""
 
     @classmethod
+    def derive_canonical_operation_class(
+        cls,
+        task: TaskRecord,
+        parent_comp: Optional[LLDComponent] = None,
+        b_graph: Optional[BehaviorGraph] = None
+    ) -> Tuple[Optional[str], List[str]]:
+        """
+        Authoritatively derives the canonical operation class for a task from
+        CapabilityBindings -> BehaviorGraph -> Component Capabilities.
+        """
+        detected_op_classes: Set[str] = set()
+
+        # 1. From CapabilityBindings on parent LLD component
+        if parent_comp:
+            binding_op_map = {
+                b.behavior_id: (b.operation_class.value if hasattr(b.operation_class, "value") else str(b.operation_class)).lower()
+                for b in parent_comp.capability_bindings
+                if getattr(b, "operation_class", None)
+            }
+            for bid in task.parent_behaviors:
+                if bid in binding_op_map:
+                    detected_op_classes.add(binding_op_map[bid])
+
+        # 2. From BehaviorGraph behavior types
+        if b_graph:
+            for bid in task.parent_behaviors:
+                b_node = b_graph.get_node(bid)
+                if b_node:
+                    if b_node.behavior_type == BehaviorNodeType.QUERY:
+                        detected_op_classes.add("read_query")
+                    elif b_node.behavior_type == BehaviorNodeType.STATE_TRANSITION:
+                        detected_op_classes.add("state_transition")
+                    elif b_node.behavior_type == BehaviorNodeType.COMMAND:
+                        detected_op_classes.add("command_mutation")
+                    elif b_node.behavior_type == BehaviorNodeType.EVENT_PROCESSING:
+                        detected_op_classes.add("event_processing")
+
+        # 3. From UI Surface Interaction Capability
+        if not detected_op_classes and parent_comp:
+            if parent_comp.component_type == LLDComponentType.UI_SURFACE:
+                ic = getattr(parent_comp, "interaction_capability", None)
+                if ic in [UIInteractionCapability.SUBMITS_MUTATION, UIInteractionCapability.APPROVES_DECISION]:
+                    detected_op_classes.add("command_mutation")
+                elif ic == UIInteractionCapability.TRIGGERS_WORKFLOW:
+                    detected_op_classes.add("state_transition")
+                elif ic in [UIInteractionCapability.DISPLAYS_DATA, UIInteractionCapability.READ_ONLY]:
+                    detected_op_classes.add("read_query")
+
+        # 4. From Backend Component Execution Capability
+        if not detected_op_classes and parent_comp:
+            ec = getattr(parent_comp, "execution_capability", None)
+            if not ec and isinstance(getattr(parent_comp, "transport", None), ComponentExecutionCapability):
+                ec = parent_comp.transport
+            if ec:
+                ec_val = ec.value if hasattr(ec, "value") else str(ec)
+                if ec_val in ["MUTATE", "APPROVE"]:
+                    detected_op_classes.add("command_mutation")
+                elif ec_val == "READ":
+                    detected_op_classes.add("read_query")
+                elif ec_val in ["TRANSITION_STATE", "TRIGGER_WORKFLOW"]:
+                    detected_op_classes.add("state_transition")
+                elif ec_val == "PROCESS_EVENT":
+                    detected_op_classes.add("event_processing")
+
+        # 5. From Behavior ID Prefix Naming Conventions
+        if not detected_op_classes and task.parent_behaviors:
+            for bid in task.parent_behaviors:
+                b_lower = bid.lower()
+                if b_lower.startswith("cmd_") or b_lower.startswith("command_"):
+                    detected_op_classes.add("command_mutation")
+                elif b_lower.startswith("query_") or b_lower.startswith("read_") or b_lower.startswith("get_"):
+                    detected_op_classes.add("read_query")
+                elif b_lower.startswith("state_") or b_lower.startswith("transition_"):
+                    detected_op_classes.add("state_transition")
+                elif b_lower.startswith("event_"):
+                    detected_op_classes.add("event_processing")
+
+        # 6. From Task Category (state_transition, ui_component)
+        if not detected_op_classes:
+            task_cat = task.category.value if hasattr(task.category, "value") else str(task.category)
+            if task_cat in ["state_transition", "STATE_TRANSITION"]:
+                detected_op_classes.add("state_transition")
+
+        if not detected_op_classes:
+            return None, [
+                f"Task '{task.id}' ({task.title}) has no authoritative operation class source in capability bindings, behavior graph, or component capabilities. Unresolved semantic tasks cannot be executed."
+            ]
+
+        if len(detected_op_classes) > 1:
+            return None, [
+                f"Task '{task.id}' ({task.title}) contains conflicting multi-operation behaviors {sorted(detected_op_classes)}. An execution task must embody a single coherent operation class."
+            ]
+
+        return list(detected_op_classes)[0], []
+
+    @classmethod
     def compile_execution_plan(
         cls,
         tasks: List[TaskRecord],
@@ -122,52 +218,11 @@ class ExecutionPlanCompiler:
 
             # Multi-operation derivation and coherence check (1 ExecutionTask = 1 Operation Class)
             parent_comp = lld_map.get(t.parent_lld)
-            detected_op_classes: Set[str] = set()
-
-            if parent_comp:
-                binding_op_map = {
-                    b.behavior_id: (b.operation_class.value if hasattr(b.operation_class, "value") else str(b.operation_class)).lower()
-                    for b in parent_comp.capability_bindings
-                    if getattr(b, "operation_class", None)
-                }
-                for bid in t.parent_behaviors:
-                    if bid in binding_op_map:
-                        detected_op_classes.add(binding_op_map[bid])
-
-            if b_graph:
-                for bid in t.parent_behaviors:
-                    b_node = b_graph.get_node(bid)
-                    if b_node:
-                        if b_node.behavior_type == BehaviorNodeType.QUERY:
-                            detected_op_classes.add("read_query")
-                        elif b_node.behavior_type == BehaviorNodeType.STATE_TRANSITION:
-                            detected_op_classes.add("state_transition")
-                        elif b_node.behavior_type == BehaviorNodeType.COMMAND:
-                            detected_op_classes.add("command_mutation")
-                        elif b_node.behavior_type == BehaviorNodeType.EVENT_PROCESSING:
-                            detected_op_classes.add("event_processing")
-
-            if not detected_op_classes and parent_comp:
-                if parent_comp.component_type == LLDComponentType.UI_SURFACE:
-                    ic = getattr(parent_comp, "interaction_capability", None)
-                    if ic in [UIInteractionCapability.SUBMITS_MUTATION, UIInteractionCapability.APPROVES_DECISION]:
-                        detected_op_classes.add("command_mutation")
-                    elif ic == UIInteractionCapability.TRIGGERS_WORKFLOW:
-                        detected_op_classes.add("state_transition")
-                    else:
-                        detected_op_classes.add("read_query")
-
-            if not detected_op_classes:
-                detected_op_classes.add("command_mutation" if t.category != TaskCategory.UI_COMPONENT.value else "read_query")
-
-            if len(detected_op_classes) > 1:
+            op_class, op_errors = cls.derive_canonical_operation_class(t, parent_comp, b_graph)
+            if op_errors:
                 is_valid = False
-                validation_reasons.append(
-                    f"Task '{t.id}' ({t.title}) contains conflicting multi-operation behaviors {sorted(detected_op_classes)}. An execution task must embody a single coherent operation class."
-                )
-                op_class = sorted(detected_op_classes)[0]
-            else:
-                op_class = list(detected_op_classes)[0]
+                validation_reasons.extend(op_errors)
+                op_class = op_class or "unresolved"
 
             # Derive resource requirements from component and task metadata
             required_resources = cls._derive_task_resources(t, parent_comp)

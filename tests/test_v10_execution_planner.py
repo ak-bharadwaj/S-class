@@ -610,6 +610,56 @@ class TestV10ExecutionPlanner(unittest.TestCase):
         self.assertTrue(plan.is_valid)
         self.assertEqual(plan.tasks["ETSK-UI-M"].operation_class, "command_mutation", "Submitting mutation UI MUST inherit command_mutation operation class!")
 
+    def test_v10_adversarial_operation_class_tamper_with_recomputed_hashes_fails_closed(self):
+        """Adversarial Invariant: Mutating operation_class and recomputing valid plan/task hashes MUST fail Governor reconciliation."""
+        b_cmd = BehaviorNode("cmd_mutation", "Delete Database", BehaviorNodeType.COMMAND, "admin", "db", EpistemicStatus.EXPLICIT, ProvenanceKind.EXPLICIT, 1.0)
+        b_graph = BehaviorGraph(version=1)
+        b_graph.add_node(b_cmd)
+
+        comp = LLDComponent("ctrl_db", "DB Controller", LLDComponentType.CONTROLLER, LLDParentRef("mod_db", ["REQ-1"], ["cmd_mutation"]), "backend_controller", ComponentExecutionCapability.MUTATE, api_endpoints=["POST /api/db/delete"])
+        comp.component_hash = comp.compute_canonical_hash()
+
+        task = TaskRecord("TSK-DEL", "Delete Database API", "desc", TaskCategory.API_ENDPOINT, comp.id, "mod_db", ["REQ-1"], ["cmd_mutation"], source_lld_hash=comp.component_hash)
+        task.task_hash = task.compute_canonical_hash()
+
+        plan = ExecutionPlanCompiler.compile_execution_plan([task], [comp], b_graph=b_graph)
+        self.assertTrue(plan.is_valid)
+
+        # Baseline: Valid Governor audit passes
+        gov_pass = ArtifactGovernor.audit_execution_plan_governance(plan, [task], [comp], b_graph=b_graph)
+        self.assertFalse(gov_pass.is_blocked)
+
+        # ATTACK: Tamper ExecutionTask.operation_class to "read_query", reassign valid read_query agent, and recompute all hashes
+        exec_t = plan.tasks["ETSK-DEL"]
+        exec_t.operation_class = "read_query"
+        exec_t.required_agent_capability = "qa_engineer"
+        exec_t.assigned_agent = AgentAssignment(
+            task_id="ETSK-DEL",
+            agent_role="qa_engineer",
+            agent_capability_id="cap_qa_engineer",
+            assignment_rationale="Tampered QA assignment"
+        )
+        exec_t.task_hash = exec_t.compute_canonical_hash()
+        plan.plan_hash = plan.compute_canonical_hash()
+
+        # GOVERNOR GATE: Despite 100% internally consistent hashes and valid agent capabilities, Governor MUST detect the semantic disconnection!
+        gov_attack = ArtifactGovernor.audit_execution_plan_governance(plan, [task], [comp], b_graph=b_graph)
+        self.assertTrue(gov_attack.is_blocked, "Governor MUST BLOCK operation_class semantic disconnect even with valid recomputed hashes!")
+        self.assertTrue(any("operation_class semantic mismatch" in r for r in gov_attack.blocking_reasons))
+
+    def test_v10_no_operation_class_source_fails_closed_without_invention(self):
+        """Zero Invention: Task with no authoritative semantic source fails closed instead of inventing command_mutation."""
+        comp = LLDComponent("ctrl_empty", "Empty Controller", LLDComponentType.CONTROLLER, LLDParentRef("mod_e", [], []), "backend_controller")
+        comp.execution_capability = None # No execution capability
+        comp.component_hash = comp.compute_canonical_hash()
+
+        task = TaskRecord("TSK-EMPTY", "Orphan Semantic Task", "desc", TaskCategory.API_ENDPOINT, comp.id, "mod_e", [], [], source_lld_hash=comp.component_hash)
+        task.task_hash = task.compute_canonical_hash()
+
+        plan = ExecutionPlanCompiler.compile_execution_plan([task], [comp])
+        self.assertFalse(plan.is_valid, "Plan MUST fail closed without inventing an operation class!")
+        self.assertTrue(any("has no authoritative operation class source" in r for r in plan.validation_reasons))
+
 
 if __name__ == "__main__":
     unittest.main()

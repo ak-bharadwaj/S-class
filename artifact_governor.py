@@ -946,8 +946,9 @@ class ArtifactGovernor:
         if not plan.is_valid:
             reasons.extend(plan.validation_reasons)
 
-        # 4. Task Coverage & Lineage Cryptographic Reconciliation (Blocker 2)
+        # 4. Task Coverage & Lineage Cryptographic Reconciliation (Blocker 2 & Canonical Semantic Invariants)
         task_map = {t.id: t for t in tasks}
+        lld_map = {c.id: c for c in (lld_components or [])}
         task_id_set = set(task_map.keys())
         exec_source_ids = {t.source_task_id for t in plan.tasks.values()}
 
@@ -1001,7 +1002,18 @@ class ArtifactGovernor:
                     f"ExecutionTask '{exec_id}' parent_behavior_ids mismatch with governed task record."
                 )
 
-            # E. Canonical Execution Task Hash Verification
+            # E. Canonical Operation Class Reconciliation (Authoritative Semantic Invariant)
+            from execution_plan_compiler import ExecutionPlanCompiler
+            parent_lld_comp = lld_map.get(t_rec.parent_lld) if lld_map else None
+            canonical_op_class, op_errors = ExecutionPlanCompiler.derive_canonical_operation_class(t_rec, parent_lld_comp, b_graph)
+            if op_errors:
+                reasons.extend(op_errors)
+            elif canonical_op_class and exec_t.operation_class.lower() != canonical_op_class.lower():
+                reasons.append(
+                    f"ExecutionTask '{exec_id}' operation_class semantic mismatch: task claims '{exec_t.operation_class}', but canonical source derivation mandates '{canonical_op_class}'."
+                )
+
+            # F. Canonical Execution Task Hash Verification
             if hasattr(exec_t, "compute_canonical_hash"):
                 expected_exec_hash = exec_t.compute_canonical_hash()
                 if not exec_t.task_hash or exec_t.task_hash != expected_exec_hash:
