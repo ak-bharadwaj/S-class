@@ -1,83 +1,88 @@
 {
   "task_id": "TASK-02-AUTH-SESSION-REVOKE",
-  "domain": "auth_iam",
+  "domain": "auth_identity",
   "raw_prompt": "Implement password reset session invalidation that blacklists active refresh tokens across all clusters.",
   "canonical_semantic_units": {
     "password reset": {
       "ground_truth_class": "BEHAVIOR",
-      "rationale": "Security workflow triggering credential mutation and session termination."
+      "rationale": "Security workflow and event triggering account credentials update."
     },
     "session invalidation": {
       "ground_truth_class": "BEHAVIOR",
-      "rationale": "State transition terminating active authenticated sessions."
-    },
-    "session": {
-      "ground_truth_class": "ENTITY",
-      "rationale": "Core auth aggregate tracking active user authentication state."
+      "rationale": "State transition and revocation action on active user sessions."
     },
     "blacklist": {
       "ground_truth_class": "BEHAVIOR",
-      "rationale": "Action of registering revoked token identifiers in a denial list."
-    },
-    "token blacklist": {
-      "ground_truth_class": "ENTITY",
-      "rationale": "Distributed datastore / cache holding revoked token identifiers."
+      "rationale": "Action of adding revoked tokens or session identifiers to a denial registry."
     },
     "refresh tokens": {
       "ground_truth_class": "ENTITY",
-      "rationale": "Cryptographic credential entity used to issue new access tokens."
+      "rationale": "Long-lived cryptographic authentication credentials."
     },
     "across all clusters": {
       "ground_truth_class": "CONSTRAINT",
-      "rationale": "Architectural distribution constraint requiring multi-cluster synchronization."
+      "rationale": "Distributed architectural boundary constraint mandating multi-region/multi-cluster synchronization."
     },
     "implement": {
       "ground_truth_class": "NOISE",
-      "rationale": "Imperative directive keyword from user instruction."
+      "rationale": "Imperative directive verb."
+    },
+    "session": {
+      "ground_truth_class": "ENTITY",
+      "rationale": "Authenticated client session state."
+    },
+    "token blacklist": {
+      "ground_truth_class": "ENTITY",
+      "rationale": "Domain data structure and aggregate store holding revoked token identifiers."
     }
   },
   "canonical_domain_requirements": {
     "REQ-EXP-01": {
       "title": "Invalidate User Sessions on Password Reset",
+      "normative_level": "MUST",
       "expected_type": "EXPLICIT",
       "epistemic_status": "EXPLICIT",
       "provenance": "USER_PROMPT"
     },
     "REQ-EXP-02": {
       "title": "Blacklist Active Refresh Tokens Across Clusters",
+      "normative_level": "MUST",
       "expected_type": "EXPLICIT",
       "epistemic_status": "EXPLICIT",
       "provenance": "USER_PROMPT"
     },
     "REQ-DER-01": {
       "title": "Token Blacklist TTL Bound to Max Token Lifetime",
+      "normative_level": "SHOULD",
       "expected_type": "DERIVED_JUSTIFIED",
       "epistemic_status": "DERIVED_JUSTIFIED",
-      "provenance": "SECURITY_STORAGE_OPT"
+      "provenance": "RESOURCE_MANAGEMENT"
     },
     "REQ-DER-02": {
       "title": "Emit Distributed Password Reset Audit Event",
+      "normative_level": "SHOULD",
       "expected_type": "DERIVED_JUSTIFIED",
       "epistemic_status": "DERIVED_JUSTIFIED",
       "provenance": "SECURITY_AUDIT"
     },
     "REQ-DER-03": {
       "title": "Immediate Rejection of Revoked Tokens on Verification",
+      "normative_level": "MUST",
       "expected_type": "DERIVED_JUSTIFIED",
       "epistemic_status": "DERIVED_JUSTIFIED",
-      "provenance": "AUTH_ENFORCEMENT"
+      "provenance": "SECURITY_INVARIANT"
     },
     "REQ-SUP-01": {
-      "title": "Preserve Admin Session on Explicit Administrative Reset",
+      "title": "Optionally Retain Administrative Reset Session Override",
+      "normative_level": "OPTIONAL",
       "expected_type": "SUPPORTED",
       "epistemic_status": "SUPPORTED",
-      "provenance": "IAM_WORKFLOW"
+      "provenance": "IAM_ADMIN_POLICY"
     }
   },
   "forbidden_hallucinations": [
-    "User registration UI form",
-    "Generic search bar for refresh tokens",
-    "Password reset email template editor",
-    "Social media OAuth integration"
+    "User avatar upload UI page",
+    "Social login OAuth provider UI",
+    "Credit card billing management"
   ]
 }

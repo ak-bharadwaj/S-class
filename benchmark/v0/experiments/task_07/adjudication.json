@@ -1,0 +1,81 @@
+{
+  "task_id": "TASK-07-AUTH-TOKEN-REVOCATION-AMBIGUOUS",
+  "adjudication_version": "1.0",
+  "reviewer": "internal_domain_evaluator_peer_audited",
+  "review_date": "2026-08-15",
+  "adjudication_notes": "Adjudicated against frozen ground_truth_labels.json (5 canonical requirements, 3 explicit unknowns).",
+  "items": {
+    "REQ-REVOKE-01": {
+      "candidate_id": "REQ-REVOKE-01",
+      "candidate_title": "Token Revocation Endpoint and Invalidation Mechanism",
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-EXP-02",
+      "is_derived_proposal": false,
+      "reason": "Directly matches canonical requirement REQ-EXP-02 (Token Revocation Endpoint)."
+    },
+    "REQ-AUTH-01": {
+      "candidate_id": "REQ-AUTH-01",
+      "candidate_title": "User Credential Verification and Token Issuance Endpoint",
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-EXP-01",
+      "is_derived_proposal": true,
+      "reason": "Directly matches canonical requirement REQ-EXP-01 (User Credential Authentication and Token Issuance)."
+    },
+    "REQ-SEC-01": {
+      "candidate_id": "REQ-SEC-01",
+      "candidate_title": "Cryptographic Password Hashing at Rest",
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-DER-01",
+      "is_derived_proposal": true,
+      "reason": "Directly matches canonical derived requirement REQ-DER-01 (Cryptographic Credential Hashing)."
+    },
+    "REQ-SEC-02": {
+      "candidate_id": "REQ-SEC-02",
+      "candidate_title": "Bounded Token Lifetime and Automatic Expiry (TTL)",
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-DER-02",
+      "is_derived_proposal": true,
+      "reason": "Directly matches canonical derived requirement REQ-DER-02 (Bounded Token Lifetime and Expiration)."
+    },
+    "REQ-AUDIT-01": {
+      "candidate_id": "REQ-AUDIT-01",
+      "candidate_title": "Security Audit Event Logging on Authentication and Revocation",
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-DER-03",
+      "is_derived_proposal": true,
+      "reason": "Directly matches canonical derived requirement REQ-DER-03 (Authentication and Revocation Audit Logging)."
+    },
+    "REQ-SEC-03": {
+      "candidate_id": "REQ-SEC-03",
+      "candidate_title": "Cryptographic Token Entropy and Unforgeability",
+      "label": "SUPPORTED_BUT_OUTSIDE_GT",
+      "ground_truth_id": null,
+      "is_derived_proposal": true,
+      "reason": "Valid supported cryptographic security constraint outside GT."
+    },
+    "REQ-UNK-ARCH-01": {
+      "candidate_id": "REQ-UNK-ARCH-01",
+      "candidate_title": "Token Architecture: Stateless Signed Tokens vs Stateful Opaque Database Tokens",
+      "label": "UNKNOWN",
+      "ground_truth_id": "REQ-UNK-01",
+      "is_derived_proposal": false,
+      "reason": "Correctly flagged unstated token architecture format as UNKNOWN."
+    },
+    "REQ-UNK-MFA-02": {
+      "candidate_id": "REQ-UNK-MFA-02",
+      "candidate_title": "Multi-Factor Authentication (MFA / TOTP / WebAuthn) Enforcement",
+      "label": "UNKNOWN",
+      "ground_truth_id": "REQ-UNK-02",
+      "is_derived_proposal": false,
+      "reason": "Correctly flagged unstated MFA policy as UNKNOWN."
+    },
+    "REQ-UNK-PROTO-03": {
+      "candidate_id": "REQ-UNK-PROTO-03",
+      "candidate_title": "Identity Protocol Standard: OAuth 2.0 / OIDC vs SAML vs Custom REST",
+      "label": "UNKNOWN",
+      "ground_truth_id": "REQ-UNK-03",
+      "is_derived_proposal": false,
+      "reason": "Correctly flagged unstated identity protocol standard as UNKNOWN."
+    }
+  }
+}

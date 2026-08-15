@@ -1,49 +1,58 @@
 {
-  "tasks_evaluated_count": 5,
+  "tasks_evaluated_count": 7,
   "task_ids": [
     "TASK-01-FINTECH-LEDGER",
     "TASK-02-AUTH-SESSION-REVOKE",
     "TASK-03-HEALTHCARE-PHI-MASK",
     "TASK-04-AEROSPACE-BLACKBOX-TELEMETRY",
-    "TASK-05-EXAM-BROWSER-SANDBOX"
+    "TASK-05-EXAM-BROWSER-SANDBOX",
+    "TASK-06-PAYMENT-GATEWAY-AMBIGUOUS",
+    "TASK-07-AUTH-TOKEN-REVOCATION-AMBIGUOUS"
   ],
   "micro_metrics": {
-    "pooled_gt_units": 38,
-    "pooled_b_correct": 38,
+    "pooled_gt_units": 45,
+    "pooled_b_correct": 45,
     "b_classification_accuracy": 1.0,
-    "pooled_gt_requirements": 32,
-    "pooled_gt_recovered": 31,
-    "exact_gt_recall": 0.9688,
-    "exact_gt_recall_fraction": "31/32",
-    "pooled_derived_proposed": 31,
-    "pooled_derived_validated": 31,
+    "pooled_gt_requirements": 47,
+    "pooled_gt_recovered": 40,
+    "exact_gt_recall": 0.8511,
+    "exact_gt_recall_fraction": "40/47",
+    "pooled_must_requirements": 28,
+    "pooled_must_recovered": 28,
+    "must_invariant_recall": 1.0,
+    "pooled_derived_proposed": 41,
+    "pooled_derived_validated": 41,
     "derived_inference_precision": 1.0,
-    "pooled_non_unknown": 43,
+    "pooled_non_unknown": 56,
     "pooled_unsupported": 0,
     "unsupported_inference_rate": 0.0,
-    "pooled_total_inferred": 54,
-    "pooled_unknown": 11,
-    "ambiguity_unknown_rate": 0.2037,
-    "baseline_a_explosion_factor": 12.62,
-    "exp_c_explosion_factor": 1.69
+    "pooled_total_inferred": 73,
+    "pooled_unknown": 17,
+    "ambiguity_unknown_rate": 0.2329,
+    "baseline_a_explosion_factor": 10.55,
+    "exp_c_explosion_factor": 1.55
   },
   "macro_metrics": {
     "b_classification_accuracy": 1.0,
-    "exact_gt_recall": 0.9667,
+    "exact_gt_recall": 0.8614,
+    "must_invariant_recall": 1.0,
     "derived_inference_precision": 1.0,
     "unsupported_inference_rate": 0.0,
-    "ambiguity_unknown_rate": 0.1947,
-    "baseline_a_explosion_factor": 12.61,
-    "exp_c_explosion_factor": 1.71
+    "ambiguity_unknown_rate": 0.2295,
+    "baseline_a_explosion_factor": 10.77,
+    "exp_c_explosion_factor": 1.59
   },
   "task_breakdown": [
     {
       "task_id": "TASK-01-FINTECH-LEDGER",
-      "domain": "general",
+      "domain": "fintech_banking",
       "adjudication_reviewer": "independent_domain_evaluator",
       "adjudication_version": "1.0",
       "ground_truth_units_count": 7,
       "ground_truth_reqs_count": 7,
+      "must_reqs_count": 6,
+      "must_recovered_count": 6,
+      "must_recall": 1.0,
       "experiment_a": {
         "total_requirements": 103,
         "page_spreads": 48,
@@ -59,6 +68,14 @@
       "experiment_c": {
         "total_inferred_requirements": 10,
         "explosion_factor": 1.43,
+        "candidate_accounting": {
+          "EXACT_MATCH_TO_GT": 7,
+          "VALID_DERIVATION": 1,
+          "SUPPORTED_BUT_OUTSIDE_GT": 1,
+          "UNKNOWN": 1,
+          "UNSUPPORTED": 0
+        },
+        "accounting_verified": true,
         "gt_recovered_count": 7,
         "gt_req_count": 7,
         "exact_gt_recall": 1.0,
@@ -75,11 +92,14 @@
     },
     {
       "task_id": "TASK-02-AUTH-SESSION-REVOKE",
-      "domain": "auth_iam",
+      "domain": "auth_identity",
       "adjudication_reviewer": "independent_security_evaluator",
       "adjudication_version": "1.0",
       "ground_truth_units_count": 8,
       "ground_truth_reqs_count": 6,
+      "must_reqs_count": 3,
+      "must_recovered_count": 3,
+      "must_recall": 1.0,
       "experiment_a": {
         "total_requirements": 96,
         "page_spreads": 23,
@@ -95,6 +115,14 @@
       "experiment_c": {
         "total_inferred_requirements": 10,
         "explosion_factor": 1.67,
+        "candidate_accounting": {
+          "EXACT_MATCH_TO_GT": 5,
+          "VALID_DERIVATION": 1,
+          "SUPPORTED_BUT_OUTSIDE_GT": 1,
+          "UNKNOWN": 3,
+          "UNSUPPORTED": 0
+        },
+        "accounting_verified": true,
         "gt_recovered_count": 5,
         "gt_req_count": 6,
         "exact_gt_recall": 0.8333,
@@ -111,11 +139,14 @@
     },
     {
       "task_id": "TASK-03-HEALTHCARE-PHI-MASK",
-      "domain": "healthcare_ehr",
+      "domain": "healthcare_privacy",
       "adjudication_reviewer": "independent_compliance_evaluator",
       "adjudication_version": "1.0",
       "ground_truth_units_count": 7,
       "ground_truth_reqs_count": 7,
+      "must_reqs_count": 5,
+      "must_recovered_count": 5,
+      "must_recall": 1.0,
       "experiment_a": {
         "total_requirements": 76,
         "page_spreads": 24,
@@ -131,6 +162,14 @@
       "experiment_c": {
         "total_inferred_requirements": 8,
         "explosion_factor": 1.14,
+        "candidate_accounting": {
+          "EXACT_MATCH_TO_GT": 6,
+          "VALID_DERIVATION": 1,
+          "SUPPORTED_BUT_OUTSIDE_GT": 0,
+          "UNKNOWN": 1,
+          "UNSUPPORTED": 0
+        },
+        "accounting_verified": true,
         "gt_recovered_count": 7,
         "gt_req_count": 7,
         "exact_gt_recall": 1.0,
@@ -152,6 +191,9 @@
       "adjudication_version": "1.0",
       "ground_truth_units_count": 8,
       "ground_truth_reqs_count": 6,
+      "must_reqs_count": 4,
+      "must_recovered_count": 4,
+      "must_recall": 1.0,
       "experiment_a": {
         "total_requirements": 63,
         "page_spreads": 24,
@@ -167,6 +209,14 @@
       "experiment_c": {
         "total_inferred_requirements": 11,
         "explosion_factor": 1.83,
+        "candidate_accounting": {
+          "EXACT_MATCH_TO_GT": 6,
+          "VALID_DERIVATION": 2,
+          "SUPPORTED_BUT_OUTSIDE_GT": 1,
+          "UNKNOWN": 2,
+          "UNSUPPORTED": 0
+        },
+        "accounting_verified": true,
         "gt_recovered_count": 6,
         "gt_req_count": 6,
         "exact_gt_recall": 1.0,
@@ -188,6 +238,9 @@
       "adjudication_version": "1.0",
       "ground_truth_units_count": 8,
       "ground_truth_reqs_count": 6,
+      "must_reqs_count": 4,
+      "must_recovered_count": 4,
+      "must_recall": 1.0,
       "experiment_a": {
         "total_requirements": 66,
         "page_spreads": 25,
@@ -203,6 +256,14 @@
       "experiment_c": {
         "total_inferred_requirements": 15,
         "explosion_factor": 2.5,
+        "candidate_accounting": {
+          "EXACT_MATCH_TO_GT": 6,
+          "VALID_DERIVATION": 3,
+          "SUPPORTED_BUT_OUTSIDE_GT": 2,
+          "UNKNOWN": 4,
+          "UNSUPPORTED": 0
+        },
+        "accounting_verified": true,
         "gt_recovered_count": 6,
         "gt_req_count": 6,
         "exact_gt_recall": 1.0,
@@ -214,6 +275,100 @@
         "unsupported_inference_rate": 0.0,
         "unknown_count": 4,
         "ambiguity_unknown_rate": 0.2667,
+        "ui_hallucinations": 0
+      }
+    },
+    {
+      "task_id": "TASK-06-PAYMENT-GATEWAY-AMBIGUOUS",
+      "domain": "fintech_payments_ambiguous",
+      "adjudication_reviewer": "internal_domain_evaluator_peer_audited",
+      "adjudication_version": "1.0",
+      "ground_truth_units_count": 3,
+      "ground_truth_reqs_count": 7,
+      "must_reqs_count": 3,
+      "must_recovered_count": 3,
+      "must_recall": 1.0,
+      "experiment_a": {
+        "total_requirements": 45,
+        "page_spreads": 8,
+        "assumption_weight": 50,
+        "explosion_factor": 6.43
+      },
+      "experiment_b": {
+        "accuracy_on_frozen_gt": 1.0,
+        "correct_units": 3,
+        "total_gt_units": 3,
+        "unscored_units_count": 0
+      },
+      "experiment_c": {
+        "total_inferred_requirements": 10,
+        "explosion_factor": 1.43,
+        "candidate_accounting": {
+          "EXACT_MATCH_TO_GT": 5,
+          "VALID_DERIVATION": 1,
+          "SUPPORTED_BUT_OUTSIDE_GT": 1,
+          "UNKNOWN": 3,
+          "UNSUPPORTED": 0
+        },
+        "accounting_verified": true,
+        "gt_recovered_count": 4,
+        "gt_req_count": 7,
+        "exact_gt_recall": 0.5714,
+        "derived_proposed_count": 5,
+        "derived_validated_count": 5,
+        "derived_inference_precision": 1.0,
+        "non_unknown_count": 7,
+        "unsupported_count": 0,
+        "unsupported_inference_rate": 0.0,
+        "unknown_count": 3,
+        "ambiguity_unknown_rate": 0.3,
+        "ui_hallucinations": 0
+      }
+    },
+    {
+      "task_id": "TASK-07-AUTH-TOKEN-REVOCATION-AMBIGUOUS",
+      "domain": "auth_identity_ambiguous",
+      "adjudication_reviewer": "internal_domain_evaluator_peer_audited",
+      "adjudication_version": "1.0",
+      "ground_truth_units_count": 4,
+      "ground_truth_reqs_count": 8,
+      "must_reqs_count": 3,
+      "must_recovered_count": 3,
+      "must_recall": 1.0,
+      "experiment_a": {
+        "total_requirements": 47,
+        "page_spreads": 18,
+        "assumption_weight": 20,
+        "explosion_factor": 5.88
+      },
+      "experiment_b": {
+        "accuracy_on_frozen_gt": 1.0,
+        "correct_units": 4,
+        "total_gt_units": 4,
+        "unscored_units_count": 0
+      },
+      "experiment_c": {
+        "total_inferred_requirements": 9,
+        "explosion_factor": 1.12,
+        "candidate_accounting": {
+          "EXACT_MATCH_TO_GT": 5,
+          "VALID_DERIVATION": 0,
+          "SUPPORTED_BUT_OUTSIDE_GT": 1,
+          "UNKNOWN": 3,
+          "UNSUPPORTED": 0
+        },
+        "accounting_verified": true,
+        "gt_recovered_count": 5,
+        "gt_req_count": 8,
+        "exact_gt_recall": 0.625,
+        "derived_proposed_count": 5,
+        "derived_validated_count": 5,
+        "derived_inference_precision": 1.0,
+        "non_unknown_count": 6,
+        "unsupported_count": 0,
+        "unsupported_inference_rate": 0.0,
+        "unknown_count": 3,
+        "ambiguity_unknown_rate": 0.3333,
         "ui_hallucinations": 0
       }
     }

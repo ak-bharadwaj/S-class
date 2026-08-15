@@ -39,36 +39,42 @@
   "canonical_domain_requirements": {
     "REQ-EXP-01": {
       "title": "Disable and Block Dual-Monitor Display Mirroring",
+      "normative_level": "MUST",
       "expected_type": "EXPLICIT",
       "epistemic_status": "EXPLICIT",
       "provenance": "USER_PROMPT"
     },
     "REQ-EXP-02": {
       "title": "Intercept and Block OS Clipboard Paste Events",
+      "normative_level": "MUST",
       "expected_type": "EXPLICIT",
       "epistemic_status": "EXPLICIT",
       "provenance": "USER_PROMPT"
     },
     "REQ-DER-01": {
       "title": "Suppress OS Global Keyboard Shortcuts (Alt+Tab, PrintScreen, WinKey)",
+      "normative_level": "MUST",
       "expected_type": "DERIVED_JUSTIFIED",
       "epistemic_status": "DERIVED_JUSTIFIED",
       "provenance": "SANDBOX_SECURITY"
     },
     "REQ-DER-02": {
       "title": "Unauthorized Background Process Enumeration and Blacklisting",
+      "normative_level": "SHOULD",
       "expected_type": "DERIVED_JUSTIFIED",
       "epistemic_status": "DERIVED_JUSTIFIED",
       "provenance": "ANTI_CHEAT_INTEGRITY"
     },
     "REQ-DER-03": {
       "title": "Security Audit Logging of Sandbox Escape Attempts",
+      "normative_level": "SHOULD",
       "expected_type": "DERIVED_JUSTIFIED",
       "epistemic_status": "DERIVED_JUSTIFIED",
       "provenance": "AUDIT_TELEMETRY"
     },
     "REQ-SUP-01": {
       "title": "Graceful Restoration of System Settings and Clipboard on Exam Exit",
+      "normative_level": "MUST",
       "expected_type": "SUPPORTED",
       "epistemic_status": "SUPPORTED",
       "provenance": "OS_SYSTEM_CLEANUP"

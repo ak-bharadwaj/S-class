@@ -1,0 +1,24 @@
+{
+  "experiment": "EXPERIMENT B — Controlled Semantic Unit Classification (Task 06)",
+  "task_id": "TASK-06-PAYMENT-GATEWAY-AMBIGUOUS",
+  "classifications": [
+    {
+      "unit": "payment processing service",
+      "class": "ENTITY",
+      "confidence": 0.95,
+      "rationale": "Identifies the core domain aggregate boundary and system bounded context responsible for orchestrating transaction lifecycles, ledger mutations, and gateway communications."
+    },
+    {
+      "unit": "secure",
+      "class": "CONSTRAINT",
+      "confidence": 0.95,
+      "rationale": "Specifies fundamental, non-negotiable security and regulatory rules (e.g., PCI-DSS compliance, payload encryption at rest and in transit, tokenization, mutual TLS) that must remain inviolable across all operational states."
+    },
+    {
+      "unit": "build",
+      "class": "NOISE",
+      "confidence": 0.99,
+      "rationale": "An imperative prompt-scaffolding verb directing agent action; contains no domain semantics, data models, or runtime business constraints."
+    }
+  ]
+}

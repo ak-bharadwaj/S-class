@@ -1,0 +1,30 @@
+{
+  "experiment": "EXPERIMENT B — Controlled Semantic Unit Classification (Task 07)",
+  "task_id": "TASK-07-AUTH-TOKEN-REVOCATION-AMBIGUOUS",
+  "classifications": [
+    {
+      "unit": "authentication platform",
+      "class": "ENTITY",
+      "confidence": 0.95,
+      "rationale": "'Authentication platform' designates the top-level domain bounded context and aggregate system container responsible for managing identity records, session states, and authentication lifecycle operations."
+    },
+    {
+      "unit": "token revocation",
+      "class": "BEHAVIOR",
+      "confidence": 0.98,
+      "rationale": "'Token revocation' specifies an active runtime workflow and state transition mechanism whereby an issued token's state changes from valid/active to invalidated/revoked."
+    },
+    {
+      "unit": "build",
+      "class": "NOISE",
+      "confidence": 0.99,
+      "rationale": "'Build' is an imperative prompt directive/instructional verb without domain-specific data modeling, business constraint, or architectural state semantics."
+    },
+    {
+      "unit": "token",
+      "class": "ENTITY",
+      "confidence": 0.97,
+      "rationale": "'Token' constitutes a core domain entity / security credential data artifact that encapsulates cryptographic claims, subject identifiers, expiry metadata, and validity state."
+    }
+  ]
+}

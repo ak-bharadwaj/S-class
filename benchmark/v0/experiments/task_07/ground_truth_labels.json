@@ -1,0 +1,86 @@
+{
+  "task_id": "TASK-07-AUTH-TOKEN-REVOCATION-AMBIGUOUS",
+  "domain": "auth_identity_ambiguous",
+  "raw_prompt": "Build an authentication platform with token revocation.",
+  "canonical_semantic_units": {
+    "authentication platform": {
+      "ground_truth_class": "ENTITY",
+      "rationale": "Primary identity subsystem and authentication service aggregate."
+    },
+    "token revocation": {
+      "ground_truth_class": "BEHAVIOR",
+      "rationale": "State transition and revocation action invalidating active security credentials."
+    },
+    "build": {
+      "ground_truth_class": "NOISE",
+      "rationale": "Imperative directive command."
+    },
+    "token": {
+      "ground_truth_class": "ENTITY",
+      "rationale": "Cryptographic authentication token artifact."
+    }
+  },
+  "canonical_domain_requirements": {
+    "REQ-EXP-01": {
+      "title": "User Credential Authentication and Token Issuance",
+      "normative_level": "MUST",
+      "expected_type": "EXPLICIT",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT"
+    },
+    "REQ-EXP-02": {
+      "title": "Token Revocation Endpoint",
+      "normative_level": "MUST",
+      "expected_type": "EXPLICIT",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT"
+    },
+    "REQ-DER-01": {
+      "title": "Cryptographic Credential Hashing (Argon2id / bcrypt)",
+      "normative_level": "MUST",
+      "expected_type": "DERIVED_JUSTIFIED",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "IDENTITY_SECURITY"
+    },
+    "REQ-DER-02": {
+      "title": "Bounded Token Lifetime and Automatic Expiration (TTL)",
+      "normative_level": "SHOULD",
+      "expected_type": "DERIVED_JUSTIFIED",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "SECURITY_BEST_PRACTICE"
+    },
+    "REQ-DER-03": {
+      "title": "Authentication and Revocation Security Audit Logging",
+      "normative_level": "SHOULD",
+      "expected_type": "DERIVED_JUSTIFIED",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "SECURITY_AUDIT"
+    },
+    "REQ-UNK-01": {
+      "title": "Token Format Architecture: Stateless JWT with Blacklist vs Stateful Opaque Tokens",
+      "normative_level": "UNKNOWN",
+      "expected_type": "UNKNOWN",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSPECIFIED_DESIGN"
+    },
+    "REQ-UNK-02": {
+      "title": "Multi-Factor Authentication (MFA / WebAuthn / TOTP) Requirement",
+      "normative_level": "UNKNOWN",
+      "expected_type": "UNKNOWN",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSPECIFIED_DESIGN"
+    },
+    "REQ-UNK-03": {
+      "title": "Identity Protocol Standard: OAuth2 / OIDC vs SAML vs Proprietary REST",
+      "normative_level": "UNKNOWN",
+      "expected_type": "UNKNOWN",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSPECIFIED_DESIGN"
+    }
+  },
+  "forbidden_hallucinations": [
+    "User registration web UI with password strength meters",
+    "Admin role management web dashboard",
+    "Specific third-party provider assumption (e.g. forced Auth0 / Firebase integration)"
+  ]
+}

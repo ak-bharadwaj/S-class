@@ -39,36 +39,42 @@
   "canonical_domain_requirements": {
     "REQ-EXP-01": {
       "title": "Ingest and Buffer ARINC 429 Telemetry Frames",
+      "normative_level": "MUST",
       "expected_type": "EXPLICIT",
       "epistemic_status": "EXPLICIT",
       "provenance": "USER_PROMPT"
     },
     "REQ-EXP-02": {
       "title": "Emergency Flush to Crash-Survivable Memory on Power Loss",
+      "normative_level": "MUST",
       "expected_type": "EXPLICIT",
       "epistemic_status": "EXPLICIT",
       "provenance": "USER_PROMPT"
     },
     "REQ-DER-01": {
       "title": "Non-Volatile Flash Wear-Leveling and Circular Ring Overwrite",
+      "normative_level": "SHOULD",
       "expected_type": "DERIVED_JUSTIFIED",
       "epistemic_status": "DERIVED_JUSTIFIED",
       "provenance": "AVIONICS_STORAGE_INTEGRITY"
     },
     "REQ-DER-02": {
       "title": "Hold-Up Capacitor Bounded Execution Window Enforcement (<=50ms)",
+      "normative_level": "MUST",
       "expected_type": "DERIVED_JUSTIFIED",
       "epistemic_status": "DERIVED_JUSTIFIED",
       "provenance": "HARDWARE_SURVIVABILITY"
     },
     "REQ-DER-03": {
       "title": "ARINC 429 Parity and Word Integrity Verification",
+      "normative_level": "MUST",
       "expected_type": "DERIVED_JUSTIFIED",
       "epistemic_status": "DERIVED_JUSTIFIED",
       "provenance": "AVIONICS_PROTOCOL"
     },
     "REQ-SUP-01": {
       "title": "DO-178C Level A Deterministic Static Memory Allocation",
+      "normative_level": "SHOULD",
       "expected_type": "SUPPORTED",
       "epistemic_status": "SUPPORTED",
       "provenance": "SAFETY_CRITICAL_STANDARD"

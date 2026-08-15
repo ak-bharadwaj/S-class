@@ -1,85 +1,91 @@
 {
   "task_id": "TASK-03-HEALTHCARE-PHI-MASK",
-  "domain": "healthcare_ehr",
+  "domain": "healthcare_privacy",
   "raw_prompt": "Build an export pipeline that strips 18 HIPAA Safe Harbor direct identifiers before analytics ingestion.",
   "canonical_semantic_units": {
     "export pipeline": {
       "ground_truth_class": "ENTITY",
-      "rationale": "ETL batch processing worker / pipeline data transformation component."
+      "rationale": "ETL batch/streaming pipeline aggregate transferring data to analytics sink."
     },
     "export": {
       "ground_truth_class": "BEHAVIOR",
-      "rationale": "Data extraction and serialization operation."
+      "rationale": "Dynamic action and system workflow of extracting data records."
     },
     "strips": {
       "ground_truth_class": "BEHAVIOR",
-      "rationale": "Data redaction / filtering transformation action."
+      "rationale": "Data transformation and redaction/de-identification action."
     },
     "18 HIPAA Safe Harbor direct identifiers": {
       "ground_truth_class": "INVARIANT",
-      "rationale": "Regulatory compliance rule requiring complete elimination of 18 specific PII fields."
+      "rationale": "Statutory regulatory privacy rule (45 CFR § 164.514(b)(2)) defining the de-identification constraint."
     },
     "patient records": {
       "ground_truth_class": "ENTITY",
-      "rationale": "Clinical and demographic healthcare records aggregate root."
+      "rationale": "Primary domain data model and core entity aggregate containing clinical and demographic PHI."
     },
     "analytics ingestion": {
       "ground_truth_class": "ENTITY",
-      "rationale": "Target data warehouse / analytical downstream system."
+      "rationale": "Downstream storage / query warehouse destination aggregate."
     },
     "build": {
       "ground_truth_class": "NOISE",
-      "rationale": "Imperative directive verb from user instruction."
+      "rationale": "Imperative directive command."
     }
   },
   "canonical_domain_requirements": {
     "REQ-EXP-01": {
-      "title": "Export Patient Diagnostic Records",
+      "title": "Export Patient Diagnostic Records to Analytics",
+      "normative_level": "MUST",
       "expected_type": "EXPLICIT",
       "epistemic_status": "EXPLICIT",
       "provenance": "USER_PROMPT"
     },
     "REQ-EXP-02": {
       "title": "Strip 18 HIPAA Safe Harbor Identifiers",
+      "normative_level": "MUST",
       "expected_type": "EXPLICIT",
       "epistemic_status": "EXPLICIT",
       "provenance": "USER_PROMPT"
     },
     "REQ-DER-01": {
-      "title": "Redact Direct Identifiers (SSN, Phone, Email, MRN, Names)",
+      "title": "Redact Direct Identifiers (Name, SSN, MRN, Phone, Email, License)",
+      "normative_level": "MUST",
       "expected_type": "DERIVED_JUSTIFIED",
       "epistemic_status": "DERIVED_JUSTIFIED",
-      "provenance": "HIPAA_SAFE_HARBOR_RULE"
+      "provenance": "HIPAA_STATUTORY_RULE"
     },
     "REQ-DER-02": {
-      "title": "Truncate Geographic Identifiers (3-Digit Zip Codes)",
+      "title": "Truncate Geographic Identifiers to 3-Digit Zip Codes",
+      "normative_level": "MUST",
       "expected_type": "DERIVED_JUSTIFIED",
       "epistemic_status": "DERIVED_JUSTIFIED",
-      "provenance": "HIPAA_SAFE_HARBOR_RULE"
+      "provenance": "HIPAA_STATUTORY_RULE"
     },
     "REQ-DER-03": {
-      "title": "Generalize Dates and Age Capping (>89 Years to Year Only)",
+      "title": "Generalize Dates and Age Capping >89 Years",
+      "normative_level": "MUST",
       "expected_type": "DERIVED_JUSTIFIED",
       "epistemic_status": "DERIVED_JUSTIFIED",
-      "provenance": "HIPAA_SAFE_HARBOR_RULE"
+      "provenance": "HIPAA_STATUTORY_RULE"
     },
     "REQ-DER-04": {
-      "title": "Fail-Closed PII Pattern Regex Filter",
+      "title": "Fail-Closed PII Pattern Regex Filter on Free-Text Fields",
+      "normative_level": "SHOULD",
       "expected_type": "DERIVED_JUSTIFIED",
       "epistemic_status": "DERIVED_JUSTIFIED",
-      "provenance": "DATA_SECURITY"
+      "provenance": "HIPAA_STATUTORY_RULE"
     },
     "REQ-SUP-01": {
       "title": "Sign Sanitized Batch with Cryptographic Integrity Hash",
+      "normative_level": "SHOULD",
       "expected_type": "SUPPORTED",
       "epistemic_status": "SUPPORTED",
-      "provenance": "AUDIT_COMPLIANCE"
+      "provenance": "SECURITY_AUDIT"
     }
   },
   "forbidden_hallucinations": [
-    "Patient appointment scheduling UI",
-    "Doctor consultation chat room",
-    "Billing insurance claim form",
-    "Generic search UI for safe harbor rules"
+    "Patient medical record portal UI",
+    "Doctor appointment booking UI",
+    "Clinical notes rich text editor"
   ]
 }

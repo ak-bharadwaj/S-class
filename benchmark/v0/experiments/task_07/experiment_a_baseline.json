@@ -1,0 +1,2655 @@
+{
+  "experiment": "EXPERIMENT A \u2014 Current Baseline (Task 07)",
+  "raw_prompt": "Build an authentication platform with token revocation.",
+  "gate_result": "PASS_WITH_DECISIONS",
+  "total_assumption_weight": 20,
+  "scope_tier": "moderate",
+  "archetypes": [
+    "greenfield"
+  ],
+  "total_requirements_count": 47,
+  "requirements_by_category": {
+    "explicit": 1,
+    "derived": 46
+  },
+  "flattened_requirements": [
+    {
+      "category": "explicit",
+      "title": "Unknown",
+      "type": "explicit",
+      "action": "create",
+      "why_chain": [],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Role 'authentication platform' bound to capability 'token_revocation'",
+        "Inferred access level 'standard' from clause semantics",
+        "Source clause: 'Build an authentication platform with token revocation.'"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for Authentication Platform Dashboard (/dashboard)",
+        "Layout type: metrics_grid",
+        "Composed components: MetricStatCardGrid, UpcomingEventsTimeline, QuickActionShortcuts, RecentActivityFeed"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for Authentication Platform Dashboard -> Overview",
+        "Input fields: kpiMetrics (object), announcements (array), pendingTasksCount (number), recentEvents (array)",
+        "Actions: Refresh Real-Time Metrics, Acknowledge Notification, Trigger Quick Action"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for Authentication Platform Dashboard",
+        "Endpoints: GET /api/dashboard/metrics, GET /api/dashboard/announcements, GET /api/notifications"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for Authentication Platform Self-Profile (/profile)",
+        "Layout type: tabbed_card_layout",
+        "Composed components: AvatarUploader, BioHeaderCard, PersonalDetailsTab, OrganizationalCredentialsTab"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for Authentication Platform Self-Profile -> Personal Details",
+        "Input fields: fullName (string), personalEmail (email), mobileNumber (tel), dob (date), gender (select)",
+        "Actions: Update Personal Info, Upload Avatar Image"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for Authentication Platform Self-Profile -> Organizational Credentials",
+        "Input fields: identifierCode (string, read-only), departmentUnit (string, read-only), roleTitle (string, read-only), onboardingDate (date)",
+        "Actions: Download Digital ID Card"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for Authentication Platform Self-Profile -> Security & Authentication",
+        "Input fields: currentPassword (password), newPassword (password), confirmPassword (password), twoFactorToggle (boolean)",
+        "Actions: Change Password, Revoke Active Sessions"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for Authentication Platform Self-Profile",
+        "Endpoints: GET /api/profile, PUT /api/profile, POST /api/profile/avatar"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for Token Revocation Workspace (/token-revocation)",
+        "Layout type: master_detail_grid",
+        "Composed components: TokenRevocationDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for Token Revocation Workspace -> Token Revocation Directory",
+        "Input fields: token_revocationId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+        "Actions: Create Token Revocation, Edit Token Revocation, Archive Token Revocation"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for Token Revocation Workspace",
+        "Endpoints: GET /api/token_revocations, POST /api/token_revocations, GET /api/token_revocations/{id}"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for Token Workspace (/token)",
+        "Layout type: master_detail_grid",
+        "Composed components: TokenDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for Token Workspace -> Token Directory",
+        "Input fields: tokenId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+        "Actions: Create Token, Edit Token, Archive Token"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for Token Workspace",
+        "Endpoints: GET /api/tokens, POST /api/tokens, GET /api/tokens/{id}"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for Revocation Workspace (/revocation)",
+        "Layout type: master_detail_grid",
+        "Composed components: RevocationDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for Revocation Workspace -> Revocation Directory",
+        "Input fields: revocationId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+        "Actions: Create Revocation, Edit Revocation, Archive Revocation"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for Revocation Workspace",
+        "Endpoints: GET /api/revocations, POST /api/revocations, GET /api/revocations/{id}"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for Authentication Platform Document Vault (/documents)",
+        "Layout type: document_vault",
+        "Composed components: FileUploadZone, VirusScanStatusPill, CategoryFolderTabs, DocumentPreviewModal"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for Authentication Platform Document Vault -> Document Vault",
+        "Input fields: fileName (string), fileSizeBytes (number), fileCategory (select), uploadedBy (string), securityScanStatus (badge)",
+        "Actions: Upload Document, Download Document, Delete Document"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for Authentication Platform Document Vault",
+        "Endpoints: GET /api/documents, POST /api/documents/upload, DELETE /api/documents/{id}"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for User Dashboard (/dashboard)",
+        "Layout type: metrics_grid",
+        "Composed components: MetricStatCardGrid, UpcomingEventsTimeline, QuickActionShortcuts, RecentActivityFeed"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for User Dashboard -> Overview",
+        "Input fields: kpiMetrics (object), announcements (array), pendingTasksCount (number), recentEvents (array)",
+        "Actions: Refresh Real-Time Metrics, Acknowledge Notification, Trigger Quick Action"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for User Dashboard",
+        "Endpoints: GET /api/dashboard/metrics, GET /api/dashboard/announcements, GET /api/notifications"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for User Self-Profile (/profile)",
+        "Layout type: tabbed_card_layout",
+        "Composed components: AvatarUploader, BioHeaderCard, PersonalDetailsTab, OrganizationalCredentialsTab"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for User Self-Profile -> Personal Details",
+        "Input fields: fullName (string), personalEmail (email), mobileNumber (tel), dob (date), gender (select)",
+        "Actions: Update Personal Info, Upload Avatar Image"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for User Self-Profile -> Organizational Credentials",
+        "Input fields: identifierCode (string, read-only), departmentUnit (string, read-only), roleTitle (string, read-only), onboardingDate (date)",
+        "Actions: Download Digital ID Card"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for User Self-Profile -> Security & Authentication",
+        "Input fields: currentPassword (password), newPassword (password), confirmPassword (password), twoFactorToggle (boolean)",
+        "Actions: Change Password, Revoke Active Sessions"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for User Self-Profile",
+        "Endpoints: GET /api/profile, PUT /api/profile, POST /api/profile/avatar"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for Token Revocation Workspace (/token-revocation)",
+        "Layout type: master_detail_grid",
+        "Composed components: TokenRevocationDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for Token Revocation Workspace -> Token Revocation Directory",
+        "Input fields: token_revocationId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+        "Actions: Create Token Revocation, Edit Token Revocation, Archive Token Revocation"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for Token Revocation Workspace",
+        "Endpoints: GET /api/token_revocations, POST /api/token_revocations, GET /api/token_revocations/{id}"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for Token Workspace (/token)",
+        "Layout type: master_detail_grid",
+        "Composed components: TokenDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for Token Workspace -> Token Directory",
+        "Input fields: tokenId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+        "Actions: Create Token, Edit Token, Archive Token"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for Token Workspace",
+        "Endpoints: GET /api/tokens, POST /api/tokens, GET /api/tokens/{id}"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for Revocation Workspace (/revocation)",
+        "Layout type: master_detail_grid",
+        "Composed components: RevocationDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for Revocation Workspace -> Revocation Directory",
+        "Input fields: revocationId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+        "Actions: Create Revocation, Edit Revocation, Archive Revocation"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for Revocation Workspace",
+        "Endpoints: GET /api/revocations, POST /api/revocations, GET /api/revocations/{id}"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for User Document Vault (/documents)",
+        "Layout type: document_vault",
+        "Composed components: FileUploadZone, VirusScanStatusPill, CategoryFolderTabs, DocumentPreviewModal"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for User Document Vault -> Document Vault",
+        "Input fields: fileName (string), fileSizeBytes (number), fileCategory (select), uploadedBy (string), securityScanStatus (badge)",
+        "Actions: Upload Document, Download Document, Delete Document"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for User Document Vault",
+        "Endpoints: GET /api/documents, POST /api/documents/upload, DELETE /api/documents/{id}"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "All non-trivial projects require structured logging for debugging"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Input sanitization protects against injection and validation defects"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Unhandled exceptions lead to process crashes or blank UI screens"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Automated tests guarantee regressions are caught during CI"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Hardcoded secrets/config violate 12-Factor app methodology"
+      ],
+      "provenance": "UNKNOWN"
+    }
+  ],
+  "page_spreads_count": 18,
+  "low_level_designs_count": 9,
+  "scope_boundaries": {
+    "in_scope": [
+      "Integration of Crypto Web3 requested by user"
+    ],
+    "out_of_scope": [
+      "Unrequested Payment Gateway (No Stripe Payment Gateway / Razorpay Checkout)",
+      "Unrequested Gamification (No Gamification Rewards Engine / User Badges & XP)",
+      "Unrequested Ai Chatbot (No AI Assistant Chatbot / LLM Integration Widget)",
+      "Unrequested Social Oauth (No Third-Party Social OAuth Integrations)"
+    ]
+  },
+  "questions_for_human": [
+    "Clarify scope/boundary for REQ-BASE-0: Authentication Platform - Token Revocation"
+  ],
+  "acceptance_criteria": [
+    "Verify that Authentication Platform - Token Revocation is functioning as expected.",
+    "Verify that role 'authentication platform' can access all assigned capabilities without permission errors.",
+    "Verify that role 'user' can access all assigned capabilities without permission errors."
+  ],
+  "raw_synthesized_spec": {
+    "intent_summary": "Implement features for roles: ['authentication platform', 'user']. Archetypes: ['greenfield']",
+    "requirements": {
+      "explicit": [
+        {
+          "id": "REQ-BASE-0",
+          "description": "Authentication Platform - Token Revocation",
+          "type": "explicit",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "must_ask",
+          "evidence": [
+            {
+              "source_file": "user_request",
+              "section": null,
+              "reference_text": "Build an authentication platform with token revocation.",
+              "line_number": null
+            }
+          ],
+          "why_chain": [],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [],
+          "consequences": [
+            "REQ-PAGE-1",
+            "REQ-LLD-COMP-1",
+            "REQ-LLD-FIELDS-2",
+            "REQ-LLD-API-3",
+            "REQ-LLD-COMP-4",
+            "REQ-LLD-FIELDS-5",
+            "REQ-LLD-FIELDS-6",
+            "REQ-LLD-FIELDS-7",
+            "REQ-LLD-API-8",
+            "REQ-LLD-COMP-9",
+            "REQ-LLD-FIELDS-10",
+            "REQ-LLD-API-11",
+            "REQ-LLD-COMP-12",
+            "REQ-LLD-FIELDS-13",
+            "REQ-LLD-API-14",
+            "REQ-LLD-COMP-15",
+            "REQ-LLD-FIELDS-16",
+            "REQ-LLD-API-17",
+            "REQ-LLD-COMP-18",
+            "REQ-LLD-FIELDS-19",
+            "REQ-LLD-API-20",
+            "REQ-LLD-COMP-21",
+            "REQ-LLD-FIELDS-22",
+            "REQ-LLD-API-23",
+            "REQ-LLD-COMP-24",
+            "REQ-LLD-FIELDS-25",
+            "REQ-LLD-FIELDS-26",
+            "REQ-LLD-FIELDS-27",
+            "REQ-LLD-API-28",
+            "REQ-LLD-COMP-29",
+            "REQ-LLD-FIELDS-30",
+            "REQ-LLD-API-31",
+            "REQ-LLD-COMP-32",
+            "REQ-LLD-FIELDS-33",
+            "REQ-LLD-API-34",
+            "REQ-LLD-COMP-35",
+            "REQ-LLD-FIELDS-36",
+            "REQ-LLD-API-37",
+            "REQ-LLD-COMP-38",
+            "REQ-LLD-FIELDS-39",
+            "REQ-LLD-API-40",
+            "REQ-INF-UNI-001",
+            "REQ-INF-UNI-002",
+            "REQ-INF-UNI-003",
+            "REQ-INF-UNI-004",
+            "REQ-INF-UNI-005"
+          ],
+          "assumption_type": null
+        }
+      ],
+      "derived": [
+        {
+          "id": "REQ-PAGE-1",
+          "description": "Authentication Platform View \u2014 Token Revocation",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Role 'authentication platform' bound to capability 'token_revocation'",
+            "Inferred access level 'standard' from clause semantics",
+            "Source clause: 'Build an authentication platform with token revocation.'"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-LLD-COMP-1",
+          "description": "[AUTHENTICATION PLATFORM] Authentication Platform Dashboard \u2014 UI Component Hierarchy: MetricStatCardGrid, UpcomingEventsTimeline, QuickActionShortcuts, RecentActivityFeed",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for Authentication Platform Dashboard",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for Authentication Platform Dashboard (/dashboard)",
+            "Layout type: metrics_grid",
+            "Composed components: MetricStatCardGrid, UpcomingEventsTimeline, QuickActionShortcuts, RecentActivityFeed"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-2",
+          "description": "[AUTHENTICATION PLATFORM] Authentication Platform Dashboard (Overview) \u2014 Form Fields: kpiMetrics (object), announcements (array), pendingTasksCount (number), recentEvents (array) | Actions: Refresh Real-Time Metrics, Acknowledge Notification, Trigger Quick Action",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for Authentication Platform Dashboard -> Overview",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for Authentication Platform Dashboard -> Overview",
+            "Input fields: kpiMetrics (object), announcements (array), pendingTasksCount (number), recentEvents (array)",
+            "Actions: Refresh Real-Time Metrics, Acknowledge Notification, Trigger Quick Action"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-3",
+          "description": "[AUTHENTICATION PLATFORM] Authentication Platform Dashboard \u2014 Backing REST APIs: GET /api/dashboard/metrics, GET /api/dashboard/announcements, GET /api/notifications",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for Authentication Platform Dashboard",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for Authentication Platform Dashboard",
+            "Endpoints: GET /api/dashboard/metrics, GET /api/dashboard/announcements, GET /api/notifications"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-4",
+          "description": "[AUTHENTICATION PLATFORM] Authentication Platform Self-Profile \u2014 UI Component Hierarchy: AvatarUploader, BioHeaderCard, PersonalDetailsTab, OrganizationalCredentialsTab",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for Authentication Platform Self-Profile",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for Authentication Platform Self-Profile (/profile)",
+            "Layout type: tabbed_card_layout",
+            "Composed components: AvatarUploader, BioHeaderCard, PersonalDetailsTab, OrganizationalCredentialsTab"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-5",
+          "description": "[AUTHENTICATION PLATFORM] Authentication Platform Self-Profile (Personal Details) \u2014 Form Fields: fullName (string), personalEmail (email), mobileNumber (tel), dob (date), gender (select) | Actions: Update Personal Info, Upload Avatar Image",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for Authentication Platform Self-Profile -> Personal Details",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for Authentication Platform Self-Profile -> Personal Details",
+            "Input fields: fullName (string), personalEmail (email), mobileNumber (tel), dob (date), gender (select)",
+            "Actions: Update Personal Info, Upload Avatar Image"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-6",
+          "description": "[AUTHENTICATION PLATFORM] Authentication Platform Self-Profile (Organizational Credentials) \u2014 Form Fields: identifierCode (string, read-only), departmentUnit (string, read-only), roleTitle (string, read-only), onboardingDate (date) | Actions: Download Digital ID Card",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for Authentication Platform Self-Profile -> Organizational Credentials",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for Authentication Platform Self-Profile -> Organizational Credentials",
+            "Input fields: identifierCode (string, read-only), departmentUnit (string, read-only), roleTitle (string, read-only), onboardingDate (date)",
+            "Actions: Download Digital ID Card"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-7",
+          "description": "[AUTHENTICATION PLATFORM] Authentication Platform Self-Profile (Security & Authentication) \u2014 Form Fields: currentPassword (password), newPassword (password), confirmPassword (password), twoFactorToggle (boolean) | Actions: Change Password, Revoke Active Sessions",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for Authentication Platform Self-Profile -> Security & Authentication",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for Authentication Platform Self-Profile -> Security & Authentication",
+            "Input fields: currentPassword (password), newPassword (password), confirmPassword (password), twoFactorToggle (boolean)",
+            "Actions: Change Password, Revoke Active Sessions"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-8",
+          "description": "[AUTHENTICATION PLATFORM] Authentication Platform Self-Profile \u2014 Backing REST APIs: GET /api/profile, PUT /api/profile, POST /api/profile/avatar",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for Authentication Platform Self-Profile",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for Authentication Platform Self-Profile",
+            "Endpoints: GET /api/profile, PUT /api/profile, POST /api/profile/avatar"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-9",
+          "description": "[AUTHENTICATION PLATFORM] Token Revocation Workspace \u2014 UI Component Hierarchy: TokenRevocationDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for Token Revocation Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for Token Revocation Workspace (/token-revocation)",
+            "Layout type: master_detail_grid",
+            "Composed components: TokenRevocationDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-10",
+          "description": "[AUTHENTICATION PLATFORM] Token Revocation Workspace (Token Revocation Directory) \u2014 Form Fields: token_revocationId (string), title / name (string), status (badge), categoryType (select), assignedTo (string) | Actions: Create Token Revocation, Edit Token Revocation, Archive Token Revocation",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for Token Revocation Workspace -> Token Revocation Directory",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for Token Revocation Workspace -> Token Revocation Directory",
+            "Input fields: token_revocationId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+            "Actions: Create Token Revocation, Edit Token Revocation, Archive Token Revocation"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-11",
+          "description": "[AUTHENTICATION PLATFORM] Token Revocation Workspace \u2014 Backing REST APIs: GET /api/token_revocations, POST /api/token_revocations, GET /api/token_revocations/{id}",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for Token Revocation Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for Token Revocation Workspace",
+            "Endpoints: GET /api/token_revocations, POST /api/token_revocations, GET /api/token_revocations/{id}"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-12",
+          "description": "[AUTHENTICATION PLATFORM] Token Workspace \u2014 UI Component Hierarchy: TokenDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for Token Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for Token Workspace (/token)",
+            "Layout type: master_detail_grid",
+            "Composed components: TokenDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-13",
+          "description": "[AUTHENTICATION PLATFORM] Token Workspace (Token Directory) \u2014 Form Fields: tokenId (string), title / name (string), status (badge), categoryType (select), assignedTo (string) | Actions: Create Token, Edit Token, Archive Token",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for Token Workspace -> Token Directory",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for Token Workspace -> Token Directory",
+            "Input fields: tokenId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+            "Actions: Create Token, Edit Token, Archive Token"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-14",
+          "description": "[AUTHENTICATION PLATFORM] Token Workspace \u2014 Backing REST APIs: GET /api/tokens, POST /api/tokens, GET /api/tokens/{id}",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for Token Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for Token Workspace",
+            "Endpoints: GET /api/tokens, POST /api/tokens, GET /api/tokens/{id}"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-15",
+          "description": "[AUTHENTICATION PLATFORM] Revocation Workspace \u2014 UI Component Hierarchy: RevocationDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for Revocation Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for Revocation Workspace (/revocation)",
+            "Layout type: master_detail_grid",
+            "Composed components: RevocationDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-16",
+          "description": "[AUTHENTICATION PLATFORM] Revocation Workspace (Revocation Directory) \u2014 Form Fields: revocationId (string), title / name (string), status (badge), categoryType (select), assignedTo (string) | Actions: Create Revocation, Edit Revocation, Archive Revocation",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for Revocation Workspace -> Revocation Directory",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for Revocation Workspace -> Revocation Directory",
+            "Input fields: revocationId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+            "Actions: Create Revocation, Edit Revocation, Archive Revocation"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-17",
+          "description": "[AUTHENTICATION PLATFORM] Revocation Workspace \u2014 Backing REST APIs: GET /api/revocations, POST /api/revocations, GET /api/revocations/{id}",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for Revocation Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for Revocation Workspace",
+            "Endpoints: GET /api/revocations, POST /api/revocations, GET /api/revocations/{id}"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-18",
+          "description": "[AUTHENTICATION PLATFORM] Authentication Platform Document Vault \u2014 UI Component Hierarchy: FileUploadZone, VirusScanStatusPill, CategoryFolderTabs, DocumentPreviewModal",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for Authentication Platform Document Vault",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for Authentication Platform Document Vault (/documents)",
+            "Layout type: document_vault",
+            "Composed components: FileUploadZone, VirusScanStatusPill, CategoryFolderTabs, DocumentPreviewModal"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-19",
+          "description": "[AUTHENTICATION PLATFORM] Authentication Platform Document Vault (Document Vault) \u2014 Form Fields: fileName (string), fileSizeBytes (number), fileCategory (select), uploadedBy (string), securityScanStatus (badge) | Actions: Upload Document, Download Document, Delete Document",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for Authentication Platform Document Vault -> Document Vault",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for Authentication Platform Document Vault -> Document Vault",
+            "Input fields: fileName (string), fileSizeBytes (number), fileCategory (select), uploadedBy (string), securityScanStatus (badge)",
+            "Actions: Upload Document, Download Document, Delete Document"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-20",
+          "description": "[AUTHENTICATION PLATFORM] Authentication Platform Document Vault \u2014 Backing REST APIs: GET /api/documents, POST /api/documents/upload, DELETE /api/documents/{id}",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for Authentication Platform Document Vault",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for Authentication Platform Document Vault",
+            "Endpoints: GET /api/documents, POST /api/documents/upload, DELETE /api/documents/{id}"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-21",
+          "description": "[USER] User Dashboard \u2014 UI Component Hierarchy: MetricStatCardGrid, UpcomingEventsTimeline, QuickActionShortcuts, RecentActivityFeed",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for User Dashboard",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for User Dashboard (/dashboard)",
+            "Layout type: metrics_grid",
+            "Composed components: MetricStatCardGrid, UpcomingEventsTimeline, QuickActionShortcuts, RecentActivityFeed"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-22",
+          "description": "[USER] User Dashboard (Overview) \u2014 Form Fields: kpiMetrics (object), announcements (array), pendingTasksCount (number), recentEvents (array) | Actions: Refresh Real-Time Metrics, Acknowledge Notification, Trigger Quick Action",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for User Dashboard -> Overview",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for User Dashboard -> Overview",
+            "Input fields: kpiMetrics (object), announcements (array), pendingTasksCount (number), recentEvents (array)",
+            "Actions: Refresh Real-Time Metrics, Acknowledge Notification, Trigger Quick Action"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-23",
+          "description": "[USER] User Dashboard \u2014 Backing REST APIs: GET /api/dashboard/metrics, GET /api/dashboard/announcements, GET /api/notifications",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for User Dashboard",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for User Dashboard",
+            "Endpoints: GET /api/dashboard/metrics, GET /api/dashboard/announcements, GET /api/notifications"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-24",
+          "description": "[USER] User Self-Profile \u2014 UI Component Hierarchy: AvatarUploader, BioHeaderCard, PersonalDetailsTab, OrganizationalCredentialsTab",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for User Self-Profile",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for User Self-Profile (/profile)",
+            "Layout type: tabbed_card_layout",
+            "Composed components: AvatarUploader, BioHeaderCard, PersonalDetailsTab, OrganizationalCredentialsTab"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-25",
+          "description": "[USER] User Self-Profile (Personal Details) \u2014 Form Fields: fullName (string), personalEmail (email), mobileNumber (tel), dob (date), gender (select) | Actions: Update Personal Info, Upload Avatar Image",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for User Self-Profile -> Personal Details",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for User Self-Profile -> Personal Details",
+            "Input fields: fullName (string), personalEmail (email), mobileNumber (tel), dob (date), gender (select)",
+            "Actions: Update Personal Info, Upload Avatar Image"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-26",
+          "description": "[USER] User Self-Profile (Organizational Credentials) \u2014 Form Fields: identifierCode (string, read-only), departmentUnit (string, read-only), roleTitle (string, read-only), onboardingDate (date) | Actions: Download Digital ID Card",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for User Self-Profile -> Organizational Credentials",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for User Self-Profile -> Organizational Credentials",
+            "Input fields: identifierCode (string, read-only), departmentUnit (string, read-only), roleTitle (string, read-only), onboardingDate (date)",
+            "Actions: Download Digital ID Card"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-27",
+          "description": "[USER] User Self-Profile (Security & Authentication) \u2014 Form Fields: currentPassword (password), newPassword (password), confirmPassword (password), twoFactorToggle (boolean) | Actions: Change Password, Revoke Active Sessions",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for User Self-Profile -> Security & Authentication",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for User Self-Profile -> Security & Authentication",
+            "Input fields: currentPassword (password), newPassword (password), confirmPassword (password), twoFactorToggle (boolean)",
+            "Actions: Change Password, Revoke Active Sessions"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-28",
+          "description": "[USER] User Self-Profile \u2014 Backing REST APIs: GET /api/profile, PUT /api/profile, POST /api/profile/avatar",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for User Self-Profile",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for User Self-Profile",
+            "Endpoints: GET /api/profile, PUT /api/profile, POST /api/profile/avatar"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-29",
+          "description": "[USER] Token Revocation Workspace \u2014 UI Component Hierarchy: TokenRevocationDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for Token Revocation Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for Token Revocation Workspace (/token-revocation)",
+            "Layout type: master_detail_grid",
+            "Composed components: TokenRevocationDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-30",
+          "description": "[USER] Token Revocation Workspace (Token Revocation Directory) \u2014 Form Fields: token_revocationId (string), title / name (string), status (badge), categoryType (select), assignedTo (string) | Actions: Create Token Revocation, Edit Token Revocation, Archive Token Revocation",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for Token Revocation Workspace -> Token Revocation Directory",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for Token Revocation Workspace -> Token Revocation Directory",
+            "Input fields: token_revocationId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+            "Actions: Create Token Revocation, Edit Token Revocation, Archive Token Revocation"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-31",
+          "description": "[USER] Token Revocation Workspace \u2014 Backing REST APIs: GET /api/token_revocations, POST /api/token_revocations, GET /api/token_revocations/{id}",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for Token Revocation Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for Token Revocation Workspace",
+            "Endpoints: GET /api/token_revocations, POST /api/token_revocations, GET /api/token_revocations/{id}"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-32",
+          "description": "[USER] Token Workspace \u2014 UI Component Hierarchy: TokenDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for Token Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for Token Workspace (/token)",
+            "Layout type: master_detail_grid",
+            "Composed components: TokenDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-33",
+          "description": "[USER] Token Workspace (Token Directory) \u2014 Form Fields: tokenId (string), title / name (string), status (badge), categoryType (select), assignedTo (string) | Actions: Create Token, Edit Token, Archive Token",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for Token Workspace -> Token Directory",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for Token Workspace -> Token Directory",
+            "Input fields: tokenId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+            "Actions: Create Token, Edit Token, Archive Token"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-34",
+          "description": "[USER] Token Workspace \u2014 Backing REST APIs: GET /api/tokens, POST /api/tokens, GET /api/tokens/{id}",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for Token Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for Token Workspace",
+            "Endpoints: GET /api/tokens, POST /api/tokens, GET /api/tokens/{id}"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-35",
+          "description": "[USER] Revocation Workspace \u2014 UI Component Hierarchy: RevocationDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for Revocation Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for Revocation Workspace (/revocation)",
+            "Layout type: master_detail_grid",
+            "Composed components: RevocationDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-36",
+          "description": "[USER] Revocation Workspace (Revocation Directory) \u2014 Form Fields: revocationId (string), title / name (string), status (badge), categoryType (select), assignedTo (string) | Actions: Create Revocation, Edit Revocation, Archive Revocation",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for Revocation Workspace -> Revocation Directory",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for Revocation Workspace -> Revocation Directory",
+            "Input fields: revocationId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+            "Actions: Create Revocation, Edit Revocation, Archive Revocation"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-37",
+          "description": "[USER] Revocation Workspace \u2014 Backing REST APIs: GET /api/revocations, POST /api/revocations, GET /api/revocations/{id}",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for Revocation Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for Revocation Workspace",
+            "Endpoints: GET /api/revocations, POST /api/revocations, GET /api/revocations/{id}"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-38",
+          "description": "[USER] User Document Vault \u2014 UI Component Hierarchy: FileUploadZone, VirusScanStatusPill, CategoryFolderTabs, DocumentPreviewModal",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for User Document Vault",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for User Document Vault (/documents)",
+            "Layout type: document_vault",
+            "Composed components: FileUploadZone, VirusScanStatusPill, CategoryFolderTabs, DocumentPreviewModal"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-39",
+          "description": "[USER] User Document Vault (Document Vault) \u2014 Form Fields: fileName (string), fileSizeBytes (number), fileCategory (select), uploadedBy (string), securityScanStatus (badge) | Actions: Upload Document, Download Document, Delete Document",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for User Document Vault -> Document Vault",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for User Document Vault -> Document Vault",
+            "Input fields: fileName (string), fileSizeBytes (number), fileCategory (select), uploadedBy (string), securityScanStatus (badge)",
+            "Actions: Upload Document, Download Document, Delete Document"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-40",
+          "description": "[USER] User Document Vault \u2014 Backing REST APIs: GET /api/documents, POST /api/documents/upload, DELETE /api/documents/{id}",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for User Document Vault",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for User Document Vault",
+            "Endpoints: GET /api/documents, POST /api/documents/upload, DELETE /api/documents/{id}"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-INF-UNI-001",
+          "description": "Implement structured JSON logging across all execution paths",
+          "type": "derived",
+          "category": "system_invariant",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "All non-trivial projects require structured logging for debugging"
+          ],
+          "affects": [
+            "backend",
+            "observability"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "architecture"
+        },
+        {
+          "id": "REQ-INF-UNI-002",
+          "description": "Sanitize and validate all external inputs at system boundaries",
+          "type": "derived",
+          "category": "system_invariant",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Input sanitization protects against injection and validation defects"
+          ],
+          "affects": [
+            "backend",
+            "validation"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "permission"
+        },
+        {
+          "id": "REQ-INF-UNI-003",
+          "description": "Catch unhandled exceptions and return structured error envelopes",
+          "type": "derived",
+          "category": "system_invariant",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Unhandled exceptions lead to process crashes or blank UI screens"
+          ],
+          "affects": [
+            "backend",
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-INF-UNI-004",
+          "description": "Maintain unit and integration test coverage for primary workflows",
+          "type": "derived",
+          "category": "system_invariant",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Automated tests guarantee regressions are caught during CI"
+          ],
+          "affects": [
+            "tests",
+            "backend",
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-INF-UNI-005",
+          "description": "Decouple configuration from code using environment variables",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Hardcoded secrets/config violate 12-Factor app methodology"
+          ],
+          "affects": [
+            "config",
+            "backend",
+            "infrastructure"
+          ],
+          "depends_on": [
+            "REQ-BASE-0"
+          ],
+          "consequences": [],
+          "assumption_type": "architecture"
+        }
+      ]
+    },
+    "affected_systems": {
+      "frontend": [
+        "REQ-BASE-0",
+        "REQ-PAGE-1",
+        "REQ-LLD-COMP-1",
+        "REQ-LLD-FIELDS-2",
+        "REQ-LLD-COMP-4",
+        "REQ-LLD-FIELDS-5",
+        "REQ-LLD-FIELDS-6",
+        "REQ-LLD-FIELDS-7",
+        "REQ-LLD-COMP-9",
+        "REQ-LLD-FIELDS-10",
+        "REQ-LLD-COMP-12",
+        "REQ-LLD-FIELDS-13",
+        "REQ-LLD-COMP-15",
+        "REQ-LLD-FIELDS-16",
+        "REQ-LLD-COMP-18",
+        "REQ-LLD-FIELDS-19",
+        "REQ-LLD-COMP-21",
+        "REQ-LLD-FIELDS-22",
+        "REQ-LLD-COMP-24",
+        "REQ-LLD-FIELDS-25",
+        "REQ-LLD-FIELDS-26",
+        "REQ-LLD-FIELDS-27",
+        "REQ-LLD-COMP-29",
+        "REQ-LLD-FIELDS-30",
+        "REQ-LLD-COMP-32",
+        "REQ-LLD-FIELDS-33",
+        "REQ-LLD-COMP-35",
+        "REQ-LLD-FIELDS-36",
+        "REQ-LLD-COMP-38",
+        "REQ-LLD-FIELDS-39",
+        "REQ-INF-UNI-003",
+        "REQ-INF-UNI-004"
+      ],
+      "backend": [
+        "REQ-BASE-0",
+        "REQ-PAGE-1",
+        "REQ-LLD-FIELDS-2",
+        "REQ-LLD-API-3",
+        "REQ-LLD-FIELDS-5",
+        "REQ-LLD-FIELDS-6",
+        "REQ-LLD-FIELDS-7",
+        "REQ-LLD-API-8",
+        "REQ-LLD-FIELDS-10",
+        "REQ-LLD-API-11",
+        "REQ-LLD-FIELDS-13",
+        "REQ-LLD-API-14",
+        "REQ-LLD-FIELDS-16",
+        "REQ-LLD-API-17",
+        "REQ-LLD-FIELDS-19",
+        "REQ-LLD-API-20",
+        "REQ-LLD-FIELDS-22",
+        "REQ-LLD-API-23",
+        "REQ-LLD-FIELDS-25",
+        "REQ-LLD-FIELDS-26",
+        "REQ-LLD-FIELDS-27",
+        "REQ-LLD-API-28",
+        "REQ-LLD-FIELDS-30",
+        "REQ-LLD-API-31",
+        "REQ-LLD-FIELDS-33",
+        "REQ-LLD-API-34",
+        "REQ-LLD-FIELDS-36",
+        "REQ-LLD-API-37",
+        "REQ-LLD-FIELDS-39",
+        "REQ-LLD-API-40",
+        "REQ-INF-UNI-001",
+        "REQ-INF-UNI-002",
+        "REQ-INF-UNI-003",
+        "REQ-INF-UNI-004",
+        "REQ-INF-UNI-005"
+      ],
+      "database": [],
+      "auth": [],
+      "infrastructure": [
+        "REQ-INF-UNI-005"
+      ],
+      "observability": [
+        "REQ-INF-UNI-001"
+      ],
+      "validation": [
+        "REQ-INF-UNI-002"
+      ],
+      "tests": [
+        "REQ-INF-UNI-004"
+      ],
+      "config": [
+        "REQ-INF-UNI-005"
+      ]
+    },
+    "conflicts": [],
+    "questions_for_human": [
+      "Clarify scope/boundary for REQ-BASE-0: Authentication Platform - Token Revocation"
+    ],
+    "acceptance_criteria": [
+      "Verify that Authentication Platform - Token Revocation is functioning as expected.",
+      "Verify that role 'authentication platform' can access all assigned capabilities without permission errors.",
+      "Verify that role 'user' can access all assigned capabilities without permission errors."
+    ],
+    "gate_result": "PASS_WITH_DECISIONS",
+    "total_assumption_weight": 20,
+    "archetypes": [
+      "greenfield"
+    ],
+    "scope_tier": "moderate",
+    "spec_version": 1,
+    "page_spreads": {
+      "user": [
+        {
+          "route": "/dashboard",
+          "page_name": "User Dashboard",
+          "module_key": "dashboard",
+          "description": "Operational metrics, tasks, and real-time updates for user"
+        },
+        {
+          "route": "/profile",
+          "page_name": "User Self-Profile",
+          "module_key": "profile",
+          "description": "Account profile, contact details, and credentials for user"
+        },
+        {
+          "route": "/token-revocation",
+          "page_name": "Token Revocation Workspace",
+          "module_key": "token-revocation",
+          "description": "Manage and interact with Token Revocation"
+        },
+        {
+          "route": "/token",
+          "page_name": "Token Workspace",
+          "module_key": "token",
+          "description": "Manage and interact with Token"
+        },
+        {
+          "route": "/revocation",
+          "page_name": "Revocation Workspace",
+          "module_key": "revocation",
+          "description": "Manage and interact with Revocation"
+        },
+        {
+          "route": "/documents",
+          "page_name": "User Document Vault",
+          "module_key": "documents",
+          "description": "File uploads, records, and digital receipts for user"
+        },
+        {
+          "page_name": "User Authentication Management Context",
+          "route": "/user/authentication_management_context",
+          "owned_capabilities": [
+            "query_operator_inspect_authentication"
+          ],
+          "owned_entities": [
+            "authentication"
+          ],
+          "module_key": "Authentication Management Context",
+          "description": "Authentication Management Context management workspace for user",
+          "architecture_style": "Modular Monolith with Bounded Contexts"
+        },
+        {
+          "page_name": "User Revocation Management Context",
+          "route": "/user/revocation_management_context",
+          "owned_capabilities": [
+            "query_operator_inspect_revocation"
+          ],
+          "owned_entities": [
+            "revocation"
+          ],
+          "module_key": "Revocation Management Context",
+          "description": "Revocation Management Context management workspace for user",
+          "architecture_style": "Modular Monolith with Bounded Contexts"
+        },
+        {
+          "page_name": "User Token Management Context",
+          "route": "/user/token_management_context",
+          "owned_capabilities": [
+            "query_operator_inspect_token"
+          ],
+          "owned_entities": [
+            "token"
+          ],
+          "module_key": "Token Management Context",
+          "description": "Token Management Context management workspace for user",
+          "architecture_style": "Modular Monolith with Bounded Contexts"
+        }
+      ],
+      "authentication platform": [
+        {
+          "route": "/dashboard",
+          "page_name": "Authentication Platform Dashboard",
+          "module_key": "dashboard",
+          "description": "Operational metrics, tasks, and real-time updates for authentication platform"
+        },
+        {
+          "route": "/profile",
+          "page_name": "Authentication Platform Self-Profile",
+          "module_key": "profile",
+          "description": "Account profile, contact details, and credentials for authentication platform"
+        },
+        {
+          "route": "/token-revocation",
+          "page_name": "Token Revocation Workspace",
+          "module_key": "token-revocation",
+          "description": "Manage and interact with Token Revocation"
+        },
+        {
+          "route": "/token",
+          "page_name": "Token Workspace",
+          "module_key": "token",
+          "description": "Manage and interact with Token"
+        },
+        {
+          "route": "/revocation",
+          "page_name": "Revocation Workspace",
+          "module_key": "revocation",
+          "description": "Manage and interact with Revocation"
+        },
+        {
+          "route": "/documents",
+          "page_name": "Authentication Platform Document Vault",
+          "module_key": "documents",
+          "description": "File uploads, records, and digital receipts for authentication platform"
+        },
+        {
+          "page_name": "Authentication platform Authentication Management Context",
+          "route": "/authentication platform/authentication_management_context",
+          "owned_capabilities": [
+            "query_operator_inspect_authentication"
+          ],
+          "owned_entities": [
+            "authentication"
+          ],
+          "module_key": "Authentication Management Context",
+          "description": "Authentication Management Context management workspace for authentication platform",
+          "architecture_style": "Modular Monolith with Bounded Contexts"
+        },
+        {
+          "page_name": "Authentication platform Revocation Management Context",
+          "route": "/authentication platform/revocation_management_context",
+          "owned_capabilities": [
+            "query_operator_inspect_revocation"
+          ],
+          "owned_entities": [
+            "revocation"
+          ],
+          "module_key": "Revocation Management Context",
+          "description": "Revocation Management Context management workspace for authentication platform",
+          "architecture_style": "Modular Monolith with Bounded Contexts"
+        },
+        {
+          "page_name": "Authentication platform Token Management Context",
+          "route": "/authentication platform/token_management_context",
+          "owned_capabilities": [
+            "query_operator_inspect_token"
+          ],
+          "owned_entities": [
+            "token"
+          ],
+          "module_key": "Token Management Context",
+          "description": "Token Management Context management workspace for authentication platform",
+          "architecture_style": "Modular Monolith with Bounded Contexts"
+        }
+      ]
+    },
+    "low_level_designs": {
+      "ctrl_ctx_authentication_management": {
+        "id": "ctrl_ctx_authentication_management",
+        "name": "Authentication Management Context Controller",
+        "component_type": "controller",
+        "parent": {
+          "hld_id": "ctx_authentication_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "backend_controller",
+        "transport": "rest_http",
+        "route": "/api/authentications",
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "Verify actor authorization",
+          "Validate request payload schema"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "authentication"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_authentication"
+        ],
+        "capability_bindings": [],
+        "component_hash": "eaa4b8f1335a9c6d94662142cf5498c3d5ee4edbbf657f9437fae8de85916460"
+      },
+      "svc_ctx_authentication_management": {
+        "id": "svc_ctx_authentication_management",
+        "name": "Authentication Management Context Service Layer",
+        "component_type": "service",
+        "parent": {
+          "hld_id": "ctx_authentication_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "domain_service",
+        "transport": "internal_function",
+        "route": null,
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [
+          "Authentication Management ContextTransactionManager",
+          "Authentication Management ContextPolicyEvaluator"
+        ],
+        "api_endpoints": [],
+        "validation_rules": [
+          "Enforce state pre/post transitions",
+          "Emit audit log side effects"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "authentication"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_authentication"
+        ],
+        "capability_bindings": [],
+        "component_hash": "ec549cacde856f9c1973570befb94dbfcdf778d3e234e743d65d728b6216643e"
+      },
+      "ui_ctx_authentication_management": {
+        "id": "ui_ctx_authentication_management",
+        "name": "Authentication Workflow Interface",
+        "component_type": "ui_surface",
+        "parent": {
+          "hld_id": "ctx_authentication_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "frontend_interface",
+        "transport": "rest_http",
+        "route": "/authentications",
+        "layout": "behavioral_workflow_surface",
+        "execution_capability": null,
+        "interaction_capability": "SUBMITS_MUTATION",
+        "sub_components": [
+          "AuthenticationDetailHeader",
+          "AuthenticationActionToolbar",
+          "AuthenticationAuditHistoryPanel"
+        ],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "UI actions trigger backend transport contracts"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "READ_QUERY",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "authentication"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_authentication"
+        ],
+        "capability_bindings": [],
+        "component_hash": "c78e7bfb6a33646a589efb35ab46e8da0454e796a12c608b30bc163cdcf99968"
+      },
+      "ctrl_ctx_revocation_management": {
+        "id": "ctrl_ctx_revocation_management",
+        "name": "Revocation Management Context Controller",
+        "component_type": "controller",
+        "parent": {
+          "hld_id": "ctx_revocation_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "backend_controller",
+        "transport": "rest_http",
+        "route": "/api/revocations",
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "Verify actor authorization",
+          "Validate request payload schema"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "revocation"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_revocation"
+        ],
+        "capability_bindings": [],
+        "component_hash": "bd1338a109ff4e9da566ca0438914f259dd0129e426393f63b9b85e0ddc9da85"
+      },
+      "svc_ctx_revocation_management": {
+        "id": "svc_ctx_revocation_management",
+        "name": "Revocation Management Context Service Layer",
+        "component_type": "service",
+        "parent": {
+          "hld_id": "ctx_revocation_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "domain_service",
+        "transport": "internal_function",
+        "route": null,
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [
+          "Revocation Management ContextTransactionManager",
+          "Revocation Management ContextPolicyEvaluator"
+        ],
+        "api_endpoints": [],
+        "validation_rules": [
+          "Enforce state pre/post transitions",
+          "Emit audit log side effects"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "revocation"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_revocation"
+        ],
+        "capability_bindings": [],
+        "component_hash": "7c30074d16da8bf8d51463f23d875680816e41e4341026d9568ccc3bc4131d23"
+      },
+      "ui_ctx_revocation_management": {
+        "id": "ui_ctx_revocation_management",
+        "name": "Revocation Workflow Interface",
+        "component_type": "ui_surface",
+        "parent": {
+          "hld_id": "ctx_revocation_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "frontend_interface",
+        "transport": "rest_http",
+        "route": "/revocations",
+        "layout": "behavioral_workflow_surface",
+        "execution_capability": null,
+        "interaction_capability": "SUBMITS_MUTATION",
+        "sub_components": [
+          "RevocationDetailHeader",
+          "RevocationActionToolbar",
+          "RevocationAuditHistoryPanel"
+        ],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "UI actions trigger backend transport contracts"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "READ_QUERY",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "revocation"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_revocation"
+        ],
+        "capability_bindings": [],
+        "component_hash": "f0bb417ad70393a7232d3107bf41ff16efc45c6f3e18464dac14101c455b1ba8"
+      },
+      "ctrl_ctx_token_management": {
+        "id": "ctrl_ctx_token_management",
+        "name": "Token Management Context Controller",
+        "component_type": "controller",
+        "parent": {
+          "hld_id": "ctx_token_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "backend_controller",
+        "transport": "rest_http",
+        "route": "/api/tokens",
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "Verify actor authorization",
+          "Validate request payload schema"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "token"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_token"
+        ],
+        "capability_bindings": [],
+        "component_hash": "85180dc6543739ba366adb2299f06e7259a64cbfa1addb49ca613ceaa127c1c9"
+      },
+      "svc_ctx_token_management": {
+        "id": "svc_ctx_token_management",
+        "name": "Token Management Context Service Layer",
+        "component_type": "service",
+        "parent": {
+          "hld_id": "ctx_token_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "domain_service",
+        "transport": "internal_function",
+        "route": null,
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [
+          "Token Management ContextTransactionManager",
+          "Token Management ContextPolicyEvaluator"
+        ],
+        "api_endpoints": [],
+        "validation_rules": [
+          "Enforce state pre/post transitions",
+          "Emit audit log side effects"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "token"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_token"
+        ],
+        "capability_bindings": [],
+        "component_hash": "1f1e369c44d6d2a13d9c7748601c5860640d8c5d01b30ad93109806b6975e312"
+      },
+      "ui_ctx_token_management": {
+        "id": "ui_ctx_token_management",
+        "name": "Token Workflow Interface",
+        "component_type": "ui_surface",
+        "parent": {
+          "hld_id": "ctx_token_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "frontend_interface",
+        "transport": "rest_http",
+        "route": "/tokens",
+        "layout": "behavioral_workflow_surface",
+        "execution_capability": null,
+        "interaction_capability": "SUBMITS_MUTATION",
+        "sub_components": [
+          "TokenDetailHeader",
+          "TokenActionToolbar",
+          "TokenAuditHistoryPanel"
+        ],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "UI actions trigger backend transport contracts"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "READ_QUERY",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "token"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_token"
+        ],
+        "capability_bindings": [],
+        "component_hash": "d86beaf0de8de3e8c7b492609c5fc4573e0cfe4d8fbe021126e50e64de1602ee"
+      }
+    },
+    "scope_boundaries": {
+      "in_scope": [
+        "Integration of Crypto Web3 requested by user"
+      ],
+      "out_of_scope": [
+        "Unrequested Payment Gateway (No Stripe Payment Gateway / Razorpay Checkout)",
+        "Unrequested Gamification (No Gamification Rewards Engine / User Badges & XP)",
+        "Unrequested Ai Chatbot (No AI Assistant Chatbot / LLM Integration Widget)",
+        "Unrequested Social Oauth (No Third-Party Social OAuth Integrations)"
+      ]
+    },
+    "domain_graph": {
+      "nodes": [
+        {
+          "id": "actor_operator",
+          "name": "Operator",
+          "primitive_type": "actor",
+          "attributes": {},
+          "provenance": "explicit",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "description": "System actor: operator"
+        },
+        {
+          "id": "entity_token",
+          "name": "Token",
+          "primitive_type": "entity",
+          "attributes": {},
+          "provenance": "explicit",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "description": "Core domain entity: token"
+        },
+        {
+          "id": "entity_authentication",
+          "name": "Authentication",
+          "primitive_type": "entity",
+          "attributes": {},
+          "provenance": "explicit",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "description": "Core domain entity: authentication"
+        },
+        {
+          "id": "entity_revocation",
+          "name": "Revocation",
+          "primitive_type": "entity",
+          "attributes": {},
+          "provenance": "explicit",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "description": "Core domain entity: revocation"
+        }
+      ],
+      "edges": [
+        {
+          "source_id": "actor_operator",
+          "relation": "authorized_for",
+          "target_id": "entity_token",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "actor_operator",
+          "relation": "authorized_for",
+          "target_id": "entity_authentication",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "actor_operator",
+          "relation": "authorized_for",
+          "target_id": "entity_revocation",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        }
+      ]
+    },
+    "domain_specificity_score": 0.8,
+    "unsupported_invention_rate": 0.0,
+    "assumption_ledger": []
+  }
+}

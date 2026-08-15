@@ -1,0 +1,75 @@
+{
+  "task_id": "TASK-06-PAYMENT-GATEWAY-AMBIGUOUS",
+  "domain": "fintech_payments_ambiguous",
+  "raw_prompt": "Build a secure payment processing service.",
+  "canonical_semantic_units": {
+    "payment processing service": {
+      "ground_truth_class": "ENTITY",
+      "rationale": "Primary backend service and transactional aggregate responsible for handling payments."
+    },
+    "secure": {
+      "ground_truth_class": "CONSTRAINT",
+      "rationale": "High-level non-functional security constraint requiring encryption, integrity, and compliance."
+    },
+    "build": {
+      "ground_truth_class": "NOISE",
+      "rationale": "Imperative directive command."
+    }
+  },
+  "canonical_domain_requirements": {
+    "REQ-EXP-01": {
+      "title": "Payment Authorization and Charge Execution",
+      "normative_level": "MUST",
+      "expected_type": "EXPLICIT",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT"
+    },
+    "REQ-DER-01": {
+      "title": "Idempotency Key Deduplication on Payment Transactions",
+      "normative_level": "MUST",
+      "expected_type": "DERIVED_JUSTIFIED",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "PAYMENT_INTEGRITY"
+    },
+    "REQ-DER-02": {
+      "title": "Transport Layer Security (TLS) and PCI-DSS Scope Boundary",
+      "normative_level": "MUST",
+      "expected_type": "DERIVED_JUSTIFIED",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "SECURITY_COMPLIANCE"
+    },
+    "REQ-DER-03": {
+      "title": "Structured Payment Audit Trail and Event Telemetry",
+      "normative_level": "SHOULD",
+      "expected_type": "DERIVED_JUSTIFIED",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "FINANCIAL_AUDIT"
+    },
+    "REQ-UNK-01": {
+      "title": "Target Payment Rail and Gateway Provider",
+      "normative_level": "UNKNOWN",
+      "expected_type": "UNKNOWN",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSPECIFIED_DESIGN"
+    },
+    "REQ-UNK-02": {
+      "title": "Cardholder Data Persistence vs Gateway Tokenization Model",
+      "normative_level": "UNKNOWN",
+      "expected_type": "UNKNOWN",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSPECIFIED_DESIGN"
+    },
+    "REQ-UNK-03": {
+      "title": "Multi-Currency Settlement and Refund Policy Architecture",
+      "normative_level": "UNKNOWN",
+      "expected_type": "UNKNOWN",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSPECIFIED_DESIGN"
+    }
+  },
+  "forbidden_hallucinations": [
+    "Merchant onboarding web UI",
+    "Customer billing dashboard",
+    "Specific third-party provider assumption (e.g. forced Stripe integration without prompt instruction)"
+  ]
+}

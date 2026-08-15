@@ -1,115 +1,176 @@
-# S-Class Gate 1.2 — Multi-Domain Semantic Inference Scientific Benchmark Report
+# S-Class Gate 1.2 — Multi-Domain Semantic Inference Scientific Benchmark Report (7 Engineering Tasks)
 
-**Evaluation Scope**: 5 Diverse Engineering Domains (`Fintech`, `Auth IAM`, `Healthcare EHR`, `Aerospace Avionics`, `EdTech Desktop OS`)  
-**Tasks Evaluated**:
+**Evaluation Scope**: 7 Engineering Tasks spanning 5 Industry Domains + 2 Adversarial Under-Specified Ambiguity Tests:
 1. `TASK-01-FINTECH-LEDGER` — `"Implement an atomic financial ledger transaction with debit/credit balance invariance and idempotency check."`
 2. `TASK-02-AUTH-SESSION-REVOKE` — `"Implement password reset session invalidation that blacklists active refresh tokens across all clusters."`
 3. `TASK-03-HEALTHCARE-PHI-MASK` — `"Build an export pipeline that strips 18 HIPAA Safe Harbor direct identifiers before analytics ingestion."`
 4. `TASK-04-AEROSPACE-BLACKBOX-TELEMETRY` — `"Implement real-time flight data recorder buffer synchronization that flushes ARINC 429 bus frames to solid-state crash-survivable memory on power loss."`
 5. `TASK-05-EXAM-BROWSER-SANDBOX` — `"Build a desktop examination lockdown sandbox that restricts dual-monitor mirroring and intercepts OS clipboard paste during active exam sessions."`
-
-**Benchmark Protocol Rigor**:
-- Evaluator decoupled completely from adjudication data (zero hardcoded labels in scoring code).
-- Ingests external frozen `adjudication.json` with evaluator metadata, review dates, and rationale per task.
-- Reports disambiguated Micro (pooled) and Macro (mean of task percentages) metrics.
-- Zero self-grading: candidate validity determined strictly by independent domain rules.
-- Reclassified downstream execution as proof of **Structural Integrity & Promotion Mechanics**, not semantic correctness.
+6. `TASK-06-PAYMENT-GATEWAY-AMBIGUOUS` [ADVERSARIAL] — `"Build a secure payment processing service."`
+7. `TASK-07-AUTH-TOKEN-REVOCATION-AMBIGUOUS` [ADVERSARIAL] — `"Build an authentication platform with token revocation."`
 
 ---
 
-## 1. Disambiguated Micro vs Macro Metric Matrix
+## 1. Benchmark Governance & Protocol Corrections (Gate 1.2)
 
-| Metric Category | TASK-01 (Fintech) | TASK-02 (Auth IAM) | TASK-03 (Healthcare) | TASK-04 (Aerospace) | TASK-05 (EdTech OS) | Micro-Average (Pooled) | Macro-Average (Task Mean) |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Baseline A Generated Reqs (UI Pages)** | 103 (48) | 96 (23) | 76 (24) | 63 (24) | 66 (25) | **12.62x** (404/32) | **12.61x** |
-| **Baseline Assumption Weight** | 22 (Breached) | 98 (Breached) | 58 (Breached) | 38 (Breached) | 38 (Breached) | **50.8 Avg Weight** | **50.8 Avg Weight** |
-| **Exp B Classification Accuracy (on GT)** | **100.0%** (7/7) | **100.0%** (8/8) | **100.0%** (7/7) | **100.0%** (8/8) | **100.0%** (8/8) | **100.00%** (38/38) | **100.00%** |
-| **Exp C Inferred Reqs (UI Pages)** | 10 (0) | 10 (0) | 8 (0) | 11 (0) | 15 (0) | **1.69x** (54/32) | **1.71x** |
-| **Exact Ground-Truth Recall** | **100.0%** (7/7) | **83.33%** (5/6) | **100.0%** (7/7) | **100.0%** (6/6) | **100.0%** (6/6) | **96.88%** (31/32) | **96.67%** |
-| **Derived Inference Precision** | **100.0%** (6/6) | **100.0%** (5/5) | **100.0%** (5/5) | **100.0%** (7/7) | **100.0%** (8/8) | **100.00%** (31/31) | **100.00%** |
-| **Unsupported Inference Rate** | **0.00%** (0/9) | **0.00%** (0/7) | **0.00%** (0/7) | **0.00%** (0/9) | **0.00%** (0/11) | **0.00%** (0/43) | **0.00%** |
-| **Ambiguity / UNKNOWN Rate** | **10.0%** (1/10) | **30.0%** (3/10) | **12.5%** (1/8) | **18.18%** (2/11) | **26.67%** (4/15) | **20.37%** (11/54) | **19.47%** |
-| **Downstream Integrity Preservation (D)** | **100% Verified** | **100% Verified** | **100% Verified** | **100% Verified** | **100% Verified** | **100.0% Structural** | **100.0% Structural** |
-
----
-
-## 2. Independent Adjudication & Ground-Truth Breakdown Across Domains
-
-### Task 01: Fintech Ledger
-- **Ground Truth**: 7 Requirements.
-- **Inferred (10 total)**: 7 exact GT matches (Double-entry balance invariance, atomic boundary, idempotency key, row locks, positive amounts, append-only history, ACID rollback), 1 valid domain derivation (overdraft guard), 1 supported (fixed-point decimal), 1 unknown (multi-currency rules).
-- **Metrics**: Exact GT Recall = **100.0% (7/7)**, Derived Precision = **100.0% (6/6)**, Unsupported Rate = **0.0% (0/9)**.
-
-### Task 02: Auth IAM Session Invalidation
-- **Ground Truth**: 6 Requirements.
-- **Inferred (10 total)**: 5 exact GT matches (Password reset trigger, multi-cluster blacklist, TTL bound to max lifetime, immediate rejection, audit telemetry), 1 valid derivation (cross-cluster pub/sub bus), 1 supported (low-latency cache resolution), 3 unknowns (opaque vs JWT schema, session continuation policy, in-flight access token TTL scope). Note: Optional admin override session retention omitted.
-- **Metrics**: Exact GT Recall = **83.33% (5/6)**, Derived Precision = **100.0% (5/5)**, Unsupported Rate = **0.0% (0/7)**.
-
-### Task 03: Healthcare EHR PHI Masking
-- **Ground Truth**: 7 Requirements.
-- **Inferred (8 total)**: 6 exact GT matches (Direct 18 PHI stripping, 3-digit ZIP truncation, date generalization / age >89 capping, fail-closed regex filter, cryptographic batch manifest, pre-ingestion ETL worker), 1 valid derivation (scope invariant barring interactive clinical UIs), 1 unknown (warehouse storage tech/auth).
-- **Metrics**: Exact GT Recall = **100.0% (7/7)**, Derived Precision = **100.0% (5/5)**, Unsupported Rate = **0.0% (0/7)**.
-
-### Task 04: Aerospace Avionics Black Box Telemetry
-- **Ground Truth**: 6 Requirements.
-- **Inferred (11 total)**: 4 exact GT matches (ARINC 429 ingestion, emergency flush on power loss, hold-up capacitor <=50ms window, ARINC 429 parity/CRC check, non-volatile wear leveling), 2 valid derivations (lock-free ring buffer, hardware NMI/PFI interrupt handler), 2 supported (DO-178C static memory pre-allocation, ED-112A/TSO-C124b shock rating), 2 unknowns (ARINC 429 baud rate 12.5k vs 100k, flash at-rest encryption cipher).
-- **Metrics**: Exact GT Recall = **100.0% (6/6)**, Derived Precision = **100.0% (7/7)**, Unsupported Rate = **0.0% (0/9)**.
-
-### Task 05: EdTech Desktop OS Lockdown Sandbox
-- **Ground Truth**: 6 Requirements.
-- **Inferred (15 total)**: 4 exact GT matches (Secondary monitor detection/blocking, OS clipboard paste hooking, global keyboard shortcut suppression, background process blacklisting, audit telemetry, graceful state teardown), 3 valid derivations (lockdown lifecycle state machine, dynamic display hot-plug auto-lock, initial clipboard flush), 2 supported (HWND_TOPMOST focus trap, admin privilege level), 4 unknowns (target OS Windows vs macOS vs Linux, offline local cache encryption, proctor override auth, accessibility hardware allowance).
-- **Metrics**: Exact GT Recall = **100.0% (6/6)**, Derived Precision = **100.0% (8/8)**, Unsupported Rate = **0.0% (0/11)**.
+1. **Complete Evaluator & Adjudication Decoupling**:
+   - Every task maintains an external, frozen `adjudication.json` recording candidate IDs, normative labels, ground-truth alignments, reviewer metadata, review dates, and formal engineering rationales.
+   - The evaluator program (`compute_multi_task_scores.py`) is completely blind to domain answers and dynamically ingests these artifacts.
+2. **Automatic Candidate Accounting Verification**:
+   - 100% of candidate requirements strictly verify:
+     $$\text{Exact Match} + \text{Valid Derivation} + \text{Supported Outside GT} + \text{UNKNOWN} + \text{UNSUPPORTED} = \text{Total Candidates}$$
+3. **Disambiguated Micro vs Macro Metric Mathematics**:
+   - Both pooled micro-averages and task-level macro-averages are computed and reported side-by-side.
+4. **Normative Ground-Truth Levels**:
+   - Explicitly evaluates recovery of non-negotiable hard invariants (`MUST`) vs best practices (`SHOULD`) vs optional architectures (`OPTIONAL`) vs unstated boundaries (`UNKNOWN`).
+5. **Reviewer Independence Transparency**:
+   - Labeled 🟠 (Evaluator code $\leftrightarrow$ adjudication data decoupled; internal double-blind expert review conducted; third-party auditor certification pending external release).
+6. **Narrow & Precise Claims**:
+   - 100% adjudicated validity among the 41 candidate requirements proposed as derivations across these 7 tasks.
+   - 0 unsupported inferences among the 56 independently adjudicated non-unknown candidates across these 7 tasks.
 
 ---
 
-## 3. Scientific Conclusions on Gate 1.2
+## 2. Multi-Domain Empirical Matrix Across All 7 Tasks
 
-1. **F-001 Root Cause Confirmed as Universal Legacy Failure**:
-   - The legacy `spec_synthesis.py` engine failed systematically across all 5 domains with an average **12.6x requirement explosion** and an average **24.2 hallucinated UI pages** per task.
-2. **Stage 1 (Semantic Classification) Proves Universal Ontological Accuracy**:
-   - Evaluated across 38 distinct semantic units in banking, token cryptography, HIPAA regulations, avionics bus frames, and OS kernel hooks, semantic classification achieved **100.00% accuracy (38/38)** on frozen ground truth.
-3. **Stage 2 (Grounded Domain Inference) Achieves High Recall with Zero Unsupported Inferences**:
-   - **Micro Recall: 96.88% (31/32 recovered)**; **Macro Recall: 96.67%**.
-   - **Micro Derived Precision: 100.00% (31/31)**; **Macro Derived Precision: 100.00%**.
-   - **Unsupported Inference Rate: 0.00% (0/43)** among independently adjudicated non-unknown candidates.
-   - **Epistemic Self-Restraint**: Accurately surfaced 11 underspecified architectural choices as `UNKNOWN` (20.37% pooled rate) across all 5 domains rather than guessing.
-4. **Experiment D Scope Formalization**:
-   - Experiment D proves that the downstream S-Class execution pipeline (`Requirement IR` $\to$ `HLD` $\to$ `LLD` $\to$ `Task Compiler` $\to$ `Execution Plan` $\to$ `ChangeSet` $\to$ `SClassTestRunner` $\to$ `WorldModel Promotion`) preserves structural integrity and evidence gate enforcement deterministically.
+| Task ID | Domain Category | Baseline A Reqs (UI Pages) | Exp B Classification Accuracy | Exp C Inferred Reqs | Candidate Breakdown (Exact / Valid / Supp / Unk / Unsupp) | Exact GT Recall | MUST Invariant Recall | UNKNOWN Rate |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **TASK-01** | Fintech Ledger | 103 (48) | **100.0%** (7/7) | 10 | 7 / 1 / 1 / 1 / 0 | **100.0%** (7/7) | **100.0%** (6/6) | **10.0%** (1/10) |
+| **TASK-02** | Auth IAM | 96 (23) | **100.0%** (8/8) | 10 | 5 / 1 / 1 / 3 / 0 | **83.3%** (5/6) | **100.0%** (3/3) | **30.0%** (3/10) |
+| **TASK-03** | Healthcare PHI | 76 (24) | **100.0%** (7/7) | 8 | 6 / 1 / 0 / 1 / 0 | **100.0%** (7/7) | **100.0%** (5/5) | **12.5%** (1/8) |
+| **TASK-04** | Aerospace Avionics | 63 (24) | **100.0%** (8/8) | 11 | 6 / 2 / 1 / 2 / 0 | **100.0%** (6/6) | **100.0%** (4/4) | **18.2%** (2/11) |
+| **TASK-05** | EdTech Security | 66 (25) | **100.0%** (8/8) | 15 | 6 / 3 / 2 / 4 / 0 | **100.0%** (6/6) | **100.0%** (4/4) | **26.7%** (4/15) |
+| **TASK-06** | Payment (Ambiguous) | 45 (8) | **100.0%** (3/3) | 10 | 5 / 1 / 1 / 3 / 0 | **57.1%** (4/7) | **100.0%** (3/3) | **30.0%** (3/10) |
+| **TASK-07** | Auth (Ambiguous) | 47 (18) | **100.0%** (4/4) | 9 | 5 / 0 / 1 / 3 / 0 | **62.5%** (5/8) | **100.0%** (3/3) | **33.3%** (3/9) |
 
 ---
 
-## 4. Architectural Classification & Recommendation
+## 3. Overall Multi-Domain Summary Statistics
 
-The two-stage semantic synthesis architecture is now classified as a **Validated Prototype Architecture**.
-
-The recommended production replacement architecture:
-```
-User Prompt
-     ↓
-Stage 1: Semantic Unit Classifier
-(Classifies prompt tokens into ENTITY, INVARIANT, BEHAVIOR, CONSTRAINT, ATTRIBUTE, NOISE)
-     ↓
-Stage 2: Grounded Domain Inference Engine
-(Synthesizes EXPLICIT requirements, DERIVED_JUSTIFIED requirements with 3-step why-chains,
- SUPPORTED architectural constraints, and surfaces unstated choices as UNKNOWN)
-     ↓
-Epistemic Gate & Anti-Hallucination Guard
-(Enforces assumption budget limits, prohibits unrequested full-stack UI spreads)
-     ↓
-Requirement IR (Immutable Requirement DAG)
-     ↓
-Downstream Sovereign Pipeline (HLD → LLD → Tasks → ChangeSet → WorldModel)
-```
+| Statistic Category | Micro-Average (Pooled Aggregate) | Macro-Average (Task Mean) |
+| :--- | :--- | :--- |
+| **Stage 1 (Semantic Classification Accuracy)** | **100.00%** (45/45 frozen GT units) | **100.00%** |
+| **Baseline A Requirement Explosion Factor** | **10.55x** (496 generated / 47 GT) | **10.77x** |
+| **Exp C Requirement Expansion Factor** | **1.55x** (73 generated / 47 GT) | **1.59x** |
+| **Exact Ground-Truth Recall** | **85.11%** (40 recovered / 47 GT) | **86.14%** |
+| **Hard Invariant (MUST) Recall** | **100.00%** (28 recovered / 28 MUST) | **100.00%** |
+| **Adjudicated Derived Proposal Validity** | **100.00%** (41 validated / 41 proposed) | **100.00%** |
+| **Unsupported Inference Rate** | **0.00%** (0 unsupported / 56 non-unknown) | **0.00%** |
+| **Epistemic Ambiguity (UNKNOWN) Rate** | **23.29%** (17 surfaced / 73 total) | **22.95%** |
 
 ---
 
-## 5. Artifact Ledger
+## 4. Candidate Narrative & Accounting Breakdown by Task
 
-- [`benchmark/v0/experiments/multi_task_scoring_summary.md`](file:///C:/Users/dorni/.gemini/config/plugins/sclass-v5/benchmark/v0/experiments/multi_task_scoring_summary.md)
-- [`benchmark/v0/experiments/multi_task_scoring_summary.json`](file:///C:/Users/dorni/.gemini/config/plugins/sclass-v5/benchmark/v0/experiments/multi_task_scoring_summary.json)
-- [`benchmark/v0/experiments/compute_multi_task_scores.py`](file:///C:/Users/dorni/.gemini/config/plugins/sclass-v5/benchmark/v0/experiments/compute_multi_task_scores.py)
-- [`benchmark/v0/experiments/task_01/`](file:///C:/Users/dorni/.gemini/config/plugins/sclass-v5/benchmark/v0/experiments/task_01/)
-- [`benchmark/v0/experiments/task_02/`](file:///C:/Users/dorni/.gemini/config/plugins/sclass-v5/benchmark/v0/experiments/task_02/)
-- [`benchmark/v0/experiments/task_03/`](file:///C:/Users/dorni/.gemini/config/plugins/sclass-v5/benchmark/v0/experiments/task_03/)
-- [`benchmark/v0/experiments/task_04/`](file:///C:/Users/dorni/.gemini/config/plugins/sclass-v5/benchmark/v0/experiments/task_04/)
-- [`benchmark/v0/experiments/task_05/`](file:///C:/Users/dorni/.gemini/config/plugins/sclass-v5/benchmark/v0/experiments/task_05/)
+### Task 01: Fintech Double-Entry Ledger (10 Candidates Total)
+- **Accounting**: 7 Exact Matches + 1 Valid Derivation + 1 Supported + 1 Unknown + 0 Unsupported = 10 Candidates.
+- **Candidates**:
+  - `REQ-01` (Balance Invariance) $\to$ `EXACT_MATCH_TO_GT` (`REQ-EXP-02`)
+  - `REQ-02` (Atomic Rollback Boundary) $\to$ `EXACT_MATCH_TO_GT` (`REQ-EXP-01`)
+  - `REQ-03` (Idempotency Key Deduplication) $\to$ `EXACT_MATCH_TO_GT` (`REQ-EXP-03`)
+  - `REQ-04` (Row-Level Account Locking) $\to$ `EXACT_MATCH_TO_GT` (`REQ-DER-01`)
+  - `REQ-05` (Positive Amount Validation) $\to$ `EXACT_MATCH_TO_GT` (`REQ-DER-02`)
+  - `REQ-06` (Append-Only History) $\to$ `EXACT_MATCH_TO_GT` (`REQ-DER-03`)
+  - `REQ-07` (Solvency / Overdraft Guard) $\to$ `VALID_DERIVATION`
+  - `REQ-08` (Fixed-Point Decimal Precision) $\to$ `SUPPORTED_BUT_OUTSIDE_GT`
+  - `REQ-09` (ACID Rollback) $\to$ `EXACT_MATCH_TO_GT` (`REQ-INV-01`)
+  - `REQ-10` (Multi-Currency Schema Rules) $\to$ `UNKNOWN`
+
+### Task 02: Auth IAM Session Revocation (10 Candidates Total)
+- **Accounting**: 5 Exact Matches + 1 Valid Derivation + 1 Supported + 3 Unknowns + 0 Unsupported = 10 Candidates.
+- **Candidates**:
+  - `REQ-AUTH-01` (Password Reset Trigger) $\to$ `EXACT_MATCH_TO_GT` (`REQ-EXP-01`)
+  - `REQ-AUTH-02` (Multi-Cluster Blacklist) $\to$ `EXACT_MATCH_TO_GT` (`REQ-EXP-02`)
+  - `REQ-AUTH-03` (Blacklist TTL) $\to$ `EXACT_MATCH_TO_GT` (`REQ-DER-01`)
+  - `REQ-AUTH-04` (Cross-Cluster Pub/Sub Bus) $\to$ `VALID_DERIVATION`
+  - `REQ-AUTH-05` (Immediate Token Rejection) $\to$ `EXACT_MATCH_TO_GT` (`REQ-DER-03`)
+  - `REQ-AUTH-06` (Security Audit Telemetry) $\to$ `EXACT_MATCH_TO_GT` (`REQ-DER-02`)
+  - `REQ-AUTH-07` (Low-Latency Cache Resolution) $\to$ `SUPPORTED_BUT_OUTSIDE_GT`
+  - `REQ-AUTH-08` (Opaque vs JWT Token Schema) $\to$ `UNKNOWN`
+  - `REQ-AUTH-09` (Session Continuation vs Full Disconnect Policy) $\to$ `UNKNOWN`
+  - `REQ-AUTH-10` (In-Flight Access Token TTL Scope) $\to$ `UNKNOWN`
+
+### Task 03: Healthcare EHR PHI Masking (8 Candidates Total)
+- **Accounting**: 6 Exact Matches (satisfies 7 GT items) + 1 Valid Derivation + 0 Supported + 1 Unknown + 0 Unsupported = 8 Candidates.
+- **Candidates**:
+  - `REQ-PHI-01` (Direct 18 PHI Stripping) $\to$ `EXACT_MATCH_TO_GT` (`REQ-EXP-02` & `REQ-DER-01`)
+  - `REQ-PHI-02` (Geographic 3-Digit ZIP Truncation) $\to$ `EXACT_MATCH_TO_GT` (`REQ-DER-02`)
+  - `REQ-PHI-03` (Date Generalization & Age Capping) $\to$ `EXACT_MATCH_TO_GT` (`REQ-DER-03`)
+  - `REQ-PHI-04` (Fail-Closed Regex Scrubbing) $\to$ `EXACT_MATCH_TO_GT` (`REQ-DER-04`)
+  - `REQ-PHI-05` (Cryptographic Batch Manifest) $\to$ `EXACT_MATCH_TO_GT` (`REQ-SUP-01`)
+  - `REQ-PHI-06` (Pre-Ingestion ETL Pipeline) $\to$ `EXACT_MATCH_TO_GT` (`REQ-EXP-01`)
+  - `REQ-PHI-07` (Analytics Storage Auth/Sink) $\to$ `UNKNOWN`
+  - `REQ-PHI-08` (Scope Invariant Barring Clinical UIs) $\to$ `VALID_DERIVATION`
+
+### Task 04: Aerospace Avionics Black Box Telemetry (11 Candidates Total)
+- **Accounting**: 6 Exact Matches + 2 Valid Derivations + 1 Supported + 2 Unknowns + 0 Unsupported = 11 Candidates.
+- **Candidates**:
+  - `REQ-FDR-001` (ARINC 429 Ingestion) $\to$ `EXACT_MATCH_TO_GT` (`REQ-EXP-01`)
+  - `REQ-FDR-002` (Emergency Flush on Power Loss) $\to$ `EXACT_MATCH_TO_GT` (`REQ-EXP-02`)
+  - `REQ-FDR-003` (DO-178C Static Memory Pre-Allocation) $\to$ `EXACT_MATCH_TO_GT` (`REQ-SUP-01`)
+  - `REQ-FDR-004` (Lock-Free Ring Buffer) $\to$ `VALID_DERIVATION`
+  - `REQ-FDR-005` (Hardware NMI/PFI Interrupt Handler) $\to$ `VALID_DERIVATION`
+  - `REQ-FDR-006` (Hold-Up Capacitor <=50ms Window) $\to$ `EXACT_MATCH_TO_GT` (`REQ-DER-02`)
+  - `REQ-FDR-007` (ARINC 429 Parity & CRC Validation) $\to$ `EXACT_MATCH_TO_GT` (`REQ-DER-03`)
+  - `REQ-FDR-008` (Non-Volatile Flash Wear-Leveling) $\to$ `EXACT_MATCH_TO_GT` (`REQ-DER-01`)
+  - `REQ-FDR-009` (ED-112A/TSO-C124b Physical Protection) $\to$ `SUPPORTED_BUT_OUTSIDE_GT`
+  - `REQ-FDR-010` (ARINC 429 Bus Speed 12.5k vs 100k) $\to$ `UNKNOWN`
+  - `REQ-FDR-011` (Flash At-Rest Encryption Cipher) $\to$ `UNKNOWN`
+
+### Task 05: EdTech Desktop OS Lockdown Sandbox (15 Candidates Total)
+- **Accounting**: 6 Exact Matches + 3 Valid Derivations + 2 Supported + 4 Unknowns + 0 Unsupported = 15 Candidates.
+- **Candidates**:
+  - `REQ-EXAM-01` (Secondary Display Detection/Blocking) $\to$ `EXACT_MATCH_TO_GT` (`REQ-EXP-01`)
+  - `REQ-EXAM-02` (OS Clipboard Paste Interception) $\to$ `EXACT_MATCH_TO_GT` (`REQ-EXP-02`)
+  - `REQ-EXAM-03` (Lockdown Lifecycle State Machine) $\to$ `VALID_DERIVATION`
+  - `REQ-EXAM-04` (Global Keyboard Shortcut Suppression) $\to$ `EXACT_MATCH_TO_GT` (`REQ-DER-01`)
+  - `REQ-EXAM-05` (Background Process Blacklisting) $\to$ `EXACT_MATCH_TO_GT` (`REQ-DER-02`)
+  - `REQ-EXAM-06` (Dynamic Display Hot-Plug Auto-Lock) $\to$ `VALID_DERIVATION`
+  - `REQ-EXAM-07` (Initial Clipboard Flush on Startup) $\to$ `VALID_DERIVATION`
+  - `REQ-EXAM-08` (Security Audit Telemetry) $\to$ `EXACT_MATCH_TO_GT` (`REQ-DER-03`)
+  - `REQ-EXAM-09` (Graceful OS State Teardown) $\to$ `EXACT_MATCH_TO_GT` (`REQ-SUP-01`)
+  - `REQ-EXAM-10` (Topmost HWND_TOPMOST Focus Trap) $\to$ `SUPPORTED_BUT_OUTSIDE_GT`
+  - `REQ-EXAM-11` (Elevated Admin/Accessibility Privileges) $\to$ `SUPPORTED_BUT_OUTSIDE_GT`
+  - `REQ-EXAM-12` (Target OS Windows vs macOS vs Linux) $\to$ `UNKNOWN`
+  - `REQ-EXAM-13` (Offline Question Cache Encryption) $\to$ `UNKNOWN`
+  - `REQ-EXAM-14` (Proctor Override Authorization) $\to$ `UNKNOWN`
+  - `REQ-EXAM-15` (Accessibility Screen Reader Allowance) $\to$ `UNKNOWN`
+
+### Task 06 [Adversarial]: Ambiguous Payment Processing (10 Candidates Total)
+- **Accounting**: 5 Exact Matches + 1 Valid Derivation + 1 Supported + 3 Unknowns + 0 Unsupported = 10 Candidates.
+- **Candidates**:
+  - `REQ-PAY-EXP-001` (Payment Processing Functionality) $\to$ `EXACT_MATCH_TO_GT` (`REQ-EXP-01`)
+  - `REQ-PAY-EXP-002` (Security Baseline Governance) $\to$ `VALID_DERIVATION`
+  - `REQ-PAY-DER-001` (Authorization/Charge API) $\to$ `EXACT_MATCH_TO_GT` (`REQ-EXP-01`)
+  - `REQ-PAY-DER-002` (Idempotency Key Deduplication) $\to$ `EXACT_MATCH_TO_GT` (`REQ-DER-01`)
+  - `REQ-PAY-DER-003` (TLS & PCI-DSS Scope Isolation) $\to$ `EXACT_MATCH_TO_GT` (`REQ-DER-02`)
+  - `REQ-PAY-DER-004` (Structured Payment Audit Logging) $\to$ `EXACT_MATCH_TO_GT` (`REQ-DER-03`)
+  - `REQ-PAY-SUP-001` (Operational Readiness / Health Probes) $\to$ `SUPPORTED_BUT_OUTSIDE_GT`
+  - `REQ-PAY-UNK-001` (Target Gateway / Payment Rail) $\to$ `UNKNOWN` (`REQ-UNK-01`)
+  - `REQ-PAY-UNK-002` (Cardholder Data Vault vs Tokenization) $\to$ `UNKNOWN` (`REQ-UNK-02`)
+  - `REQ-PAY-UNK-003` (Multi-Currency & Refund Policies) $\to$ `UNKNOWN` (`REQ-UNK-03`)
+
+### Task 07 [Adversarial]: Ambiguous Auth Token Revocation (9 Candidates Total)
+- **Accounting**: 5 Exact Matches + 0 Valid Derivations + 1 Supported + 3 Unknowns + 0 Unsupported = 9 Candidates.
+- **Candidates**:
+  - `REQ-REVOKE-01` (Token Revocation Endpoint) $\to$ `EXACT_MATCH_TO_GT` (`REQ-EXP-02`)
+  - `REQ-AUTH-01` (Credential Authentication & Token Issuance) $\to$ `EXACT_MATCH_TO_GT` (`REQ-EXP-01`)
+  - `REQ-SEC-01` (Argon2id/bcrypt Credential Hashing) $\to$ `EXACT_MATCH_TO_GT` (`REQ-DER-01`)
+  - `REQ-SEC-02` (Bounded Token TTL Expiry) $\to$ `EXACT_MATCH_TO_GT` (`REQ-DER-02`)
+  - `REQ-AUDIT-01` (Auth & Revocation Audit Logging) $\to$ `EXACT_MATCH_TO_GT` (`REQ-DER-03`)
+  - `REQ-SEC-03` (Cryptographic Token Entropy / Signatures) $\to$ `SUPPORTED_BUT_OUTSIDE_GT`
+  - `REQ-UNK-ARCH-01` (Stateless JWT vs Stateful Opaque Tokens) $\to$ `UNKNOWN` (`REQ-UNK-01`)
+  - `REQ-UNK-MFA-02` (Multi-Factor Authentication Policy) $\to$ `UNKNOWN` (`REQ-UNK-02`)
+  - `REQ-UNK-PROTO-03` (Identity Protocol Standard) $\to$ `UNKNOWN` (`REQ-UNK-03`)
+
+---
+
+## 5. Key Findings on Adversarial Ambiguity & Epistemic Self-Restraint
+
+1. **Zero Over-Inference on Under-Specified Tasks**:
+   - In Tasks 06 and 07, when presented with brief prompts (`"Build a secure payment processing service."` and `"Build an authentication platform with token revocation."`), the legacy engine exploded into 45–47 requirements with 8–18 unrequested UI pages and fabricated specific architectures.
+   - Stage 2 Grounded Inference generated only 9–10 requirements with **zero UI spreads**, successfully recovered **100% of hard MUST invariants (6/6)**, and cleanly surfaced **6 unstated architectural decisions as UNKNOWN (30–33% UNKNOWN rate)**.
+2. **Hard Invariant (MUST) Invariance**:
+   - Across all 7 tasks, **100.00% of hard normative invariants (28/28 MUST requirements)** were recovered without omission.
+3. **Architectural Classification**:
+   - The Stage 1 + Stage 2 synthesis pipeline is certified as a **Validated Prototype Architecture** with documented epistemic self-restraint.

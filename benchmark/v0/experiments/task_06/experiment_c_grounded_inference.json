@@ -1,0 +1,106 @@
+{
+  "experiment": "EXPERIMENT C — Grounded Domain Inference (Task 06)",
+  "task_id": "TASK-06-PAYMENT-GATEWAY-AMBIGUOUS",
+  "inferred_requirements": [
+    {
+      "requirement_id": "REQ-PAY-EXP-001",
+      "title": "Payment Processing Service Core Functionality",
+      "description": "Provide a centralized software service capable of receiving transaction requests and processing monetary payment transactions.",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Directly requested in user prompt: 'Build a ... payment processing service.'"
+    },
+    {
+      "requirement_id": "REQ-PAY-EXP-002",
+      "title": "Payment Service Security Baseline",
+      "description": "Establish security controls and defensive measures safeguarding payment execution, transaction data, and service infrastructure.",
+      "type": "SECURITY",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Directly requested in user prompt: 'Build a secure payment processing service.'"
+    },
+    {
+      "requirement_id": "REQ-PAY-DER-001",
+      "title": "Payment Authorization and Charge Execution Interface",
+      "description": "Expose an API endpoint to accept payment intent parameters (amount, currency, payment source/token) and execute transaction authorization and capture against the downstream payment ledger.",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "PAYMENT_INTEGRITY",
+      "confidence": 0.98,
+      "justification": "1. Why: The service is commissioned to process payments, requiring an ingestion channel for transaction requests. 2. Why: Processing payments requires a distinct programmatic boundary to validate transaction parameters (currency, amount, payment method) and initiate charge authorization. 3. Why: Without an authorization/charge execution endpoint, no transactions can be initiated, making the service functionally inoperative."
+    },
+    {
+      "requirement_id": "REQ-PAY-DER-002",
+      "title": "Idempotency Key Deduplication for Transaction Execution",
+      "description": "Implement unique idempotency key validation and deduplication storage on payment execution requests to prevent duplicate transaction charges during client retries or network failures.",
+      "type": "INVARIANT",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "PAYMENT_INTEGRITY",
+      "confidence": 0.98,
+      "justification": "1. Why: Distributed payment networks inevitably suffer from network timeouts, dropped packets, and automatic client retries. 2. Why: Retrying a non-idempotent charge request would cause duplicate deductions from customer accounts and corrupted ledger state. 3. Why: Idempotency deduplication guarantees strict exactly-once payment execution semantics at the business logic layer regardless of transport retries."
+    },
+    {
+      "requirement_id": "REQ-PAY-DER-003",
+      "title": "Cryptographic TLS Encryption in Transit and PCI-DSS Scope Boundary",
+      "description": "Enforce TLS 1.2+ encryption for all inbound and outbound communication channels and maintain strict isolation of the payment cardholder data environment (CDE) in accordance with PCI-DSS boundary standards.",
+      "type": "SECURITY",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "SECURITY_COMPLIANCE",
+      "confidence": 0.99,
+      "justification": "1. Why: The prompt explicitly mandates a 'secure' payment processing service that handles sensitive financial and cardholder data. 2. Why: Unencrypted transmission or porous architectural boundaries expose cardholder data to interception, man-in-the-middle attacks, and compliance failure (PCI-DSS Req 4). 3. Why: Cryptographic transport encryption and strict CDE scope isolation are technically mandatory to prevent credential leakage and satisfy security baselines."
+    },
+    {
+      "requirement_id": "REQ-PAY-DER-004",
+      "title": "Immutable Structured Audit Event Logging",
+      "description": "Emit immutable, structured audit log events for all state transitions across the payment lifecycle (attempted, authorized, captured, failed, refunded) while strictly masking/redacting sensitive cardholder PAN and CVV data.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "FINANCIAL_AUDIT",
+      "confidence": 0.96,
+      "justification": "1. Why: Payment systems require non-repudiation, financial dispute resolution, and regulatory auditability for every transaction. 2. Why: Diagnosing settlement discrepancies, fraud patterns, or systemic failures requires an immutable, time-sequenced record of all lifecycle events. 3. Why: Structured audit logging (with PCI-compliant PAN masking) is technically necessary to ensure traceability without creating security vulnerabilities."
+    },
+    {
+      "requirement_id": "REQ-PAY-SUP-001",
+      "title": "Health Check and Operational Readiness Telemetry",
+      "description": "Provide health check probe endpoints (/healthz, /readyz) and runtime operational metrics to support high-availability orchestration and payment service monitoring.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "SUPPORTED",
+      "provenance": "PAYMENT_INTEGRITY",
+      "confidence": 0.85,
+      "justification": "Standard architectural property supporting continuous uptime, load-balancer routing, and failure recovery in high-reliability financial service deployments."
+    },
+    {
+      "requirement_id": "REQ-PAY-UNK-001",
+      "title": "Target Payment Rail and Gateway Provider Specification",
+      "description": "Specification of downstream payment settlement rail and provider integration (e.g., Stripe, Adyen, Braintree, ISO 8583 Card Network, or ACH/SEPA direct bank rails).",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 0.0,
+      "justification": "Unstated in user prompt. Target provider, integration protocol (REST, ISO 8583, AS2), and clearing rails cannot be inferred without explicit business specification."
+    },
+    {
+      "requirement_id": "REQ-PAY-UNK-002",
+      "title": "Cardholder Data Persistence and Vaulting Architecture",
+      "description": "Definition of cardholder data handling architecture: PCI-DSS Level 1 PAN storage vault with HSM encryption vs. client-side hosted tokenization (zero PAN storage scope).",
+      "type": "SECURITY",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 0.0,
+      "justification": "Unstated in user prompt. The persistence strategy for sensitive payment credentials fundamentally changes architectural compliance scope and cannot be assumed."
+    },
+    {
+      "requirement_id": "REQ-PAY-UNK-003",
+      "title": "Multi-Currency Settlement and Refund Lifecycle Rules",
+      "description": "Business rules governing multi-currency conversion, settlement timelines, partial authorizations, split payments, and refund/dispute lifecycles.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 0.0,
+      "justification": "Unstated in user prompt. Currency handling, FX markup, partial capture policies, and refund workflows depend entirely on unspecified domain business rules."
+    }
+  ]
+}

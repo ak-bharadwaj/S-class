@@ -1,0 +1,96 @@
+{
+  "experiment": "EXPERIMENT C — Grounded Domain Inference (Task 07)",
+  "task_id": "TASK-07-AUTH-TOKEN-REVOCATION-AMBIGUOUS",
+  "inferred_requirements": [
+    {
+      "requirement_id": "REQ-REVOKE-01",
+      "title": "Token Revocation Endpoint and Invalidation Mechanism",
+      "description": "The platform must expose an endpoint or API allowing authenticated subjects or administrators to explicitly revoke/invalidate an active authentication token, ensuring any subsequent presentation of the token is rejected with an HTTP 401 Unauthorized status.",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Directly requested in the user prompt ('with token revocation'). An explicit mechanism to invalidate issued tokens prior to natural expiration is the core functional requirement."
+    },
+    {
+      "requirement_id": "REQ-AUTH-01",
+      "title": "User Credential Verification and Token Issuance Endpoint",
+      "description": "The platform must provide an endpoint to accept subject identity credentials, verify their authenticity against stored credentials, and issue a signed or opaque authorization/session token upon successful verification.",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "IDENTITY_SECURITY",
+      "confidence": 0.99,
+      "justification": "Why-Chain: (1) The user prompt mandates an 'authentication platform', which intrinsically requires verifying identity claims. (2) Token revocation fundamentally requires that valid authentication tokens exist and are issued to authenticated subjects. (3) Therefore, a credential verification and token issuance interface is technically necessary to establish identity and generate revocable tokens."
+    },
+    {
+      "requirement_id": "REQ-SEC-01",
+      "title": "Cryptographic Password Hashing at Rest",
+      "description": "If user credentials include passwords or shared secrets, the platform must store them strictly using modern, salted, adaptive one-way cryptographic hashing algorithms (e.g., Argon2id or bcrypt with appropriate work factors) rather than plaintext or unsalted/fast hashes.",
+      "type": "SECURITY",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "SECURITY_BEST_PRACTICE",
+      "confidence": 0.95,
+      "justification": "Why-Chain: (1) The authentication platform must persist a reference secret to verify user credentials during authentication. (2) Storing plaintext or weakly hashed passwords exposes credentials to catastrophic compromise in the event of database exfiltration. (3) Therefore, slow, salted cryptographic hashing (Argon2id/bcrypt) is technically necessary to safeguard credential confidentiality at rest."
+    },
+    {
+      "requirement_id": "REQ-SEC-02",
+      "title": "Bounded Token Lifetime and Automatic Expiry (TTL)",
+      "description": "All issued authentication tokens must enforce an explicit bounded expiration timestamp (Time-To-Live / TTL), ensuring tokens automatically become invalid after a finite duration even in the absence of explicit revocation.",
+      "type": "INVARIANT",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "IDENTITY_SECURITY",
+      "confidence": 0.98,
+      "justification": "Why-Chain: (1) Tokens confer ambient authorization to resources without re-evaluating primary credentials on each request. (2) Tokens without an expiration boundary present an indefinite vulnerability window upon leakage and cause unbounded state growth for revocation tracking systems. (3) Therefore, enforcing an explicit TTL expiration boundary is technically necessary for bounded risk exposure and deterministic state cleanup."
+    },
+    {
+      "requirement_id": "REQ-AUDIT-01",
+      "title": "Security Audit Event Logging on Authentication and Revocation",
+      "description": "The platform must generate structured, tamper-evident audit records capturing all authentication attempts (success and failure), token issuance events, and explicit token revocation events, including timestamp, subject ID, client IP/agent, and outcome.",
+      "type": "SECURITY",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "SECURITY_AUDIT",
+      "confidence": 0.95,
+      "justification": "Why-Chain: (1) Authentication and revocation endpoints control critical identity state transitions and access boundaries. (2) Detecting credential brute-forcing, account takeover, token replay, or improper revocation requires forensic visibility into identity transactions. (3) Therefore, structured audit logging of auth and revocation events is technically necessary to maintain security observability, non-repudiation, and forensic traceability."
+    },
+    {
+      "requirement_id": "REQ-SEC-03",
+      "title": "Cryptographic Token Entropy and Unforgeability",
+      "description": "All issued tokens must be cryptographically unforgeable, generated using a cryptographically secure pseudorandom number generator (CSPRNG) with at least 128 bits of entropy (for opaque tokens) or signed using standard cryptographic signature algorithms (e.g., Ed25519, RS256, HMAC-SHA256 for signed tokens).",
+      "type": "SECURITY",
+      "epistemic_status": "SUPPORTED",
+      "provenance": "IDENTITY_SECURITY",
+      "confidence": 0.92,
+      "justification": "Why-Chain: (1) Tokens act as bearer authorization credentials within the authentication platform. (2) Low-entropy, predictable, or unsigned tokens allow adversaries to forge identity claims without authenticating. (3) Therefore, high cryptographic entropy or asymmetric/symmetric cryptographic signatures are supported architectural properties necessary to guarantee token authenticity."
+    },
+    {
+      "requirement_id": "REQ-UNK-ARCH-01",
+      "title": "Token Architecture: Stateless Signed Tokens vs Stateful Opaque Database Tokens",
+      "description": "Whether tokens must be implemented as stateless cryptographically signed payloads (e.g., JWT with JTI denylisting/revocation list in a distributed cache) or stateful opaque reference tokens (validated on every request against a centralized database/datastore) is unspecified.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 0.0,
+      "justification": "The prompt does not state latency requirements, horizontal scaling constraints, or storage models. Both stateless signed tokens with revocation denylists and stateful opaque tokens satisfy the token revocation requirement with distinct operational trade-offs; selecting one without domain specifications would be an ungrounded assumption."
+    },
+    {
+      "requirement_id": "REQ-UNK-MFA-02",
+      "title": "Multi-Factor Authentication (MFA / TOTP / WebAuthn) Enforcement",
+      "description": "Whether multi-factor authentication (e.g., TOTP, SMS OTP, FIDO2/WebAuthn hardware tokens) is required, optional, or unsupported for the authentication platform.",
+      "type": "SECURITY",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 0.0,
+      "justification": "The prompt asks for a baseline authentication platform with token revocation without specifying threat models, compliance mandates (e.g., PCI-DSS, SOC 2), or user risk tiers. Assuming MFA requirements without explicit user specification would be an ungrounded hallucination."
+    },
+    {
+      "requirement_id": "REQ-UNK-PROTO-03",
+      "title": "Identity Protocol Standard: OAuth 2.0 / OIDC vs SAML vs Custom REST",
+      "description": "Whether the platform must comply with formal identity specifications (such as OAuth 2.0 RFC 6749 and RFC 7009 Token Revocation, OpenID Connect Core 1.0, SAML 2.0) or provide a bespoke REST/RPC authentication interface.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 0.0,
+      "justification": "The prompt does not specify the integration ecosystem, whether third-party client delegation is needed, or if standardized federated protocols are mandated. Assuming a specific protocol standard (like OAuth 2.0 / RFC 7009) rather than surfacing it as an unstated domain configuration would violate epistemic restraint."
+    }
+  ]
+}

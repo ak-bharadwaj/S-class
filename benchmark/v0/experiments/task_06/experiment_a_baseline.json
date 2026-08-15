@@ -1,0 +1,2521 @@
+{
+  "experiment": "EXPERIMENT A \u2014 Current Baseline (Task 06)",
+  "raw_prompt": "Build a secure payment processing service.",
+  "gate_result": "PASS_WITH_DECISIONS",
+  "total_assumption_weight": 50,
+  "scope_tier": "moderate",
+  "archetypes": [
+    "greenfield"
+  ],
+  "total_requirements_count": 45,
+  "requirements_by_category": {
+    "explicit": 4,
+    "derived": 41
+  },
+  "flattened_requirements": [
+    {
+      "category": "explicit",
+      "title": "Unknown",
+      "type": "explicit",
+      "action": "create",
+      "why_chain": [],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "explicit",
+      "title": "Unknown",
+      "type": "explicit",
+      "action": "create",
+      "why_chain": [],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "explicit",
+      "title": "Unknown",
+      "type": "explicit",
+      "action": "create",
+      "why_chain": [],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "explicit",
+      "title": "Unknown",
+      "type": "explicit",
+      "action": "create",
+      "why_chain": [],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'manage' to action 'list_view'",
+        "Step 3: Feature 'secure' requires module 'secure_list_view'",
+        "Step 4: Derived requirement for user to list_view on secure"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'manage' to action 'create_form'",
+        "Step 3: Feature 'secure' requires module 'secure_create_form'",
+        "Step 4: Derived requirement for user to create_form on secure"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'manage' to action 'edit_form'",
+        "Step 3: Feature 'secure' requires module 'secure_edit_form'",
+        "Step 4: Derived requirement for user to edit_form on secure"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'manage' to action 'detail_view'",
+        "Step 3: Feature 'secure' requires module 'secure_detail_view'",
+        "Step 4: Derived requirement for user to detail_view on secure"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'manage' to action 'list_view'",
+        "Step 3: Feature 'payment' requires module 'payment_list_view'",
+        "Step 4: Derived requirement for user to list_view on payment"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'manage' to action 'create_form'",
+        "Step 3: Feature 'payment' requires module 'payment_create_form'",
+        "Step 4: Derived requirement for user to create_form on payment"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'manage' to action 'edit_form'",
+        "Step 3: Feature 'payment' requires module 'payment_edit_form'",
+        "Step 4: Derived requirement for user to edit_form on payment"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'manage' to action 'detail_view'",
+        "Step 3: Feature 'payment' requires module 'payment_detail_view'",
+        "Step 4: Derived requirement for user to detail_view on payment"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'manage' to action 'list_view'",
+        "Step 3: Feature 'processing' requires module 'processing_list_view'",
+        "Step 4: Derived requirement for user to list_view on processing"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'manage' to action 'create_form'",
+        "Step 3: Feature 'processing' requires module 'processing_create_form'",
+        "Step 4: Derived requirement for user to create_form on processing"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'manage' to action 'edit_form'",
+        "Step 3: Feature 'processing' requires module 'processing_edit_form'",
+        "Step 4: Derived requirement for user to edit_form on processing"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'manage' to action 'detail_view'",
+        "Step 3: Feature 'processing' requires module 'processing_detail_view'",
+        "Step 4: Derived requirement for user to detail_view on processing"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'manage' to action 'list_view'",
+        "Step 3: Feature 'service' requires module 'service_list_view'",
+        "Step 4: Derived requirement for user to list_view on service"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'manage' to action 'create_form'",
+        "Step 3: Feature 'service' requires module 'service_create_form'",
+        "Step 4: Derived requirement for user to create_form on service"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'manage' to action 'edit_form'",
+        "Step 3: Feature 'service' requires module 'service_edit_form'",
+        "Step 4: Derived requirement for user to edit_form on service"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Step 1: Identified role 'user' from user request",
+        "Step 2: Mapped verb 'manage' to action 'detail_view'",
+        "Step 3: Feature 'service' requires module 'service_detail_view'",
+        "Step 4: Derived requirement for user to detail_view on service"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for User Dashboard (/dashboard)",
+        "Layout type: metrics_grid",
+        "Composed components: MetricStatCardGrid, UpcomingEventsTimeline, QuickActionShortcuts, RecentActivityFeed"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for User Dashboard -> Overview",
+        "Input fields: kpiMetrics (object), announcements (array), pendingTasksCount (number), recentEvents (array)",
+        "Actions: Refresh Real-Time Metrics, Acknowledge Notification, Trigger Quick Action"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for User Dashboard",
+        "Endpoints: GET /api/dashboard/metrics, GET /api/dashboard/announcements, GET /api/notifications"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for User Self-Profile (/profile)",
+        "Layout type: tabbed_card_layout",
+        "Composed components: AvatarUploader, BioHeaderCard, PersonalDetailsTab, OrganizationalCredentialsTab"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for User Self-Profile -> Personal Details",
+        "Input fields: fullName (string), personalEmail (email), mobileNumber (tel), dob (date), gender (select)",
+        "Actions: Update Personal Info, Upload Avatar Image"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for User Self-Profile -> Organizational Credentials",
+        "Input fields: identifierCode (string, read-only), departmentUnit (string, read-only), roleTitle (string, read-only), onboardingDate (date)",
+        "Actions: Download Digital ID Card"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for User Self-Profile -> Security & Authentication",
+        "Input fields: currentPassword (password), newPassword (password), confirmPassword (password), twoFactorToggle (boolean)",
+        "Actions: Change Password, Revoke Active Sessions"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for User Self-Profile",
+        "Endpoints: GET /api/profile, PUT /api/profile, POST /api/profile/avatar"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for Payment Workspace (/payment)",
+        "Layout type: master_detail_grid",
+        "Composed components: PaymentDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for Payment Workspace -> Payment Directory",
+        "Input fields: paymentId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+        "Actions: Create Payment, Edit Payment, Archive Payment"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for Payment Workspace",
+        "Endpoints: GET /api/payments, POST /api/payments, GET /api/payments/{id}"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for Processing Workspace (/processing)",
+        "Layout type: master_detail_grid",
+        "Composed components: ProcessingDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for Processing Workspace -> Processing Directory",
+        "Input fields: processingId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+        "Actions: Create Processing, Edit Processing, Archive Processing"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for Processing Workspace",
+        "Endpoints: GET /api/processings, POST /api/processings, GET /api/processings/{id}"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for Service Workspace (/service)",
+        "Layout type: master_detail_grid",
+        "Composed components: ServiceDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for Service Workspace -> Service Directory",
+        "Input fields: serviceId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+        "Actions: Create Service, Edit Service, Archive Service"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for Service Workspace",
+        "Endpoints: GET /api/services, POST /api/services, GET /api/services/{id}"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Canonical Low-Level Design expansion for User Document Vault (/documents)",
+        "Layout type: document_vault",
+        "Composed components: FileUploadZone, VirusScanStatusPill, CategoryFolderTabs, DocumentPreviewModal"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Mandatory field definitions for User Document Vault -> Document Vault",
+        "Input fields: fileName (string), fileSizeBytes (number), fileCategory (select), uploadedBy (string), securityScanStatus (badge)",
+        "Actions: Upload Document, Download Document, Delete Document"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "REST API contract for User Document Vault",
+        "Endpoints: GET /api/documents, POST /api/documents/upload, DELETE /api/documents/{id}"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "All non-trivial projects require structured logging for debugging"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Input sanitization protects against injection and validation defects"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Unhandled exceptions lead to process crashes or blank UI screens"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Automated tests guarantee regressions are caught during CI"
+      ],
+      "provenance": "UNKNOWN"
+    },
+    {
+      "category": "derived",
+      "title": "Unknown",
+      "type": "derived",
+      "action": "create",
+      "why_chain": [
+        "Hardcoded secrets/config violate 12-Factor app methodology"
+      ],
+      "provenance": "UNKNOWN"
+    }
+  ],
+  "page_spreads_count": 8,
+  "low_level_designs_count": 6,
+  "scope_boundaries": {
+    "in_scope": [
+      "Integration of Payment Gateway requested by user"
+    ],
+    "out_of_scope": [
+      "Unrequested Gamification (No Gamification Rewards Engine / User Badges & XP)",
+      "Unrequested Ai Chatbot (No AI Assistant Chatbot / LLM Integration Widget)",
+      "Unrequested Crypto Web3 (No Crypto Wallet Connect / Web3 Smart Contract Interaction)",
+      "Unrequested Social Oauth (No Third-Party Social OAuth Integrations)"
+    ]
+  },
+  "questions_for_human": [
+    "Clarify scope/boundary for REQ-BASE-0: Implement feature: secure"
+  ],
+  "acceptance_criteria": [
+    "Verify that Implement feature: secure is functioning as expected.",
+    "Verify that Implement feature: payment is functioning as expected.",
+    "Verify that Implement feature: processing is functioning as expected.",
+    "Verify that Implement feature: service is functioning as expected.",
+    "Verify that role 'user' can access all assigned capabilities without permission errors."
+  ],
+  "raw_synthesized_spec": {
+    "intent_summary": "Implement features for roles: ['user']. Archetypes: ['greenfield']",
+    "requirements": {
+      "explicit": [
+        {
+          "id": "REQ-BASE-0",
+          "description": "Implement feature: secure",
+          "type": "explicit",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "must_ask",
+          "evidence": [
+            {
+              "source_file": "user_request",
+              "section": null,
+              "reference_text": "secure",
+              "line_number": null
+            }
+          ],
+          "why_chain": [],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [],
+          "consequences": [
+            "REQ-EXP-1",
+            "REQ-EXP-2",
+            "REQ-EXP-3",
+            "REQ-EXP-4",
+            "REQ-EXP-5",
+            "REQ-EXP-6",
+            "REQ-EXP-7",
+            "REQ-EXP-8",
+            "REQ-EXP-9",
+            "REQ-EXP-10",
+            "REQ-EXP-11",
+            "REQ-EXP-12",
+            "REQ-EXP-13",
+            "REQ-EXP-14",
+            "REQ-EXP-15",
+            "REQ-EXP-16",
+            "REQ-LLD-COMP-1",
+            "REQ-LLD-FIELDS-2",
+            "REQ-LLD-API-3",
+            "REQ-LLD-COMP-4",
+            "REQ-LLD-FIELDS-5",
+            "REQ-LLD-FIELDS-6",
+            "REQ-LLD-FIELDS-7",
+            "REQ-LLD-API-8",
+            "REQ-LLD-COMP-9",
+            "REQ-LLD-FIELDS-10",
+            "REQ-LLD-API-11",
+            "REQ-LLD-COMP-12",
+            "REQ-LLD-FIELDS-13",
+            "REQ-LLD-API-14",
+            "REQ-LLD-COMP-15",
+            "REQ-LLD-FIELDS-16",
+            "REQ-LLD-API-17",
+            "REQ-LLD-COMP-18",
+            "REQ-LLD-FIELDS-19",
+            "REQ-LLD-API-20",
+            "REQ-INF-UNI-001",
+            "REQ-INF-UNI-002",
+            "REQ-INF-UNI-003",
+            "REQ-INF-UNI-004",
+            "REQ-INF-UNI-005"
+          ],
+          "assumption_type": null
+        },
+        {
+          "id": "REQ-BASE-1",
+          "description": "Implement feature: payment",
+          "type": "explicit",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "user_request",
+              "section": null,
+              "reference_text": "payment",
+              "line_number": null
+            }
+          ],
+          "why_chain": [],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [],
+          "consequences": [
+            "REQ-EXP-1",
+            "REQ-EXP-2",
+            "REQ-EXP-3",
+            "REQ-EXP-4",
+            "REQ-EXP-5",
+            "REQ-EXP-6",
+            "REQ-EXP-7",
+            "REQ-EXP-8",
+            "REQ-EXP-9",
+            "REQ-EXP-10",
+            "REQ-EXP-11",
+            "REQ-EXP-12",
+            "REQ-EXP-13",
+            "REQ-EXP-14",
+            "REQ-EXP-15",
+            "REQ-EXP-16",
+            "REQ-LLD-COMP-1",
+            "REQ-LLD-FIELDS-2",
+            "REQ-LLD-API-3",
+            "REQ-LLD-COMP-4",
+            "REQ-LLD-FIELDS-5",
+            "REQ-LLD-FIELDS-6",
+            "REQ-LLD-FIELDS-7",
+            "REQ-LLD-API-8",
+            "REQ-LLD-COMP-9",
+            "REQ-LLD-FIELDS-10",
+            "REQ-LLD-API-11",
+            "REQ-LLD-COMP-12",
+            "REQ-LLD-FIELDS-13",
+            "REQ-LLD-API-14",
+            "REQ-LLD-COMP-15",
+            "REQ-LLD-FIELDS-16",
+            "REQ-LLD-API-17",
+            "REQ-LLD-COMP-18",
+            "REQ-LLD-FIELDS-19",
+            "REQ-LLD-API-20",
+            "REQ-INF-UNI-001",
+            "REQ-INF-UNI-002",
+            "REQ-INF-UNI-003",
+            "REQ-INF-UNI-004",
+            "REQ-INF-UNI-005"
+          ],
+          "assumption_type": null
+        },
+        {
+          "id": "REQ-BASE-2",
+          "description": "Implement feature: processing",
+          "type": "explicit",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "user_request",
+              "section": null,
+              "reference_text": "processing",
+              "line_number": null
+            }
+          ],
+          "why_chain": [],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [],
+          "consequences": [
+            "REQ-EXP-1",
+            "REQ-EXP-2",
+            "REQ-EXP-3",
+            "REQ-EXP-4",
+            "REQ-EXP-5",
+            "REQ-EXP-6",
+            "REQ-EXP-7",
+            "REQ-EXP-8",
+            "REQ-EXP-9",
+            "REQ-EXP-10",
+            "REQ-EXP-11",
+            "REQ-EXP-12",
+            "REQ-EXP-13",
+            "REQ-EXP-14",
+            "REQ-EXP-15",
+            "REQ-EXP-16",
+            "REQ-LLD-COMP-1",
+            "REQ-LLD-FIELDS-2",
+            "REQ-LLD-API-3",
+            "REQ-LLD-COMP-4",
+            "REQ-LLD-FIELDS-5",
+            "REQ-LLD-FIELDS-6",
+            "REQ-LLD-FIELDS-7",
+            "REQ-LLD-API-8",
+            "REQ-LLD-COMP-9",
+            "REQ-LLD-FIELDS-10",
+            "REQ-LLD-API-11",
+            "REQ-LLD-COMP-12",
+            "REQ-LLD-FIELDS-13",
+            "REQ-LLD-API-14",
+            "REQ-LLD-COMP-15",
+            "REQ-LLD-FIELDS-16",
+            "REQ-LLD-API-17",
+            "REQ-LLD-COMP-18",
+            "REQ-LLD-FIELDS-19",
+            "REQ-LLD-API-20",
+            "REQ-INF-UNI-001",
+            "REQ-INF-UNI-002",
+            "REQ-INF-UNI-003",
+            "REQ-INF-UNI-004",
+            "REQ-INF-UNI-005"
+          ],
+          "assumption_type": null
+        },
+        {
+          "id": "REQ-BASE-3",
+          "description": "Implement feature: service",
+          "type": "explicit",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "user_request",
+              "section": null,
+              "reference_text": "service",
+              "line_number": null
+            }
+          ],
+          "why_chain": [],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [],
+          "consequences": [
+            "REQ-EXP-1",
+            "REQ-EXP-2",
+            "REQ-EXP-3",
+            "REQ-EXP-4",
+            "REQ-EXP-5",
+            "REQ-EXP-6",
+            "REQ-EXP-7",
+            "REQ-EXP-8",
+            "REQ-EXP-9",
+            "REQ-EXP-10",
+            "REQ-EXP-11",
+            "REQ-EXP-12",
+            "REQ-EXP-13",
+            "REQ-EXP-14",
+            "REQ-EXP-15",
+            "REQ-EXP-16",
+            "REQ-LLD-COMP-1",
+            "REQ-LLD-FIELDS-2",
+            "REQ-LLD-API-3",
+            "REQ-LLD-COMP-4",
+            "REQ-LLD-FIELDS-5",
+            "REQ-LLD-FIELDS-6",
+            "REQ-LLD-FIELDS-7",
+            "REQ-LLD-API-8",
+            "REQ-LLD-COMP-9",
+            "REQ-LLD-FIELDS-10",
+            "REQ-LLD-API-11",
+            "REQ-LLD-COMP-12",
+            "REQ-LLD-FIELDS-13",
+            "REQ-LLD-API-14",
+            "REQ-LLD-COMP-15",
+            "REQ-LLD-FIELDS-16",
+            "REQ-LLD-API-17",
+            "REQ-LLD-COMP-18",
+            "REQ-LLD-FIELDS-19",
+            "REQ-LLD-API-20",
+            "REQ-INF-UNI-001",
+            "REQ-INF-UNI-002",
+            "REQ-INF-UNI-003",
+            "REQ-INF-UNI-004",
+            "REQ-INF-UNI-005"
+          ],
+          "assumption_type": null
+        }
+      ],
+      "derived": [
+        {
+          "id": "REQ-EXP-1",
+          "description": "Role 'user' needs list_view capability for secure",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'manage' to action 'list_view'",
+            "Step 3: Feature 'secure' requires module 'secure_list_view'",
+            "Step 4: Derived requirement for user to list_view on secure"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-EXP-2",
+          "description": "Role 'user' needs create_form capability for secure",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'manage' to action 'create_form'",
+            "Step 3: Feature 'secure' requires module 'secure_create_form'",
+            "Step 4: Derived requirement for user to create_form on secure"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-EXP-3",
+          "description": "Role 'user' needs edit_form capability for secure",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'manage' to action 'edit_form'",
+            "Step 3: Feature 'secure' requires module 'secure_edit_form'",
+            "Step 4: Derived requirement for user to edit_form on secure"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-EXP-4",
+          "description": "Role 'user' needs detail_view capability for secure",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'manage' to action 'detail_view'",
+            "Step 3: Feature 'secure' requires module 'secure_detail_view'",
+            "Step 4: Derived requirement for user to detail_view on secure"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-EXP-5",
+          "description": "Role 'user' needs list_view capability for payment",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'manage' to action 'list_view'",
+            "Step 3: Feature 'payment' requires module 'payment_list_view'",
+            "Step 4: Derived requirement for user to list_view on payment"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-EXP-6",
+          "description": "Role 'user' needs create_form capability for payment",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'manage' to action 'create_form'",
+            "Step 3: Feature 'payment' requires module 'payment_create_form'",
+            "Step 4: Derived requirement for user to create_form on payment"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-EXP-7",
+          "description": "Role 'user' needs edit_form capability for payment",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'manage' to action 'edit_form'",
+            "Step 3: Feature 'payment' requires module 'payment_edit_form'",
+            "Step 4: Derived requirement for user to edit_form on payment"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-EXP-8",
+          "description": "Role 'user' needs detail_view capability for payment",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'manage' to action 'detail_view'",
+            "Step 3: Feature 'payment' requires module 'payment_detail_view'",
+            "Step 4: Derived requirement for user to detail_view on payment"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-EXP-9",
+          "description": "Role 'user' needs list_view capability for processing",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'manage' to action 'list_view'",
+            "Step 3: Feature 'processing' requires module 'processing_list_view'",
+            "Step 4: Derived requirement for user to list_view on processing"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-EXP-10",
+          "description": "Role 'user' needs create_form capability for processing",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'manage' to action 'create_form'",
+            "Step 3: Feature 'processing' requires module 'processing_create_form'",
+            "Step 4: Derived requirement for user to create_form on processing"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-EXP-11",
+          "description": "Role 'user' needs edit_form capability for processing",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'manage' to action 'edit_form'",
+            "Step 3: Feature 'processing' requires module 'processing_edit_form'",
+            "Step 4: Derived requirement for user to edit_form on processing"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-EXP-12",
+          "description": "Role 'user' needs detail_view capability for processing",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'manage' to action 'detail_view'",
+            "Step 3: Feature 'processing' requires module 'processing_detail_view'",
+            "Step 4: Derived requirement for user to detail_view on processing"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-EXP-13",
+          "description": "Role 'user' needs list_view capability for service",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'manage' to action 'list_view'",
+            "Step 3: Feature 'service' requires module 'service_list_view'",
+            "Step 4: Derived requirement for user to list_view on service"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-EXP-14",
+          "description": "Role 'user' needs create_form capability for service",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'manage' to action 'create_form'",
+            "Step 3: Feature 'service' requires module 'service_create_form'",
+            "Step 4: Derived requirement for user to create_form on service"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-EXP-15",
+          "description": "Role 'user' needs edit_form capability for service",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'manage' to action 'edit_form'",
+            "Step 3: Feature 'service' requires module 'service_edit_form'",
+            "Step 4: Derived requirement for user to edit_form on service"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-EXP-16",
+          "description": "Role 'user' needs detail_view capability for service",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Step 1: Identified role 'user' from user request",
+            "Step 2: Mapped verb 'manage' to action 'detail_view'",
+            "Step 3: Feature 'service' requires module 'service_detail_view'",
+            "Step 4: Derived requirement for user to detail_view on service"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-LLD-COMP-1",
+          "description": "[USER] User Dashboard \u2014 UI Component Hierarchy: MetricStatCardGrid, UpcomingEventsTimeline, QuickActionShortcuts, RecentActivityFeed",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for User Dashboard",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for User Dashboard (/dashboard)",
+            "Layout type: metrics_grid",
+            "Composed components: MetricStatCardGrid, UpcomingEventsTimeline, QuickActionShortcuts, RecentActivityFeed"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-2",
+          "description": "[USER] User Dashboard (Overview) \u2014 Form Fields: kpiMetrics (object), announcements (array), pendingTasksCount (number), recentEvents (array) | Actions: Refresh Real-Time Metrics, Acknowledge Notification, Trigger Quick Action",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for User Dashboard -> Overview",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for User Dashboard -> Overview",
+            "Input fields: kpiMetrics (object), announcements (array), pendingTasksCount (number), recentEvents (array)",
+            "Actions: Refresh Real-Time Metrics, Acknowledge Notification, Trigger Quick Action"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-3",
+          "description": "[USER] User Dashboard \u2014 Backing REST APIs: GET /api/dashboard/metrics, GET /api/dashboard/announcements, GET /api/notifications",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for User Dashboard",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for User Dashboard",
+            "Endpoints: GET /api/dashboard/metrics, GET /api/dashboard/announcements, GET /api/notifications"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-4",
+          "description": "[USER] User Self-Profile \u2014 UI Component Hierarchy: AvatarUploader, BioHeaderCard, PersonalDetailsTab, OrganizationalCredentialsTab",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for User Self-Profile",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for User Self-Profile (/profile)",
+            "Layout type: tabbed_card_layout",
+            "Composed components: AvatarUploader, BioHeaderCard, PersonalDetailsTab, OrganizationalCredentialsTab"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-5",
+          "description": "[USER] User Self-Profile (Personal Details) \u2014 Form Fields: fullName (string), personalEmail (email), mobileNumber (tel), dob (date), gender (select) | Actions: Update Personal Info, Upload Avatar Image",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for User Self-Profile -> Personal Details",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for User Self-Profile -> Personal Details",
+            "Input fields: fullName (string), personalEmail (email), mobileNumber (tel), dob (date), gender (select)",
+            "Actions: Update Personal Info, Upload Avatar Image"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-6",
+          "description": "[USER] User Self-Profile (Organizational Credentials) \u2014 Form Fields: identifierCode (string, read-only), departmentUnit (string, read-only), roleTitle (string, read-only), onboardingDate (date) | Actions: Download Digital ID Card",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for User Self-Profile -> Organizational Credentials",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for User Self-Profile -> Organizational Credentials",
+            "Input fields: identifierCode (string, read-only), departmentUnit (string, read-only), roleTitle (string, read-only), onboardingDate (date)",
+            "Actions: Download Digital ID Card"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-7",
+          "description": "[USER] User Self-Profile (Security & Authentication) \u2014 Form Fields: currentPassword (password), newPassword (password), confirmPassword (password), twoFactorToggle (boolean) | Actions: Change Password, Revoke Active Sessions",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for User Self-Profile -> Security & Authentication",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for User Self-Profile -> Security & Authentication",
+            "Input fields: currentPassword (password), newPassword (password), confirmPassword (password), twoFactorToggle (boolean)",
+            "Actions: Change Password, Revoke Active Sessions"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-8",
+          "description": "[USER] User Self-Profile \u2014 Backing REST APIs: GET /api/profile, PUT /api/profile, POST /api/profile/avatar",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for User Self-Profile",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for User Self-Profile",
+            "Endpoints: GET /api/profile, PUT /api/profile, POST /api/profile/avatar"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-9",
+          "description": "[USER] Payment Workspace \u2014 UI Component Hierarchy: PaymentDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for Payment Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for Payment Workspace (/payment)",
+            "Layout type: master_detail_grid",
+            "Composed components: PaymentDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-10",
+          "description": "[USER] Payment Workspace (Payment Directory) \u2014 Form Fields: paymentId (string), title / name (string), status (badge), categoryType (select), assignedTo (string) | Actions: Create Payment, Edit Payment, Archive Payment",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for Payment Workspace -> Payment Directory",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for Payment Workspace -> Payment Directory",
+            "Input fields: paymentId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+            "Actions: Create Payment, Edit Payment, Archive Payment"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-11",
+          "description": "[USER] Payment Workspace \u2014 Backing REST APIs: GET /api/payments, POST /api/payments, GET /api/payments/{id}",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for Payment Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for Payment Workspace",
+            "Endpoints: GET /api/payments, POST /api/payments, GET /api/payments/{id}"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-12",
+          "description": "[USER] Processing Workspace \u2014 UI Component Hierarchy: ProcessingDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for Processing Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for Processing Workspace (/processing)",
+            "Layout type: master_detail_grid",
+            "Composed components: ProcessingDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-13",
+          "description": "[USER] Processing Workspace (Processing Directory) \u2014 Form Fields: processingId (string), title / name (string), status (badge), categoryType (select), assignedTo (string) | Actions: Create Processing, Edit Processing, Archive Processing",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for Processing Workspace -> Processing Directory",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for Processing Workspace -> Processing Directory",
+            "Input fields: processingId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+            "Actions: Create Processing, Edit Processing, Archive Processing"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-14",
+          "description": "[USER] Processing Workspace \u2014 Backing REST APIs: GET /api/processings, POST /api/processings, GET /api/processings/{id}",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for Processing Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for Processing Workspace",
+            "Endpoints: GET /api/processings, POST /api/processings, GET /api/processings/{id}"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-15",
+          "description": "[USER] Service Workspace \u2014 UI Component Hierarchy: ServiceDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for Service Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for Service Workspace (/service)",
+            "Layout type: master_detail_grid",
+            "Composed components: ServiceDataGrid, SearchFilterBar, DetailInspectorDrawer, CreateEntityModal"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-16",
+          "description": "[USER] Service Workspace (Service Directory) \u2014 Form Fields: serviceId (string), title / name (string), status (badge), categoryType (select), assignedTo (string) | Actions: Create Service, Edit Service, Archive Service",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for Service Workspace -> Service Directory",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for Service Workspace -> Service Directory",
+            "Input fields: serviceId (string), title / name (string), status (badge), categoryType (select), assignedTo (string)",
+            "Actions: Create Service, Edit Service, Archive Service"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-17",
+          "description": "[USER] Service Workspace \u2014 Backing REST APIs: GET /api/services, POST /api/services, GET /api/services/{id}",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for Service Workspace",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for Service Workspace",
+            "Endpoints: GET /api/services, POST /api/services, GET /api/services/{id}"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-LLD-COMP-18",
+          "description": "[USER] User Document Vault \u2014 UI Component Hierarchy: FileUploadZone, VirusScanStatusPill, CategoryFolderTabs, DocumentPreviewModal",
+          "type": "derived",
+          "category": "ux_derivation",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "UI hierarchy for User Document Vault",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Canonical Low-Level Design expansion for User Document Vault (/documents)",
+            "Layout type: document_vault",
+            "Composed components: FileUploadZone, VirusScanStatusPill, CategoryFolderTabs, DocumentPreviewModal"
+          ],
+          "affects": [
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "ux"
+        },
+        {
+          "id": "REQ-LLD-FIELDS-19",
+          "description": "[USER] User Document Vault (Document Vault) \u2014 Form Fields: fileName (string), fileSizeBytes (number), fileCategory (select), uploadedBy (string), securityScanStatus (badge) | Actions: Upload Document, Download Document, Delete Document",
+          "type": "derived",
+          "category": "product_requirement",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "Fields for User Document Vault -> Document Vault",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "Mandatory field definitions for User Document Vault -> Document Vault",
+            "Input fields: fileName (string), fileSizeBytes (number), fileCategory (select), uploadedBy (string), securityScanStatus (badge)",
+            "Actions: Upload Document, Download Document, Delete Document"
+          ],
+          "affects": [
+            "frontend",
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "data"
+        },
+        {
+          "id": "REQ-LLD-API-20",
+          "description": "[USER] User Document Vault \u2014 Backing REST APIs: GET /api/documents, POST /api/documents/upload, DELETE /api/documents/{id}",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [
+            {
+              "source_file": "canonical_domain_ontology",
+              "section": null,
+              "reference_text": "REST endpoints for User Document Vault",
+              "line_number": null
+            }
+          ],
+          "why_chain": [
+            "REST API contract for User Document Vault",
+            "Endpoints: GET /api/documents, POST /api/documents/upload, DELETE /api/documents/{id}"
+          ],
+          "affects": [
+            "backend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "api"
+        },
+        {
+          "id": "REQ-INF-UNI-001",
+          "description": "Implement structured JSON logging across all execution paths",
+          "type": "derived",
+          "category": "system_invariant",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "All non-trivial projects require structured logging for debugging"
+          ],
+          "affects": [
+            "backend",
+            "observability"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "architecture"
+        },
+        {
+          "id": "REQ-INF-UNI-002",
+          "description": "Sanitize and validate all external inputs at system boundaries",
+          "type": "derived",
+          "category": "system_invariant",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Input sanitization protects against injection and validation defects"
+          ],
+          "affects": [
+            "backend",
+            "validation"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "permission"
+        },
+        {
+          "id": "REQ-INF-UNI-003",
+          "description": "Catch unhandled exceptions and return structured error envelopes",
+          "type": "derived",
+          "category": "system_invariant",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Unhandled exceptions lead to process crashes or blank UI screens"
+          ],
+          "affects": [
+            "backend",
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-INF-UNI-004",
+          "description": "Maintain unit and integration test coverage for primary workflows",
+          "type": "derived",
+          "category": "system_invariant",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Automated tests guarantee regressions are caught during CI"
+          ],
+          "affects": [
+            "tests",
+            "backend",
+            "frontend"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "behavior"
+        },
+        {
+          "id": "REQ-INF-UNI-005",
+          "description": "Decouple configuration from code using environment variables",
+          "type": "derived",
+          "category": "architectural_constraint",
+          "action": "create",
+          "decision_threshold": "auto",
+          "evidence": [],
+          "why_chain": [
+            "Hardcoded secrets/config violate 12-Factor app methodology"
+          ],
+          "affects": [
+            "config",
+            "backend",
+            "infrastructure"
+          ],
+          "depends_on": [
+            "REQ-BASE-0",
+            "REQ-BASE-1",
+            "REQ-BASE-2",
+            "REQ-BASE-3"
+          ],
+          "consequences": [],
+          "assumption_type": "architecture"
+        }
+      ]
+    },
+    "affected_systems": {
+      "frontend": [
+        "REQ-BASE-0",
+        "REQ-BASE-1",
+        "REQ-BASE-2",
+        "REQ-BASE-3",
+        "REQ-EXP-1",
+        "REQ-EXP-2",
+        "REQ-EXP-3",
+        "REQ-EXP-4",
+        "REQ-EXP-5",
+        "REQ-EXP-6",
+        "REQ-EXP-7",
+        "REQ-EXP-8",
+        "REQ-EXP-9",
+        "REQ-EXP-10",
+        "REQ-EXP-11",
+        "REQ-EXP-12",
+        "REQ-EXP-13",
+        "REQ-EXP-14",
+        "REQ-EXP-15",
+        "REQ-EXP-16",
+        "REQ-LLD-COMP-1",
+        "REQ-LLD-FIELDS-2",
+        "REQ-LLD-COMP-4",
+        "REQ-LLD-FIELDS-5",
+        "REQ-LLD-FIELDS-6",
+        "REQ-LLD-FIELDS-7",
+        "REQ-LLD-COMP-9",
+        "REQ-LLD-FIELDS-10",
+        "REQ-LLD-COMP-12",
+        "REQ-LLD-FIELDS-13",
+        "REQ-LLD-COMP-15",
+        "REQ-LLD-FIELDS-16",
+        "REQ-LLD-COMP-18",
+        "REQ-LLD-FIELDS-19",
+        "REQ-INF-UNI-003",
+        "REQ-INF-UNI-004"
+      ],
+      "backend": [
+        "REQ-BASE-0",
+        "REQ-BASE-1",
+        "REQ-BASE-2",
+        "REQ-BASE-3",
+        "REQ-EXP-1",
+        "REQ-EXP-2",
+        "REQ-EXP-3",
+        "REQ-EXP-4",
+        "REQ-EXP-5",
+        "REQ-EXP-6",
+        "REQ-EXP-7",
+        "REQ-EXP-8",
+        "REQ-EXP-9",
+        "REQ-EXP-10",
+        "REQ-EXP-11",
+        "REQ-EXP-12",
+        "REQ-EXP-13",
+        "REQ-EXP-14",
+        "REQ-EXP-15",
+        "REQ-EXP-16",
+        "REQ-LLD-FIELDS-2",
+        "REQ-LLD-API-3",
+        "REQ-LLD-FIELDS-5",
+        "REQ-LLD-FIELDS-6",
+        "REQ-LLD-FIELDS-7",
+        "REQ-LLD-API-8",
+        "REQ-LLD-FIELDS-10",
+        "REQ-LLD-API-11",
+        "REQ-LLD-FIELDS-13",
+        "REQ-LLD-API-14",
+        "REQ-LLD-FIELDS-16",
+        "REQ-LLD-API-17",
+        "REQ-LLD-FIELDS-19",
+        "REQ-LLD-API-20",
+        "REQ-INF-UNI-001",
+        "REQ-INF-UNI-002",
+        "REQ-INF-UNI-003",
+        "REQ-INF-UNI-004",
+        "REQ-INF-UNI-005"
+      ],
+      "database": [],
+      "auth": [],
+      "infrastructure": [
+        "REQ-INF-UNI-005"
+      ],
+      "observability": [
+        "REQ-INF-UNI-001"
+      ],
+      "validation": [
+        "REQ-INF-UNI-002"
+      ],
+      "tests": [
+        "REQ-INF-UNI-004"
+      ],
+      "config": [
+        "REQ-INF-UNI-005"
+      ]
+    },
+    "conflicts": [],
+    "questions_for_human": [
+      "Clarify scope/boundary for REQ-BASE-0: Implement feature: secure"
+    ],
+    "acceptance_criteria": [
+      "Verify that Implement feature: secure is functioning as expected.",
+      "Verify that Implement feature: payment is functioning as expected.",
+      "Verify that Implement feature: processing is functioning as expected.",
+      "Verify that Implement feature: service is functioning as expected.",
+      "Verify that role 'user' can access all assigned capabilities without permission errors."
+    ],
+    "gate_result": "PASS_WITH_DECISIONS",
+    "total_assumption_weight": 50,
+    "archetypes": [
+      "greenfield"
+    ],
+    "scope_tier": "moderate",
+    "spec_version": 1,
+    "page_spreads": {
+      "user": [
+        {
+          "route": "/dashboard",
+          "page_name": "User Dashboard",
+          "module_key": "dashboard",
+          "description": "Operational metrics, tasks, and real-time updates for user"
+        },
+        {
+          "route": "/profile",
+          "page_name": "User Self-Profile",
+          "module_key": "profile",
+          "description": "Account profile, contact details, and credentials for user"
+        },
+        {
+          "route": "/payment",
+          "page_name": "Payment Workspace",
+          "module_key": "payment",
+          "description": "Manage and interact with Payment"
+        },
+        {
+          "route": "/processing",
+          "page_name": "Processing Workspace",
+          "module_key": "processing",
+          "description": "Manage and interact with Processing"
+        },
+        {
+          "route": "/service",
+          "page_name": "Service Workspace",
+          "module_key": "service",
+          "description": "Manage and interact with Service"
+        },
+        {
+          "route": "/documents",
+          "page_name": "User Document Vault",
+          "module_key": "documents",
+          "description": "File uploads, records, and digital receipts for user"
+        },
+        {
+          "page_name": "User Payment Management Context",
+          "route": "/user/payment_management_context",
+          "owned_capabilities": [
+            "query_operator_inspect_payment"
+          ],
+          "owned_entities": [
+            "payment"
+          ],
+          "module_key": "Payment Management Context",
+          "description": "Payment Management Context management workspace for user",
+          "architecture_style": "Modular Monolith with Bounded Contexts"
+        },
+        {
+          "page_name": "User Secure Management Context",
+          "route": "/user/secure_management_context",
+          "owned_capabilities": [
+            "query_operator_inspect_secure"
+          ],
+          "owned_entities": [
+            "secure"
+          ],
+          "module_key": "Secure Management Context",
+          "description": "Secure Management Context management workspace for user",
+          "architecture_style": "Modular Monolith with Bounded Contexts"
+        }
+      ]
+    },
+    "low_level_designs": {
+      "ctrl_ctx_payment_management": {
+        "id": "ctrl_ctx_payment_management",
+        "name": "Payment Management Context Controller",
+        "component_type": "controller",
+        "parent": {
+          "hld_id": "ctx_payment_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "backend_controller",
+        "transport": "rest_http",
+        "route": "/api/payments",
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "Verify actor authorization",
+          "Validate request payload schema"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "payment"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_payment"
+        ],
+        "capability_bindings": [],
+        "component_hash": "0c63007a850c4370ef1cbeead364dac5ddcd01c367f8f2dcabb5c3708d37bef5"
+      },
+      "svc_ctx_payment_management": {
+        "id": "svc_ctx_payment_management",
+        "name": "Payment Management Context Service Layer",
+        "component_type": "service",
+        "parent": {
+          "hld_id": "ctx_payment_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "domain_service",
+        "transport": "internal_function",
+        "route": null,
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [
+          "Payment Management ContextTransactionManager",
+          "Payment Management ContextPolicyEvaluator"
+        ],
+        "api_endpoints": [],
+        "validation_rules": [
+          "Enforce state pre/post transitions",
+          "Emit audit log side effects"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "payment"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_payment"
+        ],
+        "capability_bindings": [],
+        "component_hash": "1e407664b7cb844c65de0c1e2a9360deeb2bd3618f323f364918762bb537d967"
+      },
+      "ui_ctx_payment_management": {
+        "id": "ui_ctx_payment_management",
+        "name": "Payment Workflow Interface",
+        "component_type": "ui_surface",
+        "parent": {
+          "hld_id": "ctx_payment_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "frontend_interface",
+        "transport": "rest_http",
+        "route": "/payments",
+        "layout": "behavioral_workflow_surface",
+        "execution_capability": null,
+        "interaction_capability": "SUBMITS_MUTATION",
+        "sub_components": [
+          "PaymentDetailHeader",
+          "PaymentActionToolbar",
+          "PaymentAuditHistoryPanel"
+        ],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "UI actions trigger backend transport contracts"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "READ_QUERY",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "payment"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_payment"
+        ],
+        "capability_bindings": [],
+        "component_hash": "55b276cb235f1f1c73dc0783b303b8cd5e565699eb4e789ab3bb016fe4de0bac"
+      },
+      "ctrl_ctx_secure_management": {
+        "id": "ctrl_ctx_secure_management",
+        "name": "Secure Management Context Controller",
+        "component_type": "controller",
+        "parent": {
+          "hld_id": "ctx_secure_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "backend_controller",
+        "transport": "rest_http",
+        "route": "/api/secures",
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "Verify actor authorization",
+          "Validate request payload schema"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "secure"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_secure"
+        ],
+        "capability_bindings": [],
+        "component_hash": "b05db204181bfbaf9926fd8a76a3dbb4057d92e32d19a2486e55fe486aa9f8fc"
+      },
+      "svc_ctx_secure_management": {
+        "id": "svc_ctx_secure_management",
+        "name": "Secure Management Context Service Layer",
+        "component_type": "service",
+        "parent": {
+          "hld_id": "ctx_secure_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "domain_service",
+        "transport": "internal_function",
+        "route": null,
+        "layout": "standard_view",
+        "execution_capability": "MUTATE",
+        "interaction_capability": null,
+        "sub_components": [
+          "Secure Management ContextTransactionManager",
+          "Secure Management ContextPolicyEvaluator"
+        ],
+        "api_endpoints": [],
+        "validation_rules": [
+          "Enforce state pre/post transitions",
+          "Emit audit log side effects"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "secure"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_secure"
+        ],
+        "capability_bindings": [],
+        "component_hash": "32de7e6987ed11b79ee3aa93a46d0fb136682fdb69eb92706a0408c06a86edae"
+      },
+      "ui_ctx_secure_management": {
+        "id": "ui_ctx_secure_management",
+        "name": "Secure Workflow Interface",
+        "component_type": "ui_surface",
+        "parent": {
+          "hld_id": "ctx_secure_management",
+          "req_ids": [],
+          "behavior_ids": []
+        },
+        "role": "frontend_interface",
+        "transport": "rest_http",
+        "route": "/secures",
+        "layout": "behavioral_workflow_surface",
+        "execution_capability": null,
+        "interaction_capability": "SUBMITS_MUTATION",
+        "sub_components": [
+          "SecureDetailHeader",
+          "SecureActionToolbar",
+          "SecureAuditHistoryPanel"
+        ],
+        "api_endpoints": [
+          "PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE"
+        ],
+        "validation_rules": [
+          "UI actions trigger backend transport contracts"
+        ],
+        "reasoning_graph": [],
+        "allowed_operation_classes": [
+          "COMMAND_MUTATION",
+          "READ_QUERY",
+          "STATE_TRANSITION"
+        ],
+        "owned_entities": [
+          "secure"
+        ],
+        "owned_capabilities": [
+          "query_operator_inspect_secure"
+        ],
+        "capability_bindings": [],
+        "component_hash": "1317f888199fd90c264864ba123a2f0ead0f51afcb62951c19586de246072313"
+      }
+    },
+    "scope_boundaries": {
+      "in_scope": [
+        "Integration of Payment Gateway requested by user"
+      ],
+      "out_of_scope": [
+        "Unrequested Gamification (No Gamification Rewards Engine / User Badges & XP)",
+        "Unrequested Ai Chatbot (No AI Assistant Chatbot / LLM Integration Widget)",
+        "Unrequested Crypto Web3 (No Crypto Wallet Connect / Web3 Smart Contract Interaction)",
+        "Unrequested Social Oauth (No Third-Party Social OAuth Integrations)"
+      ]
+    },
+    "domain_graph": {
+      "nodes": [
+        {
+          "id": "actor_operator",
+          "name": "Operator",
+          "primitive_type": "actor",
+          "attributes": {},
+          "provenance": "explicit",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "description": "System actor: operator"
+        },
+        {
+          "id": "entity_payment",
+          "name": "Payment",
+          "primitive_type": "entity",
+          "attributes": {},
+          "provenance": "explicit",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "description": "Core domain entity: payment"
+        },
+        {
+          "id": "entity_secure",
+          "name": "Secure",
+          "primitive_type": "entity",
+          "attributes": {},
+          "provenance": "explicit",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "description": "Core domain entity: secure"
+        }
+      ],
+      "edges": [
+        {
+          "source_id": "actor_operator",
+          "relation": "authorized_for",
+          "target_id": "entity_payment",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        },
+        {
+          "source_id": "actor_operator",
+          "relation": "authorized_for",
+          "target_id": "entity_secure",
+          "provenance": "strongly_derived",
+          "confidence": 1.0,
+          "evidence_ref": null,
+          "inference_rule": null,
+          "assumptions": [],
+          "metadata": {}
+        }
+      ]
+    },
+    "domain_specificity_score": 0.8,
+    "unsupported_invention_rate": 0.0,
+    "assumption_ledger": []
+  }
+}
