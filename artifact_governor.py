@@ -616,33 +616,51 @@ class ArtifactGovernor:
                             f"Task {t.id} ({t.title}) tampered capability binding requirement lineage: binding claims {binding.requirement_ids}, but canonical RequirementGraph specifies {canonical_req_ids}."
                         )
 
-                    # D. Binding Content Hash Integrity Verification
+                    # D. Binding Content Hash Integrity & Strict Deserialization Verification
                     if hasattr(binding, "compute_hash"):
                         expected_hash = binding.compute_hash()
-                        if getattr(binding, "binding_hash", "") and binding.binding_hash != expected_hash:
+                        if not getattr(binding, "binding_hash", ""):
+                            reasons.append(
+                                f"Task {t.id} ({t.title}) missing mandatory binding_hash in CapabilityBinding (integrity field required)."
+                            )
+                        elif binding.binding_hash != expected_hash:
                             reasons.append(
                                 f"Task {t.id} ({t.title}) tampered capability binding hash: binding hash '{binding.binding_hash}' does not match computed digest '{expected_hash}'."
                             )
 
-                    # E. Component Identity Binding Verification
+                    # E. Upstream Source Artifact & Graph Lineage Integrity Verification
+                    expected_beh_hash = hashlib.sha256(f"{beh_node.id}|{beh_node.behavior_type.value}|{beh_node.target_entity_id}|{beh_node.name}".encode("utf-8")).hexdigest()
+                    if getattr(binding, "source_behavior_hash", "") and binding.source_behavior_hash != expected_beh_hash:
+                        reasons.append(
+                            f"Task {t.id} ({t.title}) stale/tampered source_behavior_hash in binding: expected '{expected_beh_hash}', got '{binding.source_behavior_hash}'."
+                        )
+
+                    matching_req_nodes = [r for r in r_graph.nodes.values() if beh_node.id in getattr(r, "source_behaviors", [])]
+                    expected_req_hash = hashlib.sha256(",".join(sorted([f"{r.id}:{r.capability}:{r.target}" for r in matching_req_nodes])).encode("utf-8")).hexdigest()
+                    if getattr(binding, "source_requirement_hash", "") and binding.source_requirement_hash != expected_req_hash:
+                        reasons.append(
+                            f"Task {t.id} ({t.title}) stale/tampered source_requirement_hash in binding: expected '{expected_req_hash}', got '{binding.source_requirement_hash}'."
+                        )
+
+                    # F. Component Identity Binding Verification
                     if binding.lld_component_id != parent_comp.id:
                         reasons.append(
                             f"Task {t.id} ({t.title}) capability binding identity conflict: binding for behavior '{beh_id}' designates component '{binding.lld_component_id}', but task is mapped to '{parent_comp.id}'."
                         )
 
-                    # F. Allowed Component Type Contract Verification
+                    # G. Allowed Component Type Contract Verification
                     if parent_comp.component_type not in binding.allowed_component_types:
                         reasons.append(
                             f"Task {t.id} ({t.title}) semantic capability responsibility mismatch: operation class '{binding.operation_class.value}' for behavior '{beh_node.name}' does not permit component type '{parent_comp.component_type.value}' (allowed: {[ct.value for ct in binding.allowed_component_types]})."
                         )
 
-                    # G. Prohibited Component Role Contract Verification
+                    # H. Prohibited Component Role Contract Verification
                     if parent_comp.role in binding.prohibited_component_roles or (parent_comp.layout in ["read_only", "query_view"] and binding.operation_class == OperationClass.COMMAND_MUTATION):
                         reasons.append(
                             f"Task {t.id} ({t.title}) semantic capability mismatch: operation class '{binding.operation_class.value}' for behavior '{beh_node.name}' is prohibited on component role '{parent_comp.role}' / layout '{parent_comp.layout}'."
                         )
 
-                    # H. Target Entity Ownership Responsibility Contract Verification
+                    # I. Target Entity Ownership Responsibility Contract Verification
                     if parent_comp.owned_entities:
                         comp_ents = [e.replace("entity_", "").replace("resource_", "").replace("wf_", "").lower() for e in parent_comp.owned_entities]
                         if clean_binding_ent not in comp_ents:
@@ -650,7 +668,7 @@ class ArtifactGovernor:
                                 f"Task {t.id} ({t.title}) semantic entity responsibility mismatch: task entity '{binding.target_entity or beh_node.target_entity_id}' is not owned by parent LLD '{parent_comp.id}' owned entities {parent_comp.owned_entities}."
                             )
 
-                    # I. Grounded HLD Capability Ownership Contract Verification
+                    # J. Grounded HLD Capability Ownership Contract Verification
                     if not binding.hld_capability or (parent_comp.owned_capabilities and binding.hld_capability not in parent_comp.owned_capabilities):
                         reasons.append(
                             f"Task {t.id} ({t.title}) ungrounded HLD capability in binding: binding capability '{binding.hld_capability}' is missing or not owned by parent LLD '{parent_comp.id}' owned capabilities {parent_comp.owned_capabilities}."

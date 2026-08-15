@@ -472,16 +472,18 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         self.assertTrue(any("semantic capability responsibility mismatch" in r for r in gov_res_evt_ui.blocking_reasons))
 
         # 16. Negative Attack Vector 11: Tampered OperationClass in CapabilityBinding
+        tampered_op_binding = CapabilityBinding(
+            behavior_id=vehicle_task.parent_behaviors[0], requirement_ids=list(vehicle_task.parent_reqs),
+            operation_class=OperationClass.READ_QUERY, # Tampered! Canonical is COMMAND_MUTATION
+            target_entity=vehicle_comp.owned_entities[0], hld_capability=vehicle_comp.owned_capabilities[0],
+            lld_component_id="ctrl_tampered_op", allowed_component_types=[LLDComponentType.CONTROLLER, LLDComponentType.SERVICE]
+        )
+        tampered_op_binding.binding_hash = tampered_op_binding.compute_hash()
         tampered_op_comp = LLDComponent(
             id="ctrl_tampered_op", name="Vehicle Controller Tampered OP", component_type=LLDComponentType.CONTROLLER,
             parent=vehicle_comp.parent, role="backend_controller",
             owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
-            capability_bindings=[CapabilityBinding(
-                behavior_id=vehicle_task.parent_behaviors[0], requirement_ids=list(vehicle_task.parent_reqs),
-                operation_class=OperationClass.READ_QUERY, # Tampered! Canonical is COMMAND_MUTATION
-                target_entity=vehicle_comp.owned_entities[0], hld_capability=vehicle_comp.owned_capabilities[0],
-                lld_component_id="ctrl_tampered_op", allowed_component_types=[LLDComponentType.CONTROLLER, LLDComponentType.SERVICE]
-            )]
+            capability_bindings=[tampered_op_binding]
         )
         tampered_op_task = TaskRecord(
             id="TSK-TAMPERED-OP", title="Execute Vehicle Dispatch", description="desc",
@@ -495,17 +497,19 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         self.assertTrue(any("tampered capability binding operation_class" in r for r in gov_res_tampered_op.blocking_reasons))
 
         # 17. Negative Attack Vector 12: Tampered Target Entity in CapabilityBinding
+        tampered_ent_binding = CapabilityBinding(
+            behavior_id=vehicle_task.parent_behaviors[0], requirement_ids=list(vehicle_task.parent_reqs),
+            operation_class=OperationClass.COMMAND_MUTATION,
+            target_entity="invoice", # Tampered! Canonical is vehicle
+            hld_capability=vehicle_comp.owned_capabilities[0], lld_component_id="ctrl_tampered_ent",
+            allowed_component_types=[LLDComponentType.CONTROLLER, LLDComponentType.SERVICE]
+        )
+        tampered_ent_binding.binding_hash = tampered_ent_binding.compute_hash()
         tampered_ent_comp = LLDComponent(
             id="ctrl_tampered_ent", name="Vehicle Controller Tampered Ent", component_type=LLDComponentType.CONTROLLER,
             parent=vehicle_comp.parent, role="backend_controller",
             owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
-            capability_bindings=[CapabilityBinding(
-                behavior_id=vehicle_task.parent_behaviors[0], requirement_ids=list(vehicle_task.parent_reqs),
-                operation_class=OperationClass.COMMAND_MUTATION,
-                target_entity="invoice", # Tampered! Canonical is vehicle
-                hld_capability=vehicle_comp.owned_capabilities[0], lld_component_id="ctrl_tampered_ent",
-                allowed_component_types=[LLDComponentType.CONTROLLER, LLDComponentType.SERVICE]
-            )]
+            capability_bindings=[tampered_ent_binding]
         )
         tampered_ent_task = TaskRecord(
             id="TSK-TAMPERED-ENT", title="Execute Vehicle Dispatch", description="desc",
@@ -519,16 +523,18 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         self.assertTrue(any("tampered capability binding target entity" in r for r in gov_res_tampered_ent.blocking_reasons))
 
         # 18. Negative Attack Vector 13: Tampered Requirement Lineage in CapabilityBinding
+        tampered_req_binding = CapabilityBinding(
+            behavior_id=vehicle_task.parent_behaviors[0], requirement_ids=["REQ-FORGED-999"], # Tampered!
+            operation_class=OperationClass.COMMAND_MUTATION,
+            target_entity=vehicle_comp.owned_entities[0], hld_capability=vehicle_comp.owned_capabilities[0],
+            lld_component_id="ctrl_tampered_req", allowed_component_types=[LLDComponentType.CONTROLLER, LLDComponentType.SERVICE]
+        )
+        tampered_req_binding.binding_hash = tampered_req_binding.compute_hash()
         tampered_req_comp = LLDComponent(
             id="ctrl_tampered_req", name="Vehicle Controller Tampered Req", component_type=LLDComponentType.CONTROLLER,
             parent=vehicle_comp.parent, role="backend_controller",
             owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
-            capability_bindings=[CapabilityBinding(
-                behavior_id=vehicle_task.parent_behaviors[0], requirement_ids=["REQ-FORGED-999"], # Tampered!
-                operation_class=OperationClass.COMMAND_MUTATION,
-                target_entity=vehicle_comp.owned_entities[0], hld_capability=vehicle_comp.owned_capabilities[0],
-                lld_component_id="ctrl_tampered_req", allowed_component_types=[LLDComponentType.CONTROLLER, LLDComponentType.SERVICE]
-            )]
+            capability_bindings=[tampered_req_binding]
         )
         tampered_req_task = TaskRecord(
             id="TSK-TAMPERED-REQ", title="Execute Vehicle Dispatch", description="desc",
@@ -567,16 +573,18 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         self.assertTrue(any("tampered capability binding hash" in r for r in gov_res_tampered_hash.blocking_reasons))
 
         # 20. Negative Attack Vector 15: Ungrounded HLD Capability in CapabilityBinding
+        ungrounded_hld_binding = CapabilityBinding(
+            behavior_id=vehicle_task.parent_behaviors[0], requirement_ids=list(vehicle_task.parent_reqs),
+            operation_class=OperationClass.COMMAND_MUTATION, target_entity=vehicle_comp.owned_entities[0],
+            hld_capability="", # Ungrounded empty string!
+            lld_component_id="ctrl_ungrounded_hld", allowed_component_types=[LLDComponentType.CONTROLLER, LLDComponentType.SERVICE]
+        )
+        ungrounded_hld_binding.binding_hash = ungrounded_hld_binding.compute_hash()
         ungrounded_hld_comp = LLDComponent(
             id="ctrl_ungrounded_hld", name="Vehicle Controller Ungrounded HLD", component_type=LLDComponentType.CONTROLLER,
             parent=vehicle_comp.parent, role="backend_controller",
             owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
-            capability_bindings=[CapabilityBinding(
-                behavior_id=vehicle_task.parent_behaviors[0], requirement_ids=list(vehicle_task.parent_reqs),
-                operation_class=OperationClass.COMMAND_MUTATION, target_entity=vehicle_comp.owned_entities[0],
-                hld_capability="", # Ungrounded empty string!
-                lld_component_id="ctrl_ungrounded_hld", allowed_component_types=[LLDComponentType.CONTROLLER, LLDComponentType.SERVICE]
-            )]
+            capability_bindings=[ungrounded_hld_binding]
         )
         ungrounded_hld_task = TaskRecord(
             id="TSK-UNGROUNDED-HLD", title="Execute Vehicle Dispatch", description="desc",
@@ -588,6 +596,100 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         self.assertTrue(gov_res_ungrounded_hld.is_blocked, "ArtifactGovernor MUST block task when CapabilityBinding hld_capability is ungrounded / empty!")
         self.assertEqual(gov_res_ungrounded_hld.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("ungrounded HLD capability in binding" in r for r in gov_res_ungrounded_hld.blocking_reasons))
+
+        # 21. Negative Attack Vector 16: Mutated allowed_component_types (Hash Coverage Attack)
+        valid_binding = vehicle_comp.capability_bindings[0]
+        mutated_allowed_binding = CapabilityBinding(
+            behavior_id=valid_binding.behavior_id, requirement_ids=list(valid_binding.requirement_ids),
+            operation_class=valid_binding.operation_class, target_entity=valid_binding.target_entity,
+            hld_capability=valid_binding.hld_capability, lld_component_id=valid_binding.lld_component_id,
+            allowed_component_types=[LLDComponentType.CONTROLLER, LLDComponentType.SERVICE, LLDComponentType.UI_SURFACE, LLDComponentType.PIPELINE_WORKER], # Injected!
+            prohibited_component_roles=list(valid_binding.prohibited_component_roles),
+            source_behavior_hash=valid_binding.source_behavior_hash,
+            source_requirement_hash=valid_binding.source_requirement_hash,
+            source_hld_hash=valid_binding.source_hld_hash,
+            binding_hash=valid_binding.binding_hash # Keep old valid hash!
+        )
+        mutated_allowed_comp = LLDComponent(
+            id=vehicle_comp.id, name=vehicle_comp.name, component_type=vehicle_comp.component_type,
+            parent=vehicle_comp.parent, role=vehicle_comp.role,
+            owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
+            capability_bindings=[mutated_allowed_binding]
+        )
+        gov_res_mutated_allowed = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [mutated_allowed_comp], b_graph_multi)
+        self.assertTrue(gov_res_mutated_allowed.is_blocked, "ArtifactGovernor MUST block task when allowed_component_types is mutated because hash covers all security fields!")
+        self.assertEqual(gov_res_mutated_allowed.validation_status, ValidationStatus.INVALID)
+        self.assertTrue(any("tampered capability binding hash" in r for r in gov_res_mutated_allowed.blocking_reasons))
+
+        # 22. Negative Attack Vector 17: Mutated prohibited_component_roles (Hash Coverage Attack)
+        mutated_roles_binding = CapabilityBinding(
+            behavior_id=valid_binding.behavior_id, requirement_ids=list(valid_binding.requirement_ids),
+            operation_class=valid_binding.operation_class, target_entity=valid_binding.target_entity,
+            hld_capability=valid_binding.hld_capability, lld_component_id=valid_binding.lld_component_id,
+            allowed_component_types=list(valid_binding.allowed_component_types),
+            prohibited_component_roles=[], # Stripped out prohibited roles!
+            source_behavior_hash=valid_binding.source_behavior_hash,
+            source_requirement_hash=valid_binding.source_requirement_hash,
+            source_hld_hash=valid_binding.source_hld_hash,
+            binding_hash=valid_binding.binding_hash # Keep old valid hash!
+        )
+        mutated_roles_comp = LLDComponent(
+            id=vehicle_comp.id, name=vehicle_comp.name, component_type=vehicle_comp.component_type,
+            parent=vehicle_comp.parent, role=vehicle_comp.role,
+            owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
+            capability_bindings=[mutated_roles_binding]
+        )
+        gov_res_mutated_roles = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [mutated_roles_comp], b_graph_multi)
+        self.assertTrue(gov_res_mutated_roles.is_blocked, "ArtifactGovernor MUST block task when prohibited_component_roles is mutated because hash covers all security fields!")
+        self.assertEqual(gov_res_mutated_roles.validation_status, ValidationStatus.INVALID)
+        self.assertTrue(any("tampered capability binding hash" in r for r in gov_res_mutated_roles.blocking_reasons))
+
+        # 23. Negative Attack Vector 18: Missing binding_hash (Strict Deserialization Rejection)
+        missing_hash_binding = CapabilityBinding(
+            behavior_id=valid_binding.behavior_id, requirement_ids=list(valid_binding.requirement_ids),
+            operation_class=valid_binding.operation_class, target_entity=valid_binding.target_entity,
+            hld_capability=valid_binding.hld_capability, lld_component_id=valid_binding.lld_component_id,
+            allowed_component_types=list(valid_binding.allowed_component_types),
+            prohibited_component_roles=list(valid_binding.prohibited_component_roles),
+            source_behavior_hash=valid_binding.source_behavior_hash,
+            source_requirement_hash=valid_binding.source_requirement_hash,
+            source_hld_hash=valid_binding.source_hld_hash,
+            binding_hash="" # Missing hash!
+        )
+        missing_hash_comp = LLDComponent(
+            id=vehicle_comp.id, name=vehicle_comp.name, component_type=vehicle_comp.component_type,
+            parent=vehicle_comp.parent, role=vehicle_comp.role,
+            owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
+            capability_bindings=[missing_hash_binding]
+        )
+        gov_res_missing_hash = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [missing_hash_comp], b_graph_multi)
+        self.assertTrue(gov_res_missing_hash.is_blocked, "ArtifactGovernor MUST block task when binding_hash is missing in CapabilityBinding!")
+        self.assertEqual(gov_res_missing_hash.validation_status, ValidationStatus.INVALID)
+        self.assertTrue(any("missing mandatory binding_hash" in r for r in gov_res_missing_hash.blocking_reasons))
+
+        # 24. Negative Attack Vector 19: Stale / Mismatched source_behavior_hash
+        stale_src_binding = CapabilityBinding(
+            behavior_id=valid_binding.behavior_id, requirement_ids=list(valid_binding.requirement_ids),
+            operation_class=valid_binding.operation_class, target_entity=valid_binding.target_entity,
+            hld_capability=valid_binding.hld_capability, lld_component_id=valid_binding.lld_component_id,
+            allowed_component_types=list(valid_binding.allowed_component_types),
+            prohibited_component_roles=list(valid_binding.prohibited_component_roles),
+            source_behavior_hash="stale_beh_digest_abc123", # Stale upstream source hash!
+            source_requirement_hash=valid_binding.source_requirement_hash,
+            source_hld_hash=valid_binding.source_hld_hash,
+            binding_hash=""
+        )
+        stale_src_binding.binding_hash = stale_src_binding.compute_hash()
+        stale_src_comp = LLDComponent(
+            id=vehicle_comp.id, name=vehicle_comp.name, component_type=vehicle_comp.component_type,
+            parent=vehicle_comp.parent, role=vehicle_comp.role,
+            owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
+            capability_bindings=[stale_src_binding]
+        )
+        gov_res_stale_src = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [stale_src_comp], b_graph_multi)
+        self.assertTrue(gov_res_stale_src.is_blocked, "ArtifactGovernor MUST block task when source_behavior_hash does not match canonical BehaviorNode!")
+        self.assertEqual(gov_res_stale_src.validation_status, ValidationStatus.INVALID)
+        self.assertTrue(any("stale/tampered source_behavior_hash" in r for r in gov_res_stale_src.blocking_reasons))
 
         # 15. Invariant: LLDCompiler MUST NOT fabricate synthetic REQ-001 ancestry for ungrounded modules
         empty_r_graph = RequirementGraph()

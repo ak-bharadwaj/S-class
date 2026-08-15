@@ -68,16 +68,28 @@ class CapabilityBinding:
     lld_component_id: str
     allowed_component_types: List[LLDComponentType]
     prohibited_component_roles: List[str] = field(default_factory=list)
+    source_behavior_hash: str = ""
+    source_requirement_hash: str = ""
+    source_hld_hash: str = ""
     binding_hash: str = ""
 
     def compute_hash(self) -> str:
-        req_str = ",".join(sorted(self.requirement_ids))
-        content = f"{self.behavior_id}|{req_str}|{self.operation_class.value}|{self.target_entity}|{self.hld_capability}|{self.lld_component_id}"
-        return hashlib.sha256(content.encode("utf-8")).hexdigest()
-
-    def __post_init__(self):
-        if not self.binding_hash:
-            self.binding_hash = self.compute_hash()
+        """Computes deterministic SHA-256 hash over ALL security-relevant binding fields and source hashes."""
+        payload = {
+            "behavior_id": self.behavior_id,
+            "requirement_ids": sorted(self.requirement_ids),
+            "operation_class": self.operation_class.value,
+            "target_entity": self.target_entity,
+            "hld_capability": self.hld_capability,
+            "lld_component_id": self.lld_component_id,
+            "allowed_component_types": sorted([ct.value for ct in self.allowed_component_types]),
+            "prohibited_component_roles": sorted(self.prohibited_component_roles),
+            "source_behavior_hash": self.source_behavior_hash,
+            "source_requirement_hash": self.source_requirement_hash,
+            "source_hld_hash": self.source_hld_hash
+        }
+        canonical_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -89,6 +101,9 @@ class CapabilityBinding:
             "lld_component_id": self.lld_component_id,
             "allowed_component_types": [ct.value for ct in self.allowed_component_types],
             "prohibited_component_roles": self.prohibited_component_roles,
+            "source_behavior_hash": self.source_behavior_hash,
+            "source_requirement_hash": self.source_requirement_hash,
+            "source_hld_hash": self.source_hld_hash,
             "binding_hash": self.binding_hash
         }
 
@@ -103,6 +118,9 @@ class CapabilityBinding:
             lld_component_id=data.get("lld_component_id", ""),
             allowed_component_types=[LLDComponentType(ct) for ct in data.get("allowed_component_types", [])],
             prohibited_component_roles=list(data.get("prohibited_component_roles", [])),
+            source_behavior_hash=data.get("source_behavior_hash", ""),
+            source_requirement_hash=data.get("source_requirement_hash", ""),
+            source_hld_hash=data.get("source_hld_hash", ""),
             binding_hash=data.get("binding_hash", "")
         )
 
@@ -230,13 +248,14 @@ class LLDCompiler:
             matching_req_ids = [r.id for r in r_graph.nodes.values() if b_node.id in getattr(r, "source_behaviors", [])]
 
             # Exact HLD capability: must be an owned_capability from mod that matches requirement capability or behavior stem.
-            # ZERO UNGROUNDED FALLBACKS (NO defaulting to mod.owned_capabilities[0] or b_node.id)!
+            # ZERO UNGROUNDED FALLBACKS (NO substring matching, NO defaulting to mod.owned_capabilities[0] or b_node.id)!
             req_caps = [r.capability for r in r_graph.nodes.values() if b_node.id in getattr(r, "source_behaviors", []) and r.capability in mod.owned_capabilities]
             if req_caps:
                 exact_hld_cap = req_caps[0]
+            elif b_node.id in mod.owned_capabilities:
+                exact_hld_cap = b_node.id
             else:
-                matching_owned = [c for c in mod.owned_capabilities if c.lower() in b_node.name.lower() or b_node.id.lower() in c.lower()]
-                exact_hld_cap = matching_owned[0] if matching_owned else ""
+                exact_hld_cap = ""
 
             # Precise allowed component types & prohibited roles per OperationClass
             if op_class == OperationClass.COMMAND_MUTATION:
@@ -256,7 +275,18 @@ class LLDCompiler:
             if comp_type == LLDComponentType.UI_SURFACE and comp_layout == "read_only" and op_class == OperationClass.COMMAND_MUTATION:
                 prohibited_roles.append("frontend_interface")
 
-            bindings.append(CapabilityBinding(
+            # Source artifact / graph integrity hashes establishing upstream provenance
+            beh_content = f"{b_node.id}|{b_node.behavior_type.value}|{b_node.target_entity_id}|{b_node.name}"
+            source_beh_hash = hashlib.sha256(beh_content.encode("utf-8")).hexdigest()
+
+            matching_req_nodes = [r for r in r_graph.nodes.values() if b_node.id in getattr(r, "source_behaviors", [])]
+            req_content = ",".join(sorted([f"{r.id}:{r.capability}:{r.target}" for r in matching_req_nodes]))
+            source_req_hash = hashlib.sha256(req_content.encode("utf-8")).hexdigest()
+
+            hld_content = f"{mod.id}|{','.join(sorted(mod.owned_capabilities))}|{','.join(sorted(mod.owned_entities))}"
+            source_hld_hash = hashlib.sha256(hld_content.encode("utf-8")).hexdigest()
+
+            b_binding = CapabilityBinding(
                 behavior_id=b_id,
                 requirement_ids=matching_req_ids,
                 operation_class=op_class,
@@ -264,8 +294,14 @@ class LLDCompiler:
                 hld_capability=exact_hld_cap,
                 lld_component_id=comp_id,
                 allowed_component_types=allowed_types,
-                prohibited_component_roles=prohibited_roles
-            ))
+                prohibited_component_roles=prohibited_roles,
+                source_behavior_hash=source_beh_hash,
+                source_requirement_hash=source_req_hash,
+                source_hld_hash=source_hld_hash,
+                binding_hash=""
+            )
+            b_binding.binding_hash = b_binding.compute_hash()
+            bindings.append(b_binding)
         return bindings
 
     @classmethod
