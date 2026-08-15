@@ -485,13 +485,22 @@ class ArtifactGovernor:
         tasks: List[TaskRecord],
         r_graph: RequirementGraph,
         lld_components: List[LLDComponent],
-        b_graph: Optional[BehaviorGraph] = None
+        b_graph: BehaviorGraph
     ) -> GovernanceGateResult:
         reasons: List[str] = []
         if tasks and not lld_components:
             return GovernanceGateResult(
                 is_blocked=True,
                 blocking_reasons=["Missing mandatory canonical LLD component architecture context for task governance audit."],
+                recommended_fsm_state=FSMTransitionTarget.DESIGN,
+                validation_status=ValidationStatus.INVALID,
+                approval_status=ApprovalStatus.REJECTED
+            )
+
+        if tasks and (b_graph is None or not getattr(b_graph, "nodes", None)):
+            return GovernanceGateResult(
+                is_blocked=True,
+                blocking_reasons=["Missing mandatory canonical BehaviorGraph context for task governance audit."],
                 recommended_fsm_state=FSMTransitionTarget.DESIGN,
                 validation_status=ValidationStatus.INVALID,
                 approval_status=ApprovalStatus.REJECTED
@@ -516,7 +525,7 @@ class ArtifactGovernor:
 
             if not t.parent_behaviors:
                 reasons.append(f"Task {t.id} ({t.title}) has no upstream Behavior Graph lineage.")
-            elif b_map and not set(t.parent_behaviors).issubset(set(b_map.keys())):
+            elif not set(t.parent_behaviors).issubset(set(b_map.keys())):
                 invalid_beh = [b for b in t.parent_behaviors if b not in b_map]
                 reasons.append(f"Task {t.id} ({t.title}) references nonexistent upstream Behavior IDs: {invalid_beh}.")
 
@@ -557,27 +566,30 @@ class ArtifactGovernor:
                         f"Task {t.id} ({t.title}) references ungrounded parent LLD '{t.parent_lld}' with zero behavior coverage."
                     )
 
-                # 3. Capability-Level Semantic Compatibility (Task ↔ LLD Component Responsibility)
-                if b_map:
-                    for beh_id in t.parent_behaviors:
-                        if beh_id in b_map:
-                            beh_node = b_map[beh_id]
-                            # Check mutation command vs read-only UI surface / query-only service
-                            if beh_node.behavior_type == BehaviorNodeType.COMMAND:
-                                if parent_comp.component_type.value == "ui_surface" and parent_comp.layout == "read_only":
+                # 3. Capability & Operation Class Semantic Compatibility
+                is_read_only_comp = (
+                    getattr(parent_comp, "layout", "") in ["read_only", "query_view", "viewer", "dashboard_view"]
+                    or getattr(parent_comp, "role", "") in ["read_model", "query_service", "read_only_view", "audit_viewer"]
+                )
+
+                for beh_id in t.parent_behaviors:
+                    if beh_id in b_map:
+                        beh_node = b_map[beh_id]
+                        # Check mutation command vs read-only component
+                        if beh_node.behavior_type == BehaviorNodeType.COMMAND and is_read_only_comp:
+                            reasons.append(
+                                f"Task {t.id} ({t.title}) semantic capability mismatch: mutation command '{beh_node.name}' cannot be implemented by read-only component '{parent_comp.id}' ({parent_comp.role})."
+                            )
+                        # Check target entity domain alignment between task/behavior and LLD component
+                        target_ent = getattr(beh_node, "target_entity_id", "")
+                        if target_ent:
+                            ent_stem = target_ent.replace("entity_", "").replace("resource_", "").replace("wf_", "").lower()
+                            if ent_stem and ent_stem not in parent_comp.id.lower() and ent_stem not in parent_comp.name.lower() and ent_stem not in (parent_comp.route or "").lower():
+                                comp_tokens = [tok.lower() for tok in parent_comp.name.split() if len(tok) > 3]
+                                if comp_tokens and not any(tok in ent_stem or ent_stem in tok for tok in comp_tokens):
                                     reasons.append(
-                                        f"Task {t.id} ({t.title}) semantic capability mismatch: mutation command '{beh_node.name}' cannot be implemented by read-only UI surface '{parent_comp.id}'."
+                                        f"Task {t.id} ({t.title}) semantic domain mismatch: task entity '{ent_stem}' conflicts with parent LLD '{parent_comp.id}' domain ({parent_comp.name})."
                                     )
-                            # Check target entity domain alignment between task/behavior and LLD component
-                            target_ent = getattr(beh_node, "target_entity_id", "")
-                            if target_ent:
-                                ent_stem = target_ent.replace("entity_", "").replace("resource_", "").replace("wf_", "").lower()
-                                if ent_stem and ent_stem not in parent_comp.id.lower() and ent_stem not in parent_comp.name.lower() and ent_stem not in (parent_comp.route or "").lower():
-                                    comp_tokens = [tok.lower() for tok in parent_comp.name.split() if len(tok) > 3]
-                                    if comp_tokens and not any(tok in ent_stem or ent_stem in tok for tok in comp_tokens):
-                                        reasons.append(
-                                            f"Task {t.id} ({t.title}) semantic domain mismatch: task entity '{ent_stem}' conflicts with parent LLD '{parent_comp.id}' domain ({parent_comp.name})."
-                                        )
 
         if reasons:
             return GovernanceGateResult(

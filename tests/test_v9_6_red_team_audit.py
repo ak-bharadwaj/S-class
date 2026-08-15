@@ -280,7 +280,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             parent_hld=tasks[0].parent_hld, parent_reqs=[],
             parent_behaviors=tasks[0].parent_behaviors
         )
-        gov_res_missing = ArtifactGovernor.audit_task_governance([forged_missing_parent], r_graph, lld_components)
+        gov_res_missing = ArtifactGovernor.audit_task_governance([forged_missing_parent], r_graph, lld_components, b_graph)
         self.assertTrue(gov_res_missing.is_blocked, "ArtifactGovernor MUST block task lacking parent references")
         self.assertEqual(gov_res_missing.validation_status, ValidationStatus.INVALID)
 
@@ -291,7 +291,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             parent_hld=tasks[0].parent_hld, parent_reqs=["REQ-NONEXISTENT-999"],
             parent_behaviors=tasks[0].parent_behaviors
         )
-        gov_res_nonexistent = ArtifactGovernor.audit_task_governance([forged_nonexistent_parent], r_graph, lld_components)
+        gov_res_nonexistent = ArtifactGovernor.audit_task_governance([forged_nonexistent_parent], r_graph, lld_components, b_graph)
         self.assertTrue(gov_res_nonexistent.is_blocked, "ArtifactGovernor MUST block task with forged nonexistent parent references")
         self.assertEqual(gov_res_nonexistent.validation_status, ValidationStatus.INVALID)
 
@@ -324,10 +324,10 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             parent_hld=vehicle_task.parent_hld, parent_reqs=vehicle_task.parent_reqs,
             parent_behaviors=vehicle_task.parent_behaviors
         )
-        gov_res_wrong_existing = ArtifactGovernor.audit_task_governance([hijacked_task], r_graph_multi, lld_multi)
+        gov_res_wrong_existing = ArtifactGovernor.audit_task_governance([hijacked_task], r_graph_multi, lld_multi, b_graph_multi)
         self.assertTrue(gov_res_wrong_existing.is_blocked, "ArtifactGovernor MUST block task pointing to wrong but existing LLD parent component!")
         self.assertEqual(gov_res_wrong_existing.validation_status, ValidationStatus.INVALID)
-        self.assertTrue(any("semantic parent mismatch" in r for r in gov_res_wrong_existing.blocking_reasons))
+        self.assertTrue(any("semantic parent mismatch" in r or "semantic domain mismatch" in r for r in gov_res_wrong_existing.blocking_reasons))
 
         # 9. Negative Attack Vector 4: Partial-Overlap Scope Attack ({REQ-A, REQ-UNOWNED} vs {REQ-A, REQ-B})
         req_owned = vehicle_task.parent_reqs[0]
@@ -383,12 +383,19 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         self.assertTrue(any("semantic capability mismatch" in r for r in gov_res_cap_mismatch.blocking_reasons))
 
         # 12. Negative Attack Vector 7: Missing Mandatory Canonical LLD Architecture Context at API Boundary
-        gov_res_no_lld = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, lld_components=[])
+        gov_res_no_lld = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, lld_components=[], b_graph=b_graph_multi)
         self.assertTrue(gov_res_no_lld.is_blocked, "ArtifactGovernor MUST block task governance audit when canonical LLD context is omitted or empty!")
         self.assertEqual(gov_res_no_lld.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("Missing mandatory canonical LLD component" in r for r in gov_res_no_lld.blocking_reasons))
 
-        # 13. Invariant: LLDCompiler MUST NOT fabricate synthetic REQ-001 ancestry for ungrounded modules
+        # 13. Negative Attack Vector 8: Missing Mandatory Canonical BehaviorGraph Context at API Boundary
+        empty_b_graph = BehaviorGraph()
+        gov_res_no_bgraph = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, lld_multi, empty_b_graph)
+        self.assertTrue(gov_res_no_bgraph.is_blocked, "ArtifactGovernor MUST block task governance audit when canonical BehaviorGraph context is omitted or empty!")
+        self.assertEqual(gov_res_no_bgraph.validation_status, ValidationStatus.INVALID)
+        self.assertTrue(any("Missing mandatory canonical BehaviorGraph context" in r for r in gov_res_no_bgraph.blocking_reasons))
+
+        # 14. Invariant: LLDCompiler MUST NOT fabricate synthetic REQ-001 ancestry for ungrounded modules
         empty_r_graph = RequirementGraph()
         synthetic_mod = HLDModule(id="mod_synth", name="Synthetic", system_boundary="internal", owned_entities=["X"], owned_capabilities=["nonexistent_cap"])
         synthetic_hld = HLDDesign(system_name="HLD-001", architecture_style="Modular Monolith", modules=[synthetic_mod], adrs=[], version=1)
