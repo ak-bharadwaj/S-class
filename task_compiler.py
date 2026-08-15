@@ -76,10 +76,19 @@ class TaskRecord:
         else:
             self.target_scope_status = TaskTargetScopeStatus.UNRESOLVED
 
-        if not self.task_spec_hash:
-            self.task_spec_hash = self.compute_spec_hash()
-        if not self.task_hash:
-            self.task_hash = self.task_spec_hash
+        computed_spec = self.compute_spec_hash()
+        if self.task_spec_hash:
+            if self.task_spec_hash != computed_spec:
+                raise ValueError(f"TaskRecord '{self.id}' task_spec_hash mismatch upon construction: provided '{self.task_spec_hash[:8]}', computed '{computed_spec[:8]}'")
+        else:
+            self.task_spec_hash = computed_spec
+
+        computed_canonical = self.compute_canonical_hash()
+        if self.task_hash:
+            if self.task_hash != computed_canonical:
+                raise ValueError(f"TaskRecord '{self.id}' task_hash mismatch upon construction: provided '{self.task_hash[:8]}', computed '{computed_canonical[:8]}'")
+        else:
+            self.task_hash = computed_canonical
 
     def compute_spec_hash(self) -> str:
         """Computes deterministic SHA-256 hash over immutable semantic specification fields."""
@@ -107,6 +116,12 @@ class TaskRecord:
 
     def to_dict(self) -> Dict[str, Any]:
         cat_val = self.category.value if hasattr(self.category, "value") else str(self.category)
+        computed_spec = self.compute_spec_hash()
+        computed_canonical = self.compute_canonical_hash()
+        if self.task_spec_hash and self.task_spec_hash != computed_spec:
+            raise ValueError(f"TaskRecord '{self.id}' cannot serialize: task_spec_hash mismatch (provided: '{self.task_spec_hash[:8]}', computed: '{computed_spec[:8]}')")
+        if self.task_hash and self.task_hash != computed_canonical:
+            raise ValueError(f"TaskRecord '{self.id}' cannot serialize: task_hash mismatch (provided: '{self.task_hash[:8]}', computed: '{computed_canonical[:8]}')")
         return {
             "id": self.id,
             "title": self.title,
@@ -121,8 +136,8 @@ class TaskRecord:
             "verification_criteria": self.verification_criteria,
             "source_lld_hash": self.source_lld_hash,
             "source_binding_hashes": self.source_binding_hashes,
-            "task_spec_hash": self.task_spec_hash or self.compute_spec_hash(),
-            "task_hash": self.task_hash or self.compute_canonical_hash()
+            "task_spec_hash": computed_spec,
+            "task_hash": computed_canonical
         }
 
     @classmethod

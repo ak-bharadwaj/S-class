@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ master ]
 
+permissions:
+  contents: read
+  statuses: write
+  checks: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -31,3 +36,13 @@ jobs:
         PYTHONPATH: .
       run: |
         python -m pytest tests/ -v
+
+    - name: Update Commit Status
+      if: always()
+      run: |
+        curl -s -X POST \
+          -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+          -H "Accept: application/vnd.github+json" \
+          https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.sha }} \
+          -d "{\"state\":\"${{ job.status }}\",\"target_url\":\"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"description\":\"Pytest Matrix (Python ${{ matrix.python-version }}): ${{ job.status }}\",\"context\":\"continuous-integration/pytest-py${{ matrix.python-version }}\"}"
+
