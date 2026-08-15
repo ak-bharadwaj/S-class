@@ -371,6 +371,8 @@ class TestV11StabilizationPass(unittest.TestCase):
         
         plugin_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         core_modules = [
+            "domain_primitives",
+            "file_lock",
             "event_store",
             "runtime",
             "sclass_kernel",

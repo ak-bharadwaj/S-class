@@ -29,34 +29,8 @@ def write_json_atomic(path: str, data: Any) -> None:
         json.dump(data, f, indent=2)
     os.replace(temp_path, path)
 
-class _SimpleFileLock:
-    """Local hardware-safe mutual exclusion lock avoiding circular imports with runtime."""
-    def __init__(self, lock_path: str, timeout: float = 10.0):
-        self.lock_path = os.path.abspath(lock_path)
-        self.timeout = timeout
-        self._fd = None
+from file_lock import FileLock
 
-    def __enter__(self):
-        start = time.time()
-        while True:
-            try:
-                self._fd = os.open(self.lock_path, os.O_CREAT | os.O_RDWR | os.O_EXCL)
-                return self
-            except OSError:
-                if (time.time() - start) > self.timeout:
-                    try:
-                        os.unlink(self.lock_path)
-                    except OSError:
-                        pass
-                time.sleep(0.05)
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if self._fd is not None:
-            try:
-                os.close(self._fd)
-                os.unlink(self.lock_path)
-            except OSError:
-                pass
 
 from domain_primitives import (
     DomainPrimitiveType,
@@ -852,7 +826,7 @@ class SpecificationCompiler:
         state_dir = os.path.join(workspace_dir, ".agents")
         os.makedirs(state_dir, exist_ok=True)
         lock_file = os.path.join(state_dir, ".pipeline_version.lock")
-        with _SimpleFileLock(lock_file):
+        with FileLock(lock_file):
             existing_versions = []
             if os.path.exists(state_dir):
                 for fname in os.listdir(state_dir):
