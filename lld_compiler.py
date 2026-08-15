@@ -183,6 +183,73 @@ class LLDCompiler:
     """Compiles HLDDesign, RequirementGraph, and BehaviorGraph into architecture-specific LLD components."""
 
     @classmethod
+    def build_capability_bindings_for_component(
+        cls,
+        behavior_ids: List[str],
+        r_graph: RequirementGraph,
+        b_graph: BehaviorGraph,
+        mod: HLDModule,
+        comp_id: str,
+        comp_type: LLDComponentType,
+        comp_role: str,
+        comp_layout: str = "standard_view"
+    ) -> List[CapabilityBinding]:
+        """Derives exact, component-specific CapabilityBindings matching HLD capability semantics and allowed types."""
+        bindings: List[CapabilityBinding] = []
+        for b_id in behavior_ids:
+            b_node = b_graph.get_node(b_id)
+            if not b_node:
+                continue
+
+            op_class = (
+                OperationClass.COMMAND_MUTATION if b_node.behavior_type == BehaviorNodeType.COMMAND
+                else OperationClass.READ_QUERY if b_node.behavior_type == BehaviorNodeType.QUERY
+                else OperationClass.EVENT_PROCESSING if b_node.behavior_type == BehaviorNodeType.SIDE_EFFECT
+                else OperationClass.STATE_TRANSITION
+            )
+
+            # Exact matching requirement IDs
+            matching_req_ids = [r.id for r in r_graph.nodes.values() if b_node.id in r.source_behaviors]
+
+            # Exact HLD capability: must be an owned_capability from mod that matches requirement capability or behavior stem
+            req_caps = [r.capability for r in r_graph.nodes.values() if b_node.id in r.source_behaviors and r.capability in mod.owned_capabilities]
+            if req_caps:
+                exact_hld_cap = req_caps[0]
+            else:
+                matching_owned = [c for c in mod.owned_capabilities if c.lower() in b_node.name.lower() or b_node.id.lower() in c.lower()]
+                exact_hld_cap = matching_owned[0] if matching_owned else (mod.owned_capabilities[0] if mod.owned_capabilities else b_node.id)
+
+            # Precise allowed component types & prohibited roles per OperationClass
+            if op_class == OperationClass.COMMAND_MUTATION:
+                allowed_types = [LLDComponentType.CONTROLLER, LLDComponentType.SERVICE, LLDComponentType.CLI_DISPATCHER]
+                prohibited_roles = ["read_model", "query_service", "read_only_view", "audit_viewer", "pipeline_worker", "event_handler"]
+            elif op_class == OperationClass.READ_QUERY:
+                allowed_types = [LLDComponentType.CONTROLLER, LLDComponentType.SERVICE, LLDComponentType.UI_SURFACE, LLDComponentType.CLI_DISPATCHER]
+                prohibited_roles = ["pipeline_worker", "event_handler", "batch_sink"]
+            elif op_class == OperationClass.EVENT_PROCESSING:
+                allowed_types = [LLDComponentType.EVENT_HANDLER, LLDComponentType.PIPELINE_WORKER, LLDComponentType.SERVICE]
+                prohibited_roles = ["read_only_view", "read_model", "ui_surface", "backend_controller", "cli_dispatcher"]
+            else:  # STATE_TRANSITION
+                allowed_types = [LLDComponentType.SERVICE, LLDComponentType.EVENT_HANDLER, LLDComponentType.CONTROLLER, LLDComponentType.CLI_DISPATCHER, LLDComponentType.PIPELINE_WORKER]
+                prohibited_roles = ["read_only_view", "read_model", "query_service", "audit_viewer"]
+
+            # If UI surface has layout == "read_only", it is prohibited from COMMAND_MUTATION
+            if comp_type == LLDComponentType.UI_SURFACE and comp_layout == "read_only" and op_class == OperationClass.COMMAND_MUTATION:
+                prohibited_roles.append("frontend_interface")
+
+            bindings.append(CapabilityBinding(
+                behavior_id=b_id,
+                requirement_ids=matching_req_ids,
+                operation_class=op_class,
+                target_entity=b_node.target_entity_id,
+                hld_capability=exact_hld_cap,
+                lld_component_id=comp_id,
+                allowed_component_types=allowed_types,
+                prohibited_component_roles=prohibited_roles
+            ))
+        return bindings
+
+    @classmethod
     def determine_execution_architecture(cls, archetypes: Optional[List[Any]], hld: HLDDesign) -> ExecutionArchitecture:
         arch_set = set((a.value if hasattr(a, "value") else str(a)).lower() for a in (archetypes or []))
         if "cli_tool" in arch_set:
@@ -264,44 +331,24 @@ class LLDCompiler:
             if not mod_endpoints:
                 mod_endpoints.append("PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE")
 
+            sorted_behaviors = sorted(list(set(mod_behaviors)))
+            sorted_reqs = sorted(list(set(mod_reqs)))
+
             parent_ref = LLDParentRef(
                 hld_id=mod.id,
-                req_ids=sorted(list(set(mod_reqs))),
-                behavior_ids=sorted(list(set(mod_behaviors)))
+                req_ids=sorted_reqs,
+                behavior_ids=sorted_behaviors
             )
 
-            # Build formal CapabilityBindings for the module's behaviors
-            cap_bindings: List[CapabilityBinding] = []
-            for b_id in mod_behaviors:
-                b_node = b_graph.get_node(b_id)
-                if b_node:
-                    op_class = (
-                        OperationClass.COMMAND_MUTATION if b_node.behavior_type == BehaviorNodeType.COMMAND
-                        else OperationClass.READ_QUERY if b_node.behavior_type == BehaviorNodeType.QUERY
-                        else OperationClass.EVENT_PROCESSING if b_node.behavior_type == BehaviorNodeType.EVENT
-                        else OperationClass.STATE_TRANSITION
-                    )
-                    matching_req_ids = [r.id for r in r_graph.nodes.values() if b_node.id in r.source_behaviors]
-                    cap_bindings.append(CapabilityBinding(
-                        behavior_id=b_id,
-                        requirement_ids=matching_req_ids,
-                        operation_class=op_class,
-                        target_entity=b_node.target_entity_id,
-                        hld_capability=b_node.name,
-                        lld_component_id=f"ctrl_{mod.id}" if exec_arch in [ExecutionArchitecture.FULLSTACK_APP, ExecutionArchitecture.BACKEND_SERVICE] else f"cli_{mod.id}",
-                        allowed_component_types=[
-                            LLDComponentType.CONTROLLER, LLDComponentType.SERVICE,
-                            LLDComponentType.UI_SURFACE, LLDComponentType.CLI_DISPATCHER,
-                            LLDComponentType.PIPELINE_WORKER, LLDComponentType.EVENT_HANDLER
-                        ],
-                        prohibited_component_roles=["read_model", "query_service", "read_only_view", "audit_viewer"] if op_class == OperationClass.COMMAND_MUTATION else []
-                    ))
-
-            # Execution-Architecture Specific Component Generation
+            # Execution-Architecture Specific Component Generation with exact component-bound CapabilityBindings
             if exec_arch == ExecutionArchitecture.CLI_DISPATCHER:
+                comp_id = f"cli_{mod.id}"
                 cli_endpoints = [ep for ep in mod_endpoints if "PROPOSED_CANDIDATE" not in ep]
+                bindings = cls.build_capability_bindings_for_component(
+                    sorted_behaviors, r_graph, b_graph, mod, comp_id, LLDComponentType.CLI_DISPATCHER, "cli_dispatcher", "cli_subcommand_dispatch"
+                )
                 lld_components.append(LLDComponent(
-                    id=f"cli_{mod.id}",
+                    id=comp_id,
                     name=f"{mod.name} CLI Command Suite",
                     component_type=LLDComponentType.CLI_DISPATCHER,
                     parent=parent_ref,
@@ -315,12 +362,16 @@ class LLDCompiler:
                     allowed_operation_classes=[OperationClass.COMMAND_MUTATION, OperationClass.READ_QUERY, OperationClass.STATE_TRANSITION],
                     owned_entities=list(mod.owned_entities),
                     owned_capabilities=list(mod.owned_capabilities),
-                    capability_bindings=cap_bindings
+                    capability_bindings=bindings
                 ))
 
             elif exec_arch == ExecutionArchitecture.DATA_PIPELINE_WORKER:
+                comp_id = f"pipe_{mod.id}"
+                bindings = cls.build_capability_bindings_for_component(
+                    sorted_behaviors, r_graph, b_graph, mod, comp_id, LLDComponentType.PIPELINE_WORKER, "pipeline_worker"
+                )
                 lld_components.append(LLDComponent(
-                    id=f"pipe_{mod.id}",
+                    id=comp_id,
                     name=f"{mod.name} Pipeline Stage Worker",
                     component_type=LLDComponentType.PIPELINE_WORKER,
                     parent=parent_ref,
@@ -332,12 +383,16 @@ class LLDCompiler:
                     allowed_operation_classes=[OperationClass.EVENT_PROCESSING, OperationClass.STATE_TRANSITION],
                     owned_entities=list(mod.owned_entities),
                     owned_capabilities=list(mod.owned_capabilities),
-                    capability_bindings=cap_bindings
+                    capability_bindings=bindings
                 ))
 
             elif exec_arch == ExecutionArchitecture.EVENT_DRIVEN_MICROSERVICE:
+                comp_id = f"event_{mod.id}"
+                bindings = cls.build_capability_bindings_for_component(
+                    sorted_behaviors, r_graph, b_graph, mod, comp_id, LLDComponentType.EVENT_HANDLER, "event_handler"
+                )
                 lld_components.append(LLDComponent(
-                    id=f"event_{mod.id}",
+                    id=comp_id,
                     name=f"{mod.name} Event Handler Service",
                     component_type=LLDComponentType.EVENT_HANDLER,
                     parent=parent_ref,
@@ -349,7 +404,7 @@ class LLDCompiler:
                     allowed_operation_classes=[OperationClass.EVENT_PROCESSING, OperationClass.STATE_TRANSITION],
                     owned_entities=list(mod.owned_entities),
                     owned_capabilities=list(mod.owned_capabilities),
-                    capability_bindings=cap_bindings
+                    capability_bindings=bindings
                 ))
 
             else:
@@ -369,8 +424,12 @@ class LLDCompiler:
                 else:
                     p_route = f"{p_ent}s"
 
+                ctrl_id = f"ctrl_{mod.id}"
+                ctrl_bindings = cls.build_capability_bindings_for_component(
+                    sorted_behaviors, r_graph, b_graph, mod, ctrl_id, LLDComponentType.CONTROLLER, "backend_controller"
+                )
                 lld_components.append(LLDComponent(
-                    id=f"ctrl_{mod.id}",
+                    id=ctrl_id,
                     name=f"{mod.name} Controller",
                     component_type=LLDComponentType.CONTROLLER,
                     parent=parent_ref,
@@ -382,11 +441,15 @@ class LLDCompiler:
                     allowed_operation_classes=[OperationClass.COMMAND_MUTATION, OperationClass.READ_QUERY, OperationClass.STATE_TRANSITION],
                     owned_entities=list(mod.owned_entities),
                     owned_capabilities=list(mod.owned_capabilities),
-                    capability_bindings=cap_bindings
+                    capability_bindings=ctrl_bindings
                 ))
 
+                svc_id = f"svc_{mod.id}"
+                svc_bindings = cls.build_capability_bindings_for_component(
+                    sorted_behaviors, r_graph, b_graph, mod, svc_id, LLDComponentType.SERVICE, "domain_service"
+                )
                 lld_components.append(LLDComponent(
-                    id=f"svc_{mod.id}",
+                    id=svc_id,
                     name=f"{mod.name} Service Layer",
                     component_type=LLDComponentType.SERVICE,
                     parent=parent_ref,
@@ -397,7 +460,7 @@ class LLDCompiler:
                     allowed_operation_classes=[OperationClass.COMMAND_MUTATION, OperationClass.READ_QUERY, OperationClass.STATE_TRANSITION, OperationClass.EVENT_PROCESSING],
                     owned_entities=list(mod.owned_entities),
                     owned_capabilities=list(mod.owned_capabilities),
-                    capability_bindings=cap_bindings
+                    capability_bindings=svc_bindings
                 ))
 
                 if exec_arch == ExecutionArchitecture.FULLSTACK_APP:
@@ -412,8 +475,12 @@ class LLDCompiler:
                     else:
                         ui_route = f"{stem_clean}s"
 
+                    ui_id = f"ui_{mod.id}"
+                    ui_bindings = cls.build_capability_bindings_for_component(
+                        sorted_behaviors, r_graph, b_graph, mod, ui_id, LLDComponentType.UI_SURFACE, "frontend_interface", "behavioral_workflow_surface"
+                    )
                     lld_components.append(LLDComponent(
-                        id=f"ui_{mod.id}",
+                        id=ui_id,
                         name=f"{ent_stem} Workflow Interface",
                         component_type=LLDComponentType.UI_SURFACE,
                         parent=parent_ref,
@@ -427,7 +494,7 @@ class LLDCompiler:
                         allowed_operation_classes=[OperationClass.COMMAND_MUTATION, OperationClass.READ_QUERY],
                         owned_entities=list(mod.owned_entities),
                         owned_capabilities=list(mod.owned_capabilities),
-                        capability_bindings=cap_bindings
+                        capability_bindings=ui_bindings
                     ))
 
         return lld_components

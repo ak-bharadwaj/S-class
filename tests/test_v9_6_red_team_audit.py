@@ -65,6 +65,7 @@ from lld_compiler import (
     LLDCompiler,
     LLDComponent,
     LLDComponentType,
+    LLDParentRef,
     InteractionTransport,
     OperationClass,
     CapabilityBinding
@@ -372,7 +373,14 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         # 11. Negative Attack Vector 6: Semantic Capability Mismatch (Mutation Command -> Read-Only Surface)
         read_only_ui_comp = LLDComponent(
             id="ui_read_only", name="Vehicle Read-Only View", component_type=LLDComponentType.UI_SURFACE,
-            parent=vehicle_comp.parent, role="frontend_interface", layout="read_only"
+            parent=vehicle_comp.parent, role="frontend_interface", layout="read_only",
+            owned_entities=list(vehicle_comp.owned_entities),
+            owned_capabilities=list(vehicle_comp.owned_capabilities),
+            capability_bindings=LLDCompiler.build_capability_bindings_for_component(
+                vehicle_comp.parent.behavior_ids, r_graph_multi, b_graph_multi,
+                HLDModule(id=vehicle_comp.parent.hld_id, name="Vehicle", system_boundary="internal", owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities)),
+                "ui_read_only", LLDComponentType.UI_SURFACE, "frontend_interface", "read_only"
+            )
         )
         mutation_task = TaskRecord(
             id="TSK-MUTATION-MISMATCH", title="Execute Vehicle Mutation", description="desc",
@@ -398,13 +406,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         self.assertEqual(gov_res_no_bgraph.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("Missing mandatory canonical BehaviorGraph context" in r for r in gov_res_no_bgraph.blocking_reasons))
 
-        # 14. Negative Attack Vector 9: Operation Class Responsibility Mismatch (READ_QUERY behavior assigned to Event-Only Worker)
-        event_worker_comp = LLDComponent(
-            id="pipe_event_only", name="Event Only Worker", component_type=LLDComponentType.PIPELINE_WORKER,
-            parent=vehicle_comp.parent, role="pipeline_worker", transport=InteractionTransport.EVENT_TOPIC,
-            allowed_operation_classes=[OperationClass.EVENT_PROCESSING, OperationClass.STATE_TRANSITION],
-            owned_entities=list(vehicle_comp.owned_entities)
-        )
+        # 14. Negative Attack Vector 9: Full Operation Class Matrix Validation (READ_QUERY on Event Worker & EVENT_PROCESSING on UI Surface)
         query_b_node = BehaviorNode(
             id="qry_vehicle_status", name="QueryVehicleStatus", behavior_type=BehaviorNodeType.QUERY,
             actor_id="dispatcher", target_entity_id="vehicle", epistemic_status=EpistemicStatus.EXPLICIT,
@@ -415,8 +417,19 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             id="REQ-VEH-QRY", kind=RequirementKind.FUNCTIONAL, statement="Query vehicle status",
             actor="dispatcher", capability="query_status", target="vehicle", source_behaviors=[query_b_node.id]
         ))
-        event_worker_comp.parent.behavior_ids.append(query_b_node.id)
-        event_worker_comp.parent.req_ids.append("REQ-VEH-QRY")
+        event_worker_comp = LLDComponent(
+            id="pipe_event_only", name="Event Only Worker", component_type=LLDComponentType.PIPELINE_WORKER,
+            parent=LLDParentRef(hld_id=vehicle_comp.parent.hld_id, req_ids=["REQ-VEH-QRY"], behavior_ids=[query_b_node.id]),
+            role="pipeline_worker", transport=InteractionTransport.EVENT_TOPIC,
+            allowed_operation_classes=[OperationClass.EVENT_PROCESSING, OperationClass.STATE_TRANSITION],
+            owned_entities=list(vehicle_comp.owned_entities),
+            owned_capabilities=list(vehicle_comp.owned_capabilities),
+            capability_bindings=LLDCompiler.build_capability_bindings_for_component(
+                [query_b_node.id], r_graph_multi, b_graph_multi,
+                HLDModule(id=vehicle_comp.parent.hld_id, name="Vehicle", system_boundary="internal", owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities)),
+                "pipe_event_only", LLDComponentType.PIPELINE_WORKER, "pipeline_worker"
+            )
+        )
         mismatched_op_task = TaskRecord(
             id="TSK-OP-MISMATCH", title="Query Vehicle Status Task", description="desc",
             category=TaskCategory.API_ENDPOINT, parent_lld=event_worker_comp.id,
@@ -424,9 +437,39 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             parent_behaviors=[query_b_node.id]
         )
         gov_res_op_mismatch = ArtifactGovernor.audit_task_governance([mismatched_op_task], r_graph_multi, [event_worker_comp], b_graph_multi)
-        self.assertTrue(gov_res_op_mismatch.is_blocked, "ArtifactGovernor MUST block task when operation class (READ_QUERY) is not supported by parent LLD component!")
+        self.assertTrue(gov_res_op_mismatch.is_blocked, "ArtifactGovernor MUST block task when operation class (READ_QUERY) is not permitted for component type (PIPELINE_WORKER)!")
         self.assertEqual(gov_res_op_mismatch.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("semantic capability responsibility mismatch" in r for r in gov_res_op_mismatch.blocking_reasons))
+
+        # 15. Negative Attack Vector 10: Event Processing on UI Surface (EVENT_PROCESSING on UI_SURFACE)
+        event_b_node = BehaviorNode(
+            id="evt_vehicle_telemetry", name="VehicleTelemetryStream", behavior_type=BehaviorNodeType.SIDE_EFFECT,
+            actor_id="dispatcher", target_entity_id="vehicle", epistemic_status=EpistemicStatus.EXPLICIT,
+            provenance=ProvenanceKind.EXPLICIT, confidence=1.0, evidence_ref="Telemetry event"
+        )
+        b_graph_multi.add_node(event_b_node)
+        r_graph_multi.add_requirement(RequirementNode(
+            id="REQ-VEH-EVT", kind=RequirementKind.FUNCTIONAL, statement="Vehicle telemetry stream",
+            actor="dispatcher", capability="stream_telemetry", target="vehicle", source_behaviors=[event_b_node.id]
+        ))
+        ui_comp = next(c for c in lld_multi if c.component_type == LLDComponentType.UI_SURFACE)
+        ui_comp.parent.behavior_ids.append(event_b_node.id)
+        ui_comp.parent.req_ids.append("REQ-VEH-EVT")
+        ui_comp.capability_bindings.extend(LLDCompiler.build_capability_bindings_for_component(
+            [event_b_node.id], r_graph_multi, b_graph_multi,
+            HLDModule(id=ui_comp.parent.hld_id, name="Vehicle", system_boundary="internal", owned_entities=list(ui_comp.owned_entities), owned_capabilities=list(ui_comp.owned_capabilities)),
+            ui_comp.id, LLDComponentType.UI_SURFACE, ui_comp.role, ui_comp.layout
+        ))
+        event_on_ui_task = TaskRecord(
+            id="TSK-EVT-UI-MISMATCH", title="Stream Telemetry Task", description="desc",
+            category=TaskCategory.API_ENDPOINT, parent_lld=ui_comp.id,
+            parent_hld=vehicle_task.parent_hld, parent_reqs=["REQ-VEH-EVT"],
+            parent_behaviors=[event_b_node.id]
+        )
+        gov_res_evt_ui = ArtifactGovernor.audit_task_governance([event_on_ui_task], r_graph_multi, [ui_comp], b_graph_multi)
+        self.assertTrue(gov_res_evt_ui.is_blocked, "ArtifactGovernor MUST block task when EVENT_PROCESSING is assigned to UI_SURFACE component!")
+        self.assertEqual(gov_res_evt_ui.validation_status, ValidationStatus.INVALID)
+        self.assertTrue(any("semantic capability responsibility mismatch" in r for r in gov_res_evt_ui.blocking_reasons))
 
         # 15. Invariant: LLDCompiler MUST NOT fabricate synthetic REQ-001 ancestry for ungrounded modules
         empty_r_graph = RequirementGraph()
