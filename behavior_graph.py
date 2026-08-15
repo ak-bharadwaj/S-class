@@ -268,6 +268,11 @@ class BehaviorGraph:
         }
 
     @classmethod
+    def from_governed_dict(cls, data: Dict[str, Any]) -> 'BehaviorGraph':
+        """Dedicated strict ingestion API for governed behavior graph artifacts."""
+        return cls.from_dict(data, strict=True)
+
+    @classmethod
     def from_dict(cls, data: Dict[str, Any], strict: bool = False) -> 'BehaviorGraph':
         if strict:
             if "version" not in data:

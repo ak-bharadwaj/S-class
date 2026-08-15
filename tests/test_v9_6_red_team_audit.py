@@ -68,6 +68,7 @@ from lld_compiler import (
     LLDParentRef,
     InteractionTransport,
     OperationClass,
+    UIInteractionCapability,
     CapabilityBinding
 )
 from task_compiler import (
@@ -1123,19 +1124,21 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
                 "operation_class": "INVALID_CLASS"
             })
 
-        # 43. Negative Attack Vector 38: CapabilityBinding.from_dict Strict Mode Rejects Missing Critical Identity Fields
-        with self.assertRaises(ValueError):
-            CapabilityBinding.from_dict({
-                "lld_component_id": "comp_dispatch",
-                "operation_class": "COMMAND_MUTATION"
-                # Missing behavior_id!
-            }, strict=True)
-        with self.assertRaises(ValueError):
-            CapabilityBinding.from_dict({
-                "behavior_id": "cmd_dispatch",
-                "operation_class": "COMMAND_MUTATION"
-                # Missing lld_component_id!
-            }, strict=True)
+        # 43. Negative Attack Vector 38: CapabilityBinding.from_governed_dict Strict Mode Rejects ANY Incomplete Governance Fields
+        base_valid_dict = valid_binding.to_dict()
+        self.assertIsInstance(CapabilityBinding.from_governed_dict(base_valid_dict), CapabilityBinding)
+
+        for required_key in [
+            "behavior_id", "lld_component_id", "operation_class", "target_entity",
+            "hld_capability", "allowed_component_types", "source_behavior_hash",
+            "source_requirement_hash", "source_hld_hash", "source_behavior_graph_version",
+            "source_requirement_graph_version", "source_hld_module_id",
+            "source_hld_version", "binding_hash"
+        ]:
+            incomplete_dict = dict(base_valid_dict)
+            incomplete_dict.pop(required_key)
+            with self.assertRaises(ValueError, msg=f"Strict CapabilityBinding deserialization MUST reject missing '{required_key}'"):
+                CapabilityBinding.from_governed_dict(incomplete_dict)
 
         # 44. Negative Attack Vector 39: Strict Positive Integer Graph Version Validation (Reject Non-Positive / Boolean / Missing in Strict Mode)
         with self.assertRaises(ValueError):
@@ -1152,9 +1155,9 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             RequirementGraph(version=False)
 
         with self.assertRaises(ValueError):
-            BehaviorGraph.from_dict({"nodes": [], "edges": []}, strict=True)
+            BehaviorGraph.from_governed_dict({"nodes": [], "edges": []})
         with self.assertRaises(ValueError):
-            RequirementGraph.from_dict({"nodes": [], "edges": []}, strict=True)
+            RequirementGraph.from_governed_dict({"nodes": [], "edges": []})
 
         # 45. Negative Attack Vector 40: Passive UI Surfaces (dashboard_view / inspector_view) Prohibited from COMMAND_MUTATION
         passive_dashboard_binding = CapabilityBinding(
@@ -1206,6 +1209,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             id=vehicle_comp.id, name="Fleet Dispatch Action Modal",
             component_type=LLDComponentType.UI_SURFACE,
             parent=vehicle_comp.parent, role="frontend_interface", layout="form_modal",
+            interaction_capability=UIInteractionCapability.SUBMITS_MUTATION,
             owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
             capability_bindings=[action_form_binding]
         )

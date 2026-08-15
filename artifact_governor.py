@@ -22,7 +22,7 @@ from typing import Dict, List, Set, Any, Optional, Tuple
 from behavior_graph import BehaviorGraph, BehaviorNodeType, EpistemicStatus
 from requirement_ir import RequirementGraph, RequirementNode
 from hld_compiler import HLDDesign, HLDModule, ADRRecord, ValidationStatus, ApprovalStatus
-from lld_compiler import LLDComponent, LLDComponentType, OperationClass, CapabilityBinding
+from lld_compiler import LLDComponent, LLDComponentType, OperationClass, UIInteractionCapability, CapabilityBinding
 from task_compiler import TaskRecord
 
 
@@ -745,17 +745,25 @@ class ArtifactGovernor:
                             f"Task {t.id} ({t.title}) semantic capability responsibility mismatch: operation class '{binding.operation_class.value}' for behavior '{beh_node.name}' does not permit component type '{parent_comp.component_type.value}' (allowed: {[ct.value for ct in binding.allowed_component_types]})."
                         )
 
-                    # H. Prohibited Component Role & Interaction Contract Verification
+                    # H. Prohibited Component Role & UI Interaction Capability Contract Verification
                     passive_layouts = {"read_only", "query_view", "dashboard_view", "telemetry_view", "inspector_view", "viewer"}
                     passive_roles = {"read_only_view", "read_model", "dashboard_viewer", "audit_viewer", "telemetry_viewer", "query_service"}
                     is_passive_mutation_ui = (
                         parent_comp.component_type == LLDComponentType.UI_SURFACE and
                         binding.operation_class == OperationClass.COMMAND_MUTATION and
-                        (parent_comp.layout in passive_layouts or parent_comp.role in passive_roles)
+                        (
+                            getattr(parent_comp, "interaction_capability", UIInteractionCapability.DISPLAYS_DATA) not in [
+                                UIInteractionCapability.SUBMITS_MUTATION,
+                                UIInteractionCapability.TRIGGERS_WORKFLOW,
+                                UIInteractionCapability.APPROVES_DECISION
+                            ] or
+                            parent_comp.layout in passive_layouts or
+                            parent_comp.role in passive_roles
+                        )
                     )
                     if parent_comp.role in binding.prohibited_component_roles or is_passive_mutation_ui:
                         reasons.append(
-                            f"Task {t.id} ({t.title}) semantic capability mismatch: operation class '{binding.operation_class.value}' for behavior '{beh_node.name}' is prohibited on component role '{parent_comp.role}' / layout '{parent_comp.layout}'."
+                            f"Task {t.id} ({t.title}) semantic capability mismatch: operation class '{binding.operation_class.value}' for behavior '{beh_node.name}' is prohibited on component role '{parent_comp.role}' / layout '{parent_comp.layout}' / interaction capability '{getattr(parent_comp, 'interaction_capability', 'DISPLAYS_DATA')}'."
                         )
 
                     # I. Target Entity Ownership Responsibility Contract Verification

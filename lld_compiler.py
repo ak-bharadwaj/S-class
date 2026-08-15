@@ -57,6 +57,15 @@ class OperationClass(str, Enum):
     STATE_TRANSITION = "STATE_TRANSITION"
 
 
+class UIInteractionCapability(str, Enum):
+    """Explicit semantic UI interaction capability model."""
+    READ_ONLY = "READ_ONLY"
+    DISPLAYS_DATA = "DISPLAYS_DATA"
+    SUBMITS_MUTATION = "SUBMITS_MUTATION"
+    APPROVES_DECISION = "APPROVES_DECISION"
+    TRIGGERS_WORKFLOW = "TRIGGERS_WORKFLOW"
+
+
 @dataclass
 class CapabilityBinding:
     """Formal binding between Behavior, Requirement, and LLD Component capability responsibility."""
@@ -120,14 +129,28 @@ class CapabilityBinding:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any], strict: bool = True) -> 'CapabilityBinding':
+    def from_governed_dict(cls, data: Dict[str, Any]) -> 'CapabilityBinding':
+        """Dedicated strict ingestion API for governed capability bindings."""
+        return cls.from_dict(data, strict=True)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any], strict: bool = False) -> 'CapabilityBinding':
         if strict:
-            if not data.get("behavior_id"):
-                raise ValueError("Missing mandatory 'behavior_id' in CapabilityBinding serialized data")
-            if not data.get("lld_component_id"):
-                raise ValueError("Missing mandatory 'lld_component_id' in CapabilityBinding serialized data")
-            if "operation_class" not in data or not data["operation_class"]:
-                raise ValueError("Missing mandatory 'operation_class' in CapabilityBinding serialized data (ZERO DEFAULT TOLERATED)")
+            mandatory_fields = [
+                "behavior_id", "lld_component_id", "operation_class", "target_entity",
+                "hld_capability", "allowed_component_types", "source_behavior_hash",
+                "source_requirement_hash", "source_hld_hash", "source_behavior_graph_version",
+                "source_requirement_graph_version", "source_hld_module_id",
+                "source_hld_version", "binding_hash"
+            ]
+            for field_name in mandatory_fields:
+                val = data.get(field_name)
+                if val is None or (isinstance(val, str) and not val.strip()):
+                    raise ValueError(f"Missing or empty mandatory governed field '{field_name}' in CapabilityBinding serialized data")
+                if field_name == "allowed_component_types" and (not isinstance(val, (list, tuple)) or len(val) == 0):
+                    raise ValueError("Missing or empty mandatory 'allowed_component_types' list in CapabilityBinding serialized data")
+                if field_name == "source_hld_version" and (not isinstance(val, int) or isinstance(val, bool) or int(val) <= 0):
+                    raise ValueError(f"Field 'source_hld_version' must be a positive integer in CapabilityBinding, got {val}")
 
         op_raw = data.get("operation_class")
         if not op_raw:
@@ -191,6 +214,7 @@ class LLDComponent:
     transport: InteractionTransport = InteractionTransport.REST_HTTP
     route: Optional[str] = None
     layout: str = "standard_view"
+    interaction_capability: UIInteractionCapability = UIInteractionCapability.DISPLAYS_DATA
     sub_components: List[str] = field(default_factory=list)
     api_endpoints: List[str] = field(default_factory=list)
     validation_rules: List[str] = field(default_factory=list)
@@ -210,6 +234,7 @@ class LLDComponent:
             "transport": self.transport.value,
             "route": self.route,
             "layout": self.layout,
+            "interaction_capability": self.interaction_capability.value,
             "sub_components": self.sub_components,
             "api_endpoints": self.api_endpoints,
             "validation_rules": self.validation_rules,
@@ -231,6 +256,7 @@ class LLDComponent:
             transport=InteractionTransport(data.get("transport", InteractionTransport.REST_HTTP.value)),
             route=data.get("route"),
             layout=data.get("layout", "standard_view"),
+            interaction_capability=UIInteractionCapability(data.get("interaction_capability", UIInteractionCapability.DISPLAYS_DATA.value)),
             sub_components=list(data.get("sub_components", [])),
             api_endpoints=list(data.get("api_endpoints", [])),
             validation_rules=list(data.get("validation_rules", [])),
@@ -454,6 +480,7 @@ class LLDCompiler:
                     transport=InteractionTransport.CLI_COMMAND,
                     route="cli://subcommands",
                     layout="cli_subcommand_dispatch",
+                    interaction_capability=UIInteractionCapability.SUBMITS_MUTATION,
                     sub_components=["ArgParser", "SubcommandRouter", "ConfigLoader", "ExitCodeHandler"],
                     api_endpoints=cli_endpoints,
                     validation_rules=["POSIX flag compliance", "Exit code 0 for success, 1 for error, 2 for usage failure"],
@@ -475,6 +502,7 @@ class LLDCompiler:
                     parent=parent_ref,
                     role="pipeline_worker",
                     transport=InteractionTransport.EVENT_TOPIC,
+                    interaction_capability=UIInteractionCapability.TRIGGERS_WORKFLOW,
                     sub_components=["StreamConsumer", "StageTransformer", "BatchSink"],
                     api_endpoints=mod_endpoints,
                     validation_rules=["At-least-once stream processing", "Dead-letter queue on schema error"],
@@ -496,6 +524,7 @@ class LLDCompiler:
                     parent=parent_ref,
                     role="event_handler",
                     transport=InteractionTransport.EVENT_TOPIC,
+                    interaction_capability=UIInteractionCapability.TRIGGERS_WORKFLOW,
                     sub_components=["KafkaMessageConsumer", "DomainEventHandler", "OutboxPublisher"],
                     api_endpoints=mod_endpoints,
                     validation_rules=["Idempotent message handling", "Transactional outbox commitment"],
@@ -534,6 +563,7 @@ class LLDCompiler:
                     role="backend_controller",
                     transport=InteractionTransport.REST_HTTP,
                     route=f"/api/{p_route}",
+                    interaction_capability=UIInteractionCapability.SUBMITS_MUTATION,
                     api_endpoints=mod_endpoints,
                     validation_rules=["Verify actor authorization", "Validate request payload schema"],
                     allowed_operation_classes=[OperationClass.COMMAND_MUTATION, OperationClass.READ_QUERY, OperationClass.STATE_TRANSITION],
@@ -553,6 +583,7 @@ class LLDCompiler:
                     parent=parent_ref,
                     role="domain_service",
                     transport=InteractionTransport.INTERNAL_FUNCTION,
+                    interaction_capability=UIInteractionCapability.SUBMITS_MUTATION,
                     sub_components=[f"{mod.name}TransactionManager", f"{mod.name}PolicyEvaluator"],
                     validation_rules=["Enforce state pre/post transitions", "Emit audit log side effects"],
                     allowed_operation_classes=[OperationClass.COMMAND_MUTATION, OperationClass.READ_QUERY, OperationClass.STATE_TRANSITION, OperationClass.EVENT_PROCESSING],
@@ -586,6 +617,7 @@ class LLDCompiler:
                         transport=InteractionTransport.REST_HTTP,
                         route=f"/{ui_route}",
                         layout="behavioral_workflow_surface",
+                        interaction_capability=UIInteractionCapability.SUBMITS_MUTATION,
                         sub_components=[f"{ent_stem}DetailHeader", f"{ent_stem}ActionToolbar", f"{ent_stem}AuditHistoryPanel"],
                         api_endpoints=mod_endpoints,
                         validation_rules=["UI actions trigger backend transport contracts"],

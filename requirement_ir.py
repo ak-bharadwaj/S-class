@@ -509,6 +509,11 @@ class RequirementGraph:
         }
 
     @classmethod
+    def from_governed_dict(cls, data: Dict[str, Any]) -> 'RequirementGraph':
+        """Dedicated strict ingestion API for governed requirement graph artifacts."""
+        return cls.from_dict(data, strict=True)
+
+    @classmethod
     def from_dict(cls, data: Dict[str, Any], strict: bool = False) -> 'RequirementGraph':
         if strict:
             if "version" not in data:
