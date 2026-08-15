@@ -224,6 +224,10 @@ class RequirementNode:
         json_bytes = json.dumps(payload, sort_keys=True).encode("utf-8")
         return hashlib.sha256(json_bytes).hexdigest()
 
+    def compute_canonical_hash(self) -> str:
+        """Alias for canonical_hash() for consistent interface."""
+        return self.canonical_hash()
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "id": self.id,

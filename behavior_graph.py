@@ -13,6 +13,7 @@ from enum import Enum
 from typing import Dict, List, Set, Any, Optional, Tuple
 import re
 import json
+import hashlib
 from domain_primitives import (
     DomainPrimitiveType,
     ProvenanceKind,
@@ -69,6 +70,26 @@ class BehaviorNode:
     to_state: Optional[str] = None
     policy_ids: List[str] = field(default_factory=list)
     description: str = ""
+
+    def compute_canonical_hash(self) -> str:
+        """Computes deterministic canonical SHA-256 hash capturing all semantic properties of this BehaviorNode."""
+        payload = {
+            "id": self.id,
+            "name": self.name,
+            "behavior_type": self.behavior_type.value,
+            "actor_id": self.actor_id,
+            "target_entity_id": self.target_entity_id,
+            "epistemic_status": self.epistemic_status.value,
+            "provenance": self.provenance.value,
+            "confidence": round(float(self.confidence), 4),
+            "evidence_ref": self.evidence_ref or "",
+            "from_state": self.from_state or "",
+            "to_state": self.to_state or "",
+            "policy_ids": sorted(self.policy_ids or []),
+            "description": self.description or ""
+        }
+        canonical_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
 
     def to_dict(self) -> Dict[str, Any]:
         return {

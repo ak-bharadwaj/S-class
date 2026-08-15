@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Set, Any, Optional, Tuple
 import json
+import hashlib
 
 from behavior_graph import BehaviorGraph, BehaviorNodeType, BehaviorRelationType, EpistemicStatus
 from requirement_ir import RequirementGraph, RequirementNode, RequirementKind, NFRCategory
@@ -104,6 +105,21 @@ class HLDModule:
     integration_points: List[str] = field(default_factory=list)
     security_boundary: str = "ROLE_BASED_ACCESS_CONTROL"
     consistency_model: str = "STRONG_TRANSACTIONAL"
+
+    def compute_canonical_hash(self) -> str:
+        """Computes deterministic canonical SHA-256 hash capturing all semantic properties of this HLDModule."""
+        payload = {
+            "id": self.id,
+            "name": self.name,
+            "system_boundary": self.system_boundary,
+            "owned_entities": sorted(self.owned_entities or []),
+            "owned_capabilities": sorted(self.owned_capabilities or []),
+            "integration_points": sorted(self.integration_points or []),
+            "security_boundary": self.security_boundary,
+            "consistency_model": self.consistency_model
+        }
+        canonical_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
 
     def to_dict(self) -> Dict[str, Any]:
         return {

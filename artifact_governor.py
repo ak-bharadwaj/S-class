@@ -485,7 +485,8 @@ class ArtifactGovernor:
         tasks: List[TaskRecord],
         r_graph: RequirementGraph,
         lld_components: List[LLDComponent],
-        b_graph: BehaviorGraph
+        b_graph: BehaviorGraph,
+        hld_modules: Optional[List[HLDModule]] = None
     ) -> GovernanceGateResult:
         reasons: List[str] = []
         if tasks and not lld_components:
@@ -629,18 +630,60 @@ class ArtifactGovernor:
                             )
 
                     # E. Upstream Source Artifact & Graph Lineage Integrity Verification
-                    expected_beh_hash = hashlib.sha256(f"{beh_node.id}|{beh_node.behavior_type.value}|{beh_node.target_entity_id}|{beh_node.name}".encode("utf-8")).hexdigest()
-                    if getattr(binding, "source_behavior_hash", "") and binding.source_behavior_hash != expected_beh_hash:
+                    # 1. Behavior Source Hash Verification (Mandatory & Canonical)
+                    if not getattr(binding, "source_behavior_hash", ""):
                         reasons.append(
-                            f"Task {t.id} ({t.title}) stale/tampered source_behavior_hash in binding: expected '{expected_beh_hash}', got '{binding.source_behavior_hash}'."
+                            f"Task {t.id} ({t.title}) missing mandatory source_behavior_hash in CapabilityBinding."
                         )
+                    else:
+                        expected_beh_hash = (
+                            beh_node.compute_canonical_hash() if hasattr(beh_node, "compute_canonical_hash")
+                            else hashlib.sha256(f"{beh_node.id}|{beh_node.behavior_type.value}|{beh_node.target_entity_id}|{beh_node.name}".encode("utf-8")).hexdigest()
+                        )
+                        if binding.source_behavior_hash != expected_beh_hash:
+                            reasons.append(
+                                f"Task {t.id} ({t.title}) stale/tampered source_behavior_hash in binding: expected '{expected_beh_hash}', got '{binding.source_behavior_hash}'."
+                            )
 
-                    matching_req_nodes = [r for r in r_graph.nodes.values() if beh_node.id in getattr(r, "source_behaviors", [])]
-                    expected_req_hash = hashlib.sha256(",".join(sorted([f"{r.id}:{r.capability}:{r.target}" for r in matching_req_nodes])).encode("utf-8")).hexdigest()
-                    if getattr(binding, "source_requirement_hash", "") and binding.source_requirement_hash != expected_req_hash:
+                    # 2. Requirement Source Hash Verification (Mandatory & Canonical)
+                    if not getattr(binding, "source_requirement_hash", ""):
                         reasons.append(
-                            f"Task {t.id} ({t.title}) stale/tampered source_requirement_hash in binding: expected '{expected_req_hash}', got '{binding.source_requirement_hash}'."
+                            f"Task {t.id} ({t.title}) missing mandatory source_requirement_hash in CapabilityBinding."
                         )
+                    else:
+                        matching_req_nodes = [r for r in r_graph.nodes.values() if beh_node.id in getattr(r, "source_behaviors", [])]
+                        req_payload = {
+                            "behavior_id": beh_node.id,
+                            "requirement_hashes": sorted([r.canonical_hash() if hasattr(r, "canonical_hash") else r.id for r in matching_req_nodes])
+                        }
+                        expected_req_hash = hashlib.sha256(json.dumps(req_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+                        if binding.source_requirement_hash != expected_req_hash:
+                            reasons.append(
+                                f"Task {t.id} ({t.title}) stale/tampered source_requirement_hash in binding: expected '{expected_req_hash}', got '{binding.source_requirement_hash}'."
+                            )
+
+                    # 3. HLD Module Source Hash Verification (Mandatory & Canonical)
+                    if not getattr(binding, "source_hld_hash", ""):
+                        reasons.append(
+                            f"Task {t.id} ({t.title}) missing mandatory source_hld_hash in CapabilityBinding."
+                        )
+                    else:
+                        hld_mod_map = {m.id: m for m in (hld_modules or [])}
+                        parent_hld_id = parent_comp.parent.hld_id if parent_comp.parent else ""
+                        if parent_hld_id in hld_mod_map:
+                            expected_hld_hash = hld_mod_map[parent_hld_id].compute_canonical_hash()
+                        else:
+                            expected_hld_hash = HLDModule(
+                                id=parent_hld_id,
+                                name=parent_comp.name,
+                                system_boundary="internal",
+                                owned_entities=list(parent_comp.owned_entities),
+                                owned_capabilities=list(parent_comp.owned_capabilities)
+                            ).compute_canonical_hash()
+                        if binding.source_hld_hash != expected_hld_hash:
+                            reasons.append(
+                                f"Task {t.id} ({t.title}) stale/tampered source_hld_hash in binding: expected '{expected_hld_hash}', got '{binding.source_hld_hash}'."
+                            )
 
                     # F. Component Identity Binding Verification
                     if binding.lld_component_id != parent_comp.id:

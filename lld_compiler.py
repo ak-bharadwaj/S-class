@@ -276,15 +276,16 @@ class LLDCompiler:
                 prohibited_roles.append("frontend_interface")
 
             # Source artifact / graph integrity hashes establishing upstream provenance
-            beh_content = f"{b_node.id}|{b_node.behavior_type.value}|{b_node.target_entity_id}|{b_node.name}"
-            source_beh_hash = hashlib.sha256(beh_content.encode("utf-8")).hexdigest()
+            source_beh_hash = b_node.compute_canonical_hash()
 
             matching_req_nodes = [r for r in r_graph.nodes.values() if b_node.id in getattr(r, "source_behaviors", [])]
-            req_content = ",".join(sorted([f"{r.id}:{r.capability}:{r.target}" for r in matching_req_nodes]))
-            source_req_hash = hashlib.sha256(req_content.encode("utf-8")).hexdigest()
+            req_payload = {
+                "behavior_id": b_node.id,
+                "requirement_hashes": sorted([r.canonical_hash() for r in matching_req_nodes])
+            }
+            source_req_hash = hashlib.sha256(json.dumps(req_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
 
-            hld_content = f"{mod.id}|{','.join(sorted(mod.owned_capabilities))}|{','.join(sorted(mod.owned_entities))}"
-            source_hld_hash = hashlib.sha256(hld_content.encode("utf-8")).hexdigest()
+            source_hld_hash = mod.compute_canonical_hash()
 
             b_binding = CapabilityBinding(
                 behavior_id=b_id,
