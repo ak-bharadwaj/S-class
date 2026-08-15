@@ -89,9 +89,9 @@ class AuthorizedFileChange:
 class AuthorizedChangeSet:
     changeset_id: str
     source_repository_state_hash: str  # Must strictly match planning snapshot repository_state_hash
+    source_execution_plan_hash: str   # Must strictly match planning execution plan hash
+    source_task_hashes: Dict[str, str]  # Mapping task_id -> task_content_hash
     authorized_changes: Dict[str, AuthorizedFileChange] = field(default_factory=dict)
-    source_execution_plan_hash: str = "DEFAULT_EXEC_PLAN"
-    source_task_hashes: Dict[str, str] = field(default_factory=dict)
     source_snapshot_id: Optional[str] = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat() + "Z")
     changeset_hash: str = ""
@@ -99,6 +99,10 @@ class AuthorizedChangeSet:
     def __post_init__(self):
         if not self.source_repository_state_hash:
             raise ValueError("AuthorizedChangeSet must carry non-empty source_repository_state_hash.")
+        if not self.source_execution_plan_hash:
+            raise ValueError("AuthorizedChangeSet must carry non-empty source_execution_plan_hash.")
+        if not self.source_task_hashes:
+            raise ValueError("AuthorizedChangeSet must carry non-empty source_task_hashes.")
         if not self.changeset_hash:
             self.changeset_hash = self.compute_canonical_hash()
 
@@ -147,12 +151,16 @@ class AuthorizedChangeSet:
             norm_k = k.replace("\\", "/").strip().lstrip("/")
             changes[norm_k] = AuthorizedFileChange.from_dict(v)
 
+        for req in ["changeset_id", "source_repository_state_hash", "source_execution_plan_hash", "source_task_hashes"]:
+            if req not in d:
+                raise ValueError(f"AuthorizedChangeSet missing mandatory field '{req}'")
+
         obj = cls(
             changeset_id=d["changeset_id"],
             source_repository_state_hash=d["source_repository_state_hash"],
+            source_execution_plan_hash=d["source_execution_plan_hash"],
+            source_task_hashes=dict(d["source_task_hashes"]),
             authorized_changes=changes,
-            source_execution_plan_hash=d.get("source_execution_plan_hash", "DEFAULT_EXEC_PLAN"),
-            source_task_hashes=dict(d.get("source_task_hashes", {})),
             source_snapshot_id=d.get("source_snapshot_id"),
             created_at=d.get("created_at", datetime.now(timezone.utc).isoformat() + "Z"),
             changeset_hash=d.get("changeset_hash", "")
@@ -162,11 +170,11 @@ class AuthorizedChangeSet:
     @classmethod
     def from_governed_dict(cls, d: Dict[str, Any], strict_governance: bool = True) -> "AuthorizedChangeSet":
         """
-        Fail-closed deserializer that authoritatively recomputes and checks changeset_hash.
+        Fail-closed deserializer that authoritatively recomputes and checks changeset_hash and mandatory lineage.
         """
         if not isinstance(d, dict):
             raise ValueError(f"Governed AuthorizedChangeSet must be a dictionary, got {type(d)}")
-        for req in ["changeset_id", "source_repository_state_hash", "authorized_changes"]:
+        for req in ["changeset_id", "source_repository_state_hash", "source_execution_plan_hash", "source_task_hashes", "authorized_changes"]:
             if req not in d:
                 raise ValueError(f"Governed AuthorizedChangeSet missing mandatory field '{req}'")
 

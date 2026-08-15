@@ -1291,7 +1291,11 @@ class ArtifactGovernor:
         if result_gov.is_blocked:
             reasons.extend([f"RESULT_SNAPSHOT_INTEGRITY_FAILED: {r}" for r in result_gov.blocking_reasons])
 
-        # 3. Audit ChangeSet Canonical Integrity
+        # 3. Audit ChangeSet Canonical Integrity & Lineage
+        if not getattr(changeset, "source_execution_plan_hash", None):
+            reasons.append("CHANGESET_LINEAGE_MISSING: ChangeSet missing mandatory source_execution_plan_hash.")
+        if not getattr(changeset, "source_task_hashes", None):
+            reasons.append("CHANGESET_LINEAGE_MISSING: ChangeSet missing mandatory source_task_hashes.")
         recomputed_cs_hash = changeset.compute_canonical_hash()
         if changeset.changeset_hash != recomputed_cs_hash:
             reasons.append(
@@ -1342,12 +1346,13 @@ class ArtifactGovernor:
             TargetRelation,
             ImplementationRelation,
             VerificationRelation,
-            TruthLevel,
             ImplementationStatus,
             CoverageStatus,
             ExecutionResult,
+            TruthLevel,
+            ResolutionKind,
             ProvenanceRecord,
-            ResolutionKind
+            SovereignCryptoAuthority
         )
 
         reasons: List[str] = []
@@ -1411,7 +1416,7 @@ class ArtifactGovernor:
                     reasons.append(f"INVALID_IMPLEMENTATION_STATUS: ImplementationRelation status must be IMPLEMENTED, VERIFIED, or STALE, got '{rel.status.value}'.")
 
                 # Sovereign Cryptographic ImplementationEvidence Verification
-                from world_model import ImplementationEvidence, verify_sovereign_evidence_signature
+                from world_model import ImplementationEvidence
                 ev = rel.evidence
                 if not ev or not isinstance(ev, (ImplementationEvidence, dict)):
                     reasons.append(f"MISSING_IMPLEMENTATION_EVIDENCE: ImplementationRelation for '{rel.symbol_id}' missing cryptographic ImplementationEvidence.")
@@ -1422,7 +1427,9 @@ class ArtifactGovernor:
                     expected_ev_hash = ev_obj.compute_evidence_hash()
                     if ev_obj.evidence_hash != expected_ev_hash:
                         reasons.append(f"INVALID_IMPLEMENTATION_EVIDENCE_HASH: evidence_hash mismatch on '{rel.symbol_id}'.")
-                    if not getattr(ev_obj, "evidence_signature", None) or not verify_sovereign_evidence_signature(ev_obj.evidence_hash, ev_obj.evidence_signature):
+                    if not getattr(ev_obj, "evidence_signature", None) or not SovereignCryptoAuthority.verify(
+                        "IMPLEMENTATION_EVIDENCE", ev_obj.issuer_subsystem, ev_obj.evidence_id, ev_obj.evidence_hash, ev_obj.evidence_signature
+                    ):
                         reasons.append(f"UNAUTHENTICATED_EVIDENCE_SIGNATURE: ImplementationEvidence for '{rel.symbol_id}' lacks valid sovereign HMAC signature.")
                     if not ev_obj.observed_delta_hash:
                         reasons.append(f"MISSING_OBSERVED_DELTA_HASH: ImplementationEvidence for '{rel.symbol_id}' lacks observed_delta_hash.")
@@ -1448,7 +1455,7 @@ class ArtifactGovernor:
                 elif prov.truth_level == TruthLevel.OBSERVED:
                     if rel.execution_status not in [ExecutionResult.PASSED, ExecutionResult.FAILED, ExecutionResult.ERRORED]:
                         reasons.append(f"INVALID_OBSERVED_EXECUTION_STATUS: OBSERVED verification relation requires concrete execution result, got '{rel.execution_status.value}'.")
-                    from world_model import VerificationEvidence, verify_sovereign_evidence_signature
+                    from world_model import VerificationEvidence
                     ev = rel.evidence
                     if not ev or not isinstance(ev, (VerificationEvidence, dict)):
                         reasons.append(f"MISSING_VERIFICATION_EVIDENCE: OBSERVED VerificationRelation missing cryptographic VerificationEvidence.")
@@ -1459,7 +1466,9 @@ class ArtifactGovernor:
                         expected_ev_hash = ev_obj.compute_evidence_hash()
                         if ev_obj.evidence_hash != expected_ev_hash:
                             reasons.append(f"INVALID_VERIFICATION_EVIDENCE_HASH: evidence_hash mismatch on '{rel.test_entity_id}'.")
-                        if not getattr(ev_obj, "evidence_signature", None) or not verify_sovereign_evidence_signature(ev_obj.evidence_hash, ev_obj.evidence_signature):
+                        if not getattr(ev_obj, "evidence_signature", None) or not SovereignCryptoAuthority.verify(
+                            "VERIFICATION_EVIDENCE", ev_obj.issuer_subsystem, ev_obj.evidence_id, ev_obj.evidence_hash, ev_obj.evidence_signature
+                        ):
                             reasons.append(f"UNAUTHENTICATED_EVIDENCE_SIGNATURE: VerificationEvidence for '{rel.test_entity_id}' lacks valid sovereign HMAC signature.")
                         if ev_obj.test_entity_id != rel.test_entity_id:
                             reasons.append(f"EVIDENCE_TEST_MISMATCH: VerificationEvidence test '{ev_obj.test_entity_id}' != relation test '{rel.test_entity_id}'.")

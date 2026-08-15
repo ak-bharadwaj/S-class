@@ -691,10 +691,22 @@ class SpecificationCompiler:
             snap_path = os.path.join(workspace_dir, ".agents", "repo_snapshot.json")
             RepositorySnapshotEngine.save_snapshot(repo_snapshot, snap_path)
 
-            # 3. Derive AuthorizedChangeSet from tasks
+            # 3. Derive AuthorizedChangeSet from tasks with strict lineage
+            source_task_hashes = {
+                t.id: (t.task_hash if hasattr(t, "task_hash") and t.task_hash else hashlib.sha256(t.id.encode("utf-8")).hexdigest())
+                for t in tasks
+            } if tasks else {"TASK-INIT": hashlib.sha256(b"TASK-INIT").hexdigest()}
+
+            source_execution_plan_hash = (
+                execution_plan.plan_hash if execution_plan and hasattr(execution_plan, "plan_hash") and execution_plan.plan_hash
+                else hashlib.sha256(";".join(sorted(source_task_hashes.values())).encode("utf-8")).hexdigest()
+            )
+
             authorized_changeset = AuthorizedChangeSet(
                 changeset_id=f"CS-{int(datetime.now(timezone.utc).timestamp())}",
                 source_repository_state_hash=repo_snapshot.repository_state_hash,
+                source_execution_plan_hash=source_execution_plan_hash,
+                source_task_hashes=source_task_hashes,
                 source_snapshot_id=repo_snapshot.snapshot_id
             )
             for t in tasks:

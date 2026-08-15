@@ -21,6 +21,7 @@ Sovereign Evidence & Monotonic Invalidation:
 - Repository drift automatically invalidates out-of-date implementations into ImplementationStatus.STALE.
 """
 
+import os
 import json
 import hashlib
 import uuid
@@ -181,21 +182,144 @@ class ProvenanceRecord:
 
 
 import hmac
-
-_SOVEREIGN_ENGINE_SECRET = b"sclass_sovereign_v11_secret_key_8f3a9e2c1b4d7e6f"
-
-
-def compute_sovereign_evidence_signature(evidence_hash: str, secret: bytes = _SOVEREIGN_ENGINE_SECRET) -> str:
-    """Computes HMAC-SHA256 signature for evidence authenticity within process boundary."""
-    return hmac.new(secret, evidence_hash.encode("utf-8"), hashlib.sha256).hexdigest()
+import secrets
 
 
-def verify_sovereign_evidence_signature(evidence_hash: str, signature: str, secret: bytes = _SOVEREIGN_ENGINE_SECRET) -> bool:
-    """Verifies HMAC-SHA256 signature against sovereign engine key."""
-    if not signature or not evidence_hash:
-        return False
-    expected = compute_sovereign_evidence_signature(evidence_hash, secret)
-    return hmac.compare_digest(expected, signature)
+class SovereignCryptoAuthority:
+    """
+    Sovereign cryptographic authority managing process-boundary key material
+    and domain-separated proof attestation without hard-coded secrets.
+    """
+    _in_process_key: Optional[bytes] = None
+    _in_process_key_id: str = "sovereign-root-v1"
+
+    @classmethod
+    def get_signing_key(cls) -> bytes:
+        env_key = os.environ.get("SCLASS_SOVEREIGN_KEY")
+        if env_key:
+            return env_key.encode("utf-8")
+        if cls._in_process_key is None:
+            cls._in_process_key = secrets.token_bytes(32)
+        return cls._in_process_key
+
+    @classmethod
+    def set_signing_key(cls, key_bytes: bytes, key_id: str = "sovereign-root-v1") -> None:
+        cls._in_process_key = key_bytes
+        cls._in_process_key_id = key_id
+
+    @classmethod
+    def get_key_id(cls) -> str:
+        return os.environ.get("SCLASS_SOVEREIGN_KEY_ID", cls._in_process_key_id)
+
+    @classmethod
+    def compute_domain_context(cls, artifact_type: str, issuer_id: str, evidence_id: str, evidence_hash: str) -> str:
+        return f"SCLASS_V11_DOMAIN:{artifact_type}:{issuer_id}:{evidence_id}:{evidence_hash}"
+
+    @classmethod
+    def sign(cls, artifact_type: str, issuer_id: str, evidence_id: str, evidence_hash: str) -> str:
+        context = cls.compute_domain_context(artifact_type, issuer_id, evidence_id, evidence_hash)
+        return hmac.new(cls.get_signing_key(), context.encode("utf-8"), hashlib.sha256).hexdigest()
+
+    @classmethod
+    def verify(cls, artifact_type: str, issuer_id: str, evidence_id: str, evidence_hash: str, signature: str) -> bool:
+        if not signature or not evidence_hash:
+            return False
+        expected = cls.sign(artifact_type, issuer_id, evidence_id, evidence_hash)
+        return hmac.compare_digest(expected, signature)
+
+
+def compute_sovereign_evidence_signature(evidence_hash: str, artifact_type: str = "IMPLEMENTATION_EVIDENCE", issuer_id: str = "SCLASS_PROMOTION_ENGINE", evidence_id: str = "") -> str:
+    """Computes domain-separated HMAC signature for evidence authenticity."""
+    return SovereignCryptoAuthority.sign(artifact_type, issuer_id, evidence_id, evidence_hash)
+
+
+def verify_sovereign_evidence_signature(evidence_hash: str, signature: str, artifact_type: str = "IMPLEMENTATION_EVIDENCE", issuer_id: str = "SCLASS_PROMOTION_ENGINE", evidence_id: str = "") -> bool:
+    """Verifies domain-separated HMAC signature against sovereign crypto authority."""
+    return SovereignCryptoAuthority.verify(artifact_type, issuer_id, evidence_id, evidence_hash, signature)
+
+
+# -----------------------------------------------------------------------------
+# Evidence Envelope Architecture
+# -----------------------------------------------------------------------------
+
+@dataclass
+class EvidenceEnvelope:
+    """
+    Standardized cryptographic evidence envelope enabling local HMAC and
+    distributed/asymmetric signatures without altering world model ontology.
+    """
+    envelope_id: str
+    artifact_type: str  # e.g. "IMPLEMENTATION_EVIDENCE" or "VERIFICATION_EVIDENCE"
+    issuer_id: str      # e.g. "SCLASS_PROMOTION_ENGINE" or "SCLASS_TEST_RUNNER"
+    algorithm: str      # e.g. "HMAC-SHA256"
+    key_id: str
+    evidence_payload: Dict[str, Any]
+    evidence_hash: str
+    signature: str
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat() + "Z")
+    canonical_hash: str = ""
+
+    def __post_init__(self):
+        if not self.signature:
+            self.signature = SovereignCryptoAuthority.sign(
+                self.artifact_type, self.issuer_id,
+                self.evidence_payload.get("evidence_id", ""),
+                self.evidence_hash
+            )
+        if not self.canonical_hash:
+            self.canonical_hash = self.compute_canonical_hash()
+
+    def compute_canonical_hash(self) -> str:
+        payload = {
+            "envelope_id": self.envelope_id,
+            "artifact_type": self.artifact_type,
+            "issuer_id": self.issuer_id,
+            "algorithm": self.algorithm,
+            "key_id": self.key_id,
+            "evidence_hash": self.evidence_hash,
+            "signature": self.signature,
+            "created_at": self.created_at
+        }
+        canonical_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+
+    def verify(self) -> bool:
+        if not SovereignCryptoAuthority.verify(
+            self.artifact_type, self.issuer_id,
+            self.evidence_payload.get("evidence_id", ""),
+            self.evidence_hash, self.signature
+        ):
+            return False
+        return self.canonical_hash == self.compute_canonical_hash()
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "envelope_id": self.envelope_id,
+            "artifact_type": self.artifact_type,
+            "issuer_id": self.issuer_id,
+            "algorithm": self.algorithm,
+            "key_id": self.key_id,
+            "evidence_payload": self.evidence_payload,
+            "evidence_hash": self.evidence_hash,
+            "signature": self.signature,
+            "created_at": self.created_at,
+            "canonical_hash": self.canonical_hash
+        }
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "EvidenceEnvelope":
+        return cls(
+            envelope_id=d["envelope_id"],
+            artifact_type=d["artifact_type"],
+            issuer_id=d["issuer_id"],
+            algorithm=d.get("algorithm", "HMAC-SHA256"),
+            key_id=d.get("key_id", "sovereign-root-v1"),
+            evidence_payload=d["evidence_payload"],
+            evidence_hash=d["evidence_hash"],
+            signature=d["signature"],
+            created_at=d.get("created_at", datetime.now(timezone.utc).isoformat() + "Z"),
+            canonical_hash=d.get("canonical_hash", "")
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -225,7 +349,9 @@ class ImplementationEvidence:
         if not self.evidence_hash:
             self.evidence_hash = self.compute_evidence_hash()
         if not self.evidence_signature:
-            self.evidence_signature = compute_sovereign_evidence_signature(self.evidence_hash)
+            self.evidence_signature = SovereignCryptoAuthority.sign(
+                "IMPLEMENTATION_EVIDENCE", self.issuer_subsystem, self.evidence_id, self.evidence_hash
+            )
 
     def compute_evidence_hash(self) -> str:
         payload = {
@@ -262,7 +388,9 @@ class ImplementationEvidence:
             "execution_record_id": self.execution_record_id,
             "timestamp": self.timestamp,
             "evidence_hash": self.evidence_hash or self.compute_evidence_hash(),
-            "evidence_signature": self.evidence_signature or compute_sovereign_evidence_signature(self.evidence_hash or self.compute_evidence_hash())
+            "evidence_signature": self.evidence_signature or SovereignCryptoAuthority.sign(
+                "IMPLEMENTATION_EVIDENCE", self.issuer_subsystem, self.evidence_id, self.evidence_hash or self.compute_evidence_hash()
+            )
         }
 
     @classmethod
@@ -316,7 +444,9 @@ class VerificationEvidence:
         if not self.evidence_hash:
             self.evidence_hash = self.compute_evidence_hash()
         if not self.evidence_signature:
-            self.evidence_signature = compute_sovereign_evidence_signature(self.evidence_hash)
+            self.evidence_signature = SovereignCryptoAuthority.sign(
+                "VERIFICATION_EVIDENCE", self.issuer_subsystem, self.evidence_id, self.evidence_hash
+            )
 
     def compute_evidence_hash(self) -> str:
         payload = {
@@ -351,7 +481,9 @@ class VerificationEvidence:
             "execution_receipt_hash": self.execution_receipt_hash,
             "timestamp": self.timestamp,
             "evidence_hash": self.evidence_hash or self.compute_evidence_hash(),
-            "evidence_signature": self.evidence_signature or compute_sovereign_evidence_signature(self.evidence_hash or self.compute_evidence_hash())
+            "evidence_signature": self.evidence_signature or SovereignCryptoAuthority.sign(
+                "VERIFICATION_EVIDENCE", self.issuer_subsystem, self.evidence_id, self.evidence_hash or self.compute_evidence_hash()
+            )
         }
 
     @classmethod

@@ -87,7 +87,9 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
 
         changeset = AuthorizedChangeSet(
             changeset_id="CS-001",
-            source_repository_state_hash=anchor.repository_state_hash
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash="plan_hash_001",
+            source_task_hashes={"TASK-001": "task_hash_001"}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -121,7 +123,9 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
         # ChangeSet ONLY authorizes editing src/app.py
         changeset = AuthorizedChangeSet(
             changeset_id="CS-002",
-            source_repository_state_hash=anchor.repository_state_hash
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash="plan_hash_002",
+            source_task_hashes={"TASK-001": "task_hash_001"}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -156,7 +160,9 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
         # ChangeSet ONLY authorizes creating src/button.py
         changeset = AuthorizedChangeSet(
             changeset_id="CS-003",
-            source_repository_state_hash=anchor.repository_state_hash
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash="plan_hash_003",
+            source_task_hashes={"TASK-001": "task_hash_001"}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/button.py",
@@ -190,7 +196,9 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
 
         changeset = AuthorizedChangeSet(
             changeset_id="CS-004",
-            source_repository_state_hash=anchor.repository_state_hash
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash="plan_hash_004",
+            source_task_hashes={"TASK-001": "task_hash_001"}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -223,7 +231,9 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
         # ChangeSet compiled against Snapshot A
         changeset = AuthorizedChangeSet(
             changeset_id="CS-005",
-            source_repository_state_hash=anchor_A.repository_state_hash
+            source_repository_state_hash=anchor_A.repository_state_hash,
+            source_execution_plan_hash="plan_hash_005",
+            source_task_hashes={"TASK-001": "task_hash_001"}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -257,7 +267,9 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
         # Authorize modifying app.py and creating helper.py
         changeset = AuthorizedChangeSet(
             changeset_id="CS-006",
-            source_repository_state_hash=anchor.repository_state_hash
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash="plan_hash_006",
+            source_task_hashes={"TASK-001": "task_hash_001", "TASK-002": "task_hash_002"}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -304,7 +316,9 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
 
         changeset = AuthorizedChangeSet(
             changeset_id="CS-007",
-            source_repository_state_hash=anchor.repository_state_hash
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash="plan_hash_007",
+            source_task_hashes={"TASK-001": "task_hash_001"}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",

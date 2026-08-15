@@ -407,6 +407,8 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
         changeset = AuthorizedChangeSet(
             changeset_id="CS-001",
             source_repository_state_hash=before_snap.repository_state_hash,
+            source_execution_plan_hash="plan_hash_1",
+            source_task_hashes={"TASK-001": "task_hash_1"},
             authorized_changes={
                 "src/a.py": AuthorizedFileChange(
                     file_path="src/a.py",
@@ -572,6 +574,8 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
         changeset = AuthorizedChangeSet(
             changeset_id="CS-BILL-01",
             source_repository_state_hash=before_snap.repository_state_hash,
+            source_execution_plan_hash="plan_hash_bill",
+            source_task_hashes={"TASK-BILL-01": "task_sha256_abc"},
             authorized_changes={
                 "src/billing.py": AuthorizedFileChange(
                     file_path="src/billing.py",
@@ -607,7 +611,7 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
         self.assertEqual(impl_rel.provenance.truth_level, TruthLevel.OBSERVED)
 
         gov_res1 = ArtifactGovernor.audit_world_model_governance(world_model, self.test_dir)
-        self.assertFalse(gov_res1.is_blocked)
+        self.assertFalse(gov_res1.is_blocked, msg=f"Governor blocked reasons: {gov_res1.blocking_reasons}")
 
         # Step 5: Issue Sovereign VerificationEvidence & Promote to VERIFIED
         verif_evidence = WorldModelPromotionEngine.issue_verification_evidence(
@@ -881,11 +885,105 @@ test('UserService returns user', async () => {
         raw_cs = {
             "changeset_id": "CS-TEST",
             "source_repository_state_hash": "hash_123",
+            "source_execution_plan_hash": "plan_123",
+            "source_task_hashes": {"TASK-001": "task_hash_1"},
             "authorized_changes": {}
         }
         with self.assertRaises(ValueError) as ctx:
             AuthorizedChangeSet.from_governed_dict(raw_cs, strict_governance=True)
         self.assertIn("missing mandatory 'changeset_hash'", str(ctx.exception))
+
+    # -------------------------------------------------------------------------
+    # Test 25: ChangeSet Missing Mandatory Lineage Fails Closed
+    # -------------------------------------------------------------------------
+    def test_v11_world_model_changeset_missing_mandatory_lineage_fails_closed(self):
+        """Invariant: AuthorizedChangeSet missing execution plan hash or task hashes fails closed."""
+        with self.assertRaises(ValueError) as ctx1:
+            AuthorizedChangeSet(
+                changeset_id="CS-NOLINEAGE",
+                source_repository_state_hash="hash_123",
+                source_execution_plan_hash="",
+                source_task_hashes={"TASK-001": "hash_1"}
+            )
+        self.assertIn("must carry non-empty source_execution_plan_hash", str(ctx1.exception))
+
+        with self.assertRaises(ValueError) as ctx2:
+            AuthorizedChangeSet(
+                changeset_id="CS-NOTASKS",
+                source_repository_state_hash="hash_123",
+                source_execution_plan_hash="plan_123",
+                source_task_hashes={}
+            )
+        self.assertIn("must carry non-empty source_task_hashes", str(ctx2.exception))
+
+    # -------------------------------------------------------------------------
+    # Test 26: Domain Separation Prevents Cross-Type Replay Attack
+    # -------------------------------------------------------------------------
+    def test_v11_world_model_domain_separation_cross_type_replay_fails_closed(self):
+        """Invariant: Using an ImplementationEvidence signature on a VerificationEvidence is rejected."""
+        self._create_file("src/service.py", "def run(): pass")
+        self._create_file("tests/test_service.py", "def test_run(): pass")
+        world_model = WorldModelEngine.build_world_model(self.test_dir)
+
+        # Generate signature for IMPLEMENTATION_EVIDENCE
+        from world_model import SovereignCryptoAuthority
+        impl_sig = SovereignCryptoAuthority.sign(
+            artifact_type="IMPLEMENTATION_EVIDENCE",
+            issuer_id="SCLASS_TEST_RUNNER",
+            evidence_id="verif_ev_123",
+            evidence_hash="hash_matching_payload"
+        )
+
+        # Replay implementation signature into VerificationEvidence
+        replayed_verif_ev = VerificationEvidence(
+            evidence_id="verif_ev_123",
+            issuer_subsystem="SCLASS_TEST_RUNNER",
+            test_entity_id="test://tests/test_service.py#test_run",
+            target_entity_id="sym://src/service.py#run",
+            test_framework="pytest",
+            repository_state_hash=world_model.repository_state_hash,
+            execution_result=ExecutionResult.PASSED,
+            exit_code=0,
+            execution_receipt_hash="receipt_123",
+            timestamp=datetime.now(timezone.utc).isoformat() + "Z",
+            evidence_signature=impl_sig  # Replayed signature
+        )
+
+        world_model.add_relation(VerificationRelation(
+            test_entity_id="test://tests/test_service.py#test_run",
+            target_entity_id="sym://src/service.py#run",
+            verification_kind=VerificationKind.DIRECT_UNIT_TEST,
+            coverage_status=CoverageStatus.DYNAMICALLY_OBSERVED,
+            execution_status=ExecutionResult.PASSED,
+            provenance=ProvenanceRecord(
+                truth_level=TruthLevel.OBSERVED,
+                source="TEST_RUNNER",
+                confidence=1.0,
+                evidence="Replay attack"
+            ),
+            evidence=replayed_verif_ev
+        ))
+
+        gov_res = ArtifactGovernor.audit_world_model_governance(world_model, self.test_dir)
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("UNAUTHENTICATED_EVIDENCE_SIGNATURE" in r for r in gov_res.blocking_reasons))
+
+    # -------------------------------------------------------------------------
+    # Test 27: Dynamic Ephemeral Key Rotation Invalidates Stale Signatures
+    # -------------------------------------------------------------------------
+    def test_v11_world_model_ephemeral_key_rotation_invalidates_stale_signatures(self):
+        """Invariant: Rotating the sovereign key renders signatures from prior key invalid."""
+        from world_model import SovereignCryptoAuthority
+        old_key = b"old_secret_key_1111111111111111"
+        new_key = b"new_secret_key_2222222222222222"
+
+        SovereignCryptoAuthority.set_signing_key(old_key)
+        old_sig = SovereignCryptoAuthority.sign("IMPLEMENTATION_EVIDENCE", "SCLASS_PROMOTION_ENGINE", "ev_1", "hash_1")
+        self.assertTrue(SovereignCryptoAuthority.verify("IMPLEMENTATION_EVIDENCE", "SCLASS_PROMOTION_ENGINE", "ev_1", "hash_1", old_sig))
+
+        # Rotate key
+        SovereignCryptoAuthority.set_signing_key(new_key)
+        self.assertFalse(SovereignCryptoAuthority.verify("IMPLEMENTATION_EVIDENCE", "SCLASS_PROMOTION_ENGINE", "ev_1", "hash_1", old_sig))
 
 
 if __name__ == "__main__":

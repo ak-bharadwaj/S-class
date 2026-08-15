@@ -1085,7 +1085,12 @@ class WorldModelPromotionEngine:
         # 1. Verify Sovereign Issuer & Signature
         if evidence.issuer_subsystem != "SCLASS_PROMOTION_ENGINE":
             raise ValueError(f"ImplementationEvidence issuer_subsystem must be 'SCLASS_PROMOTION_ENGINE', got '{evidence.issuer_subsystem}'.")
-        if not getattr(evidence, "evidence_signature", None) or not verify_sovereign_evidence_signature(evidence.evidence_hash, evidence.evidence_signature):
+        if not getattr(evidence, "evidence_signature", None) or not verify_sovereign_evidence_signature(
+            evidence.evidence_hash, evidence.evidence_signature,
+            artifact_type="IMPLEMENTATION_EVIDENCE",
+            issuer_id=evidence.issuer_subsystem,
+            evidence_id=evidence.evidence_id
+        ):
             raise ValueError("ImplementationEvidence lacks valid sovereign engine HMAC signature.")
 
         # 2. Verify Evidence Hash Integrity
@@ -1139,7 +1144,12 @@ class WorldModelPromotionEngine:
         # 1. Verify Sovereign Issuer & Signature
         if evidence.issuer_subsystem != "SCLASS_TEST_RUNNER":
             raise ValueError(f"VerificationEvidence issuer_subsystem must be 'SCLASS_TEST_RUNNER', got '{evidence.issuer_subsystem}'.")
-        if not getattr(evidence, "evidence_signature", None) or not verify_sovereign_evidence_signature(evidence.evidence_hash, evidence.evidence_signature):
+        if not getattr(evidence, "evidence_signature", None) or not verify_sovereign_evidence_signature(
+            evidence.evidence_hash, evidence.evidence_signature,
+            artifact_type="VERIFICATION_EVIDENCE",
+            issuer_id=evidence.issuer_subsystem,
+            evidence_id=evidence.evidence_id
+        ):
             raise ValueError("VerificationEvidence lacks valid sovereign engine HMAC signature.")
 
         # 2. Verify Evidence Hash Integrity
