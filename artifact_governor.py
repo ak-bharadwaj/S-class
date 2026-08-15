@@ -1198,18 +1198,40 @@ class ArtifactGovernor:
             if not is_partition_valid:
                 reasons.extend(partition_errors)
 
-        # 4. Authoritative Summary & Language Map Recomputation (Item 6)
-        for k, v in snapshot.classification_summary.items():
-            if recomputed_summary.get(k, 0) != v:
+        # 4. Authoritative Summary & Language Map Recomputation & Set-Completeness (Hardened)
+        stored_summary_keys = set(snapshot.classification_summary.keys())
+        recomputed_summary_keys = set(recomputed_summary.keys())
+        missing_summary_keys = recomputed_summary_keys - stored_summary_keys
+        extra_summary_keys = stored_summary_keys - recomputed_summary_keys
+
+        if missing_summary_keys:
+            reasons.append(f"RepositorySnapshot classification_summary missing categories: {sorted(missing_summary_keys)}.")
+        if extra_summary_keys:
+            reasons.append(f"RepositorySnapshot classification_summary contains unknown extra categories: {sorted(extra_summary_keys)}.")
+
+        for k in sorted(recomputed_summary_keys.intersection(stored_summary_keys)):
+            v = snapshot.classification_summary[k]
+            if recomputed_summary[k] != v:
                 reasons.append(
-                    f"RepositorySnapshot classification_summary mismatch for '{k}': claims {v}, recomputed from manifest is {recomputed_summary.get(k, 0)}."
+                    f"RepositorySnapshot classification_summary count mismatch for '{k}': claims {v}, recomputed from manifest is {recomputed_summary[k]}."
                 )
 
-        for lang, paths in snapshot.language_map.items():
-            expected_paths = sorted(recomputed_lang_map.get(lang, []))
+        stored_lang_keys = set(snapshot.language_map.keys())
+        recomputed_lang_keys = set(recomputed_lang_map.keys())
+        missing_lang_keys = recomputed_lang_keys - stored_lang_keys
+        extra_lang_keys = stored_lang_keys - recomputed_lang_keys
+
+        if missing_lang_keys:
+            reasons.append(f"RepositorySnapshot language_map missing languages present in manifest: {sorted(missing_lang_keys)}.")
+        if extra_lang_keys:
+            reasons.append(f"RepositorySnapshot language_map contains phantom languages: {sorted(extra_lang_keys)}.")
+
+        for lang in sorted(recomputed_lang_keys.intersection(stored_lang_keys)):
+            paths = snapshot.language_map[lang]
+            expected_paths = sorted(recomputed_lang_map[lang])
             if sorted(paths) != expected_paths:
                 reasons.append(
-                    f"RepositorySnapshot language_map mismatch for '{lang}': paths disagree with file_manifest."
+                    f"RepositorySnapshot language_map path list mismatch for '{lang}': claims disagree with file_manifest."
                 )
 
         # 5. Live Disk Synchronization Verification (Drift Check)

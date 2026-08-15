@@ -264,11 +264,12 @@ class RepositorySnapshot:
         """
         Computes deterministic, authoritative repository state identity.
         In-scope: tree_hash, file content hashes, structural classifications, language tags,
-        boundary flags, symlink statuses, and boundary partition structure.
+        boundary flags, symlink statuses and targets, classification evidence reasons,
+        and boundary partition structure.
         Out-of-scope: snapshot_timestamp and snapshot_id (guaranteeing 100% temporal reproducibility).
         """
         file_signatures = [
-            f"{path}:{entry.file_hash}:{entry.classification.value if hasattr(entry.classification, 'value') else str(entry.classification)}:{entry.language.value if hasattr(entry.language, 'value') else str(entry.language)}:{int(entry.is_generated)}:{int(entry.is_third_party)}:{int(entry.is_locked)}:{int(entry.is_symlink)}:{int(entry.is_external_symlink)}"
+            f"{path}:{entry.file_hash}:{entry.classification.value if hasattr(entry.classification, 'value') else str(entry.classification)}:{entry.language.value if hasattr(entry.language, 'value') else str(entry.language)}:{int(entry.is_generated)}:{int(entry.is_third_party)}:{int(entry.is_locked)}:{int(entry.is_symlink)}:{int(entry.is_external_symlink)}:{entry.symlink_target or ''}:{entry.classification_reason}"
             for path, entry in sorted(self.file_manifest.items())
         ]
         payload = {

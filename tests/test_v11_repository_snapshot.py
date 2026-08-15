@@ -275,7 +275,7 @@ class TestV11RepositorySnapshot(unittest.TestCase):
 
         gov_res = ArtifactGovernor.audit_repository_snapshot_governance(snap, self.test_dir)
         self.assertTrue(gov_res.is_blocked)
-        self.assertTrue(any("classification_summary mismatch" in r for r in gov_res.blocking_reasons))
+        self.assertTrue(any("classification_summary count mismatch" in r for r in gov_res.blocking_reasons))
 
     # -------------------------------------------------------------------------
     # V11.9: Hash Tampering Fails Governor
@@ -319,6 +319,95 @@ class TestV11RepositorySnapshot(unittest.TestCase):
         self.assertEqual(loaded.canonical_hash, snap.canonical_hash)
         self.assertEqual(loaded.tree_hash, snap.tree_hash)
         self.assertEqual(loaded.repository_state_hash, snap.repository_state_hash)
+
+    def test_v11_symlink_target_change_mutates_repository_state_hash(self):
+        """Blocker 1: Retargeting a symlink (even to identical content) mutates repository_state_hash."""
+        self._create_file("src/target_a.py", "val = 42")
+        self._create_file("src/target_b.py", "val = 42")
+
+        link_path = os.path.join(self.test_dir, "src", "active_target.py")
+        src_a = os.path.join(self.test_dir, "src", "target_a.py")
+        src_b = os.path.join(self.test_dir, "src", "target_b.py")
+
+        try:
+            os.symlink(src_a, link_path)
+        except OSError:
+            return  # Skip on Windows if privileges are lacking
+
+        snap1 = RepositorySnapshotEngine.capture_snapshot(self.test_dir, snapshot_id="SNP-1", snapshot_timestamp="2026-08-15T00:00:00Z")
+
+        # Retarget symlink to target_b.py (content is identical!)
+        os.unlink(link_path)
+        os.symlink(src_b, link_path)
+
+        snap2 = RepositorySnapshotEngine.capture_snapshot(self.test_dir, snapshot_id="SNP-1", snapshot_timestamp="2026-08-15T00:00:00Z")
+
+        # Tree hash is identical because file content bytes did not change
+        self.assertEqual(snap1.tree_hash, snap2.tree_hash)
+
+        # BUT repository_state_hash MUST differ because reference topology changed!
+        self.assertNotEqual(snap1.repository_state_hash, snap2.repository_state_hash)
+
+        is_match, errors = RepositorySnapshotEngine.reconcile_snapshot_match(snap1, snap2)
+        self.assertFalse(is_match)
+        self.assertTrue(any("repository_state_hash mismatch" in e for e in errors))
+
+    def test_v11_missing_or_extra_key_in_classification_summary_fails_governor(self):
+        """Item 2: Summary missing a key or containing unknown keys fails Governor set-completeness."""
+        self._create_file("src/app.py", "pass")
+        snap = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        # ATTACK 1: Missing category
+        snap_missing = RepositorySnapshot.from_dict(snap.to_dict())
+        del snap_missing.classification_summary["unknown"]
+        gov_res1 = ArtifactGovernor.audit_repository_snapshot_governance(snap_missing, self.test_dir)
+        self.assertTrue(gov_res1.is_blocked)
+        self.assertTrue(any("classification_summary missing categories" in r for r in gov_res1.blocking_reasons))
+
+        # ATTACK 2: Extra phantom category
+        snap_extra = RepositorySnapshot.from_dict(snap.to_dict())
+        snap_extra.classification_summary["phantom_category"] = 0
+        gov_res2 = ArtifactGovernor.audit_repository_snapshot_governance(snap_extra, self.test_dir)
+        self.assertTrue(gov_res2.is_blocked)
+        self.assertTrue(any("contains unknown extra categories" in r for r in gov_res2.blocking_reasons))
+
+    def test_v11_missing_or_extra_key_in_language_map_fails_governor(self):
+        """Item 3: Language map missing a language or containing phantom languages fails Governor."""
+        self._create_file("src/app.py", "pass")
+        snap = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        # ATTACK 1: Missing language
+        snap_missing = RepositorySnapshot.from_dict(snap.to_dict())
+        del snap_missing.language_map["python"]
+        gov_res1 = ArtifactGovernor.audit_repository_snapshot_governance(snap_missing, self.test_dir)
+        self.assertTrue(gov_res1.is_blocked)
+        self.assertTrue(any("language_map missing languages" in r for r in gov_res1.blocking_reasons))
+
+        # ATTACK 2: Extra phantom language
+        snap_extra = RepositorySnapshot.from_dict(snap.to_dict())
+        snap_extra.language_map["ruby"] = ["src/app.py"]
+        gov_res2 = ArtifactGovernor.audit_repository_snapshot_governance(snap_extra, self.test_dir)
+        self.assertTrue(gov_res2.is_blocked)
+        self.assertTrue(any("language_map contains phantom languages" in r for r in gov_res2.blocking_reasons))
+
+    def test_v11_tampered_classification_reason_mutates_repository_state_hash(self):
+        """Item 4: Tampering evidentiary classification_reason mutates repository_state_hash."""
+        self._create_file("src/app.py", "pass")
+        snap = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        original_state_hash = snap.repository_state_hash
+
+        # Modifying classification reason
+        snap.file_manifest["src/app.py"].classification_reason = "tampered reason without authoritative basis"
+        recomputed_state_hash = snap.compute_repository_state_hash()
+
+        # State hash must change
+        self.assertNotEqual(original_state_hash, recomputed_state_hash)
+
+        # Governor blocks because snapshot.repository_state_hash disagrees
+        gov_res = ArtifactGovernor.audit_repository_snapshot_governance(snap, self.test_dir)
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("repository_state_hash mismatch" in r for r in gov_res.blocking_reasons))
 
 
 if __name__ == "__main__":
