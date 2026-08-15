@@ -533,6 +533,83 @@ class TestV10ExecutionPlanner(unittest.TestCase):
         with self.assertRaises(ValueError):
             ExecutionCheckpoint.from_dict(tampered_dict, strict=True)
 
+    def test_v10_final_unknown_agent_capability_id_fails_closed(self):
+        """Final Hardening: Unknown/forged agent capability ID fails closed in Governor."""
+        comp = LLDComponent("ctrl_test", "Test Controller", LLDComponentType.CONTROLLER, LLDParentRef("mod_t", ["REQ-1"], ["cmd_1"]), "backend_controller", ComponentExecutionCapability.MUTATE, api_endpoints=["POST /api/test"])
+        comp.component_hash = comp.compute_canonical_hash()
+        task = TaskRecord("TSK-F1", "Test Task", "desc", TaskCategory.API_ENDPOINT, comp.id, "mod_t", ["REQ-1"], ["cmd_1"], source_lld_hash=comp.component_hash)
+        task.task_hash = task.compute_canonical_hash()
+
+        plan = ExecutionPlanCompiler.compile_execution_plan([task], [comp])
+
+        # Forge unknown agent_capability_id
+        plan.tasks["ETSK-F1"].assigned_agent = AgentAssignment(
+            task_id="ETSK-F1",
+            agent_role="rogue_agent",
+            agent_capability_id="cap_fake_999",
+            assignment_rationale="Forged capability"
+        )
+        plan.tasks["ETSK-F1"].task_hash = plan.tasks["ETSK-F1"].compute_canonical_hash()
+        plan.plan_hash = plan.compute_canonical_hash()
+
+        gov_res = ArtifactGovernor.audit_execution_plan_governance(plan, [task], [comp])
+        self.assertTrue(gov_res.is_blocked, "Governor MUST block task with unknown agent capability ID!")
+        self.assertTrue(any("is unknown in canonical capability registry" in r for r in gov_res.blocking_reasons))
+
+    def test_v10_final_required_agent_capability_mismatch_fails_closed(self):
+        """Final Hardening: required_agent_capability must match assigned agent role/capability."""
+        comp = LLDComponent("ctrl_test", "Test Controller", LLDComponentType.CONTROLLER, LLDParentRef("mod_t", ["REQ-1"], ["cmd_1"]), "backend_controller", ComponentExecutionCapability.MUTATE, api_endpoints=["POST /api/test"])
+        comp.component_hash = comp.compute_canonical_hash()
+        task = TaskRecord("TSK-F2", "Test Task", "desc", TaskCategory.API_ENDPOINT, comp.id, "mod_t", ["REQ-1"], ["cmd_1"], source_lld_hash=comp.component_hash)
+        task.task_hash = task.compute_canonical_hash()
+
+        plan = ExecutionPlanCompiler.compile_execution_plan([task], [comp])
+
+        # Mismatch required_agent_capability
+        plan.tasks["ETSK-F2"].required_agent_capability = "security_auditor"
+        plan.tasks["ETSK-F2"].task_hash = plan.tasks["ETSK-F2"].compute_canonical_hash()
+        plan.plan_hash = plan.compute_canonical_hash()
+
+        gov_res = ArtifactGovernor.audit_execution_plan_governance(plan, [task], [comp])
+        self.assertTrue(gov_res.is_blocked, "Governor MUST block task with mismatched required_agent_capability!")
+        self.assertTrue(any("does not match assigned agent" in r for r in gov_res.blocking_reasons))
+
+    def test_v10_final_conflicting_multi_operation_task_rejected(self):
+        """Final Hardening: TaskRecord with conflicting multi-operation classes (e.g. COMMAND + QUERY) is rejected."""
+        b_cmd = BehaviorNode("cmd_order", "Create Order", BehaviorNodeType.COMMAND, "user", "order", EpistemicStatus.EXPLICIT, ProvenanceKind.EXPLICIT, 1.0)
+        b_query = BehaviorNode("query_order", "View Order", BehaviorNodeType.QUERY, "user", "order", EpistemicStatus.EXPLICIT, ProvenanceKind.EXPLICIT, 1.0)
+
+        b_graph = BehaviorGraph(version=1)
+        b_graph.add_node(b_cmd)
+        b_graph.add_node(b_query)
+
+        comp = LLDComponent("ctrl_order", "Order Controller", LLDComponentType.CONTROLLER, LLDParentRef("mod_o", ["REQ-1"], ["cmd_order", "query_order"]), "backend_controller", ComponentExecutionCapability.MUTATE)
+        comp.component_hash = comp.compute_canonical_hash()
+
+        # Incoherent task combining COMMAND and QUERY
+        multi_op_task = TaskRecord("TSK-MULTI", "Incoherent Multi-Op Task", "desc", TaskCategory.API_ENDPOINT, comp.id, "mod_o", ["REQ-1"], ["cmd_order", "query_order"], source_lld_hash=comp.component_hash)
+        multi_op_task.task_hash = multi_op_task.compute_canonical_hash()
+
+        plan = ExecutionPlanCompiler.compile_execution_plan([multi_op_task], [comp], b_graph=b_graph)
+        self.assertFalse(plan.is_valid, "Plan MUST reject tasks containing conflicting multi-operation behaviors!")
+        self.assertTrue(any("contains conflicting multi-operation behaviors" in r for r in plan.validation_reasons))
+
+    def test_v10_final_ui_interaction_capability_operation_class_semantics(self):
+        """Final Hardening: UI tasks inherit operation class from interaction_capability instead of hardcoded read_query."""
+        comp_mutate_ui = LLDComponent(
+            "ui_submit", "Order Submission Form", LLDComponentType.UI_SURFACE,
+            LLDParentRef("mod_ui", ["REQ-1"], ["cmd_submit"]), "frontend_interface",
+            interaction_capability=UIInteractionCapability.SUBMITS_MUTATION
+        )
+        comp_mutate_ui.component_hash = comp_mutate_ui.compute_canonical_hash()
+
+        t_mutate = TaskRecord("TSK-UI-M", "Build Submit UI", "desc", TaskCategory.UI_COMPONENT, comp_mutate_ui.id, "mod_ui", ["REQ-1"], ["cmd_submit"], source_lld_hash=comp_mutate_ui.component_hash)
+        t_mutate.task_hash = t_mutate.compute_canonical_hash()
+
+        plan = ExecutionPlanCompiler.compile_execution_plan([t_mutate], [comp_mutate_ui])
+        self.assertTrue(plan.is_valid)
+        self.assertEqual(plan.tasks["ETSK-UI-M"].operation_class, "command_mutation", "Submitting mutation UI MUST inherit command_mutation operation class!")
+
 
 if __name__ == "__main__":
     unittest.main()

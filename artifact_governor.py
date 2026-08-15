@@ -1033,14 +1033,23 @@ class ArtifactGovernor:
                         )
                     claimed_write_res.update(write_res)
 
-        # 6. Agent Assignment & Operation Class Compatibility Verification (Blocker 1)
+        # 6. Agent Assignment & Operation Class Compatibility Verification (Blocker 1 & Final Hardening)
         for t_id, task in plan.tasks.items():
             if not task.assigned_agent:
                 reasons.append(f"ExecutionTask '{t_id}' ({task.title}) has no capable agent assignment.")
             else:
                 from execution_plan_compiler import DEFAULT_AGENT_CAPABILITIES
                 cap = DEFAULT_AGENT_CAPABILITIES.get(task.assigned_agent.agent_capability_id)
-                if cap:
+                if not cap:
+                    reasons.append(
+                        f"ExecutionTask '{t_id}' assigned agent capability ID '{task.assigned_agent.agent_capability_id}' is unknown in canonical capability registry."
+                    )
+                else:
+                    if task.required_agent_capability and task.required_agent_capability.lower() not in [cap.agent_role.lower(), cap.id.lower(), task.assigned_agent.agent_role.lower(), task.assigned_agent.agent_capability_id.lower()]:
+                        reasons.append(
+                            f"ExecutionTask '{t_id}' required_agent_capability '{task.required_agent_capability}' does not match assigned agent '{task.assigned_agent.agent_role}' ({task.assigned_agent.agent_capability_id})."
+                        )
+
                     if task.operation_class.lower() not in [op.lower() for op in cap.supported_operation_classes]:
                         reasons.append(
                             f"ExecutionTask '{t_id}' assigned agent '{task.assigned_agent.agent_role}' does not support required operation class '{task.operation_class}' (supported: {cap.supported_operation_classes})."
