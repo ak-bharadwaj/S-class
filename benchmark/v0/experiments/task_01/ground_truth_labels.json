@@ -1,0 +1,84 @@
+{
+  "task_id": "TASK-01-FINTECH-LEDGER",
+  "raw_prompt": "Implement an atomic financial ledger transaction with debit/credit balance invariance and idempotency check.",
+  "canonical_semantic_units": {
+    "atomic": {
+      "ground_truth_class": "INVARIANT",
+      "rationale": "Atomicity is an ACID system invariant (all-or-nothing execution), not an entity or UI component."
+    },
+    "financial ledger": {
+      "ground_truth_class": "ENTITY",
+      "rationale": "Ledger is a core domain entity / aggregate root storing accounting records."
+    },
+    "transaction": {
+      "ground_truth_class": "ENTITY",
+      "rationale": "Transaction is a primary business entity representing a financial posting event."
+    },
+    "debit/credit": {
+      "ground_truth_class": "ATTRIBUTE",
+      "rationale": "Debits and credits are numeric entry attributes / posting line types on a transaction."
+    },
+    "balance invariance": {
+      "ground_truth_class": "INVARIANT",
+      "rationale": "Debit sum must equal credit sum. A mathematical balance equation that must never be violated."
+    },
+    "idempotency check": {
+      "ground_truth_class": "BEHAVIOR",
+      "rationale": "Deduplication mechanism preventing duplicate execution of identical client requests."
+    },
+    "implement": {
+      "ground_truth_class": "NOISE",
+      "rationale": "Imperative directive keyword from user instruction."
+    }
+  },
+  "canonical_domain_requirements": {
+    "REQ-EXP-01": {
+      "title": "Post Double-Entry Transaction",
+      "expected_type": "EXPLICIT",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT"
+    },
+    "REQ-EXP-02": {
+      "title": "Validate Debit Equal Credit Balance Invariance",
+      "expected_type": "EXPLICIT",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT"
+    },
+    "REQ-EXP-03": {
+      "title": "Idempotency Key Deduplication Check",
+      "expected_type": "EXPLICIT",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT"
+    },
+    "REQ-DER-01": {
+      "title": "Row-Level Account Balance Locking",
+      "expected_type": "DERIVED_JUSTIFIED",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "CONCURRENCY_SAFETY"
+    },
+    "REQ-DER-02": {
+      "title": "Disallow Negative Amount / Non-Zero Transfer Guard",
+      "expected_type": "DERIVED_JUSTIFIED",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "ACCOUNTING_VALIDATION"
+    },
+    "REQ-DER-03": {
+      "title": "Append-Only Immutable Audit Trail",
+      "expected_type": "DERIVED_JUSTIFIED",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "LEDGER_INTEGRITY"
+    },
+    "REQ-INV-01": {
+      "title": "Atomic Database Transaction Rollback on Failure",
+      "expected_type": "SUPPORTED",
+      "epistemic_status": "SUPPORTED",
+      "provenance": "ACID_TRANSACTION"
+    }
+  },
+  "forbidden_hallucinations": [
+    "CRUD workspace for idempotency checks",
+    "Registration page for ledger transactions",
+    "Generic search UI for balance invariance",
+    "Soft-delete endpoint for accounting entries"
+  ]
+}

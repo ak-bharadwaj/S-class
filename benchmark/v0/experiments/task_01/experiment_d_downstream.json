@@ -1,0 +1,24 @@
+{
+  "experiment": "EXPERIMENT D \u2014 Full Downstream Path",
+  "requirement_ir_nodes_count": 9,
+  "requirement_ir_invariants": 5,
+  "hld_modules_count": 2,
+  "lld_components_count": 2,
+  "compiled_tasks_count": 3,
+  "execution_plan_batches_count": 2,
+  "execution_plan_batches": [
+    [
+      "ETASK-T01",
+      "ETASK-T03"
+    ],
+    [
+      "ETASK-T02"
+    ]
+  ],
+  "changeset_authorized_files_count": 4,
+  "changeset_boundary_violations": 0,
+  "target_promoted_to_implemented": true,
+  "implemented_promoted_to_verified": true,
+  "final_truth_level": "OBSERVED",
+  "downstream_integrity_preserved": true
+}

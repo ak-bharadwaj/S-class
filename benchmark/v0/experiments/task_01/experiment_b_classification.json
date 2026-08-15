@@ -1,0 +1,60 @@
+{
+  "classifications": [
+    {
+      "unit": "atomic financial ledger transaction",
+      "class": "ENTITY",
+      "confidence": 0.94,
+      "justification": "Refers to a core domain aggregate root and transactional data object within a financial ledger system with atomic execution semantics.",
+      "uncertainty": 0.06
+    },
+    {
+      "unit": "debit/credit balance invariance",
+      "class": "INVARIANT",
+      "confidence": 0.98,
+      "justification": "Specifies a formal mathematical/accounting rule (double-entry zero-sum equality) that must never be violated across ledger entries.",
+      "uncertainty": 0.02
+    },
+    {
+      "unit": "idempotency check",
+      "class": "BEHAVIOR",
+      "confidence": 0.95,
+      "justification": "Represents a dynamic system operational protocol and deduplication response mechanism to safely handle duplicate incoming requests.",
+      "uncertainty": 0.05
+    },
+    {
+      "unit": "atomic",
+      "class": "INVARIANT",
+      "confidence": 0.91,
+      "justification": "Refers to the ACID atomicity property and integrity rule requiring that transactions execute all-or-nothing without partial state persistence.",
+      "uncertainty": 0.09
+    },
+    {
+      "unit": "financial ledger transaction",
+      "class": "ENTITY",
+      "confidence": 0.97,
+      "justification": "A primary domain data object and transactional aggregate root representing a recorded financial transfer in the ledger.",
+      "uncertainty": 0.03
+    },
+    {
+      "unit": "debit/credit",
+      "class": "ATTRIBUTE",
+      "confidence": 0.88,
+      "justification": "Represents the data fields, entry types, or financial properties associated with ledger entries.",
+      "uncertainty": 0.12
+    },
+    {
+      "unit": "balance invariance",
+      "class": "INVARIANT",
+      "confidence": 0.97,
+      "justification": "Specifies a mathematical and logical integrity constraint requiring that account or ledger balances remain consistent without violation.",
+      "uncertainty": 0.03
+    },
+    {
+      "unit": "implement",
+      "class": "NOISE",
+      "confidence": 0.99,
+      "justification": "A generic procedural verb/scaffolding term explicitly categorized as conversational noise in engineering requirements specification.",
+      "uncertainty": 0.01
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+{
+  "raw_prompt": "Implement an atomic financial ledger transaction with debit/credit balance invariance and idempotency check.",
+  "inferred_requirements": [
+    {
+      "requirement_id": "REQ-01",
+      "title": "Double-Entry Debit and Credit Balance Invariance",
+      "description": "For every financial transaction consisting of multiple ledger entry legs, the total sum of all debits must strictly equal the total sum of all credits (sum(debits) - sum(credits) = 0). Any transaction where debits do not balance credits must be rejected prior to state mutation.",
+      "type": "INVARIANT",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Step 1: The prompt explicitly demands 'debit/credit balance invariance'. Step 2: In double-entry bookkeeping, the fundamental mathematical equality is sum(debits) == sum(credits). Step 3: Enforcing zero-sum invariance ensures value conservation and prevents unauthorized creation or destruction of monetary value."
+    },
+    {
+      "requirement_id": "REQ-02",
+      "title": "Atomic Execution and Failure Rollback Boundary",
+      "description": "All debit and credit legs of a transaction, together with account balance mutations, must execute within an indivisible atomic boundary. If any entry, constraint check, or database persistence fails, all intermediate mutations must be rolled back completely to leave the ledger in its pre-transaction consistent state.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Step 1: The prompt explicitly requires an 'atomic financial ledger transaction'. Step 2: Under the ACID contract, atomicity requires an all-or-nothing execution guarantee. Step 3: If a debit succeeds but a credit fails, partial state persistence corrupts ledger integrity; therefore, full rollback on any failure is mathematically and technically necessary."
+    },
+    {
+      "requirement_id": "REQ-03",
+      "title": "Idempotency Key Deduplication and Replay Prevention",
+      "description": "The transaction processor must accept a unique idempotency key per transaction request. If a transaction with the same key has already been executed successfully, the system must return the existing transaction record without duplicate execution. In-flight concurrent requests with identical keys must be deduplicated or serialized.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Step 1: The user prompt explicitly requests an 'idempotency check'. Step 2: Distributed client retries and network reconnects routinely send duplicate mutation requests. Step 3: An idempotency guard guarantees f(x) = f(f(x)), preventing duplicate debit/credit side effects."
+    },
+    {
+      "requirement_id": "REQ-04",
+      "title": "Row-Level Account Balance Locking Under Concurrency",
+      "description": "Concurrent transactions touching the same account records must acquire row-level locks (e.g. pessimistic SELECT FOR UPDATE or deterministic version-based optimistic locking) in a consistent canonical order to eliminate race conditions, lost updates, and deadlocks.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "CONCURRENCY_SAFETY",
+      "confidence": 0.96,
+      "justification": "Step 1: Financial transactions execute concurrently against shared accounts under high throughput. Step 2: Without row-level synchronization, read-modify-write interleaving causes lost balance updates and race conditions. Step 3: Row-level balance locking is technically necessary to uphold atomicity and balance invariants under concurrency."
+    },
+    {
+      "requirement_id": "REQ-05",
+      "title": "Strictly Positive Transfer Amount Validation",
+      "description": "All monetary amounts in transaction entry legs must be strictly positive non-zero quantities (amount > 0). Zero-value legs and negative amounts must be rejected to prevent semantic inversion of debits and credits and ledger pollution.",
+      "type": "INVARIANT",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "DOMAIN_INVARIANT",
+      "confidence": 0.95,
+      "justification": "Step 1: In formal double-entry accounting, directionality is determined by entry classification (debit vs credit), not negative signs. Step 2: Allowing negative amounts subverts balance invariants and ledger polarity. Step 3: Disallowing non-positive amounts is a derived domain rule necessary for accounting correctness."
+    },
+    {
+      "requirement_id": "REQ-06",
+      "title": "Immutable Append-Only Ledger History",
+      "description": "Committed transaction records and journal entries must be immutable and append-only. Direct updates (UPDATE) or physical deletions (DELETE) on historical accounting entries are prohibited; corrections must be executed as compensating reversing journal entries.",
+      "type": "INVARIANT",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "DOMAIN_INVARIANT",
+      "confidence": 0.94,
+      "justification": "Step 1: The core domain standard for financial ledgers is non-repudiation and auditability. Step 2: Modifying or deleting committed entries destroys the audit trail and compromises cryptographic/forensic integrity. Step 3: Append-only immutability is mathematically necessary to guarantee ledger history consistency."
+    },
+    {
+      "requirement_id": "REQ-07",
+      "title": "Account Balance Solvency and Overdraft Protection",
+      "description": "Before applying debit balance mutations, the system must verify that the source account maintains sufficient cleared funds or an explicitly authorized overdraft limit, preventing unauthorized negative balance states.",
+      "type": "INVARIANT",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "DOMAIN_INVARIANT",
+      "confidence": 0.92,
+      "justification": "Step 1: Financial ledgers model real-world asset solvency and credit constraints. Step 2: Permitting uncontrolled debits beyond available balance creates uncollateralized credit risk and violates asset balance floors. Step 3: Balance sufficiency verification is a derived domain invariant."
+    },
+    {
+      "requirement_id": "REQ-08",
+      "title": "Exact Precision Fixed-Point / Minor-Unit Representation",
+      "description": "All monetary values and ledger calculations must use exact fixed-point decimals or integer minor units (e.g., integer cents) to prevent binary floating-point rounding errors (IEEE 754).",
+      "type": "INVARIANT",
+      "epistemic_status": "SUPPORTED",
+      "provenance": "DOMAIN_INVARIANT",
+      "confidence": 0.95,
+      "justification": "Step 1: Standard floating-point arithmetic introduces fractional binary precision artifacts (e.g., 0.1 + 0.2 != 0.3). Step 2: Balance invariance requires exact equality (debits - credits == 0). Step 3: Fixed-point or integer minor-unit arithmetic is a prerequisite for exact zero-sum validation."
+    },
+    {
+      "requirement_id": "REQ-09",
+      "title": "ACID Database Rollback on Execution Exception",
+      "description": "In the event of an unhandled runtime error, lock acquisition timeout, or integrity violation during transaction execution, the underlying database connection must execute a ROLLBACK instruction to guarantee zero partial state leakage.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "SUPPORTED",
+      "provenance": "ACID_CONTRACT",
+      "confidence": 0.98,
+      "justification": "Step 1: System failures, concurrency conflicts, or network partitions can interrupt execution midway. Step 2: Atomic transaction semantics dictate that incomplete transactions must leave no persistent artifacts. Step 3: Explicit transaction rollback handling is technically necessary to satisfy the ACID contract."
+    },
+    {
+      "requirement_id": "REQ-10",
+      "title": "Underspecified Domain Schema and Multi-Currency Rules",
+      "description": "Specific Chart of Accounts classification, multi-currency foreign exchange settlement rules, and tenant routing keys are not specified in the raw prompt and must not be hallucinated without explicit domain configuration.",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 0.85,
+      "justification": "Step 1: The user prompt specifies transaction-level operational invariants ('atomic', 'balance invariance', 'idempotency'). Step 2: Broader organizational details such as multi-currency routing or specific account taxonomies are unstated. Step 3: Per epistemic grounding rules, unstated business features are designated UNKNOWN rather than invented."
+    }
+  ]
+}

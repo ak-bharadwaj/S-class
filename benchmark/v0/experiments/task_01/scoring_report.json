@@ -1,0 +1,43 @@
+{
+  "task_id": "TASK-01-FINTECH-LEDGER",
+  "ground_truth_canonical_units_count": 7,
+  "ground_truth_canonical_requirements_count": 7,
+  "experiment_a_baseline": {
+    "total_generated_requirements": 103,
+    "generated_ui_page_spreads": 48,
+    "requirement_explosion_factor": 14.71,
+    "conflation_failure_observed": true,
+    "conflation_details": "Coerced 'atomic financial ledger transaction' into Role and 'debit/credit balance invariance' into full CRUD capability."
+  },
+  "experiment_b_classification": {
+    "accuracy": 0.7143,
+    "entity_precision": 0.0,
+    "entity_recall": 0.0,
+    "invariant_precision": 1.0,
+    "invariant_recall": 1.0,
+    "behavior_precision": 1.0,
+    "behavior_recall": 1.0,
+    "noise_filtered": true
+  },
+  "experiment_c_grounded_inference": {
+    "total_inferred_requirements": 10,
+    "explicit_requirements_count": 3,
+    "derived_justified_count": 4,
+    "supported_count": 2,
+    "unknown_clarifications_count": 1,
+    "unsupported_inference_rate": 0.0,
+    "ambiguity_unknown_rate": 0.1,
+    "useful_inference_recall": 1.2857,
+    "requirement_explosion_factor": 1.43,
+    "ui_hallucinations_injected": 0
+  },
+  "experiment_d_downstream": {
+    "requirement_ir_node_count": 9,
+    "compiled_tasks_count": 3,
+    "execution_plan_batches_count": 2,
+    "changeset_boundary_violations": 0,
+    "world_model_promoted_to_implemented": true,
+    "world_model_promoted_to_verified": true,
+    "downstream_integrity_preserved": true
+  }
+}
