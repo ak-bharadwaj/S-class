@@ -165,14 +165,26 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             actor="unauthorized_actor",
             capability="kernel_mutation",
             target="kernel",
+            nfr_category=NFRCategory.PERFORMANCE,
             evidence=[item_nan, item_fake_prov]
         )
         r_graph = RequirementGraph()
         r_graph.add_requirement(req_node)
         b_graph = BehaviorGraph()
 
-        # Run authoritative HLD Compiler and Debate Engine directly
+        # Run authoritative HLD Compiler and verify EvidenceItem propagation into ADR
         hld = HLDCompiler.compile_hld(r_graph, b_graph)
+        adr_evidence_ids = []
+        for adr in hld.adrs:
+            for ev in (adr.evidence or []):
+                if isinstance(ev, dict) and "id" in ev:
+                    adr_evidence_ids.append(ev["id"])
+                elif isinstance(ev, str):
+                    adr_evidence_ids.append(ev)
+
+        self.assertIn("EV-NAN", adr_evidence_ids, "Upstream EvidenceItem 'EV-NAN' MUST be preserved in HLD ADR evidence lineage!")
+
+        # Run authoritative Debate Engine directly
         debate_result = ArchitectureDebateEngine.run_debate_cycle(
             hld=hld,
             r_graph=r_graph,
@@ -184,8 +196,20 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
 
         # Invariant: Authoritative Debate Pipeline MUST NOT accept any ADR backed by INVALID evidence
         self.assertEqual(len(debate_result.accepted_adrs), 0, "Real Debate Pipeline MUST NOT accept ADRs backed by INVALID evidence!")
+        
+        # Verify exact EvidenceItem ID and fail-closed quality score in DecisionRecord decomposed claims
+        found_ev_nan_record = False
         for dec_rec in debate_result.decision_records:
             self.assertIn(dec_rec.decision_outcome, [DecisionOutcome.INSUFFICIENT_DEBATE, DecisionOutcome.REJECT], "Downstream DecisionOutcome must be INSUFFICIENT_DEBATE or REJECT")
+            ev_records = dec_rec.decomposed_claim.get("evidence_quality_records", [])
+            for r in ev_records:
+                if r.get("evidence_id") == "EV-NAN":
+                    found_ev_nan_record = True
+                    self.assertEqual(r.get("evidence_state"), EvidenceState.NO_EVIDENCE.value)
+                    self.assertEqual(r.get("quality_score"), 0.0)
+                    self.assertEqual(r.get("strength"), 0.0)
+
+        self.assertTrue(found_ev_nan_record, "DecisionRecord decomposed claim MUST explicitly contain 'EV-NAN' with NO_EVIDENCE and quality=0.0!")
 
     # -------------------------------------------------------------------------
     # Pillar 3: Requirement Graph Integrity, Precedence & Cycle Rejection

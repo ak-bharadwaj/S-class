@@ -341,13 +341,20 @@ class ClaimDecomposer:
             costs.append("Maintenance and code abstraction cost.")
             falsifiers.append(f"If requirements invalidate '{dec}'.")
 
-        # Evaluate Evidence Quality strictly (NO EVIDENCE = 0.0 QUALITY SCORE!)
+        # Evaluate Evidence Quality strictly preserving upstream EvidenceItem provenance and IDs
         ev_records: List[EvidenceQualityRecord] = []
         raw_clean = raw_request.lower()
         evidence_list = adr.evidence or []
 
+        # Index upstream RequirementGraph evidence items by ID
+        upstream_evidence_map: Dict[str, Any] = {}
+        for req in r_graph.nodes.values():
+            for e in (req.evidence or []):
+                e_id = getattr(e, "id", None) or (e.get("id") if isinstance(e, dict) else str(e))
+                upstream_evidence_map[e_id] = e
+
         GENERIC_FALLBACK_KEYWORDS = ["default architectural inference", "default context", "no evidence", "generic default"]
-        valid_evidences = [ev for ev in evidence_list if not any(kw in ev.lower() for kw in GENERIC_FALLBACK_KEYWORDS)]
+        valid_evidences = [ev for ev in evidence_list if not (isinstance(ev, str) and any(kw in ev.lower() for kw in GENERIC_FALLBACK_KEYWORDS))]
 
         if not valid_evidences:
             ev_records.append(EvidenceQualityRecord(
@@ -362,19 +369,68 @@ class ClaimDecomposer:
                 quality_score=0.0
             ))
         else:
-            for idx, ev_str in enumerate(valid_evidences):
-                is_prompt_ev = any(kw in raw_clean for kw in ev_str.lower().split()) if raw_clean else False
-                ev_state = EvidenceState.EXPLICIT_REQUIREMENT if is_prompt_ev else EvidenceState.DIRECT_EVIDENCE
-                ev_records.append(EvidenceQualityRecord(
-                    evidence_id=f"EV-{target_id}-{idx+1}",
-                    evidence_state=ev_state,
-                    source="EXPLICIT_PROMPT" if is_prompt_ev else "REQUIREMENT_GRAPH",
-                    reference_text=ev_str,
-                    strength=0.95 if is_prompt_ev else 0.85,
-                    freshness=1.0,
-                    directness=0.95 if is_prompt_ev else 0.85,
-                    relevance_score=0.95 if is_prompt_ev else 0.90
-                ))
+            for idx, ev_entry in enumerate(valid_evidences):
+                ev_id = None
+                ev_quality = 0.85
+                is_invalid = False
+                ref_text = str(ev_entry)
+
+                if isinstance(ev_entry, dict):
+                    ev_id = ev_entry.get("id")
+                    ev_prov = str(ev_entry.get("provenance", "")).lower()
+                    ev_qual_val = ev_entry.get("quality", 0.0)
+                    try:
+                        ev_quality = float(ev_qual_val)
+                    except Exception:
+                        ev_quality = 0.0
+                    ref_text = ev_entry.get("content") or ev_entry.get("source_ref") or ev_id or str(ev_entry)
+                    if "invalid" in ev_prov or ev_quality <= 0.0:
+                        is_invalid = True
+                elif hasattr(ev_entry, "provenance") and hasattr(ev_entry, "quality"):
+                    ev_id = getattr(ev_entry, "id", None)
+                    ev_prov = str(getattr(ev_entry, "provenance", "")).lower()
+                    ev_quality = float(getattr(ev_entry, "quality", 0.0))
+                    ref_text = getattr(ev_entry, "content", "") or getattr(ev_entry, "source_ref", "") or ev_id or str(ev_entry)
+                    if "invalid" in ev_prov or ev_quality <= 0.0:
+                        is_invalid = True
+                elif isinstance(ev_entry, str) and ev_entry in upstream_evidence_map:
+                    up_e = upstream_evidence_map[ev_entry]
+                    ev_id = ev_entry
+                    ev_prov = str(getattr(up_e, "provenance", up_e.get("provenance", "") if isinstance(up_e, dict) else "")).lower()
+                    ev_qual_val = getattr(up_e, "quality", up_e.get("quality", 0.0) if isinstance(up_e, dict) else 0.0)
+                    try:
+                        ev_quality = float(ev_qual_val)
+                    except Exception:
+                        ev_quality = 0.0
+                    if "invalid" in ev_prov or ev_quality <= 0.0:
+                        is_invalid = True
+
+                final_ev_id = ev_id if ev_id else f"EV-{target_id}-{idx+1}"
+                if is_invalid:
+                    ev_records.append(EvidenceQualityRecord(
+                        evidence_id=final_ev_id,
+                        evidence_state=EvidenceState.NO_EVIDENCE,
+                        source="REQUIREMENT_GRAPH",
+                        reference_text=ref_text,
+                        strength=0.0,
+                        freshness=0.0,
+                        directness=0.0,
+                        relevance_score=0.0,
+                        quality_score=0.0
+                    ))
+                else:
+                    is_prompt_ev = any(kw in raw_clean for kw in ref_text.lower().split()) if raw_clean else False
+                    ev_state = EvidenceState.EXPLICIT_REQUIREMENT if is_prompt_ev else EvidenceState.DIRECT_EVIDENCE
+                    ev_records.append(EvidenceQualityRecord(
+                        evidence_id=final_ev_id,
+                        evidence_state=ev_state,
+                        source="EXPLICIT_PROMPT" if is_prompt_ev else "REQUIREMENT_GRAPH",
+                        reference_text=ref_text,
+                        strength=0.95 if is_prompt_ev else ev_quality,
+                        freshness=1.0,
+                        directness=0.95 if is_prompt_ev else 0.85,
+                        relevance_score=0.95 if is_prompt_ev else 0.90
+                    ))
 
         return EngineeringClaim(
             claim_id=f"CLAIM-{target_id}",
@@ -405,7 +461,8 @@ class GenericDebateEvaluator:
         raw_request: str = ""
     ) -> DecisionRiskProfile:
         """COMPOSITIONAL (non-mutually-exclusive) dynamic risk profiling identifying ALL triggered high-risk dimensions."""
-        combined_text = (adr.title + " " + adr.id + " " + adr.decision + " " + adr.reason + " " + " ".join(adr.evidence or [])).lower()
+        ev_strs = [e.get("content", str(e)) if isinstance(e, dict) else (getattr(e, "content", str(e)) if hasattr(e, "content") else str(e)) for e in (adr.evidence or [])]
+        combined_text = (adr.title + " " + adr.id + " " + adr.decision + " " + adr.reason + " " + " ".join(ev_strs)).lower()
         raw_clean = raw_request.lower()
         reqs = list(r_graph.nodes.values())
 
@@ -419,26 +476,21 @@ class GenericDebateEvaluator:
         if any(k in combined_text or k in raw_clean for k in ["scale", "throughput", "50k", "10k", "ingestion", "latency", "events/sec", "performance"]) or any(r.nfr_category == NFRCategory.PERFORMANCE for r in reqs):
             required_dims.add("Scalability & Performance")
 
-        # 3. Security & Authorization (exact word/token match to prevent 'audit' matching 'auth')
-        sec_keywords = ["authentication", "authorization", "rbac", "permission", "guard", "authorized", "security policy"]
-        tokens = combined_text.split() + raw_clean.split()
-        if any(k in combined_text or k in raw_clean for k in sec_keywords) or any(k in tokens for k in ["auth", "actor"]) or any(e.relation == BehaviorRelationType.AUTHORIZED_FOR for e in b_graph.edges):
-            required_dims.add("Security & Authorization")
+        # 3. Authentication & Access Control
+        if any(k in combined_text or k in raw_clean for k in ["auth", "rbac", "abac", "token", "permission", "login", "role", "access control", "unauthorized"]):
+            required_dims.add("Authentication & Access Control")
 
-        # 4. Fault Tolerance & Resilience
-        if any(k in combined_text or k in raw_clean for k in ["resilience", "outage", "circuit", "retry", "failover", "ha", "healthcare", "safety", "fault"]):
-            required_dims.add("Fault Tolerance & Resilience")
+        # 4. Fault Tolerance & Recovery
+        if any(k in combined_text or k in raw_clean for k in ["retry", "circuit breaker", "fallback", "failover", "recovery", "resilience"]):
+            required_dims.add("Fault Tolerance & Recovery")
 
-        # 5. Modularity & Coupling
-        if any(k in combined_text or k in raw_clean for k in ["topology", "microservice", "monolith", "bounded context", "module", "coupling", "decoupled"]) or len(hld_compiler_modules := getattr(adr, "affected_modules", [])) > 0:
-            required_dims.add("Modularity & Coupling")
-
-        if not required_dims:
-            required_dims.add("Modularity & Coupling")
+        # 5. Modular Boundaries & Coupling
+        if any(k in combined_text or k in raw_clean for k in ["boundary", "coupling", "cohesion", "module", "context", "isolated"]):
+            required_dims.add("Modular Boundaries & Coupling")
 
         return DecisionRiskProfile(
             adr_id=adr.id,
-            primary_domain="MULTI_DIMENSIONAL_COMPOSITIONAL",
+            primary_domain=adr.title,
             required_high_risk_dimensions=sorted(list(required_dims))
         )
 
@@ -457,9 +509,9 @@ class GenericDebateEvaluator:
         alternatives: List[ArchitecturalAlternative] = []
         dimension_gates: List[DimensionGateResult] = []
 
-        raw_clean = raw_request.lower()
         reqs = list(r_graph.nodes.values())
-        ev_list_lower = [ev.lower() for ev in (adr.evidence or [])]
+        raw_clean = raw_request.lower()
+        ev_list_lower = [str(ev.get("content", ev)).lower() if isinstance(ev, dict) else str(ev).lower() for ev in (adr.evidence or [])]
 
         # ---------------------------------------------------------------------
         # Dimension 1: Scalability & Performance Gate

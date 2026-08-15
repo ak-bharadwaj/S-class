@@ -41,7 +41,7 @@ class ADRRecord:
     title: str
     decision: str
     alternatives: List[str]
-    evidence: List[str]
+    evidence: List[Any]
     affected_modules: List[str]
     rejected_options: List[str]
     reason: str
@@ -59,7 +59,7 @@ class ADRRecord:
             "title": self.title,
             "decision": self.decision,
             "alternatives": self.alternatives,
-            "evidence": self.evidence,
+            "evidence": [e.to_dict() if hasattr(e, "to_dict") else e for e in self.evidence],
             "affected_modules": self.affected_modules,
             "rejected_options": self.rejected_options,
             "reason": self.reason,
@@ -84,12 +84,12 @@ class ADRRecord:
             rejected_options=data.get("rejected_options", []),
             reason=data.get("reason", ""),
             status=data.get("status", "ACCEPTED"),
-            confidence=data.get("confidence", 1.0),
+            confidence=float(data.get("confidence", 1.0)),
             epistemic_status=EpistemicStatus(data.get("epistemic_status", "derived")),
-            validation_status=ValidationStatus(data.get("validation_status", "UNVALIDATED")),
-            approval_status=ApprovalStatus(data.get("approval_status", "NOT_REQUIRED")),
-            version=data.get("version", 1),
-            previous_version_hash=data.get("previous_version_hash", None)
+            validation_status=ValidationStatus(data.get("validation_status", "unvalidated")),
+            approval_status=ApprovalStatus(data.get("approval_status", "not_required")),
+            version=int(data.get("version", 1)),
+            previous_version_hash=data.get("previous_version_hash")
         )
 
 
@@ -150,7 +150,17 @@ class HLDDesign:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'HLDDesign':
+    def from_dict(cls, data: Dict[str, Any], strict_governance: bool = False) -> 'HLDDesign':
+        if strict_governance:
+            if not isinstance(data, dict):
+                raise ValueError("Governance Deserialization Error: HLDDesign data must be a dictionary")
+            required_keys = ["system_name", "architecture_style", "modules", "adrs"]
+            for k in required_keys:
+                if k not in data:
+                    raise ValueError(f"Governance Deserialization Error: Missing required field '{k}'")
+            if not isinstance(data["modules"], list) or not isinstance(data["adrs"], list):
+                raise ValueError("Governance Deserialization Error: 'modules' and 'adrs' must be lists")
+
         modules = [HLDModule.from_dict(m) if isinstance(m, dict) else m for m in data.get("modules", [])]
         adrs = [ADRRecord.from_dict(a) if isinstance(a, dict) else a for a in data.get("adrs", [])]
         return cls(
@@ -170,16 +180,22 @@ class ADRReasoningEngine:
         reqs = list(r_graph.nodes.values())
         raw_clean = raw_request.lower()
 
+        # Collect upstream requirement EvidenceItems
+        perf_reqs = [r for r in reqs if r.nfr_category == NFRCategory.PERFORMANCE]
+        perf_evidence = [e for r in perf_reqs for e in (r.evidence or [])]
+        all_req_evidence = [e for r in reqs for e in (r.evidence or [])]
+
         has_microservices_evidence = any(kw in raw_clean for kw in ["microservice", "docker-compose", "kafka", "distributed", "independent scaling", "event-driven"])
         has_high_throughput = any(r.nfr_category == NFRCategory.PERFORMANCE and ("10k" in r.statement.lower() or "scale" in r.statement.lower()) for r in reqs)
 
         if has_microservices_evidence or has_high_throughput:
+            evidence_payload = [e.to_dict() if hasattr(e, "to_dict") else e for e in perf_evidence] or ["Explicit microservices container evidence or high-throughput performance NFR"]
             return ADRRecord(
                 id="ADR-001",
                 title="Architectural Topology Selection",
                 decision="Distributed Microservices & Event-Driven Architecture",
                 alternatives=["Modular Monolith", "Serverless Functions"],
-                evidence=["Explicit microservices container evidence or high-throughput performance NFR"],
+                evidence=evidence_payload,
                 affected_modules=[],
                 rejected_options=["Modular Monolith"],
                 reason="System scale or explicit workspace evidence requires independent service deployment and event-driven decoupling.",
@@ -190,13 +206,14 @@ class ADRReasoningEngine:
                 approval_status=ApprovalStatus.NOT_REQUIRED
             )
         else:
+            evidence_payload = [e.to_dict() if hasattr(e, "to_dict") else e for e in all_req_evidence] or ["Domain graph capability workflow cohesion"]
             # Emits Modular Monolith as PROPOSED candidate if evidence is ambiguous
             return ADRRecord(
                 id="ADR-001",
                 title="Architectural Topology Selection",
                 decision="Modular Monolith with Bounded Contexts",
                 alternatives=["Distributed Microservices", "Serverless Functions"],
-                evidence=["Domain graph capability workflow cohesion"],
+                evidence=evidence_payload,
                 affected_modules=[],
                 rejected_options=[],
                 reason="Plausible default topology for transactional consistency; marked PROPOSED for human/DEBATE confirmation.",
@@ -268,18 +285,20 @@ class HLDCompiler:
             for data in sorted(capability_clusters.values(), key=lambda x: x["id"])
         ]
 
-
-
-        # 2. Evaluate ADRs conditionally
+        # 2. Evaluate ADRs conditionally with upstream Requirement evidence lineage
         adr_topology = ADRReasoningEngine.evaluate_architecture_topology(r_graph, raw_request)
         adr_topology.affected_modules = [m.id for m in modules]
+
+        auth_reqs = [r for r in r_graph.nodes.values() if "auth" in r.capability.lower() or "login" in r.capability.lower() or "manage" in r.capability.lower()]
+        auth_evidence = [e for r in auth_reqs for e in (r.evidence or [])]
+        adr_auth_evidence = [e.to_dict() if hasattr(e, "to_dict") else e for e in auth_evidence] or ["Source requirements capability authorization edges"]
 
         adr_auth = ADRRecord(
             id="ADR-002",
             title="Authentication & Authorization Architecture",
             decision="Role-Based Access Control (RBAC) with Epistemic Capability Guards",
             alternatives=["Attribute-Based Access Control (ABAC)"],
-            evidence=["Source requirements capability authorization edges"],
+            evidence=adr_auth_evidence,
             affected_modules=[m.id for m in modules],
             rejected_options=["Attribute-Based Access Control (ABAC)"],
             reason="RBAC provides deterministic security boundaries aligned with extracted domain actors.",

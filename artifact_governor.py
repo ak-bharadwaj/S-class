@@ -167,12 +167,13 @@ class ArtifactGovernor:
     @classmethod
     def compute_canonical_adr_hash(cls, adr: ADRRecord) -> str:
         """Computes SHA-256 digest over canonical JSON representation of core ADR decision content."""
+        ev_serialized = [e if isinstance(e, str) else json.dumps(e, sort_keys=True) for e in (adr.evidence or [])]
         adr_dict = {
             "id": adr.id,
             "title": adr.title,
             "decision": adr.decision,
             "alternatives": sorted(list(adr.alternatives)) if adr.alternatives else [],
-            "evidence": sorted(list(adr.evidence)) if adr.evidence else [],
+            "evidence": sorted(ev_serialized),
             "affected_modules": sorted(list(adr.affected_modules)) if adr.affected_modules else [],
             "rejected_options": sorted(list(adr.rejected_options)) if adr.rejected_options else [],
             "reason": adr.reason
@@ -566,7 +567,7 @@ class ArtifactGovernor:
             if hld_data and isinstance(hld_data, dict):
                 try:
                     from hld_compiler import HLDDesign
-                    hld_obj = HLDDesign.from_dict(hld_data)
+                    hld_obj = HLDDesign.from_dict(hld_data, strict_governance=True)
                     hld_gov_dynamic = cls.audit_hld_governance(hld_obj, True, [], workspace_dir=workspace_dir)
                     is_blocked = hld_gov_dynamic.is_blocked
                     hld_gov = hld_gov_dynamic.to_dict()
