@@ -1407,24 +1407,28 @@ class ArtifactGovernor:
                     reasons.append(f"ORPHAN_IMPLEMENTATION_RELATION: symbol '{rel.symbol_id}' not found in world model.")
                 if prov.truth_level != TruthLevel.OBSERVED:
                     reasons.append(f"UNVERIFIED_IMPLEMENTATION_TRUTH_LEVEL: ImplementationRelation strictly requires OBSERVED truth level, got '{prov.truth_level.value}'.")
-                if rel.status not in [ImplementationStatus.IMPLEMENTED, ImplementationStatus.VERIFIED]:
-                    reasons.append(f"INVALID_IMPLEMENTATION_STATUS: ImplementationRelation status must be IMPLEMENTED or VERIFIED, got '{rel.status.value}'.")
+                if rel.status not in [ImplementationStatus.IMPLEMENTED, ImplementationStatus.VERIFIED, ImplementationStatus.STALE]:
+                    reasons.append(f"INVALID_IMPLEMENTATION_STATUS: ImplementationRelation status must be IMPLEMENTED, VERIFIED, or STALE, got '{rel.status.value}'.")
 
-                # Cryptographic ImplementationEvidence Verification
+                # Sovereign Cryptographic ImplementationEvidence Verification
                 from world_model import ImplementationEvidence
                 ev = rel.evidence
                 if not ev or not isinstance(ev, (ImplementationEvidence, dict)):
                     reasons.append(f"MISSING_IMPLEMENTATION_EVIDENCE: ImplementationRelation for '{rel.symbol_id}' missing cryptographic ImplementationEvidence.")
                 else:
                     ev_obj = ev if isinstance(ev, ImplementationEvidence) else ImplementationEvidence.from_dict(ev)
+                    if ev_obj.issuer_subsystem != "SCLASS_PROMOTION_ENGINE":
+                        reasons.append(f"UNAUTHORIZED_EVIDENCE_ISSUER: ImplementationEvidence issuer '{ev_obj.issuer_subsystem}' is not authorized 'SCLASS_PROMOTION_ENGINE'.")
                     expected_ev_hash = ev_obj.compute_evidence_hash()
                     if ev_obj.evidence_hash != expected_ev_hash:
                         reasons.append(f"INVALID_IMPLEMENTATION_EVIDENCE_HASH: evidence_hash mismatch on '{rel.symbol_id}'.")
+                    if not ev_obj.observed_delta_hash:
+                        reasons.append(f"MISSING_OBSERVED_DELTA_HASH: ImplementationEvidence for '{rel.symbol_id}' lacks observed_delta_hash.")
                     if ev_obj.target_symbol_id != rel.symbol_id:
                         reasons.append(f"EVIDENCE_SYMBOL_MISMATCH: ImplementationEvidence target '{ev_obj.target_symbol_id}' != relation symbol '{rel.symbol_id}'.")
                     if ev_obj.source_task_id != rel.task_id:
                         reasons.append(f"EVIDENCE_TASK_MISMATCH: ImplementationEvidence task '{ev_obj.source_task_id}' != relation task '{rel.task_id}'.")
-                    if ev_obj.after_repository_state_hash != world_model.repository_state_hash:
+                    if rel.status != ImplementationStatus.STALE and ev_obj.after_repository_state_hash != world_model.repository_state_hash:
                         reasons.append(f"STALE_IMPLEMENTATION_EVIDENCE: evidence after_repository_state_hash '{ev_obj.after_repository_state_hash[:8]}' != current model '{world_model.repository_state_hash[:8]}'.")
 
             elif isinstance(rel, VerificationRelation):
@@ -1448,9 +1452,15 @@ class ArtifactGovernor:
                         reasons.append(f"MISSING_VERIFICATION_EVIDENCE: OBSERVED VerificationRelation missing cryptographic VerificationEvidence.")
                     else:
                         ev_obj = ev if isinstance(ev, VerificationEvidence) else VerificationEvidence.from_dict(ev)
+                        if ev_obj.issuer_subsystem != "SCLASS_TEST_RUNNER":
+                            reasons.append(f"UNAUTHORIZED_VERIFIER_ISSUER: VerificationEvidence issuer '{ev_obj.issuer_subsystem}' is not authorized 'SCLASS_TEST_RUNNER'.")
                         expected_ev_hash = ev_obj.compute_evidence_hash()
                         if ev_obj.evidence_hash != expected_ev_hash:
                             reasons.append(f"INVALID_VERIFICATION_EVIDENCE_HASH: evidence_hash mismatch on '{rel.test_entity_id}'.")
+                        if ev_obj.test_entity_id != rel.test_entity_id:
+                            reasons.append(f"EVIDENCE_TEST_MISMATCH: VerificationEvidence test '{ev_obj.test_entity_id}' != relation test '{rel.test_entity_id}'.")
+                        if ev_obj.target_entity_id != rel.target_entity_id:
+                            reasons.append(f"EVIDENCE_TARGET_MISMATCH: VerificationEvidence target '{ev_obj.target_entity_id}' != relation target '{rel.target_entity_id}'.")
 
             elif isinstance(rel, DependencyRelation):
                 if rel.from_entity not in entity_ids:

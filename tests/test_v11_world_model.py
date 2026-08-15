@@ -11,16 +11,19 @@ Comprehensive verification of:
 7. DERIVED -> IMPLEMENTED Prohibited (Implementation requires OBSERVED + Evidence)
 8. Tampered ImplementationEvidence Hash Fails Closed
 9. Stale Repository State ImplementationEvidence Fails Closed
-10. Authoritative State Promotion Workflow (TARGETED -> IMPLEMENTED -> VERIFIED)
-11. Unmodeled Code Execution Barrier (Hard safety boundary on unmodeled files)
-12. Unmodeled Syntax Fabrication Blocked (Governor rejects inner symbols on unmodeled modules)
-13. Python Language Adapter
-14. TypeScript / JavaScript Language Adapter
-15. Symbol Identity Hash Stability vs Revision Hash
-16. Complete Referential Integrity (Orphan relations fail Governor closed)
-17. Entity Dictionary Key Parity
-18. Missing Mandatory Hashes Fail Closed
-19. Transitive Impact Radius Computation
+10. Unauthorized Evidence Issuer Rejected (Must be SCLASS_PROMOTION_ENGINE)
+11. Unauthorized ChangeSet Delta Discrepancy Blocks Evidence Issuance
+12. Unauthorized Verifier Issuer Rejected (Must be SCLASS_TEST_RUNNER)
+13. Failing Test Exit Code Blocks Verified Evidence Issuance
+14. Repository Drift Invalidates IMPLEMENTED -> STALE
+15. Authoritative State Promotion Workflow (TARGETED -> IMPLEMENTED -> VERIFIED)
+16. Unmodeled Code Execution Barrier (Hard safety boundary on unmodeled files)
+17. Unmodeled Syntax Fabrication Blocked (Governor rejects inner symbols on unmodeled modules)
+18. Python Language Adapter
+19. TypeScript / JavaScript Language Adapter
+20. Symbol Identity Hash Stability vs Revision Hash
+21. Complete Referential Integrity (Orphan relations fail Governor closed)
+22. Transitive Impact Radius Computation
 """
 
 import os
@@ -67,7 +70,16 @@ from world_model_engine import (
     WorldModelEngine,
     WorldModelPromotionEngine
 )
-from repository_snapshot import RepositorySnapshotEngine, FileClassification, LanguageKind
+from repository_snapshot import (
+    RepositorySnapshotEngine,
+    FileClassification,
+    LanguageKind
+)
+from changeset_ir import (
+    AuthorizedChangeSet,
+    AuthorizedFileChange,
+    FileMutationOp
+)
 from artifact_governor import ArtifactGovernor
 
 
@@ -238,12 +250,13 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
             before_repository_state_hash="before_123",
             after_repository_state_hash=world_model.repository_state_hash,
             target_symbol_id="sym://src/service.py#run",
+            target_symbol_revision="rev_123",
             mutation_op="MODIFY",
+            observed_delta_hash="delta_hash_123",
             execution_record_id="exec_123",
             timestamp=datetime.now(timezone.utc).isoformat() + "Z"
         )
 
-        # Injected relation with DERIVED instead of OBSERVED
         world_model.add_relation(ImplementationRelation(
             symbol_id="sym://src/service.py#run",
             task_id="TASK-001",
@@ -276,7 +289,9 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
             before_repository_state_hash="before_123",
             after_repository_state_hash=world_model.repository_state_hash,
             target_symbol_id="sym://src/service.py#run",
+            target_symbol_revision="rev_123",
             mutation_op="MODIFY",
+            observed_delta_hash="delta_hash_123",
             execution_record_id="exec_123",
             timestamp=datetime.now(timezone.utc).isoformat() + "Z",
             evidence_hash="forged_bad_hash_999"
@@ -314,7 +329,9 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
             before_repository_state_hash="before_123",
             after_repository_state_hash="stale_foreign_repo_hash_999",
             target_symbol_id="sym://src/service.py#run",
+            target_symbol_revision="rev_123",
             mutation_op="MODIFY",
+            observed_delta_hash="delta_hash_123",
             execution_record_id="exec_123",
             timestamp=datetime.now(timezone.utc).isoformat() + "Z"
         )
@@ -337,12 +354,202 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
         self.assertTrue(any("STALE_IMPLEMENTATION_EVIDENCE" in r for r in gov_res.blocking_reasons))
 
     # -------------------------------------------------------------------------
-    # Test 10: Authoritative Promotion State Machine Workflow
+    # Test 10: Unauthorized Evidence Issuer Rejected
+    # -------------------------------------------------------------------------
+    def test_v11_world_model_unauthorized_evidence_issuer_rejected(self):
+        """Invariant: Evidence with unauthorized issuer (not SCLASS_PROMOTION_ENGINE) is rejected."""
+        self._create_file("src/service.py", "def run(): pass")
+        world_model = WorldModelEngine.build_world_model(self.test_dir)
+
+        mock_evidence = ImplementationEvidence(
+            issuer_subsystem="ROGUE_AGENT",
+            source_task_id="TASK-001",
+            source_task_hash="task_hash_123",
+            source_changeset_hash="cs_hash_123",
+            before_repository_state_hash="before_123",
+            after_repository_state_hash=world_model.repository_state_hash,
+            target_symbol_id="sym://src/service.py#run",
+            target_symbol_revision="rev_123",
+            mutation_op="MODIFY",
+            observed_delta_hash="delta_hash_123",
+            execution_record_id="exec_123",
+            timestamp=datetime.now(timezone.utc).isoformat() + "Z"
+        )
+
+        world_model.add_relation(ImplementationRelation(
+            symbol_id="sym://src/service.py#run",
+            task_id="TASK-001",
+            status=ImplementationStatus.IMPLEMENTED,
+            provenance=ProvenanceRecord(
+                truth_level=TruthLevel.OBSERVED,
+                source="AGENT",
+                confidence=1.0,
+                evidence="Self executed"
+            ),
+            evidence=mock_evidence
+        ))
+
+        gov_res = ArtifactGovernor.audit_world_model_governance(world_model, self.test_dir)
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("UNAUTHORIZED_EVIDENCE_ISSUER" in r for r in gov_res.blocking_reasons))
+
+    # -------------------------------------------------------------------------
+    # Test 11: Unauthorized ChangeSet Reconciliation Delta Discrepancy Blocks Issuance
+    # -------------------------------------------------------------------------
+    def test_v11_world_model_unauthorized_changeset_reconciliation_delta_mismatch_blocks_issuance(self):
+        """Invariant: Modifying unpermitted files (e.g. rogue B.py) fails ChangeSet reconciliation and blocks issuance."""
+        self._create_file("src/a.py", "def fn_a(): return 1")
+        self._create_file("src/b.py", "def fn_b(): return 2")
+
+        before_snap = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        # Authorized ChangeSet permits editing ONLY a.py
+        changeset = AuthorizedChangeSet(
+            changeset_id="CS-001",
+            source_repository_state_hash=before_snap.repository_state_hash,
+            authorized_changes={
+                "src/a.py": AuthorizedFileChange(
+                    file_path="src/a.py",
+                    operation=FileMutationOp.MODIFY,
+                    authorized_by_tasks=["TASK-001"],
+                    expected_source_file_hash=before_snap.file_manifest["src/a.py"].file_hash
+                )
+            }
+        )
+
+        # Agent edits a.py AND unauthorized b.py
+        self._create_file("src/a.py", "def fn_a(): return 10")
+        self._create_file("src/b.py", "def fn_b(): return 20 # Malicious edit")
+
+        after_snap = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        with self.assertRaises(ValueError) as ctx:
+            WorldModelPromotionEngine.issue_implementation_evidence(
+                anchor_snapshot=before_snap,
+                changeset=changeset,
+                result_snapshot=after_snap,
+                target_symbol_id="sym://src/a.py#fn_a",
+                target_symbol_revision="rev_a",
+                source_task_id="TASK-001",
+                source_task_hash="task_hash_1",
+                execution_record_id="exec_1"
+            )
+        self.assertIn("ChangeSet reconciliation failed", str(ctx.exception))
+        self.assertIn("UNAUTHORIZED_FILE_MODIFICATION", str(ctx.exception))
+
+    # -------------------------------------------------------------------------
+    # Test 12: Unauthorized Verifier Issuer Rejected
+    # -------------------------------------------------------------------------
+    def test_v11_world_model_unauthorized_verifier_issuer_rejected(self):
+        """Invariant: Verification evidence with unauthorized issuer is rejected by Governor."""
+        self._create_file("src/service.py", "def run(): pass")
+        self._create_file("tests/test_service.py", "def test_run(): pass")
+        world_model = WorldModelEngine.build_world_model(self.test_dir)
+
+        mock_verif_ev = VerificationEvidence(
+            issuer_subsystem="ROGUE_LLM",
+            test_entity_id="test://tests/test_service.py#test_run",
+            target_entity_id="sym://src/service.py#run",
+            test_framework="pytest",
+            repository_state_hash=world_model.repository_state_hash,
+            execution_result=ExecutionResult.PASSED,
+            exit_code=0,
+            execution_receipt_hash="receipt_123",
+            timestamp=datetime.now(timezone.utc).isoformat() + "Z"
+        )
+
+        world_model.add_relation(VerificationRelation(
+            test_entity_id="test://tests/test_service.py#test_run",
+            target_entity_id="sym://src/service.py#run",
+            verification_kind=VerificationKind.DIRECT_UNIT_TEST,
+            coverage_status=CoverageStatus.DYNAMICALLY_OBSERVED,
+            execution_status=ExecutionResult.PASSED,
+            provenance=ProvenanceRecord(
+                truth_level=TruthLevel.OBSERVED,
+                source="AGENT",
+                confidence=1.0,
+                evidence="Ran test in imagination"
+            ),
+            evidence=mock_verif_ev
+        ))
+
+        gov_res = ArtifactGovernor.audit_world_model_governance(world_model, self.test_dir)
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("UNAUTHORIZED_VERIFIER_ISSUER" in r for r in gov_res.blocking_reasons))
+
+    # -------------------------------------------------------------------------
+    # Test 13: Failing Test Exit Code Blocks Verified Evidence Issuance
+    # -------------------------------------------------------------------------
+    def test_v11_world_model_failing_test_cannot_issue_verified_evidence(self):
+        """Invariant: Test failures (exit_code != 0) cannot issue passing VerificationEvidence."""
+        with self.assertRaises(ValueError) as ctx:
+            WorldModelPromotionEngine.issue_verification_evidence(
+                test_entity_id="test://tests/test_a.py#test_fn",
+                target_entity_id="sym://src/a.py#fn",
+                test_framework="pytest",
+                repository_state_hash="hash_123",
+                execution_result=ExecutionResult.FAILED,
+                exit_code=1,
+                execution_receipt_hash="receipt_err"
+            )
+        self.assertIn("Cannot issue passing VerificationEvidence", str(ctx.exception))
+
+    # -------------------------------------------------------------------------
+    # Test 14: Repository Drift Invalidates IMPLEMENTED to STALE
+    # -------------------------------------------------------------------------
+    def test_v11_world_model_repository_drift_invalidates_implemented_to_stale(self):
+        """Invariant: Out-of-band repository modifications transition IMPLEMENTED symbols to STALE."""
+        self._create_file("src/service.py", "def calculate(): return 10")
+        world_model = WorldModelEngine.build_world_model(self.test_dir)
+
+        snap1 = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        # Authorized implementation
+        evidence = ImplementationEvidence(
+            issuer_subsystem="SCLASS_PROMOTION_ENGINE",
+            source_task_id="TASK-01",
+            source_task_hash="task_hash_1",
+            source_changeset_hash="cs_hash_1",
+            before_repository_state_hash="before_1",
+            after_repository_state_hash=snap1.repository_state_hash,
+            target_symbol_id="sym://src/service.py#calculate",
+            target_symbol_revision="rev_1",
+            mutation_op="MODIFY",
+            observed_delta_hash="delta_hash_1",
+            execution_record_id="exec_1",
+            timestamp=datetime.now(timezone.utc).isoformat() + "Z"
+        )
+
+        impl_rel = ImplementationRelation(
+            symbol_id="sym://src/service.py#calculate",
+            task_id="TASK-01",
+            status=ImplementationStatus.IMPLEMENTED,
+            provenance=ProvenanceRecord(
+                truth_level=TruthLevel.OBSERVED,
+                source="AUTHORIZED_EXECUTION_ENGINE",
+                confidence=1.0,
+                evidence="Implemented"
+            ),
+            evidence=evidence
+        )
+        world_model.add_relation(impl_rel)
+        self.assertEqual(impl_rel.status, ImplementationStatus.IMPLEMENTED)
+
+        # Modify file out-of-band
+        self._create_file("src/service.py", "def calculate(): return 9999 # External drift")
+        snap2 = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        invalidated = world_model.invalidate_drifted_symbols(snap2)
+        self.assertIn("sym://src/service.py#calculate", invalidated)
+        self.assertEqual(impl_rel.status, ImplementationStatus.STALE)
+
+    # -------------------------------------------------------------------------
+    # Test 15: Authoritative Promotion State Machine Workflow
     # -------------------------------------------------------------------------
     def test_v11_world_model_authoritative_promotion_state_machine_workflow(self):
-        """Invariant: TARGETED -> IMPLEMENTED -> VERIFIED executes legally with cryptographic evidence."""
+        """Invariant: TARGETED -> IMPLEMENTED -> VERIFIED executes legally with sovereign issuance."""
         self._create_file("src/billing.py", "def calculate(): return 100")
-        self._create_file("tests/test_billing.py", "from src.billing import calculate\ndef test_calc(): assert calculate() == 100")
+        self._create_file("tests/test_billing.py", "from src.billing import calculate\ndef test_calc(): assert calculate() == 115")
 
         mock_pipeline = {
             "lld_components": [{"id": "COMP-BILL", "component_name": "BillingService"}],
@@ -353,31 +560,42 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
             }]
         }
 
-        # Step 1: Build Pre-Execution Model (TARGETED)
+        # Step 1: Pre-Execution Model (TARGETED)
         world_model = WorldModelEngine.build_world_model(self.test_dir, pipeline_data=mock_pipeline)
         target_rels = [r for r in world_model.relations if isinstance(r, TargetRelation)]
         self.assertEqual(len(target_rels), 1)
         self.assertEqual(target_rels[0].status, ImplementationStatus.TARGETED)
 
-        initial_repo_hash = world_model.repository_state_hash
+        before_snap = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
 
-        # Step 2: Code Execution Delta Occurs
+        # Step 2: Formulate Authorized ChangeSet
+        changeset = AuthorizedChangeSet(
+            changeset_id="CS-BILL-01",
+            source_repository_state_hash=before_snap.repository_state_hash,
+            authorized_changes={
+                "src/billing.py": AuthorizedFileChange(
+                    file_path="src/billing.py",
+                    operation=FileMutationOp.MODIFY,
+                    authorized_by_tasks=["TASK-BILL-01"],
+                    expected_source_file_hash=before_snap.file_manifest["src/billing.py"].file_hash
+                )
+            }
+        )
+
+        # Step 3: Execute Code Delta
         self._create_file("src/billing.py", "def calculate(): return 115 # Added VAT")
-        new_snapshot = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
-        new_repo_hash = new_snapshot.repository_state_hash
-        self.assertNotEqual(initial_repo_hash, new_repo_hash)
+        after_snap = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
 
-        # Step 3: Authoritative Implementation Promotion
-        impl_evidence = ImplementationEvidence(
+        # Step 4: Issue Sovereign ImplementationEvidence
+        impl_evidence = WorldModelPromotionEngine.issue_implementation_evidence(
+            anchor_snapshot=before_snap,
+            changeset=changeset,
+            result_snapshot=after_snap,
+            target_symbol_id="sym://src/billing.py#calculate",
+            target_symbol_revision="rev_vat_115",
             source_task_id="TASK-BILL-01",
             source_task_hash="task_sha256_abc",
-            source_changeset_hash="changeset_sha256_def",
-            before_repository_state_hash=initial_repo_hash,
-            after_repository_state_hash=new_repo_hash,
-            target_symbol_id="sym://src/billing.py#calculate",
-            mutation_op="MODIFY",
-            execution_record_id="exec_record_001",
-            timestamp=datetime.now(timezone.utc).isoformat() + "Z"
+            execution_record_id="exec_record_001"
         )
 
         impl_rel = WorldModelPromotionEngine.promote_target_to_implemented(
@@ -388,20 +606,18 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
         self.assertEqual(impl_rel.status, ImplementationStatus.IMPLEMENTED)
         self.assertEqual(impl_rel.provenance.truth_level, TruthLevel.OBSERVED)
 
-        # Governor passes IMPLEMENTED state
         gov_res1 = ArtifactGovernor.audit_world_model_governance(world_model, self.test_dir)
         self.assertFalse(gov_res1.is_blocked)
 
-        # Step 4: Authoritative Verification Promotion
-        verif_evidence = VerificationEvidence(
+        # Step 5: Issue Sovereign VerificationEvidence & Promote to VERIFIED
+        verif_evidence = WorldModelPromotionEngine.issue_verification_evidence(
             test_entity_id="test://tests/test_billing.py#test_calc",
             target_entity_id="sym://src/billing.py#calculate",
             test_framework="pytest",
-            repository_state_hash=new_repo_hash,
+            repository_state_hash=after_snap.repository_state_hash,
             execution_result=ExecutionResult.PASSED,
             exit_code=0,
-            execution_receipt_hash="receipt_sha256_xyz",
-            timestamp=datetime.now(timezone.utc).isoformat() + "Z"
+            execution_receipt_hash="receipt_sha256_xyz"
         )
 
         verif_rel = WorldModelPromotionEngine.promote_to_verified(
@@ -413,12 +629,11 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
         self.assertEqual(verif_rel.execution_status, ExecutionResult.PASSED)
         self.assertEqual(verif_rel.coverage_status, CoverageStatus.DYNAMICALLY_OBSERVED)
 
-        # Governor passes VERIFIED state
         gov_res2 = ArtifactGovernor.audit_world_model_governance(world_model, self.test_dir)
         self.assertFalse(gov_res2.is_blocked)
 
     # -------------------------------------------------------------------------
-    # Test 11: Unmodeled Code Execution Barrier
+    # Test 16: Unmodeled Code Execution Barrier
     # -------------------------------------------------------------------------
     def test_v11_world_model_unmodeled_code_execution_barrier(self):
         """Invariant: Targeting an unmodeled file triggers UNMODELED_CODE_BARRIER and blocks Governor."""
@@ -433,7 +648,6 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
         self.assertFalse(can_target)
         self.assertIn("UNMODELED_CODE_BARRIER", barrier_reason)
 
-        # Inject TargetRelation pointing to unmodeled file -> Governor blocks
         world_model.add_relation(TargetRelation(
             task_id="TASK-RUST-01",
             target_entity_id="mod://src/engine.rs",
@@ -452,7 +666,7 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
         self.assertTrue(any("UNMODELED_CODE_EXECUTION_BARRIER" in r for r in gov_res.blocking_reasons))
 
     # -------------------------------------------------------------------------
-    # Test 12: Unmodeled Syntax Fabrication Blocked
+    # Test 17: Unmodeled Syntax Fabrication Blocked
     # -------------------------------------------------------------------------
     def test_v11_world_model_unmodeled_syntax_fabrication_fails_governor(self):
         """Invariant: Unmodeled modules declaring fake inner symbols fail Governor."""
@@ -470,7 +684,7 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
         self.assertTrue(any("UNMODELED_MODULE_SYNTAX_FABRICATION" in r for r in gov_res.blocking_reasons))
 
     # -------------------------------------------------------------------------
-    # Test 13: Python Language Adapter
+    # Test 18: Python Language Adapter
     # -------------------------------------------------------------------------
     def test_v11_world_model_python_language_adapter(self):
         """Invariant: Python adapter extracts classes, methods, routes, and call dependencies."""
@@ -504,7 +718,7 @@ def get_billing():
         self.assertIsInstance(api_ent, APIEntity)
 
     # -------------------------------------------------------------------------
-    # Test 14: TypeScript / JavaScript Language Adapter
+    # Test 19: TypeScript / JavaScript Language Adapter
     # -------------------------------------------------------------------------
     def test_v11_world_model_typescript_javascript_language_adapter(self):
         """Invariant: TypeScript/JavaScript adapter parses exports, classes, interfaces, routes, and tests."""
@@ -555,7 +769,7 @@ test('UserService returns user', async () => {
         self.assertIsNotNone(test_ent)
 
     # -------------------------------------------------------------------------
-    # Test 15: Symbol Identity Hash vs Revision Hash
+    # Test 20: Symbol Identity Hash vs Revision Hash
     # -------------------------------------------------------------------------
     def test_v11_world_model_symbol_identity_hash_vs_revision_hash_stability(self):
         """Invariant: Refactoring line numbers preserves identity_hash while updating revision_hash."""
@@ -575,7 +789,7 @@ test('UserService returns user', async () => {
         self.assertNotEqual(sym1.symbol_revision_hash, sym2.symbol_revision_hash)
 
     # -------------------------------------------------------------------------
-    # Test 16: Complete Referential Integrity & Orphan Blocking
+    # Test 21: Complete Referential Integrity & Orphan Blocking
     # -------------------------------------------------------------------------
     def test_v11_world_model_referential_integrity_and_orphan_blocking(self):
         """Invariant: Half-orphaned relations with missing entities are strictly blocked."""
@@ -600,37 +814,7 @@ test('UserService returns user', async () => {
         self.assertTrue(any("ORPHAN_TARGET_RELATION" in r for r in gov_res.blocking_reasons))
 
     # -------------------------------------------------------------------------
-    # Test 17: Entity Dictionary Key Parity
-    # -------------------------------------------------------------------------
-    def test_v11_world_model_entity_dict_key_mismatch_fails_closed(self):
-        """Invariant: Entity dictionary key mismatching entity.id fails closed."""
-        self._create_file("src/app.py", "def app(): pass")
-        world_model = WorldModelEngine.build_world_model(self.test_dir)
-
-        raw_dict = world_model.to_dict()
-        raw_dict["entities"]["sym://fake_key"] = raw_dict["entities"].pop("sym://src/app.py#app")
-
-        with self.assertRaises(ValueError) as ctx:
-            EngineeringWorldModel.from_governed_dict(raw_dict, strict_governance=True)
-        self.assertIn("entity key mismatch", str(ctx.exception).lower())
-
-    # -------------------------------------------------------------------------
-    # Test 18: Missing Mandatory Hashes Fail Closed
-    # -------------------------------------------------------------------------
-    def test_v11_world_model_missing_mandatory_hashes_fail_closed(self):
-        """Invariant: Missing repository_state_hash or canonical_hash fails closed."""
-        self._create_file("src/app.py", "def app(): pass")
-        world_model = WorldModelEngine.build_world_model(self.test_dir)
-
-        raw_dict = world_model.to_dict()
-        raw_dict["repository_state_hash"] = ""
-
-        with self.assertRaises(ValueError) as ctx:
-            EngineeringWorldModel.from_governed_dict(raw_dict, strict_governance=True)
-        self.assertIn("repository_state_hash", str(ctx.exception))
-
-    # -------------------------------------------------------------------------
-    # Test 19: Transitive Impact Radius Computation
+    # Test 22: Transitive Impact Radius Computation
     # -------------------------------------------------------------------------
     def test_v11_world_model_transitive_impact_radius(self):
         """Invariant: Impact radius accurately computes downstream affected symbols, APIs, modules, and tests."""

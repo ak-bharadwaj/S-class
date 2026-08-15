@@ -12,21 +12,23 @@ Four-Tier Truth Ontology:
 
 Epistemic Relation Separation:
 - TargetRelation (TARGETS): Pre-execution task intent (ImplementationStatus: TARGETED, TruthLevel: PROPOSED/DERIVED)
-- ImplementationRelation (IMPLEMENTS): Verified code implementation (ImplementationStatus: IMPLEMENTED/VERIFIED, TruthLevel: OBSERVED, backed by ImplementationEvidence)
-- VerificationRelation (VERIFIED_BY): Test coverage & runtime verification (CoverageStatus: STATICALLY_LINKED/DYNAMICALLY_OBSERVED, ExecutionResult: UNTESTED/PASSED/FAILED, backed by VerificationEvidence when OBSERVED)
+- ImplementationRelation (IMPLEMENTS): Verified code implementation (ImplementationStatus: IMPLEMENTED/VERIFIED/STALE, TruthLevel: OBSERVED, backed by sovereign ImplementationEvidence)
+- VerificationRelation (VERIFIED_BY): Test coverage & runtime verification (CoverageStatus: STATICALLY_LINKED/DYNAMICALLY_OBSERVED, ExecutionResult: UNTESTED/PASSED/FAILED, backed by sovereign VerificationEvidence)
 
-Cryptographic Evidence & Hard Knowledge Boundaries:
-- ImplementationEvidence & VerificationEvidence bind task/changeset/repository hashes.
-- Unmodeled files create explicit barriers preventing autonomous changes without active language adapters.
+Sovereign Evidence & Monotonic Invalidation:
+- ImplementationEvidence: Issued exclusively by S-Class ChangeSet delta reconciliation (binds observed_delta_hash, symbol revision, task hash, changeset hash).
+- VerificationEvidence: Issued exclusively by S-Class Test Runner (binds command hash, raw result hash, receipt hash, exit code 0).
+- Repository drift automatically invalidates out-of-date implementations into ImplementationStatus.STALE.
 """
 
 import json
 import hashlib
+import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from dataclasses import dataclass, field
 from typing import Dict, List, Set, Optional, Tuple, Any, Union
-from repository_snapshot import FileClassification, LanguageKind
+from repository_snapshot import FileClassification, LanguageKind, RepositorySnapshot
 
 
 class TruthLevel(str, Enum):
@@ -179,21 +181,25 @@ class ProvenanceRecord:
 
 
 # -----------------------------------------------------------------------------
-# Cryptographic Evidence Records
+# Cryptographic Sovereign Evidence Records
 # -----------------------------------------------------------------------------
 
 @dataclass
 class ImplementationEvidence:
-    """Cryptographically bound evidence of an authorized code change."""
+    """Cryptographically bound sovereign evidence of an authorized code change."""
     source_task_id: str
     source_task_hash: str
     source_changeset_hash: str
     before_repository_state_hash: str
     after_repository_state_hash: str
     target_symbol_id: str
+    target_symbol_revision: str
     mutation_op: str
+    observed_delta_hash: str
     execution_record_id: str
     timestamp: str
+    evidence_id: str = field(default_factory=lambda: f"impl_ev_{uuid.uuid4().hex[:12]}")
+    issuer_subsystem: str = "SCLASS_PROMOTION_ENGINE"
     evidence_hash: str = ""
 
     def __post_init__(self):
@@ -202,13 +208,17 @@ class ImplementationEvidence:
 
     def compute_evidence_hash(self) -> str:
         payload = {
+            "evidence_id": self.evidence_id,
+            "issuer_subsystem": self.issuer_subsystem,
             "source_task_id": self.source_task_id,
             "source_task_hash": self.source_task_hash,
             "source_changeset_hash": self.source_changeset_hash,
             "before_repository_state_hash": self.before_repository_state_hash,
             "after_repository_state_hash": self.after_repository_state_hash,
             "target_symbol_id": self.target_symbol_id,
+            "target_symbol_revision": self.target_symbol_revision,
             "mutation_op": self.mutation_op,
+            "observed_delta_hash": self.observed_delta_hash,
             "execution_record_id": self.execution_record_id,
             "timestamp": self.timestamp
         }
@@ -217,13 +227,17 @@ class ImplementationEvidence:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
+            "evidence_id": self.evidence_id,
+            "issuer_subsystem": self.issuer_subsystem,
             "source_task_id": self.source_task_id,
             "source_task_hash": self.source_task_hash,
             "source_changeset_hash": self.source_changeset_hash,
             "before_repository_state_hash": self.before_repository_state_hash,
             "after_repository_state_hash": self.after_repository_state_hash,
             "target_symbol_id": self.target_symbol_id,
+            "target_symbol_revision": self.target_symbol_revision,
             "mutation_op": self.mutation_op,
+            "observed_delta_hash": self.observed_delta_hash,
             "execution_record_id": self.execution_record_id,
             "timestamp": self.timestamp,
             "evidence_hash": self.evidence_hash or self.compute_evidence_hash()
@@ -231,17 +245,26 @@ class ImplementationEvidence:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "ImplementationEvidence":
-        for req in ["source_task_id", "source_task_hash", "source_changeset_hash", "before_repository_state_hash", "after_repository_state_hash", "target_symbol_id", "mutation_op", "execution_record_id", "timestamp"]:
+        for req in [
+            "source_task_id", "source_task_hash", "source_changeset_hash",
+            "before_repository_state_hash", "after_repository_state_hash",
+            "target_symbol_id", "mutation_op", "observed_delta_hash",
+            "execution_record_id", "timestamp"
+        ]:
             if req not in d:
                 raise ValueError(f"ImplementationEvidence missing mandatory field '{req}'")
         return cls(
+            evidence_id=d.get("evidence_id", f"impl_ev_{uuid.uuid4().hex[:12]}"),
+            issuer_subsystem=d.get("issuer_subsystem", "SCLASS_PROMOTION_ENGINE"),
             source_task_id=d["source_task_id"],
             source_task_hash=d["source_task_hash"],
             source_changeset_hash=d["source_changeset_hash"],
             before_repository_state_hash=d["before_repository_state_hash"],
             after_repository_state_hash=d["after_repository_state_hash"],
             target_symbol_id=d["target_symbol_id"],
+            target_symbol_revision=d.get("target_symbol_revision", ""),
             mutation_op=d["mutation_op"],
+            observed_delta_hash=d["observed_delta_hash"],
             execution_record_id=d["execution_record_id"],
             timestamp=d["timestamp"],
             evidence_hash=d.get("evidence_hash", "")
@@ -250,7 +273,7 @@ class ImplementationEvidence:
 
 @dataclass
 class VerificationEvidence:
-    """Cryptographically bound evidence of an executed test receipt."""
+    """Cryptographically bound sovereign evidence of an executed test receipt."""
     test_entity_id: str
     target_entity_id: str
     test_framework: str
@@ -259,6 +282,10 @@ class VerificationEvidence:
     exit_code: int
     execution_receipt_hash: str
     timestamp: str
+    command_hash: str = ""
+    raw_result_hash: str = ""
+    evidence_id: str = field(default_factory=lambda: f"verif_ev_{uuid.uuid4().hex[:12]}")
+    issuer_subsystem: str = "SCLASS_TEST_RUNNER"
     evidence_hash: str = ""
 
     def __post_init__(self):
@@ -267,9 +294,13 @@ class VerificationEvidence:
 
     def compute_evidence_hash(self) -> str:
         payload = {
+            "evidence_id": self.evidence_id,
+            "issuer_subsystem": self.issuer_subsystem,
             "test_entity_id": self.test_entity_id,
             "target_entity_id": self.target_entity_id,
             "test_framework": self.test_framework,
+            "command_hash": self.command_hash,
+            "raw_result_hash": self.raw_result_hash,
             "repository_state_hash": self.repository_state_hash,
             "execution_result": self.execution_result.value if isinstance(self.execution_result, ExecutionResult) else str(self.execution_result),
             "exit_code": self.exit_code,
@@ -281,9 +312,13 @@ class VerificationEvidence:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
+            "evidence_id": self.evidence_id,
+            "issuer_subsystem": self.issuer_subsystem,
             "test_entity_id": self.test_entity_id,
             "target_entity_id": self.target_entity_id,
             "test_framework": self.test_framework,
+            "command_hash": self.command_hash,
+            "raw_result_hash": self.raw_result_hash,
             "repository_state_hash": self.repository_state_hash,
             "execution_result": self.execution_result.value if isinstance(self.execution_result, ExecutionResult) else str(self.execution_result),
             "exit_code": self.exit_code,
@@ -298,9 +333,13 @@ class VerificationEvidence:
             if req not in d:
                 raise ValueError(f"VerificationEvidence missing mandatory field '{req}'")
         return cls(
+            evidence_id=d.get("evidence_id", f"verif_ev_{uuid.uuid4().hex[:12]}"),
+            issuer_subsystem=d.get("issuer_subsystem", "SCLASS_TEST_RUNNER"),
             test_entity_id=d["test_entity_id"],
             target_entity_id=d["target_entity_id"],
             test_framework=d["test_framework"],
+            command_hash=d.get("command_hash", ""),
+            raw_result_hash=d.get("raw_result_hash", ""),
             repository_state_hash=d["repository_state_hash"],
             execution_result=ExecutionResult(d["execution_result"]),
             exit_code=int(d["exit_code"]),
@@ -706,9 +745,9 @@ class ImplementationRelation:
     """Represents established code implementation backed by cryptographic ImplementationEvidence (IMPLEMENTS)."""
     symbol_id: str  # Concrete SymbolEntity ID
     task_id: str  # e.g., "TASK-001"
-    status: ImplementationStatus  # IMPLEMENTED or VERIFIED
+    status: ImplementationStatus  # IMPLEMENTED or VERIFIED or STALE
     provenance: ProvenanceRecord  # Must be OBSERVED
-    evidence: ImplementationEvidence  # Mandatory cryptographically bound proof
+    evidence: ImplementationEvidence  # Mandatory sovereign cryptographic proof
     requirement_id: Optional[str] = None
     behavior_id: Optional[str] = None
     lld_component_id: Optional[str] = None
@@ -877,6 +916,28 @@ class EngineeringWorldModel:
                 f"without an active language adapter. Direct autonomous modification is prohibited without prior modeling."
             )
         return True, ""
+
+    def invalidate_drifted_symbols(self, current_snapshot: RepositorySnapshot) -> List[str]:
+        """
+        Detects file mutations between current repository snapshot and evidence anchors.
+        Monotonically transitions affected ImplementationRelation items to ImplementationStatus.STALE.
+        """
+        invalidated_symbols = []
+        for rel in self.relations:
+            if isinstance(rel, ImplementationRelation) and rel.status in [ImplementationStatus.IMPLEMENTED, ImplementationStatus.VERIFIED]:
+                sym = self.get_symbol(rel.symbol_id)
+                if sym:
+                    current_file_entry = current_snapshot.file_manifest.get(sym.file_path)
+                    current_file_hash = current_file_entry.file_hash if current_file_entry else None
+
+                    # If file is deleted or modified from evidence post-state, mark STALE
+                    if current_file_hash is None or (rel.evidence and rel.evidence.after_repository_state_hash != current_snapshot.repository_state_hash):
+                        rel.status = ImplementationStatus.STALE
+                        invalidated_symbols.append(rel.symbol_id)
+
+        if invalidated_symbols:
+            self.canonical_hash = self.compute_canonical_hash()
+        return invalidated_symbols
 
     def get_callers(self, symbol_id: str) -> List[str]:
         """Returns entity IDs that call or depend on symbol_id."""

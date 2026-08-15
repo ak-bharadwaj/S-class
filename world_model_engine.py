@@ -17,6 +17,9 @@ import os
 import ast
 import re
 import json
+import hashlib
+import uuid
+from datetime import datetime, timezone
 from abc import ABC, abstractmethod
 from typing import Dict, List, Set, Optional, Tuple, Any
 
@@ -980,7 +983,92 @@ class WorldModelEngine:
 
 
 class WorldModelPromotionEngine:
-    """Mechanically enforces authoritative, evidence-backed state promotion in the Engineering World Model."""
+    """Mechanically enforces authoritative, sovereign evidence issuance and state promotion in the Engineering World Model."""
+
+    @classmethod
+    def issue_implementation_evidence(
+        cls,
+        anchor_snapshot: RepositorySnapshot,
+        changeset: Any,
+        result_snapshot: RepositorySnapshot,
+        target_symbol_id: str,
+        target_symbol_revision: str,
+        source_task_id: str,
+        source_task_hash: str,
+        execution_record_id: str
+    ) -> ImplementationEvidence:
+        """Authoritatively reconciles the ChangeSet against repository deltas and issues a sovereign ImplementationEvidence."""
+        recon = RepositorySnapshotEngine.reconcile_changeset(anchor_snapshot, result_snapshot, changeset)
+        if not recon.is_reconciled:
+            raise ValueError(f"Cannot issue ImplementationEvidence: ChangeSet reconciliation failed with violations: {recon.violations}")
+
+        auth_changes = sorted(changeset.authorized_changes.keys())
+        delta_payload = []
+        for p in auth_changes:
+            change = changeset.authorized_changes[p]
+            b_hash = anchor_snapshot.file_manifest[p].file_hash if p in anchor_snapshot.file_manifest else "NONE"
+            a_hash = result_snapshot.file_manifest[p].file_hash if p in result_snapshot.file_manifest else "NONE"
+            delta_payload.append(f"{p}:{change.operation.value}:{b_hash}->{a_hash}")
+
+        delta_str = ";".join(delta_payload)
+        observed_delta_hash = hashlib.sha256(delta_str.encode("utf-8")).hexdigest()
+
+        mutation_op = "MODIFY"
+        for p, ch in changeset.authorized_changes.items():
+            mutation_op = ch.operation.value if hasattr(ch.operation, "value") else str(ch.operation)
+            break
+
+        import uuid
+        evidence = ImplementationEvidence(
+            evidence_id=f"impl_ev_{uuid.uuid4().hex[:12]}",
+            issuer_subsystem="SCLASS_PROMOTION_ENGINE",
+            source_task_id=source_task_id,
+            source_task_hash=source_task_hash,
+            source_changeset_hash=changeset.changeset_hash,
+            before_repository_state_hash=anchor_snapshot.repository_state_hash,
+            after_repository_state_hash=result_snapshot.repository_state_hash,
+            target_symbol_id=target_symbol_id,
+            target_symbol_revision=target_symbol_revision,
+            mutation_op=mutation_op,
+            observed_delta_hash=observed_delta_hash,
+            execution_record_id=execution_record_id,
+            timestamp=datetime.now(timezone.utc).isoformat() + "Z"
+        )
+        return evidence
+
+    @classmethod
+    def issue_verification_evidence(
+        cls,
+        test_entity_id: str,
+        target_entity_id: str,
+        test_framework: str,
+        repository_state_hash: str,
+        execution_result: ExecutionResult,
+        exit_code: int,
+        execution_receipt_hash: str,
+        command_hash: str = "",
+        raw_result_hash: str = ""
+    ) -> VerificationEvidence:
+        """Authoritatively validates test execution parameters and issues a sovereign VerificationEvidence."""
+        if execution_result != ExecutionResult.PASSED or exit_code != 0:
+            raise ValueError(f"Cannot issue passing VerificationEvidence for failing test execution (exit_code={exit_code}, result={execution_result.value}).")
+
+        import uuid
+        evidence = VerificationEvidence(
+            evidence_id=f"verif_ev_{uuid.uuid4().hex[:12]}",
+            issuer_subsystem="SCLASS_TEST_RUNNER",
+            test_entity_id=test_entity_id,
+            target_entity_id=target_entity_id,
+            test_framework=test_framework,
+            command_hash=command_hash,
+            raw_result_hash=raw_result_hash,
+            repository_state_hash=repository_state_hash,
+            execution_result=execution_result,
+            exit_code=exit_code,
+            execution_receipt_hash=execution_receipt_hash,
+            timestamp=datetime.now(timezone.utc).isoformat() + "Z"
+        )
+        return evidence
 
     @classmethod
     def promote_target_to_implemented(
@@ -989,22 +1077,26 @@ class WorldModelPromotionEngine:
         target_rel: TargetRelation,
         evidence: ImplementationEvidence
     ) -> ImplementationRelation:
-        """Promotes TARGETED TargetRelation -> IMPLEMENTED ImplementationRelation backed by verified ImplementationEvidence."""
+        """Promotes TARGETED TargetRelation -> IMPLEMENTED ImplementationRelation backed by sovereign ImplementationEvidence."""
         if target_rel.status != ImplementationStatus.TARGETED:
             raise ValueError(f"Cannot promote relation with status '{target_rel.status.value}', expected TARGETED.")
 
-        # 1. Verify Evidence Hash Integrity
+        # 1. Verify Sovereign Issuer
+        if evidence.issuer_subsystem != "SCLASS_PROMOTION_ENGINE":
+            raise ValueError(f"ImplementationEvidence issuer_subsystem must be 'SCLASS_PROMOTION_ENGINE', got '{evidence.issuer_subsystem}'.")
+
+        # 2. Verify Evidence Hash Integrity
         expected_hash = evidence.compute_evidence_hash()
         if evidence.evidence_hash != expected_hash:
             raise ValueError(f"ImplementationEvidence hash mismatch: stored '{evidence.evidence_hash}' != recomputed '{expected_hash}'.")
 
-        # 2. Verify Referential Parity
+        # 3. Verify Referential Parity
         if evidence.target_symbol_id != target_rel.target_entity_id:
             raise ValueError(f"ImplementationEvidence target_symbol_id '{evidence.target_symbol_id}' does not match TargetRelation '{target_rel.target_entity_id}'.")
         if evidence.source_task_id != target_rel.task_id:
             raise ValueError(f"ImplementationEvidence source_task_id '{evidence.source_task_id}' does not match TargetRelation task_id '{target_rel.task_id}'.")
 
-        # 3. Verify Repository Anchor Drift
+        # 4. Verify Repository Anchor Drift
         if evidence.before_repository_state_hash == evidence.after_repository_state_hash:
             raise ValueError("ImplementationEvidence before and after repository state hashes are identical (no observed delta).")
 
@@ -1037,22 +1129,26 @@ class WorldModelPromotionEngine:
         impl_rel: ImplementationRelation,
         evidence: VerificationEvidence
     ) -> VerificationRelation:
-        """Promotes IMPLEMENTED ImplementationRelation -> VERIFIED backed by verified VerificationEvidence."""
-        if impl_rel.status not in [ImplementationStatus.IMPLEMENTED, ImplementationStatus.VERIFIED]:
+        """Promotes IMPLEMENTED ImplementationRelation -> VERIFIED backed by sovereign VerificationEvidence."""
+        if impl_rel.status != ImplementationStatus.IMPLEMENTED:
             raise ValueError(f"Cannot promote relation with status '{impl_rel.status.value}', expected IMPLEMENTED.")
 
-        # 1. Verify Evidence Hash Integrity
+        # 1. Verify Sovereign Issuer
+        if evidence.issuer_subsystem != "SCLASS_TEST_RUNNER":
+            raise ValueError(f"VerificationEvidence issuer_subsystem must be 'SCLASS_TEST_RUNNER', got '{evidence.issuer_subsystem}'.")
+
+        # 2. Verify Evidence Hash Integrity
         expected_hash = evidence.compute_evidence_hash()
         if evidence.evidence_hash != expected_hash:
             raise ValueError(f"VerificationEvidence hash mismatch: stored '{evidence.evidence_hash}' != recomputed '{expected_hash}'.")
 
-        # 2. Verify Execution Success
+        # 3. Verify Execution Success
         if evidence.execution_result != ExecutionResult.PASSED:
             raise ValueError(f"Cannot verify implementation with non-passing execution result '{evidence.execution_result.value}'.")
         if evidence.exit_code != 0:
             raise ValueError(f"Cannot verify implementation with non-zero test exit code {evidence.exit_code}.")
 
-        # 3. Verify Referential Parity
+        # 4. Verify Referential Parity
         if evidence.target_entity_id != impl_rel.symbol_id:
             raise ValueError(f"VerificationEvidence target_entity_id '{evidence.target_entity_id}' does not match ImplementationRelation '{impl_rel.symbol_id}'.")
 
