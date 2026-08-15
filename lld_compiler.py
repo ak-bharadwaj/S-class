@@ -48,6 +48,52 @@ class LLDComponentType(str, Enum):
     EVENT_HANDLER = "event_handler"
 
 
+class OperationClass(str, Enum):
+    """Formal semantic operation classes."""
+    COMMAND_MUTATION = "COMMAND_MUTATION"
+    READ_QUERY = "READ_QUERY"
+    EVENT_PROCESSING = "EVENT_PROCESSING"
+    STATE_TRANSITION = "STATE_TRANSITION"
+
+
+@dataclass
+class CapabilityBinding:
+    """Formal binding between Behavior, Requirement, and LLD Component capability responsibility."""
+    behavior_id: str
+    requirement_ids: List[str]
+    operation_class: OperationClass
+    target_entity: str
+    hld_capability: str
+    lld_component_id: str
+    allowed_component_types: List[LLDComponentType]
+    prohibited_component_roles: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "behavior_id": self.behavior_id,
+            "requirement_ids": self.requirement_ids,
+            "operation_class": self.operation_class.value,
+            "target_entity": self.target_entity,
+            "hld_capability": self.hld_capability,
+            "lld_component_id": self.lld_component_id,
+            "allowed_component_types": [ct.value for ct in self.allowed_component_types],
+            "prohibited_component_roles": self.prohibited_component_roles
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'CapabilityBinding':
+        return cls(
+            behavior_id=data["behavior_id"],
+            requirement_ids=list(data.get("requirement_ids", [])),
+            operation_class=OperationClass(data["operation_class"]),
+            target_entity=data.get("target_entity", ""),
+            hld_capability=data.get("hld_capability", ""),
+            lld_component_id=data.get("lld_component_id", ""),
+            allowed_component_types=[LLDComponentType(ct) for ct in data.get("allowed_component_types", [])],
+            prohibited_component_roles=list(data.get("prohibited_component_roles", []))
+        )
+
+
 @dataclass
 class LLDParentRef:
     """Upstream parent lineage links establishing 100% change propagation traceability."""
@@ -86,6 +132,10 @@ class LLDComponent:
     api_endpoints: List[str] = field(default_factory=list)
     validation_rules: List[str] = field(default_factory=list)
     reasoning_graph: List[Dict[str, Any]] = field(default_factory=list)
+    allowed_operation_classes: List[OperationClass] = field(default_factory=list)
+    owned_entities: List[str] = field(default_factory=list)
+    owned_capabilities: List[str] = field(default_factory=list)
+    capability_bindings: List[CapabilityBinding] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -100,8 +150,33 @@ class LLDComponent:
             "sub_components": self.sub_components,
             "api_endpoints": self.api_endpoints,
             "validation_rules": self.validation_rules,
-            "reasoning_graph": self.reasoning_graph
+            "reasoning_graph": self.reasoning_graph,
+            "allowed_operation_classes": [oc.value for oc in self.allowed_operation_classes],
+            "owned_entities": self.owned_entities,
+            "owned_capabilities": self.owned_capabilities,
+            "capability_bindings": [cb.to_dict() for cb in self.capability_bindings]
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'LLDComponent':
+        return cls(
+            id=data["id"],
+            name=data["name"],
+            component_type=LLDComponentType(data["component_type"]),
+            parent=LLDParentRef.from_dict(data["parent"]) if isinstance(data.get("parent"), dict) else data["parent"],
+            role=data.get("role", "component"),
+            transport=InteractionTransport(data.get("transport", InteractionTransport.REST_HTTP.value)),
+            route=data.get("route"),
+            layout=data.get("layout", "standard_view"),
+            sub_components=list(data.get("sub_components", [])),
+            api_endpoints=list(data.get("api_endpoints", [])),
+            validation_rules=list(data.get("validation_rules", [])),
+            reasoning_graph=list(data.get("reasoning_graph", [])),
+            allowed_operation_classes=[OperationClass(oc) for oc in data.get("allowed_operation_classes", [])],
+            owned_entities=list(data.get("owned_entities", [])),
+            owned_capabilities=list(data.get("owned_capabilities", [])),
+            capability_bindings=[CapabilityBinding.from_dict(cb) for cb in data.get("capability_bindings", [])]
+        )
 
 
 class LLDCompiler:
@@ -195,6 +270,33 @@ class LLDCompiler:
                 behavior_ids=sorted(list(set(mod_behaviors)))
             )
 
+            # Build formal CapabilityBindings for the module's behaviors
+            cap_bindings: List[CapabilityBinding] = []
+            for b_id in mod_behaviors:
+                b_node = b_graph.get_node(b_id)
+                if b_node:
+                    op_class = (
+                        OperationClass.COMMAND_MUTATION if b_node.behavior_type == BehaviorNodeType.COMMAND
+                        else OperationClass.READ_QUERY if b_node.behavior_type == BehaviorNodeType.QUERY
+                        else OperationClass.EVENT_PROCESSING if b_node.behavior_type == BehaviorNodeType.EVENT
+                        else OperationClass.STATE_TRANSITION
+                    )
+                    matching_req_ids = [r.id for r in r_graph.nodes.values() if b_node.id in r.source_behaviors]
+                    cap_bindings.append(CapabilityBinding(
+                        behavior_id=b_id,
+                        requirement_ids=matching_req_ids,
+                        operation_class=op_class,
+                        target_entity=b_node.target_entity_id,
+                        hld_capability=b_node.name,
+                        lld_component_id=f"ctrl_{mod.id}" if exec_arch in [ExecutionArchitecture.FULLSTACK_APP, ExecutionArchitecture.BACKEND_SERVICE] else f"cli_{mod.id}",
+                        allowed_component_types=[
+                            LLDComponentType.CONTROLLER, LLDComponentType.SERVICE,
+                            LLDComponentType.UI_SURFACE, LLDComponentType.CLI_DISPATCHER,
+                            LLDComponentType.PIPELINE_WORKER, LLDComponentType.EVENT_HANDLER
+                        ],
+                        prohibited_component_roles=["read_model", "query_service", "read_only_view", "audit_viewer"] if op_class == OperationClass.COMMAND_MUTATION else []
+                    ))
+
             # Execution-Architecture Specific Component Generation
             if exec_arch == ExecutionArchitecture.CLI_DISPATCHER:
                 cli_endpoints = [ep for ep in mod_endpoints if "PROPOSED_CANDIDATE" not in ep]
@@ -209,7 +311,11 @@ class LLDCompiler:
                     layout="cli_subcommand_dispatch",
                     sub_components=["ArgParser", "SubcommandRouter", "ConfigLoader", "ExitCodeHandler"],
                     api_endpoints=cli_endpoints,
-                    validation_rules=["POSIX flag compliance", "Exit code 0 for success, 1 for error, 2 for usage failure"]
+                    validation_rules=["POSIX flag compliance", "Exit code 0 for success, 1 for error, 2 for usage failure"],
+                    allowed_operation_classes=[OperationClass.COMMAND_MUTATION, OperationClass.READ_QUERY, OperationClass.STATE_TRANSITION],
+                    owned_entities=list(mod.owned_entities),
+                    owned_capabilities=list(mod.owned_capabilities),
+                    capability_bindings=cap_bindings
                 ))
 
             elif exec_arch == ExecutionArchitecture.DATA_PIPELINE_WORKER:
@@ -222,7 +328,11 @@ class LLDCompiler:
                     transport=InteractionTransport.EVENT_TOPIC,
                     sub_components=["StreamConsumer", "StageTransformer", "BatchSink"],
                     api_endpoints=mod_endpoints,
-                    validation_rules=["At-least-once stream processing", "Dead-letter queue on schema error"]
+                    validation_rules=["At-least-once stream processing", "Dead-letter queue on schema error"],
+                    allowed_operation_classes=[OperationClass.EVENT_PROCESSING, OperationClass.STATE_TRANSITION],
+                    owned_entities=list(mod.owned_entities),
+                    owned_capabilities=list(mod.owned_capabilities),
+                    capability_bindings=cap_bindings
                 ))
 
             elif exec_arch == ExecutionArchitecture.EVENT_DRIVEN_MICROSERVICE:
@@ -235,7 +345,11 @@ class LLDCompiler:
                     transport=InteractionTransport.EVENT_TOPIC,
                     sub_components=["KafkaMessageConsumer", "DomainEventHandler", "OutboxPublisher"],
                     api_endpoints=mod_endpoints,
-                    validation_rules=["Idempotent message handling", "Transactional outbox commitment"]
+                    validation_rules=["Idempotent message handling", "Transactional outbox commitment"],
+                    allowed_operation_classes=[OperationClass.EVENT_PROCESSING, OperationClass.STATE_TRANSITION],
+                    owned_entities=list(mod.owned_entities),
+                    owned_capabilities=list(mod.owned_capabilities),
+                    capability_bindings=cap_bindings
                 ))
 
             else:
@@ -264,7 +378,11 @@ class LLDCompiler:
                     transport=InteractionTransport.REST_HTTP,
                     route=f"/api/{p_route}",
                     api_endpoints=mod_endpoints,
-                    validation_rules=["Verify actor authorization", "Validate request payload schema"]
+                    validation_rules=["Verify actor authorization", "Validate request payload schema"],
+                    allowed_operation_classes=[OperationClass.COMMAND_MUTATION, OperationClass.READ_QUERY, OperationClass.STATE_TRANSITION],
+                    owned_entities=list(mod.owned_entities),
+                    owned_capabilities=list(mod.owned_capabilities),
+                    capability_bindings=cap_bindings
                 ))
 
                 lld_components.append(LLDComponent(
@@ -275,7 +393,11 @@ class LLDCompiler:
                     role="domain_service",
                     transport=InteractionTransport.INTERNAL_FUNCTION,
                     sub_components=[f"{mod.name}TransactionManager", f"{mod.name}PolicyEvaluator"],
-                    validation_rules=["Enforce state pre/post transitions", "Emit audit log side effects"]
+                    validation_rules=["Enforce state pre/post transitions", "Emit audit log side effects"],
+                    allowed_operation_classes=[OperationClass.COMMAND_MUTATION, OperationClass.READ_QUERY, OperationClass.STATE_TRANSITION, OperationClass.EVENT_PROCESSING],
+                    owned_entities=list(mod.owned_entities),
+                    owned_capabilities=list(mod.owned_capabilities),
+                    capability_bindings=cap_bindings
                 ))
 
                 if exec_arch == ExecutionArchitecture.FULLSTACK_APP:
@@ -301,7 +423,11 @@ class LLDCompiler:
                         layout="behavioral_workflow_surface",
                         sub_components=[f"{ent_stem}DetailHeader", f"{ent_stem}ActionToolbar", f"{ent_stem}AuditHistoryPanel"],
                         api_endpoints=mod_endpoints,
-                        validation_rules=["UI actions trigger backend transport contracts"]
+                        validation_rules=["UI actions trigger backend transport contracts"],
+                        allowed_operation_classes=[OperationClass.COMMAND_MUTATION, OperationClass.READ_QUERY],
+                        owned_entities=list(mod.owned_entities),
+                        owned_capabilities=list(mod.owned_capabilities),
+                        capability_bindings=cap_bindings
                     ))
 
         return lld_components

@@ -22,7 +22,7 @@ from typing import Dict, List, Set, Any, Optional, Tuple
 from behavior_graph import BehaviorGraph, BehaviorNodeType, EpistemicStatus
 from requirement_ir import RequirementGraph, RequirementNode
 from hld_compiler import HLDDesign, HLDModule, ADRRecord, ValidationStatus, ApprovalStatus
-from lld_compiler import LLDComponent
+from lld_compiler import LLDComponent, OperationClass, CapabilityBinding
 from task_compiler import TaskRecord
 
 
@@ -566,7 +566,7 @@ class ArtifactGovernor:
                         f"Task {t.id} ({t.title}) references ungrounded parent LLD '{t.parent_lld}' with zero behavior coverage."
                     )
 
-                # 3. Capability & Operation Class Semantic Compatibility
+                # 3. Structural Capability & Operation Class Semantic Responsibility Contract
                 is_read_only_comp = (
                     getattr(parent_comp, "layout", "") in ["read_only", "query_view", "viewer", "dashboard_view"]
                     or getattr(parent_comp, "role", "") in ["read_model", "query_service", "read_only_view", "audit_viewer"]
@@ -575,21 +575,33 @@ class ArtifactGovernor:
                 for beh_id in t.parent_behaviors:
                     if beh_id in b_map:
                         beh_node = b_map[beh_id]
-                        # Check mutation command vs read-only component
-                        if beh_node.behavior_type == BehaviorNodeType.COMMAND and is_read_only_comp:
+                        op_class = (
+                            OperationClass.COMMAND_MUTATION if beh_node.behavior_type == BehaviorNodeType.COMMAND
+                            else OperationClass.READ_QUERY if beh_node.behavior_type == BehaviorNodeType.QUERY
+                            else OperationClass.EVENT_PROCESSING if beh_node.behavior_type == BehaviorNodeType.EVENT
+                            else OperationClass.STATE_TRANSITION
+                        )
+
+                        # A. Operation Class Contract
+                        if parent_comp.allowed_operation_classes and op_class not in parent_comp.allowed_operation_classes:
+                            reasons.append(
+                                f"Task {t.id} ({t.title}) semantic capability responsibility mismatch: operation class '{op_class.value}' for behavior '{beh_node.name}' is not supported by parent LLD '{parent_comp.id}' allowed operations {[oc.value for oc in parent_comp.allowed_operation_classes]}."
+                            )
+
+                        # B. Prohibited Component Role Contract (e.g. mutation command on read model)
+                        if op_class == OperationClass.COMMAND_MUTATION and is_read_only_comp:
                             reasons.append(
                                 f"Task {t.id} ({t.title}) semantic capability mismatch: mutation command '{beh_node.name}' cannot be implemented by read-only component '{parent_comp.id}' ({parent_comp.role})."
                             )
-                        # Check target entity domain alignment between task/behavior and LLD component
-                        target_ent = getattr(beh_node, "target_entity_id", "")
-                        if target_ent:
-                            ent_stem = target_ent.replace("entity_", "").replace("resource_", "").replace("wf_", "").lower()
-                            if ent_stem and ent_stem not in parent_comp.id.lower() and ent_stem not in parent_comp.name.lower() and ent_stem not in (parent_comp.route or "").lower():
-                                comp_tokens = [tok.lower() for tok in parent_comp.name.split() if len(tok) > 3]
-                                if comp_tokens and not any(tok in ent_stem or ent_stem in tok for tok in comp_tokens):
-                                    reasons.append(
-                                        f"Task {t.id} ({t.title}) semantic domain mismatch: task entity '{ent_stem}' conflicts with parent LLD '{parent_comp.id}' domain ({parent_comp.name})."
-                                    )
+
+                        # C. Structural Entity Ownership Responsibility Contract
+                        if getattr(beh_node, "target_entity_id", "") and getattr(parent_comp, "owned_entities", None):
+                            clean_beh_ent = beh_node.target_entity_id.replace("entity_", "").replace("resource_", "").replace("wf_", "").lower()
+                            comp_ents = [e.replace("entity_", "").replace("resource_", "").replace("wf_", "").lower() for e in parent_comp.owned_entities]
+                            if clean_beh_ent not in comp_ents:
+                                reasons.append(
+                                    f"Task {t.id} ({t.title}) semantic entity responsibility mismatch: task entity '{beh_node.target_entity_id}' is not owned by parent LLD '{parent_comp.id}' owned entities {parent_comp.owned_entities}."
+                                )
 
         if reasons:
             return GovernanceGateResult(

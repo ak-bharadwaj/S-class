@@ -64,7 +64,10 @@ from hld_compiler import (
 from lld_compiler import (
     LLDCompiler,
     LLDComponent,
-    LLDComponentType
+    LLDComponentType,
+    InteractionTransport,
+    OperationClass,
+    CapabilityBinding
 )
 from task_compiler import (
     TaskCompiler,
@@ -327,7 +330,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         gov_res_wrong_existing = ArtifactGovernor.audit_task_governance([hijacked_task], r_graph_multi, lld_multi, b_graph_multi)
         self.assertTrue(gov_res_wrong_existing.is_blocked, "ArtifactGovernor MUST block task pointing to wrong but existing LLD parent component!")
         self.assertEqual(gov_res_wrong_existing.validation_status, ValidationStatus.INVALID)
-        self.assertTrue(any("semantic parent mismatch" in r or "semantic domain mismatch" in r for r in gov_res_wrong_existing.blocking_reasons))
+        self.assertTrue(any("semantic parent mismatch" in r or "semantic entity responsibility mismatch" in r for r in gov_res_wrong_existing.blocking_reasons))
 
         # 9. Negative Attack Vector 4: Partial-Overlap Scope Attack ({REQ-A, REQ-UNOWNED} vs {REQ-A, REQ-B})
         req_owned = vehicle_task.parent_reqs[0]
@@ -395,7 +398,37 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         self.assertEqual(gov_res_no_bgraph.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("Missing mandatory canonical BehaviorGraph context" in r for r in gov_res_no_bgraph.blocking_reasons))
 
-        # 14. Invariant: LLDCompiler MUST NOT fabricate synthetic REQ-001 ancestry for ungrounded modules
+        # 14. Negative Attack Vector 9: Operation Class Responsibility Mismatch (READ_QUERY behavior assigned to Event-Only Worker)
+        event_worker_comp = LLDComponent(
+            id="pipe_event_only", name="Event Only Worker", component_type=LLDComponentType.PIPELINE_WORKER,
+            parent=vehicle_comp.parent, role="pipeline_worker", transport=InteractionTransport.EVENT_TOPIC,
+            allowed_operation_classes=[OperationClass.EVENT_PROCESSING, OperationClass.STATE_TRANSITION],
+            owned_entities=list(vehicle_comp.owned_entities)
+        )
+        query_b_node = BehaviorNode(
+            id="qry_vehicle_status", name="QueryVehicleStatus", behavior_type=BehaviorNodeType.QUERY,
+            actor_id="dispatcher", target_entity_id="vehicle", epistemic_status=EpistemicStatus.EXPLICIT,
+            provenance=ProvenanceKind.EXPLICIT, confidence=1.0, evidence_ref="Query status"
+        )
+        b_graph_multi.add_node(query_b_node)
+        r_graph_multi.add_requirement(RequirementNode(
+            id="REQ-VEH-QRY", kind=RequirementKind.FUNCTIONAL, statement="Query vehicle status",
+            actor="dispatcher", capability="query_status", target="vehicle", source_behaviors=[query_b_node.id]
+        ))
+        event_worker_comp.parent.behavior_ids.append(query_b_node.id)
+        event_worker_comp.parent.req_ids.append("REQ-VEH-QRY")
+        mismatched_op_task = TaskRecord(
+            id="TSK-OP-MISMATCH", title="Query Vehicle Status Task", description="desc",
+            category=TaskCategory.API_ENDPOINT, parent_lld=event_worker_comp.id,
+            parent_hld=vehicle_task.parent_hld, parent_reqs=["REQ-VEH-QRY"],
+            parent_behaviors=[query_b_node.id]
+        )
+        gov_res_op_mismatch = ArtifactGovernor.audit_task_governance([mismatched_op_task], r_graph_multi, [event_worker_comp], b_graph_multi)
+        self.assertTrue(gov_res_op_mismatch.is_blocked, "ArtifactGovernor MUST block task when operation class (READ_QUERY) is not supported by parent LLD component!")
+        self.assertEqual(gov_res_op_mismatch.validation_status, ValidationStatus.INVALID)
+        self.assertTrue(any("semantic capability responsibility mismatch" in r for r in gov_res_op_mismatch.blocking_reasons))
+
+        # 15. Invariant: LLDCompiler MUST NOT fabricate synthetic REQ-001 ancestry for ungrounded modules
         empty_r_graph = RequirementGraph()
         synthetic_mod = HLDModule(id="mod_synth", name="Synthetic", system_boundary="internal", owned_entities=["X"], owned_capabilities=["nonexistent_cap"])
         synthetic_hld = HLDDesign(system_name="HLD-001", architecture_style="Modular Monolith", modules=[synthetic_mod], adrs=[], version=1)
