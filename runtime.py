@@ -8,7 +8,7 @@ import logging
 import hashlib
 from datetime import datetime, timezone
 from dataclasses import dataclass, asdict, field
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Set, Tuple
 
 # Local Paths configuration
 PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
