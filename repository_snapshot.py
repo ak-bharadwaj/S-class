@@ -254,7 +254,7 @@ class RepositorySnapshot:
     def compute_tree_hash(self) -> str:
         """Computes deterministic Merkle-style tree hash over sorted relative paths and file content hashes."""
         entries = [
-            f"{path}:{entry.file_hash}"
+            {"path": path, "file_hash": entry.file_hash}
             for path, entry in sorted(self.file_manifest.items())
         ]
         payload = json.dumps(entries, sort_keys=True, separators=(",", ":"))
@@ -263,18 +263,31 @@ class RepositorySnapshot:
     def compute_repository_state_hash(self) -> str:
         """
         Computes deterministic, authoritative repository state identity.
+        Uses structured canonical JSON serialization to eliminate delimiter-based serialization ambiguity.
         In-scope: tree_hash, file content hashes, structural classifications, language tags,
         boundary flags, symlink statuses and targets, classification evidence reasons,
         and boundary partition structure.
         Out-of-scope: snapshot_timestamp and snapshot_id (guaranteeing 100% temporal reproducibility).
         """
-        file_signatures = [
-            f"{path}:{entry.file_hash}:{entry.classification.value if hasattr(entry.classification, 'value') else str(entry.classification)}:{entry.language.value if hasattr(entry.language, 'value') else str(entry.language)}:{int(entry.is_generated)}:{int(entry.is_third_party)}:{int(entry.is_locked)}:{int(entry.is_symlink)}:{int(entry.is_external_symlink)}:{entry.symlink_target or ''}:{entry.classification_reason}"
+        file_entries_canonical = [
+            {
+                "path": path,
+                "file_hash": entry.file_hash,
+                "classification": entry.classification.value if hasattr(entry.classification, "value") else str(entry.classification),
+                "language": entry.language.value if hasattr(entry.language, "value") else str(entry.language),
+                "is_generated": bool(entry.is_generated),
+                "is_third_party": bool(entry.is_third_party),
+                "is_locked": bool(entry.is_locked),
+                "is_symlink": bool(entry.is_symlink),
+                "is_external_symlink": bool(entry.is_external_symlink),
+                "symlink_target": entry.symlink_target or "",
+                "classification_reason": entry.classification_reason or ""
+            }
             for path, entry in sorted(self.file_manifest.items())
         ]
         payload = {
             "tree_hash": self.tree_hash or self.compute_tree_hash(),
-            "file_signatures": file_signatures,
+            "file_entries": file_entries_canonical,
             "boundary_manifest": self.boundary_manifest.to_dict()
         }
         canonical_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))

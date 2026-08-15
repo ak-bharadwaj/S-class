@@ -409,6 +409,25 @@ class TestV11RepositorySnapshot(unittest.TestCase):
         self.assertTrue(gov_res.is_blocked)
         self.assertTrue(any("repository_state_hash mismatch" in r for r in gov_res.blocking_reasons))
 
+    def test_v11_adversarial_delimiter_injection_and_structural_ambiguity_fails_collision(self):
+        """V11.1 Cryptographic: Delimiter injection (colons, braces, quotes) cannot forge repository_state_hash collision."""
+        self._create_file("src/app.py", "pass")
+        snap1 = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        # File with colons and special JSON characters in fields
+        snap1.file_manifest["src/app.py"].classification_reason = "evidence: [tag: 1, flag: True]"
+        snap1.file_manifest["src/app.py"].symlink_target = "rel:path/with:colons"
+        hash1 = snap1.compute_repository_state_hash()
+
+        # Construct candidate spoof with shifted field boundaries
+        snap2 = RepositorySnapshot.from_dict(snap1.to_dict())
+        snap2.file_manifest["src/app.py"].classification_reason = "evidence"
+        snap2.file_manifest["src/app.py"].symlink_target = "rel:path/with:colons: [tag: 1, flag: True]"
+        hash2 = snap2.compute_repository_state_hash()
+
+        # Structured canonical JSON prevents cross-field boundary leakage
+        self.assertNotEqual(hash1, hash2)
+
 
 if __name__ == "__main__":
     unittest.main()
