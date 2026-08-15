@@ -255,8 +255,12 @@ class LLDComponent:
     capability_bindings: List[CapabilityBinding] = field(default_factory=list)
     component_hash: str = ""
 
+    def __post_init__(self):
+        if not self.component_hash:
+            self.component_hash = self.compute_canonical_hash()
+
     def compute_canonical_hash(self) -> str:
-        """Computes deterministic SHA-256 hash over all component semantic fields, capabilities, and binding digests."""
+        """Computes deterministic SHA-256 hash over all component semantic fields, capabilities, endpoints, and binding digests."""
         payload = {
             "id": self.id,
             "name": self.name,
@@ -268,6 +272,9 @@ class LLDComponent:
             "layout": self.layout,
             "execution_capability": self.execution_capability.value if self.execution_capability else "",
             "interaction_capability": self.interaction_capability.value if self.interaction_capability else "",
+            "sub_components": sorted(self.sub_components),
+            "api_endpoints": sorted(self.api_endpoints),
+            "validation_rules": sorted(self.validation_rules),
             "allowed_operation_classes": sorted([oc.value for oc in self.allowed_operation_classes]),
             "owned_entities": sorted(self.owned_entities),
             "owned_capabilities": sorted(self.owned_capabilities),
@@ -307,7 +314,7 @@ class LLDComponent:
     @classmethod
     def from_dict(cls, data: Dict[str, Any], strict: bool = False) -> 'LLDComponent':
         if strict:
-            mandatory = ["id", "name", "component_type", "parent", "role", "transport", "layout"]
+            mandatory = ["id", "name", "component_type", "parent", "role", "transport", "layout", "component_hash"]
             for m in mandatory:
                 if m not in data or not data[m]:
                     raise ValueError(f"Missing mandatory governed field '{m}' in LLDComponent serialized data")
@@ -365,7 +372,7 @@ class LLDComponent:
             capability_bindings=bindings,
             component_hash=data.get("component_hash", "")
         )
-        if not comp.component_hash:
+        if not strict and not comp.component_hash:
             comp.component_hash = comp.compute_canonical_hash()
         return comp
 

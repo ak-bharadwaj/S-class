@@ -1143,18 +1143,23 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
                 CapabilityBinding.from_governed_dict(incomplete_dict)
 
         # 43b. LLDComponent.from_governed_dict Strict Mode & Ontology Invariant Verification
-        valid_ui_dict = {
-            "id": "ui_001",
-            "name": "Fleet Dispatch UI",
-            "component_type": "ui_surface",
-            "parent": {"hld_id": "HLD-001", "req_ids": ["REQ-001"], "behavior_ids": ["cmd_dispatch"]},
-            "role": "frontend_interface",
-            "transport": "rest_http",
-            "layout": "form_modal",
-            "interaction_capability": "SUBMITS_MUTATION",
-            "capability_bindings": [base_valid_dict]
-        }
+        temp_ui_comp = LLDComponent(
+            id="ui_001", name="Fleet Dispatch UI",
+            component_type=LLDComponentType.UI_SURFACE,
+            parent=LLDParentRef(hld_id="HLD-001", req_ids=["REQ-001"], behavior_ids=["cmd_dispatch"]),
+            role="frontend_interface", transport=InteractionTransport.REST_HTTP,
+            layout="form_modal", interaction_capability=UIInteractionCapability.SUBMITS_MUTATION,
+            capability_bindings=[valid_binding]
+        )
+        temp_ui_comp.component_hash = temp_ui_comp.compute_canonical_hash()
+        valid_ui_dict = temp_ui_comp.to_dict()
         self.assertIsInstance(LLDComponent.from_governed_dict(valid_ui_dict), LLDComponent)
+
+        # Missing component_hash on governed LLDComponent -> Reject
+        no_hash_ui_dict = dict(valid_ui_dict)
+        no_hash_ui_dict.pop("component_hash")
+        with self.assertRaises(ValueError, msg="LLDComponent.from_governed_dict MUST reject missing component_hash"):
+            LLDComponent.from_governed_dict(no_hash_ui_dict)
 
         # Missing interaction_capability on UI_SURFACE -> Reject
         invalid_ui_dict = dict(valid_ui_dict)
@@ -1171,13 +1176,14 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             "role": "domain_service",
             "transport": "internal_function",
             "layout": "standard_view",
+            "component_hash": "dummy_hash",
             # Missing execution_capability!
             "capability_bindings": [base_valid_dict]
         }
         with self.assertRaises(ValueError, msg="LLDComponent.from_governed_dict MUST reject service missing execution_capability"):
             LLDComponent.from_governed_dict(invalid_svc_dict)
 
-        # 43c. LLD Component Canonical Hash Tampering Detection
+        # 43c. LLD Component Canonical Hash Tampering & Omission Detection in Governor
         tampered_hash_comp = LLDComponent(
             id=vehicle_comp.id, name="Fleet Dispatch Action Modal",
             component_type=LLDComponentType.UI_SURFACE,
@@ -1190,6 +1196,39 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         gov_res_tampered_comp = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [tampered_hash_comp], b_graph_multi, hld_modules=hld_multi.modules)
         self.assertTrue(gov_res_tampered_comp.is_blocked, "ArtifactGovernor MUST block task when LLD component hash mismatches canonical digest!")
         self.assertTrue(any("canonical content hash mismatch" in r for r in gov_res_tampered_comp.blocking_reasons))
+
+        missing_hash_comp = LLDComponent(
+            id=vehicle_comp.id, name="Fleet Dispatch Action Modal",
+            component_type=LLDComponentType.UI_SURFACE,
+            parent=vehicle_comp.parent, role="frontend_interface", layout="form_modal",
+            interaction_capability=UIInteractionCapability.SUBMITS_MUTATION,
+            owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
+            capability_bindings=[valid_binding]
+        )
+        missing_hash_comp.component_hash = "" # Manually wipe hash!
+        gov_res_missing_comp_hash = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [missing_hash_comp], b_graph_multi, hld_modules=hld_multi.modules)
+        self.assertTrue(gov_res_missing_comp_hash.is_blocked, "ArtifactGovernor MUST block task when LLD component is missing component_hash!")
+        self.assertTrue(any("missing mandatory canonical component_hash" in r for r in gov_res_missing_comp_hash.blocking_reasons))
+
+        # 43d. Authoritative ComponentExecutionCapability Enforcement (Backend Mutation Command Mismatched to READ-only Service)
+        read_only_svc_comp = LLDComponent(
+            id="svc_readonly_dispatch", name="Fleet Dispatch Read Service",
+            component_type=LLDComponentType.SERVICE,
+            parent=vehicle_comp.parent, role="domain_service", layout="standard_view",
+            execution_capability=ComponentExecutionCapability.READ, # Mismatch for COMMAND_MUTATION!
+            owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
+            capability_bindings=[valid_binding]
+        )
+        read_only_svc_comp.component_hash = read_only_svc_comp.compute_canonical_hash()
+        read_svc_task = TaskRecord(
+            id="TSK-READ-SVC-MUTATION", title="Execute Vehicle Dispatch", description="desc",
+            category=TaskCategory.API_ENDPOINT, parent_lld=read_only_svc_comp.id,
+            parent_hld=vehicle_task.parent_hld, parent_reqs=vehicle_task.parent_reqs,
+            parent_behaviors=vehicle_task.parent_behaviors
+        )
+        gov_res_exec_mismatch = ArtifactGovernor.audit_task_governance([read_svc_task], r_graph_multi, [read_only_svc_comp], b_graph_multi, hld_modules=hld_multi.modules)
+        self.assertTrue(gov_res_exec_mismatch.is_blocked, "ArtifactGovernor MUST block COMMAND_MUTATION on backend component with execution_capability = READ!")
+        self.assertTrue(any("execution capability mismatch" in r for r in gov_res_exec_mismatch.blocking_reasons))
 
         # 44. Negative Attack Vector 39: Strict Positive Integer Graph Version Validation (Reject Non-Positive / Boolean / Missing in Strict Mode)
         with self.assertRaises(ValueError):
@@ -1231,9 +1270,11 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             id=vehicle_comp.id, name="Fleet Passive Dashboard",
             component_type=LLDComponentType.UI_SURFACE,
             parent=vehicle_comp.parent, role="dashboard_viewer", layout="dashboard_view",
+            interaction_capability=UIInteractionCapability.DISPLAYS_DATA,
             owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
             capability_bindings=[passive_dashboard_binding]
         )
+        passive_dashboard_comp.component_hash = passive_dashboard_comp.compute_canonical_hash()
         gov_res_passive_ui = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [passive_dashboard_comp], b_graph_multi, hld_modules=hld_multi.modules)
         self.assertTrue(gov_res_passive_ui.is_blocked, "ArtifactGovernor MUST block COMMAND_MUTATION mapped to passive dashboard_view UI surface!")
         self.assertEqual(gov_res_passive_ui.validation_status, ValidationStatus.INVALID)
@@ -1264,6 +1305,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
             capability_bindings=[action_form_binding]
         )
+        action_form_comp.component_hash = action_form_comp.compute_canonical_hash()
         gov_res_action_ui = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [action_form_comp], b_graph_multi, hld_modules=hld_multi.modules)
         self.assertFalse(gov_res_action_ui.is_blocked, f"ArtifactGovernor MUST permit COMMAND_MUTATION on interactive action form UI surface! Reasons: {gov_res_action_ui.blocking_reasons}")
         self.assertEqual(gov_res_action_ui.validation_status, ValidationStatus.VALID)

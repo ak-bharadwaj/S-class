@@ -22,7 +22,14 @@ from typing import Dict, List, Set, Any, Optional, Tuple
 from behavior_graph import BehaviorGraph, BehaviorNodeType, EpistemicStatus
 from requirement_ir import RequirementGraph, RequirementNode
 from hld_compiler import HLDDesign, HLDModule, ADRRecord, ValidationStatus, ApprovalStatus
-from lld_compiler import LLDComponent, LLDComponentType, OperationClass, UIInteractionCapability, CapabilityBinding
+from lld_compiler import (
+    LLDComponent,
+    LLDComponentType,
+    OperationClass,
+    UIInteractionCapability,
+    ComponentExecutionCapability,
+    CapabilityBinding
+)
 from task_compiler import TaskRecord
 
 
@@ -743,10 +750,34 @@ class ArtifactGovernor:
                     if hasattr(parent_comp, "compute_canonical_hash"):
                         expected_comp_hash = parent_comp.compute_canonical_hash()
                         actual_comp_hash = getattr(parent_comp, "component_hash", "")
-                        if actual_comp_hash and actual_comp_hash != expected_comp_hash:
+                        if not actual_comp_hash:
+                            reasons.append(
+                                f"Task {t.id} ({t.title}) LLD component '{parent_comp.id}' is missing mandatory canonical component_hash!"
+                            )
+                        elif actual_comp_hash != expected_comp_hash:
                             reasons.append(
                                 f"Task {t.id} ({t.title}) LLD component '{parent_comp.id}' canonical content hash mismatch (actual: {actual_comp_hash[:8]}, computed: {expected_comp_hash[:8]})!"
                             )
+
+                    # G1. Authoritative Backend/Worker/CLI Execution Capability Contract Verification
+                    if parent_comp.component_type != LLDComponentType.UI_SURFACE:
+                        exec_cap = getattr(parent_comp, "execution_capability", None)
+                        if not exec_cap:
+                            reasons.append(
+                                f"Task {t.id} ({t.title}) non-UI LLD component '{parent_comp.id}' is missing mandatory execution_capability!"
+                            )
+                        else:
+                            ALLOWED_EXEC_CAPABILITIES = {
+                                OperationClass.COMMAND_MUTATION: [ComponentExecutionCapability.MUTATE, ComponentExecutionCapability.TRANSITION_STATE],
+                                OperationClass.READ_QUERY: [ComponentExecutionCapability.READ],
+                                OperationClass.EVENT_PROCESSING: [ComponentExecutionCapability.PROCESS_EVENT, ComponentExecutionCapability.TRIGGER_WORKFLOW],
+                                OperationClass.STATE_TRANSITION: [ComponentExecutionCapability.TRANSITION_STATE, ComponentExecutionCapability.MUTATE, ComponentExecutionCapability.TRIGGER_WORKFLOW]
+                            }
+                            valid_caps = ALLOWED_EXEC_CAPABILITIES.get(binding.operation_class, [])
+                            if exec_cap not in valid_caps:
+                                reasons.append(
+                                    f"Task {t.id} ({t.title}) execution capability mismatch: operation class '{binding.operation_class.value}' requires execution capability in {[c.value for c in valid_caps]} on component '{parent_comp.id}', but found '{exec_cap.value}'."
+                                )
 
                     # G. Allowed Component Type Contract Verification
                     if parent_comp.component_type not in binding.allowed_component_types:
