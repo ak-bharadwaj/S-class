@@ -365,7 +365,7 @@ time.sleep(30)
 
     def test_persistent_lock_file_no_detached_inode_race(self):
         """Falsification Test: Verify persistent lock file is NEVER unlinked on release, eliminating detached-inode races across rapid serial & concurrent releases/acquisitions."""
-        import concurrent.futures, json
+        import concurrent.futures, json, threading
         lock_path = os.path.join(self.test_dir, ".agents", "persistent_race.lock")
 
         # 1. Acquire and release lock
@@ -388,20 +388,43 @@ time.sleep(30)
             self.assertNotIn("status", data2)
             self.assertEqual(data2.get("pid"), os.getpid())
 
-        # 4. Concurrent acquisition race: 5 threads attempting acquisition simultaneously on persistent file
-        acquired_owners = []
+        # 4. Strict Mutual Exclusion Verification across 5 concurrent workers
+        active_count = 0
+        max_active_count = 0
+        active_lock = threading.Lock()
+        worker_intervals = []
 
         def worker_task(worker_id):
+            nonlocal active_count, max_active_count
             with FileLock(lock_path, timeout=5.0):
-                acquired_owners.append(worker_id)
+                t_enter = time.time()
+                with active_lock:
+                    active_count += 1
+                    if active_count > max_active_count:
+                        max_active_count = active_count
+
                 time.sleep(0.01)
+
+                t_exit = time.time()
+                with active_lock:
+                    active_count -= 1
+                    worker_intervals.append((worker_id, t_enter, t_exit))
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             futures = [executor.submit(worker_task, i) for i in range(5)]
             for f in concurrent.futures.as_completed(futures):
                 f.result()
 
-        self.assertEqual(len(acquired_owners), 5, "All 5 concurrent workers MUST acquire lock in serial order without deadlocking or failing")
+        self.assertEqual(len(worker_intervals), 5, "All 5 concurrent workers MUST acquire lock in serial order")
+        self.assertEqual(max_active_count, 1, "STRICT MUTUAL EXCLUSION: max concurrent active workers MUST NEVER exceed 1!")
+        
+        # Verify strict non-overlapping critical sections across all executed intervals
+        sorted_intervals = sorted(worker_intervals, key=lambda x: x[1])
+        for i in range(1, len(sorted_intervals)):
+            prev_exit = sorted_intervals[i-1][2]
+            curr_enter = sorted_intervals[i][1]
+            self.assertGreaterEqual(curr_enter, prev_exit - 0.001, f"Worker {sorted_intervals[i][0]} enter time MUST be >= previous worker exit time")
+
         self.assertTrue(os.path.exists(lock_path), "Persistent lock file MUST remain intact on disk throughout concurrent releases")
 
 

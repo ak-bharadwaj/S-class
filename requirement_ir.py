@@ -41,6 +41,57 @@ class NFRCategory(str, Enum):
 
 
 @dataclass
+class EvidenceItem:
+    """Structured representation of grounded evidence backing a requirement or behavioral claim."""
+    id: str
+    source_type: str = "PROSE"
+    source_ref: str = ""
+    content: str = ""
+    provenance: ProvenanceKind = ProvenanceKind.EXPLICIT
+    quality: float = 1.0
+    timestamp: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "source_type": self.source_type,
+            "source_ref": self.source_ref,
+            "content": self.content,
+            "provenance": self.provenance.value if isinstance(self.provenance, ProvenanceKind) else str(self.provenance),
+            "quality": self.quality,
+            "timestamp": self.timestamp
+        }
+
+    @classmethod
+    def from_dict(cls, data: Any) -> "EvidenceItem":
+        if isinstance(data, EvidenceItem):
+            return data
+        if isinstance(data, str):
+            import hashlib
+            return cls(
+                id=f"EVID-{hashlib.sha256(data.encode('utf-8')).hexdigest()[:8]}",
+                source_type="LEGACY_PROSE",
+                source_ref="prompt",
+                content=data,
+                provenance=ProvenanceKind.EXPLICIT,
+                quality=1.0
+            )
+        if isinstance(data, dict):
+            prov = data.get("provenance", "explicit")
+            prov_enum = ProvenanceKind(prov) if isinstance(prov, str) and prov in [p.value for p in ProvenanceKind] else ProvenanceKind.EXPLICIT
+            return cls(
+                id=data.get("id", f"EVID-{uuid.uuid4().hex[:8]}"),
+                source_type=data.get("source_type", "PROSE"),
+                source_ref=data.get("source_ref", ""),
+                content=data.get("content", ""),
+                provenance=prov_enum,
+                quality=float(data.get("quality", 1.0)),
+                timestamp=data.get("timestamp", "")
+            )
+        return cls(id=f"EVID-{uuid.uuid4().hex[:8]}", content=str(data))
+
+
+@dataclass
 class RequirementNode:
     """A machine-verifiable software requirement with full evidence lineage."""
     id: str
@@ -58,7 +109,7 @@ class RequirementNode:
     epistemic_status: EpistemicStatus = EpistemicStatus.DERIVED
     provenance: ProvenanceKind = ProvenanceKind.STRONGLY_DERIVED
     confidence: float = 1.0
-    evidence: Optional[str] = None
+    evidence: List[EvidenceItem] = field(default_factory=list)
     source_behaviors: List[str] = field(default_factory=list)
     assumptions: List[str] = field(default_factory=list)
     dependencies: List[str] = field(default_factory=list)
@@ -86,6 +137,7 @@ class RequirementNode:
     def canonical_hash(self) -> str:
         """Computes a SHA-256 canonical hash over ALL 16 fields of the requirement node (including epistemic metadata)."""
         import hashlib
+        serialized_evidence = [e.to_dict() if isinstance(e, EvidenceItem) else EvidenceItem.from_dict(e).to_dict() for e in (self.evidence or [])]
         payload = {
             "id": self.id,
             "kind": self.kind.value if isinstance(self.kind, RequirementKind) else str(self.kind),
@@ -102,7 +154,7 @@ class RequirementNode:
             "epistemic_status": self.epistemic_status.value if isinstance(self.epistemic_status, EpistemicStatus) else str(self.epistemic_status),
             "provenance": self.provenance.value if isinstance(self.provenance, ProvenanceKind) else str(self.provenance),
             "confidence": self.confidence,
-            "evidence": self.evidence,
+            "evidence": serialized_evidence,
             "source_behaviors": sorted(self.source_behaviors),
             "assumptions": sorted(self.assumptions),
             "dependencies": sorted(self.dependencies)
@@ -127,7 +179,7 @@ class RequirementNode:
             "epistemic_status": self.epistemic_status.value,
             "provenance": self.provenance.value,
             "confidence": self.confidence,
-            "evidence": self.evidence,
+            "evidence": [e.to_dict() if isinstance(e, EvidenceItem) else EvidenceItem.from_dict(e).to_dict() for e in (self.evidence or [])],
             "source_behaviors": self.source_behaviors,
             "assumptions": self.assumptions,
             "dependencies": self.dependencies,
@@ -137,6 +189,14 @@ class RequirementNode:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'RequirementNode':
+        raw_ev = data.get("evidence", [])
+        if isinstance(raw_ev, str):
+            parsed_ev = [EvidenceItem.from_dict(raw_ev)] if raw_ev else []
+        elif isinstance(raw_ev, list):
+            parsed_ev = [EvidenceItem.from_dict(e) for e in raw_ev]
+        else:
+            parsed_ev = []
+
         return cls(
             id=data["id"],
             kind=RequirementKind(data["kind"]),
@@ -153,7 +213,7 @@ class RequirementNode:
             epistemic_status=EpistemicStatus(data.get("epistemic_status", "derived")),
             provenance=ProvenanceKind(data.get("provenance", "strongly_derived")),
             confidence=data.get("confidence", 1.0),
-            evidence=data.get("evidence"),
+            evidence=parsed_ev,
             source_behaviors=data.get("source_behaviors", []),
             assumptions=data.get("assumptions", []),
             dependencies=data.get("dependencies", [])
@@ -245,10 +305,22 @@ class RequirementGraph:
                     if req.confidence > existing.confidence:
                         existing.confidence = req.confidence
 
-            # Evidence Safeguard: preserve and accumulate grounded evidence items without losing prior evidence
+            # Evidence Safeguard: preserve and accumulate structured EvidenceItem entries without losing prior evidence
             if req.evidence:
-                combined_evidence = list(dict.fromkeys((existing.evidence or []) + req.evidence))
-                existing.evidence = combined_evidence
+                existing_items = [EvidenceItem.from_dict(e) for e in (existing.evidence or [])]
+                item_map = {(e.source_type, e.source_ref, e.content): e for e in existing_items}
+
+                for raw_new in req.evidence:
+                    new_item = EvidenceItem.from_dict(raw_new)
+                    key = (new_item.source_type, new_item.source_ref, new_item.content)
+                    if key not in item_map:
+                        item_map[key] = new_item
+                    else:
+                        old_item = item_map[key]
+                        if _get_provenance_rank(new_item.provenance) > _get_provenance_rank(old_item.provenance):
+                            item_map[key] = new_item
+
+                existing.evidence = list(item_map.values())
 
             return existing
 

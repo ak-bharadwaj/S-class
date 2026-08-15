@@ -198,7 +198,7 @@ class FileLock:
             "process_start_time": self.owner_proc_start
         }).encode("utf-8")
 
-        os.makedirs(os.path.dirname(self.lock_path), exist_ok=True)
+        os.makedirs(os.path.dirname(self.lock_path), mode=0o700, exist_ok=True)
 
         while True:
             # Enforce local thread-safe activation tracking within same process
@@ -212,8 +212,8 @@ class FileLock:
                 continue
 
             try:
-                # Open or create persistent lock file (os.O_CREAT | os.O_RDWR)
-                fd = os.open(self.lock_path, os.O_CREAT | os.O_RDWR, 0o666)
+                # Open or create persistent lock file with owner-only permissions (0o600)
+                fd = os.open(self.lock_path, os.O_CREAT | os.O_RDWR, 0o600)
             except OSError:
                 if time.time() - start_time >= self.timeout:
                     raise TimeoutError(f"FileLock timeout opening persistent lock file: {self.lock_path}")
