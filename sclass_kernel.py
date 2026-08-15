@@ -89,6 +89,9 @@ class MinimalDeterministicKernel:
             else:
                 actual_event = event_name
                 caller_from_state = kwargs.get("from_state")
+        elif not event_name and from_state:
+            actual_event = from_state
+            caller_from_state = None
         else:
             caller_from_state = from_state or kwargs.get("from_state")
             actual_event = event_name or kwargs.get("event_name", "")

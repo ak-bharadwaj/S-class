@@ -67,6 +67,19 @@ class EventRecord:
             workflow_profile=workflow_profile
         )
 
+    def __getitem__(self, key: str) -> Any:
+        if hasattr(self, key):
+            return getattr(self, key)
+        if isinstance(self.payload, dict) and key in self.payload:
+            return self.payload[key]
+        raise KeyError(key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
 
 class EventStore:
     """Append-only canonical event log with Snapshot Checkpointing for O(delta) replay performance."""
@@ -135,9 +148,8 @@ class EventStore:
         with open(store_file, "r", encoding="utf-8") as f:
             for idx, line in enumerate(f):
                 line_str = line.strip()
-                if line_str:
+                if line_str and idx >= offset:
                     d = json.loads(line_str)
                     rec = EventRecord.from_dict(d)
-                    if rec.event_id > offset or offset == 0:
-                        events.append(rec)
+                    events.append(rec)
         return events
