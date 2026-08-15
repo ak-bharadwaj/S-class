@@ -1,20 +1,24 @@
 """
-S-Class EOS V11.2 — Engineering World Model Engine (world_model_engine.py)
+S-Class EOS V11.2 — Authoritative World Model Engine & Language Adapters (world_model_engine.py)
 
-Extracts and weaves concrete software truth from:
-1. Repository Snapshot & file boundaries
-2. Polyglot AST analysis (Python AST, TypeScript/JavaScript signatures, route decorators, test suites)
-3. Grounded architectural specifications (Requirements, Behaviors, LLD Components, Tasks)
+Extracts and weaves concrete software truth via pluggable language adapters:
+1. PythonLanguageAdapter: Full AST parsing, typing, route decorators, pytest test discovery
+2. TypeScriptJavaScriptLanguageAdapter: Classes, interfaces, exported functions, Express/Next routes, Jest/Vitest tests
+3. FallbackLanguageAdapter: Explicit unmodeled file boundaries without pretending AST understanding
 
-Produces a unified, cryptographically hashed EngineeringWorldModel.
+Grounded Spec Weaver:
+- Strictly maps tasks to symbols only via explicit symbol targeting or LLD component interfaces
+- Sets ImplementationStatus.TARGETED (never FULLY_IMPLEMENTED before execution)
+- Sets CoverageStatus.STATICALLY_LINKED and ExecutionResult.UNTESTED (never PASSED without execution)
 """
 
 import os
 import ast
 import re
 import json
-import inspect
+from abc import ABC, abstractmethod
 from typing import Dict, List, Set, Optional, Tuple, Any
+
 from repository_snapshot import (
     RepositorySnapshot,
     RepositorySnapshotEngine,
@@ -41,39 +45,64 @@ from world_model import (
     DependencyKind,
     OwnershipKind,
     ImplementationStatus,
-    VerificationKind
+    CoverageStatus,
+    ExecutionResult,
+    VerificationKind,
+    TruthLevel,
+    ResolutionKind,
+    ProvenanceRecord
 )
 
 
-class PythonASTExtractor:
-    """Extracts symbols, APIs, test entities, and dependency relations from Python AST."""
+class LanguageAdapter(ABC):
+    """Abstract base class for language-specific AST and semantic extraction."""
 
-    @classmethod
-    def extract_from_file(
-        cls,
+    @abstractmethod
+    def can_handle(self, file_entry: FileEntry) -> bool:
+        pass
+
+    @abstractmethod
+    def extract(
+        self,
         rel_path: str,
         full_path: str,
-        file_entry: Optional[FileEntry] = None
+        file_entry: FileEntry
+    ) -> Tuple[ModuleEntity, List[SymbolEntity], List[APIEntity], List[TestEntity], List[DependencyRelation]]:
+        pass
+
+
+class PythonLanguageAdapter(LanguageAdapter):
+    """Extracts symbols, APIs, test entities, and dependency relations from Python AST."""
+
+    def can_handle(self, file_entry: FileEntry) -> bool:
+        return file_entry.language == LanguageKind.PYTHON
+
+    def extract(
+        self,
+        rel_path: str,
+        full_path: str,
+        file_entry: FileEntry
     ) -> Tuple[ModuleEntity, List[SymbolEntity], List[APIEntity], List[TestEntity], List[DependencyRelation]]:
         rel_path = rel_path.replace("\\", "/").strip().lstrip("/")
         mod_id = f"mod://{rel_path}"
         mod_name = os.path.splitext(os.path.basename(rel_path))[0]
-        classification = file_entry.classification if file_entry else FileClassification.SOURCE
-        file_hash = file_entry.file_hash if file_entry else ""
+        classification = file_entry.classification
+        file_hash = file_entry.file_hash
 
         try:
             with open(full_path, "r", encoding="utf-8", errors="replace") as f:
                 content = f.read()
             tree = ast.parse(content, filename=rel_path)
-        except Exception:
-            # Fallback for unparseable syntax
+        except Exception as e:
             module_ent = ModuleEntity(
                 id=mod_id,
                 path=rel_path,
                 name=mod_name,
                 classification=classification,
                 language=LanguageKind.PYTHON,
-                file_hash=file_hash
+                file_hash=file_hash,
+                is_modeled=False,
+                provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="PYTHON_AST_SYNTAX_ERROR", confidence=0.0, evidence=str(e))
             )
             return module_ent, [], [], [], []
 
@@ -86,7 +115,7 @@ class PythonASTExtractor:
         imports: List[str] = []
         exports: List[str] = []
 
-        # 1. Extract Imports and File-level Dependency Relations
+        # 1. Extract Imports & Track Resolved Targets
         imported_symbols: Dict[str, str] = {}
         for node in ast.iter_child_nodes(tree):
             if isinstance(node, ast.Import):
@@ -99,7 +128,8 @@ class PythonASTExtractor:
                         from_entity=mod_id,
                         to_entity=f"mod://{rel_import_path}",
                         relation_kind=DependencyKind.IMPORTS,
-                        is_external=not os.path.exists(os.path.join(os.path.dirname(full_path), f"{alias.name.replace('.', '/')}.py"))
+                        resolution=ResolutionKind.RESOLVED if os.path.exists(os.path.join(os.path.dirname(full_path), f"{alias.name.replace('.', '/')}.py")) else ResolutionKind.EXTERNAL,
+                        provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="PYTHON_AST_IMPORT", confidence=1.0)
                     ))
             elif isinstance(node, ast.ImportFrom):
                 mod_str = node.module or ""
@@ -112,10 +142,10 @@ class PythonASTExtractor:
                         from_entity=mod_id,
                         to_entity=f"sym://{rel_import_path}#{alias.name}",
                         relation_kind=DependencyKind.IMPORTS,
-                        is_external=False
+                        resolution=ResolutionKind.RESOLVED,
+                        provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="PYTHON_AST_IMPORT_FROM", confidence=1.0)
                     ))
 
-        # Helper to extract function/method signature & params
         def parse_params(fn_node: Any) -> List[Dict[str, Any]]:
             params = []
             for arg in fn_node.args.args:
@@ -144,23 +174,24 @@ class PythonASTExtractor:
                     line_start=node.lineno,
                     line_end=getattr(node, "end_lineno", node.lineno),
                     docstring=cls_doc,
-                    visibility=cls_visibility
+                    visibility=cls_visibility,
+                    provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="PYTHON_AST_CLASS", confidence=1.0)
                 )
                 symbols.append(cls_sym)
                 symbol_ids.append(cls_sym_id)
                 if cls_visibility == VisibilityKind.PUBLIC:
                     exports.append(cls_name)
 
-                # Inheritance relations
                 for base in node.bases:
                     base_name = ast.unparse(base)
                     relations.append(DependencyRelation(
                         from_entity=cls_sym_id,
                         to_entity=f"sym://{base_name}",
-                        relation_kind=DependencyKind.INHERITS
+                        relation_kind=DependencyKind.INHERITS,
+                        resolution=ResolutionKind.RESOLVED if base_name in imported_symbols else ResolutionKind.AMBIGUOUS,
+                        provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="PYTHON_AST_INHERITANCE", confidence=0.9)
                     ))
 
-                # Class methods
                 for sub in node.body:
                     if isinstance(sub, (ast.FunctionDef, ast.AsyncFunctionDef)):
                         method_name = sub.name
@@ -184,12 +215,12 @@ class PythonASTExtractor:
                             return_type=parse_return_type(sub),
                             docstring=method_doc,
                             visibility=method_vis,
-                            is_async=is_async
+                            is_async=is_async,
+                            provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="PYTHON_AST_METHOD", confidence=1.0)
                         )
                         symbols.append(m_sym)
                         symbol_ids.append(method_sym_id)
 
-                        # Test method detection
                         if method_name.startswith("test_") or cls_name.startswith("Test"):
                             test_ent = TestEntity(
                                 id=f"test://{rel_path}#{qual_name}",
@@ -198,7 +229,8 @@ class PythonASTExtractor:
                                 file_path=rel_path,
                                 line_start=sub.lineno,
                                 line_end=getattr(sub, "end_lineno", sub.lineno),
-                                test_type=TestKind.UNIT
+                                test_type=TestKind.UNIT,
+                                provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="PYTHON_TEST_DISCOVERY", confidence=1.0)
                             )
                             tests.append(test_ent)
 
@@ -209,8 +241,7 @@ class PythonASTExtractor:
                 is_async = isinstance(node, ast.AsyncFunctionDef)
                 fn_doc = ast.get_docstring(node)
 
-                # Check for API Route Decorators (FastAPI / Flask / Django)
-                route_info = cls._extract_route_decorator(node)
+                route_info = self._extract_route_decorator(node)
                 sym_type = SymbolType.ROUTE_HANDLER if route_info else SymbolType.FUNCTION
 
                 f_sym = SymbolEntity(
@@ -228,7 +259,8 @@ class PythonASTExtractor:
                     docstring=fn_doc,
                     visibility=fn_vis,
                     is_async=is_async,
-                    is_entrypoint=route_info is not None or fn_name in ["main", "cli"]
+                    is_entrypoint=route_info is not None or fn_name in ["main", "cli"],
+                    provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="PYTHON_AST_FUNCTION", confidence=1.0)
                 )
                 symbols.append(f_sym)
                 symbol_ids.append(fn_sym_id)
@@ -243,11 +275,11 @@ class PythonASTExtractor:
                         protocol=ProtocolKind.HTTP_REST,
                         method=method.upper(),
                         route_path=path,
-                        handler_symbol_id=fn_sym_id
+                        handler_symbol_id=fn_sym_id,
+                        provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="FASTAPI_FLASK_DECORATOR", confidence=1.0)
                     )
                     apis.append(api_ent)
 
-                # Standalone test function detection
                 if fn_name.startswith("test_"):
                     test_ent = TestEntity(
                         id=f"test://{rel_path}#{fn_name}",
@@ -256,11 +288,12 @@ class PythonASTExtractor:
                         file_path=rel_path,
                         line_start=node.lineno,
                         line_end=getattr(node, "end_lineno", node.lineno),
-                        test_type=TestKind.UNIT
+                        test_type=TestKind.UNIT,
+                        provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="PYTHON_TEST_DISCOVERY", confidence=1.0)
                     )
                     tests.append(test_ent)
 
-        # 3. Extract Calls (Inter-symbol Call Graph with Import Resolution)
+        # 3. Extract Calls & Call Graph
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 caller_name = node.name
@@ -271,24 +304,32 @@ class PythonASTExtractor:
                             callee_name = subnode.func.id
                             if callee_name in imported_symbols:
                                 callee_id = imported_symbols[callee_name]
+                                res = ResolutionKind.RESOLVED
                             else:
                                 callee_id = f"sym://{rel_path}#{callee_name}"
+                                res = ResolutionKind.RESOLVED if callee_name in symbol_ids else ResolutionKind.AMBIGUOUS
                             relations.append(DependencyRelation(
                                 from_entity=caller_sym_id,
                                 to_entity=callee_id,
-                                relation_kind=DependencyKind.CALLS
+                                relation_kind=DependencyKind.CALLS,
+                                resolution=res,
+                                provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="PYTHON_AST_CALL", confidence=0.95 if res == ResolutionKind.RESOLVED else 0.6)
                             ))
                         elif isinstance(subnode.func, ast.Attribute):
                             attr_name = subnode.func.attr
                             if isinstance(subnode.func.value, ast.Name) and subnode.func.value.id in imported_symbols:
                                 parent_mod = imported_symbols[subnode.func.value.id].replace("mod://", "").strip()
                                 callee_id = f"sym://{parent_mod}#{attr_name}"
+                                res = ResolutionKind.RESOLVED
                             else:
                                 callee_id = f"sym://{attr_name}"
+                                res = ResolutionKind.AMBIGUOUS
                             relations.append(DependencyRelation(
                                 from_entity=caller_sym_id,
                                 to_entity=callee_id,
-                                relation_kind=DependencyKind.CALLS
+                                relation_kind=DependencyKind.CALLS,
+                                resolution=res,
+                                provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="PYTHON_AST_CALL_ATTR", confidence=0.9 if res == ResolutionKind.RESOLVED else 0.5)
                             ))
 
         module_ent = ModuleEntity(
@@ -301,14 +342,14 @@ class PythonASTExtractor:
             exports=exports,
             imports=imports,
             file_hash=file_hash,
-            docstring=docstring
+            docstring=docstring,
+            is_modeled=True,
+            provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="PYTHON_LANGUAGE_ADAPTER", confidence=1.0)
         )
 
         return module_ent, symbols, apis, tests, relations
 
-    @classmethod
-    def _extract_route_decorator(cls, fn_node: Any) -> Optional[Tuple[str, str]]:
-        """Extracts (HTTP_METHOD, ROUTE_PATH) from FastAPI/Flask decorator patterns."""
+    def _extract_route_decorator(self, fn_node: Any) -> Optional[Tuple[str, str]]:
         for deco in getattr(fn_node, "decorator_list", []):
             if isinstance(deco, ast.Call):
                 deco_func = deco.func
@@ -334,8 +375,274 @@ class PythonASTExtractor:
         return None
 
 
+class TypeScriptJavaScriptLanguageAdapter(LanguageAdapter):
+    """Extracts symbols, APIs, and tests from TypeScript and JavaScript files."""
+
+    def can_handle(self, file_entry: FileEntry) -> bool:
+        return file_entry.language in [LanguageKind.TYPESCRIPT, LanguageKind.JAVASCRIPT]
+
+    def extract(
+        self,
+        rel_path: str,
+        full_path: str,
+        file_entry: FileEntry
+    ) -> Tuple[ModuleEntity, List[SymbolEntity], List[APIEntity], List[TestEntity], List[DependencyRelation]]:
+        rel_path = rel_path.replace("\\", "/").strip().lstrip("/")
+        mod_id = f"mod://{rel_path}"
+        mod_name = os.path.splitext(os.path.basename(rel_path))[0]
+        classification = file_entry.classification
+        file_hash = file_entry.file_hash
+
+        try:
+            with open(full_path, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+        except Exception as e:
+            module_ent = ModuleEntity(
+                id=mod_id,
+                path=rel_path,
+                name=mod_name,
+                classification=classification,
+                language=file_entry.language,
+                file_hash=file_hash,
+                is_modeled=False,
+                provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="TS_JS_READ_ERROR", confidence=0.0, evidence=str(e))
+            )
+            return module_ent, [], [], [], []
+
+        symbols: List[SymbolEntity] = []
+        apis: List[APIEntity] = []
+        tests: List[TestEntity] = []
+        relations: List[DependencyRelation] = []
+        symbol_ids: List[str] = []
+        exports: List[str] = []
+        imports: List[str] = []
+
+        lines = content.splitlines()
+
+        # 1. Regex parsing for TypeScript/JavaScript constructs
+        import_pattern = re.compile(r'import\s+(?:\{([^}]+)\}|\*\s+as\s+(\w+)|(\w+))\s+from\s+[\'"]([^\'"]+)[\'"]')
+        fn_pattern = re.compile(r'(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)')
+        arrow_pattern = re.compile(r'(?:export\s+)?const\s+(\w+)\s*=\s*(?:async\s*)?\(([^)]*)\)\s*(?::\s*([^{=]+))?\s*=>')
+        class_pattern = re.compile(r'(?:export\s+)?class\s+(\w+)(?:\s+extends\s+(\w+))?(?:\s+implements\s+([\w\s,]+))?')
+        interface_pattern = re.compile(r'(?:export\s+)?interface\s+(\w+)')
+        route_pattern = re.compile(r'(?:app|router)\.(get|post|put|delete|patch)\s*\(\s*[\'"]([^\'"]+)[\'"]')
+        next_route_pattern = re.compile(r'export\s+(?:async\s+)?function\s+(GET|POST|PUT|DELETE|PATCH)\s*\(')
+        test_pattern = re.compile(r'(?:test|it)\s*\(\s*[\'"]([^\'"]+)[\'"]')
+
+        imported_symbols: Dict[str, str] = {}
+        for lineno, line in enumerate(lines, start=1):
+            # Imports
+            for match in import_pattern.finditer(line):
+                named, star, default_imp, mod_src = match.groups()
+                imports.append(mod_src)
+                norm_mod_src = mod_src.lstrip("./").lstrip("../")
+                if named:
+                    for sym in named.split(","):
+                        sym_clean = sym.strip()
+                        if sym_clean:
+                            imported_symbols[sym_clean] = f"sym://{norm_mod_src}#{sym_clean}"
+                            relations.append(DependencyRelation(
+                                from_entity=mod_id,
+                                to_entity=f"sym://{norm_mod_src}#{sym_clean}",
+                                relation_kind=DependencyKind.IMPORTS,
+                                resolution=ResolutionKind.RESOLVED,
+                                provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="TS_JS_IMPORT", confidence=1.0)
+                            ))
+
+            # Classes
+            for match in class_pattern.finditer(line):
+                cname, base, impls = match.groups()
+                sym_id = f"sym://{rel_path}#{cname}"
+                sym = SymbolEntity(
+                    id=sym_id,
+                    name=cname,
+                    qualified_name=cname,
+                    symbol_type=SymbolType.CLASS,
+                    module_id=mod_id,
+                    file_path=rel_path,
+                    line_start=lineno,
+                    line_end=lineno,
+                    signature=f"class {cname}",
+                    provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="TS_JS_CLASS_PARSER", confidence=0.95)
+                )
+                symbols.append(sym)
+                symbol_ids.append(sym_id)
+                if "export" in line:
+                    exports.append(cname)
+
+            # Interfaces
+            for match in interface_pattern.finditer(line):
+                iname = match.group(1)
+                sym_id = f"sym://{rel_path}#{iname}"
+                sym = SymbolEntity(
+                    id=sym_id,
+                    name=iname,
+                    qualified_name=iname,
+                    symbol_type=SymbolType.INTERFACE,
+                    module_id=mod_id,
+                    file_path=rel_path,
+                    line_start=lineno,
+                    line_end=lineno,
+                    signature=f"interface {iname}",
+                    provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="TS_INTERFACE_PARSER", confidence=0.95)
+                )
+                symbols.append(sym)
+                symbol_ids.append(sym_id)
+                if "export" in line:
+                    exports.append(iname)
+
+            # Functions & Arrow Functions
+            for match in fn_pattern.finditer(line):
+                fname, params = match.groups()
+                sym_id = f"sym://{rel_path}#{fname}"
+                sym = SymbolEntity(
+                    id=sym_id,
+                    name=fname,
+                    qualified_name=fname,
+                    symbol_type=SymbolType.FUNCTION,
+                    module_id=mod_id,
+                    file_path=rel_path,
+                    line_start=lineno,
+                    line_end=lineno,
+                    signature=f"function {fname}({params})",
+                    provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="TS_JS_FN_PARSER", confidence=0.95)
+                )
+                symbols.append(sym)
+                symbol_ids.append(sym_id)
+                if "export" in line:
+                    exports.append(fname)
+
+            for match in arrow_pattern.finditer(line):
+                fname, params, ret_type = match.groups()
+                sym_id = f"sym://{rel_path}#{fname}"
+                sym = SymbolEntity(
+                    id=sym_id,
+                    name=fname,
+                    qualified_name=fname,
+                    symbol_type=SymbolType.FUNCTION,
+                    module_id=mod_id,
+                    file_path=rel_path,
+                    line_start=lineno,
+                    line_end=lineno,
+                    signature=f"const {fname} = ({params}) =>",
+                    return_type=ret_type.strip() if ret_type else None,
+                    provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="TS_JS_ARROW_PARSER", confidence=0.95)
+                )
+                symbols.append(sym)
+                symbol_ids.append(sym_id)
+                if "export" in line:
+                    exports.append(fname)
+
+            # Routes (Express / Fastify)
+            for match in route_pattern.finditer(line):
+                method, path = match.groups()
+                api_ent = APIEntity(
+                    id=f"api://{method.upper()}{path}",
+                    name=f"{method.upper()} {path}",
+                    protocol=ProtocolKind.HTTP_REST,
+                    method=method.upper(),
+                    route_path=path,
+                    handler_symbol_id=f"sym://{rel_path}#route_{method}_{path.replace('/', '_')}",
+                    provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="EXPRESS_ROUTE_PARSER", confidence=0.9)
+                )
+                apis.append(api_ent)
+
+            # Next.js App Router (export async function GET(req) {})
+            for match in next_route_pattern.finditer(line):
+                method = match.group(1)
+                route_path = "/" + "/".join(rel_path.replace("app/", "").replace("src/app/", "").split("/")[:-1])
+                api_ent = APIEntity(
+                    id=f"api://{method.upper()}{route_path}",
+                    name=f"{method.upper()} {route_path}",
+                    protocol=ProtocolKind.HTTP_REST,
+                    method=method.upper(),
+                    route_path=route_path,
+                    handler_symbol_id=f"sym://{rel_path}#{method}",
+                    provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="NEXTJS_ROUTE_PARSER", confidence=0.95)
+                )
+                apis.append(api_ent)
+
+            # Jest / Vitest tests
+            for match in test_pattern.finditer(line):
+                tname = match.group(1)
+                test_ent = TestEntity(
+                    id=f"test://{rel_path}#{tname}",
+                    name=tname,
+                    test_framework=TestFramework.JEST if "jest" in content else TestFramework.VITEST,
+                    file_path=rel_path,
+                    line_start=lineno,
+                    line_end=lineno,
+                    test_type=TestKind.UNIT,
+                    provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="JEST_VITEST_PARSER", confidence=0.95)
+                )
+                tests.append(test_ent)
+
+        module_ent = ModuleEntity(
+            id=mod_id,
+            path=rel_path,
+            name=mod_name,
+            classification=classification,
+            language=file_entry.language,
+            symbols=symbol_ids,
+            exports=exports,
+            imports=imports,
+            file_hash=file_hash,
+            is_modeled=True,
+            provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="TS_JS_LANGUAGE_ADAPTER", confidence=0.95)
+        )
+
+        return module_ent, symbols, apis, tests, relations
+
+
+class FallbackLanguageAdapter(LanguageAdapter):
+    """Handles unsupported/unmodeled languages without fabricating false AST understanding."""
+
+    def can_handle(self, file_entry: FileEntry) -> bool:
+        return True  # Fallback for all other files
+
+    def extract(
+        self,
+        rel_path: str,
+        full_path: str,
+        file_entry: FileEntry
+    ) -> Tuple[ModuleEntity, List[SymbolEntity], List[APIEntity], List[TestEntity], List[DependencyRelation]]:
+        rel_path = rel_path.replace("\\", "/").strip().lstrip("/")
+        mod_id = f"mod://{rel_path}"
+        mod_name = os.path.splitext(os.path.basename(rel_path))[0]
+
+        module_ent = ModuleEntity(
+            id=mod_id,
+            path=rel_path,
+            name=mod_name,
+            classification=file_entry.classification,
+            language=file_entry.language,
+            symbols=[],
+            exports=[],
+            imports=[],
+            file_hash=file_entry.file_hash,
+            is_modeled=False,
+            provenance=ProvenanceRecord(
+                truth_level=TruthLevel.STATIC,
+                source="FALLBACK_ADAPTER",
+                confidence=0.5,
+                evidence=f"File classification recorded without AST parsing for language '{file_entry.language.value}'"
+            )
+        )
+        return module_ent, [], [], [], []
+
+
+# -----------------------------------------------------------------------------
+# Grounded Specification Weaver
+# -----------------------------------------------------------------------------
+
 class GroundedSpecWeaver:
-    """Weaves Requirement, Behavior, LLD Component, and Task lineages into the World Model."""
+    """
+    Authoritatively weaves Requirement, Behavior, LLD Component, and Task lineages into the World Model.
+    Strict Invariants:
+    1. NEVER fabricates FULLY_IMPLEMENTED before execution. Pre-execution targets are marked ImplementationStatus.TARGETED.
+    2. NEVER fabricates PASSED for un-executed tests. Static calls are marked CoverageStatus.STATICALLY_LINKED and ExecutionResult.UNTESTED.
+    3. NEVER uses coarse filename coincidence to assert symbol implementation.
+    """
 
     @classmethod
     def weave_specifications(
@@ -356,26 +663,30 @@ class GroundedSpecWeaver:
         lld_list = pipeline_data.get("lld_components", []) or []
         tasks_list = pipeline_data.get("tasks", []) or []
 
-        # Map LLD Components to Modules & Symbols
+        # 1. Map LLD Components to Modules & Symbols (OwnershipRelation)
         for lld in lld_list:
             comp_id = _get(lld, "id") or _get(lld, "component_name")
             comp_name = _get(lld, "component_name", "")
+            declared_symbols = _get(lld, "declared_symbols", []) or []
             if not comp_id:
                 continue
 
             for ent_id, ent in world_model.entities.items():
                 if isinstance(ent, SymbolEntity):
-                    if comp_name.lower() in ent.qualified_name.lower() or comp_name.lower() in ent.file_path.lower():
+                    # Explicit symbol declaration or exact component match
+                    if ent.name in declared_symbols or ent.qualified_name in declared_symbols:
                         world_model.add_relation(OwnershipRelation(
                             component_id=comp_id,
                             entity_id=ent.id,
-                            ownership_kind=OwnershipKind.PRIMARY_OWNER
+                            ownership_kind=OwnershipKind.PRIMARY_OWNER,
+                            provenance=ProvenanceRecord(truth_level=TruthLevel.DERIVED, source="LLD_DECLARED_SYMBOL", confidence=1.0)
                         ))
 
-        # Map Tasks to Symbols and form ImplementationRelations
+        # 2. Map Tasks to Symbols (ImplementationRelation - TARGETED status)
         for t in tasks_list:
             t_id = _get(t, "id")
             parent_lld = _get(t, "parent_lld")
+            target_symbols = _get(t, "target_symbols", []) or []
             target_files = _get(t, "target_files", []) or []
 
             if not t_id:
@@ -390,20 +701,22 @@ class GroundedSpecWeaver:
                         beh_id = _get(lld, "parent_behavior_id") or _get(lld, "behavior_id")
                         break
 
+            # Map explicit target symbols
             for ent_id, ent in world_model.entities.items():
                 if isinstance(ent, SymbolEntity):
-                    matches_file = any(tf.replace("\\", "/").strip().lstrip("/") == ent.file_path for tf in target_files)
-                    if matches_file or (parent_lld and parent_lld.lower() in ent.qualified_name.lower()):
+                    is_explicit_target = (ent.id in target_symbols or ent.qualified_name in target_symbols or ent.name in target_symbols)
+                    if is_explicit_target:
                         world_model.add_relation(ImplementationRelation(
                             symbol_id=ent.id,
                             requirement_id=req_id,
                             behavior_id=beh_id,
                             lld_component_id=parent_lld,
                             task_id=t_id,
-                            implementation_status=ImplementationStatus.FULLY_IMPLEMENTED
+                            implementation_status=ImplementationStatus.TARGETED,
+                            provenance=ProvenanceRecord(truth_level=TruthLevel.PROPOSED, source="TASK_TARGET_SYMBOLS", confidence=1.0)
                         ))
 
-        # Map TestEntities to Symbols and form VerificationRelations
+        # 3. Map TestEntities to Symbols (VerificationRelation - UNTESTED status)
         for ent_id, ent in world_model.entities.items():
             if isinstance(ent, TestEntity):
                 callees = world_model.get_callees(f"sym://{ent.file_path}#{ent.name}")
@@ -421,12 +734,24 @@ class GroundedSpecWeaver:
                             behavior_id=lin["behaviors"][0] if lin["behaviors"] else None,
                             task_id=lin["tasks"][0] if lin["tasks"] else None,
                             verification_kind=VerificationKind.DIRECT_UNIT_TEST,
-                            last_result="PASSED"
+                            coverage_status=CoverageStatus.STATICALLY_LINKED,
+                            execution_status=ExecutionResult.UNTESTED,
+                            provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="STATIC_TEST_CALL_GRAPH", confidence=1.0)
                         ))
 
 
+# -----------------------------------------------------------------------------
+# Top-Level World Model Engine Orchestrator
+# -----------------------------------------------------------------------------
+
 class WorldModelEngine:
     """Top-level Orchestrator for extracting, constructing, and querying the Engineering World Model."""
+
+    ADAPTERS: List[LanguageAdapter] = [
+        PythonLanguageAdapter(),
+        TypeScriptJavaScriptLanguageAdapter(),
+        FallbackLanguageAdapter()
+    ]
 
     @classmethod
     def build_world_model(
@@ -436,7 +761,7 @@ class WorldModelEngine:
         pipeline_data: Optional[Dict[str, Any]] = None
     ) -> EngineeringWorldModel:
         """
-        Builds the complete EngineeringWorldModel from disk workspace, snapshot, and refinement pipeline.
+        Builds the complete EngineeringWorldModel using appropriate language adapters.
         """
         if snapshot is None:
             snapshot = RepositorySnapshotEngine.capture_snapshot(workspace_dir)
@@ -446,7 +771,8 @@ class WorldModelEngine:
             name=os.path.basename(os.path.abspath(workspace_dir)),
             root_path=".",
             repository_state_hash=snapshot.repository_state_hash,
-            primary_language=LanguageKind.PYTHON
+            primary_language=LanguageKind.PYTHON,
+            provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="REPOSITORY_ROOT", confidence=1.0)
         )
 
         world_model = EngineeringWorldModel(
@@ -456,26 +782,26 @@ class WorldModelEngine:
             relations=[]
         )
 
-        # 1. Parse all source and test files
+        # 1. Parse all files via matching language adapters
         for rel_path, file_entry in snapshot.file_manifest.items():
             full_path = os.path.join(workspace_dir, rel_path)
-            if file_entry.language == LanguageKind.PYTHON:
-                mod_ent, symbols, apis, tests, relations = PythonASTExtractor.extract_from_file(
-                    rel_path, full_path, file_entry
-                )
-                world_model.add_entity(mod_ent)
-                root_ent.modules.append(mod_ent.id)
+            for adapter in cls.ADAPTERS:
+                if adapter.can_handle(file_entry):
+                    mod_ent, symbols, apis, tests, relations = adapter.extract(rel_path, full_path, file_entry)
+                    world_model.add_entity(mod_ent)
+                    root_ent.modules.append(mod_ent.id)
 
-                for sym in symbols:
-                    world_model.add_entity(sym)
-                for api in apis:
-                    world_model.add_entity(api)
-                for tst in tests:
-                    world_model.add_entity(tst)
-                for rel in relations:
-                    world_model.add_relation(rel)
+                    for sym in symbols:
+                        world_model.add_entity(sym)
+                    for api in apis:
+                        world_model.add_entity(api)
+                    for tst in tests:
+                        world_model.add_entity(tst)
+                    for rel in relations:
+                        world_model.add_relation(rel)
+                    break
 
-        # 2. Weave Grounded Specifications (if provided or discoverable)
+        # 2. Weave Grounded Specifications
         if pipeline_data is None:
             pipeline_file = os.path.join(workspace_dir, ".agents", "v7_refinement_pipeline.json")
             if os.path.exists(pipeline_file):

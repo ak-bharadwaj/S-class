@@ -1329,7 +1329,7 @@ class ArtifactGovernor:
     ) -> GovernanceGateResult:
         """
         Audits Engineering World Model structural consistency, referential integrity,
-        Merkle canonical hash validity, and alignment with repository files.
+        Merkle canonical hash validity, repository state hash anchoring, and epistemic truth discipline.
         """
         from world_model import (
             EngineeringWorldModel,
@@ -1340,51 +1340,80 @@ class ArtifactGovernor:
             DependencyRelation,
             OwnershipRelation,
             ImplementationRelation,
-            VerificationRelation
+            VerificationRelation,
+            TruthLevel,
+            ImplementationStatus,
+            ExecutionResult
         )
 
         reasons: List[str] = []
 
-        # 1. Merkle Canonical Hash Verification
-        recomputed = world_model.compute_canonical_hash()
-        if world_model.canonical_hash != recomputed:
-            reasons.append(
-                f"WORLD_MODEL_INTEGRITY_VIOLATION: canonical_hash '{world_model.canonical_hash[:8]}' "
-                f"does not match recomputed hash '{recomputed[:8]}'."
-            )
+        # 1. Mandatory Repository State Hash & Canonical Hash
+        if not getattr(world_model, "repository_state_hash", None):
+            reasons.append("MANDATORY_REPOSITORY_STATE_HASH_MISSING: Engineering World Model must carry non-empty repository_state_hash.")
+        if not getattr(world_model, "canonical_hash", None):
+            reasons.append("MANDATORY_CANONICAL_HASH_MISSING: Engineering World Model must carry non-empty canonical_hash.")
+        else:
+            recomputed = world_model.compute_canonical_hash()
+            if world_model.canonical_hash != recomputed:
+                reasons.append(
+                    f"WORLD_MODEL_INTEGRITY_VIOLATION: canonical_hash '{world_model.canonical_hash[:8]}' "
+                    f"does not match recomputed hash '{recomputed[:8]}'."
+                )
 
-        # 2. Referential Integrity Check
-        entity_ids = set(world_model.entities.keys())
+        # 2. Entity Key vs ID Reconciliation
+        entity_ids = set()
+        for k, v in world_model.entities.items():
+            if v.id != k:
+                reasons.append(f"ENTITY_KEY_MISMATCH: dictionary key '{k}' does not match entity id '{v.id}'.")
+            entity_ids.add(v.id)
 
+        # 3. Referential Integrity Check
         for rel in world_model.relations:
-            if isinstance(rel, OwnershipRelation):
+            if isinstance(rel, DependencyRelation):
+                if rel.from_entity not in entity_ids:
+                    reasons.append(f"ORPHAN_DEPENDENCY_SOURCE: from_entity '{rel.from_entity}' not found in world model.")
+                # If resolution is RESOLVED, to_entity must exist
+                from world_model import ResolutionKind
+                if rel.resolution == ResolutionKind.RESOLVED and rel.to_entity not in entity_ids:
+                    reasons.append(f"ORPHAN_DEPENDENCY_TARGET: resolved to_entity '{rel.to_entity}' not found in world model.")
+
+            elif isinstance(rel, OwnershipRelation):
                 if rel.entity_id not in entity_ids:
-                    reasons.append(
-                        f"ORPHAN_OWNERSHIP_RELATION: target entity '{rel.entity_id}' not found in world model entities."
-                    )
+                    reasons.append(f"ORPHAN_OWNERSHIP_RELATION: target entity '{rel.entity_id}' not found in world model.")
+
             elif isinstance(rel, ImplementationRelation):
                 if rel.symbol_id not in entity_ids:
-                    reasons.append(
-                        f"ORPHAN_IMPLEMENTATION_RELATION: symbol '{rel.symbol_id}' not found in world model entities."
-                    )
+                    reasons.append(f"ORPHAN_IMPLEMENTATION_RELATION: symbol '{rel.symbol_id}' not found in world model.")
+                # Epistemic check: PROPOSED truth level cannot claim FULLY_IMPLEMENTED / VERIFIED
+                if rel.provenance.truth_level == TruthLevel.PROPOSED:
+                    if rel.implementation_status in [ImplementationStatus.IMPLEMENTED, ImplementationStatus.VERIFIED]:
+                        reasons.append(
+                            f"FABRICATED_IMPLEMENTATION_STATUS: symbol '{rel.symbol_id}' with PROPOSED truth level "
+                            f"cannot claim implementation status '{rel.implementation_status.value}' before execution."
+                        )
+
             elif isinstance(rel, VerificationRelation):
                 if rel.test_entity_id not in entity_ids:
-                    reasons.append(
-                        f"ORPHAN_VERIFICATION_RELATION: test entity '{rel.test_entity_id}' not found in world model entities."
-                    )
+                    reasons.append(f"ORPHAN_VERIFICATION_RELATION: test entity '{rel.test_entity_id}' not found in world model.")
                 if rel.target_entity_id not in entity_ids:
-                    reasons.append(
-                        f"ORPHAN_VERIFICATION_RELATION: target entity '{rel.target_entity_id}' not found in world model entities."
-                    )
+                    reasons.append(f"ORPHAN_VERIFICATION_RELATION: target entity '{rel.target_entity_id}' not found in world model.")
+                # Epistemic check: STATIC truth level cannot claim PASSED or FAILED execution result
+                if rel.provenance.truth_level == TruthLevel.STATIC:
+                    if rel.execution_status in [ExecutionResult.PASSED, ExecutionResult.FAILED]:
+                        reasons.append(
+                            f"FABRICATED_EXECUTION_RESULT: test '{rel.test_entity_id}' with STATIC truth level "
+                            f"cannot assert execution result '{rel.execution_status.value}' without runtime execution evidence."
+                        )
 
-        # 3. File System / Snapshot Boundary Alignment
+        # 4. Live Repository Snapshot Alignment
         if workspace_dir:
             from repository_snapshot import RepositorySnapshotEngine
             snapshot = RepositorySnapshotEngine.capture_snapshot(workspace_dir)
-            if world_model.repository_state_hash and world_model.repository_state_hash != snapshot.repository_state_hash:
+            if not world_model.repository_state_hash or world_model.repository_state_hash != snapshot.repository_state_hash:
                 reasons.append(
                     f"WORLD_MODEL_SNAPSHOT_DRIFT: world model repository_state_hash "
-                    f"'{world_model.repository_state_hash[:8]}' differs from live workspace state "
+                    f"'{getattr(world_model, 'repository_state_hash', '')[:8]}' differs from live workspace state "
                     f"'{snapshot.repository_state_hash[:8]}'."
                 )
 
