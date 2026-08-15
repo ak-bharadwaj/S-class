@@ -47,6 +47,8 @@ class FSMTransitionTarget(str, Enum):
     CLARIFICATION = "CLARIFICATION"
     TASK_COMPILATION = "TASK_COMPILATION"
     CODING = "CODING"
+    QA = "QA"
+    RELEASE = "RELEASE"
 
 
 class ApprovalAuthority(str, Enum):
@@ -1258,6 +1260,68 @@ class ArtifactGovernor:
         )
 
     @classmethod
+    def audit_changeset_reconciliation_governance(
+        cls,
+        anchor_snapshot: Any,
+        result_snapshot: Any,
+        changeset: Any,
+        workspace_dir: Optional[str] = None
+    ) -> GovernanceGateResult:
+        """
+        Audits algebraic ChangeSet reconciliation:
+        Result Snapshot == Anchor Snapshot (+) Authorized ChangeSet
+        Verifies that:
+        1. Anchor snapshot governance passes.
+        2. Result snapshot governance passes.
+        3. ChangeSet canonical hash and task integrity pass.
+        4. ChangeSet reconciliation has zero violations.
+        5. Live disk matches result_snapshot.
+        """
+        from repository_snapshot import RepositorySnapshotEngine
+
+        reasons: List[str] = []
+
+        # 1. Audit Anchor Snapshot Integrity
+        anchor_gov = cls.audit_repository_snapshot_governance(anchor_snapshot, repo_root=None)
+        if anchor_gov.is_blocked:
+            reasons.extend([f"ANCHOR_SNAPSHOT_INTEGRITY_FAILED: {r}" for r in anchor_gov.blocking_reasons])
+
+        # 2. Audit Result Snapshot Integrity
+        result_gov = cls.audit_repository_snapshot_governance(result_snapshot, repo_root=workspace_dir)
+        if result_gov.is_blocked:
+            reasons.extend([f"RESULT_SNAPSHOT_INTEGRITY_FAILED: {r}" for r in result_gov.blocking_reasons])
+
+        # 3. Audit ChangeSet Canonical Integrity
+        recomputed_cs_hash = changeset.compute_canonical_hash()
+        if changeset.changeset_hash != recomputed_cs_hash:
+            reasons.append(
+                f"CHANGESET_INTEGRITY_FAILED: stored changeset_hash '{changeset.changeset_hash[:8]}' "
+                f"does not match recomputed canonical hash '{recomputed_cs_hash[:8]}'."
+            )
+
+        # 4. Perform Algebraic Reconciliation
+        recon_res = RepositorySnapshotEngine.reconcile_changeset(anchor_snapshot, result_snapshot, changeset)
+        if not recon_res.is_reconciled:
+            reasons.extend(recon_res.violations)
+
+        if reasons:
+            return GovernanceGateResult(
+                is_blocked=True,
+                blocking_reasons=reasons,
+                recommended_fsm_state=FSMTransitionTarget.CODING,
+                validation_status=ValidationStatus.BLOCKED,
+                approval_status=ApprovalStatus.REJECTED
+            )
+
+        return GovernanceGateResult(
+            is_blocked=False,
+            blocking_reasons=[],
+            recommended_fsm_state=FSMTransitionTarget.QA,
+            validation_status=ValidationStatus.VALID,
+            approval_status=ApprovalStatus.APPROVED
+        )
+
+    @classmethod
     def enforce_fsm_transition(
         cls,
         current_phase: str,
@@ -1268,9 +1332,9 @@ class ArtifactGovernor:
         """
         Enforces authoritative control-plane gate on FSM state transitions.
         Blocks transition to downstream execution states (CODING, QA, RELEASE) if:
-        1. Any governed ADR is BLOCKED or missing cryptographic ApprovalRecord
-        2. Dynamic governance audit throws an exception or encounters malformed artifacts (FAILS CLOSED!)
-        3. Upstream compilation artifact is blocked or failed hard validation gates
+        - Planning snapshot does not match live repository before CODING.
+        - Result snapshot does not match Anchor (+) Authorized ChangeSet before QA / RELEASE.
+        - Dynamic ADR cryptographic approvals, LLD hashes, Task hashes, or snapshot drift fail.
         """
         cwd = workspace_dir if workspace_dir else os.getcwd()
         pipeline_file = os.path.join(cwd, ".agents", "v7_refinement_pipeline.json")
@@ -1369,52 +1433,112 @@ class ArtifactGovernor:
                             "recommended_fsm_state": "DESIGN"
                         }
 
-                # V11.1 Authoritative Repository Snapshot Control-Plane Enforcement
+                # V11.1 Authoritative Repository Snapshot & ChangeSet Reconciliation Control-Plane Enforcement
                 snap_gov_dict = {}
                 if target_phase in ["CODING", "QA", "RELEASE"]:
-                    snap_data = None
+                    from repository_snapshot import RepositorySnapshot, RepositorySnapshotEngine
+                    from changeset_ir import AuthorizedChangeSet
+
+                    # Check for planning snapshot and authorized changeset
+                    anchor_data = None
+                    changeset_data = None
                     if workspace_dir:
-                        disk_snap_path = os.path.join(workspace_dir, ".agents", "repo_snapshot.json")
-                        if os.path.exists(disk_snap_path):
+                        anchor_path = os.path.join(workspace_dir, ".agents", "planning_snapshot.json")
+                        cs_path = os.path.join(workspace_dir, ".agents", "authorized_changeset.json")
+                        if os.path.exists(anchor_path):
                             try:
-                                with open(disk_snap_path, "r", encoding="utf-8") as sf:
-                                    snap_data = json.load(sf)
+                                with open(anchor_path, "r", encoding="utf-8") as af:
+                                    anchor_data = json.load(af)
                             except Exception:
                                 pass
-                    if not snap_data:
-                        snap_data = pipe_data.get("repository_snapshot")
+                        if os.path.exists(cs_path):
+                            try:
+                                with open(cs_path, "r", encoding="utf-8") as cf:
+                                    changeset_data = json.load(cf)
+                            except Exception:
+                                pass
 
-                    if not snap_data:
-                        is_blocked = True
-                        snap_gov_dict = {
-                            "is_blocked": True,
-                            "blocking_reasons": [
-                                f"MANDATORY_REPOSITORY_SNAPSHOT_MISSING: Persisted pipeline and workspace are missing mandatory RepositorySnapshot required for execution phase '{target_phase}'."
-                            ],
-                            "validation_status": "BLOCKED",
-                            "approval_status": "REJECTED",
-                            "recommended_fsm_state": "DESIGN"
-                        }
-                    else:
+                    if not anchor_data:
+                        anchor_data = pipe_data.get("planning_snapshot") or pipe_data.get("repository_snapshot")
+                    if not changeset_data:
+                        changeset_data = pipe_data.get("authorized_changeset")
+
+                    # If transitioning to QA/RELEASE with an authorized changeset, run strict algebraic reconciliation
+                    if target_phase in ["QA", "RELEASE"] and anchor_data and changeset_data:
                         try:
-                            from repository_snapshot import RepositorySnapshot
-                            snap_obj = RepositorySnapshot.from_governed_dict(snap_data)
-                            snap_gov_dynamic = cls.audit_repository_snapshot_governance(
-                                snap_obj,
-                                repo_root=workspace_dir
+                            anchor_snap = RepositorySnapshot.from_governed_dict(anchor_data)
+                            cs_obj = AuthorizedChangeSet.from_governed_dict(changeset_data)
+                            result_snap = RepositorySnapshotEngine.capture_snapshot(workspace_dir)
+
+                            recon_gov = cls.audit_changeset_reconciliation_governance(
+                                anchor_snap,
+                                result_snap,
+                                cs_obj,
+                                workspace_dir=workspace_dir
                             )
-                            if snap_gov_dynamic.is_blocked:
+                            if recon_gov.is_blocked:
                                 is_blocked = True
-                            snap_gov_dict = snap_gov_dynamic.to_dict()
+                                snap_gov_dict = recon_gov.to_dict()
+                            else:
+                                # PROMOTION TO NEXT TRUSTED BASELINE:
+                                # When reconciliation passes without drift, promote result snapshot to repo_snapshot.json
+                                if workspace_dir:
+                                    snap_disk_path = os.path.join(workspace_dir, ".agents", "repo_snapshot.json")
+                                    RepositorySnapshotEngine.save_snapshot(result_snap, snap_disk_path)
+                                snap_gov_dict = recon_gov.to_dict()
                         except Exception as e:
                             is_blocked = True
                             snap_gov_dict = {
                                 "is_blocked": True,
-                                "blocking_reasons": [f"GOVERNANCE_AUDIT_ERROR: Dynamic repository snapshot governance rehydration failed closed due to error: {e}"],
+                                "blocking_reasons": [f"GOVERNANCE_AUDIT_ERROR: ChangeSet reconciliation failed closed due to error: {e}"],
+                                "validation_status": "BLOCKED",
+                                "approval_status": "REJECTED",
+                                "recommended_fsm_state": "CODING"
+                            }
+                    else:
+                        # Standard Snapshot Verification (e.g. CODING phase entry)
+                        snap_data = None
+                        if workspace_dir:
+                            disk_snap_path = os.path.join(workspace_dir, ".agents", "repo_snapshot.json")
+                            if os.path.exists(disk_snap_path):
+                                try:
+                                    with open(disk_snap_path, "r", encoding="utf-8") as sf:
+                                        snap_data = json.load(sf)
+                                except Exception:
+                                    pass
+                        if not snap_data:
+                            snap_data = anchor_data or pipe_data.get("repository_snapshot")
+
+                        if not snap_data:
+                            is_blocked = True
+                            snap_gov_dict = {
+                                "is_blocked": True,
+                                "blocking_reasons": [
+                                    f"MANDATORY_REPOSITORY_SNAPSHOT_MISSING: Persisted pipeline and workspace are missing mandatory RepositorySnapshot required for execution phase '{target_phase}'."
+                                ],
                                 "validation_status": "BLOCKED",
                                 "approval_status": "REJECTED",
                                 "recommended_fsm_state": "DESIGN"
                             }
+                        else:
+                            try:
+                                snap_obj = RepositorySnapshot.from_governed_dict(snap_data)
+                                snap_gov_dynamic = cls.audit_repository_snapshot_governance(
+                                    snap_obj,
+                                    repo_root=workspace_dir
+                                )
+                                if snap_gov_dynamic.is_blocked:
+                                    is_blocked = True
+                                snap_gov_dict = snap_gov_dynamic.to_dict()
+                            except Exception as e:
+                                is_blocked = True
+                                snap_gov_dict = {
+                                    "is_blocked": True,
+                                    "blocking_reasons": [f"GOVERNANCE_AUDIT_ERROR: Dynamic repository snapshot governance rehydration failed closed due to error: {e}"],
+                                    "validation_status": "BLOCKED",
+                                    "approval_status": "REJECTED",
+                                    "recommended_fsm_state": "DESIGN"
+                                }
 
                 if is_blocked or hld_gov.get("is_blocked", False) or task_gov.get("is_blocked", False) or snap_gov_dict.get("is_blocked", False):
                     reasons = []

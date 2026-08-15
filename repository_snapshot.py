@@ -951,6 +951,113 @@ class RepositorySnapshotEngine:
         return len(errors) == 0, errors
 
     @classmethod
+    def reconcile_changeset(
+        cls,
+        anchor_snapshot: RepositorySnapshot,
+        result_snapshot: RepositorySnapshot,
+        changeset: Any
+    ) -> "ChangeSetReconciliationResult":
+        """
+        Hard Invariant:
+        Result Snapshot == Anchor Snapshot (+) Authorized ChangeSet
+
+        Mathematically verifies that:
+        1. All untouched files remain byte-for-byte and classification-for-classification identical.
+        2. All newly created files were explicitly authorized with operation CREATE.
+        3. All modified files were explicitly authorized with operation MODIFY.
+        4. All deleted files were explicitly authorized with operation DELETE.
+        5. ChangeSet source_repository_state_hash strictly matches anchor_snapshot.repository_state_hash.
+        """
+        from changeset_ir import FileMutationOp
+
+        violations: List[str] = []
+
+        # 1. Verify Anchor State Hash Equality
+        if changeset.source_repository_state_hash != anchor_snapshot.repository_state_hash:
+            violations.append(
+                f"STALE_CHANGESET_SOURCE_ANCHOR: ChangeSet source_repository_state_hash "
+                f"'{changeset.source_repository_state_hash[:8]}' does not match anchor snapshot "
+                f"repository_state_hash '{anchor_snapshot.repository_state_hash[:8]}'."
+            )
+
+        auth_changes = changeset.authorized_changes
+
+        # 2. Verify Every File in Anchor Manifest
+        for path, anchor_entry in anchor_snapshot.file_manifest.items():
+            if path not in auth_changes:
+                # File was NOT authorized to change -> MUST exist identically in result snapshot
+                if path not in result_snapshot.file_manifest:
+                    violations.append(
+                        f"UNAUTHORIZED_FILE_DELETION: File '{path}' was deleted without authorization in ChangeSet."
+                    )
+                else:
+                    res_entry = result_snapshot.file_manifest[path]
+                    if res_entry.file_hash != anchor_entry.file_hash:
+                        violations.append(
+                            f"UNAUTHORIZED_FILE_MODIFICATION: File '{path}' was modified without authorization in ChangeSet "
+                            f"(anchor hash '{anchor_entry.file_hash[:8]}', result hash '{res_entry.file_hash[:8]}')."
+                        )
+                    if res_entry.classification != anchor_entry.classification:
+                        violations.append(
+                            f"UNAUTHORIZED_CLASSIFICATION_MUTATION: File '{path}' classification shifted from "
+                            f"'{anchor_entry.classification.value}' to '{res_entry.classification.value}' without authorization."
+                        )
+                    if res_entry.symlink_target != anchor_entry.symlink_target:
+                        violations.append(
+                            f"UNAUTHORIZED_SYMLINK_MUTATION: File '{path}' symlink target shifted from "
+                            f"'{anchor_entry.symlink_target}' to '{res_entry.symlink_target}' without authorization."
+                        )
+            else:
+                # File WAS authorized to change
+                change = auth_changes[path]
+                if change.operation == FileMutationOp.DELETE:
+                    if path in result_snapshot.file_manifest:
+                        violations.append(
+                            f"FAILED_AUTHORIZED_DELETION: File '{path}' was authorized for DELETION but still exists in result snapshot."
+                        )
+                elif change.operation == FileMutationOp.MODIFY:
+                    if path not in result_snapshot.file_manifest:
+                        violations.append(
+                            f"MISSING_MODIFIED_FILE: File '{path}' was authorized for MODIFY but is missing from result snapshot."
+                        )
+                    elif change.expected_source_file_hash and anchor_entry.file_hash != change.expected_source_file_hash:
+                        violations.append(
+                            f"SOURCE_HASH_PRECONDITION_VIOLATED: File '{path}' anchor hash '{anchor_entry.file_hash[:8]}' "
+                            f"does not match ChangeSet expected_source_file_hash '{change.expected_source_file_hash[:8]}'."
+                        )
+
+        # 3. Verify Every File in Result Manifest (Catch Unauthorized Creations)
+        for path, res_entry in result_snapshot.file_manifest.items():
+            if path not in anchor_snapshot.file_manifest:
+                if path not in auth_changes:
+                    violations.append(
+                        f"UNAUTHORIZED_FILE_CREATION: File '{path}' was created on disk but is not authorized in ChangeSet."
+                    )
+                else:
+                    change = auth_changes[path]
+                    if change.operation != FileMutationOp.CREATE:
+                        violations.append(
+                            f"ILLEGAL_MUTATION_OP: File '{path}' was created on disk, but ChangeSet declared "
+                            f"operation '{change.operation.value}' (expected CREATE)."
+                        )
+
+        # 4. Verify All Declared Creations Were Fulfilled
+        for path, change in auth_changes.items():
+            if change.operation == FileMutationOp.CREATE and path not in result_snapshot.file_manifest:
+                violations.append(
+                    f"MISSING_CREATED_FILE: File '{path}' was authorized for CREATE but was not created in result snapshot."
+                )
+
+        is_reconciled = len(violations) == 0
+        return ChangeSetReconciliationResult(
+            is_reconciled=is_reconciled,
+            violations=violations,
+            anchor_state_hash=anchor_snapshot.repository_state_hash,
+            result_state_hash=result_snapshot.repository_state_hash,
+            changeset_hash=changeset.changeset_hash
+        )
+
+    @classmethod
     def save_snapshot(cls, snapshot: RepositorySnapshot, target_path: str) -> None:
         """Persists governed repository snapshot atomically."""
         parent_dir = os.path.dirname(os.path.abspath(target_path))
@@ -968,3 +1075,21 @@ class RepositorySnapshotEngine:
         with open(source_path, "r", encoding="utf-8") as fp:
             data = json.load(fp)
         return RepositorySnapshot.from_governed_dict(data) if strict else RepositorySnapshot.from_dict(data)
+
+
+@dataclass
+class ChangeSetReconciliationResult:
+    is_reconciled: bool
+    violations: List[str] = field(default_factory=list)
+    anchor_state_hash: str = ""
+    result_state_hash: str = ""
+    changeset_hash: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "is_reconciled": self.is_reconciled,
+            "violations": list(self.violations),
+            "anchor_state_hash": self.anchor_state_hash,
+            "result_state_hash": self.result_state_hash,
+            "changeset_hash": self.changeset_hash
+        }

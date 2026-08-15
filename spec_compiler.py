@@ -11,6 +11,7 @@ import os
 import re
 import json
 import hashlib
+from datetime import datetime, timezone
 from typing import Dict, List, Set, Any, Optional, Tuple
 
 def load_json(path: str) -> Any:
@@ -675,12 +676,47 @@ class SpecificationCompiler:
 
         repo_snapshot = None
         snap_gov = None
+        authorized_changeset = None
         if workspace_dir:
             from repository_snapshot import RepositorySnapshotEngine
+            from changeset_ir import AuthorizedChangeSet, AuthorizedFileChange, FileMutationOp
             repo_snapshot = RepositorySnapshotEngine.capture_snapshot(workspace_dir)
             snap_gov = ArtifactGovernor.audit_repository_snapshot_governance(repo_snapshot, repo_root=workspace_dir)
+
+            # 1. Save immutable planning snapshot anchor
+            anchor_path = os.path.join(workspace_dir, ".agents", "planning_snapshot.json")
+            RepositorySnapshotEngine.save_snapshot(repo_snapshot, anchor_path)
+
+            # 2. Save active repo_snapshot.json baseline pointer
             snap_path = os.path.join(workspace_dir, ".agents", "repo_snapshot.json")
             RepositorySnapshotEngine.save_snapshot(repo_snapshot, snap_path)
+
+            # 3. Derive AuthorizedChangeSet from tasks
+            authorized_changeset = AuthorizedChangeSet(
+                changeset_id=f"CS-{int(datetime.now(timezone.utc).timestamp())}",
+                source_repository_state_hash=repo_snapshot.repository_state_hash,
+                source_snapshot_id=repo_snapshot.snapshot_id
+            )
+            for t in tasks:
+                t_paths = getattr(t, "target_files", []) or []
+                for p in t_paths:
+                    norm_p = p.replace("\\", "/").strip().lstrip("/")
+                    op = FileMutationOp.CREATE if norm_p not in repo_snapshot.file_manifest else FileMutationOp.MODIFY
+                    if norm_p not in authorized_changeset.authorized_changes:
+                        authorized_changeset.add_change(AuthorizedFileChange(
+                            file_path=norm_p,
+                            operation=op,
+                            authorized_by_tasks=[t.id],
+                            authorized_by_lld=t.parent_lld,
+                            expected_source_file_hash=repo_snapshot.file_manifest[norm_p].file_hash if norm_p in repo_snapshot.file_manifest else None
+                        ))
+                    else:
+                        existing = authorized_changeset.authorized_changes[norm_p]
+                        if t.id not in existing.authorized_by_tasks:
+                            existing.authorized_by_tasks.append(t.id)
+
+            cs_path = os.path.join(workspace_dir, ".agents", "authorized_changeset.json")
+            write_json_atomic(cs_path, authorized_changeset.to_dict())
 
         final_blocked = task_gov.is_blocked or (plan_gov.is_blocked if plan_gov else False) or (snap_gov.is_blocked if snap_gov else False)
         if snap_gov and snap_gov.is_blocked:
@@ -704,6 +740,8 @@ class SpecificationCompiler:
             "task_governance": task_gov.to_dict(),
             "execution_plan": execution_plan.to_dict() if execution_plan else None,
             "execution_plan_governance": plan_gov.to_dict() if plan_gov else {},
+            "planning_snapshot": repo_snapshot.to_dict() if repo_snapshot else None,
+            "authorized_changeset": authorized_changeset.to_dict() if authorized_changeset else None,
             "repository_snapshot": repo_snapshot.to_dict() if repo_snapshot else None,
             "repository_snapshot_governance": snap_gov.to_dict() if snap_gov else {},
             "blocked": final_blocked,
@@ -754,6 +792,8 @@ class SpecificationCompiler:
                 "lld_governance": res_pipe.get("lld_governance", {}),
                 "tasks": [t.to_dict() if hasattr(t, "to_dict") else t for t in res_pipe.get("tasks", [])],
                 "task_governance": res_pipe.get("task_governance", {}),
+                "planning_snapshot": res_pipe.get("planning_snapshot"),
+                "authorized_changeset": res_pipe.get("authorized_changeset"),
                 "repository_snapshot": res_pipe.get("repository_snapshot"),
                 "repository_snapshot_governance": res_pipe.get("repository_snapshot_governance", {}),
                 "blocked": res_pipe.get("blocked", False)
