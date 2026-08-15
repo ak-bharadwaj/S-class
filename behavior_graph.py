@@ -198,7 +198,8 @@ class BehaviorEdge:
 class BehaviorGraph:
     """Typed Multigraph for system behavior, authorization, state transitions, and audit trails."""
 
-    def __init__(self):
+    def __init__(self, version: int = 1):
+        self.version: int = version
         self.nodes: Dict[str, BehaviorNode] = {}
         self.edges: List[BehaviorEdge] = []
         self._adjacency: Dict[str, List[BehaviorEdge]] = {}
@@ -259,13 +260,14 @@ class BehaviorGraph:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
+            "version": self.version,
             "nodes": [n.to_dict() for n in self.nodes.values()],
             "edges": [e.to_dict() for e in self.edges]
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'BehaviorGraph':
-        graph = cls()
+        graph = cls(version=int(data.get("version", 1)))
         for node_data in data.get("nodes", []):
             graph.add_node(BehaviorNode.from_dict(node_data))
         for edge_data in data.get("edges", []):

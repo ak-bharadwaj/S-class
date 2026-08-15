@@ -122,9 +122,9 @@ class CapabilityBinding:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'CapabilityBinding':
         return cls(
-            behavior_id=data["behavior_id"],
+            behavior_id=data.get("behavior_id", ""),
             requirement_ids=list(data.get("requirement_ids", [])),
-            operation_class=OperationClass(data["operation_class"]),
+            operation_class=OperationClass(data["operation_class"]) if "operation_class" in data else OperationClass.READ_QUERY,
             target_entity=data.get("target_entity", ""),
             hld_capability=data.get("hld_capability", ""),
             lld_component_id=data.get("lld_component_id", ""),
@@ -133,10 +133,10 @@ class CapabilityBinding:
             source_behavior_hash=data.get("source_behavior_hash", ""),
             source_requirement_hash=data.get("source_requirement_hash", ""),
             source_hld_hash=data.get("source_hld_hash", ""),
-            source_behavior_graph_version=data.get("source_behavior_graph_version", "v1"),
-            source_requirement_graph_version=data.get("source_requirement_graph_version", "v1"),
+            source_behavior_graph_version=data.get("source_behavior_graph_version", ""),
+            source_requirement_graph_version=data.get("source_requirement_graph_version", ""),
             source_hld_module_id=data.get("source_hld_module_id", ""),
-            source_hld_version=int(data.get("source_hld_version", 1)),
+            source_hld_version=int(data.get("source_hld_version", 0)),
             binding_hash=data.get("binding_hash", "")
         )
 
@@ -275,7 +275,7 @@ class LLDCompiler:
 
             # Precise allowed component types & prohibited roles per OperationClass
             if op_class == OperationClass.COMMAND_MUTATION:
-                allowed_types = [LLDComponentType.CONTROLLER, LLDComponentType.SERVICE, LLDComponentType.CLI_DISPATCHER]
+                allowed_types = [LLDComponentType.CONTROLLER, LLDComponentType.SERVICE, LLDComponentType.UI_SURFACE, LLDComponentType.CLI_DISPATCHER]
                 prohibited_roles = ["read_model", "query_service", "read_only_view", "audit_viewer", "pipeline_worker", "event_handler"]
             elif op_class == OperationClass.READ_QUERY:
                 allowed_types = [LLDComponentType.CONTROLLER, LLDComponentType.SERVICE, LLDComponentType.UI_SURFACE, LLDComponentType.CLI_DISPATCHER]
@@ -303,6 +303,10 @@ class LLDCompiler:
 
             source_hld_hash = mod.compute_canonical_hash()
 
+            b_graph_ver = str(getattr(b_graph, "version", "1"))
+            r_graph_ver = str(getattr(r_graph, "version", "1"))
+            hld_ver = int(getattr(mod, "version", 1))
+
             b_binding = CapabilityBinding(
                 behavior_id=b_id,
                 requirement_ids=matching_req_ids,
@@ -315,10 +319,10 @@ class LLDCompiler:
                 source_behavior_hash=source_beh_hash,
                 source_requirement_hash=source_req_hash,
                 source_hld_hash=source_hld_hash,
-                source_behavior_graph_version="v1",
-                source_requirement_graph_version="v1",
+                source_behavior_graph_version=b_graph_ver,
+                source_requirement_graph_version=r_graph_ver,
                 source_hld_module_id=mod.id,
-                source_hld_version=1,
+                source_hld_version=hld_ver,
                 binding_hash=""
             )
             b_binding.binding_hash = b_binding.compute_hash()

@@ -486,7 +486,7 @@ class ArtifactGovernor:
         r_graph: RequirementGraph,
         lld_components: List[LLDComponent],
         b_graph: BehaviorGraph,
-        hld_modules: Optional[List[HLDModule]] = None
+        hld_modules: List[HLDModule]
     ) -> GovernanceGateResult:
         reasons: List[str] = []
         if tasks and not lld_components:
@@ -672,26 +672,47 @@ class ArtifactGovernor:
                             )
 
                     # 3. HLD Module Source Hash Verification (Mandatory & Canonical - ZERO SYNTHETIC FALLBACK!)
+                    hld_mod_map = {m.id: m for m in (hld_modules or [])}
+                    parent_hld_id = parent_comp.parent.hld_id if parent_comp.parent else ""
+                    canonical_hld_mod = hld_mod_map.get(parent_hld_id) if parent_hld_id else None
+
                     if not getattr(binding, "source_hld_hash", ""):
                         reasons.append(
                             f"Task {t.id} ({t.title}) missing mandatory source_hld_hash in CapabilityBinding."
                         )
+                    elif not parent_hld_id or not canonical_hld_mod:
+                        reasons.append(
+                            f"Task {t.id} ({t.title}) references parent LLD '{parent_comp.id}' whose parent HLD module '{parent_hld_id}' is not found in canonical HLD module context."
+                        )
                     else:
-                        hld_mod_map = {m.id: m for m in (hld_modules or [])}
-                        parent_hld_id = parent_comp.parent.hld_id if parent_comp.parent else ""
-                        if not parent_hld_id or parent_hld_id not in hld_mod_map:
+                        expected_hld_hash = canonical_hld_mod.compute_canonical_hash()
+                        if binding.source_hld_hash != expected_hld_hash:
                             reasons.append(
-                                f"Task {t.id} ({t.title}) references parent LLD '{parent_comp.id}' whose parent HLD module '{parent_hld_id}' is not found in canonical HLD module context."
+                                f"Task {t.id} ({t.title}) stale/tampered source_hld_hash in binding: expected '{expected_hld_hash}', got '{binding.source_hld_hash}'."
                             )
-                        else:
-                            canonical_hld_mod = hld_mod_map[parent_hld_id]
-                            expected_hld_hash = canonical_hld_mod.compute_canonical_hash()
-                            if binding.source_hld_hash != expected_hld_hash:
-                                reasons.append(
-                                    f"Task {t.id} ({t.title}) stale/tampered source_hld_hash in binding: expected '{expected_hld_hash}', got '{binding.source_hld_hash}'."
-                                )
 
-                    # 4. Source HLD Module ID Identity Verification (Mandatory & Canonical)
+                    # 4. Source Version and Identity Lineage Verification (Mandatory & Strict)
+                    expected_b_ver = str(getattr(b_graph, "version", "1"))
+                    expected_r_ver = str(getattr(r_graph, "version", "1"))
+
+                    if not getattr(binding, "source_behavior_graph_version", ""):
+                        reasons.append(
+                            f"Task {t.id} ({t.title}) missing mandatory source_behavior_graph_version in CapabilityBinding."
+                        )
+                    elif binding.source_behavior_graph_version != expected_b_ver:
+                        reasons.append(
+                            f"Task {t.id} ({t.title}) source_behavior_graph_version mismatch in binding: expected '{expected_b_ver}', got '{binding.source_behavior_graph_version}'."
+                        )
+
+                    if not getattr(binding, "source_requirement_graph_version", ""):
+                        reasons.append(
+                            f"Task {t.id} ({t.title}) missing mandatory source_requirement_graph_version in CapabilityBinding."
+                        )
+                    elif binding.source_requirement_graph_version != expected_r_ver:
+                        reasons.append(
+                            f"Task {t.id} ({t.title}) source_requirement_graph_version mismatch in binding: expected '{expected_r_ver}', got '{binding.source_requirement_graph_version}'."
+                        )
+
                     parent_hld_id = parent_comp.parent.hld_id if parent_comp.parent else ""
                     if not getattr(binding, "source_hld_module_id", ""):
                         reasons.append(
@@ -700,6 +721,16 @@ class ArtifactGovernor:
                     elif binding.source_hld_module_id != parent_hld_id:
                         reasons.append(
                             f"Task {t.id} ({t.title}) source_hld_module_id conflict in binding: binding designates module '{binding.source_hld_module_id}', but parent LLD references HLD module '{parent_hld_id}'."
+                        )
+
+                    expected_hld_ver = int(getattr(canonical_hld_mod, "version", 1)) if canonical_hld_mod else 1
+                    if not getattr(binding, "source_hld_version", 0) or int(binding.source_hld_version) <= 0:
+                        reasons.append(
+                            f"Task {t.id} ({t.title}) missing mandatory source_hld_version in CapabilityBinding."
+                        )
+                    elif int(binding.source_hld_version) != expected_hld_ver:
+                        reasons.append(
+                            f"Task {t.id} ({t.title}) source_hld_version mismatch in binding: expected {expected_hld_ver}, got {binding.source_hld_version}."
                         )
 
                     # F. Component Identity Binding Verification

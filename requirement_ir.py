@@ -335,7 +335,8 @@ class CircularDependencyError(ValueError):
 class RequirementGraph:
     """Graph of machine-verifiable requirements, tracking dependencies and detecting holes."""
 
-    def __init__(self):
+    def __init__(self, version: int = 1):
+        self.version: int = version
         self.nodes: Dict[str, RequirementNode] = {}
         self.edges: List[Tuple[str, str, str]] = []  # (source_id, relation, target_id)
 
@@ -500,6 +501,17 @@ class RequirementGraph:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
+            "version": self.version,
             "nodes": [n.to_dict() for n in self.nodes.values()],
             "edges": self.edges
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'RequirementGraph':
+        graph = cls(version=int(data.get("version", 1)))
+        for node_data in data.get("nodes", []):
+            graph.add_requirement(RequirementNode.from_dict(node_data))
+        for edge_data in data.get("edges", []):
+            if isinstance(edge_data, (list, tuple)) and len(edge_data) == 3:
+                graph.edges.append((str(edge_data[0]), str(edge_data[1]), str(edge_data[2])))
+        return graph

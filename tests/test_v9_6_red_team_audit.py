@@ -920,7 +920,221 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         self.assertEqual(gov_res_tampered_hld_id.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("source_hld_module_id conflict in binding" in r for r in gov_res_tampered_hld_id.blocking_reasons))
 
-        # 15. Invariant: LLDCompiler MUST NOT fabricate synthetic REQ-001 ancestry for ungrounded modules
+        # 35. Negative Attack Vector 30: Missing Mandatory source_behavior_graph_version in CapabilityBinding
+        missing_b_ver_binding = CapabilityBinding(
+            behavior_id=valid_binding.behavior_id, requirement_ids=list(valid_binding.requirement_ids),
+            operation_class=valid_binding.operation_class, target_entity=valid_binding.target_entity,
+            hld_capability=valid_binding.hld_capability, lld_component_id=valid_binding.lld_component_id,
+            allowed_component_types=list(valid_binding.allowed_component_types),
+            prohibited_component_roles=list(valid_binding.prohibited_component_roles),
+            source_behavior_hash=valid_binding.source_behavior_hash,
+            source_requirement_hash=valid_binding.source_requirement_hash,
+            source_hld_hash=valid_binding.source_hld_hash,
+            source_behavior_graph_version="", # Missing!
+            source_requirement_graph_version=valid_binding.source_requirement_graph_version,
+            source_hld_module_id=valid_binding.source_hld_module_id,
+            source_hld_version=valid_binding.source_hld_version,
+            binding_hash=""
+        )
+        missing_b_ver_binding.binding_hash = missing_b_ver_binding.compute_hash()
+        missing_b_ver_comp = LLDComponent(
+            id=vehicle_comp.id, name=vehicle_comp.name, component_type=vehicle_comp.component_type,
+            parent=vehicle_comp.parent, role=vehicle_comp.role,
+            owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
+            capability_bindings=[missing_b_ver_binding]
+        )
+        gov_res_missing_b_ver = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [missing_b_ver_comp], b_graph_multi, hld_modules=hld_multi.modules)
+        self.assertTrue(gov_res_missing_b_ver.is_blocked, "ArtifactGovernor MUST block task when source_behavior_graph_version is missing in CapabilityBinding!")
+        self.assertEqual(gov_res_missing_b_ver.validation_status, ValidationStatus.INVALID)
+        self.assertTrue(any("missing mandatory source_behavior_graph_version" in r for r in gov_res_missing_b_ver.blocking_reasons))
+
+        # 36. Negative Attack Vector 31: Stale/Mismatched source_behavior_graph_version in CapabilityBinding
+        mismatched_b_ver_binding = CapabilityBinding(
+            behavior_id=valid_binding.behavior_id, requirement_ids=list(valid_binding.requirement_ids),
+            operation_class=valid_binding.operation_class, target_entity=valid_binding.target_entity,
+            hld_capability=valid_binding.hld_capability, lld_component_id=valid_binding.lld_component_id,
+            allowed_component_types=list(valid_binding.allowed_component_types),
+            prohibited_component_roles=list(valid_binding.prohibited_component_roles),
+            source_behavior_hash=valid_binding.source_behavior_hash,
+            source_requirement_hash=valid_binding.source_requirement_hash,
+            source_hld_hash=valid_binding.source_hld_hash,
+            source_behavior_graph_version="v99", # Mismatched!
+            source_requirement_graph_version=valid_binding.source_requirement_graph_version,
+            source_hld_module_id=valid_binding.source_hld_module_id,
+            source_hld_version=valid_binding.source_hld_version,
+            binding_hash=""
+        )
+        mismatched_b_ver_binding.binding_hash = mismatched_b_ver_binding.compute_hash()
+        mismatched_b_ver_comp = LLDComponent(
+            id=vehicle_comp.id, name=vehicle_comp.name, component_type=vehicle_comp.component_type,
+            parent=vehicle_comp.parent, role=vehicle_comp.role,
+            owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
+            capability_bindings=[mismatched_b_ver_binding]
+        )
+        gov_res_mismatched_b_ver = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [mismatched_b_ver_comp], b_graph_multi, hld_modules=hld_multi.modules)
+        self.assertTrue(gov_res_mismatched_b_ver.is_blocked, "ArtifactGovernor MUST block task when source_behavior_graph_version does not match canonical BehaviorGraph version!")
+        self.assertEqual(gov_res_mismatched_b_ver.validation_status, ValidationStatus.INVALID)
+        self.assertTrue(any("source_behavior_graph_version mismatch" in r for r in gov_res_mismatched_b_ver.blocking_reasons))
+
+        # 37. Negative Attack Vector 32: Missing Mandatory source_requirement_graph_version in CapabilityBinding
+        missing_r_ver_binding = CapabilityBinding(
+            behavior_id=valid_binding.behavior_id, requirement_ids=list(valid_binding.requirement_ids),
+            operation_class=valid_binding.operation_class, target_entity=valid_binding.target_entity,
+            hld_capability=valid_binding.hld_capability, lld_component_id=valid_binding.lld_component_id,
+            allowed_component_types=list(valid_binding.allowed_component_types),
+            prohibited_component_roles=list(valid_binding.prohibited_component_roles),
+            source_behavior_hash=valid_binding.source_behavior_hash,
+            source_requirement_hash=valid_binding.source_requirement_hash,
+            source_hld_hash=valid_binding.source_hld_hash,
+            source_behavior_graph_version=valid_binding.source_behavior_graph_version,
+            source_requirement_graph_version="", # Missing!
+            source_hld_module_id=valid_binding.source_hld_module_id,
+            source_hld_version=valid_binding.source_hld_version,
+            binding_hash=""
+        )
+        missing_r_ver_binding.binding_hash = missing_r_ver_binding.compute_hash()
+        missing_r_ver_comp = LLDComponent(
+            id=vehicle_comp.id, name=vehicle_comp.name, component_type=vehicle_comp.component_type,
+            parent=vehicle_comp.parent, role=vehicle_comp.role,
+            owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
+            capability_bindings=[missing_r_ver_binding]
+        )
+        gov_res_missing_r_ver = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [missing_r_ver_comp], b_graph_multi, hld_modules=hld_multi.modules)
+        self.assertTrue(gov_res_missing_r_ver.is_blocked, "ArtifactGovernor MUST block task when source_requirement_graph_version is missing in CapabilityBinding!")
+        self.assertEqual(gov_res_missing_r_ver.validation_status, ValidationStatus.INVALID)
+        self.assertTrue(any("missing mandatory source_requirement_graph_version" in r for r in gov_res_missing_r_ver.blocking_reasons))
+
+        # 38. Negative Attack Vector 33: Stale/Mismatched source_requirement_graph_version in CapabilityBinding
+        mismatched_r_ver_binding = CapabilityBinding(
+            behavior_id=valid_binding.behavior_id, requirement_ids=list(valid_binding.requirement_ids),
+            operation_class=valid_binding.operation_class, target_entity=valid_binding.target_entity,
+            hld_capability=valid_binding.hld_capability, lld_component_id=valid_binding.lld_component_id,
+            allowed_component_types=list(valid_binding.allowed_component_types),
+            prohibited_component_roles=list(valid_binding.prohibited_component_roles),
+            source_behavior_hash=valid_binding.source_behavior_hash,
+            source_requirement_hash=valid_binding.source_requirement_hash,
+            source_hld_hash=valid_binding.source_hld_hash,
+            source_behavior_graph_version=valid_binding.source_behavior_graph_version,
+            source_requirement_graph_version="v99", # Mismatched!
+            source_hld_module_id=valid_binding.source_hld_module_id,
+            source_hld_version=valid_binding.source_hld_version,
+            binding_hash=""
+        )
+        mismatched_r_ver_binding.binding_hash = mismatched_r_ver_binding.compute_hash()
+        mismatched_r_ver_comp = LLDComponent(
+            id=vehicle_comp.id, name=vehicle_comp.name, component_type=vehicle_comp.component_type,
+            parent=vehicle_comp.parent, role=vehicle_comp.role,
+            owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
+            capability_bindings=[mismatched_r_ver_binding]
+        )
+        gov_res_mismatched_r_ver = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [mismatched_r_ver_comp], b_graph_multi, hld_modules=hld_multi.modules)
+        self.assertTrue(gov_res_mismatched_r_ver.is_blocked, "ArtifactGovernor MUST block task when source_requirement_graph_version does not match canonical RequirementGraph version!")
+        self.assertEqual(gov_res_mismatched_r_ver.validation_status, ValidationStatus.INVALID)
+        self.assertTrue(any("source_requirement_graph_version mismatch" in r for r in gov_res_mismatched_r_ver.blocking_reasons))
+
+        # 39. Negative Attack Vector 34: Missing / 0 source_hld_version in CapabilityBinding
+        missing_hld_ver_binding = CapabilityBinding(
+            behavior_id=valid_binding.behavior_id, requirement_ids=list(valid_binding.requirement_ids),
+            operation_class=valid_binding.operation_class, target_entity=valid_binding.target_entity,
+            hld_capability=valid_binding.hld_capability, lld_component_id=valid_binding.lld_component_id,
+            allowed_component_types=list(valid_binding.allowed_component_types),
+            prohibited_component_roles=list(valid_binding.prohibited_component_roles),
+            source_behavior_hash=valid_binding.source_behavior_hash,
+            source_requirement_hash=valid_binding.source_requirement_hash,
+            source_hld_hash=valid_binding.source_hld_hash,
+            source_behavior_graph_version=valid_binding.source_behavior_graph_version,
+            source_requirement_graph_version=valid_binding.source_requirement_graph_version,
+            source_hld_module_id=valid_binding.source_hld_module_id,
+            source_hld_version=0, # Missing / 0!
+            binding_hash=""
+        )
+        missing_hld_ver_binding.binding_hash = missing_hld_ver_binding.compute_hash()
+        missing_hld_ver_comp = LLDComponent(
+            id=vehicle_comp.id, name=vehicle_comp.name, component_type=vehicle_comp.component_type,
+            parent=vehicle_comp.parent, role=vehicle_comp.role,
+            owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
+            capability_bindings=[missing_hld_ver_binding]
+        )
+        gov_res_missing_hld_ver = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [missing_hld_ver_comp], b_graph_multi, hld_modules=hld_multi.modules)
+        self.assertTrue(gov_res_missing_hld_ver.is_blocked, "ArtifactGovernor MUST block task when source_hld_version is 0 / missing in CapabilityBinding!")
+        self.assertEqual(gov_res_missing_hld_ver.validation_status, ValidationStatus.INVALID)
+        self.assertTrue(any("missing mandatory source_hld_version" in r for r in gov_res_missing_hld_ver.blocking_reasons))
+
+        # 40. Negative Attack Vector 35: Stale/Mismatched source_hld_version in CapabilityBinding
+        mismatched_hld_ver_binding = CapabilityBinding(
+            behavior_id=valid_binding.behavior_id, requirement_ids=list(valid_binding.requirement_ids),
+            operation_class=valid_binding.operation_class, target_entity=valid_binding.target_entity,
+            hld_capability=valid_binding.hld_capability, lld_component_id=valid_binding.lld_component_id,
+            allowed_component_types=list(valid_binding.allowed_component_types),
+            prohibited_component_roles=list(valid_binding.prohibited_component_roles),
+            source_behavior_hash=valid_binding.source_behavior_hash,
+            source_requirement_hash=valid_binding.source_requirement_hash,
+            source_hld_hash=valid_binding.source_hld_hash,
+            source_behavior_graph_version=valid_binding.source_behavior_graph_version,
+            source_requirement_graph_version=valid_binding.source_requirement_graph_version,
+            source_hld_module_id=valid_binding.source_hld_module_id,
+            source_hld_version=99, # Mismatched!
+            binding_hash=""
+        )
+        mismatched_hld_ver_binding.binding_hash = mismatched_hld_ver_binding.compute_hash()
+        mismatched_hld_ver_comp = LLDComponent(
+            id=vehicle_comp.id, name=vehicle_comp.name, component_type=vehicle_comp.component_type,
+            parent=vehicle_comp.parent, role=vehicle_comp.role,
+            owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
+            capability_bindings=[mismatched_hld_ver_binding]
+        )
+        gov_res_mismatched_hld_ver = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [mismatched_hld_ver_comp], b_graph_multi, hld_modules=hld_multi.modules)
+        self.assertTrue(gov_res_mismatched_hld_ver.is_blocked, "ArtifactGovernor MUST block task when source_hld_version does not match canonical HLD module version!")
+        self.assertEqual(gov_res_mismatched_hld_ver.validation_status, ValidationStatus.INVALID)
+        self.assertTrue(any("source_hld_version mismatch" in r for r in gov_res_mismatched_hld_ver.blocking_reasons))
+
+        # 41. Negative Attack Vector 36: Strict Deserialization Rejects Missing Version Defaults
+        deserialized_missing_binding = CapabilityBinding.from_dict({
+            "behavior_id": valid_binding.behavior_id,
+            "requirement_ids": list(valid_binding.requirement_ids),
+            "operation_class": valid_binding.operation_class.value,
+            "target_entity": valid_binding.target_entity,
+            "hld_capability": valid_binding.hld_capability,
+            "lld_component_id": valid_binding.lld_component_id,
+            "allowed_component_types": [ct.value for ct in valid_binding.allowed_component_types],
+            "prohibited_component_roles": list(valid_binding.prohibited_component_roles),
+            "source_behavior_hash": valid_binding.source_behavior_hash,
+            "source_requirement_hash": valid_binding.source_requirement_hash,
+            "source_hld_hash": valid_binding.source_hld_hash,
+            "binding_hash": "dummy_hash"
+            # Omitted: source_behavior_graph_version, source_requirement_graph_version, source_hld_module_id, source_hld_version
+        })
+        self.assertEqual(deserialized_missing_binding.source_behavior_graph_version, "")
+        self.assertEqual(deserialized_missing_binding.source_requirement_graph_version, "")
+        self.assertEqual(deserialized_missing_binding.source_hld_module_id, "")
+        self.assertEqual(deserialized_missing_binding.source_hld_version, 0)
+
+        # 42. End-to-End Production Compiler Lineage Verification: SpecCompiler -> LLD -> Tasks -> Governor PASS
+        e2e_b_graph = BehaviorGraph(version=1)
+        e2e_b_node = BehaviorNode(
+            id="cmd_dispatch_fleet", name="DispatchFleetVehicle", behavior_type=BehaviorNodeType.COMMAND,
+            actor_id="fleet_manager", target_entity_id="fleet_vehicle", epistemic_status=EpistemicStatus.EXPLICIT,
+            provenance=ProvenanceKind.EXPLICIT, confidence=1.0, evidence_ref="Dispatch vehicle command"
+        )
+        e2e_b_graph.add_node(e2e_b_node)
+        e2e_r_graph = RequirementGraph.compile_from_behavior_graph(e2e_b_graph)
+        e2e_hld = HLDCompiler.compile_hld(e2e_r_graph, e2e_b_graph, raw_request="Enterprise Dispatch Fleet Engine")
+        e2e_lld = LLDCompiler.compile_lld(e2e_hld, e2e_r_graph, e2e_b_graph)
+        e2e_tasks = TaskCompiler.compile_tasks(e2e_lld, r_graph=e2e_r_graph, b_graph=e2e_b_graph)
+
+        # Audit with mandatory canonical HLD modules context
+        e2e_task_gov = ArtifactGovernor.audit_task_governance(e2e_tasks, e2e_r_graph, e2e_lld, e2e_b_graph, hld_modules=e2e_hld.modules)
+        self.assertFalse(e2e_task_gov.is_blocked, f"End-to-End Task Governance audit MUST PASS without any blocking reasons! Reasons: {e2e_task_gov.blocking_reasons}")
+        self.assertEqual(e2e_task_gov.validation_status, ValidationStatus.VALID, "End-to-end task validation status MUST be VALID!")
+        self.assertEqual(e2e_task_gov.recommended_fsm_state, FSMTransitionTarget.CODING, "End-to-end task audit MUST recommend CODING state!")
+        self.assertGreater(len(e2e_tasks), 0, "Production pipeline must compile at least 1 task!")
+        for t in e2e_tasks:
+            self.assertTrue(len(t.parent_lld) > 0, "Task parent_lld must be non-empty")
+            self.assertTrue(len(t.parent_hld) > 0, "Task parent_hld must be non-empty")
+            self.assertTrue(len(t.parent_reqs) > 0, "Task parent_reqs must be non-empty")
+            self.assertTrue(len(t.parent_behaviors) > 0, "Task parent_behaviors must be non-empty")
+
+        # 43. Invariant: LLDCompiler MUST NOT fabricate synthetic REQ-001 ancestry for ungrounded modules
         empty_r_graph = RequirementGraph()
         synthetic_mod = HLDModule(id="mod_synth", name="Synthetic", system_boundary="internal", owned_entities=["X"], owned_capabilities=["nonexistent_cap"])
         synthetic_hld = HLDDesign(system_name="HLD-001", architecture_style="Modular Monolith", modules=[synthetic_mod], adrs=[], version=1)
