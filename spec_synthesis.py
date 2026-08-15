@@ -2061,7 +2061,13 @@ class SpecSynthesisEngine:
     def extract_intent(self, raw_request: str, workspace_vocab: Optional[Dict[str, Set[str]]] = None) -> StructuredIntent:
         return StructuredPromptParser.parse_request(raw_request, workspace_vocab)
 
-    def run_synthesis(self, raw_request: str, workspace_dir: str, clarification_answers: Optional[Dict[str, str]] = None) -> SynthesizedSpec:
+    def run_synthesis(
+        self,
+        raw_request: str,
+        workspace_dir: str,
+        clarification_answers: Optional[Dict[str, str]] = None,
+        shadow_mode: bool = False
+    ) -> SynthesizedSpec:
         logger.info("Starting Specification Synthesis Pipeline V5.0 (Semantic Domain Graph & Compiler)")
 
         agents_dir = os.path.join(workspace_dir, ".agents")
@@ -2423,6 +2429,21 @@ class SpecSynthesisEngine:
                 error_paths=[]
             )
             write_json_atomic(os.path.join(agents_dir, "intent_contract.json"), ic.to_dict())
+
+            # Optional Isolated Shadow-Mode Synthesis Execution
+            is_shadow_env = os.environ.get("SCLASS_SHADOW_SYNTHESIS", "false").lower() in ["true", "1", "yes"]
+            if shadow_mode or is_shadow_env:
+                try:
+                    from shadow_semantic_synthesis import ShadowSynthesizer
+                    shadow_synth = ShadowSynthesizer()
+                    shadow_synth.run_shadow(
+                        raw_request=raw_request,
+                        workspace_dir=workspace_dir,
+                        evidence=evidence,
+                        legacy_spec_dict=spec.__dict__
+                    )
+                except Exception as shadow_err:
+                    logger.warning(f"[SpecSynthesis] Shadow synthesis warning: {shadow_err}")
         except Exception as e:
             logger.error(f"Failed to write JSON outputs: {e}")
 

@@ -1,0 +1,181 @@
+{
+  "benchmark": "S-Class Shadow-Mode Semantic Synthesis Engine Benchmark",
+  "total_tasks_evaluated": 7,
+  "aggregate_metrics": {
+    "micro_gt_recall": 85.11,
+    "macro_gt_recall": 85.88,
+    "micro_must_recall": 92.86,
+    "macro_must_recall": 92.86,
+    "average_pass3_stability_score": 0.9264,
+    "unsupported_inference_rate": 0.0,
+    "total_shadow_requirements": 39,
+    "total_shadow_page_spreads": 0,
+    "total_legacy_requirements": 496,
+    "total_legacy_page_spreads": 170,
+    "total_scope_explosion_prevented": 457,
+    "total_ui_hallucinations_suppressed": 170
+  },
+  "task_reports": [
+    {
+      "task_id": "TASK-01-FINTECH-LEDGER",
+      "domain": "fintech_banking",
+      "gt_requirements_count": 7,
+      "must_invariants_count": 6,
+      "shadow_requirements_count": 7,
+      "shadow_page_spreads_count": 0,
+      "shadow_gt_recall": 85.71,
+      "shadow_must_recall": 83.33,
+      "convergence_state": "CONVERGED",
+      "convergence_rationale": "Specification converged at Pass 3: Jaccard=0.7143, Stability=0.95, 0 unsupported inferences.",
+      "pass_stability_scores": [
+        0.7,
+        0.925,
+        0.95
+      ],
+      "legacy_requirements_count": 103,
+      "legacy_page_spreads_count": 48,
+      "scope_explosion_delta": 96,
+      "hallucinated_pages_delta": 48,
+      "omitted_by_legacy_count": 5,
+      "semantic_integrity_score": 0.1
+    },
+    {
+      "task_id": "TASK-02-AUTH-SESSION-REVOKE",
+      "domain": "auth_identity",
+      "gt_requirements_count": 6,
+      "must_invariants_count": 3,
+      "shadow_requirements_count": 6,
+      "shadow_page_spreads_count": 0,
+      "shadow_gt_recall": 100.0,
+      "shadow_must_recall": 100.0,
+      "convergence_state": "CONVERGED",
+      "convergence_rationale": "Specification converged at Pass 3: Jaccard=0.6667, Stability=0.94, 0 unsupported inferences.",
+      "pass_stability_scores": [
+        0.7,
+        0.9,
+        0.94
+      ],
+      "legacy_requirements_count": 96,
+      "legacy_page_spreads_count": 23,
+      "scope_explosion_delta": 90,
+      "hallucinated_pages_delta": 23,
+      "omitted_by_legacy_count": 4,
+      "semantic_integrity_score": 0.1
+    },
+    {
+      "task_id": "TASK-03-HEALTHCARE-PHI-MASK",
+      "domain": "healthcare_privacy",
+      "gt_requirements_count": 7,
+      "must_invariants_count": 5,
+      "shadow_requirements_count": 5,
+      "shadow_page_spreads_count": 0,
+      "shadow_gt_recall": 71.43,
+      "shadow_must_recall": 100.0,
+      "convergence_state": "STABILIZING",
+      "convergence_rationale": "Specification stabilizing: Pass 3 Jaccard=0.6.",
+      "pass_stability_scores": [
+        0.7,
+        0.85,
+        0.925
+      ],
+      "legacy_requirements_count": 76,
+      "legacy_page_spreads_count": 24,
+      "scope_explosion_delta": 71,
+      "hallucinated_pages_delta": 24,
+      "omitted_by_legacy_count": 3,
+      "semantic_integrity_score": 0.1
+    },
+    {
+      "task_id": "TASK-04-AEROSPACE-BLACKBOX-TELEMETRY",
+      "domain": "aerospace_avionics",
+      "gt_requirements_count": 6,
+      "must_invariants_count": 4,
+      "shadow_requirements_count": 6,
+      "shadow_page_spreads_count": 0,
+      "shadow_gt_recall": 83.33,
+      "shadow_must_recall": 100.0,
+      "convergence_state": "CONVERGED",
+      "convergence_rationale": "Specification converged at Pass 3: Jaccard=0.6667, Stability=0.94, 0 unsupported inferences.",
+      "pass_stability_scores": [
+        0.7,
+        0.9,
+        0.94
+      ],
+      "legacy_requirements_count": 63,
+      "legacy_page_spreads_count": 24,
+      "scope_explosion_delta": 57,
+      "hallucinated_pages_delta": 24,
+      "omitted_by_legacy_count": 4,
+      "semantic_integrity_score": 0.1
+    },
+    {
+      "task_id": "TASK-05-EXAM-BROWSER-SANDBOX",
+      "domain": "edtech_security",
+      "gt_requirements_count": 6,
+      "must_invariants_count": 4,
+      "shadow_requirements_count": 6,
+      "shadow_page_spreads_count": 0,
+      "shadow_gt_recall": 100.0,
+      "shadow_must_recall": 100.0,
+      "convergence_state": "CONVERGED",
+      "convergence_rationale": "Specification converged at Pass 3: Jaccard=0.6667, Stability=0.94, 0 unsupported inferences.",
+      "pass_stability_scores": [
+        0.7,
+        0.9,
+        0.94
+      ],
+      "legacy_requirements_count": 66,
+      "legacy_page_spreads_count": 25,
+      "scope_explosion_delta": 60,
+      "hallucinated_pages_delta": 25,
+      "omitted_by_legacy_count": 4,
+      "semantic_integrity_score": 0.1
+    },
+    {
+      "task_id": "TASK-06-PAYMENT-GATEWAY-AMBIGUOUS",
+      "domain": "fintech_payments_ambiguous",
+      "gt_requirements_count": 7,
+      "must_invariants_count": 3,
+      "shadow_requirements_count": 3,
+      "shadow_page_spreads_count": 0,
+      "shadow_gt_recall": 85.71,
+      "shadow_must_recall": 100.0,
+      "convergence_state": "STABILIZING",
+      "convergence_rationale": "Specification stabilizing: Pass 3 Jaccard=0.3333.",
+      "pass_stability_scores": [
+        0.7,
+        1.0,
+        0.85
+      ],
+      "legacy_requirements_count": 45,
+      "legacy_page_spreads_count": 8,
+      "scope_explosion_delta": 42,
+      "hallucinated_pages_delta": 8,
+      "omitted_by_legacy_count": 1,
+      "semantic_integrity_score": 0.18
+    },
+    {
+      "task_id": "TASK-07-AUTH-TOKEN-REVOCATION-AMBIGUOUS",
+      "domain": "auth_identity_ambiguous",
+      "gt_requirements_count": 8,
+      "must_invariants_count": 3,
+      "shadow_requirements_count": 6,
+      "shadow_page_spreads_count": 0,
+      "shadow_gt_recall": 75.0,
+      "shadow_must_recall": 66.67,
+      "convergence_state": "CONVERGED",
+      "convergence_rationale": "Specification converged at Pass 3: Jaccard=0.6667, Stability=0.94, 0 unsupported inferences.",
+      "pass_stability_scores": [
+        0.7,
+        0.9,
+        0.94
+      ],
+      "legacy_requirements_count": 47,
+      "legacy_page_spreads_count": 18,
+      "scope_explosion_delta": 41,
+      "hallucinated_pages_delta": 18,
+      "omitted_by_legacy_count": 4,
+      "semantic_integrity_score": 0.1
+    }
+  ]
+}
