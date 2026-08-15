@@ -111,6 +111,16 @@ class RequirementNode:
         )
 
 
+class DuplicateIDConflictError(ValueError):
+    """Raised when adding a requirement with an existing ID but conflicting semantic content."""
+    pass
+
+
+class CircularDependencyError(ValueError):
+    """Raised when adding a requirement dependency that creates a cycle."""
+    pass
+
+
 class RequirementGraph:
     """Graph of machine-verifiable requirements, tracking dependencies and detecting holes."""
 
@@ -119,12 +129,43 @@ class RequirementGraph:
         self.edges: List[Tuple[str, str, str]] = []  # (source_id, relation, target_id)
 
     def add_requirement(self, req: RequirementNode) -> RequirementNode:
+        if req.id in self.nodes:
+            existing = self.nodes[req.id]
+            # Check for semantic conflict under same ID
+            if (existing.statement != req.statement or
+                existing.capability != req.capability or
+                existing.target != req.target or
+                existing.kind != req.kind):
+                raise DuplicateIDConflictError(
+                    f"Requirement ID '{req.id}' semantic conflict: "
+                    f"Existing '{existing.statement}' ({existing.capability}) vs "
+                    f"New '{req.statement}' ({req.capability}). CASUAL MERGING REJECTED."
+                )
+            return existing
+
         self.nodes[req.id] = req
         return req
 
+    def _has_path(self, start_id: str, target_id: str, visited: Optional[Set[str]] = None) -> bool:
+        if visited is None:
+            visited = set()
+        if start_id == target_id:
+            return True
+        visited.add(start_id)
+        for src, rel, tgt in self.edges:
+            if src == start_id and rel == "depends_on" and tgt not in visited:
+                if self._has_path(tgt, target_id, visited):
+                    return True
+        return False
+
     def add_dependency(self, req_id: str, depends_on_req_id: str):
         if req_id in self.nodes and depends_on_req_id in self.nodes:
-            self.edges.append((req_id, "depends_on", depends_on_req_id))
+            if req_id == depends_on_req_id or self._has_path(depends_on_req_id, req_id):
+                raise CircularDependencyError(
+                    f"Circular requirement dependency detected: '{req_id}' -> '{depends_on_req_id}' -> '{req_id}'"
+                )
+            if (req_id, "depends_on", depends_on_req_id) not in self.edges:
+                self.edges.append((req_id, "depends_on", depends_on_req_id))
             if depends_on_req_id not in self.nodes[req_id].dependencies:
                 self.nodes[req_id].dependencies.append(depends_on_req_id)
 

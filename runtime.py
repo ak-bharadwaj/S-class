@@ -147,9 +147,9 @@ class FileLock:
                         else:
                             # Live process holds lock — keep waiting regardless of lock_age
                             pass
-                    elif not pid_str and lock_age > 0.5:
-                        # Empty/corrupt lock file cleanup
-                        logger.warning(f"Empty/corrupt lock file detected. Recovering: {self.lock_path}")
+                    else:
+                        # Empty/corrupt lock file cleanup (non-digit or empty content)
+                        logger.warning(f"Empty/corrupt lock file detected ('{pid_str}'). Recovering: {self.lock_path}")
                         try:
                             os.unlink(self.lock_path)
                         except OSError:
