@@ -1388,6 +1388,15 @@ class ArtifactGovernor:
             if isinstance(rel, TargetRelation):
                 if rel.target_entity_id not in entity_ids:
                     reasons.append(f"ORPHAN_TARGET_RELATION: target_entity '{rel.target_entity_id}' not found in world model.")
+                else:
+                    target_ent = world_model.entities[rel.target_entity_id]
+                    if isinstance(target_ent, ModuleEntity) and not target_ent.is_modeled:
+                        reasons.append(f"UNMODELED_CODE_EXECUTION_BARRIER: TargetRelation targets unmodeled file '{target_ent.path}'.")
+                    elif isinstance(target_ent, SymbolEntity):
+                        parent_mod = world_model.get_module(target_ent.module_id)
+                        if parent_mod and not parent_mod.is_modeled:
+                            reasons.append(f"UNMODELED_CODE_EXECUTION_BARRIER: TargetRelation targets symbol '{target_ent.name}' in unmodeled file '{parent_mod.path}'.")
+
                 if prov.truth_level not in [TruthLevel.PROPOSED, TruthLevel.DERIVED]:
                     reasons.append(f"INVALID_TARGET_TRUTH_LEVEL: TargetRelation must have PROPOSED or DERIVED truth level, got '{prov.truth_level.value}'.")
                 if rel.status != ImplementationStatus.TARGETED:
@@ -1396,10 +1405,27 @@ class ArtifactGovernor:
             elif isinstance(rel, ImplementationRelation):
                 if rel.symbol_id not in entity_ids:
                     reasons.append(f"ORPHAN_IMPLEMENTATION_RELATION: symbol '{rel.symbol_id}' not found in world model.")
-                if prov.truth_level not in [TruthLevel.DERIVED, TruthLevel.OBSERVED]:
-                    reasons.append(f"UNVERIFIED_IMPLEMENTATION_TRUTH_LEVEL: ImplementationRelation requires DERIVED or OBSERVED truth level, got '{prov.truth_level.value}'.")
+                if prov.truth_level != TruthLevel.OBSERVED:
+                    reasons.append(f"UNVERIFIED_IMPLEMENTATION_TRUTH_LEVEL: ImplementationRelation strictly requires OBSERVED truth level, got '{prov.truth_level.value}'.")
                 if rel.status not in [ImplementationStatus.IMPLEMENTED, ImplementationStatus.VERIFIED]:
                     reasons.append(f"INVALID_IMPLEMENTATION_STATUS: ImplementationRelation status must be IMPLEMENTED or VERIFIED, got '{rel.status.value}'.")
+
+                # Cryptographic ImplementationEvidence Verification
+                from world_model import ImplementationEvidence
+                ev = rel.evidence
+                if not ev or not isinstance(ev, (ImplementationEvidence, dict)):
+                    reasons.append(f"MISSING_IMPLEMENTATION_EVIDENCE: ImplementationRelation for '{rel.symbol_id}' missing cryptographic ImplementationEvidence.")
+                else:
+                    ev_obj = ev if isinstance(ev, ImplementationEvidence) else ImplementationEvidence.from_dict(ev)
+                    expected_ev_hash = ev_obj.compute_evidence_hash()
+                    if ev_obj.evidence_hash != expected_ev_hash:
+                        reasons.append(f"INVALID_IMPLEMENTATION_EVIDENCE_HASH: evidence_hash mismatch on '{rel.symbol_id}'.")
+                    if ev_obj.target_symbol_id != rel.symbol_id:
+                        reasons.append(f"EVIDENCE_SYMBOL_MISMATCH: ImplementationEvidence target '{ev_obj.target_symbol_id}' != relation symbol '{rel.symbol_id}'.")
+                    if ev_obj.source_task_id != rel.task_id:
+                        reasons.append(f"EVIDENCE_TASK_MISMATCH: ImplementationEvidence task '{ev_obj.source_task_id}' != relation task '{rel.task_id}'.")
+                    if ev_obj.after_repository_state_hash != world_model.repository_state_hash:
+                        reasons.append(f"STALE_IMPLEMENTATION_EVIDENCE: evidence after_repository_state_hash '{ev_obj.after_repository_state_hash[:8]}' != current model '{world_model.repository_state_hash[:8]}'.")
 
             elif isinstance(rel, VerificationRelation):
                 if rel.test_entity_id not in entity_ids:
@@ -1416,6 +1442,15 @@ class ArtifactGovernor:
                 elif prov.truth_level == TruthLevel.OBSERVED:
                     if rel.execution_status not in [ExecutionResult.PASSED, ExecutionResult.FAILED, ExecutionResult.ERRORED]:
                         reasons.append(f"INVALID_OBSERVED_EXECUTION_STATUS: OBSERVED verification relation requires concrete execution result, got '{rel.execution_status.value}'.")
+                    from world_model import VerificationEvidence
+                    ev = rel.evidence
+                    if not ev or not isinstance(ev, (VerificationEvidence, dict)):
+                        reasons.append(f"MISSING_VERIFICATION_EVIDENCE: OBSERVED VerificationRelation missing cryptographic VerificationEvidence.")
+                    else:
+                        ev_obj = ev if isinstance(ev, VerificationEvidence) else VerificationEvidence.from_dict(ev)
+                        expected_ev_hash = ev_obj.compute_evidence_hash()
+                        if ev_obj.evidence_hash != expected_ev_hash:
+                            reasons.append(f"INVALID_VERIFICATION_EVIDENCE_HASH: evidence_hash mismatch on '{rel.test_entity_id}'.")
 
             elif isinstance(rel, DependencyRelation):
                 if rel.from_entity not in entity_ids:

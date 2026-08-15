@@ -12,10 +12,11 @@ Four-Tier Truth Ontology:
 
 Epistemic Relation Separation:
 - TargetRelation (TARGETS): Pre-execution task intent (ImplementationStatus: TARGETED, TruthLevel: PROPOSED/DERIVED)
-- ImplementationRelation (IMPLEMENTS): Verified code implementation (ImplementationStatus: IMPLEMENTED/VERIFIED, TruthLevel: DERIVED/OBSERVED)
-- VerificationRelation (VERIFIED_BY): Test coverage & runtime verification (CoverageStatus: STATICALLY_LINKED/DYNAMICALLY_OBSERVED, ExecutionResult: UNTESTED/PASSED/FAILED)
+- ImplementationRelation (IMPLEMENTS): Verified code implementation (ImplementationStatus: IMPLEMENTED/VERIFIED, TruthLevel: OBSERVED, backed by ImplementationEvidence)
+- VerificationRelation (VERIFIED_BY): Test coverage & runtime verification (CoverageStatus: STATICALLY_LINKED/DYNAMICALLY_OBSERVED, ExecutionResult: UNTESTED/PASSED/FAILED, backed by VerificationEvidence when OBSERVED)
 
-Knowledge Boundaries:
+Cryptographic Evidence & Hard Knowledge Boundaries:
+- ImplementationEvidence & VerificationEvidence bind task/changeset/repository hashes.
 - Unmodeled files create explicit barriers preventing autonomous changes without active language adapters.
 """
 
@@ -174,6 +175,138 @@ class ProvenanceRecord:
             source=str(d["source"]),
             confidence=float(d["confidence"]),
             evidence=str(d["evidence"])
+        )
+
+
+# -----------------------------------------------------------------------------
+# Cryptographic Evidence Records
+# -----------------------------------------------------------------------------
+
+@dataclass
+class ImplementationEvidence:
+    """Cryptographically bound evidence of an authorized code change."""
+    source_task_id: str
+    source_task_hash: str
+    source_changeset_hash: str
+    before_repository_state_hash: str
+    after_repository_state_hash: str
+    target_symbol_id: str
+    mutation_op: str
+    execution_record_id: str
+    timestamp: str
+    evidence_hash: str = ""
+
+    def __post_init__(self):
+        if not self.evidence_hash:
+            self.evidence_hash = self.compute_evidence_hash()
+
+    def compute_evidence_hash(self) -> str:
+        payload = {
+            "source_task_id": self.source_task_id,
+            "source_task_hash": self.source_task_hash,
+            "source_changeset_hash": self.source_changeset_hash,
+            "before_repository_state_hash": self.before_repository_state_hash,
+            "after_repository_state_hash": self.after_repository_state_hash,
+            "target_symbol_id": self.target_symbol_id,
+            "mutation_op": self.mutation_op,
+            "execution_record_id": self.execution_record_id,
+            "timestamp": self.timestamp
+        }
+        canonical_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "source_task_id": self.source_task_id,
+            "source_task_hash": self.source_task_hash,
+            "source_changeset_hash": self.source_changeset_hash,
+            "before_repository_state_hash": self.before_repository_state_hash,
+            "after_repository_state_hash": self.after_repository_state_hash,
+            "target_symbol_id": self.target_symbol_id,
+            "mutation_op": self.mutation_op,
+            "execution_record_id": self.execution_record_id,
+            "timestamp": self.timestamp,
+            "evidence_hash": self.evidence_hash or self.compute_evidence_hash()
+        }
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "ImplementationEvidence":
+        for req in ["source_task_id", "source_task_hash", "source_changeset_hash", "before_repository_state_hash", "after_repository_state_hash", "target_symbol_id", "mutation_op", "execution_record_id", "timestamp"]:
+            if req not in d:
+                raise ValueError(f"ImplementationEvidence missing mandatory field '{req}'")
+        return cls(
+            source_task_id=d["source_task_id"],
+            source_task_hash=d["source_task_hash"],
+            source_changeset_hash=d["source_changeset_hash"],
+            before_repository_state_hash=d["before_repository_state_hash"],
+            after_repository_state_hash=d["after_repository_state_hash"],
+            target_symbol_id=d["target_symbol_id"],
+            mutation_op=d["mutation_op"],
+            execution_record_id=d["execution_record_id"],
+            timestamp=d["timestamp"],
+            evidence_hash=d.get("evidence_hash", "")
+        )
+
+
+@dataclass
+class VerificationEvidence:
+    """Cryptographically bound evidence of an executed test receipt."""
+    test_entity_id: str
+    target_entity_id: str
+    test_framework: str
+    repository_state_hash: str
+    execution_result: ExecutionResult
+    exit_code: int
+    execution_receipt_hash: str
+    timestamp: str
+    evidence_hash: str = ""
+
+    def __post_init__(self):
+        if not self.evidence_hash:
+            self.evidence_hash = self.compute_evidence_hash()
+
+    def compute_evidence_hash(self) -> str:
+        payload = {
+            "test_entity_id": self.test_entity_id,
+            "target_entity_id": self.target_entity_id,
+            "test_framework": self.test_framework,
+            "repository_state_hash": self.repository_state_hash,
+            "execution_result": self.execution_result.value if isinstance(self.execution_result, ExecutionResult) else str(self.execution_result),
+            "exit_code": self.exit_code,
+            "execution_receipt_hash": self.execution_receipt_hash,
+            "timestamp": self.timestamp
+        }
+        canonical_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "test_entity_id": self.test_entity_id,
+            "target_entity_id": self.target_entity_id,
+            "test_framework": self.test_framework,
+            "repository_state_hash": self.repository_state_hash,
+            "execution_result": self.execution_result.value if isinstance(self.execution_result, ExecutionResult) else str(self.execution_result),
+            "exit_code": self.exit_code,
+            "execution_receipt_hash": self.execution_receipt_hash,
+            "timestamp": self.timestamp,
+            "evidence_hash": self.evidence_hash or self.compute_evidence_hash()
+        }
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "VerificationEvidence":
+        for req in ["test_entity_id", "target_entity_id", "test_framework", "repository_state_hash", "execution_result", "exit_code", "execution_receipt_hash", "timestamp"]:
+            if req not in d:
+                raise ValueError(f"VerificationEvidence missing mandatory field '{req}'")
+        return cls(
+            test_entity_id=d["test_entity_id"],
+            target_entity_id=d["target_entity_id"],
+            test_framework=d["test_framework"],
+            repository_state_hash=d["repository_state_hash"],
+            execution_result=ExecutionResult(d["execution_result"]),
+            exit_code=int(d["exit_code"]),
+            execution_receipt_hash=d["execution_receipt_hash"],
+            timestamp=d["timestamp"],
+            evidence_hash=d.get("evidence_hash", "")
         )
 
 
@@ -570,11 +703,12 @@ class TargetRelation:
 
 @dataclass
 class ImplementationRelation:
-    """Represents established code implementation backed by diffs/execution (IMPLEMENTS)."""
+    """Represents established code implementation backed by cryptographic ImplementationEvidence (IMPLEMENTS)."""
     symbol_id: str  # Concrete SymbolEntity ID
     task_id: str  # e.g., "TASK-001"
     status: ImplementationStatus  # IMPLEMENTED or VERIFIED
-    provenance: ProvenanceRecord  # Must be DERIVED or OBSERVED
+    provenance: ProvenanceRecord  # Must be OBSERVED
+    evidence: ImplementationEvidence  # Mandatory cryptographically bound proof
     requirement_id: Optional[str] = None
     behavior_id: Optional[str] = None
     lld_component_id: Optional[str] = None
@@ -588,6 +722,7 @@ class ImplementationRelation:
             "requirement_id": self.requirement_id,
             "behavior_id": self.behavior_id,
             "lld_component_id": self.lld_component_id,
+            "evidence": self.evidence.to_dict() if hasattr(self.evidence, "to_dict") else self.evidence,
             "provenance": self.provenance.to_dict()
         }
 
@@ -595,13 +730,16 @@ class ImplementationRelation:
     def from_dict(cls, d: Dict[str, Any]) -> "ImplementationRelation":
         if "provenance" not in d:
             raise ValueError("ImplementationRelation missing mandatory provenance.")
+        if "evidence" not in d or not isinstance(d["evidence"], dict):
+            raise ValueError("ImplementationRelation missing mandatory ImplementationEvidence dict.")
         return cls(
             symbol_id=d["symbol_id"],
             task_id=d["task_id"],
-            status=ImplementationStatus(d.get("status", d.get("implementation_status", "implemented"))),
+            status=ImplementationStatus(d.get("status", "implemented")),
             requirement_id=d.get("requirement_id"),
             behavior_id=d.get("behavior_id"),
             lld_component_id=d.get("lld_component_id"),
+            evidence=ImplementationEvidence.from_dict(d["evidence"]),
             provenance=ProvenanceRecord.from_dict(d["provenance"])
         )
 
@@ -615,11 +753,15 @@ class VerificationRelation:
     coverage_status: CoverageStatus
     execution_status: ExecutionResult
     provenance: ProvenanceRecord
+    evidence: Optional[Union[VerificationEvidence, Dict[str, Any]]] = None
     requirement_id: Optional[str] = None
     behavior_id: Optional[str] = None
     task_id: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
+        ev_dict = None
+        if self.evidence:
+            ev_dict = self.evidence.to_dict() if hasattr(self.evidence, "to_dict") else self.evidence
         return {
             "relation_type": "verification",
             "test_entity_id": self.test_entity_id,
@@ -630,6 +772,7 @@ class VerificationRelation:
             "requirement_id": self.requirement_id,
             "behavior_id": self.behavior_id,
             "task_id": self.task_id,
+            "evidence": ev_dict,
             "provenance": self.provenance.to_dict()
         }
 
@@ -637,10 +780,13 @@ class VerificationRelation:
     def from_dict(cls, d: Dict[str, Any]) -> "VerificationRelation":
         if "provenance" not in d:
             raise ValueError("VerificationRelation missing mandatory provenance.")
-        exec_st = d.get("execution_status")
-        if not exec_st:
-            legacy_res = d.get("last_result", "UNTESTED").lower()
-            exec_st = legacy_res if legacy_res in [e.value for e in ExecutionResult] else "untested"
+        exec_st = d.get("execution_status", "untested")
+        ev_obj = None
+        if d.get("evidence") and isinstance(d["evidence"], dict):
+            try:
+                ev_obj = VerificationEvidence.from_dict(d["evidence"])
+            except Exception:
+                ev_obj = d["evidence"]
 
         return cls(
             test_entity_id=d["test_entity_id"],
@@ -651,6 +797,7 @@ class VerificationRelation:
             requirement_id=d.get("requirement_id"),
             behavior_id=d.get("behavior_id"),
             task_id=d.get("task_id"),
+            evidence=ev_obj,
             provenance=ProvenanceRecord.from_dict(d["provenance"])
         )
 

@@ -39,6 +39,8 @@ from world_model import (
     TargetRelation,
     ImplementationRelation,
     VerificationRelation,
+    ImplementationEvidence,
+    VerificationEvidence,
     SymbolType,
     VisibilityKind,
     ProtocolKind,
@@ -975,3 +977,108 @@ class WorldModelEngine:
         with open(source_path, "r", encoding="utf-8") as fp:
             data = json.load(fp)
         return EngineeringWorldModel.from_governed_dict(data) if strict else EngineeringWorldModel.from_dict(data)
+
+
+class WorldModelPromotionEngine:
+    """Mechanically enforces authoritative, evidence-backed state promotion in the Engineering World Model."""
+
+    @classmethod
+    def promote_target_to_implemented(
+        cls,
+        world_model: EngineeringWorldModel,
+        target_rel: TargetRelation,
+        evidence: ImplementationEvidence
+    ) -> ImplementationRelation:
+        """Promotes TARGETED TargetRelation -> IMPLEMENTED ImplementationRelation backed by verified ImplementationEvidence."""
+        if target_rel.status != ImplementationStatus.TARGETED:
+            raise ValueError(f"Cannot promote relation with status '{target_rel.status.value}', expected TARGETED.")
+
+        # 1. Verify Evidence Hash Integrity
+        expected_hash = evidence.compute_evidence_hash()
+        if evidence.evidence_hash != expected_hash:
+            raise ValueError(f"ImplementationEvidence hash mismatch: stored '{evidence.evidence_hash}' != recomputed '{expected_hash}'.")
+
+        # 2. Verify Referential Parity
+        if evidence.target_symbol_id != target_rel.target_entity_id:
+            raise ValueError(f"ImplementationEvidence target_symbol_id '{evidence.target_symbol_id}' does not match TargetRelation '{target_rel.target_entity_id}'.")
+        if evidence.source_task_id != target_rel.task_id:
+            raise ValueError(f"ImplementationEvidence source_task_id '{evidence.source_task_id}' does not match TargetRelation task_id '{target_rel.task_id}'.")
+
+        # 3. Verify Repository Anchor Drift
+        if evidence.before_repository_state_hash == evidence.after_repository_state_hash:
+            raise ValueError("ImplementationEvidence before and after repository state hashes are identical (no observed delta).")
+
+        if world_model.repository_state_hash != evidence.after_repository_state_hash:
+            world_model.repository_state_hash = evidence.after_repository_state_hash
+
+        impl_rel = ImplementationRelation(
+            symbol_id=evidence.target_symbol_id,
+            task_id=evidence.source_task_id,
+            status=ImplementationStatus.IMPLEMENTED,
+            provenance=ProvenanceRecord(
+                truth_level=TruthLevel.OBSERVED,
+                source="AUTHORIZED_EXECUTION_ENGINE",
+                confidence=1.0,
+                evidence=f"ChangeSet mutation {evidence.mutation_op} verified by execution record {evidence.execution_record_id}"
+            ),
+            evidence=evidence
+        )
+
+        # Remove target relation and add implementation relation
+        world_model.relations = [r for r in world_model.relations if r != target_rel]
+        world_model.add_relation(impl_rel)
+        world_model.canonical_hash = world_model.compute_canonical_hash()
+        return impl_rel
+
+    @classmethod
+    def promote_to_verified(
+        cls,
+        world_model: EngineeringWorldModel,
+        impl_rel: ImplementationRelation,
+        evidence: VerificationEvidence
+    ) -> VerificationRelation:
+        """Promotes IMPLEMENTED ImplementationRelation -> VERIFIED backed by verified VerificationEvidence."""
+        if impl_rel.status not in [ImplementationStatus.IMPLEMENTED, ImplementationStatus.VERIFIED]:
+            raise ValueError(f"Cannot promote relation with status '{impl_rel.status.value}', expected IMPLEMENTED.")
+
+        # 1. Verify Evidence Hash Integrity
+        expected_hash = evidence.compute_evidence_hash()
+        if evidence.evidence_hash != expected_hash:
+            raise ValueError(f"VerificationEvidence hash mismatch: stored '{evidence.evidence_hash}' != recomputed '{expected_hash}'.")
+
+        # 2. Verify Execution Success
+        if evidence.execution_result != ExecutionResult.PASSED:
+            raise ValueError(f"Cannot verify implementation with non-passing execution result '{evidence.execution_result.value}'.")
+        if evidence.exit_code != 0:
+            raise ValueError(f"Cannot verify implementation with non-zero test exit code {evidence.exit_code}.")
+
+        # 3. Verify Referential Parity
+        if evidence.target_entity_id != impl_rel.symbol_id:
+            raise ValueError(f"VerificationEvidence target_entity_id '{evidence.target_entity_id}' does not match ImplementationRelation '{impl_rel.symbol_id}'.")
+
+        impl_rel.status = ImplementationStatus.VERIFIED
+        impl_rel.provenance = ProvenanceRecord(
+            truth_level=TruthLevel.OBSERVED,
+            source="TEST_RUNNER_RECEIPT",
+            confidence=1.0,
+            evidence=f"Verified by test '{evidence.test_entity_id}' (receipt hash {evidence.execution_receipt_hash[:8]})"
+        )
+
+        verif_rel = VerificationRelation(
+            test_entity_id=evidence.test_entity_id,
+            target_entity_id=evidence.target_entity_id,
+            verification_kind=VerificationKind.DIRECT_UNIT_TEST,
+            coverage_status=CoverageStatus.DYNAMICALLY_OBSERVED,
+            execution_status=ExecutionResult.PASSED,
+            provenance=ProvenanceRecord(
+                truth_level=TruthLevel.OBSERVED,
+                source="TEST_RUNNER_RECEIPT",
+                confidence=1.0,
+                evidence=f"Test executed with exit code 0 on repository state {evidence.repository_state_hash[:8]}"
+            ),
+            evidence=evidence
+        )
+
+        world_model.add_relation(verif_rel)
+        world_model.canonical_hash = world_model.compute_canonical_hash()
+        return verif_rel
