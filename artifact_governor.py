@@ -588,37 +588,72 @@ class ArtifactGovernor:
 
                     binding = comp_bindings[beh_id]
 
-                    # A. Component Identity Binding Verification
+                    # A. Canonical OperationClass Truth Verification (Cross-check against canonical BehaviorNode.behavior_type)
+                    canonical_op_class = (
+                        OperationClass.COMMAND_MUTATION if beh_node.behavior_type == BehaviorNodeType.COMMAND
+                        else OperationClass.READ_QUERY if beh_node.behavior_type == BehaviorNodeType.QUERY
+                        else OperationClass.EVENT_PROCESSING if beh_node.behavior_type == BehaviorNodeType.SIDE_EFFECT
+                        else OperationClass.STATE_TRANSITION if beh_node.behavior_type == BehaviorNodeType.STATE_TRANSITION
+                        else None
+                    )
+                    if canonical_op_class is None or binding.operation_class != canonical_op_class:
+                        reasons.append(
+                            f"Task {t.id} ({t.title}) tampered capability binding operation_class: binding claims '{binding.operation_class.value}', but canonical BehaviorNode '{beh_node.id}' dictates '{canonical_op_class.value if canonical_op_class else 'UNCLASSIFIED'}'."
+                        )
+
+                    # B. Canonical Target Entity Truth Verification (Cross-check against canonical BehaviorNode.target_entity_id)
+                    clean_binding_ent = (binding.target_entity or "").replace("entity_", "").replace("resource_", "").replace("wf_", "").lower()
+                    clean_beh_ent = (beh_node.target_entity_id or "").replace("entity_", "").replace("resource_", "").replace("wf_", "").lower()
+                    if clean_binding_ent != clean_beh_ent:
+                        reasons.append(
+                            f"Task {t.id} ({t.title}) tampered capability binding target entity: binding claims '{binding.target_entity}', but canonical BehaviorNode '{beh_node.id}' targets '{beh_node.target_entity_id}'."
+                        )
+
+                    # C. Canonical Requirement Lineage Truth Verification (Cross-check against RequirementGraph)
+                    canonical_req_ids = sorted([r.id for r in r_graph.nodes.values() if beh_node.id in getattr(r, "source_behaviors", [])])
+                    if sorted(binding.requirement_ids) != canonical_req_ids:
+                        reasons.append(
+                            f"Task {t.id} ({t.title}) tampered capability binding requirement lineage: binding claims {binding.requirement_ids}, but canonical RequirementGraph specifies {canonical_req_ids}."
+                        )
+
+                    # D. Binding Content Hash Integrity Verification
+                    if hasattr(binding, "compute_hash"):
+                        expected_hash = binding.compute_hash()
+                        if getattr(binding, "binding_hash", "") and binding.binding_hash != expected_hash:
+                            reasons.append(
+                                f"Task {t.id} ({t.title}) tampered capability binding hash: binding hash '{binding.binding_hash}' does not match computed digest '{expected_hash}'."
+                            )
+
+                    # E. Component Identity Binding Verification
                     if binding.lld_component_id != parent_comp.id:
                         reasons.append(
                             f"Task {t.id} ({t.title}) capability binding identity conflict: binding for behavior '{beh_id}' designates component '{binding.lld_component_id}', but task is mapped to '{parent_comp.id}'."
                         )
 
-                    # B. Allowed Component Type Contract Verification
+                    # F. Allowed Component Type Contract Verification
                     if parent_comp.component_type not in binding.allowed_component_types:
                         reasons.append(
                             f"Task {t.id} ({t.title}) semantic capability responsibility mismatch: operation class '{binding.operation_class.value}' for behavior '{beh_node.name}' does not permit component type '{parent_comp.component_type.value}' (allowed: {[ct.value for ct in binding.allowed_component_types]})."
                         )
 
-                    # C. Prohibited Component Role Contract Verification
+                    # G. Prohibited Component Role Contract Verification
                     if parent_comp.role in binding.prohibited_component_roles or (parent_comp.layout in ["read_only", "query_view"] and binding.operation_class == OperationClass.COMMAND_MUTATION):
                         reasons.append(
                             f"Task {t.id} ({t.title}) semantic capability mismatch: operation class '{binding.operation_class.value}' for behavior '{beh_node.name}' is prohibited on component role '{parent_comp.role}' / layout '{parent_comp.layout}'."
                         )
 
-                    # D. Target Entity Responsibility Contract Verification
+                    # H. Target Entity Ownership Responsibility Contract Verification
                     if parent_comp.owned_entities:
-                        clean_target_ent = (binding.target_entity or beh_node.target_entity_id).replace("entity_", "").replace("resource_", "").replace("wf_", "").lower()
                         comp_ents = [e.replace("entity_", "").replace("resource_", "").replace("wf_", "").lower() for e in parent_comp.owned_entities]
-                        if clean_target_ent not in comp_ents:
+                        if clean_binding_ent not in comp_ents:
                             reasons.append(
                                 f"Task {t.id} ({t.title}) semantic entity responsibility mismatch: task entity '{binding.target_entity or beh_node.target_entity_id}' is not owned by parent LLD '{parent_comp.id}' owned entities {parent_comp.owned_entities}."
                             )
 
-                    # E. HLD Capability Contract Verification
-                    if parent_comp.owned_capabilities and binding.hld_capability not in parent_comp.owned_capabilities:
+                    # I. Grounded HLD Capability Ownership Contract Verification
+                    if not binding.hld_capability or (parent_comp.owned_capabilities and binding.hld_capability not in parent_comp.owned_capabilities):
                         reasons.append(
-                            f"Task {t.id} ({t.title}) semantic HLD capability mismatch: binding capability '{binding.hld_capability}' is not owned by parent LLD '{parent_comp.id}' owned capabilities {parent_comp.owned_capabilities}."
+                            f"Task {t.id} ({t.title}) ungrounded HLD capability in binding: binding capability '{binding.hld_capability}' is missing or not owned by parent LLD '{parent_comp.id}' owned capabilities {parent_comp.owned_capabilities}."
                         )
 
         if reasons:

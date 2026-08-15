@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Set, Any, Optional, Tuple
 import json
+import hashlib
 
 from behavior_graph import BehaviorGraph, BehaviorNodeType, EpistemicStatus
 from requirement_ir import RequirementGraph, RequirementNode
@@ -67,6 +68,16 @@ class CapabilityBinding:
     lld_component_id: str
     allowed_component_types: List[LLDComponentType]
     prohibited_component_roles: List[str] = field(default_factory=list)
+    binding_hash: str = ""
+
+    def compute_hash(self) -> str:
+        req_str = ",".join(sorted(self.requirement_ids))
+        content = f"{self.behavior_id}|{req_str}|{self.operation_class.value}|{self.target_entity}|{self.hld_capability}|{self.lld_component_id}"
+        return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+    def __post_init__(self):
+        if not self.binding_hash:
+            self.binding_hash = self.compute_hash()
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -77,7 +88,8 @@ class CapabilityBinding:
             "hld_capability": self.hld_capability,
             "lld_component_id": self.lld_component_id,
             "allowed_component_types": [ct.value for ct in self.allowed_component_types],
-            "prohibited_component_roles": self.prohibited_component_roles
+            "prohibited_component_roles": self.prohibited_component_roles,
+            "binding_hash": self.binding_hash
         }
 
     @classmethod
@@ -90,7 +102,8 @@ class CapabilityBinding:
             hld_capability=data.get("hld_capability", ""),
             lld_component_id=data.get("lld_component_id", ""),
             allowed_component_types=[LLDComponentType(ct) for ct in data.get("allowed_component_types", [])],
-            prohibited_component_roles=list(data.get("prohibited_component_roles", []))
+            prohibited_component_roles=list(data.get("prohibited_component_roles", [])),
+            binding_hash=data.get("binding_hash", "")
         )
 
 
@@ -201,23 +214,29 @@ class LLDCompiler:
             if not b_node:
                 continue
 
-            op_class = (
-                OperationClass.COMMAND_MUTATION if b_node.behavior_type == BehaviorNodeType.COMMAND
-                else OperationClass.READ_QUERY if b_node.behavior_type == BehaviorNodeType.QUERY
-                else OperationClass.EVENT_PROCESSING if b_node.behavior_type == BehaviorNodeType.SIDE_EFFECT
-                else OperationClass.STATE_TRANSITION
-            )
+            if b_node.behavior_type == BehaviorNodeType.COMMAND:
+                op_class = OperationClass.COMMAND_MUTATION
+            elif b_node.behavior_type == BehaviorNodeType.QUERY:
+                op_class = OperationClass.READ_QUERY
+            elif b_node.behavior_type == BehaviorNodeType.SIDE_EFFECT:
+                op_class = OperationClass.EVENT_PROCESSING
+            elif b_node.behavior_type == BehaviorNodeType.STATE_TRANSITION:
+                op_class = OperationClass.STATE_TRANSITION
+            else:
+                # Unknown / unclassified BehaviorNodeType -> DO NOT default to STATE_TRANSITION! Skip to fail closed.
+                continue
 
             # Exact matching requirement IDs
-            matching_req_ids = [r.id for r in r_graph.nodes.values() if b_node.id in r.source_behaviors]
+            matching_req_ids = [r.id for r in r_graph.nodes.values() if b_node.id in getattr(r, "source_behaviors", [])]
 
-            # Exact HLD capability: must be an owned_capability from mod that matches requirement capability or behavior stem
-            req_caps = [r.capability for r in r_graph.nodes.values() if b_node.id in r.source_behaviors and r.capability in mod.owned_capabilities]
+            # Exact HLD capability: must be an owned_capability from mod that matches requirement capability or behavior stem.
+            # ZERO UNGROUNDED FALLBACKS (NO defaulting to mod.owned_capabilities[0] or b_node.id)!
+            req_caps = [r.capability for r in r_graph.nodes.values() if b_node.id in getattr(r, "source_behaviors", []) and r.capability in mod.owned_capabilities]
             if req_caps:
                 exact_hld_cap = req_caps[0]
             else:
                 matching_owned = [c for c in mod.owned_capabilities if c.lower() in b_node.name.lower() or b_node.id.lower() in c.lower()]
-                exact_hld_cap = matching_owned[0] if matching_owned else (mod.owned_capabilities[0] if mod.owned_capabilities else b_node.id)
+                exact_hld_cap = matching_owned[0] if matching_owned else ""
 
             # Precise allowed component types & prohibited roles per OperationClass
             if op_class == OperationClass.COMMAND_MUTATION:
