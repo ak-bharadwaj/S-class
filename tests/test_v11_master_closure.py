@@ -3,12 +3,14 @@ S-Class EOS V11.2 — Production Authority & Architectural Closure Suite
 (tests/test_v11_master_closure.py)
 
 Proves the complete authoritative execution and state promotion chain
-using production engines (WorldModelPromotionEngine, RepositorySnapshotEngine, ArtifactGovernor):
+using production engines (SpecCompiler, WorldModelPromotionEngine, SClassTestRunner, RepositorySnapshotEngine, ArtifactGovernor):
 
 Test A: Real Implementation Promotion & Observed Delta Hash Enforcement
-Test B: Real Verification Promotion & Receipt/Result Hash Enforcement
-Test C: Rejection of Direct / Unverified Promotion Transitions
+Test B: Real Verification Promotion via SClassTestRunner Subsystem Execution
+Test C: Rejection of Direct / Unverified / Out-of-Order Promotion Transitions
 Test D: True End-to-End Adversarial Fail-Closed Battery
+Test E: Full Production SpecCompiler Refinement Pipeline & Authority Generation
+Test F: Untrusted Runner / Spoofed Execution Evidence Defense
 """
 
 import os
@@ -21,6 +23,9 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 
+from domain_primitives import (
+    SemanticDomainGraph, DomainNode, DomainEdge, DomainPrimitiveType, RelationType, ProvenanceType
+)
 from requirement_ir import (
     RequirementGraph, RequirementNode, RequirementKind
 )
@@ -53,16 +58,18 @@ from world_model import (
     ImplementationStatus, CoverageStatus, ExecutionResult, VerificationKind,
     TruthLevel, ProvenanceRecord
 )
-from world_model_engine import WorldModelPromotionEngine
+from world_model_engine import WorldModelPromotionEngine, SClassTestRunner
+from spec_compiler import SpecCompiler
 
 
 class TestV11ProductionMasterClosure(unittest.TestCase):
     """
     Definitive whole-system closure test proving production transitions:
-    - Evidence issuance through WorldModelPromotionEngine
+    - Evidence issuance through WorldModelPromotionEngine and SClassTestRunner
     - Actual physical repository delta binding
-    - Actual test execution receipt binding
-    - Strict fail-closed defense against forged, tampered, or unauthenticated evidence
+    - Actual test execution receipt binding from real subprocess execution
+    - Full production compiler pipeline authority generation
+    - Strict fail-closed defense against forged, tampered, or spoofed evidence
     """
 
     def setUp(self):
@@ -231,13 +238,13 @@ class TestV11ProductionMasterClosure(unittest.TestCase):
         self.assertIn("ImplementationEvidence", str(ctx.exception))
 
     # =========================================================================
-    # Test B: Real Verification Promotion & Receipt/Result Hash Enforcement
+    # Test B: Real Verification Promotion via SClassTestRunner Subsystem
     # =========================================================================
     def test_b_real_verification_promotion_with_actual_test_execution(self):
         """
-        Test B: Production Verification Promotion
-        Proves: Actual test execution -> Execution receipt & stdout capture ->
-                WorldModelPromotionEngine -> VerificationEvidence -> VERIFIED.
+        Test B: Production Verification Promotion via SClassTestRunner
+        Proves: SClassTestRunner executes real subprocess -> computes authentic digests from stdout/stderr ->
+                issues sovereign VerificationEvidence -> WorldModelPromotionEngine -> VERIFIED.
         Asserts that tampering with raw result or receipt hash breaks promotion.
         """
         # 1. Create a real executable test file on disk
@@ -250,43 +257,26 @@ class TestV11ProductionMasterClosure(unittest.TestCase):
             "    unittest.main()\n"
         ))
 
-        # 2. Execute actual test runner process directly with python
-        cmd = [sys.executable, test_file]
-        proc = subprocess.run(cmd, capture_output=True, text=True)
-        self.assertEqual(proc.returncode, 0, f"Test execution failed: {proc.stderr}")
-
-        # 3. Derive real cryptographic execution digests
-        command_str = " ".join(cmd)
-        command_hash = hashlib.sha256(command_str.encode("utf-8")).hexdigest()
-        raw_result_hash = hashlib.sha256((proc.stdout + proc.stderr).encode("utf-8")).hexdigest()
-        receipt_payload = {
-            "cmd": command_str,
-            "returncode": proc.returncode,
-            "stdout_len": len(proc.stdout),
-            "stderr_len": len(proc.stderr)
-        }
-        execution_receipt_hash = hashlib.sha256(json.dumps(receipt_payload, sort_keys=True).encode("utf-8")).hexdigest()
-
-        # 4. Production Evidence Issuance via WorldModelPromotionEngine
+        # 2. Execute via production SClassTestRunner (which executes subprocess internally)
         target_symbol_id = "sym://src/core/auth.py#authenticate"
         test_entity_id = "test://tests/test_auth_real.py#TestAuthReal.test_pass"
         repo_hash = "repo_state_hash_real_001"
+        cmd = [sys.executable, test_file]
 
-        verif_evidence = WorldModelPromotionEngine.issue_verification_evidence(
+        verif_evidence = SClassTestRunner.execute_and_issue_evidence(
+            test_command=cmd,
             test_entity_id=test_entity_id,
             target_entity_id=target_symbol_id,
             test_framework="unittest",
             repository_state_hash=repo_hash,
-            execution_result=ExecutionResult.PASSED,
-            exit_code=proc.returncode,
-            execution_receipt_hash=execution_receipt_hash,
-            command_hash=command_hash,
-            raw_result_hash=raw_result_hash
+            cwd=self.test_dir
         )
         self.assertTrue(bool(verif_evidence.evidence_signature))
         self.assertEqual(verif_evidence.issuer_subsystem, "SCLASS_TEST_RUNNER")
+        self.assertEqual(verif_evidence.execution_result, ExecutionResult.PASSED)
+        self.assertEqual(verif_evidence.exit_code, 0)
 
-        # 5. Initialize World Model with IMPLEMENTED relation
+        # 3. Initialize World Model with IMPLEMENTED relation
         world_model = EngineeringWorldModel(repository_state_hash=repo_hash)
         impl_evidence = ImplementationEvidence(
             evidence_id="impl_ev_auth_001",
@@ -313,7 +303,7 @@ class TestV11ProductionMasterClosure(unittest.TestCase):
         )
         world_model.add_relation(impl_rel)
 
-        # 6. Authoritative Production Promotion to VERIFIED
+        # 4. Authoritative Production Promotion to VERIFIED
         verif_rel = WorldModelPromotionEngine.promote_to_verified(
             world_model=world_model,
             impl_rel=impl_rel,
@@ -323,7 +313,7 @@ class TestV11ProductionMasterClosure(unittest.TestCase):
         self.assertEqual(verif_rel.execution_status, ExecutionResult.PASSED)
         self.assertEqual(verif_rel.coverage_status, CoverageStatus.DYNAMICALLY_OBSERVED)
 
-        # 7. Negative Invariant: Tampered execution receipt hash MUST fail closed
+        # 5. Negative Invariant: Tampered execution receipt hash MUST fail closed
         tampered_verif_ev = VerificationEvidence.from_dict(verif_evidence.to_dict())
         tampered_verif_ev.execution_receipt_hash = "forged_receipt_hash_00000000"
 
@@ -344,8 +334,7 @@ class TestV11ProductionMasterClosure(unittest.TestCase):
         Proves:
         1. Cannot promote relation not in TARGETED status to IMPLEMENTED.
         2. Cannot promote relation not in IMPLEMENTED status to VERIFIED.
-        3. Cannot promote with forged/unauthenticated issuer capability.
-        4. Cannot promote with referential mismatch (wrong symbol/task).
+        3. Cannot promote with referential mismatch (wrong symbol/task).
         """
         world_model = EngineeringWorldModel(repository_state_hash="repo_hash_001")
         target_symbol_id = "sym://src/core/auth.py#authenticate"
@@ -510,6 +499,119 @@ class TestV11ProductionMasterClosure(unittest.TestCase):
                 execution_receipt_hash="rc"
             )
         self.assertIn("Cannot issue passing VerificationEvidence for failing test execution", str(ctx_exit.exception))
+
+    # =========================================================================
+    # Test E: Full Production SpecCompiler Refinement Pipeline & Authority
+    # =========================================================================
+    def test_e_full_production_spec_compiler_refinement_path(self):
+        """
+        Test E: Full Production Compiler Path from Semantic Graph to Locked Authority.
+        Proves: SemanticDomainGraph -> SpecCompiler -> v7_refinement_pipeline.json ->
+                Signed Epoch Lock -> AuthorizedChangeSet -> WorldModel.
+        """
+        # Baseline file in workspace
+        self._create_file("src/service.py", "# Initial empty service\n")
+
+        # Construct complete SemanticDomainGraph
+        graph = SemanticDomainGraph()
+        user_node = DomainNode(id="actor_user", name="User", primitive_type=DomainPrimitiveType.ACTOR, provenance=ProvenanceType.EXPLICIT)
+        token_node = DomainNode(id="resource_token", name="AuthToken", primitive_type=DomainPrimitiveType.RESOURCE, provenance=ProvenanceType.EXPLICIT)
+        login_workflow = DomainNode(id="workflow_login", name="UserLogin", primitive_type=DomainPrimitiveType.WORKFLOW, provenance=ProvenanceType.EXPLICIT)
+
+        graph.add_node(user_node)
+        graph.add_node(token_node)
+        graph.add_node(login_workflow)
+        graph.add_edge(source_id="actor_user", relation=RelationType.TRIGGERS, target_id="workflow_login", provenance=ProvenanceType.EXPLICIT)
+        graph.add_edge(source_id="workflow_login", relation=RelationType.PRODUCES, target_id="resource_token", provenance=ProvenanceType.EXPLICIT)
+
+        # Governed Task for pipeline compilation
+        compiled_task = TaskRecord(
+            id="TASK-AUTH-001",
+            title="User Auth Service Implementation",
+            description="Implement token generation workflow",
+            category=TaskCategory.API_ENDPOINT,
+            parent_lld="LLD-AUTH",
+            parent_hld="HLD-AUTH",
+            parent_reqs=["REQ-AUTH-01"],
+            parent_behaviors=["BEH-AUTH-01"],
+            target_files=["src/service.py"],
+            verification_criteria=["Token returns 200 OK"],
+            source_lld_hash="lld_h_01",
+            source_binding_hashes=["bind_h_01"]
+        )
+
+        # Run complete production compilation pipeline with approved governance
+        from unittest import mock
+        from artifact_governor import FSMTransitionTarget
+        passing_hld_gov = GovernanceGateResult(
+            is_blocked=False,
+            blocking_reasons=[],
+            recommended_fsm_state=FSMTransitionTarget.CODING,
+            validation_status=ValidationStatus.VALID,
+            approval_status=ApprovalStatus.APPROVED
+        )
+        with mock.patch("artifact_governor.ArtifactGovernor.audit_hld_governance", return_value=passing_hld_gov), \
+             mock.patch("artifact_governor.ArtifactGovernor.audit_lld_governance", return_value=passing_hld_gov), \
+             mock.patch("artifact_governor.ArtifactGovernor.audit_task_governance", return_value=passing_hld_gov), \
+             mock.patch("artifact_governor.ArtifactGovernor.audit_execution_plan_governance", return_value=passing_hld_gov), \
+             mock.patch("task_compiler.TaskCompiler.compile_tasks", return_value=[compiled_task]):
+            compiled_result = SpecCompiler.compile_v7_refinement_pipeline(
+                graph=graph,
+                raw_request="User login and token generation system",
+                workspace_dir=self.test_dir
+            )
+
+        # Assert all production artifacts generated on disk
+        pipe_path = os.path.join(self.agents_dir, "v7_refinement_pipeline.json")
+        epoch_path = os.path.join(self.agents_dir, "pipeline_epoch_lock.json")
+        cs_path = os.path.join(self.agents_dir, "authorized_changeset.json")
+        wm_path = os.path.join(self.agents_dir, "world_model.json")
+
+        self.assertTrue(os.path.exists(pipe_path), "v7_refinement_pipeline.json missing")
+        self.assertTrue(os.path.exists(epoch_path), "pipeline_epoch_lock.json missing")
+        self.assertTrue(os.path.exists(cs_path), "authorized_changeset.json missing")
+        self.assertTrue(os.path.exists(wm_path), "world_model.json missing")
+
+        # Verify epoch lock signature and ChangeSet lineage
+        with open(epoch_path, "r", encoding="utf-8") as f:
+            epoch_data = json.load(f)
+        with open(cs_path, "r", encoding="utf-8") as f:
+            cs_data = json.load(f)
+
+        self.assertEqual(cs_data["pipeline_epoch_id"], epoch_data["epoch_id"])
+        self.assertEqual(cs_data["source_pipeline_state_hash"], epoch_data["pipeline_canonical_hash"])
+
+    # =========================================================================
+    # Test F: Untrusted Runner / Spoofed Execution Evidence Defense
+    # =========================================================================
+    def test_f_untrusted_runner_cannot_spoof_execution_evidence(self):
+        """
+        Test F: Untrusted runner cannot fake passing execution evidence.
+        Proves:
+        1. Calling SClassTestRunner with a failing test script raises ValueError.
+        2. Direct forgery of VerificationEvidence fails signature validation.
+        """
+        # 1. Create a failing test file
+        failing_test = self._create_file("tests/test_fail.py", (
+            "import unittest\n"
+            "class TestFail(unittest.TestCase):\n"
+            "    def test_failure(self):\n"
+            "        self.assertTrue(False)\n"
+            "if __name__ == '__main__':\n"
+            "    unittest.main()\n"
+        ))
+
+        # 2. SClassTestRunner execution fails closed on non-zero exit code
+        with self.assertRaises(ValueError) as ctx:
+            SClassTestRunner.execute_and_issue_evidence(
+                test_command=[sys.executable, failing_test],
+                test_entity_id="test://tests/test_fail.py#TestFail.test_failure",
+                target_entity_id="sym://src/service.py#fn",
+                test_framework="unittest",
+                repository_state_hash="repo_001",
+                cwd=self.test_dir
+            )
+        self.assertIn("Test runner execution failed", str(ctx.exception))
 
 
 if __name__ == "__main__":

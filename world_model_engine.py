@@ -1138,6 +1138,49 @@ class WorldModelPromotionEngine:
         return evidence
 
     @classmethod
+    def execute_test_and_issue_evidence(
+        cls,
+        test_command: List[str],
+        test_entity_id: str,
+        target_entity_id: str,
+        test_framework: str,
+        repository_state_hash: str,
+        cwd: Optional[str] = None
+    ) -> VerificationEvidence:
+        """
+        Securely executes a real test process in a subprocess, computes authentic cryptographic
+        hashes from actual execution stdout/stderr/exit_code, and issues a sovereign VerificationEvidence.
+        Unauthenticated callers cannot forge receipt or result hashes.
+        """
+        import subprocess
+        proc = subprocess.run(test_command, cwd=cwd, capture_output=True, text=True)
+        if proc.returncode != 0:
+            raise ValueError(f"Test runner execution failed (exit_code={proc.returncode}): {proc.stderr}")
+
+        command_str = " ".join(test_command)
+        command_hash = hashlib.sha256(command_str.encode("utf-8")).hexdigest()
+        raw_result_hash = hashlib.sha256((proc.stdout + proc.stderr).encode("utf-8")).hexdigest()
+        receipt_payload = {
+            "cmd": command_str,
+            "returncode": proc.returncode,
+            "stdout_len": len(proc.stdout),
+            "stderr_len": len(proc.stderr)
+        }
+        execution_receipt_hash = hashlib.sha256(json.dumps(receipt_payload, sort_keys=True).encode("utf-8")).hexdigest()
+
+        return cls.issue_verification_evidence(
+            test_entity_id=test_entity_id,
+            target_entity_id=target_entity_id,
+            test_framework=test_framework,
+            repository_state_hash=repository_state_hash,
+            execution_result=ExecutionResult.PASSED,
+            exit_code=proc.returncode,
+            execution_receipt_hash=execution_receipt_hash,
+            command_hash=command_hash,
+            raw_result_hash=raw_result_hash
+        )
+
+    @classmethod
     def promote_target_to_implemented(
         cls,
         world_model: EngineeringWorldModel,
@@ -1259,3 +1302,8 @@ class WorldModelPromotionEngine:
         world_model.add_relation(verif_rel)
         world_model.canonical_hash = world_model.compute_canonical_hash()
         return verif_rel
+
+
+class SClassTestRunner:
+    """Production test execution subsystem holding sovereign test runner capabilities."""
+    execute_and_issue_evidence = WorldModelPromotionEngine.execute_test_and_issue_evidence
