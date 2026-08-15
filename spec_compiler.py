@@ -747,6 +747,27 @@ class SpecificationCompiler:
             "blocked": final_blocked,
             "target_fsm_state": recommended_target
         }
+
+        # V11.2 Engineering World Model Construction & Governance
+        world_model = None
+        world_model_gov = None
+        if workspace_dir and repo_snapshot:
+            from world_model_engine import WorldModelEngine
+            world_model = WorldModelEngine.build_world_model(
+                workspace_dir,
+                snapshot=repo_snapshot,
+                pipeline_data=res_dict
+            )
+            world_model_gov = ArtifactGovernor.audit_world_model_governance(world_model, workspace_dir=workspace_dir)
+            wm_path = os.path.join(workspace_dir, ".agents", "world_model.json")
+            WorldModelEngine.save_world_model(world_model, wm_path)
+
+            res_dict["world_model"] = world_model.to_dict()
+            res_dict["world_model_governance"] = world_model_gov.to_dict()
+
+            if world_model_gov.is_blocked:
+                res_dict["blocked"] = True
+
         if workspace_dir:
             cls.save_versioned_pipeline_artifact(res_dict, workspace_dir)
             if execution_plan:
@@ -794,6 +815,8 @@ class SpecificationCompiler:
                 "task_governance": res_pipe.get("task_governance", {}),
                 "planning_snapshot": res_pipe.get("planning_snapshot"),
                 "authorized_changeset": res_pipe.get("authorized_changeset"),
+                "world_model": res_pipe.get("world_model"),
+                "world_model_governance": res_pipe.get("world_model_governance", {}),
                 "repository_snapshot": res_pipe.get("repository_snapshot"),
                 "repository_snapshot_governance": res_pipe.get("repository_snapshot_governance", {}),
                 "blocked": res_pipe.get("blocked", False)

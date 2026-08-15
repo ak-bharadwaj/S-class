@@ -1322,6 +1322,90 @@ class ArtifactGovernor:
         )
 
     @classmethod
+    def audit_world_model_governance(
+        cls,
+        world_model: Any,
+        workspace_dir: Optional[str] = None
+    ) -> GovernanceGateResult:
+        """
+        Audits Engineering World Model structural consistency, referential integrity,
+        Merkle canonical hash validity, and alignment with repository files.
+        """
+        from world_model import (
+            EngineeringWorldModel,
+            ModuleEntity,
+            SymbolEntity,
+            APIEntity,
+            TestEntity,
+            DependencyRelation,
+            OwnershipRelation,
+            ImplementationRelation,
+            VerificationRelation
+        )
+
+        reasons: List[str] = []
+
+        # 1. Merkle Canonical Hash Verification
+        recomputed = world_model.compute_canonical_hash()
+        if world_model.canonical_hash != recomputed:
+            reasons.append(
+                f"WORLD_MODEL_INTEGRITY_VIOLATION: canonical_hash '{world_model.canonical_hash[:8]}' "
+                f"does not match recomputed hash '{recomputed[:8]}'."
+            )
+
+        # 2. Referential Integrity Check
+        entity_ids = set(world_model.entities.keys())
+
+        for rel in world_model.relations:
+            if isinstance(rel, OwnershipRelation):
+                if rel.entity_id not in entity_ids:
+                    reasons.append(
+                        f"ORPHAN_OWNERSHIP_RELATION: target entity '{rel.entity_id}' not found in world model entities."
+                    )
+            elif isinstance(rel, ImplementationRelation):
+                if rel.symbol_id not in entity_ids:
+                    reasons.append(
+                        f"ORPHAN_IMPLEMENTATION_RELATION: symbol '{rel.symbol_id}' not found in world model entities."
+                    )
+            elif isinstance(rel, VerificationRelation):
+                if rel.test_entity_id not in entity_ids:
+                    reasons.append(
+                        f"ORPHAN_VERIFICATION_RELATION: test entity '{rel.test_entity_id}' not found in world model entities."
+                    )
+                if rel.target_entity_id not in entity_ids:
+                    reasons.append(
+                        f"ORPHAN_VERIFICATION_RELATION: target entity '{rel.target_entity_id}' not found in world model entities."
+                    )
+
+        # 3. File System / Snapshot Boundary Alignment
+        if workspace_dir:
+            from repository_snapshot import RepositorySnapshotEngine
+            snapshot = RepositorySnapshotEngine.capture_snapshot(workspace_dir)
+            if world_model.repository_state_hash and world_model.repository_state_hash != snapshot.repository_state_hash:
+                reasons.append(
+                    f"WORLD_MODEL_SNAPSHOT_DRIFT: world model repository_state_hash "
+                    f"'{world_model.repository_state_hash[:8]}' differs from live workspace state "
+                    f"'{snapshot.repository_state_hash[:8]}'."
+                )
+
+        if reasons:
+            return GovernanceGateResult(
+                is_blocked=True,
+                blocking_reasons=reasons,
+                recommended_fsm_state=FSMTransitionTarget.CODING,
+                validation_status=ValidationStatus.BLOCKED,
+                approval_status=ApprovalStatus.REJECTED
+            )
+
+        return GovernanceGateResult(
+            is_blocked=False,
+            blocking_reasons=[],
+            recommended_fsm_state=FSMTransitionTarget.QA,
+            validation_status=ValidationStatus.VALID,
+            approval_status=ApprovalStatus.APPROVED
+        )
+
+    @classmethod
     def enforce_fsm_transition(
         cls,
         current_phase: str,
