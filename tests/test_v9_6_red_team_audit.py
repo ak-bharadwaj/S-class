@@ -69,6 +69,7 @@ from lld_compiler import (
     InteractionTransport,
     OperationClass,
     UIInteractionCapability,
+    ComponentExecutionCapability,
     CapabilityBinding
 )
 from task_compiler import (
@@ -1130,7 +1131,8 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
 
         for required_key in [
             "behavior_id", "lld_component_id", "operation_class", "target_entity",
-            "hld_capability", "allowed_component_types", "source_behavior_hash",
+            "hld_capability", "requirement_ids", "allowed_component_types",
+            "prohibited_component_roles", "source_behavior_hash",
             "source_requirement_hash", "source_hld_hash", "source_behavior_graph_version",
             "source_requirement_graph_version", "source_hld_module_id",
             "source_hld_version", "binding_hash"
@@ -1139,6 +1141,55 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             incomplete_dict.pop(required_key)
             with self.assertRaises(ValueError, msg=f"Strict CapabilityBinding deserialization MUST reject missing '{required_key}'"):
                 CapabilityBinding.from_governed_dict(incomplete_dict)
+
+        # 43b. LLDComponent.from_governed_dict Strict Mode & Ontology Invariant Verification
+        valid_ui_dict = {
+            "id": "ui_001",
+            "name": "Fleet Dispatch UI",
+            "component_type": "ui_surface",
+            "parent": {"hld_id": "HLD-001", "req_ids": ["REQ-001"], "behavior_ids": ["cmd_dispatch"]},
+            "role": "frontend_interface",
+            "transport": "rest_http",
+            "layout": "form_modal",
+            "interaction_capability": "SUBMITS_MUTATION",
+            "capability_bindings": [base_valid_dict]
+        }
+        self.assertIsInstance(LLDComponent.from_governed_dict(valid_ui_dict), LLDComponent)
+
+        # Missing interaction_capability on UI_SURFACE -> Reject
+        invalid_ui_dict = dict(valid_ui_dict)
+        invalid_ui_dict.pop("interaction_capability")
+        with self.assertRaises(ValueError, msg="LLDComponent.from_governed_dict MUST reject UI_SURFACE missing interaction_capability"):
+            LLDComponent.from_governed_dict(invalid_ui_dict)
+
+        # Missing execution_capability on backend SERVICE -> Reject
+        invalid_svc_dict = {
+            "id": "svc_001",
+            "name": "Fleet Dispatch Service",
+            "component_type": "service",
+            "parent": {"hld_id": "HLD-001", "req_ids": ["REQ-001"], "behavior_ids": ["cmd_dispatch"]},
+            "role": "domain_service",
+            "transport": "internal_function",
+            "layout": "standard_view",
+            # Missing execution_capability!
+            "capability_bindings": [base_valid_dict]
+        }
+        with self.assertRaises(ValueError, msg="LLDComponent.from_governed_dict MUST reject service missing execution_capability"):
+            LLDComponent.from_governed_dict(invalid_svc_dict)
+
+        # 43c. LLD Component Canonical Hash Tampering Detection
+        tampered_hash_comp = LLDComponent(
+            id=vehicle_comp.id, name="Fleet Dispatch Action Modal",
+            component_type=LLDComponentType.UI_SURFACE,
+            parent=vehicle_comp.parent, role="frontend_interface", layout="form_modal",
+            interaction_capability=UIInteractionCapability.SUBMITS_MUTATION,
+            owned_entities=list(vehicle_comp.owned_entities), owned_capabilities=list(vehicle_comp.owned_capabilities),
+            capability_bindings=[valid_binding],
+            component_hash="corrupted_sha256_component_hash"
+        )
+        gov_res_tampered_comp = ArtifactGovernor.audit_task_governance([vehicle_task], r_graph_multi, [tampered_hash_comp], b_graph_multi, hld_modules=hld_multi.modules)
+        self.assertTrue(gov_res_tampered_comp.is_blocked, "ArtifactGovernor MUST block task when LLD component hash mismatches canonical digest!")
+        self.assertTrue(any("canonical content hash mismatch" in r for r in gov_res_tampered_comp.blocking_reasons))
 
         # 44. Negative Attack Vector 39: Strict Positive Integer Graph Version Validation (Reject Non-Positive / Boolean / Missing in Strict Mode)
         with self.assertRaises(ValueError):

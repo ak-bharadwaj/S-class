@@ -739,6 +739,15 @@ class ArtifactGovernor:
                             f"Task {t.id} ({t.title}) capability binding identity conflict: binding for behavior '{beh_id}' designates component '{binding.lld_component_id}', but task is mapped to '{parent_comp.id}'."
                         )
 
+                    # G0. Canonical LLD Component Hash Integrity Verification
+                    if hasattr(parent_comp, "compute_canonical_hash"):
+                        expected_comp_hash = parent_comp.compute_canonical_hash()
+                        actual_comp_hash = getattr(parent_comp, "component_hash", "")
+                        if actual_comp_hash and actual_comp_hash != expected_comp_hash:
+                            reasons.append(
+                                f"Task {t.id} ({t.title}) LLD component '{parent_comp.id}' canonical content hash mismatch (actual: {actual_comp_hash[:8]}, computed: {expected_comp_hash[:8]})!"
+                            )
+
                     # G. Allowed Component Type Contract Verification
                     if parent_comp.component_type not in binding.allowed_component_types:
                         reasons.append(

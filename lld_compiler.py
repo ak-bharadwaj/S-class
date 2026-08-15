@@ -66,6 +66,16 @@ class UIInteractionCapability(str, Enum):
     TRIGGERS_WORKFLOW = "TRIGGERS_WORKFLOW"
 
 
+class ComponentExecutionCapability(str, Enum):
+    """Explicit semantic execution capability for backend/service/worker components."""
+    READ = "READ"
+    MUTATE = "MUTATE"
+    PROCESS_EVENT = "PROCESS_EVENT"
+    TRANSITION_STATE = "TRANSITION_STATE"
+    APPROVE = "APPROVE"
+    TRIGGER_WORKFLOW = "TRIGGER_WORKFLOW"
+
+
 @dataclass
 class CapabilityBinding:
     """Formal binding between Behavior, Requirement, and LLD Component capability responsibility."""
@@ -138,17 +148,24 @@ class CapabilityBinding:
         if strict:
             mandatory_fields = [
                 "behavior_id", "lld_component_id", "operation_class", "target_entity",
-                "hld_capability", "allowed_component_types", "source_behavior_hash",
+                "hld_capability", "requirement_ids", "allowed_component_types",
+                "prohibited_component_roles", "source_behavior_hash",
                 "source_requirement_hash", "source_hld_hash", "source_behavior_graph_version",
                 "source_requirement_graph_version", "source_hld_module_id",
                 "source_hld_version", "binding_hash"
             ]
             for field_name in mandatory_fields:
-                val = data.get(field_name)
-                if val is None or (isinstance(val, str) and not val.strip()):
-                    raise ValueError(f"Missing or empty mandatory governed field '{field_name}' in CapabilityBinding serialized data")
+                if field_name not in data:
+                    raise ValueError(f"Missing mandatory governed field '{field_name}' in CapabilityBinding serialized data")
+                val = data[field_name]
+                if val is None:
+                    raise ValueError(f"Field '{field_name}' cannot be None in CapabilityBinding serialized data")
+                if isinstance(val, str) and not val.strip():
+                    raise ValueError(f"Field '{field_name}' cannot be empty string in CapabilityBinding serialized data")
                 if field_name == "allowed_component_types" and (not isinstance(val, (list, tuple)) or len(val) == 0):
-                    raise ValueError("Missing or empty mandatory 'allowed_component_types' list in CapabilityBinding serialized data")
+                    raise ValueError("Field 'allowed_component_types' must be a non-empty list in CapabilityBinding serialized data")
+                if field_name in ["requirement_ids", "prohibited_component_roles"] and not isinstance(val, (list, tuple)):
+                    raise ValueError(f"Field '{field_name}' must be a list in CapabilityBinding serialized data")
                 if field_name == "source_hld_version" and (not isinstance(val, int) or isinstance(val, bool) or int(val) <= 0):
                     raise ValueError(f"Field 'source_hld_version' must be a positive integer in CapabilityBinding, got {val}")
 
@@ -195,11 +212,23 @@ class LLDParentRef:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'LLDParentRef':
+    def from_governed_dict(cls, data: Dict[str, Any]) -> 'LLDParentRef':
+        """Dedicated strict ingestion API for governed parent references."""
+        return cls.from_dict(data, strict=True)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any], strict: bool = False) -> 'LLDParentRef':
+        if strict:
+            if "hld_id" not in data or not data["hld_id"]:
+                raise ValueError("Missing mandatory 'hld_id' in LLDParentRef serialized data")
+            if "req_ids" not in data or not isinstance(data["req_ids"], list):
+                raise ValueError("Missing mandatory 'req_ids' list in LLDParentRef serialized data")
+            if "behavior_ids" not in data or not isinstance(data["behavior_ids"], list):
+                raise ValueError("Missing mandatory 'behavior_ids' list in LLDParentRef serialized data")
         return cls(
             hld_id=data.get("hld_id", "HLD-001"),
-            req_ids=data.get("req_ids", []),
-            behavior_ids=data.get("behavior_ids", [])
+            req_ids=list(data.get("req_ids", [])),
+            behavior_ids=list(data.get("behavior_ids", []))
         )
 
 
@@ -214,7 +243,8 @@ class LLDComponent:
     transport: InteractionTransport = InteractionTransport.REST_HTTP
     route: Optional[str] = None
     layout: str = "standard_view"
-    interaction_capability: UIInteractionCapability = UIInteractionCapability.DISPLAYS_DATA
+    execution_capability: Optional[ComponentExecutionCapability] = None
+    interaction_capability: Optional[UIInteractionCapability] = None
     sub_components: List[str] = field(default_factory=list)
     api_endpoints: List[str] = field(default_factory=list)
     validation_rules: List[str] = field(default_factory=list)
@@ -223,6 +253,28 @@ class LLDComponent:
     owned_entities: List[str] = field(default_factory=list)
     owned_capabilities: List[str] = field(default_factory=list)
     capability_bindings: List[CapabilityBinding] = field(default_factory=list)
+    component_hash: str = ""
+
+    def compute_canonical_hash(self) -> str:
+        """Computes deterministic SHA-256 hash over all component semantic fields, capabilities, and binding digests."""
+        payload = {
+            "id": self.id,
+            "name": self.name,
+            "component_type": self.component_type.value,
+            "parent": self.parent.to_dict(),
+            "role": self.role,
+            "transport": self.transport.value,
+            "route": self.route,
+            "layout": self.layout,
+            "execution_capability": self.execution_capability.value if self.execution_capability else "",
+            "interaction_capability": self.interaction_capability.value if self.interaction_capability else "",
+            "allowed_operation_classes": sorted([oc.value for oc in self.allowed_operation_classes]),
+            "owned_entities": sorted(self.owned_entities),
+            "owned_capabilities": sorted(self.owned_capabilities),
+            "binding_hashes": sorted([cb.binding_hash for cb in self.capability_bindings])
+        }
+        canonical_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -234,7 +286,8 @@ class LLDComponent:
             "transport": self.transport.value,
             "route": self.route,
             "layout": self.layout,
-            "interaction_capability": self.interaction_capability.value,
+            "execution_capability": self.execution_capability.value if self.execution_capability else None,
+            "interaction_capability": self.interaction_capability.value if self.interaction_capability else None,
             "sub_components": self.sub_components,
             "api_endpoints": self.api_endpoints,
             "validation_rules": self.validation_rules,
@@ -242,21 +295,66 @@ class LLDComponent:
             "allowed_operation_classes": [oc.value for oc in self.allowed_operation_classes],
             "owned_entities": self.owned_entities,
             "owned_capabilities": self.owned_capabilities,
-            "capability_bindings": [cb.to_dict() for cb in self.capability_bindings]
+            "capability_bindings": [cb.to_dict() for cb in self.capability_bindings],
+            "component_hash": self.component_hash or self.compute_canonical_hash()
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'LLDComponent':
-        return cls(
+    def from_governed_dict(cls, data: Dict[str, Any]) -> 'LLDComponent':
+        """Dedicated strict ingestion API for governed LLD components."""
+        return cls.from_dict(data, strict=True)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any], strict: bool = False) -> 'LLDComponent':
+        if strict:
+            mandatory = ["id", "name", "component_type", "parent", "role", "transport", "layout"]
+            for m in mandatory:
+                if m not in data or not data[m]:
+                    raise ValueError(f"Missing mandatory governed field '{m}' in LLDComponent serialized data")
+
+            comp_type_raw = data["component_type"]
+            try:
+                c_type = LLDComponentType(comp_type_raw)
+            except (ValueError, KeyError):
+                raise ValueError(f"Invalid 'component_type' '{comp_type_raw}' in LLDComponent")
+
+            if c_type == LLDComponentType.UI_SURFACE:
+                if "interaction_capability" not in data or not data["interaction_capability"]:
+                    raise ValueError("Missing mandatory 'interaction_capability' on UI_SURFACE LLDComponent in strict mode")
+                try:
+                    ui_cap = UIInteractionCapability(data["interaction_capability"])
+                except (ValueError, KeyError):
+                    raise ValueError(f"Invalid 'interaction_capability' '{data.get('interaction_capability')}' on UI_SURFACE")
+                exec_cap = None
+            else:
+                if "execution_capability" not in data or not data["execution_capability"]:
+                    raise ValueError(f"Missing mandatory 'execution_capability' on {c_type.value} LLDComponent in strict mode")
+                try:
+                    exec_cap = ComponentExecutionCapability(data["execution_capability"])
+                except (ValueError, KeyError):
+                    raise ValueError(f"Invalid 'execution_capability' '{data.get('execution_capability')}' on {c_type.value}")
+                ui_cap = None
+        else:
+            c_type = LLDComponentType(data["component_type"])
+            ui_cap = UIInteractionCapability(data["interaction_capability"]) if data.get("interaction_capability") else None
+            exec_cap = ComponentExecutionCapability(data["execution_capability"]) if data.get("execution_capability") else None
+
+        p_raw = data.get("parent", {})
+        parent_obj = LLDParentRef.from_dict(p_raw, strict=strict) if isinstance(p_raw, dict) else (p_raw if isinstance(p_raw, LLDParentRef) else LLDParentRef(hld_id="HLD-001", req_ids=[], behavior_ids=[]))
+
+        bindings = [CapabilityBinding.from_dict(cb, strict=strict) if isinstance(cb, dict) else cb for cb in data.get("capability_bindings", [])]
+
+        comp = cls(
             id=data["id"],
             name=data["name"],
-            component_type=LLDComponentType(data["component_type"]),
-            parent=LLDParentRef.from_dict(data["parent"]) if isinstance(data.get("parent"), dict) else data["parent"],
+            component_type=c_type,
+            parent=parent_obj,
             role=data.get("role", "component"),
             transport=InteractionTransport(data.get("transport", InteractionTransport.REST_HTTP.value)),
             route=data.get("route"),
             layout=data.get("layout", "standard_view"),
-            interaction_capability=UIInteractionCapability(data.get("interaction_capability", UIInteractionCapability.DISPLAYS_DATA.value)),
+            execution_capability=exec_cap,
+            interaction_capability=ui_cap,
             sub_components=list(data.get("sub_components", [])),
             api_endpoints=list(data.get("api_endpoints", [])),
             validation_rules=list(data.get("validation_rules", [])),
@@ -264,8 +362,12 @@ class LLDComponent:
             allowed_operation_classes=[OperationClass(oc) for oc in data.get("allowed_operation_classes", [])],
             owned_entities=list(data.get("owned_entities", [])),
             owned_capabilities=list(data.get("owned_capabilities", [])),
-            capability_bindings=[CapabilityBinding.from_dict(cb) for cb in data.get("capability_bindings", [])]
+            capability_bindings=bindings,
+            component_hash=data.get("component_hash", "")
         )
+        if not comp.component_hash:
+            comp.component_hash = comp.compute_canonical_hash()
+        return comp
 
 
 class LLDCompiler:
@@ -480,7 +582,8 @@ class LLDCompiler:
                     transport=InteractionTransport.CLI_COMMAND,
                     route="cli://subcommands",
                     layout="cli_subcommand_dispatch",
-                    interaction_capability=UIInteractionCapability.SUBMITS_MUTATION,
+                    execution_capability=ComponentExecutionCapability.MUTATE,
+                    interaction_capability=None,
                     sub_components=["ArgParser", "SubcommandRouter", "ConfigLoader", "ExitCodeHandler"],
                     api_endpoints=cli_endpoints,
                     validation_rules=["POSIX flag compliance", "Exit code 0 for success, 1 for error, 2 for usage failure"],
@@ -502,7 +605,8 @@ class LLDCompiler:
                     parent=parent_ref,
                     role="pipeline_worker",
                     transport=InteractionTransport.EVENT_TOPIC,
-                    interaction_capability=UIInteractionCapability.TRIGGERS_WORKFLOW,
+                    execution_capability=ComponentExecutionCapability.TRIGGER_WORKFLOW,
+                    interaction_capability=None,
                     sub_components=["StreamConsumer", "StageTransformer", "BatchSink"],
                     api_endpoints=mod_endpoints,
                     validation_rules=["At-least-once stream processing", "Dead-letter queue on schema error"],
@@ -524,7 +628,8 @@ class LLDCompiler:
                     parent=parent_ref,
                     role="event_handler",
                     transport=InteractionTransport.EVENT_TOPIC,
-                    interaction_capability=UIInteractionCapability.TRIGGERS_WORKFLOW,
+                    execution_capability=ComponentExecutionCapability.PROCESS_EVENT,
+                    interaction_capability=None,
                     sub_components=["KafkaMessageConsumer", "DomainEventHandler", "OutboxPublisher"],
                     api_endpoints=mod_endpoints,
                     validation_rules=["Idempotent message handling", "Transactional outbox commitment"],
@@ -563,7 +668,8 @@ class LLDCompiler:
                     role="backend_controller",
                     transport=InteractionTransport.REST_HTTP,
                     route=f"/api/{p_route}",
-                    interaction_capability=UIInteractionCapability.SUBMITS_MUTATION,
+                    execution_capability=ComponentExecutionCapability.MUTATE,
+                    interaction_capability=None,
                     api_endpoints=mod_endpoints,
                     validation_rules=["Verify actor authorization", "Validate request payload schema"],
                     allowed_operation_classes=[OperationClass.COMMAND_MUTATION, OperationClass.READ_QUERY, OperationClass.STATE_TRANSITION],
@@ -583,7 +689,8 @@ class LLDCompiler:
                     parent=parent_ref,
                     role="domain_service",
                     transport=InteractionTransport.INTERNAL_FUNCTION,
-                    interaction_capability=UIInteractionCapability.SUBMITS_MUTATION,
+                    execution_capability=ComponentExecutionCapability.MUTATE,
+                    interaction_capability=None,
                     sub_components=[f"{mod.name}TransactionManager", f"{mod.name}PolicyEvaluator"],
                     validation_rules=["Enforce state pre/post transitions", "Emit audit log side effects"],
                     allowed_operation_classes=[OperationClass.COMMAND_MUTATION, OperationClass.READ_QUERY, OperationClass.STATE_TRANSITION, OperationClass.EVENT_PROCESSING],
@@ -617,6 +724,7 @@ class LLDCompiler:
                         transport=InteractionTransport.REST_HTTP,
                         route=f"/{ui_route}",
                         layout="behavioral_workflow_surface",
+                        execution_capability=None,
                         interaction_capability=UIInteractionCapability.SUBMITS_MUTATION,
                         sub_components=[f"{ent_stem}DetailHeader", f"{ent_stem}ActionToolbar", f"{ent_stem}AuditHistoryPanel"],
                         api_endpoints=mod_endpoints,
