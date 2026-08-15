@@ -691,59 +691,6 @@ class SpecificationCompiler:
             snap_path = os.path.join(workspace_dir, ".agents", "repo_snapshot.json")
             RepositorySnapshotEngine.save_snapshot(repo_snapshot, snap_path)
 
-            # 3. Derive AuthorizedChangeSet from tasks with strict lineage (NO SYNTHETIC FALLBACKS)
-            if not task_gov.is_blocked and tasks:
-                source_task_hashes = {}
-                for t in tasks:
-                    th = getattr(t, "task_hash", None)
-                    if not th or not isinstance(th, str) or not th.strip():
-                        raise ValueError(
-                            f"Cannot compile AuthorizedChangeSet: Task '{getattr(t, 'id', 'UNKNOWN')}' is missing mandatory authoritative 'task_hash'. Synthetic derivation is strictly prohibited."
-                        )
-                    source_task_hashes[t.id] = th.strip()
-
-                if not execution_plan or not getattr(execution_plan, "plan_hash", None) or not str(execution_plan.plan_hash).strip():
-                    raise ValueError("Cannot compile AuthorizedChangeSet: ExecutionPlan is missing or lacks mandatory authoritative 'plan_hash'.")
-
-                source_execution_plan_hash = str(execution_plan.plan_hash).strip()
-
-                authorized_changeset = AuthorizedChangeSet(
-                    changeset_id=f"CS-{int(datetime.now(timezone.utc).timestamp())}",
-                    source_repository_state_hash=repo_snapshot.repository_state_hash,
-                    source_execution_plan_hash=source_execution_plan_hash,
-                    source_pipeline_state_hash="PENDING_PIPELINE_EPOCH_LOCK",
-                    source_task_hashes=source_task_hashes,
-                    source_snapshot_id=repo_snapshot.snapshot_id
-                )
-                for t in tasks:
-                    t_paths = getattr(t, "target_files", []) or []
-                    for p in t_paths:
-                        norm_p = p.replace("\\", "/").strip().lstrip("/")
-                        op = FileMutationOp.CREATE if norm_p not in repo_snapshot.file_manifest else FileMutationOp.MODIFY
-                        if norm_p not in authorized_changeset.authorized_changes:
-                            authorized_changeset.add_change(AuthorizedFileChange(
-                                file_path=norm_p,
-                                operation=op,
-                                authorized_by_tasks=[t.id],
-                                authorized_by_lld=t.parent_lld,
-                                expected_source_file_hash=repo_snapshot.file_manifest[norm_p].file_hash if norm_p in repo_snapshot.file_manifest else None
-                            ))
-                        else:
-                            existing = authorized_changeset.authorized_changes[norm_p]
-                            if t.id not in existing.authorized_by_tasks:
-                                existing.authorized_by_tasks.append(t.id)
-
-                cs_path = os.path.join(workspace_dir, ".agents", "authorized_changeset.json")
-                write_json_atomic(cs_path, authorized_changeset.to_dict())
-            else:
-                authorized_changeset = None
-                cs_path = os.path.join(workspace_dir, ".agents", "authorized_changeset.json")
-                if os.path.exists(cs_path):
-                    try:
-                        os.remove(cs_path)
-                    except Exception:
-                        pass
-
         final_blocked = task_gov.is_blocked or (plan_gov.is_blocked if plan_gov else False) or (snap_gov.is_blocked if snap_gov else False)
         if snap_gov and snap_gov.is_blocked:
             recommended_target = snap_gov.recommended_fsm_state.value
@@ -767,7 +714,7 @@ class SpecificationCompiler:
             "execution_plan": execution_plan.to_dict() if execution_plan else None,
             "execution_plan_governance": plan_gov.to_dict() if plan_gov else {},
             "planning_snapshot": repo_snapshot.to_dict() if repo_snapshot else None,
-            "authorized_changeset": authorized_changeset.to_dict() if authorized_changeset else None,
+            "authorized_changeset": None,
             "repository_snapshot": repo_snapshot.to_dict() if repo_snapshot else None,
             "repository_snapshot_governance": snap_gov.to_dict() if snap_gov else {},
             "blocked": final_blocked,
@@ -794,20 +741,70 @@ class SpecificationCompiler:
             if world_model_gov.is_blocked:
                 res_dict["blocked"] = True
 
+        # Authoritative Execution Chain Sequence:
+        # validated pipeline -> save artifact -> lock execution epoch -> derive ChangeSet directly from signed epoch -> persist
         if workspace_dir:
             cls.save_versioned_pipeline_artifact(res_dict, workspace_dir)
             if execution_plan:
                 ExecutionPlanCompiler.save_execution_plan(execution_plan, workspace_dir)
 
-            # Authoritative Execution Epoch Locking
+            # 1. Authoritative Execution Epoch Locking
             epoch_lock = ArtifactGovernor.lock_pipeline_epoch(workspace_dir)
-            if authorized_changeset:
-                authorized_changeset.source_pipeline_state_hash = epoch_lock["pipeline_canonical_hash"]
-                authorized_changeset.pipeline_epoch_id = epoch_lock["epoch_id"]
-                authorized_changeset.changeset_hash = authorized_changeset.compute_canonical_hash()
+
+            # 2. Derive AuthorizedChangeSet directly bound to the exact signed epoch
+            if not task_gov.is_blocked and tasks and repo_snapshot:
+                source_task_hashes = {}
+                for t in tasks:
+                    th = getattr(t, "task_spec_hash", None)
+                    if not th or not isinstance(th, str) or not th.strip():
+                        raise ValueError(
+                            f"Cannot compile AuthorizedChangeSet: Task '{getattr(t, 'id', 'UNKNOWN')}' is missing mandatory authoritative 'task_spec_hash'. Synthetic derivation is strictly prohibited."
+                        )
+                    source_task_hashes[t.id] = th.strip()
+
+                if not execution_plan or not getattr(execution_plan, "plan_hash", None) or not str(execution_plan.plan_hash).strip():
+                    raise ValueError("Cannot compile AuthorizedChangeSet: ExecutionPlan is missing or lacks mandatory authoritative 'plan_hash'.")
+
+                source_execution_plan_hash = str(execution_plan.plan_hash).strip()
+
+                authorized_changeset = AuthorizedChangeSet(
+                    changeset_id=f"CS-{int(datetime.now(timezone.utc).timestamp())}",
+                    source_repository_state_hash=repo_snapshot.repository_state_hash,
+                    source_execution_plan_hash=source_execution_plan_hash,
+                    source_pipeline_state_hash=epoch_lock["pipeline_canonical_hash"],
+                    pipeline_epoch_id=epoch_lock["epoch_id"],
+                    source_task_hashes=source_task_hashes,
+                    source_snapshot_id=repo_snapshot.snapshot_id
+                )
+                for t in tasks:
+                    t_paths = getattr(t, "target_files", []) or []
+                    for p in t_paths:
+                        norm_p = p.replace("\\", "/").strip().lstrip("/")
+                        op = FileMutationOp.CREATE if norm_p not in repo_snapshot.file_manifest else FileMutationOp.MODIFY
+                        if norm_p not in authorized_changeset.authorized_changes:
+                            authorized_changeset.add_change(AuthorizedFileChange(
+                                file_path=norm_p,
+                                operation=op,
+                                authorized_by_tasks=[t.id],
+                                authorized_by_lld=t.parent_lld,
+                                expected_source_file_hash=repo_snapshot.file_manifest[norm_p].file_hash if norm_p in repo_snapshot.file_manifest else None
+                            ))
+                        else:
+                            existing = authorized_changeset.authorized_changes[norm_p]
+                            if t.id not in existing.authorized_by_tasks:
+                                existing.authorized_by_tasks.append(t.id)
+
                 cs_path = os.path.join(workspace_dir, ".agents", "authorized_changeset.json")
                 write_json_atomic(cs_path, authorized_changeset.to_dict())
                 res_dict["authorized_changeset"] = authorized_changeset.to_dict()
+            else:
+                authorized_changeset = None
+                cs_path = os.path.join(workspace_dir, ".agents", "authorized_changeset.json")
+                if os.path.exists(cs_path):
+                    try:
+                        os.remove(cs_path)
+                    except Exception:
+                        pass
 
         return res_dict
 

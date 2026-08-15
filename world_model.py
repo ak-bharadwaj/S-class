@@ -223,20 +223,25 @@ class SovereignCryptoAuthority:
         """Resets in-process ephemeral key and capability root secret."""
         cls._in_process_key = None
         cls._capability_root_secret = secrets.token_bytes(32)
+        if "SCLASS_SOVEREIGN_KEY" in os.environ:
+            del os.environ["SCLASS_SOVEREIGN_KEY"]
 
     @classmethod
     def get_signing_key(cls) -> bytes:
+        if cls._in_process_key is not None:
+            return cls._in_process_key
         env_key = os.environ.get("SCLASS_SOVEREIGN_KEY")
         if env_key:
             return env_key.encode("utf-8")
-        if cls._in_process_key is None:
-            cls._in_process_key = secrets.token_bytes(32)
+        cls._in_process_key = secrets.token_bytes(32)
         return cls._in_process_key
 
     @classmethod
     def set_signing_key(cls, key_bytes: bytes, key_id: str = "sovereign-root-v1") -> None:
         cls._in_process_key = key_bytes
         cls._in_process_key_id = key_id
+        if "SCLASS_SOVEREIGN_KEY" in os.environ:
+            del os.environ["SCLASS_SOVEREIGN_KEY"]
 
     @classmethod
     def get_key_id(cls) -> str:

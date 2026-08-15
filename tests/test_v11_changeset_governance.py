@@ -196,12 +196,13 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
         for t in tasks:
             t.source_lld_hash = lld_hash
             t.source_binding_hashes = [binding.binding_hash]
+            t.task_spec_hash = t.compute_spec_hash()
             t.task_hash = t.compute_canonical_hash()
 
         if plan is None:
             plan = self._create_governed_plan(tasks)
         changeset.source_execution_plan_hash = plan.plan_hash
-        changeset.source_task_hashes = {t.id: t.task_hash for t in tasks}
+        changeset.source_task_hashes = {t.id: t.task_spec_hash for t in tasks}
 
         pipe_path = os.path.join(self.agents_dir, "v7_refinement_pipeline.json")
         with open(pipe_path, "w", encoding="utf-8") as f:
@@ -247,7 +248,8 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
             source_pipeline_state_hash="pending_epoch_hash",
-            source_task_hashes={task.id: task.task_hash}
+            pipeline_epoch_id="pending_epoch_id",
+            source_task_hashes={task.id: task.task_spec_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -288,7 +290,8 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
             source_pipeline_state_hash="pending_epoch_hash",
-            source_task_hashes={task.id: task.task_hash}
+            pipeline_epoch_id="pending_epoch_id",
+            source_task_hashes={task.id: task.task_spec_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -327,7 +330,8 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
             source_pipeline_state_hash="pending_epoch_hash",
-            source_task_hashes={task.id: task.task_hash}
+            pipeline_epoch_id="pending_epoch_id",
+            source_task_hashes={task.id: task.task_spec_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/button.py",
@@ -367,7 +371,8 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
             source_pipeline_state_hash="pending_epoch_hash",
-            source_task_hashes={task.id: task.task_hash}
+            pipeline_epoch_id="pending_epoch_id",
+            source_task_hashes={task.id: task.task_spec_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -405,7 +410,8 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             source_repository_state_hash=anchor_A.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
             source_pipeline_state_hash="pending_epoch_hash",
-            source_task_hashes={task.id: task.task_hash}
+            pipeline_epoch_id="pending_epoch_id",
+            source_task_hashes={task.id: task.task_spec_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -445,7 +451,8 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
             source_pipeline_state_hash="pending_epoch_hash",
-            source_task_hashes={t1.id: t1.task_hash, t2.id: t2.task_hash}
+            pipeline_epoch_id="pending_epoch_id",
+            source_task_hashes={t1.id: t1.task_spec_hash, t2.id: t2.task_spec_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -498,7 +505,8 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
             source_pipeline_state_hash="pending_epoch_hash",
-            source_task_hashes={task.id: task.task_hash}
+            pipeline_epoch_id="pending_epoch_id",
+            source_task_hashes={task.id: task.task_spec_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -542,7 +550,8 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
             source_pipeline_state_hash="pending_epoch_hash",
-            source_task_hashes={task.id: task.task_hash}
+            pipeline_epoch_id="pending_epoch_id",
+            source_task_hashes={task.id: task.task_spec_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -579,7 +588,8 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
             source_pipeline_state_hash="pending_epoch_hash",
-            source_task_hashes={task.id: task.task_hash}
+            pipeline_epoch_id="pending_epoch_id",
+            source_task_hashes={task.id: task.task_spec_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -593,7 +603,11 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
         self.assertTrue(gov_res.is_blocked)
         self.assertTrue(any("CHANGESET_WORKSPACE_CONTEXT_MISSING" in r for r in gov_res.blocking_reasons))
 
-    # -------------------------------------------------------------------------
+        gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
+            anchor, result, changeset, workspace_dir=None
+        )
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("CHANGESET_WORKSPACE_CONTEXT_MISSING" in r for r in gov_res.blocking_reasons))    # -------------------------------------------------------------------------
     # Test 10: Empty Governed Tasks in Pipeline with Non-Empty ChangeSet Fails Closed
     # -------------------------------------------------------------------------
     def test_v11_empty_governed_tasks_in_pipeline_fails_closed(self):
@@ -611,7 +625,8 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
             source_pipeline_state_hash="pending_epoch_hash",
-            source_task_hashes={task.id: task.task_hash}
+            pipeline_epoch_id="pending_epoch_id",
+            source_task_hashes={task.id: task.task_spec_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -629,6 +644,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             }, f)
         epoch_lock = ArtifactGovernor.lock_pipeline_epoch(self.test_dir)
         changeset.source_pipeline_state_hash = epoch_lock["pipeline_canonical_hash"]
+        changeset.pipeline_epoch_id = epoch_lock["epoch_id"]
         changeset.changeset_hash = changeset.compute_canonical_hash()
 
         gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
@@ -655,7 +671,8 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
             source_pipeline_state_hash="pending_epoch_hash",
-            source_task_hashes={task.id: task.task_hash}
+            pipeline_epoch_id="pending_epoch_id",
+            source_task_hashes={task.id: task.task_spec_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -676,6 +693,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             }, f)
         epoch_lock = ArtifactGovernor.lock_pipeline_epoch(self.test_dir)
         changeset.source_pipeline_state_hash = epoch_lock["pipeline_canonical_hash"]
+        changeset.pipeline_epoch_id = epoch_lock["epoch_id"]
         changeset.changeset_hash = changeset.compute_canonical_hash()
 
         gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
@@ -702,7 +720,8 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
             source_pipeline_state_hash="pending_epoch_hash",
-            source_task_hashes={task.id: task.task_hash}
+            pipeline_epoch_id="pending_epoch_id",
+            source_task_hashes={task.id: task.task_spec_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -723,6 +742,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             }, f)
         epoch_lock = ArtifactGovernor.lock_pipeline_epoch(self.test_dir)
         changeset.source_pipeline_state_hash = epoch_lock["pipeline_canonical_hash"]
+        changeset.pipeline_epoch_id = epoch_lock["epoch_id"]
         changeset.changeset_hash = changeset.compute_canonical_hash()
 
         gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
@@ -809,7 +829,8 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
             source_pipeline_state_hash="pending_epoch_hash",
-            source_task_hashes={task.id: task.task_hash}
+            pipeline_epoch_id="pending_epoch_id",
+            source_task_hashes={task.id: task.task_spec_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -862,7 +883,8 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
             source_pipeline_state_hash="pending_epoch_hash",
-            source_task_hashes={t1.id: t1.task_hash, t2.id: t2.task_hash}
+            pipeline_epoch_id="pending_epoch_id",
+            source_task_hashes={t1.id: t1.task_spec_hash, t2.id: t2.task_spec_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -880,6 +902,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             json.dump(pdata, pf)
         epoch_lock = ArtifactGovernor.lock_pipeline_epoch(self.test_dir)
         changeset.source_pipeline_state_hash = epoch_lock["pipeline_canonical_hash"]
+        changeset.pipeline_epoch_id = epoch_lock["epoch_id"]
         changeset.changeset_hash = changeset.compute_canonical_hash()
 
         self._create_file("src/app.py", "def app(): return 'executed'")
@@ -913,7 +936,8 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
             source_pipeline_state_hash="pending_epoch_hash",
-            source_task_hashes={task.id: task.task_hash}
+            pipeline_epoch_id="pending_epoch_id",
+            source_task_hashes={task.id: task.task_spec_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/secrets.py",
@@ -1014,7 +1038,8 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
             source_pipeline_state_hash="dummy_pipeline_hash",
-            source_task_hashes={task.id: task.task_hash}
+            pipeline_epoch_id="pending_epoch_id",
+            source_task_hashes={task.id: task.task_spec_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -1053,7 +1078,8 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
             source_pipeline_state_hash="pending_hash",
-            source_task_hashes={task.id: task.task_hash}
+            pipeline_epoch_id="pending_epoch_id",
+            source_task_hashes={task.id: task.task_spec_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -1095,7 +1121,8 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
             source_pipeline_state_hash="pending_hash",
-            source_task_hashes={task.id: task.task_hash}
+            pipeline_epoch_id="pending_epoch_id",
+            source_task_hashes={task.id: task.task_spec_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -1134,7 +1161,8 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
             source_pipeline_state_hash="pending_hash",
-            source_task_hashes={unscoped_task.id: unscoped_task.task_hash}
+            pipeline_epoch_id="pending_epoch_id",
+            source_task_hashes={unscoped_task.id: unscoped_task.task_spec_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -1168,7 +1196,8 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
             source_pipeline_state_hash="pending_hash",
-            source_task_hashes={task.id: task.task_hash}
+            pipeline_epoch_id="pending_epoch_id",
+            source_task_hashes={task.id: task.task_spec_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -1206,7 +1235,8 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
             source_pipeline_state_hash="pending_hash",
-            source_task_hashes={task.id: task.task_hash}
+            pipeline_epoch_id="pending_epoch_id",
+            source_task_hashes={task.id: task.task_spec_hash}
         )
         changeset.add_change(AuthorizedFileChange(
             file_path="src/app.py",
@@ -1225,6 +1255,86 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
         )
         self.assertTrue(gov_res.is_blocked)
         self.assertTrue(any("CHANGESET_TASK_HASH_LINEAGE_MISMATCH" in r for r in gov_res.blocking_reasons))
+
+    # -------------------------------------------------------------------------
+    # Test 25: Task-Hash vs Task-Spec-Hash Lineage Separation Enforced (🔴 Blocker 1)
+    # -------------------------------------------------------------------------
+    def test_v11_task_hash_vs_task_spec_hash_lineage_separation_enforced(self):
+        """Invariant: ChangeSet must carry task_spec_hash (semantic spec identity). Providing task_hash is strictly rejected."""
+        self._create_file("src/app.py", "def app(): pass")
+        anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+        self._create_file("src/app.py", "def app(): return True")
+        result = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        task = self._create_governed_task("TASK-001", target_files=["src/app.py"])
+        plan = self._create_governed_plan([task])
+
+        changeset = AuthorizedChangeSet(
+            changeset_id="CS-SPEC-VS-EXEC-TASK",
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash="pending_hash",
+            pipeline_epoch_id="pending_epoch_id",
+            source_task_hashes={task.id: task.task_spec_hash}
+        )
+        changeset.add_change(AuthorizedFileChange(
+            file_path="src/app.py",
+            operation=FileMutationOp.MODIFY,
+            authorized_by_tasks=["TASK-001"]
+        ))
+
+        self._write_mock_pipeline(anchor, changeset, tasks=[task], plan=plan)
+
+        # ATTACK: ChangeSet provides exec_task.task_hash (execution-instance digest) instead of task_spec_hash
+        exec_task = plan.batches[0].tasks[0]
+        self.assertNotEqual(exec_task.task_hash, task.task_spec_hash)
+        changeset.source_task_hashes = {task.id: exec_task.task_hash}
+        changeset.changeset_hash = changeset.compute_canonical_hash()
+
+        gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
+            anchor, result, changeset, workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("CHANGESET_TASK_HASH_LINEAGE_MISMATCH" in r for r in gov_res.blocking_reasons))
+
+    # -------------------------------------------------------------------------
+    # Test 26: Epoch-ID Mismatch Fails Closed (🔴 Blocker 2)
+    # -------------------------------------------------------------------------
+    def test_v11_epoch_id_mismatch_fails_closed(self):
+        """Invariant: ChangeSet pipeline_epoch_id must exactly match locked execution epoch ID."""
+        self._create_file("src/app.py", "def app(): pass")
+        anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+        self._create_file("src/app.py", "def app(): return True")
+        result = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        task = self._create_governed_task("TASK-001", target_files=["src/app.py"])
+        plan = self._create_governed_plan([task])
+
+        changeset = AuthorizedChangeSet(
+            changeset_id="CS-EPOCH-MISMATCH",
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash="pending_hash",
+            pipeline_epoch_id="pending_epoch_id",
+            source_task_hashes={task.id: task.task_spec_hash}
+        )
+        changeset.add_change(AuthorizedFileChange(
+            file_path="src/app.py",
+            operation=FileMutationOp.MODIFY,
+            authorized_by_tasks=["TASK-001"]
+        ))
+
+        self._write_mock_pipeline(anchor, changeset, tasks=[task], plan=plan)
+
+        # ATTACK: ChangeSet provides a different epoch_id (e.g. from an earlier or replaced epoch)
+        changeset.pipeline_epoch_id = "EPOCH-DIFFERENT-REPLACED-000000"
+        changeset.changeset_hash = changeset.compute_canonical_hash()
+
+        gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
+            anchor, result, changeset, workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("CHANGESET_EPOCH_ID_MISMATCH" in r for r in gov_res.blocking_reasons))
 
 
 if __name__ == "__main__":

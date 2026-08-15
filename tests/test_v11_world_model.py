@@ -454,6 +454,7 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
             source_repository_state_hash=before_snap.repository_state_hash,
             source_execution_plan_hash="plan_hash_1",
             source_pipeline_state_hash="pipeline_state_hash_1",
+            pipeline_epoch_id="EPOCH-001",
             source_task_hashes={"TASK-001": "task_hash_1"},
             authorized_changes={
                 "src/a.py": AuthorizedFileChange(
@@ -630,6 +631,7 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
             source_repository_state_hash=before_snap.repository_state_hash,
             source_execution_plan_hash="plan_hash_bill",
             source_pipeline_state_hash="pipeline_hash_bill",
+            pipeline_epoch_id="EPOCH-BILL-01",
             source_task_hashes={"TASK-BILL-01": "task_sha256_abc"},
             authorized_changes={
                 "src/billing.py": AuthorizedFileChange(
@@ -942,6 +944,7 @@ test('UserService returns user', async () => {
             "source_repository_state_hash": "hash_123",
             "source_execution_plan_hash": "plan_123",
             "source_pipeline_state_hash": "pipe_123",
+            "pipeline_epoch_id": "EPOCH-123",
             "source_task_hashes": {"TASK-001": "task_hash_1"},
             "authorized_changes": {}
         }
@@ -953,13 +956,14 @@ test('UserService returns user', async () => {
     # Test 25: ChangeSet Missing Mandatory Lineage Fails Closed
     # -------------------------------------------------------------------------
     def test_v11_world_model_changeset_missing_mandatory_lineage_fails_closed(self):
-        """Invariant: AuthorizedChangeSet missing execution plan hash, pipeline state hash, or task hashes fails closed."""
+        """Invariant: AuthorizedChangeSet missing execution plan hash, pipeline state hash, epoch id, or task hashes fails closed."""
         with self.assertRaises(ValueError) as ctx1:
             AuthorizedChangeSet(
                 changeset_id="CS-NOLINEAGE",
                 source_repository_state_hash="hash_123",
                 source_execution_plan_hash="",
                 source_pipeline_state_hash="pipe_123",
+                pipeline_epoch_id="EPOCH-123",
                 source_task_hashes={"TASK-001": "hash_1"}
             )
         self.assertIn("must carry non-empty source_execution_plan_hash", str(ctx1.exception))
@@ -970,19 +974,32 @@ test('UserService returns user', async () => {
                 source_repository_state_hash="hash_123",
                 source_execution_plan_hash="plan_123",
                 source_pipeline_state_hash="",
+                pipeline_epoch_id="EPOCH-123",
                 source_task_hashes={"TASK-001": "hash_1"}
             )
         self.assertIn("must carry non-empty mandatory source_pipeline_state_hash", str(ctx2.exception))
 
         with self.assertRaises(ValueError) as ctx3:
             AuthorizedChangeSet(
+                changeset_id="CS-NOEPOCH",
+                source_repository_state_hash="hash_123",
+                source_execution_plan_hash="plan_123",
+                source_pipeline_state_hash="pipe_123",
+                pipeline_epoch_id="",
+                source_task_hashes={"TASK-001": "hash_1"}
+            )
+        self.assertIn("must carry non-empty mandatory pipeline_epoch_id", str(ctx3.exception))
+
+        with self.assertRaises(ValueError) as ctx4:
+            AuthorizedChangeSet(
                 changeset_id="CS-NOTASKS",
                 source_repository_state_hash="hash_123",
                 source_execution_plan_hash="plan_123",
                 source_pipeline_state_hash="pipe_123",
+                pipeline_epoch_id="EPOCH-123",
                 source_task_hashes={}
             )
-        self.assertIn("must carry non-empty source_task_hashes", str(ctx3.exception))
+        self.assertIn("must carry non-empty source_task_hashes", str(ctx4.exception))
 
     # -------------------------------------------------------------------------
     # Test 26: Domain Separation Prevents Cross-Type Replay Attack
@@ -1144,7 +1161,7 @@ test('UserService returns user', async () => {
             approval_status=ApprovalStatus.APPROVED
         )
 
-        # 1. Task missing task_hash fails closed
+        # 1. Task missing task_spec_hash fails closed
         bad_task = TaskRecord(
             id="TASK-BAD",
             title="Bad Task",
@@ -1153,10 +1170,9 @@ test('UserService returns user', async () => {
             parent_lld="LLD-1",
             parent_hld="HLD-1",
             parent_reqs=["REQ-1"],
-            parent_behaviors=["BEH-1"],
-            task_hash=""
+            parent_behaviors=["BEH-1"]
         )
-        bad_task.task_hash = ""  # Force empty
+        bad_task.task_spec_hash = ""  # Force empty
 
         with mock.patch("artifact_governor.ArtifactGovernor.audit_hld_governance", return_value=passing_gate), \
              mock.patch("artifact_governor.ArtifactGovernor.audit_lld_governance", return_value=passing_gate), \
@@ -1167,7 +1183,7 @@ test('UserService returns user', async () => {
                     raw_request="Build secure auth service",
                     workspace_dir=self.test_dir
                 )
-            self.assertIn("missing mandatory authoritative 'task_hash'", str(ctx1.exception))
+            self.assertIn("missing mandatory authoritative 'task_spec_hash'", str(ctx1.exception))
 
         # 2. Empty tasks list yields no synthetic changeset (zero-invention)
         with mock.patch("artifact_governor.ArtifactGovernor.audit_hld_governance", return_value=passing_gate), \
@@ -1191,8 +1207,17 @@ test('UserService returns user', async () => {
             parent_reqs=["REQ-1"],
             parent_behaviors=["BEH-1"]
         )
+        good_task.task_spec_hash = good_task.compute_spec_hash()
+        good_task.task_hash = good_task.compute_canonical_hash()
         fake_plan = mock.MagicMock()
         fake_plan.plan_hash = ""
+        fake_plan.to_dict.return_value = {
+            "plan_id": "P-1",
+            "version": 1,
+            "batches": [],
+            "plan_hash": "",
+            "created_at": "2026-08-15T00:00:00Z"
+        }
         with mock.patch("artifact_governor.ArtifactGovernor.audit_hld_governance", return_value=passing_gate), \
              mock.patch("artifact_governor.ArtifactGovernor.audit_lld_governance", return_value=passing_gate), \
              mock.patch("artifact_governor.ArtifactGovernor.audit_task_governance", return_value=passing_gate), \
@@ -1206,10 +1231,10 @@ test('UserService returns user', async () => {
             self.assertIn("ExecutionPlan is missing or lacks mandatory authoritative 'plan_hash'", str(ctx3.exception))
 
     # -------------------------------------------------------------------------
-    # Test 31: Governor Blocks Upstream ExecutionPlan Hash Mismatch
+    # Test 31: Governor Blocks Upstream Execution Plan Hash Mismatch
     # -------------------------------------------------------------------------
-    def test_v11_governor_blocks_execution_plan_lineage_mismatch(self):
-        """Invariant: ChangeSet with fake/mismatched source_execution_plan_hash is blocked by Governor."""
+    def test_v11_governor_blocks_upstream_execution_plan_mismatch(self):
+        """Invariant: ChangeSet carrying execution plan hash differing from governed ExecutionPlan is blocked."""
         self._create_file("src/service.py", "def run(): pass")
         anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
         self._create_file("src/service.py", "def run(): return 1")
@@ -1234,7 +1259,8 @@ test('UserService returns user', async () => {
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash="fake_forged_plan_hash_FAKE",
             source_pipeline_state_hash=epoch_lock["pipeline_canonical_hash"],
-            source_task_hashes={task.id: task.task_hash}
+            pipeline_epoch_id=epoch_lock["epoch_id"],
+            source_task_hashes={task.id: task.task_spec_hash}
         )
         attacker_changeset.add_change(AuthorizedFileChange(
             file_path="src/service.py",
@@ -1278,7 +1304,8 @@ test('UserService returns user', async () => {
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
             source_pipeline_state_hash=epoch_lock["pipeline_canonical_hash"],
-            source_task_hashes={"TASK-A": task_a.task_hash}  # Dropped TASK-B
+            pipeline_epoch_id=epoch_lock["epoch_id"],
+            source_task_hashes={"TASK-A": task_a.task_spec_hash}  # Dropped TASK-B
         )
         dropped_task_cs.add_change(AuthorizedFileChange(
             file_path="src/service.py",
@@ -1320,6 +1347,7 @@ test('UserService returns user', async () => {
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
             source_pipeline_state_hash=epoch_lock["pipeline_canonical_hash"],
+            pipeline_epoch_id=epoch_lock["epoch_id"],
             source_task_hashes={"TASK-A": "tampered_hash_A_fake"}
         )
         tampered_task_cs.add_change(AuthorizedFileChange(

@@ -91,10 +91,10 @@ class AuthorizedChangeSet:
     source_repository_state_hash: str  # Must strictly match planning snapshot repository_state_hash
     source_execution_plan_hash: str   # Must strictly match planning execution plan hash
     source_pipeline_state_hash: str   # MANDATORY: Must strictly match locked execution epoch pipeline canonical hash
+    pipeline_epoch_id: str            # MANDATORY: Must strictly match locked execution epoch ID
     source_task_hashes: Dict[str, str]  # Mapping task_id -> task_spec_hash (immutable semantic task digest)
     authorized_changes: Dict[str, AuthorizedFileChange] = field(default_factory=dict)
     source_snapshot_id: Optional[str] = None
-    pipeline_epoch_id: Optional[str] = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat() + "Z")
     changeset_hash: str = ""
 
@@ -105,6 +105,8 @@ class AuthorizedChangeSet:
             raise ValueError("AuthorizedChangeSet must carry non-empty source_execution_plan_hash.")
         if not self.source_pipeline_state_hash or not str(self.source_pipeline_state_hash).strip():
             raise ValueError("AuthorizedChangeSet must carry non-empty mandatory source_pipeline_state_hash.")
+        if not self.pipeline_epoch_id or not str(self.pipeline_epoch_id).strip():
+            raise ValueError("AuthorizedChangeSet must carry non-empty mandatory pipeline_epoch_id.")
         if not self.source_task_hashes:
             raise ValueError("AuthorizedChangeSet must carry non-empty source_task_hashes.")
         if not self.changeset_hash:
@@ -127,7 +129,7 @@ class AuthorizedChangeSet:
             "source_repository_state_hash": self.source_repository_state_hash,
             "source_execution_plan_hash": self.source_execution_plan_hash,
             "source_pipeline_state_hash": self.source_pipeline_state_hash,
-            "pipeline_epoch_id": self.pipeline_epoch_id or "",
+            "pipeline_epoch_id": self.pipeline_epoch_id,
             "source_task_hashes": sorted_task_hashes,
             "source_snapshot_id": self.source_snapshot_id or "",
             "changes": change_hashes
@@ -159,7 +161,7 @@ class AuthorizedChangeSet:
             norm_k = k.replace("\\", "/").strip().lstrip("/")
             changes[norm_k] = AuthorizedFileChange.from_dict(v)
 
-        for req in ["changeset_id", "source_repository_state_hash", "source_execution_plan_hash", "source_pipeline_state_hash", "source_task_hashes"]:
+        for req in ["changeset_id", "source_repository_state_hash", "source_execution_plan_hash", "source_pipeline_state_hash", "pipeline_epoch_id", "source_task_hashes"]:
             if req not in d or d[req] is None or (isinstance(d[req], str) and not d[req].strip()):
                 raise ValueError(f"AuthorizedChangeSet missing mandatory field '{req}'")
 
@@ -168,7 +170,7 @@ class AuthorizedChangeSet:
             source_repository_state_hash=d["source_repository_state_hash"],
             source_execution_plan_hash=d["source_execution_plan_hash"],
             source_pipeline_state_hash=d["source_pipeline_state_hash"],
-            pipeline_epoch_id=d.get("pipeline_epoch_id"),
+            pipeline_epoch_id=d["pipeline_epoch_id"],
             source_task_hashes=dict(d["source_task_hashes"]),
             authorized_changes=changes,
             source_snapshot_id=d.get("source_snapshot_id"),
@@ -184,7 +186,7 @@ class AuthorizedChangeSet:
         """
         if not isinstance(d, dict):
             raise ValueError(f"Governed AuthorizedChangeSet must be a dictionary, got {type(d)}")
-        for req in ["changeset_id", "source_repository_state_hash", "source_execution_plan_hash", "source_pipeline_state_hash", "source_task_hashes", "authorized_changes"]:
+        for req in ["changeset_id", "source_repository_state_hash", "source_execution_plan_hash", "source_pipeline_state_hash", "pipeline_epoch_id", "source_task_hashes", "authorized_changes"]:
             if req not in d:
                 raise ValueError(f"Governed AuthorizedChangeSet missing mandatory field '{req}'")
 

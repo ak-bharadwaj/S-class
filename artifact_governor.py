@@ -1303,6 +1303,8 @@ class ArtifactGovernor:
             reasons.append("CHANGESET_LINEAGE_MISSING: ChangeSet missing mandatory source_execution_plan_hash.")
         if not getattr(changeset, "source_pipeline_state_hash", None):
             reasons.append("CHANGESET_PIPELINE_STATE_HASH_MISSING: ChangeSet missing mandatory source_pipeline_state_hash.")
+        if not getattr(changeset, "pipeline_epoch_id", None) or not str(changeset.pipeline_epoch_id).strip():
+            reasons.append("CHANGESET_EPOCH_ID_MISSING: ChangeSet missing mandatory pipeline_epoch_id.")
         if not getattr(changeset, "source_task_hashes", None):
             reasons.append("CHANGESET_LINEAGE_MISSING: ChangeSet missing mandatory source_task_hashes.")
         recomputed_cs_hash = changeset.compute_canonical_hash()
@@ -1379,6 +1381,12 @@ class ArtifactGovernor:
                         ).hexdigest()
 
                         if epoch_lock_data:
+                            locked_epoch_id = epoch_lock_data.get("epoch_id", "")
+                            if getattr(changeset, "pipeline_epoch_id", None) and changeset.pipeline_epoch_id != locked_epoch_id:
+                                reasons.append(
+                                    f"CHANGESET_EPOCH_ID_MISMATCH: ChangeSet pipeline_epoch_id "
+                                    f"'{changeset.pipeline_epoch_id}' does not match locked execution epoch ID '{locked_epoch_id}'."
+                                )
                             locked_pipe_hash = epoch_lock_data.get("pipeline_canonical_hash", "")
                             if locked_pipe_hash and locked_pipe_hash != current_pipe_canonical_hash:
                                 reasons.append(
@@ -1454,11 +1462,11 @@ class ArtifactGovernor:
                                 f"do not exactly match Governed Plan tasks {sorted(governed_task_ids)}."
                             )
 
-                        # Individual Task Hash Integrity Check (checks task_spec_hash and task_hash)
+                        # Individual Task Hash Integrity Check (strictly checks semantic task_spec_hash)
                         for t_id, expected_t in governed_tasks_dict.items():
                             if t_id in changeset.source_task_hashes:
                                 actual_th = changeset.source_task_hashes[t_id]
-                                if actual_th != expected_t.task_spec_hash and actual_th != expected_t.task_hash:
+                                if actual_th != expected_t.task_spec_hash:
                                     reasons.append(
                                         f"CHANGESET_TASK_HASH_LINEAGE_MISMATCH: ChangeSet task '{t_id}' hash "
                                         f"'{actual_th[:8]}' does not match governed TaskRecord task_spec_hash '{expected_t.task_spec_hash[:8]}'."
