@@ -10,17 +10,20 @@ Four-Tier Truth Ontology:
 - DERIVED: Logically inferred with deterministic, auditable evidence
 - PROPOSED: Hypothesis / pre-execution target mapping
 
-Epistemic Separation:
-- Target Planning != Implementation Evidence (ImplementationStatus: TARGETED vs IMPLEMENTED vs VERIFIED)
-- Static Coverage != Test Execution (CoverageStatus: STATICALLY_LINKED vs ExecutionResult: UNTESTED/PASSED/FAILED)
-- Symbol Semantic Identity != Line Spans (symbol_identity_hash vs symbol_revision_hash)
+Epistemic Relation Separation:
+- TargetRelation (TARGETS): Pre-execution task intent (ImplementationStatus: TARGETED, TruthLevel: PROPOSED/DERIVED)
+- ImplementationRelation (IMPLEMENTS): Verified code implementation (ImplementationStatus: IMPLEMENTED/VERIFIED, TruthLevel: DERIVED/OBSERVED)
+- VerificationRelation (VERIFIED_BY): Test coverage & runtime verification (CoverageStatus: STATICALLY_LINKED/DYNAMICALLY_OBSERVED, ExecutionResult: UNTESTED/PASSED/FAILED)
+
+Knowledge Boundaries:
+- Unmodeled files create explicit barriers preventing autonomous changes without active language adapters.
 """
 
 import json
 import hashlib
 from datetime import datetime, timezone
 from enum import Enum
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from typing import Dict, List, Set, Optional, Tuple, Any, Union
 from repository_snapshot import FileClassification, LanguageKind
 
@@ -136,26 +139,41 @@ class VerificationKind(str, Enum):
 
 @dataclass
 class ProvenanceRecord:
-    truth_level: TruthLevel = TruthLevel.STATIC
-    source: str = "AST_EXTRACTOR"
-    confidence: float = 1.0
-    evidence: str = "Direct AST parse"
+    truth_level: TruthLevel
+    source: str
+    confidence: float
+    evidence: str
+
+    def __post_init__(self):
+        if not isinstance(self.truth_level, TruthLevel):
+            self.truth_level = TruthLevel(str(self.truth_level))
+        if not self.source or not isinstance(self.source, str):
+            raise ValueError("ProvenanceRecord source must be a non-empty string.")
+        if not isinstance(self.confidence, (int, float)) or not (0.0 <= self.confidence <= 1.0):
+            raise ValueError(f"ProvenanceRecord confidence must be in range [0.0, 1.0], got {self.confidence}")
+        if not isinstance(self.evidence, str):
+            raise ValueError("ProvenanceRecord evidence must be a string.")
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "truth_level": self.truth_level.value if isinstance(self.truth_level, TruthLevel) else str(self.truth_level),
             "source": self.source,
-            "confidence": round(self.confidence, 4),
+            "confidence": round(float(self.confidence), 4),
             "evidence": self.evidence
         }
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "ProvenanceRecord":
+    def from_dict(cls, d: Any) -> "ProvenanceRecord":
+        if not isinstance(d, dict):
+            raise ValueError(f"ProvenanceRecord must be a dict, got {type(d)}")
+        for req in ["truth_level", "source", "confidence", "evidence"]:
+            if req not in d:
+                raise ValueError(f"ProvenanceRecord missing mandatory field '{req}'")
         return cls(
-            truth_level=TruthLevel(d.get("truth_level", "STATIC")),
-            source=d.get("source", "AST_EXTRACTOR"),
-            confidence=float(d.get("confidence", 1.0)),
-            evidence=d.get("evidence", "")
+            truth_level=TruthLevel(d["truth_level"]),
+            source=str(d["source"]),
+            confidence=float(d["confidence"]),
+            evidence=str(d["evidence"])
         )
 
 
@@ -165,14 +183,14 @@ class ProvenanceRecord:
 
 @dataclass
 class RepositoryEntity:
-    id: str = "repo://root"
-    name: str = "repository"
-    root_path: str = "."
-    repository_state_hash: str = ""
+    id: str
+    name: str
+    root_path: str
+    repository_state_hash: str
+    provenance: ProvenanceRecord
     primary_language: LanguageKind = LanguageKind.PYTHON
     modules: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
-    provenance: ProvenanceRecord = field(default_factory=lambda: ProvenanceRecord(truth_level=TruthLevel.STATIC, source="REPO_SNAPSHOT"))
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -189,7 +207,8 @@ class RepositoryEntity:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "RepositoryEntity":
-        prov = ProvenanceRecord.from_dict(d["provenance"]) if "provenance" in d else ProvenanceRecord(truth_level=TruthLevel.STATIC, source="REPO_SNAPSHOT")
+        if "provenance" not in d:
+            raise ValueError(f"RepositoryEntity '{d.get('id')}' missing mandatory provenance.")
         return cls(
             id=d["id"],
             name=d.get("name", "repository"),
@@ -198,7 +217,7 @@ class RepositoryEntity:
             primary_language=LanguageKind(d.get("primary_language", "python")),
             modules=list(d.get("modules", [])),
             metadata=dict(d.get("metadata", {})),
-            provenance=prov
+            provenance=ProvenanceRecord.from_dict(d["provenance"])
         )
 
 
@@ -207,15 +226,15 @@ class ModuleEntity:
     id: str  # e.g., "mod://src/users/service.py"
     path: str  # Normalized relative path
     name: str
-    classification: FileClassification = FileClassification.SOURCE
-    language: LanguageKind = LanguageKind.PYTHON
+    classification: FileClassification
+    language: LanguageKind
+    provenance: ProvenanceRecord
     symbols: List[str] = field(default_factory=list)  # SymbolEntity IDs
     exports: List[str] = field(default_factory=list)
     imports: List[str] = field(default_factory=list)
     file_hash: str = ""
     docstring: Optional[str] = None
-    is_modeled: bool = True  # True if parsed by an active language adapter, False if Fallback
-    provenance: ProvenanceRecord = field(default_factory=lambda: ProvenanceRecord(truth_level=TruthLevel.STATIC, source="FILE_PARSER"))
+    is_modeled: bool = True  # True if parsed by an active language adapter, False if Fallback / Unmodeled
 
     def __post_init__(self):
         self.path = self.path.replace("\\", "/").strip().lstrip("/")
@@ -241,7 +260,8 @@ class ModuleEntity:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "ModuleEntity":
-        prov = ProvenanceRecord.from_dict(d["provenance"]) if "provenance" in d else ProvenanceRecord(truth_level=TruthLevel.STATIC, source="FILE_PARSER")
+        if "provenance" not in d:
+            raise ValueError(f"ModuleEntity '{d.get('id')}' missing mandatory provenance.")
         return cls(
             id=d["id"],
             path=d["path"],
@@ -254,7 +274,7 @@ class ModuleEntity:
             file_hash=d.get("file_hash", ""),
             docstring=d.get("docstring"),
             is_modeled=bool(d.get("is_modeled", True)),
-            provenance=prov
+            provenance=ProvenanceRecord.from_dict(d["provenance"])
         )
 
 
@@ -268,6 +288,7 @@ class SymbolEntity:
     file_path: str
     line_start: int
     line_end: int
+    provenance: ProvenanceRecord
     signature: str = ""
     parameters: List[Dict[str, Any]] = field(default_factory=list)
     return_type: Optional[str] = None
@@ -277,7 +298,6 @@ class SymbolEntity:
     is_entrypoint: bool = False
     symbol_identity_hash: str = ""  # Stable semantic identity across refactorings
     symbol_revision_hash: str = ""  # Content and signature revision hash
-    provenance: ProvenanceRecord = field(default_factory=lambda: ProvenanceRecord(truth_level=TruthLevel.STATIC, source="AST_EXTRACTOR"))
 
     def __post_init__(self):
         self.file_path = self.file_path.replace("\\", "/").strip().lstrip("/")
@@ -323,7 +343,8 @@ class SymbolEntity:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "SymbolEntity":
-        prov = ProvenanceRecord.from_dict(d["provenance"]) if "provenance" in d else ProvenanceRecord(truth_level=TruthLevel.STATIC, source="AST_EXTRACTOR")
+        if "provenance" not in d:
+            raise ValueError(f"SymbolEntity '{d.get('id')}' missing mandatory provenance.")
         return cls(
             id=d["id"],
             name=d["name"],
@@ -342,7 +363,7 @@ class SymbolEntity:
             is_entrypoint=bool(d.get("is_entrypoint", False)),
             symbol_identity_hash=d.get("symbol_identity_hash", ""),
             symbol_revision_hash=d.get("symbol_revision_hash", ""),
-            provenance=prov
+            provenance=ProvenanceRecord.from_dict(d["provenance"])
         )
 
 
@@ -350,15 +371,15 @@ class SymbolEntity:
 class APIEntity:
     id: str  # e.g., "api://POST/api/v1/users"
     name: str
-    protocol: ProtocolKind = ProtocolKind.HTTP_REST
-    method: Optional[str] = "GET"
-    route_path: str = "/"
-    handler_symbol_id: str = ""
+    protocol: ProtocolKind
+    method: Optional[str]
+    route_path: str
+    handler_symbol_id: str
+    provenance: ProvenanceRecord
     request_schema: Optional[Dict[str, Any]] = None
     response_schema: Optional[Dict[str, Any]] = None
     auth_required: bool = False
     roles_allowed: List[str] = field(default_factory=list)
-    provenance: ProvenanceRecord = field(default_factory=lambda: ProvenanceRecord(truth_level=TruthLevel.STATIC, source="ROUTE_DECORATOR"))
 
     def __post_init__(self):
         if not self.id:
@@ -383,7 +404,8 @@ class APIEntity:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "APIEntity":
-        prov = ProvenanceRecord.from_dict(d["provenance"]) if "provenance" in d else ProvenanceRecord(truth_level=TruthLevel.STATIC, source="ROUTE_DECORATOR")
+        if "provenance" not in d:
+            raise ValueError(f"APIEntity '{d.get('id')}' missing mandatory provenance.")
         return cls(
             id=d["id"],
             name=d["name"],
@@ -395,7 +417,7 @@ class APIEntity:
             response_schema=d.get("response_schema"),
             auth_required=bool(d.get("auth_required", False)),
             roles_allowed=list(d.get("roles_allowed", [])),
-            provenance=prov
+            provenance=ProvenanceRecord.from_dict(d["provenance"])
         )
 
 
@@ -404,14 +426,14 @@ class TestEntity:
     __test__ = False
     id: str  # e.g., "test://tests/test_users.py#test_create_user"
     name: str
-    test_framework: TestFramework = TestFramework.PYTEST
-    file_path: str = ""
-    line_start: int = 0
-    line_end: int = 0
-    test_type: TestKind = TestKind.UNIT
+    test_framework: TestFramework
+    file_path: str
+    line_start: int
+    line_end: int
+    test_type: TestKind
+    provenance: ProvenanceRecord
     targets_symbols: List[str] = field(default_factory=list)  # SymbolEntity IDs
     targets_apis: List[str] = field(default_factory=list)  # APIEntity IDs
-    provenance: ProvenanceRecord = field(default_factory=lambda: ProvenanceRecord(truth_level=TruthLevel.STATIC, source="TEST_DISCOVERY"))
 
     def __post_init__(self):
         self.file_path = self.file_path.replace("\\", "/").strip().lstrip("/")
@@ -435,7 +457,8 @@ class TestEntity:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "TestEntity":
-        prov = ProvenanceRecord.from_dict(d["provenance"]) if "provenance" in d else ProvenanceRecord(truth_level=TruthLevel.STATIC, source="TEST_DISCOVERY")
+        if "provenance" not in d:
+            raise ValueError(f"TestEntity '{d.get('id')}' missing mandatory provenance.")
         return cls(
             id=d["id"],
             name=d["name"],
@@ -446,7 +469,7 @@ class TestEntity:
             test_type=TestKind(d.get("test_type", "unit")),
             targets_symbols=list(d.get("targets_symbols", [])),
             targets_apis=list(d.get("targets_apis", [])),
-            provenance=prov
+            provenance=ProvenanceRecord.from_dict(d["provenance"])
         )
 
 
@@ -458,9 +481,9 @@ class TestEntity:
 class DependencyRelation:
     from_entity: str
     to_entity: str
-    relation_kind: DependencyKind = DependencyKind.CALLS
-    resolution: ResolutionKind = ResolutionKind.RESOLVED
-    provenance: ProvenanceRecord = field(default_factory=lambda: ProvenanceRecord(truth_level=TruthLevel.STATIC, source="AST_CALL_GRAPH", confidence=1.0))
+    relation_kind: DependencyKind
+    resolution: ResolutionKind
+    provenance: ProvenanceRecord
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -474,21 +497,14 @@ class DependencyRelation:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "DependencyRelation":
-        prov = ProvenanceRecord.from_dict(d["provenance"]) if "provenance" in d else ProvenanceRecord(
-            truth_level=TruthLevel.STATIC,
-            source="AST_CALL_GRAPH",
-            confidence=float(d.get("confidence", 1.0)),
-            evidence="Extracted from static code analysis"
-        )
-        res_val = d.get("resolution")
-        if not res_val:
-            res_val = "EXTERNAL" if d.get("is_external", False) else "RESOLVED"
+        if "provenance" not in d:
+            raise ValueError("DependencyRelation missing mandatory provenance.")
         return cls(
             from_entity=d["from_entity"],
             to_entity=d["to_entity"],
             relation_kind=DependencyKind(d.get("relation_kind", "calls")),
-            resolution=ResolutionKind(res_val),
-            provenance=prov
+            resolution=ResolutionKind(d.get("resolution", "RESOLVED")),
+            provenance=ProvenanceRecord.from_dict(d["provenance"])
         )
 
 
@@ -496,8 +512,8 @@ class DependencyRelation:
 class OwnershipRelation:
     component_id: str  # LLD Component or Module ID
     entity_id: str  # Symbol or API or Module ID
-    ownership_kind: OwnershipKind = OwnershipKind.PRIMARY_OWNER
-    provenance: ProvenanceRecord = field(default_factory=lambda: ProvenanceRecord(truth_level=TruthLevel.DERIVED, source="LLD_SPEC_BINDING", confidence=1.0))
+    ownership_kind: OwnershipKind
+    provenance: ProvenanceRecord
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -510,86 +526,117 @@ class OwnershipRelation:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "OwnershipRelation":
-        prov = ProvenanceRecord.from_dict(d["provenance"]) if "provenance" in d else ProvenanceRecord(truth_level=TruthLevel.DERIVED, source="LLD_SPEC_BINDING", confidence=1.0)
+        if "provenance" not in d:
+            raise ValueError("OwnershipRelation missing mandatory provenance.")
         return cls(
             component_id=d["component_id"],
             entity_id=d["entity_id"],
             ownership_kind=OwnershipKind(d.get("ownership_kind", "primary_owner")),
-            provenance=prov
+            provenance=ProvenanceRecord.from_dict(d["provenance"])
+        )
+
+
+@dataclass
+class TargetRelation:
+    """Represents pre-execution task targeting intent (TARGETS)."""
+    task_id: str
+    target_entity_id: str  # SymbolEntity ID or ModuleEntity ID
+    target_kind: str  # "symbol" or "module"
+    status: ImplementationStatus  # Must be TARGETED
+    provenance: ProvenanceRecord  # Must be PROPOSED or DERIVED
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "relation_type": "target",
+            "task_id": self.task_id,
+            "target_entity_id": self.target_entity_id,
+            "target_kind": self.target_kind,
+            "status": self.status.value if isinstance(self.status, ImplementationStatus) else str(self.status),
+            "provenance": self.provenance.to_dict()
+        }
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "TargetRelation":
+        if "provenance" not in d:
+            raise ValueError("TargetRelation missing mandatory provenance.")
+        return cls(
+            task_id=d["task_id"],
+            target_entity_id=d["target_entity_id"],
+            target_kind=d.get("target_kind", "symbol"),
+            status=ImplementationStatus(d.get("status", "targeted")),
+            provenance=ProvenanceRecord.from_dict(d["provenance"])
         )
 
 
 @dataclass
 class ImplementationRelation:
+    """Represents established code implementation backed by diffs/execution (IMPLEMENTS)."""
     symbol_id: str  # Concrete SymbolEntity ID
-    requirement_id: Optional[str] = None  # e.g., "REQ-001"
-    behavior_id: Optional[str] = None  # e.g., "cmd_create_user"
-    lld_component_id: Optional[str] = None  # e.g., "ctrl_user_service"
-    task_id: Optional[str] = None  # e.g., "TASK-001"
-    implementation_status: ImplementationStatus = ImplementationStatus.TARGETED
-    provenance: ProvenanceRecord = field(default_factory=lambda: ProvenanceRecord(truth_level=TruthLevel.PROPOSED, source="TASK_TARGETING", confidence=0.8))
+    task_id: str  # e.g., "TASK-001"
+    status: ImplementationStatus  # IMPLEMENTED or VERIFIED
+    provenance: ProvenanceRecord  # Must be DERIVED or OBSERVED
+    requirement_id: Optional[str] = None
+    behavior_id: Optional[str] = None
+    lld_component_id: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "relation_type": "implementation",
             "symbol_id": self.symbol_id,
+            "task_id": self.task_id,
+            "status": self.status.value if isinstance(self.status, ImplementationStatus) else str(self.status),
             "requirement_id": self.requirement_id,
             "behavior_id": self.behavior_id,
             "lld_component_id": self.lld_component_id,
-            "task_id": self.task_id,
-            "implementation_status": self.implementation_status.value if isinstance(self.implementation_status, ImplementationStatus) else str(self.implementation_status),
             "provenance": self.provenance.to_dict()
         }
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "ImplementationRelation":
-        prov = ProvenanceRecord.from_dict(d["provenance"]) if "provenance" in d else ProvenanceRecord(
-            truth_level=TruthLevel.PROPOSED,
-            source="TASK_TARGETING",
-            confidence=0.8,
-            evidence=d.get("evidence", "Extracted from task-symbol binding")
-        )
+        if "provenance" not in d:
+            raise ValueError("ImplementationRelation missing mandatory provenance.")
         return cls(
             symbol_id=d["symbol_id"],
+            task_id=d["task_id"],
+            status=ImplementationStatus(d.get("status", d.get("implementation_status", "implemented"))),
             requirement_id=d.get("requirement_id"),
             behavior_id=d.get("behavior_id"),
             lld_component_id=d.get("lld_component_id"),
-            task_id=d.get("task_id"),
-            implementation_status=ImplementationStatus(d.get("implementation_status", "targeted")),
-            provenance=prov
+            provenance=ProvenanceRecord.from_dict(d["provenance"])
         )
 
 
 @dataclass
 class VerificationRelation:
+    """Represents static coverage or runtime verification (VERIFIED_BY)."""
     test_entity_id: str  # TestEntity ID
     target_entity_id: str  # SymbolEntity or APIEntity ID
+    verification_kind: VerificationKind
+    coverage_status: CoverageStatus
+    execution_status: ExecutionResult
+    provenance: ProvenanceRecord
     requirement_id: Optional[str] = None
     behavior_id: Optional[str] = None
     task_id: Optional[str] = None
-    verification_kind: VerificationKind = VerificationKind.DIRECT_UNIT_TEST
-    coverage_status: CoverageStatus = CoverageStatus.STATICALLY_LINKED
-    execution_status: ExecutionResult = ExecutionResult.UNTESTED
-    provenance: ProvenanceRecord = field(default_factory=lambda: ProvenanceRecord(truth_level=TruthLevel.STATIC, source="STATIC_TEST_CALL", confidence=1.0))
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "relation_type": "verification",
             "test_entity_id": self.test_entity_id,
             "target_entity_id": self.target_entity_id,
-            "requirement_id": self.requirement_id,
-            "behavior_id": self.behavior_id,
-            "task_id": self.task_id,
             "verification_kind": self.verification_kind.value if isinstance(self.verification_kind, VerificationKind) else str(self.verification_kind),
             "coverage_status": self.coverage_status.value if isinstance(self.coverage_status, CoverageStatus) else str(self.coverage_status),
             "execution_status": self.execution_status.value if isinstance(self.execution_status, ExecutionResult) else str(self.execution_status),
+            "requirement_id": self.requirement_id,
+            "behavior_id": self.behavior_id,
+            "task_id": self.task_id,
             "provenance": self.provenance.to_dict()
         }
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "VerificationRelation":
-        prov = ProvenanceRecord.from_dict(d["provenance"]) if "provenance" in d else ProvenanceRecord(truth_level=TruthLevel.STATIC, source="STATIC_TEST_CALL", confidence=1.0)
-        # Backward compatibility for legacy last_result
+        if "provenance" not in d:
+            raise ValueError("VerificationRelation missing mandatory provenance.")
         exec_st = d.get("execution_status")
         if not exec_st:
             legacy_res = d.get("last_result", "UNTESTED").lower()
@@ -598,13 +645,13 @@ class VerificationRelation:
         return cls(
             test_entity_id=d["test_entity_id"],
             target_entity_id=d["target_entity_id"],
-            requirement_id=d.get("requirement_id"),
-            behavior_id=d.get("behavior_id"),
-            task_id=d.get("task_id"),
             verification_kind=VerificationKind(d.get("verification_kind", "direct_unit_test")),
             coverage_status=CoverageStatus(d.get("coverage_status", "statically_linked")),
             execution_status=ExecutionResult(exec_st),
-            provenance=prov
+            requirement_id=d.get("requirement_id"),
+            behavior_id=d.get("behavior_id"),
+            task_id=d.get("task_id"),
+            provenance=ProvenanceRecord.from_dict(d["provenance"])
         )
 
 
@@ -613,7 +660,7 @@ class VerificationRelation:
 # -----------------------------------------------------------------------------
 
 EntityType = Union[RepositoryEntity, ModuleEntity, SymbolEntity, APIEntity, TestEntity]
-RelationType = Union[DependencyRelation, OwnershipRelation, ImplementationRelation, VerificationRelation]
+RelationType = Union[DependencyRelation, OwnershipRelation, TargetRelation, ImplementationRelation, VerificationRelation]
 
 
 @dataclass
@@ -661,6 +708,28 @@ class EngineeringWorldModel:
             if sym:
                 res.append(sym)
         return res
+
+    def can_safely_target(self, target_id: str) -> Tuple[bool, str]:
+        """
+        Evaluates whether a symbol or module can be safely targeted for autonomous modification.
+        Enforces a hard barrier if the target resides in an unmodeled file without language adapters.
+        """
+        ent = self.entities.get(target_id)
+        if not ent:
+            return False, f"TARGET_NOT_FOUND: Entity '{target_id}' does not exist in world model."
+
+        mod: Optional[ModuleEntity] = None
+        if isinstance(ent, ModuleEntity):
+            mod = ent
+        elif isinstance(ent, SymbolEntity):
+            mod = self.get_module(ent.module_id)
+
+        if mod and not mod.is_modeled:
+            return False, (
+                f"UNMODELED_CODE_BARRIER: Target '{target_id}' belongs to unmodeled file '{mod.path}' "
+                f"without an active language adapter. Direct autonomous modification is prohibited without prior modeling."
+            )
+        return True, ""
 
     def get_callers(self, symbol_id: str) -> List[str]:
         """Returns entity IDs that call or depend on symbol_id."""
@@ -739,13 +808,14 @@ class EngineeringWorldModel:
         Retrieves the unified 6-level lineage for a symbol:
         Requirement -> Behavior -> LLD Component -> Task -> Symbol -> Test
         """
+        targets = [r for r in self.relations if isinstance(r, TargetRelation) and r.target_entity_id == symbol_id]
         impls = [r for r in self.relations if isinstance(r, ImplementationRelation) and r.symbol_id == symbol_id]
         verifs = [r for r in self.relations if isinstance(r, VerificationRelation) and r.target_entity_id == symbol_id]
 
         reqs = sorted(list({r.requirement_id for r in impls if r.requirement_id}))
         behs = sorted(list({r.behavior_id for r in impls if r.behavior_id}))
         llds = sorted(list({r.lld_component_id for r in impls if r.lld_component_id}))
-        tasks = sorted(list({r.task_id for r in impls if r.task_id}))
+        tasks = sorted(list({r.task_id for r in impls if r.task_id} | {t.task_id for t in targets if t.task_id}))
         tests = sorted(list({v.test_entity_id for v in verifs}))
 
         return {
@@ -755,7 +825,7 @@ class EngineeringWorldModel:
             "lld_components": llds,
             "tasks": tasks,
             "tests": tests,
-            "is_governed": len(reqs) > 0 and len(tasks) > 0,
+            "is_governed": len(tasks) > 0 or len(impls) > 0,
             "is_tested": len(tests) > 0
         }
 
@@ -784,9 +854,11 @@ class EngineeringWorldModel:
         return untested
 
     def get_orphan_symbols(self) -> List[SymbolEntity]:
-        """Returns symbols not mapped to any upstream requirement, behavior, or task."""
+        """Returns symbols not mapped to any upstream target, implementation, or task."""
         governed_symbols = {
             r.symbol_id for r in self.relations if isinstance(r, ImplementationRelation)
+        } | {
+            r.target_entity_id for r in self.relations if isinstance(r, TargetRelation)
         }
         orphans = []
         for ent in self.entities.values():
@@ -842,6 +914,8 @@ class EngineeringWorldModel:
                 entities[k] = APIEntity.from_dict(v)
             elif etype == "test":
                 entities[k] = TestEntity.from_dict(v)
+            else:
+                raise ValueError(f"Unknown entity_type '{etype}' in world model")
 
         relations: List[RelationType] = []
         for r in d.get("relations", []):
@@ -850,10 +924,14 @@ class EngineeringWorldModel:
                 relations.append(DependencyRelation.from_dict(r))
             elif rtype == "ownership":
                 relations.append(OwnershipRelation.from_dict(r))
+            elif rtype == "target":
+                relations.append(TargetRelation.from_dict(r))
             elif rtype == "implementation":
                 relations.append(ImplementationRelation.from_dict(r))
             elif rtype == "verification":
                 relations.append(VerificationRelation.from_dict(r))
+            else:
+                raise ValueError(f"Unknown relation_type '{rtype}' in world model")
 
         model = cls(
             model_version=int(d.get("model_version", 1)),
@@ -869,7 +947,7 @@ class EngineeringWorldModel:
     def from_governed_dict(cls, d: Dict[str, Any], strict_governance: bool = True) -> "EngineeringWorldModel":
         """
         Fail-closed deserializer that authoritatively verifies canonical_hash, repository_state_hash,
-        and entity dictionary key integrity.
+        provenance completeness, and entity dictionary key integrity.
         """
         if not isinstance(d, dict):
             raise ValueError(f"Governed EngineeringWorldModel must be a dictionary, got {type(d)}")
@@ -877,10 +955,17 @@ class EngineeringWorldModel:
             if req not in d or d[req] is None or (isinstance(d[req], str) and not d[req]):
                 raise ValueError(f"Governed EngineeringWorldModel missing mandatory integrity field '{req}'")
 
-        # Verify key == entity.id for all raw entities before constructing
+        # Verify key == entity.id and provenance exists for all raw entities before constructing
         for k, v in d.get("entities", {}).items():
             if not isinstance(v, dict) or v.get("id") != k:
                 raise ValueError(f"Governed EngineeringWorldModel entity key mismatch: key '{k}' != entity id '{v.get('id')}'")
+            if "provenance" not in v:
+                raise ValueError(f"Governed EngineeringWorldModel entity '{k}' missing mandatory provenance.")
+
+        # Verify provenance exists for all relations
+        for idx, r in enumerate(d.get("relations", [])):
+            if not isinstance(r, dict) or "provenance" not in r:
+                raise ValueError(f"Governed EngineeringWorldModel relation #{idx} missing mandatory provenance.")
 
         obj = cls.from_dict(d)
         if strict_governance:

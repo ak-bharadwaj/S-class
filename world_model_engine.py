@@ -7,9 +7,10 @@ Extracts and weaves concrete software truth via pluggable language adapters:
 3. FallbackLanguageAdapter: Explicit unmodeled file boundaries without pretending AST understanding
 
 Grounded Spec Weaver:
-- Strictly maps tasks to symbols only via explicit symbol targeting or LLD component interfaces
-- Sets ImplementationStatus.TARGETED (never FULLY_IMPLEMENTED before execution)
-- Sets CoverageStatus.STATICALLY_LINKED and ExecutionResult.UNTESTED (never PASSED without execution)
+- Strictly maps tasks to symbols/modules via TargetRelation (TARGETS)
+- Sets ImplementationStatus.TARGETED with TruthLevel.PROPOSED
+- Sets CoverageStatus.STATICALLY_LINKED and ExecutionResult.UNTESTED with TruthLevel.STATIC
+- Every entity and relation is created with explicit, non-default ProvenanceRecord
 """
 
 import os
@@ -35,6 +36,7 @@ from world_model import (
     TestEntity,
     DependencyRelation,
     OwnershipRelation,
+    TargetRelation,
     ImplementationRelation,
     VerificationRelation,
     SymbolType,
@@ -50,7 +52,8 @@ from world_model import (
     VerificationKind,
     TruthLevel,
     ResolutionKind,
-    ProvenanceRecord
+    ProvenanceRecord,
+    RelationType
 )
 
 
@@ -102,7 +105,12 @@ class PythonLanguageAdapter(LanguageAdapter):
                 language=LanguageKind.PYTHON,
                 file_hash=file_hash,
                 is_modeled=False,
-                provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="PYTHON_AST_SYNTAX_ERROR", confidence=0.0, evidence=str(e))
+                provenance=ProvenanceRecord(
+                    truth_level=TruthLevel.STATIC,
+                    source="PYTHON_AST_SYNTAX_ERROR",
+                    confidence=0.0,
+                    evidence=f"Syntax parse failure: {str(e)}"
+                )
             )
             return module_ent, [], [], [], []
 
@@ -129,7 +137,12 @@ class PythonLanguageAdapter(LanguageAdapter):
                         to_entity=f"mod://{rel_import_path}",
                         relation_kind=DependencyKind.IMPORTS,
                         resolution=ResolutionKind.RESOLVED if os.path.exists(os.path.join(os.path.dirname(full_path), f"{alias.name.replace('.', '/')}.py")) else ResolutionKind.EXTERNAL,
-                        provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="PYTHON_AST_IMPORT", confidence=1.0)
+                        provenance=ProvenanceRecord(
+                            truth_level=TruthLevel.STATIC,
+                            source="PYTHON_AST_IMPORT",
+                            confidence=1.0,
+                            evidence=f"Import statement 'import {alias.name}'"
+                        )
                     ))
             elif isinstance(node, ast.ImportFrom):
                 mod_str = node.module or ""
@@ -143,7 +156,12 @@ class PythonLanguageAdapter(LanguageAdapter):
                         to_entity=f"sym://{rel_import_path}#{alias.name}",
                         relation_kind=DependencyKind.IMPORTS,
                         resolution=ResolutionKind.RESOLVED,
-                        provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="PYTHON_AST_IMPORT_FROM", confidence=1.0)
+                        provenance=ProvenanceRecord(
+                            truth_level=TruthLevel.STATIC,
+                            source="PYTHON_AST_IMPORT_FROM",
+                            confidence=1.0,
+                            evidence=f"Import statement 'from {mod_str} import {alias.name}'"
+                        )
                     ))
 
         def parse_params(fn_node: Any) -> List[Dict[str, Any]]:
@@ -175,7 +193,12 @@ class PythonLanguageAdapter(LanguageAdapter):
                     line_end=getattr(node, "end_lineno", node.lineno),
                     docstring=cls_doc,
                     visibility=cls_visibility,
-                    provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="PYTHON_AST_CLASS", confidence=1.0)
+                    provenance=ProvenanceRecord(
+                        truth_level=TruthLevel.STATIC,
+                        source="PYTHON_AST_CLASS",
+                        confidence=1.0,
+                        evidence=f"Class definition '{cls_name}' lines {node.lineno}-{getattr(node, 'end_lineno', node.lineno)}"
+                    )
                 )
                 symbols.append(cls_sym)
                 symbol_ids.append(cls_sym_id)
@@ -189,7 +212,12 @@ class PythonLanguageAdapter(LanguageAdapter):
                         to_entity=f"sym://{base_name}",
                         relation_kind=DependencyKind.INHERITS,
                         resolution=ResolutionKind.RESOLVED if base_name in imported_symbols else ResolutionKind.AMBIGUOUS,
-                        provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="PYTHON_AST_INHERITANCE", confidence=0.9)
+                        provenance=ProvenanceRecord(
+                            truth_level=TruthLevel.STATIC,
+                            source="PYTHON_AST_INHERITANCE",
+                            confidence=0.9,
+                            evidence=f"Class '{cls_name}' inherits from '{base_name}'"
+                        )
                     ))
 
                 for sub in node.body:
@@ -216,7 +244,12 @@ class PythonLanguageAdapter(LanguageAdapter):
                             docstring=method_doc,
                             visibility=method_vis,
                             is_async=is_async,
-                            provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="PYTHON_AST_METHOD", confidence=1.0)
+                            provenance=ProvenanceRecord(
+                                truth_level=TruthLevel.STATIC,
+                                source="PYTHON_AST_METHOD",
+                                confidence=1.0,
+                                evidence=f"Method definition '{qual_name}' lines {sub.lineno}-{getattr(sub, 'end_lineno', sub.lineno)}"
+                            )
                         )
                         symbols.append(m_sym)
                         symbol_ids.append(method_sym_id)
@@ -230,7 +263,12 @@ class PythonLanguageAdapter(LanguageAdapter):
                                 line_start=sub.lineno,
                                 line_end=getattr(sub, "end_lineno", sub.lineno),
                                 test_type=TestKind.UNIT,
-                                provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="PYTHON_TEST_DISCOVERY", confidence=1.0)
+                                provenance=ProvenanceRecord(
+                                    truth_level=TruthLevel.STATIC,
+                                    source="PYTHON_TEST_DISCOVERY",
+                                    confidence=1.0,
+                                    evidence=f"Test method '{qual_name}' lines {sub.lineno}-{getattr(sub, 'end_lineno', sub.lineno)}"
+                                )
                             )
                             tests.append(test_ent)
 
@@ -260,7 +298,12 @@ class PythonLanguageAdapter(LanguageAdapter):
                     visibility=fn_vis,
                     is_async=is_async,
                     is_entrypoint=route_info is not None or fn_name in ["main", "cli"],
-                    provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="PYTHON_AST_FUNCTION", confidence=1.0)
+                    provenance=ProvenanceRecord(
+                        truth_level=TruthLevel.STATIC,
+                        source="PYTHON_AST_FUNCTION",
+                        confidence=1.0,
+                        evidence=f"Function definition '{fn_name}' lines {node.lineno}-{getattr(node, 'end_lineno', node.lineno)}"
+                    )
                 )
                 symbols.append(f_sym)
                 symbol_ids.append(fn_sym_id)
@@ -276,7 +319,12 @@ class PythonLanguageAdapter(LanguageAdapter):
                         method=method.upper(),
                         route_path=path,
                         handler_symbol_id=fn_sym_id,
-                        provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="FASTAPI_FLASK_DECORATOR", confidence=1.0)
+                        provenance=ProvenanceRecord(
+                            truth_level=TruthLevel.STATIC,
+                            source="FASTAPI_FLASK_DECORATOR",
+                            confidence=1.0,
+                            evidence=f"Route decorator @app.{method.lower()}('{path}') on '{fn_name}'"
+                        )
                     )
                     apis.append(api_ent)
 
@@ -289,7 +337,12 @@ class PythonLanguageAdapter(LanguageAdapter):
                         line_start=node.lineno,
                         line_end=getattr(node, "end_lineno", node.lineno),
                         test_type=TestKind.UNIT,
-                        provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="PYTHON_TEST_DISCOVERY", confidence=1.0)
+                        provenance=ProvenanceRecord(
+                            truth_level=TruthLevel.STATIC,
+                            source="PYTHON_TEST_DISCOVERY",
+                            confidence=1.0,
+                            evidence=f"Test function '{fn_name}' lines {node.lineno}-{getattr(node, 'end_lineno', node.lineno)}"
+                        )
                     )
                     tests.append(test_ent)
 
@@ -313,7 +366,12 @@ class PythonLanguageAdapter(LanguageAdapter):
                                 to_entity=callee_id,
                                 relation_kind=DependencyKind.CALLS,
                                 resolution=res,
-                                provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="PYTHON_AST_CALL", confidence=0.95 if res == ResolutionKind.RESOLVED else 0.6)
+                                provenance=ProvenanceRecord(
+                                    truth_level=TruthLevel.STATIC,
+                                    source="PYTHON_AST_CALL",
+                                    confidence=0.95 if res == ResolutionKind.RESOLVED else 0.6,
+                                    evidence=f"Call to '{callee_name}' inside '{caller_name}'"
+                                )
                             ))
                         elif isinstance(subnode.func, ast.Attribute):
                             attr_name = subnode.func.attr
@@ -329,7 +387,12 @@ class PythonLanguageAdapter(LanguageAdapter):
                                 to_entity=callee_id,
                                 relation_kind=DependencyKind.CALLS,
                                 resolution=res,
-                                provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="PYTHON_AST_CALL_ATTR", confidence=0.9 if res == ResolutionKind.RESOLVED else 0.5)
+                                provenance=ProvenanceRecord(
+                                    truth_level=TruthLevel.STATIC,
+                                    source="PYTHON_AST_CALL_ATTR",
+                                    confidence=0.9 if res == ResolutionKind.RESOLVED else 0.5,
+                                    evidence=f"Attribute call '.{attr_name}()' inside '{caller_name}'"
+                                )
                             ))
 
         module_ent = ModuleEntity(
@@ -344,7 +407,12 @@ class PythonLanguageAdapter(LanguageAdapter):
             file_hash=file_hash,
             docstring=docstring,
             is_modeled=True,
-            provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="PYTHON_LANGUAGE_ADAPTER", confidence=1.0)
+            provenance=ProvenanceRecord(
+                truth_level=TruthLevel.STATIC,
+                source="PYTHON_LANGUAGE_ADAPTER",
+                confidence=1.0,
+                evidence="Full Python AST extraction"
+            )
         )
 
         return module_ent, symbols, apis, tests, relations
@@ -405,7 +473,12 @@ class TypeScriptJavaScriptLanguageAdapter(LanguageAdapter):
                 language=file_entry.language,
                 file_hash=file_hash,
                 is_modeled=False,
-                provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="TS_JS_READ_ERROR", confidence=0.0, evidence=str(e))
+                provenance=ProvenanceRecord(
+                    truth_level=TruthLevel.STATIC,
+                    source="TS_JS_READ_ERROR",
+                    confidence=0.0,
+                    evidence=f"File read error: {str(e)}"
+                )
             )
             return module_ent, [], [], [], []
 
@@ -446,7 +519,12 @@ class TypeScriptJavaScriptLanguageAdapter(LanguageAdapter):
                                 to_entity=f"sym://{norm_mod_src}#{sym_clean}",
                                 relation_kind=DependencyKind.IMPORTS,
                                 resolution=ResolutionKind.RESOLVED,
-                                provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="TS_JS_IMPORT", confidence=1.0)
+                                provenance=ProvenanceRecord(
+                                    truth_level=TruthLevel.STATIC,
+                                    source="TS_JS_IMPORT",
+                                    confidence=1.0,
+                                    evidence=f"Import statement line {lineno}: {line.strip()}"
+                                )
                             ))
 
             # Classes
@@ -463,7 +541,12 @@ class TypeScriptJavaScriptLanguageAdapter(LanguageAdapter):
                     line_start=lineno,
                     line_end=lineno,
                     signature=f"class {cname}",
-                    provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="TS_JS_CLASS_PARSER", confidence=0.95)
+                    provenance=ProvenanceRecord(
+                        truth_level=TruthLevel.STATIC,
+                        source="TS_JS_CLASS_PARSER",
+                        confidence=0.95,
+                        evidence=f"Class declaration line {lineno}"
+                    )
                 )
                 symbols.append(sym)
                 symbol_ids.append(sym_id)
@@ -484,7 +567,12 @@ class TypeScriptJavaScriptLanguageAdapter(LanguageAdapter):
                     line_start=lineno,
                     line_end=lineno,
                     signature=f"interface {iname}",
-                    provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="TS_INTERFACE_PARSER", confidence=0.95)
+                    provenance=ProvenanceRecord(
+                        truth_level=TruthLevel.STATIC,
+                        source="TS_INTERFACE_PARSER",
+                        confidence=0.95,
+                        evidence=f"Interface declaration line {lineno}"
+                    )
                 )
                 symbols.append(sym)
                 symbol_ids.append(sym_id)
@@ -505,7 +593,12 @@ class TypeScriptJavaScriptLanguageAdapter(LanguageAdapter):
                     line_start=lineno,
                     line_end=lineno,
                     signature=f"function {fname}({params})",
-                    provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="TS_JS_FN_PARSER", confidence=0.95)
+                    provenance=ProvenanceRecord(
+                        truth_level=TruthLevel.STATIC,
+                        source="TS_JS_FN_PARSER",
+                        confidence=0.95,
+                        evidence=f"Function declaration line {lineno}"
+                    )
                 )
                 symbols.append(sym)
                 symbol_ids.append(sym_id)
@@ -526,7 +619,12 @@ class TypeScriptJavaScriptLanguageAdapter(LanguageAdapter):
                     line_end=lineno,
                     signature=f"const {fname} = ({params}) =>",
                     return_type=ret_type.strip() if ret_type else None,
-                    provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="TS_JS_ARROW_PARSER", confidence=0.95)
+                    provenance=ProvenanceRecord(
+                        truth_level=TruthLevel.STATIC,
+                        source="TS_JS_ARROW_PARSER",
+                        confidence=0.95,
+                        evidence=f"Arrow function declaration line {lineno}"
+                    )
                 )
                 symbols.append(sym)
                 symbol_ids.append(sym_id)
@@ -543,7 +641,12 @@ class TypeScriptJavaScriptLanguageAdapter(LanguageAdapter):
                     method=method.upper(),
                     route_path=path,
                     handler_symbol_id=f"sym://{rel_path}#route_{method}_{path.replace('/', '_')}",
-                    provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="EXPRESS_ROUTE_PARSER", confidence=0.9)
+                    provenance=ProvenanceRecord(
+                        truth_level=TruthLevel.STATIC,
+                        source="EXPRESS_ROUTE_PARSER",
+                        confidence=0.9,
+                        evidence=f"Express route line {lineno}: {line.strip()}"
+                    )
                 )
                 apis.append(api_ent)
 
@@ -558,7 +661,12 @@ class TypeScriptJavaScriptLanguageAdapter(LanguageAdapter):
                     method=method.upper(),
                     route_path=route_path,
                     handler_symbol_id=f"sym://{rel_path}#{method}",
-                    provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="NEXTJS_ROUTE_PARSER", confidence=0.95)
+                    provenance=ProvenanceRecord(
+                        truth_level=TruthLevel.STATIC,
+                        source="NEXTJS_ROUTE_PARSER",
+                        confidence=0.95,
+                        evidence=f"Next.js App Router route line {lineno}: {line.strip()}"
+                    )
                 )
                 apis.append(api_ent)
 
@@ -573,7 +681,12 @@ class TypeScriptJavaScriptLanguageAdapter(LanguageAdapter):
                     line_start=lineno,
                     line_end=lineno,
                     test_type=TestKind.UNIT,
-                    provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="JEST_VITEST_PARSER", confidence=0.95)
+                    provenance=ProvenanceRecord(
+                        truth_level=TruthLevel.STATIC,
+                        source="JEST_VITEST_PARSER",
+                        confidence=0.95,
+                        evidence=f"Test declaration line {lineno}: {line.strip()}"
+                    )
                 )
                 tests.append(test_ent)
 
@@ -588,7 +701,12 @@ class TypeScriptJavaScriptLanguageAdapter(LanguageAdapter):
             imports=imports,
             file_hash=file_hash,
             is_modeled=True,
-            provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="TS_JS_LANGUAGE_ADAPTER", confidence=0.95)
+            provenance=ProvenanceRecord(
+                truth_level=TruthLevel.STATIC,
+                source="TS_JS_LANGUAGE_ADAPTER",
+                confidence=0.95,
+                evidence="Full TypeScript/JavaScript syntactic extraction"
+            )
         )
 
         return module_ent, symbols, apis, tests, relations
@@ -625,7 +743,7 @@ class FallbackLanguageAdapter(LanguageAdapter):
                 truth_level=TruthLevel.STATIC,
                 source="FALLBACK_ADAPTER",
                 confidence=0.5,
-                evidence=f"File classification recorded without AST parsing for language '{file_entry.language.value}'"
+                evidence=f"File classification recorded without AST parsing for unmodeled language '{file_entry.language.value}'"
             )
         )
         return module_ent, [], [], [], []
@@ -639,9 +757,9 @@ class GroundedSpecWeaver:
     """
     Authoritatively weaves Requirement, Behavior, LLD Component, and Task lineages into the World Model.
     Strict Invariants:
-    1. NEVER fabricates FULLY_IMPLEMENTED before execution. Pre-execution targets are marked ImplementationStatus.TARGETED.
-    2. NEVER fabricates PASSED for un-executed tests. Static calls are marked CoverageStatus.STATICALLY_LINKED and ExecutionResult.UNTESTED.
-    3. NEVER uses coarse filename coincidence to assert symbol implementation.
+    1. Pre-execution tasks map to symbols/modules via TargetRelation (TARGETS) with ImplementationStatus.TARGETED.
+    2. Static test calls map via VerificationRelation (VERIFIED_BY) with CoverageStatus.STATICALLY_LINKED and ExecutionResult.UNTESTED.
+    3. Every created relation carries an explicit, non-default ProvenanceRecord.
     """
 
     @classmethod
@@ -673,16 +791,20 @@ class GroundedSpecWeaver:
 
             for ent_id, ent in world_model.entities.items():
                 if isinstance(ent, SymbolEntity):
-                    # Explicit symbol declaration or exact component match
                     if ent.name in declared_symbols or ent.qualified_name in declared_symbols:
                         world_model.add_relation(OwnershipRelation(
                             component_id=comp_id,
                             entity_id=ent.id,
                             ownership_kind=OwnershipKind.PRIMARY_OWNER,
-                            provenance=ProvenanceRecord(truth_level=TruthLevel.DERIVED, source="LLD_DECLARED_SYMBOL", confidence=1.0)
+                            provenance=ProvenanceRecord(
+                                truth_level=TruthLevel.DERIVED,
+                                source="LLD_DECLARED_SYMBOL",
+                                confidence=1.0,
+                                evidence=f"LLD Component '{comp_id}' explicitly declares symbol '{ent.name}'"
+                            )
                         ))
 
-        # 2. Map Tasks to Symbols (ImplementationRelation - TARGETED status)
+        # 2. Map Tasks to Symbols & Modules (TargetRelation - TARGETS intent)
         for t in tasks_list:
             t_id = _get(t, "id")
             parent_lld = _get(t, "parent_lld")
@@ -692,28 +814,37 @@ class GroundedSpecWeaver:
             if not t_id:
                 continue
 
-            req_id = None
-            beh_id = None
-            if parent_lld:
-                for lld in lld_list:
-                    if _get(lld, "id") == parent_lld or _get(lld, "component_name") == parent_lld:
-                        req_id = _get(lld, "parent_requirement_id") or _get(lld, "requirement_id")
-                        beh_id = _get(lld, "parent_behavior_id") or _get(lld, "behavior_id")
-                        break
-
             # Map explicit target symbols
             for ent_id, ent in world_model.entities.items():
                 if isinstance(ent, SymbolEntity):
                     is_explicit_target = (ent.id in target_symbols or ent.qualified_name in target_symbols or ent.name in target_symbols)
                     if is_explicit_target:
-                        world_model.add_relation(ImplementationRelation(
-                            symbol_id=ent.id,
-                            requirement_id=req_id,
-                            behavior_id=beh_id,
-                            lld_component_id=parent_lld,
+                        world_model.add_relation(TargetRelation(
                             task_id=t_id,
-                            implementation_status=ImplementationStatus.TARGETED,
-                            provenance=ProvenanceRecord(truth_level=TruthLevel.PROPOSED, source="TASK_TARGET_SYMBOLS", confidence=1.0)
+                            target_entity_id=ent.id,
+                            target_kind="symbol",
+                            status=ImplementationStatus.TARGETED,
+                            provenance=ProvenanceRecord(
+                                truth_level=TruthLevel.PROPOSED,
+                                source="TASK_TARGET_SYMBOLS",
+                                confidence=1.0,
+                                evidence=f"Task '{t_id}' explicitly targets symbol '{ent.name}'"
+                            )
+                        ))
+                elif isinstance(ent, ModuleEntity):
+                    matches_file = any(tf.replace("\\", "/").strip().lstrip("/") == ent.path for tf in target_files)
+                    if matches_file:
+                        world_model.add_relation(TargetRelation(
+                            task_id=t_id,
+                            target_entity_id=ent.id,
+                            target_kind="module",
+                            status=ImplementationStatus.TARGETED,
+                            provenance=ProvenanceRecord(
+                                truth_level=TruthLevel.PROPOSED,
+                                source="TASK_TARGET_FILES",
+                                confidence=0.85,
+                                evidence=f"Task '{t_id}' declares target file '{ent.path}'"
+                            )
                         ))
 
         # 3. Map TestEntities to Symbols (VerificationRelation - UNTESTED status)
@@ -736,7 +867,12 @@ class GroundedSpecWeaver:
                             verification_kind=VerificationKind.DIRECT_UNIT_TEST,
                             coverage_status=CoverageStatus.STATICALLY_LINKED,
                             execution_status=ExecutionResult.UNTESTED,
-                            provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="STATIC_TEST_CALL_GRAPH", confidence=1.0)
+                            provenance=ProvenanceRecord(
+                                truth_level=TruthLevel.STATIC,
+                                source="STATIC_TEST_CALL_GRAPH",
+                                confidence=1.0,
+                                evidence=f"Test '{ent.name}' statically calls symbol '{callee}'"
+                            )
                         ))
 
 
@@ -772,7 +908,12 @@ class WorldModelEngine:
             root_path=".",
             repository_state_hash=snapshot.repository_state_hash,
             primary_language=LanguageKind.PYTHON,
-            provenance=ProvenanceRecord(truth_level=TruthLevel.STATIC, source="REPOSITORY_ROOT", confidence=1.0)
+            provenance=ProvenanceRecord(
+                truth_level=TruthLevel.STATIC,
+                source="REPOSITORY_ROOT",
+                confidence=1.0,
+                evidence="Repository root snapshot anchoring"
+            )
         )
 
         world_model = EngineeringWorldModel(

@@ -1329,7 +1329,7 @@ class ArtifactGovernor:
     ) -> GovernanceGateResult:
         """
         Audits Engineering World Model structural consistency, referential integrity,
-        Merkle canonical hash validity, repository state hash anchoring, and epistemic truth discipline.
+        Merkle canonical hash validity, repository state hash anchoring, and complete epistemic semantic lattice.
         """
         from world_model import (
             EngineeringWorldModel,
@@ -1339,11 +1339,15 @@ class ArtifactGovernor:
             TestEntity,
             DependencyRelation,
             OwnershipRelation,
+            TargetRelation,
             ImplementationRelation,
             VerificationRelation,
             TruthLevel,
             ImplementationStatus,
-            ExecutionResult
+            CoverageStatus,
+            ExecutionResult,
+            ProvenanceRecord,
+            ResolutionKind
         )
 
         reasons: List[str] = []
@@ -1361,50 +1365,69 @@ class ArtifactGovernor:
                     f"does not match recomputed hash '{recomputed[:8]}'."
                 )
 
-        # 2. Entity Key vs ID Reconciliation
+        # 2. Entity Key Parity, Mandatory Provenance & Unmodeled Boundary Checks
         entity_ids = set()
         for k, v in world_model.entities.items():
             if v.id != k:
                 reasons.append(f"ENTITY_KEY_MISMATCH: dictionary key '{k}' does not match entity id '{v.id}'.")
+            if not getattr(v, "provenance", None) or not isinstance(v.provenance, ProvenanceRecord):
+                reasons.append(f"MISSING_PROVENANCE: entity '{k}' lacks a valid non-default ProvenanceRecord.")
+            if isinstance(v, ModuleEntity) and not v.is_modeled:
+                if v.symbols or v.exports or v.imports:
+                    reasons.append(f"UNMODELED_MODULE_SYNTAX_FABRICATION: unmodeled module '{v.id}' cannot declare inner symbols/exports.")
             entity_ids.add(v.id)
 
-        # 3. Referential Integrity Check
-        for rel in world_model.relations:
-            if isinstance(rel, DependencyRelation):
-                if rel.from_entity not in entity_ids:
-                    reasons.append(f"ORPHAN_DEPENDENCY_SOURCE: from_entity '{rel.from_entity}' not found in world model.")
-                # If resolution is RESOLVED, to_entity must exist
-                from world_model import ResolutionKind
-                if rel.resolution == ResolutionKind.RESOLVED and rel.to_entity not in entity_ids:
-                    reasons.append(f"ORPHAN_DEPENDENCY_TARGET: resolved to_entity '{rel.to_entity}' not found in world model.")
+        # 3. Formal Semantic Lattice & Invariant Matrix for Relations
+        for idx, rel in enumerate(world_model.relations):
+            if not getattr(rel, "provenance", None) or not isinstance(rel.provenance, ProvenanceRecord):
+                reasons.append(f"MISSING_PROVENANCE: relation #{idx} lacks a valid non-default ProvenanceRecord.")
+                continue
 
-            elif isinstance(rel, OwnershipRelation):
-                if rel.entity_id not in entity_ids:
-                    reasons.append(f"ORPHAN_OWNERSHIP_RELATION: target entity '{rel.entity_id}' not found in world model.")
+            prov = rel.provenance
+
+            if isinstance(rel, TargetRelation):
+                if rel.target_entity_id not in entity_ids:
+                    reasons.append(f"ORPHAN_TARGET_RELATION: target_entity '{rel.target_entity_id}' not found in world model.")
+                if prov.truth_level not in [TruthLevel.PROPOSED, TruthLevel.DERIVED]:
+                    reasons.append(f"INVALID_TARGET_TRUTH_LEVEL: TargetRelation must have PROPOSED or DERIVED truth level, got '{prov.truth_level.value}'.")
+                if rel.status != ImplementationStatus.TARGETED:
+                    reasons.append(f"FORGED_TARGET_STATUS_ESCALATION: TargetRelation status must be TARGETED, got '{rel.status.value}'.")
 
             elif isinstance(rel, ImplementationRelation):
                 if rel.symbol_id not in entity_ids:
                     reasons.append(f"ORPHAN_IMPLEMENTATION_RELATION: symbol '{rel.symbol_id}' not found in world model.")
-                # Epistemic check: PROPOSED truth level cannot claim FULLY_IMPLEMENTED / VERIFIED
-                if rel.provenance.truth_level == TruthLevel.PROPOSED:
-                    if rel.implementation_status in [ImplementationStatus.IMPLEMENTED, ImplementationStatus.VERIFIED]:
-                        reasons.append(
-                            f"FABRICATED_IMPLEMENTATION_STATUS: symbol '{rel.symbol_id}' with PROPOSED truth level "
-                            f"cannot claim implementation status '{rel.implementation_status.value}' before execution."
-                        )
+                if prov.truth_level not in [TruthLevel.DERIVED, TruthLevel.OBSERVED]:
+                    reasons.append(f"UNVERIFIED_IMPLEMENTATION_TRUTH_LEVEL: ImplementationRelation requires DERIVED or OBSERVED truth level, got '{prov.truth_level.value}'.")
+                if rel.status not in [ImplementationStatus.IMPLEMENTED, ImplementationStatus.VERIFIED]:
+                    reasons.append(f"INVALID_IMPLEMENTATION_STATUS: ImplementationRelation status must be IMPLEMENTED or VERIFIED, got '{rel.status.value}'.")
 
             elif isinstance(rel, VerificationRelation):
                 if rel.test_entity_id not in entity_ids:
                     reasons.append(f"ORPHAN_VERIFICATION_RELATION: test entity '{rel.test_entity_id}' not found in world model.")
                 if rel.target_entity_id not in entity_ids:
                     reasons.append(f"ORPHAN_VERIFICATION_RELATION: target entity '{rel.target_entity_id}' not found in world model.")
-                # Epistemic check: STATIC truth level cannot claim PASSED or FAILED execution result
-                if rel.provenance.truth_level == TruthLevel.STATIC:
-                    if rel.execution_status in [ExecutionResult.PASSED, ExecutionResult.FAILED]:
-                        reasons.append(
-                            f"FABRICATED_EXECUTION_RESULT: test '{rel.test_entity_id}' with STATIC truth level "
-                            f"cannot assert execution result '{rel.execution_status.value}' without runtime execution evidence."
-                        )
+
+                # Lattice for VerificationRelation
+                if prov.truth_level == TruthLevel.STATIC:
+                    if rel.coverage_status != CoverageStatus.STATICALLY_LINKED:
+                        reasons.append(f"INVALID_STATIC_COVERAGE_STATUS: STATIC verification relation must have STATICALLY_LINKED coverage status, got '{rel.coverage_status.value}'.")
+                    if rel.execution_status != ExecutionResult.UNTESTED:
+                        reasons.append(f"STATIC_VERIFICATION_EXECUTION_FORGERY: STATIC verification relation cannot assert execution result '{rel.execution_status.value}'.")
+                elif prov.truth_level == TruthLevel.OBSERVED:
+                    if rel.execution_status not in [ExecutionResult.PASSED, ExecutionResult.FAILED, ExecutionResult.ERRORED]:
+                        reasons.append(f"INVALID_OBSERVED_EXECUTION_STATUS: OBSERVED verification relation requires concrete execution result, got '{rel.execution_status.value}'.")
+
+            elif isinstance(rel, DependencyRelation):
+                if rel.from_entity not in entity_ids:
+                    reasons.append(f"ORPHAN_DEPENDENCY_SOURCE: from_entity '{rel.from_entity}' not found in world model.")
+                if rel.resolution == ResolutionKind.RESOLVED and rel.to_entity not in entity_ids:
+                    reasons.append(f"ORPHAN_DEPENDENCY_TARGET: resolved to_entity '{rel.to_entity}' not found in world model.")
+
+            elif isinstance(rel, OwnershipRelation):
+                if rel.entity_id not in entity_ids:
+                    reasons.append(f"ORPHAN_OWNERSHIP_RELATION: target entity '{rel.entity_id}' not found in world model.")
+                if prov.truth_level == TruthLevel.OBSERVED:
+                    reasons.append("INVALID_OWNERSHIP_TRUTH_LEVEL: OwnershipRelation cannot carry OBSERVED truth level.")
 
         # 4. Live Repository Snapshot Alignment
         if workspace_dir:

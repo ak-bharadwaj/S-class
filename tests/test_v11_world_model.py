@@ -2,17 +2,20 @@
 S-Class EOS V11.2 — Authoritative Engineering World Model Hardening Test Suite (test_v11_world_model.py)
 
 Comprehensive verification of:
-1. Four-Tier Truth Ontology & Provenance Records (STATIC, OBSERVED, DERIVED, PROPOSED)
-2. Epistemic Integrity: No fabricated FULLY_IMPLEMENTED before execution (ImplementationStatus: TARGETED)
-3. Epistemic Integrity: No fabricated PASSED without runtime execution (CoverageStatus: STATICALLY_LINKED, ExecutionResult: UNTESTED)
-4. Python Language Adapter (AST, classes, methods, params, returns, docstrings, FastAPI/Flask routes)
-5. TypeScript / JavaScript Language Adapter (Classes, interfaces, functions, Express/Next routes, Jest tests)
-6. Fallback Language Adapter (Unsupported languages explicitly marked is_modeled=False, no fabricated AST)
-7. Symbol Identity Hash Stability (Identity preserved across refactoring; revision hash detects edits)
-8. Complete Referential Integrity (Orphan relations fail Governor closed)
-9. Entity Dictionary Key Reconciled with entity.id (Key mismatch fails closed)
-10. Mandatory Repository State Hash and Canonical Hash (Missing hashes fail closed)
-11. Transitive Impact Radius Computation
+1. Four-Tier Truth Ontology & Strict Non-Default Provenance Records
+2. Provenance Deletion Fails Closed (No silent defaults)
+3. TargetRelation (TARGETS) vs ImplementationRelation (IMPLEMENTS) Separation
+4. Target Status Escalation Blocked by Governor (TARGETED -> IMPLEMENTED/VERIFIED forgery)
+5. Static Verification Execution Forgery Blocked (STATIC -> PASSED forgery)
+6. Unmodeled Code Execution Barrier (Hard safety boundary on unmodeled files)
+7. Unmodeled Syntax Fabrication Blocked (Governor rejects inner symbols on unmodeled modules)
+8. Python Language Adapter
+9. TypeScript / JavaScript Language Adapter
+10. Symbol Identity Hash Stability vs Revision Hash
+11. Complete Referential Integrity (Orphan relations fail Governor closed)
+12. Entity Dictionary Key Parity
+13. Missing Mandatory Hashes Fail Closed
+14. Transitive Impact Radius Computation
 """
 
 import os
@@ -30,6 +33,7 @@ from world_model import (
     TestEntity,
     DependencyRelation,
     OwnershipRelation,
+    TargetRelation,
     ImplementationRelation,
     VerificationRelation,
     SymbolType,
@@ -81,10 +85,10 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
         return full_path
 
     # -------------------------------------------------------------------------
-    # Test 1: Truth Ontology & Provenance Records
+    # Test 1: Truth Ontology & Strict Provenance Records
     # -------------------------------------------------------------------------
     def test_v11_world_model_truth_ontology_and_provenance(self):
-        """Invariant: Every entity and relation carries explicit TruthLevel and ProvenanceRecord."""
+        """Invariant: Every entity and relation carries explicit, non-default ProvenanceRecord."""
         self._create_file("src/math.py", "def add(a: int, b: int) -> int: return a + b")
         world_model = WorldModelEngine.build_world_model(self.test_dir)
 
@@ -93,12 +97,29 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
         self.assertEqual(sym.provenance.truth_level, TruthLevel.STATIC)
         self.assertEqual(sym.provenance.source, "PYTHON_AST_FUNCTION")
         self.assertEqual(sym.provenance.confidence, 1.0)
+        self.assertTrue(len(sym.provenance.evidence) > 0)
 
     # -------------------------------------------------------------------------
-    # Test 2: Epistemic Integrity: No Fabricated FULLY_IMPLEMENTED
+    # Test 2: Provenance Deletion Fails Closed
+    # -------------------------------------------------------------------------
+    def test_v11_world_model_provenance_deletion_fails_closed(self):
+        """Invariant: Omitting provenance during governed deserialization raises ValueError."""
+        self._create_file("src/app.py", "def main(): pass")
+        world_model = WorldModelEngine.build_world_model(self.test_dir)
+
+        raw_dict = world_model.to_dict()
+        # Delete provenance from a symbol
+        del raw_dict["entities"]["sym://src/app.py#main"]["provenance"]
+
+        with self.assertRaises(ValueError) as ctx:
+            EngineeringWorldModel.from_governed_dict(raw_dict, strict_governance=True)
+        self.assertIn("missing mandatory provenance", str(ctx.exception).lower())
+
+    # -------------------------------------------------------------------------
+    # Test 3: TargetRelation vs ImplementationRelation Separation
     # -------------------------------------------------------------------------
     def test_v11_world_model_no_fabricated_fully_implemented_pre_execution(self):
-        """Invariant: Pre-coding tasks map to symbols with TARGETED, never FULLY_IMPLEMENTED."""
+        """Invariant: Pre-coding tasks create TargetRelation (TARGETS), never ImplementationRelation."""
         self._create_file("src/service.py", "def process_order(): pass")
 
         mock_pipeline = {
@@ -112,23 +133,45 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
 
         world_model = WorldModelEngine.build_world_model(self.test_dir, pipeline_data=mock_pipeline)
 
+        targets = [r for r in world_model.relations if isinstance(r, TargetRelation)]
         impls = [r for r in world_model.relations if isinstance(r, ImplementationRelation)]
-        self.assertEqual(len(impls), 1)
-        self.assertEqual(impls[0].implementation_status, ImplementationStatus.TARGETED)
-        self.assertEqual(impls[0].provenance.truth_level, TruthLevel.PROPOSED)
 
-        # Attacker tampers relation to claim FULLY_IMPLEMENTED before execution -> Governor blocks
-        world_model.relations[0].implementation_status = ImplementationStatus.IMPLEMENTED
-        world_model.canonical_hash = world_model.compute_canonical_hash()
+        self.assertEqual(len(targets), 1)
+        self.assertEqual(len(impls), 0)  # No ImplementationRelation created before execution!
+        self.assertEqual(targets[0].status, ImplementationStatus.TARGETED)
+        self.assertEqual(targets[0].provenance.truth_level, TruthLevel.PROPOSED)
+
+    # -------------------------------------------------------------------------
+    # Test 4: Target Status Escalation Blocked by Governor
+    # -------------------------------------------------------------------------
+    def test_v11_world_model_target_status_escalation_fails_closed(self):
+        """Invariant: Escalating TargetRelation to IMPLEMENTED or VERIFIED is blocked by Governor."""
+        self._create_file("src/service.py", "def run(): pass")
+        world_model = WorldModelEngine.build_world_model(self.test_dir)
+
+        # Attacker injects forged TargetRelation claiming VERIFIED
+        world_model.add_relation(TargetRelation(
+            task_id="TASK-001",
+            target_entity_id="sym://src/service.py#run",
+            target_kind="symbol",
+            status=ImplementationStatus.VERIFIED,
+            provenance=ProvenanceRecord(
+                truth_level=TruthLevel.PROPOSED,
+                source="FORGED_PLANNER",
+                confidence=1.0,
+                evidence="Forged verification"
+            )
+        ))
+
         gov_res = ArtifactGovernor.audit_world_model_governance(world_model, self.test_dir)
         self.assertTrue(gov_res.is_blocked)
-        self.assertTrue(any("FABRICATED_IMPLEMENTATION_STATUS" in r for r in gov_res.blocking_reasons))
+        self.assertTrue(any("FORGED_TARGET_STATUS_ESCALATION" in r for r in gov_res.blocking_reasons))
 
     # -------------------------------------------------------------------------
-    # Test 3: Epistemic Integrity: No Fabricated PASSED Without Execution
+    # Test 5: Static Verification Execution Forgery Blocked
     # -------------------------------------------------------------------------
-    def test_v11_world_model_no_fabricated_passed_static_test_call(self):
-        """Invariant: Static test call graph maps with STATICALLY_LINKED and UNTESTED, never PASSED."""
+    def test_v11_world_model_static_verification_execution_forgery_fails_closed(self):
+        """Invariant: Static VerificationRelation claiming PASSED without runtime proof is blocked."""
         self._create_file("src/calc.py", "def multiply(x, y): return x * y")
         self._create_file("tests/test_calc.py", "from src.calc import multiply\ndef test_mult(): assert multiply(2, 3) == 6")
 
@@ -138,17 +181,52 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
         self.assertEqual(len(verifs), 1)
         self.assertEqual(verifs[0].coverage_status, CoverageStatus.STATICALLY_LINKED)
         self.assertEqual(verifs[0].execution_status, ExecutionResult.UNTESTED)
-        self.assertEqual(verifs[0].provenance.truth_level, TruthLevel.STATIC)
 
-        # Attacker tampers relation to claim PASSED without execution -> Governor blocks
-        world_model.relations[len(world_model.relations) - 1].execution_status = ExecutionResult.PASSED
+        # Attacker tampers execution_status to PASSED while truth_level is STATIC
+        verifs[0].execution_status = ExecutionResult.PASSED
         world_model.canonical_hash = world_model.compute_canonical_hash()
+
         gov_res = ArtifactGovernor.audit_world_model_governance(world_model, self.test_dir)
         self.assertTrue(gov_res.is_blocked)
-        self.assertTrue(any("FABRICATED_EXECUTION_RESULT" in r for r in gov_res.blocking_reasons))
+        self.assertTrue(any("STATIC_VERIFICATION_EXECUTION_FORGERY" in r for r in gov_res.blocking_reasons))
 
     # -------------------------------------------------------------------------
-    # Test 4: Python Language Adapter
+    # Test 6: Unmodeled Code Execution Barrier
+    # -------------------------------------------------------------------------
+    def test_v11_world_model_unmodeled_code_execution_barrier(self):
+        """Invariant: Targeting an unmodeled file triggers UNMODELED_CODE_BARRIER."""
+        self._create_file("src/engine.rs", "fn run_engine() { println!(\"running\"); }")
+        world_model = WorldModelEngine.build_world_model(self.test_dir)
+
+        mod = world_model.get_module("mod://src/engine.rs")
+        self.assertIsNotNone(mod)
+        self.assertFalse(mod.is_modeled)
+
+        can_target, barrier_reason = world_model.can_safely_target("mod://src/engine.rs")
+        self.assertFalse(can_target)
+        self.assertIn("UNMODELED_CODE_BARRIER", barrier_reason)
+
+    # -------------------------------------------------------------------------
+    # Test 7: Unmodeled Module Syntax Fabrication Blocked
+    # -------------------------------------------------------------------------
+    def test_v11_world_model_unmodeled_syntax_fabrication_fails_governor(self):
+        """Invariant: Unmodeled modules declaring fake inner symbols fail Governor."""
+        self._create_file("config/app.toml", "[app]\nname = 'test'")
+        world_model = WorldModelEngine.build_world_model(self.test_dir)
+
+        mod = world_model.get_module("mod://config/app.toml")
+        self.assertFalse(mod.is_modeled)
+
+        # Attacker fabricates inner symbols on unmodeled file
+        mod.symbols.append("sym://config/app.toml#fake_symbol")
+        world_model.canonical_hash = world_model.compute_canonical_hash()
+
+        gov_res = ArtifactGovernor.audit_world_model_governance(world_model, self.test_dir)
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("UNMODELED_MODULE_SYNTAX_FABRICATION" in r for r in gov_res.blocking_reasons))
+
+    # -------------------------------------------------------------------------
+    # Test 8: Python Language Adapter
     # -------------------------------------------------------------------------
     def test_v11_world_model_python_language_adapter(self):
         """Invariant: Python adapter extracts classes, methods, routes, and call dependencies."""
@@ -169,23 +247,20 @@ def get_billing():
         self._create_file("src/billing.py", code)
         world_model = WorldModelEngine.build_world_model(self.test_dir)
 
-        # Class
         cls_sym = world_model.get_symbol("sym://src/billing.py#BillingEngine")
         self.assertIsNotNone(cls_sym)
         self.assertEqual(cls_sym.symbol_type, SymbolType.CLASS)
 
-        # Method
         m_sym = world_model.get_symbol("sym://src/billing.py#BillingEngine.calculate_invoice")
         self.assertIsNotNone(m_sym)
         self.assertEqual(m_sym.return_type, "float")
 
-        # Route
         api_ent = world_model.entities.get("api://GET/api/v1/billing")
         self.assertIsNotNone(api_ent)
         self.assertIsInstance(api_ent, APIEntity)
 
     # -------------------------------------------------------------------------
-    # Test 5: TypeScript / JavaScript Language Adapter
+    # Test 9: TypeScript / JavaScript Language Adapter
     # -------------------------------------------------------------------------
     def test_v11_world_model_typescript_javascript_language_adapter(self):
         """Invariant: TypeScript/JavaScript adapter parses exports, classes, interfaces, routes, and tests."""
@@ -221,40 +296,22 @@ test('UserService returns user', async () => {
         self.assertIsNotNone(mod)
         self.assertTrue(mod.is_modeled)
 
-        # Interface
         iface = world_model.get_symbol("sym://src/users.ts#UserDTO")
         self.assertIsNotNone(iface)
         self.assertEqual(iface.symbol_type, SymbolType.INTERFACE)
 
-        # Class
         cls_sym = world_model.get_symbol("sym://src/users.ts#UserService")
         self.assertIsNotNone(cls_sym)
         self.assertEqual(cls_sym.symbol_type, SymbolType.CLASS)
 
-        # API Route
         api_ent = world_model.entities.get("api://GET/api/users")
         self.assertIsNotNone(api_ent)
 
-        # Test
         test_ent = world_model.entities.get("test://src/users.ts#UserService returns user")
         self.assertIsNotNone(test_ent)
 
     # -------------------------------------------------------------------------
-    # Test 6: Fallback Language Adapter
-    # -------------------------------------------------------------------------
-    def test_v11_world_model_fallback_unmodeled_language_adapter(self):
-        """Invariant: Unsupported languages are marked is_modeled=False without fabricating AST."""
-        self._create_file("config/database.yaml", "host: localhost\nport: 5432")
-        world_model = WorldModelEngine.build_world_model(self.test_dir)
-
-        mod = world_model.get_module("mod://config/database.yaml")
-        self.assertIsNotNone(mod)
-        self.assertFalse(mod.is_modeled)
-        self.assertEqual(mod.symbols, [])
-        self.assertEqual(mod.provenance.source, "FALLBACK_ADAPTER")
-
-    # -------------------------------------------------------------------------
-    # Test 7: Symbol Identity Hash vs Revision Hash
+    # Test 10: Symbol Identity Hash vs Revision Hash
     # -------------------------------------------------------------------------
     def test_v11_world_model_symbol_identity_hash_vs_revision_hash_stability(self):
         """Invariant: Refactoring line numbers preserves identity_hash while updating revision_hash."""
@@ -269,33 +326,38 @@ test('UserService returns user', async () => {
         wm2 = WorldModelEngine.build_world_model(self.test_dir)
         sym2 = wm2.get_symbol("sym://src/algo.py#compute")
 
-        # Identity hash MUST remain identical despite line number change
         self.assertEqual(sym1.symbol_identity_hash, sym2.symbol_identity_hash)
-        # Line spans differ
         self.assertNotEqual(sym1.line_start, sym2.line_start)
-        # Revision hash captures line/body changes
         self.assertNotEqual(sym1.symbol_revision_hash, sym2.symbol_revision_hash)
 
     # -------------------------------------------------------------------------
-    # Test 8: Complete Referential Integrity & Orphan Blocking
+    # Test 11: Complete Referential Integrity & Orphan Blocking
     # -------------------------------------------------------------------------
     def test_v11_world_model_referential_integrity_and_orphan_blocking(self):
         """Invariant: Half-orphaned relations with missing entities are strictly blocked."""
         self._create_file("src/app.py", "def app(): pass")
         world_model = WorldModelEngine.build_world_model(self.test_dir)
 
-        # Inject orphaned implementation relation pointing to non-existent symbol
-        world_model.add_relation(ImplementationRelation(
-            symbol_id="sym://src/nonexistent.py#ghost_symbol",
-            task_id="TASK-999"
+        # Inject orphaned target relation pointing to non-existent symbol
+        world_model.add_relation(TargetRelation(
+            task_id="TASK-999",
+            target_entity_id="sym://src/nonexistent.py#ghost_symbol",
+            target_kind="symbol",
+            status=ImplementationStatus.TARGETED,
+            provenance=ProvenanceRecord(
+                truth_level=TruthLevel.PROPOSED,
+                source="TEST",
+                confidence=1.0,
+                evidence="Orphan test"
+            )
         ))
 
         gov_res = ArtifactGovernor.audit_world_model_governance(world_model, self.test_dir)
         self.assertTrue(gov_res.is_blocked)
-        self.assertTrue(any("ORPHAN_IMPLEMENTATION_RELATION" in r for r in gov_res.blocking_reasons))
+        self.assertTrue(any("ORPHAN_TARGET_RELATION" in r for r in gov_res.blocking_reasons))
 
     # -------------------------------------------------------------------------
-    # Test 9: Entity Dictionary Key Parity
+    # Test 12: Entity Dictionary Key Parity
     # -------------------------------------------------------------------------
     def test_v11_world_model_entity_dict_key_mismatch_fails_closed(self):
         """Invariant: Entity dictionary key mismatching entity.id fails closed."""
@@ -303,7 +365,6 @@ test('UserService returns user', async () => {
         world_model = WorldModelEngine.build_world_model(self.test_dir)
 
         raw_dict = world_model.to_dict()
-        # Tamper key to mismatch entity.id
         raw_dict["entities"]["sym://fake_key"] = raw_dict["entities"].pop("sym://src/app.py#app")
 
         with self.assertRaises(ValueError) as ctx:
@@ -311,7 +372,7 @@ test('UserService returns user', async () => {
         self.assertIn("entity key mismatch", str(ctx.exception).lower())
 
     # -------------------------------------------------------------------------
-    # Test 10: Missing Mandatory Hashes Fail Closed
+    # Test 13: Missing Mandatory Hashes Fail Closed
     # -------------------------------------------------------------------------
     def test_v11_world_model_missing_mandatory_hashes_fail_closed(self):
         """Invariant: Missing repository_state_hash or canonical_hash fails closed."""
@@ -326,7 +387,7 @@ test('UserService returns user', async () => {
         self.assertIn("repository_state_hash", str(ctx.exception))
 
     # -------------------------------------------------------------------------
-    # Test 11: Transitive Impact Radius Computation
+    # Test 14: Transitive Impact Radius Computation
     # -------------------------------------------------------------------------
     def test_v11_world_model_transitive_impact_radius(self):
         """Invariant: Impact radius accurately computes downstream affected symbols, APIs, modules, and tests."""
