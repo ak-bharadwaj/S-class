@@ -227,17 +227,16 @@ class TestV953EpistemicRigor(unittest.TestCase):
         competer_blocked = [True]
 
         def long_holding_owner():
-            # Set a very short stale_ttl (0.1s) so age immediately exceeds stale_ttl
-            with FileLock(lock_path, stale_ttl=0.1):
+            with FileLock(lock_path, timeout=5.0):
                 acquired_event.set()
-                time.sleep(0.4) # Hold lock past stale_ttl while process (current thread/PID) is ALIVE
+                time.sleep(0.4) # Hold lock while process (current thread/PID) is ALIVE
 
         def competing_worker():
             acquired_event.wait(timeout=2.0)
             # Try to acquire lock with short timeout (0.15s)
             start_compete = time.time()
             try:
-                with FileLock(lock_path, timeout=0.15, stale_ttl=0.1):
+                with FileLock(lock_path, timeout=0.15):
                     competer_blocked[0] = False
             except TimeoutError:
                 competer_blocked[0] = True
@@ -352,7 +351,7 @@ time.sleep(30)
             start = time.time()
             competer_blocked = False
             try:
-                with FileLock(lock_path, timeout=0.4, stale_ttl=0.01):
+                with FileLock(lock_path, timeout=0.4):
                     pass
             except TimeoutError:
                 competer_blocked = True

@@ -1907,11 +1907,11 @@ time.sleep(30)
 
             competer_blocked = False
             try:
-                with FileLock(lock_path, timeout=0.4, stale_ttl=0.01):
+                with FileLock(lock_path, timeout=0.4):
                     pass
             except TimeoutError:
                 competer_blocked = True
-            self.assertTrue(competer_blocked, "Live owner with corrupt metadata and exceeded stale_ttl MUST NEVER be stolen!")
+            self.assertTrue(competer_blocked, "Live owner with corrupt metadata MUST NEVER be stolen while holding kernel lock!")
         finally:
             if proc.poll() is None:
                 proc.kill()

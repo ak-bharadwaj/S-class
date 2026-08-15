@@ -29,8 +29,8 @@ class TestV96FailureInjection(unittest.TestCase):
         with open(lock_path, "w", encoding="utf-8") as f:
             f.write("CORRUPT_LOCK_DATA_INVALID_PID")
 
-        # FileLock must recover the corrupt lock file after stale inspection delay
-        with FileLock(lock_path, timeout=2.0, stale_ttl=0.1):
+        # FileLock acquires the lock file cleanly even with non-json content because kernel lock handle is authoritative
+        with FileLock(lock_path, timeout=2.0):
             self.assertTrue(os.path.exists(lock_path))
 
     def test_system_outcome_corrupt_pipeline_json_fails_closed_in_fsm_runner(self):
