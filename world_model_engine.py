@@ -1020,8 +1020,40 @@ class WorldModelPromotionEngine:
             break
 
         import uuid
+        from world_model import SovereignCryptoAuthority
+        capability = SovereignCryptoAuthority.issue_signing_capability("SCLASS_PROMOTION_ENGINE")
+        evidence_id = f"impl_ev_{uuid.uuid4().hex[:12]}"
+        timestamp = datetime.now(timezone.utc).isoformat() + "Z"
+
+        # Compute deterministic evidence hash
+        payload = {
+            "evidence_id": evidence_id,
+            "issuer_subsystem": "SCLASS_PROMOTION_ENGINE",
+            "source_task_id": source_task_id,
+            "source_task_hash": source_task_hash,
+            "source_changeset_hash": changeset.changeset_hash,
+            "before_repository_state_hash": anchor_snapshot.repository_state_hash,
+            "after_repository_state_hash": result_snapshot.repository_state_hash,
+            "target_symbol_id": target_symbol_id,
+            "target_symbol_revision": target_symbol_revision,
+            "mutation_op": mutation_op,
+            "observed_delta_hash": observed_delta_hash,
+            "execution_record_id": execution_record_id,
+            "timestamp": timestamp
+        }
+        canonical_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        evidence_hash = hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+
+        evidence_signature = SovereignCryptoAuthority.sign(
+            capability=capability,
+            artifact_type="IMPLEMENTATION_EVIDENCE",
+            issuer_id="SCLASS_PROMOTION_ENGINE",
+            evidence_id=evidence_id,
+            evidence_hash=evidence_hash
+        )
+
         evidence = ImplementationEvidence(
-            evidence_id=f"impl_ev_{uuid.uuid4().hex[:12]}",
+            evidence_id=evidence_id,
             issuer_subsystem="SCLASS_PROMOTION_ENGINE",
             source_task_id=source_task_id,
             source_task_hash=source_task_hash,
@@ -1033,7 +1065,9 @@ class WorldModelPromotionEngine:
             mutation_op=mutation_op,
             observed_delta_hash=observed_delta_hash,
             execution_record_id=execution_record_id,
-            timestamp=datetime.now(timezone.utc).isoformat() + "Z"
+            timestamp=timestamp,
+            evidence_hash=evidence_hash,
+            evidence_signature=evidence_signature
         )
         return evidence
 
@@ -1055,8 +1089,38 @@ class WorldModelPromotionEngine:
             raise ValueError(f"Cannot issue passing VerificationEvidence for failing test execution (exit_code={exit_code}, result={execution_result.value}).")
 
         import uuid
+        from world_model import SovereignCryptoAuthority
+        capability = SovereignCryptoAuthority.issue_signing_capability("SCLASS_TEST_RUNNER")
+        evidence_id = f"verif_ev_{uuid.uuid4().hex[:12]}"
+        timestamp = datetime.now(timezone.utc).isoformat() + "Z"
+
+        payload = {
+            "evidence_id": evidence_id,
+            "issuer_subsystem": "SCLASS_TEST_RUNNER",
+            "test_entity_id": test_entity_id,
+            "target_entity_id": target_entity_id,
+            "test_framework": test_framework,
+            "command_hash": command_hash,
+            "raw_result_hash": raw_result_hash,
+            "repository_state_hash": repository_state_hash,
+            "execution_result": execution_result.value if isinstance(execution_result, ExecutionResult) else str(execution_result),
+            "exit_code": exit_code,
+            "execution_receipt_hash": execution_receipt_hash,
+            "timestamp": timestamp
+        }
+        canonical_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        evidence_hash = hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+
+        evidence_signature = SovereignCryptoAuthority.sign(
+            capability=capability,
+            artifact_type="VERIFICATION_EVIDENCE",
+            issuer_id="SCLASS_TEST_RUNNER",
+            evidence_id=evidence_id,
+            evidence_hash=evidence_hash
+        )
+
         evidence = VerificationEvidence(
-            evidence_id=f"verif_ev_{uuid.uuid4().hex[:12]}",
+            evidence_id=evidence_id,
             issuer_subsystem="SCLASS_TEST_RUNNER",
             test_entity_id=test_entity_id,
             target_entity_id=target_entity_id,
@@ -1067,7 +1131,9 @@ class WorldModelPromotionEngine:
             execution_result=execution_result,
             exit_code=exit_code,
             execution_receipt_hash=execution_receipt_hash,
-            timestamp=datetime.now(timezone.utc).isoformat() + "Z"
+            timestamp=timestamp,
+            evidence_hash=evidence_hash,
+            evidence_signature=evidence_signature
         )
         return evidence
 

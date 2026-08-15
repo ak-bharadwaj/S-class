@@ -185,13 +185,44 @@ import hmac
 import secrets
 
 
+class SovereignSigningCapability:
+    """
+    Opaque, non-forgeable sovereign signing capability token.
+    Held exclusively by authorized execution subsystems (PromotionEngine, TestRunner).
+    Untrusted agents, tools, or mutation routines cannot sign evidence without a valid
+    capability token issued by SovereignCryptoAuthority.
+    """
+    def __init__(self, capability_secret: bytes, subsystem_id: str):
+        self._secret = capability_secret
+        self._subsystem_id = subsystem_id
+        self._is_active = True
+
+    def validate(self, expected_secret: bytes, expected_subsystem: str) -> bool:
+        return (
+            self._is_active
+            and self._subsystem_id == expected_subsystem
+            and hmac.compare_digest(self._secret, expected_secret)
+        )
+
+    def revoke(self) -> None:
+        self._is_active = False
+
+
 class SovereignCryptoAuthority:
     """
-    Sovereign cryptographic authority managing process-boundary key material
-    and domain-separated proof attestation without hard-coded secrets.
+    Sovereign cryptographic authority managing process-boundary key material,
+    authority-restricted signing capabilities, and domain-separated proof attestation.
     """
     _in_process_key: Optional[bytes] = None
     _in_process_key_id: str = "sovereign-root-v1"
+    _capability_root_secret: bytes = secrets.token_bytes(32)
+    _AUTHORIZED_SUBSYSTEMS = frozenset({"SCLASS_PROMOTION_ENGINE", "SCLASS_TEST_RUNNER"})
+
+    @classmethod
+    def reset_authority(cls) -> None:
+        """Resets in-process ephemeral key and capability root secret."""
+        cls._in_process_key = None
+        cls._capability_root_secret = secrets.token_bytes(32)
 
     @classmethod
     def get_signing_key(cls) -> bytes:
@@ -212,25 +243,47 @@ class SovereignCryptoAuthority:
         return os.environ.get("SCLASS_SOVEREIGN_KEY_ID", cls._in_process_key_id)
 
     @classmethod
+    def issue_signing_capability(cls, subsystem_id: str) -> SovereignSigningCapability:
+        """
+        Issues an authoritative, non-forgeable SovereignSigningCapability to an authorized subsystem.
+        Ordinary tools and agent routines receive PermissionError.
+        """
+        if subsystem_id not in cls._AUTHORIZED_SUBSYSTEMS:
+            raise PermissionError(f"UNAUTHORIZED_SUBSYSTEM: Subsystem '{subsystem_id}' is not authorized to hold a SovereignSigningCapability.")
+        return SovereignSigningCapability(cls._capability_root_secret, subsystem_id)
+
+    @classmethod
     def compute_domain_context(cls, artifact_type: str, issuer_id: str, evidence_id: str, evidence_hash: str) -> str:
         return f"SCLASS_V11_DOMAIN:{artifact_type}:{issuer_id}:{evidence_id}:{evidence_hash}"
 
     @classmethod
-    def sign(cls, artifact_type: str, issuer_id: str, evidence_id: str, evidence_hash: str) -> str:
+    def sign(cls, capability: SovereignSigningCapability, artifact_type: str, issuer_id: str, evidence_id: str, evidence_hash: str) -> str:
+        """
+        Signs evidence payload with domain-separated HMAC.
+        STRICT REQUIREMENT: Caller MUST provide a valid SovereignSigningCapability issued to matching issuer_id.
+        """
+        if not isinstance(capability, SovereignSigningCapability):
+            raise PermissionError("UNAUTHORIZED_SIGNING_ATTEMPT: Caller lacks SovereignSigningCapability instance.")
+        if not capability.validate(cls._capability_root_secret, issuer_id):
+            raise PermissionError(f"UNAUTHORIZED_SIGNING_ATTEMPT: Invalid or revoked SovereignSigningCapability for issuer '{issuer_id}'.")
+        if not evidence_hash or not isinstance(evidence_hash, str):
+            raise ValueError("Cannot sign empty or invalid evidence_hash.")
+
         context = cls.compute_domain_context(artifact_type, issuer_id, evidence_id, evidence_hash)
         return hmac.new(cls.get_signing_key(), context.encode("utf-8"), hashlib.sha256).hexdigest()
 
     @classmethod
     def verify(cls, artifact_type: str, issuer_id: str, evidence_id: str, evidence_hash: str, signature: str) -> bool:
-        if not signature or not evidence_hash:
+        if not signature or not evidence_hash or not isinstance(signature, str):
             return False
-        expected = cls.sign(artifact_type, issuer_id, evidence_id, evidence_hash)
+        context = cls.compute_domain_context(artifact_type, issuer_id, evidence_id, evidence_hash)
+        expected = hmac.new(cls.get_signing_key(), context.encode("utf-8"), hashlib.sha256).hexdigest()
         return hmac.compare_digest(expected, signature)
 
 
-def compute_sovereign_evidence_signature(evidence_hash: str, artifact_type: str = "IMPLEMENTATION_EVIDENCE", issuer_id: str = "SCLASS_PROMOTION_ENGINE", evidence_id: str = "") -> str:
-    """Computes domain-separated HMAC signature for evidence authenticity."""
-    return SovereignCryptoAuthority.sign(artifact_type, issuer_id, evidence_id, evidence_hash)
+def compute_sovereign_evidence_signature(capability: SovereignSigningCapability, evidence_hash: str, artifact_type: str = "IMPLEMENTATION_EVIDENCE", issuer_id: str = "SCLASS_PROMOTION_ENGINE", evidence_id: str = "") -> str:
+    """Computes domain-separated HMAC signature requiring an authorized SovereignSigningCapability."""
+    return SovereignCryptoAuthority.sign(capability, artifact_type, issuer_id, evidence_id, evidence_hash)
 
 
 def verify_sovereign_evidence_signature(evidence_hash: str, signature: str, artifact_type: str = "IMPLEMENTATION_EVIDENCE", issuer_id: str = "SCLASS_PROMOTION_ENGINE", evidence_id: str = "") -> bool:
@@ -261,11 +314,7 @@ class EvidenceEnvelope:
 
     def __post_init__(self):
         if not self.signature:
-            self.signature = SovereignCryptoAuthority.sign(
-                self.artifact_type, self.issuer_id,
-                self.evidence_payload.get("evidence_id", ""),
-                self.evidence_hash
-            )
+            raise ValueError("EvidenceEnvelope must be initialized with a non-empty signature.")
         if not self.canonical_hash:
             self.canonical_hash = self.compute_canonical_hash()
 
@@ -349,9 +398,7 @@ class ImplementationEvidence:
         if not self.evidence_hash:
             self.evidence_hash = self.compute_evidence_hash()
         if not self.evidence_signature:
-            self.evidence_signature = SovereignCryptoAuthority.sign(
-                "IMPLEMENTATION_EVIDENCE", self.issuer_subsystem, self.evidence_id, self.evidence_hash
-            )
+            raise ValueError("ImplementationEvidence must carry a non-empty evidence_signature issued by an authorized sovereign engine.")
 
     def compute_evidence_hash(self) -> str:
         payload = {
@@ -388,9 +435,7 @@ class ImplementationEvidence:
             "execution_record_id": self.execution_record_id,
             "timestamp": self.timestamp,
             "evidence_hash": self.evidence_hash or self.compute_evidence_hash(),
-            "evidence_signature": self.evidence_signature or SovereignCryptoAuthority.sign(
-                "IMPLEMENTATION_EVIDENCE", self.issuer_subsystem, self.evidence_id, self.evidence_hash or self.compute_evidence_hash()
-            )
+            "evidence_signature": self.evidence_signature
         }
 
     @classmethod
@@ -399,9 +444,9 @@ class ImplementationEvidence:
             "source_task_id", "source_task_hash", "source_changeset_hash",
             "before_repository_state_hash", "after_repository_state_hash",
             "target_symbol_id", "mutation_op", "observed_delta_hash",
-            "execution_record_id", "timestamp"
+            "execution_record_id", "timestamp", "evidence_signature"
         ]:
-            if req not in d:
+            if req not in d or not d[req]:
                 raise ValueError(f"ImplementationEvidence missing mandatory field '{req}'")
         return cls(
             evidence_id=d.get("evidence_id", f"impl_ev_{uuid.uuid4().hex[:12]}"),
@@ -418,7 +463,7 @@ class ImplementationEvidence:
             execution_record_id=d["execution_record_id"],
             timestamp=d["timestamp"],
             evidence_hash=d.get("evidence_hash", ""),
-            evidence_signature=d.get("evidence_signature", "")
+            evidence_signature=d["evidence_signature"]
         )
 
 
@@ -444,9 +489,7 @@ class VerificationEvidence:
         if not self.evidence_hash:
             self.evidence_hash = self.compute_evidence_hash()
         if not self.evidence_signature:
-            self.evidence_signature = SovereignCryptoAuthority.sign(
-                "VERIFICATION_EVIDENCE", self.issuer_subsystem, self.evidence_id, self.evidence_hash
-            )
+            raise ValueError("VerificationEvidence must carry a non-empty evidence_signature issued by an authorized test runner.")
 
     def compute_evidence_hash(self) -> str:
         payload = {
@@ -481,15 +524,17 @@ class VerificationEvidence:
             "execution_receipt_hash": self.execution_receipt_hash,
             "timestamp": self.timestamp,
             "evidence_hash": self.evidence_hash or self.compute_evidence_hash(),
-            "evidence_signature": self.evidence_signature or SovereignCryptoAuthority.sign(
-                "VERIFICATION_EVIDENCE", self.issuer_subsystem, self.evidence_id, self.evidence_hash or self.compute_evidence_hash()
-            )
+            "evidence_signature": self.evidence_signature
         }
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "VerificationEvidence":
-        for req in ["test_entity_id", "target_entity_id", "test_framework", "repository_state_hash", "execution_result", "exit_code", "execution_receipt_hash", "timestamp"]:
-            if req not in d:
+        for req in [
+            "test_entity_id", "target_entity_id", "test_framework",
+            "repository_state_hash", "execution_result", "exit_code",
+            "execution_receipt_hash", "timestamp", "evidence_signature"
+        ]:
+            if req not in d or not d[req]:
                 raise ValueError(f"VerificationEvidence missing mandatory field '{req}'")
         return cls(
             evidence_id=d.get("evidence_id", f"verif_ev_{uuid.uuid4().hex[:12]}"),
@@ -505,7 +550,7 @@ class VerificationEvidence:
             execution_receipt_hash=d["execution_receipt_hash"],
             timestamp=d["timestamp"],
             evidence_hash=d.get("evidence_hash", ""),
-            evidence_signature=d.get("evidence_signature", "")
+            evidence_signature=d["evidence_signature"]
         )
 
 

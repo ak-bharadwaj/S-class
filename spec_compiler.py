@@ -691,16 +691,23 @@ class SpecificationCompiler:
             snap_path = os.path.join(workspace_dir, ".agents", "repo_snapshot.json")
             RepositorySnapshotEngine.save_snapshot(repo_snapshot, snap_path)
 
-            # 3. Derive AuthorizedChangeSet from tasks with strict lineage
-            source_task_hashes = {
-                t.id: (t.task_hash if hasattr(t, "task_hash") and t.task_hash else hashlib.sha256(t.id.encode("utf-8")).hexdigest())
-                for t in tasks
-            } if tasks else {"TASK-INIT": hashlib.sha256(b"TASK-INIT").hexdigest()}
+            # 3. Derive AuthorizedChangeSet from tasks with strict lineage (NO FALLBACKS)
+            if not tasks:
+                raise ValueError("Cannot compile AuthorizedChangeSet: tasks list is empty. Executable ChangeSet strictly requires governed tasks.")
 
-            source_execution_plan_hash = (
-                execution_plan.plan_hash if execution_plan and hasattr(execution_plan, "plan_hash") and execution_plan.plan_hash
-                else hashlib.sha256(";".join(sorted(source_task_hashes.values())).encode("utf-8")).hexdigest()
-            )
+            source_task_hashes = {}
+            for t in tasks:
+                th = getattr(t, "task_hash", None)
+                if not th or not isinstance(th, str) or not th.strip():
+                    raise ValueError(
+                        f"Cannot compile AuthorizedChangeSet: Task '{getattr(t, 'id', 'UNKNOWN')}' is missing mandatory authoritative 'task_hash'. Synthetic derivation is strictly prohibited."
+                    )
+                source_task_hashes[t.id] = th.strip()
+
+            if not execution_plan or not getattr(execution_plan, "plan_hash", None) or not str(execution_plan.plan_hash).strip():
+                raise ValueError("Cannot compile AuthorizedChangeSet: ExecutionPlan is missing or lacks mandatory authoritative 'plan_hash'.")
+
+            source_execution_plan_hash = str(execution_plan.plan_hash).strip()
 
             authorized_changeset = AuthorizedChangeSet(
                 changeset_id=f"CS-{int(datetime.now(timezone.utc).timestamp())}",

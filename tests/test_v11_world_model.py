@@ -60,7 +60,9 @@ from world_model import (
     VerificationKind,
     TruthLevel,
     ResolutionKind,
-    ProvenanceRecord
+    ProvenanceRecord,
+    SovereignCryptoAuthority,
+    SovereignSigningCapability
 )
 from world_model_engine import (
     PythonLanguageAdapter,
@@ -243,7 +245,10 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
         self._create_file("src/service.py", "def run(): pass")
         world_model = WorldModelEngine.build_world_model(self.test_dir)
 
+        cap = SovereignCryptoAuthority.issue_signing_capability("SCLASS_PROMOTION_ENGINE")
         mock_evidence = ImplementationEvidence(
+            evidence_id="impl_ev_test7",
+            issuer_subsystem="SCLASS_PROMOTION_ENGINE",
             source_task_id="TASK-001",
             source_task_hash="task_hash_123",
             source_changeset_hash="cs_hash_123",
@@ -254,8 +259,12 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
             mutation_op="MODIFY",
             observed_delta_hash="delta_hash_123",
             execution_record_id="exec_123",
-            timestamp=datetime.now(timezone.utc).isoformat() + "Z"
+            timestamp=datetime.now(timezone.utc).isoformat() + "Z",
+            evidence_signature="placeholder"
         )
+        ev_hash = mock_evidence.compute_evidence_hash()
+        mock_evidence.evidence_hash = ev_hash
+        mock_evidence.evidence_signature = SovereignCryptoAuthority.sign(cap, "IMPLEMENTATION_EVIDENCE", "SCLASS_PROMOTION_ENGINE", "impl_ev_test7", ev_hash)
 
         world_model.add_relation(ImplementationRelation(
             symbol_id="sym://src/service.py#run",
@@ -282,7 +291,12 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
         self._create_file("src/service.py", "def run(): pass")
         world_model = WorldModelEngine.build_world_model(self.test_dir)
 
+        cap = SovereignCryptoAuthority.issue_signing_capability("SCLASS_PROMOTION_ENGINE")
+        sig = SovereignCryptoAuthority.sign(cap, "IMPLEMENTATION_EVIDENCE", "SCLASS_PROMOTION_ENGINE", "impl_ev_test8", "forged_bad_hash_999")
+
         mock_evidence = ImplementationEvidence(
+            evidence_id="impl_ev_test8",
+            issuer_subsystem="SCLASS_PROMOTION_ENGINE",
             source_task_id="TASK-001",
             source_task_hash="task_hash_123",
             source_changeset_hash="cs_hash_123",
@@ -294,7 +308,8 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
             observed_delta_hash="delta_hash_123",
             execution_record_id="exec_123",
             timestamp=datetime.now(timezone.utc).isoformat() + "Z",
-            evidence_hash="forged_bad_hash_999"
+            evidence_hash="forged_bad_hash_999",
+            evidence_signature=sig
         )
 
         world_model.add_relation(ImplementationRelation(
@@ -322,7 +337,10 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
         self._create_file("src/service.py", "def run(): pass")
         world_model = WorldModelEngine.build_world_model(self.test_dir)
 
+        cap = SovereignCryptoAuthority.issue_signing_capability("SCLASS_PROMOTION_ENGINE")
         mock_evidence = ImplementationEvidence(
+            evidence_id="impl_ev_test9",
+            issuer_subsystem="SCLASS_PROMOTION_ENGINE",
             source_task_id="TASK-001",
             source_task_hash="task_hash_123",
             source_changeset_hash="cs_hash_123",
@@ -333,8 +351,12 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
             mutation_op="MODIFY",
             observed_delta_hash="delta_hash_123",
             execution_record_id="exec_123",
-            timestamp=datetime.now(timezone.utc).isoformat() + "Z"
+            timestamp=datetime.now(timezone.utc).isoformat() + "Z",
+            evidence_signature="placeholder"
         )
+        ev_hash = mock_evidence.compute_evidence_hash()
+        mock_evidence.evidence_hash = ev_hash
+        mock_evidence.evidence_signature = SovereignCryptoAuthority.sign(cap, "IMPLEMENTATION_EVIDENCE", "SCLASS_PROMOTION_ENGINE", "impl_ev_test9", ev_hash)
 
         world_model.add_relation(ImplementationRelation(
             symbol_id="sym://src/service.py#run",
@@ -362,6 +384,7 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
         world_model = WorldModelEngine.build_world_model(self.test_dir)
 
         mock_evidence = ImplementationEvidence(
+            evidence_id="impl_ev_test10",
             issuer_subsystem="ROGUE_AGENT",
             source_task_id="TASK-001",
             source_task_hash="task_hash_123",
@@ -373,7 +396,8 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
             mutation_op="MODIFY",
             observed_delta_hash="delta_hash_123",
             execution_record_id="exec_123",
-            timestamp=datetime.now(timezone.utc).isoformat() + "Z"
+            timestamp=datetime.now(timezone.utc).isoformat() + "Z",
+            evidence_signature="rogue_agent_signature"
         )
 
         world_model.add_relation(ImplementationRelation(
@@ -449,6 +473,7 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
         world_model = WorldModelEngine.build_world_model(self.test_dir)
 
         mock_verif_ev = VerificationEvidence(
+            evidence_id="verif_ev_test12",
             issuer_subsystem="ROGUE_LLM",
             test_entity_id="test://tests/test_service.py#test_run",
             target_entity_id="sym://src/service.py#run",
@@ -457,7 +482,8 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
             execution_result=ExecutionResult.PASSED,
             exit_code=0,
             execution_receipt_hash="receipt_123",
-            timestamp=datetime.now(timezone.utc).isoformat() + "Z"
+            timestamp=datetime.now(timezone.utc).isoformat() + "Z",
+            evidence_signature="rogue_llm_signature"
         )
 
         world_model.add_relation(VerificationRelation(
@@ -507,7 +533,9 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
         snap1 = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
 
         # Authorized implementation
+        cap = SovereignCryptoAuthority.issue_signing_capability("SCLASS_PROMOTION_ENGINE")
         evidence = ImplementationEvidence(
+            evidence_id="impl_ev_test14",
             issuer_subsystem="SCLASS_PROMOTION_ENGINE",
             source_task_id="TASK-01",
             source_task_hash="task_hash_1",
@@ -519,8 +547,12 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
             mutation_op="MODIFY",
             observed_delta_hash="delta_hash_1",
             execution_record_id="exec_1",
-            timestamp=datetime.now(timezone.utc).isoformat() + "Z"
+            timestamp=datetime.now(timezone.utc).isoformat() + "Z",
+            evidence_signature="placeholder"
         )
+        ev_hash = evidence.compute_evidence_hash()
+        evidence.evidence_hash = ev_hash
+        evidence.evidence_signature = SovereignCryptoAuthority.sign(cap, "IMPLEMENTATION_EVIDENCE", "SCLASS_PROMOTION_ENGINE", "impl_ev_test14", ev_hash)
 
         impl_rel = ImplementationRelation(
             symbol_id="sym://src/service.py#calculate",
@@ -925,9 +957,11 @@ test('UserService returns user', async () => {
         self._create_file("tests/test_service.py", "def test_run(): pass")
         world_model = WorldModelEngine.build_world_model(self.test_dir)
 
-        # Generate signature for IMPLEMENTATION_EVIDENCE
+        # Generate signature for IMPLEMENTATION_EVIDENCE with valid capability
         from world_model import SovereignCryptoAuthority
+        cap = SovereignCryptoAuthority.issue_signing_capability("SCLASS_TEST_RUNNER")
         impl_sig = SovereignCryptoAuthority.sign(
+            capability=cap,
             artifact_type="IMPLEMENTATION_EVIDENCE",
             issuer_id="SCLASS_TEST_RUNNER",
             evidence_id="verif_ev_123",
@@ -946,6 +980,7 @@ test('UserService returns user', async () => {
             exit_code=0,
             execution_receipt_hash="receipt_123",
             timestamp=datetime.now(timezone.utc).isoformat() + "Z",
+            evidence_hash="hash_matching_payload",
             evidence_signature=impl_sig  # Replayed signature
         )
 
@@ -978,12 +1013,282 @@ test('UserService returns user', async () => {
         new_key = b"new_secret_key_2222222222222222"
 
         SovereignCryptoAuthority.set_signing_key(old_key)
-        old_sig = SovereignCryptoAuthority.sign("IMPLEMENTATION_EVIDENCE", "SCLASS_PROMOTION_ENGINE", "ev_1", "hash_1")
+        cap = SovereignCryptoAuthority.issue_signing_capability("SCLASS_PROMOTION_ENGINE")
+        old_sig = SovereignCryptoAuthority.sign(cap, "IMPLEMENTATION_EVIDENCE", "SCLASS_PROMOTION_ENGINE", "ev_1", "hash_1")
         self.assertTrue(SovereignCryptoAuthority.verify("IMPLEMENTATION_EVIDENCE", "SCLASS_PROMOTION_ENGINE", "ev_1", "hash_1", old_sig))
 
         # Rotate key
         SovereignCryptoAuthority.set_signing_key(new_key)
         self.assertFalse(SovereignCryptoAuthority.verify("IMPLEMENTATION_EVIDENCE", "SCLASS_PROMOTION_ENGINE", "ev_1", "hash_1", old_sig))
+
+    # -------------------------------------------------------------------------
+    # Test 28: Untrusted Caller Cannot Sign Without SovereignSigningCapability
+    # -------------------------------------------------------------------------
+    def test_v11_world_model_untrusted_caller_signing_attempt_rejected(self):
+        """Invariant: Ordinary agent/tool caller attempting to sign without capability is strictly blocked."""
+        from world_model import SovereignCryptoAuthority, SovereignSigningCapability
+        # 1. Direct call without capability
+        with self.assertRaises(PermissionError) as ctx1:
+            SovereignCryptoAuthority.sign(
+                capability="NOT_A_CAPABILITY",  # type: ignore
+                artifact_type="IMPLEMENTATION_EVIDENCE",
+                issuer_id="SCLASS_PROMOTION_ENGINE",
+                evidence_id="ev_1",
+                evidence_hash="hash_1"
+            )
+        self.assertIn("UNAUTHORIZED_SIGNING_ATTEMPT", str(ctx1.exception))
+
+        # 2. Unauthorized subsystem capability request
+        with self.assertRaises(PermissionError) as ctx2:
+            SovereignCryptoAuthority.issue_signing_capability("ROGUE_AGENT_TOOL")
+        self.assertIn("UNAUTHORIZED_SUBSYSTEM", str(ctx2.exception))
+
+        # 3. Forged capability instance
+        fake_cap = SovereignSigningCapability(b"fake_secret", "SCLASS_PROMOTION_ENGINE")
+        with self.assertRaises(PermissionError) as ctx3:
+            SovereignCryptoAuthority.sign(
+                capability=fake_cap,
+                artifact_type="IMPLEMENTATION_EVIDENCE",
+                issuer_id="SCLASS_PROMOTION_ENGINE",
+                evidence_id="ev_1",
+                evidence_hash="hash_1"
+            )
+        self.assertIn("UNAUTHORIZED_SIGNING_ATTEMPT", str(ctx3.exception))
+
+    # -------------------------------------------------------------------------
+    # Test 29: Direct Evidence Construction Without Signature Fails Closed
+    # -------------------------------------------------------------------------
+    def test_v11_world_model_direct_evidence_construction_without_signature_fails_closed(self):
+        """Invariant: Directly creating ImplementationEvidence or VerificationEvidence without signature raises ValueError."""
+        with self.assertRaises(ValueError) as ctx1:
+            ImplementationEvidence(
+                source_task_id="TASK-01",
+                source_task_hash="th_1",
+                source_changeset_hash="cs_1",
+                before_repository_state_hash="b1",
+                after_repository_state_hash="a1",
+                target_symbol_id="sym://a.py#fn",
+                target_symbol_revision="r1",
+                mutation_op="MODIFY",
+                observed_delta_hash="dh_1",
+                execution_record_id="ex_1",
+                timestamp="2026-08-15T00:00:00Z"
+            )
+        self.assertIn("must carry a non-empty evidence_signature", str(ctx1.exception))
+
+        with self.assertRaises(ValueError) as ctx2:
+            VerificationEvidence(
+                test_entity_id="test://test.py#t",
+                target_entity_id="sym://a.py#fn",
+                test_framework="pytest",
+                repository_state_hash="h1",
+                execution_result=ExecutionResult.PASSED,
+                exit_code=0,
+                execution_receipt_hash="rcpt_1",
+                timestamp="2026-08-15T00:00:00Z"
+            )
+        self.assertIn("must carry a non-empty evidence_signature", str(ctx2.exception))
+
+    # -------------------------------------------------------------------------
+    # Test 30: Compiler Task Lineage Zero-Invention Rule
+    # -------------------------------------------------------------------------
+    def test_v11_compiler_task_lineage_zero_invention_fails_closed(self):
+        """Invariant: Tasks missing task_hash or empty task list fails closed in compiler."""
+        from task_compiler import TaskRecord, TaskCategory
+        from spec_compiler import SpecificationCompiler
+
+        from unittest import mock
+        from artifact_governor import GovernanceGateResult, FSMTransitionTarget, ValidationStatus, ApprovalStatus
+
+        passing_gate = GovernanceGateResult(
+            is_blocked=False,
+            blocking_reasons=[],
+            recommended_fsm_state=FSMTransitionTarget.CODING,
+            validation_status=ValidationStatus.VALID,
+            approval_status=ApprovalStatus.APPROVED
+        )
+
+        # 1. Task missing task_hash fails closed
+        bad_task = TaskRecord(
+            id="TASK-BAD",
+            title="Bad Task",
+            description="desc",
+            category=TaskCategory.API_ENDPOINT,
+            parent_lld="LLD-1",
+            parent_hld="HLD-1",
+            parent_reqs=["REQ-1"],
+            parent_behaviors=["BEH-1"],
+            task_hash=""
+        )
+        bad_task.task_hash = ""  # Force empty
+
+        with mock.patch("artifact_governor.ArtifactGovernor.audit_hld_governance", return_value=passing_gate), \
+             mock.patch("artifact_governor.ArtifactGovernor.audit_lld_governance", return_value=passing_gate), \
+             mock.patch("task_compiler.TaskCompiler.compile_tasks", return_value=[bad_task]):
+            with self.assertRaises(ValueError) as ctx1:
+                SpecificationCompiler.compile_v7_refinement_pipeline(
+                    raw_request="Build secure auth service",
+                    workspace_dir=self.test_dir
+                )
+            self.assertIn("missing mandatory authoritative 'task_hash'", str(ctx1.exception))
+
+        # 2. Empty tasks list fails closed
+        with mock.patch("artifact_governor.ArtifactGovernor.audit_hld_governance", return_value=passing_gate), \
+             mock.patch("artifact_governor.ArtifactGovernor.audit_lld_governance", return_value=passing_gate), \
+             mock.patch("task_compiler.TaskCompiler.compile_tasks", return_value=[]):
+            with self.assertRaises(ValueError) as ctx2:
+                SpecificationCompiler.compile_v7_refinement_pipeline(
+                    raw_request="Build secure auth service",
+                    workspace_dir=self.test_dir
+                )
+            self.assertIn("tasks list is empty", str(ctx2.exception))
+
+        # 3. Missing or empty execution_plan plan_hash fails closed
+        good_task = TaskRecord(
+            id="TASK-01",
+            title="Good Task",
+            description="desc",
+            category=TaskCategory.API_ENDPOINT,
+            parent_lld="LLD-1",
+            parent_hld="HLD-1",
+            parent_reqs=["REQ-1"],
+            parent_behaviors=["BEH-1"]
+        )
+        fake_plan = mock.MagicMock()
+        fake_plan.plan_hash = ""
+        with mock.patch("artifact_governor.ArtifactGovernor.audit_hld_governance", return_value=passing_gate), \
+             mock.patch("artifact_governor.ArtifactGovernor.audit_lld_governance", return_value=passing_gate), \
+             mock.patch("task_compiler.TaskCompiler.compile_tasks", return_value=[good_task]), \
+             mock.patch("execution_plan_compiler.ExecutionPlanCompiler.compile_execution_plan", return_value=fake_plan):
+            with self.assertRaises(ValueError) as ctx3:
+                SpecificationCompiler.compile_v7_refinement_pipeline(
+                    raw_request="Build secure auth service",
+                    workspace_dir=self.test_dir
+                )
+            self.assertIn("ExecutionPlan is missing or lacks mandatory authoritative 'plan_hash'", str(ctx3.exception))
+
+    # -------------------------------------------------------------------------
+    # Test 31: Governor Blocks Upstream ExecutionPlan Hash Mismatch
+    # -------------------------------------------------------------------------
+    def test_v11_governor_blocks_execution_plan_lineage_mismatch(self):
+        """Invariant: ChangeSet with fake/mismatched source_execution_plan_hash is blocked by Governor."""
+        self._create_file("src/service.py", "def run(): pass")
+        anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+        self._create_file("src/service.py", "def run(): return 1")
+        result = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        # Write mock pipeline into workspace .agents/
+        pipeline_data = {
+            "execution_plan": {
+                "plan_hash": "authoritative_plan_hash_REAL"
+            },
+            "tasks": [
+                {"id": "TASK-001", "task_hash": "authoritative_task_hash_REAL"}
+            ]
+        }
+        with open(os.path.join(self.agents_dir, "v7_refinement_pipeline.json"), "w", encoding="utf-8") as pf:
+            json.dump(pipeline_data, pf)
+
+        # ChangeSet carrying FAKE source_execution_plan_hash
+        attacker_changeset = AuthorizedChangeSet(
+            changeset_id="CS-ATTACK-01",
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash="fake_forged_plan_hash_FAKE",
+            source_task_hashes={"TASK-001": "authoritative_task_hash_REAL"}
+        )
+        attacker_changeset.add_change(AuthorizedFileChange(
+            file_path="src/service.py",
+            operation=FileMutationOp.MODIFY,
+            authorized_by_tasks=["TASK-001"]
+        ))
+
+        gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
+            anchor, result, attacker_changeset, workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("CHANGESET_EXECUTION_PLAN_LINEAGE_MISMATCH" in r for r in gov_res.blocking_reasons))
+
+    # -------------------------------------------------------------------------
+    # Test 32: Governor Blocks Task-Set Mismatch (Dropped or Extra Tasks)
+    # -------------------------------------------------------------------------
+    def test_v11_governor_blocks_task_set_mismatch(self):
+        """Invariant: ChangeSet that drops required tasks or includes undeclared tasks is blocked."""
+        self._create_file("src/service.py", "def run(): pass")
+        anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+        self._create_file("src/service.py", "def run(): return 1")
+        result = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        # Governed pipeline declares tasks TASK-A and TASK-B
+        pipeline_data = {
+            "execution_plan": {
+                "plan_hash": "plan_hash_123"
+            },
+            "tasks": [
+                {"id": "TASK-A", "task_hash": "hash_A"},
+                {"id": "TASK-B", "task_hash": "hash_B"}
+            ]
+        }
+        with open(os.path.join(self.agents_dir, "v7_refinement_pipeline.json"), "w", encoding="utf-8") as pf:
+            json.dump(pipeline_data, pf)
+
+        # ATTACK: ChangeSet silently drops TASK-B
+        dropped_task_cs = AuthorizedChangeSet(
+            changeset_id="CS-DROP",
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash="plan_hash_123",
+            source_task_hashes={"TASK-A": "hash_A"}  # Dropped TASK-B
+        )
+        dropped_task_cs.add_change(AuthorizedFileChange(
+            file_path="src/service.py",
+            operation=FileMutationOp.MODIFY,
+            authorized_by_tasks=["TASK-A"]
+        ))
+
+        gov_res1 = ArtifactGovernor.audit_changeset_reconciliation_governance(
+            anchor, result, dropped_task_cs, workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res1.is_blocked)
+        self.assertTrue(any("CHANGESET_TASK_SET_MISMATCH" in r for r in gov_res1.blocking_reasons))
+
+    # -------------------------------------------------------------------------
+    # Test 33: Governor Blocks Tampered Task Hash Lineage Mismatch
+    # -------------------------------------------------------------------------
+    def test_v11_governor_blocks_tampered_task_hash_lineage_mismatch(self):
+        """Invariant: ChangeSet where task hash differs from governed TaskRecord is blocked."""
+        self._create_file("src/service.py", "def run(): pass")
+        anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+        self._create_file("src/service.py", "def run(): return 1")
+        result = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        pipeline_data = {
+            "execution_plan": {
+                "plan_hash": "plan_hash_123"
+            },
+            "tasks": [
+                {"id": "TASK-A", "task_hash": "authentic_hash_A"}
+            ]
+        }
+        with open(os.path.join(self.agents_dir, "v7_refinement_pipeline.json"), "w", encoding="utf-8") as pf:
+            json.dump(pipeline_data, pf)
+
+        # ATTACK: ChangeSet provides tampered task hash for TASK-A
+        tampered_task_cs = AuthorizedChangeSet(
+            changeset_id="CS-TAMPERED-TASK",
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash="plan_hash_123",
+            source_task_hashes={"TASK-A": "tampered_hash_A_fake"}
+        )
+        tampered_task_cs.add_change(AuthorizedFileChange(
+            file_path="src/service.py",
+            operation=FileMutationOp.MODIFY,
+            authorized_by_tasks=["TASK-A"]
+        ))
+
+        gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
+            anchor, result, tampered_task_cs, workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("CHANGESET_TASK_HASH_LINEAGE_MISMATCH" in r for r in gov_res.blocking_reasons))
 
 
 if __name__ == "__main__":

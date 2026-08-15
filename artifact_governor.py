@@ -1303,7 +1303,59 @@ class ArtifactGovernor:
                 f"does not match recomputed canonical hash '{recomputed_cs_hash[:8]}'."
             )
 
-        # 4. Perform Algebraic Reconciliation
+        # 4. Authoritative Upstream Lineage & Exact Task-Set Reconciliation
+        if workspace_dir:
+            pipe_path = os.path.join(workspace_dir, ".agents", "v7_refinement_pipeline.json")
+            if os.path.exists(pipe_path):
+                try:
+                    with open(pipe_path, "r", encoding="utf-8") as pf:
+                        pipe_data = json.load(pf)
+
+                    # Upstream ExecutionPlan Hash Reconciliation
+                    exec_plan_data = pipe_data.get("execution_plan")
+                    if exec_plan_data and isinstance(exec_plan_data, dict):
+                        governed_plan_hash = exec_plan_data.get("plan_hash")
+                        if not governed_plan_hash:
+                            reasons.append("GOVERNED_PLAN_INTEGRITY_MISSING: Governed ExecutionPlan in pipeline missing plan_hash.")
+                        elif changeset.source_execution_plan_hash != governed_plan_hash:
+                            reasons.append(
+                                f"CHANGESET_EXECUTION_PLAN_LINEAGE_MISMATCH: ChangeSet source_execution_plan_hash "
+                                f"'{changeset.source_execution_plan_hash[:8]}' does not match governed ExecutionPlan plan_hash '{governed_plan_hash[:8]}'."
+                            )
+
+                    # Upstream Governed Tasks & Exact Task-Set Equality Reconciliation
+                    governed_tasks_list = pipe_data.get("tasks", [])
+                    if governed_tasks_list and isinstance(governed_tasks_list, list):
+                        governed_tasks_dict = {}
+                        for gt in governed_tasks_list:
+                            if isinstance(gt, dict) and gt.get("id"):
+                                governed_tasks_dict[gt["id"]] = gt.get("task_hash", "")
+
+                        changeset_task_ids = set(changeset.source_task_hashes.keys()) if changeset.source_task_hashes else set()
+                        governed_task_ids = set(governed_tasks_dict.keys())
+
+                        # Exact Set Equality Check
+                        if changeset_task_ids != governed_task_ids:
+                            reasons.append(
+                                f"CHANGESET_TASK_SET_MISMATCH: ChangeSet tasks {sorted(changeset_task_ids)} "
+                                f"do not exactly match Governed Plan tasks {sorted(governed_task_ids)}."
+                            )
+
+                        # Individual Task Hash Integrity Check
+                        for t_id, expected_th in governed_tasks_dict.items():
+                            if t_id in changeset.source_task_hashes:
+                                actual_th = changeset.source_task_hashes[t_id]
+                                if not expected_th:
+                                    reasons.append(f"GOVERNED_TASK_INTEGRITY_MISSING: Governed TaskRecord '{t_id}' in pipeline missing task_hash.")
+                                elif actual_th != expected_th:
+                                    reasons.append(
+                                        f"CHANGESET_TASK_HASH_LINEAGE_MISMATCH: ChangeSet task '{t_id}' hash "
+                                        f"'{actual_th[:8]}' does not match governed TaskRecord task_hash '{expected_th[:8]}'."
+                                    )
+                except Exception as e:
+                    reasons.append(f"UPSTREAM_PIPELINE_LOAD_ERROR: Failed to load upstream pipeline for lineage reconciliation: {e}")
+
+        # 5. Perform Algebraic Reconciliation
         recon_res = RepositorySnapshotEngine.reconcile_changeset(anchor_snapshot, result_snapshot, changeset)
         if not recon_res.is_reconciled:
             reasons.extend(recon_res.violations)
