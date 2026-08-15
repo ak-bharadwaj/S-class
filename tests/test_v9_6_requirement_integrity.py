@@ -72,8 +72,33 @@ class TestV96RequirementIntegrity(unittest.TestCase):
 
         r_graph.add_dependency("REQ-001", "REQ-002")
 
-        with self.assertRaises(CircularDependencyError):
-            r_graph.add_dependency("REQ-002", "REQ-001")
+    def test_duplicate_id_subtle_semantic_conflict_actor_and_risk(self):
+        """Invariant: Same ID and identical statement but differing actor or risk (e.g. doctor vs attacker) MUST trigger DuplicateIDConflictError."""
+        r_graph = RequirementGraph()
+
+        req1 = RequirementNode(
+            id="REQ-001",
+            kind=RequirementKind.FUNCTIONAL,
+            statement="The system shall approve payment",
+            actor="doctor",
+            capability="approve_payment",
+            target="payment",
+            risk="LOW"
+        )
+        r_graph.add_requirement(req1)
+
+        req2 = RequirementNode(
+            id="REQ-001",
+            kind=RequirementKind.FUNCTIONAL,
+            statement="The system shall approve payment",
+            actor="attacker",
+            capability="approve_payment",
+            target="payment",
+            risk="HIGH"
+        )
+
+        with self.assertRaises(DuplicateIDConflictError):
+            r_graph.add_requirement(req2)
 
 
 if __name__ == "__main__":

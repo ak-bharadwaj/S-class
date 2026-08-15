@@ -98,45 +98,73 @@ def _process_exists(pid: int) -> bool:
             return False
 
 
+import threading
+
+_active_local_locks: Set[str] = set()
+_active_locks_guard = threading.Lock()
+
+
 class FileLock:
     """
-    Hardware-level mutual exclusion lock for FSM state files.
-    Enforces strict mutual exclusion (never bypasses lock during concurrency),
-    while proactively recovering from crashed processes via PID liveness,
-    corrupt file inspection, and max TTL lease expiration.
+    Hardware-level mutual exclusion file lock with atomic owner metadata,
+    PID liveness audit, unique process token identity, thread-safe local activation tracking,
+    and grace-period protection.
     """
-    def __init__(self, lock_path: str, timeout: float = 10.0, stale_ttl: float = 15.0):
-        self.lock_path = lock_path
+    def __init__(self, lock_path: str, timeout: float = 10.0, stale_ttl: float = 15.0, grace_period: float = 0.5):
+        self.lock_path = os.path.abspath(lock_path)
         self.timeout = timeout
         self.stale_ttl = stale_ttl
+        self.grace_period = grace_period
+        self.token = str(uuid.uuid4())
+        self.owner_pid = os.getpid()
 
     def __enter__(self):
         start_time = time.time()
+        import socket
+        owner_payload = json.dumps({
+            "pid": self.owner_pid,
+            "token": self.token,
+            "host": socket.gethostname(),
+            "start_time": start_time
+        }).encode("utf-8")
+
         while True:
             try:
                 fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
                 try:
-                    os.write(fd, str(os.getpid()).encode())
+                    os.write(fd, owner_payload)
+                    os.fsync(fd)  # Flush handle atomically to disk
                 finally:
-                    os.close(fd)  # Close handle so readers can inspect PID without sharing conflicts on Windows
-                break
+                    os.close(fd)  # Close handle so readers can inspect payload without sharing conflicts on Windows
+                with _active_locks_guard:
+                    _active_local_locks.add(self.lock_path)
+                return self
             except FileExistsError:
                 # Audit existing lock file for staleness from crashed processes
                 try:
                     lock_mtime = os.path.getmtime(self.lock_path)
                     lock_age = time.time() - lock_mtime
 
-                    # 1. Inspect PID in lock file FIRST
-                    pid_str = ""
+                    # 1. Inspect owner payload in lock file
+                    lock_data = {}
                     try:
                         with open(self.lock_path, "r", encoding="utf-8") as f:
-                            pid_str = f.read().strip()
+                            raw = f.read().strip()
+                            if raw.startswith("{"):
+                                lock_data = json.loads(raw)
+                            elif raw.isdigit():
+                                lock_data = {"pid": int(raw)}
                     except Exception:
                         pass
 
-                    # 2. Dead process check — if PID is alive, NEVER steal lock based on age
-                    if pid_str.isdigit():
-                        pid = int(pid_str)
+                    pid = lock_data.get("pid")
+                    token = lock_data.get("token")
+
+                    with _active_locks_guard:
+                        is_locally_active = self.lock_path in _active_local_locks
+
+                    # 2. Dead process check — if PID is alive, NEVER steal lock based on age unless stale abandoned
+                    if isinstance(pid, int):
                         if not _process_exists(pid):
                             logger.warning(f"Stale lock detected for dead PID {pid}. Recovering: {self.lock_path}")
                             try:
@@ -144,17 +172,31 @@ class FileLock:
                             except OSError:
                                 pass
                             continue
+                        elif is_locally_active:
+                            # Live active thread in current process holds lock — keep waiting
+                            pass
+                        elif token is None and lock_age < self.grace_period:
+                            # Fresh live lock without JSON token — keep waiting
+                            pass
+                        elif pid == self.owner_pid and not is_locally_active and lock_age >= self.grace_period:
+                            # Stale uncleaned lock file from an earlier process run
+                            try:
+                                os.unlink(self.lock_path)
+                            except OSError:
+                                pass
+                            continue
                         else:
-                            # Live process holds lock — keep waiting regardless of lock_age
+                            # Live process holds lock — keep waiting
                             pass
                     else:
-                        # Empty/corrupt lock file cleanup (non-digit or empty content)
-                        logger.warning(f"Empty/corrupt lock file detected ('{pid_str}'). Recovering: {self.lock_path}")
-                        try:
-                            os.unlink(self.lock_path)
-                        except OSError:
-                            pass
-                        continue
+                        # Empty/corrupt lock file — apply grace period before recovering
+                        if lock_age > self.grace_period:
+                            logger.warning(f"Empty/corrupt lock file detected beyond grace period ({lock_age:.2f}s > {self.grace_period}s). Recovering: {self.lock_path}")
+                            try:
+                                os.unlink(self.lock_path)
+                            except OSError:
+                                pass
+                            continue
                 except (FileNotFoundError, OSError):
                     # Lock was released by other process in the meantime
                     continue
@@ -166,18 +208,29 @@ class FileLock:
                 time.sleep(0.05)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        with _active_locks_guard:
+            _active_local_locks.discard(self.lock_path)
+
         try:
             if os.path.exists(self.lock_path):
-                # Verify we are releasing OUR OWN lock file (PID check)
+                should_unlink = False
                 try:
                     with open(self.lock_path, "r", encoding="utf-8") as f:
-                        pid_str = f.read().strip()
-                    if pid_str.isdigit() and int(pid_str) == os.getpid():
-                        os.unlink(self.lock_path)
+                        raw = f.read().strip()
+                        if raw.startswith("{"):
+                            data = json.loads(raw)
+                            if data.get("pid") == self.owner_pid and data.get("token") == self.token:
+                                should_unlink = True
+                        elif raw.isdigit() and int(raw) == self.owner_pid:
+                            should_unlink = True
                 except Exception:
                     pass
-        except OSError:
-            pass
+
+                if should_unlink:
+                    try:
+                        os.unlink(self.lock_path)
+                    except OSError:
+                        pass
         except OSError:
             pass
 

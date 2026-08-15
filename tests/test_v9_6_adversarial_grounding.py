@@ -38,14 +38,38 @@ class TestV96AdversarialGrounding(unittest.TestCase):
         self.assertEqual(len(hld.modules), 0, "Deceptive nouns/verbs must not create speculative bounded context modules")
 
     def test_unsupported_nfr_remains_unconfirmed(self):
-        """Invariant: High-risk NFR claims without explicit architecture evidence evaluate to UNKNOWN or PROPOSED."""
+        """Invariant: High-risk NFR claims (100k events/sec zero-downtime) without explicit architecture evidence evaluate to UNKNOWN or PROPOSED, NEVER PASS or CONFIRMED."""
+        from requirement_ir import RequirementNode, RequirementKind, NFRCategory
+        from architecture_debate import ArchitectureDebateEngine
+
+        r_graph = RequirementGraph()
         b_graph = BehaviorGraph()
-        # Unbacked NFR claim without security evidence
-        req_nodes = [
-            r for r in b_graph.nodes.values()
-            if getattr(r, "epistemic_status", None) in [EpistemicStatus.PROPOSED, EpistemicStatus.UNVALIDATED]
-        ]
-        self.assertEqual(len(req_nodes), 0, "BehaviorGraph must not contain unvalidated explicit nodes")
+
+        # Add unbacked high-scale NFR requirement to graph
+        unbacked_nfr = RequirementNode(
+            id="REQ-NFR-999",
+            kind=RequirementKind.NON_FUNCTIONAL,
+            nfr_category=NFRCategory.PERFORMANCE,
+            statement="System must process 100k events/sec with zero downtime across multi-region clusters.",
+            actor="system",
+            capability="high_throughput_ingestion",
+            target="cluster",
+            epistemic_status=EpistemicStatus.PROPOSED,
+            confidence=0.3,
+            evidence=None
+        )
+        r_graph.add_requirement(unbacked_nfr)
+
+        # Compile HLD with minimal unbacked prompt
+        hld = HLDCompiler.compile_hld(r_graph, b_graph, raw_request="Build basic internal dashboard")
+        debate = ArchitectureDebateEngine.run_debate_cycle(hld, r_graph, b_graph, raw_request="Build basic internal dashboard", is_debate_phase=True)
+
+        # High-scale NFR requirement without grounded architecture evidence must NOT produce accepted CONFIRMED ADR
+        for adr in debate.accepted_adrs:
+            self.assertNotEqual(adr.status, "CONFIRMED", f"ADR '{adr.id}' must not be CONFIRMED without architecture evidence")
+
+        # Must NOT grant PASS for unbacked NFR
+        self.assertTrue(len(debate.rejected_adrs) > 0 or debate.decision_sufficiency != "PASS", "Debate cycle must NOT grant PASS for unbacked 100k events/sec NFR requirement")
 
 
 if __name__ == "__main__":

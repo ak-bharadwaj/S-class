@@ -65,6 +65,38 @@ class TestV96ContractMatrix(unittest.TestCase):
         is_blocked = self.res_pipe.get("blocked", False)
         self.assertEqual(is_blocked, task_gov.get("is_blocked", False), "Pipeline blocked flag must match Task Governance result")
 
+    def test_contract_7_debate_to_revised_hld_alignment(self):
+        """Contract 7: Accepted ADRs in Debate result must match HLD design decision records."""
+        hld = self.res_pipe["hld_design"]
+        debate_dict = self.res_pipe["debate_result"]
+        accepted_adrs = debate_dict.get("accepted_adrs", [])
+        hld_adr_dict = {a.get("id") if isinstance(a, dict) else a.id: a for a in hld.adrs}
+        for acc in accepted_adrs:
+            adr_id = acc.get("id")
+            self.assertIn(adr_id, hld_adr_dict, f"Accepted debate ADR '{adr_id}' must be present in revised HLD design")
+
+    def test_contract_8_version_lineage_parent_hash_integrity(self):
+        """Contract 8: Pipeline version serialization must produce valid SHA-256 content and parent hashes."""
+        import tempfile, shutil, json
+        tmp = tempfile.mkdtemp()
+        try:
+            p1 = SpecificationCompiler.save_versioned_pipeline_artifact(self.res_pipe, tmp)
+            self.assertTrue(p1.endswith("v1.json"))
+
+            # Mutate pipeline slightly to produce v2
+            pipe2 = dict(self.res_pipe)
+            pipe2["dependency_holes"] = [{"req_id": "REQ-001", "type": "TEST_HOLE"}]
+            p2 = SpecificationCompiler.save_versioned_pipeline_artifact(pipe2, tmp)
+            self.assertTrue(p2.endswith("v2.json"))
+
+            with open(p2, "r", encoding="utf-8") as f:
+                v2_data = json.load(f)
+            self.assertEqual(v2_data.get("version"), 2)
+            self.assertEqual(v2_data.get("parent_version"), 1)
+            self.assertTrue(v2_data.get("parent_hash") is not None, "v2 must track exact parent_hash of v1")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()

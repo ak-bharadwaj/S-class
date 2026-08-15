@@ -63,6 +63,33 @@ class RequirementNode:
     assumptions: List[str] = field(default_factory=list)
     dependencies: List[str] = field(default_factory=list)
 
+    def canonical_hash(self) -> str:
+        """Computes a SHA-256 canonical hash over ALL 16 semantic fields of the requirement node."""
+        import hashlib
+        payload = {
+            "id": self.id,
+            "kind": self.kind.value if isinstance(self.kind, RequirementKind) else str(self.kind),
+            "statement": self.statement,
+            "actor": self.actor,
+            "capability": self.capability,
+            "target": self.target,
+            "nfr_category": self.nfr_category.value if isinstance(self.nfr_category, NFRCategory) else (str(self.nfr_category) if self.nfr_category else None),
+            "preconditions": sorted(self.preconditions),
+            "postconditions": sorted(self.postconditions),
+            "constraints": sorted(self.constraints),
+            "priority": self.priority,
+            "risk": self.risk,
+            "epistemic_status": self.epistemic_status.value if isinstance(self.epistemic_status, EpistemicStatus) else str(self.epistemic_status),
+            "provenance": self.provenance.value if isinstance(self.provenance, ProvenanceKind) else str(self.provenance),
+            "confidence": self.confidence,
+            "evidence": self.evidence,
+            "source_behaviors": sorted(self.source_behaviors),
+            "assumptions": sorted(self.assumptions),
+            "dependencies": sorted(self.dependencies)
+        }
+        json_bytes = json.dumps(payload, sort_keys=True).encode("utf-8")
+        return hashlib.sha256(json_bytes).hexdigest()
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "id": self.id,
@@ -83,7 +110,8 @@ class RequirementNode:
             "evidence": self.evidence,
             "source_behaviors": self.source_behaviors,
             "assumptions": self.assumptions,
-            "dependencies": self.dependencies
+            "dependencies": self.dependencies,
+            "canonical_hash": self.canonical_hash()
         }
 
     @classmethod
@@ -131,15 +159,13 @@ class RequirementGraph:
     def add_requirement(self, req: RequirementNode) -> RequirementNode:
         if req.id in self.nodes:
             existing = self.nodes[req.id]
-            # Check for semantic conflict under same ID
-            if (existing.statement != req.statement or
-                existing.capability != req.capability or
-                existing.target != req.target or
-                existing.kind != req.kind):
+            # Enforce full 16-field canonical semantic hash equality
+            if existing.canonical_hash() != req.canonical_hash():
                 raise DuplicateIDConflictError(
-                    f"Requirement ID '{req.id}' semantic conflict: "
-                    f"Existing '{existing.statement}' ({existing.capability}) vs "
-                    f"New '{req.statement}' ({req.capability}). CASUAL MERGING REJECTED."
+                    f"Requirement ID '{req.id}' semantic conflict detected: "
+                    f"Existing hash '{existing.canonical_hash()[:8]}' (actor={existing.actor}, risk={existing.risk}, nfr={existing.nfr_category}) vs "
+                    f"New hash '{req.canonical_hash()[:8]}' (actor={req.actor}, risk={req.risk}, nfr={req.nfr_category}). "
+                    f"CASUAL MERGING REJECTED."
                 )
             return existing
 
