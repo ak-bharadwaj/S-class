@@ -149,6 +149,18 @@ class HLDDesign:
             "version": self.version
         }
 
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'HLDDesign':
+        modules = [HLDModule.from_dict(m) if isinstance(m, dict) else m for m in data.get("modules", [])]
+        adrs = [ADRRecord.from_dict(a) if isinstance(a, dict) else a for a in data.get("adrs", [])]
+        return cls(
+            system_name=data.get("system_name", "HLD-001"),
+            architecture_style=data.get("architecture_style", "Modular Monolith"),
+            modules=modules,
+            adrs=adrs,
+            version=int(data.get("version", 1))
+        )
+
 
 class ADRReasoningEngine:
     """Evaluates NFRs, scale indicators, and evidence to decide topology conditionally instead of hardcoding."""

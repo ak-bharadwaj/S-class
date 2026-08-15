@@ -552,28 +552,17 @@ class ArtifactGovernor:
             is_blocked = pipe_data.get("blocked", False)
             hld_gov = pipe_data.get("hld_governance", {})
 
-            # Validate whether verified HMAC approval records resolve any blocked ADRs
-            verified_approvals = cls._load_verified_approval_records(workspace_dir)
-            if verified_approvals:
-                hld_data = pipe_data.get("hld_design", {})
-                adrs_data = hld_data.get("adrs", [])
-                curr_art_id = hld_data.get("system_name", "HLD-001")
-                curr_art_ver = int(hld_data.get("version", 1))
-
-                if adrs_data:
-                    unresolved = False
-                    for a in adrs_data:
-                        adr_id = a.get("id", "") if isinstance(a, dict) else a.id
-                        rec = verified_approvals.get(adr_id)
-                        adr_obj = ADRRecord.from_dict(a) if isinstance(a, dict) else a
-                        curr_hash = cls.compute_canonical_adr_hash(adr_obj)
-
-                        if not rec or rec.artifact_id != curr_art_id or rec.artifact_version != curr_art_ver or rec.content_hash != curr_hash or rec.decision not in ["ACCEPTED", "CONFIRMED"]:
-                            unresolved = True
-                            break
-                    if not unresolved:
-                        is_blocked = False
-                        hld_gov["is_blocked"] = False
+            # Dynamically audit HLD against cryptographic approval records
+            hld_data = pipe_data.get("hld_design", {})
+            if hld_data and isinstance(hld_data, dict):
+                try:
+                    from hld_compiler import HLDDesign
+                    hld_obj = HLDDesign.from_dict(hld_data)
+                    hld_gov_dynamic = cls.audit_hld_governance(hld_obj, True, [], workspace_dir=workspace_dir)
+                    is_blocked = hld_gov_dynamic.is_blocked
+                    hld_gov = hld_gov_dynamic.to_dict()
+                except Exception:
+                    pass
 
             if target_phase in ["TASK_COMPILATION", "CODING", "QA", "RELEASE"]:
                 if is_blocked or hld_gov.get("is_blocked", False):

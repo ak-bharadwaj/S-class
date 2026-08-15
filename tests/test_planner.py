@@ -97,7 +97,7 @@ def test_runtime_integration_bug_fix_shortcut(tmp_path):
     recs = []
     for a in hld.adrs:
         c_hash = ArtifactGovernor.compute_canonical_adr_hash(a)
-        rec = ApprovalRecord(a.id, hld.system_name or "HLD-001", getattr(hld, "version", 1), c_hash, "ACCEPTED", ApprovalAuthority.TEST_SYNTHETIC, "Test auto-approval", "2026-08-14T22:00:00Z")
+        rec = ApprovalRecord(a.id, hld.system_name or "HLD-001", getattr(hld, "version", 1), c_hash, "ACCEPTED", ApprovalAuthority.HUMAN_EXPLICIT, "Test auto-approval", "2026-08-14T22:00:00Z")
         rec.signature = rec.compute_signature(sec_key)
         recs.append(rec.to_dict())
 
@@ -142,7 +142,7 @@ def test_runtime_integration_hotfix_shortcut(tmp_path):
     recs = []
     for a in hld.adrs:
         c_hash = ArtifactGovernor.compute_canonical_adr_hash(a)
-        rec = ApprovalRecord(a.id, hld.system_name or "HLD-001", getattr(hld, "version", 1), c_hash, "ACCEPTED", ApprovalAuthority.TEST_SYNTHETIC, "Test auto-approval", "2026-08-14T22:00:00Z")
+        rec = ApprovalRecord(a.id, hld.system_name or "HLD-001", getattr(hld, "version", 1), c_hash, "ACCEPTED", ApprovalAuthority.HUMAN_EXPLICIT, "Test auto-approval", "2026-08-14T22:00:00Z")
         rec.signature = rec.compute_signature(sec_key)
         recs.append(rec.to_dict())
 
