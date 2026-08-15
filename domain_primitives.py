@@ -257,3 +257,79 @@ class SemanticDomainGraph:
                 metadata=edge_data.get("metadata", {})
             )
         return graph
+
+
+# --- Requirement Synthesis Primitive Taxonomies ---
+
+class RequirementType(str, Enum):
+    EXPLICIT = "explicit"
+    SUPPORTED = "supported"
+    DERIVED = "derived"
+    OPTIONAL = "optional"
+    UNKNOWN = "unknown"
+    CONFLICT = "conflict"
+    REUSE = "reuse"
+
+
+class ArtifactAction(str, Enum):
+    CREATE = "create"
+    EXTEND = "extend"
+    MODIFY = "modify"
+    REUSE = "reuse"
+    DEPRECATE = "deprecate"
+    DELETE = "delete"
+
+
+class RequirementCategory(str, Enum):
+    PRODUCT_REQUIREMENT = "product_requirement"
+    SYSTEM_INVARIANT = "system_invariant"
+    UX_DERIVATION = "ux_derivation"
+    ARCHITECTURAL_CONSTRAINT = "architectural_constraint"
+
+
+class DecisionThreshold(str, Enum):
+    AUTO_DECIDE = "auto"
+    PROBABLY_DECIDE = "probably"
+    MUST_ASK = "must_ask"
+    MUST_STOP = "must_stop"
+
+
+@dataclass
+class EvidenceReference:
+    source_file: str
+    section: Optional[str] = None
+    reference_text: Optional[str] = None
+    line_number: Optional[int] = None
+
+
+@dataclass
+class SynthesizedRequirement:
+    id: str
+    description: str
+    type: RequirementType
+    category: RequirementCategory
+    action: ArtifactAction
+    decision_threshold: DecisionThreshold
+    evidence: List[EvidenceReference] = field(default_factory=list)
+    why_chain: List[str] = field(default_factory=list)
+    affects: List[str] = field(default_factory=list)
+    depends_on: List[str] = field(default_factory=list)
+    consequences: List[str] = field(default_factory=list)
+    assumption_type: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "description": self.description,
+            "type": self.type.value if hasattr(self.type, "value") else str(self.type),
+            "category": self.category.value if hasattr(self.category, "value") else str(self.category),
+            "action": self.action.value if hasattr(self.action, "value") else str(self.action),
+            "decision_threshold": self.decision_threshold.value if hasattr(self.decision_threshold, "value") else str(self.decision_threshold),
+            "evidence": [e.__dict__ if hasattr(e, "__dict__") else e for e in self.evidence],
+            "why_chain": self.why_chain,
+            "affects": self.affects,
+            "depends_on": self.depends_on,
+            "consequences": self.consequences,
+            "assumption_type": self.assumption_type
+        }
+

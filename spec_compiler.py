@@ -10,6 +10,7 @@ Operates over the SemanticDomainGraph to:
 
 import os
 import re
+import time
 import json
 import hashlib
 from datetime import datetime, timezone
@@ -27,6 +28,36 @@ def write_json_atomic(path: str, data: Any) -> None:
     with open(temp_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
     os.replace(temp_path, path)
+
+class _SimpleFileLock:
+    """Local hardware-safe mutual exclusion lock avoiding circular imports with runtime."""
+    def __init__(self, lock_path: str, timeout: float = 10.0):
+        self.lock_path = os.path.abspath(lock_path)
+        self.timeout = timeout
+        self._fd = None
+
+    def __enter__(self):
+        start = time.time()
+        while True:
+            try:
+                self._fd = os.open(self.lock_path, os.O_CREAT | os.O_RDWR | os.O_EXCL)
+                return self
+            except OSError:
+                if (time.time() - start) > self.timeout:
+                    try:
+                        os.unlink(self.lock_path)
+                    except OSError:
+                        pass
+                time.sleep(0.05)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self._fd is not None:
+            try:
+                os.close(self._fd)
+                os.unlink(self.lock_path)
+            except OSError:
+                pass
+
 from domain_primitives import (
     DomainPrimitiveType,
     DomainNode,
@@ -562,8 +593,9 @@ class SpecificationCompiler:
         Semantic Domain -> Behavior Graph -> Requirement IR -> HLD + ADRs -> V9 Debate -> Artifact Governance -> LLD -> Tasks
         """
         if graph is None:
-            from spec_synthesis import SemanticDecomposer, WorkspaceDocumentScanner
-            evidence = WorkspaceDocumentScanner.full_document_discovery(workspace_dir) if workspace_dir else None
+            from semantic_decomposer import SemanticDecomposer
+            from workspace_preflight_scanner import WorkspacePreflightScanner
+            evidence = WorkspacePreflightScanner.full_project_discovery(workspace_dir) if workspace_dir else None
             req_text = raw_request or (" ".join(intent_features) if intent_features else "")
             graph = SemanticDecomposer.decompose_intent(req_text, evidence) if req_text else SemanticDomainGraph()
         if intent_features is None:
@@ -600,9 +632,9 @@ class SpecificationCompiler:
         # 5. Low-Level Design (LLD) Refinement Compilation
         lld_components = LLDCompiler.compile_lld(hld, r_graph, b_graph, archetypes=archetypes)
         if workspace_dir and os.path.exists(workspace_dir):
-            from spec_synthesis import WorkspaceDocumentScanner
-            ev_disc = WorkspaceDocumentScanner.full_document_discovery(workspace_dir)
-            if ev_disc and ev_disc.api_routes:
+            from workspace_preflight_scanner import WorkspacePreflightScanner
+            ev_disc = WorkspacePreflightScanner.full_project_discovery(workspace_dir)
+            if ev_disc and hasattr(ev_disc, 'api_routes') and ev_disc.api_routes:
                 for r_item in ev_disc.api_routes:
                     r_ep = f"{r_item.get('method', 'GET')} {r_item.get('path', '')}"
                     if lld_components and r_ep not in lld_components[0].api_endpoints:
@@ -820,9 +852,7 @@ class SpecificationCompiler:
         state_dir = os.path.join(workspace_dir, ".agents")
         os.makedirs(state_dir, exist_ok=True)
         lock_file = os.path.join(state_dir, ".pipeline_version.lock")
-
-        from runtime import FileLock
-        with FileLock(lock_file):
+        with _SimpleFileLock(lock_file):
             existing_versions = []
             if os.path.exists(state_dir):
                 for fname in os.listdir(state_dir):
@@ -920,7 +950,7 @@ class SpecificationCompiler:
         Converts compiled Low-Level Design (LLD) catalog into explicit/derived SynthesizedRequirements.
         Ensures requirements are grounded directly in the SemanticDomainGraph with evidence.
         """
-        from spec_synthesis import (
+        from domain_primitives import (
             SynthesizedRequirement,
             RequirementType,
             RequirementCategory,

@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import time
 import shutil
 import logging
 from dataclasses import dataclass, field
@@ -14,62 +15,39 @@ from domain_primitives import (
     RelationType,
     ProvenanceType,
     SemanticDomainGraph,
-    AssumptionRecord
+    AssumptionRecord,
+    RequirementType,
+    ArtifactAction,
+    RequirementCategory,
+    DecisionThreshold,
+    EvidenceReference,
+    SynthesizedRequirement
 )
 from semantic_decomposer import SemanticDecomposer
-from spec_compiler import GraphInferenceEngine, SpecificationCompiler
 from adversarial_skeptic import AdversarialSkeptic
 from practical_skeptic import PracticalSkeptic
 from requirement_ir import RequirementGraph
 from behavior_graph import BehaviorGraph
 from hld_compiler import HLDDesign, HLDModule, ADRRecord
 
-try:
-    from runtime import write_json_atomic, load_json
-except ImportError:
-    # Fallbacks for testing if runtime is not available
-    def write_json_atomic(filepath: str, data: Any) -> None:
-        with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=2)
+def write_json_atomic(filepath: str, data: Any) -> None:
+    temp_path = f"{filepath}.tmp.{os.getpid()}"
+    with open(temp_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2)
+    os.replace(temp_path, filepath)
 
-    def load_json(filepath: str) -> Any:
-        if not os.path.exists(filepath):
-            return None
+def load_json(filepath: str) -> Any:
+    if not os.path.exists(filepath):
+        return None
+    try:
         with open(filepath, 'r', encoding='utf-8') as f:
             return json.load(f)
+    except Exception:
+        return None
 
 logger = logging.getLogger("spec_synthesis")
 
 # --- Enums ---
-
-class RequirementType(Enum):
-    EXPLICIT = "explicit"
-    SUPPORTED = "supported"
-    DERIVED = "derived"
-    OPTIONAL = "optional"
-    UNKNOWN = "unknown"
-    CONFLICT = "conflict"
-    REUSE = "reuse"
-
-class ArtifactAction(Enum):
-    CREATE = "create"
-    EXTEND = "extend"
-    MODIFY = "modify"
-    REUSE = "reuse"
-    DEPRECATE = "deprecate"
-    DELETE = "delete"
-
-class RequirementCategory(Enum):
-    PRODUCT_REQUIREMENT = "product_requirement"
-    SYSTEM_INVARIANT = "system_invariant"
-    UX_DERIVATION = "ux_derivation"
-    ARCHITECTURAL_CONSTRAINT = "architectural_constraint"
-
-class DecisionThreshold(Enum):
-    AUTO_DECIDE = "auto"
-    PROBABLY_DECIDE = "probably"
-    MUST_ASK = "must_ask"
-    MUST_STOP = "must_stop"
 
 class GateResult(Enum):
     PASS = "PASS"
@@ -98,43 +76,6 @@ class ScopeTier(Enum):
 
 # --- Dataclasses ---
 
-@dataclass
-class EvidenceReference:
-    source_file: str
-    section: Optional[str] = None
-    reference_text: Optional[str] = None
-    line_number: Optional[int] = None
-
-@dataclass
-class SynthesizedRequirement:
-    id: str
-    description: str
-    type: RequirementType
-    category: RequirementCategory
-    action: ArtifactAction
-    decision_threshold: DecisionThreshold
-    evidence: List[EvidenceReference] = field(default_factory=list)
-    why_chain: List[str] = field(default_factory=list)
-    affects: List[str] = field(default_factory=list)
-    depends_on: List[str] = field(default_factory=list)
-    consequences: List[str] = field(default_factory=list)
-    assumption_type: Optional[str] = None  # ux, behavior, data, api, permission, architecture
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "id": self.id,
-            "description": self.description,
-            "type": self.type.value,
-            "category": self.category.value,
-            "action": self.action.value,
-            "decision_threshold": self.decision_threshold.value,
-            "evidence": [e.__dict__ for e in self.evidence],
-            "why_chain": self.why_chain,
-            "affects": self.affects,
-            "depends_on": self.depends_on,
-            "consequences": self.consequences,
-            "assumption_type": self.assumption_type
-        }
 
 @dataclass
 class RoleCapabilityBinding:
@@ -2170,6 +2111,7 @@ class SpecSynthesisEngine:
         domain_graph = SemanticDecomposer.decompose_intent(effective_request, evidence)
 
         # 4. Authoritative Refinement Compiler Pipeline Execution (Single Source of Truth)
+        from spec_compiler import SpecificationCompiler
         feats = intent.all_features if hasattr(intent, 'all_features') else intent.primary_features
         is_deb = os.getenv("SCLASS_DEBATE_PHASE") == "TRUE" or (clarification_answers is not None)
         v7_pipeline = SpecificationCompiler.compile_v7_refinement_pipeline(

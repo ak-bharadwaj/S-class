@@ -36,7 +36,21 @@ from lld_compiler import LLDComponent, LLDComponentType, UIInteractionCapability
 from requirement_ir import RequirementGraph, RequirementNode
 from behavior_graph import BehaviorGraph, BehaviorNodeType, EpistemicStatus, ProvenanceKind
 from hld_compiler import HLDDesign, HLDModule
-from runtime import write_json_atomic, load_json
+
+def write_json_atomic(filepath: str, data: Any) -> None:
+    temp_path = f"{filepath}.tmp.{os.getpid()}"
+    with open(temp_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2)
+    os.replace(temp_path, filepath)
+
+def load_json(filepath: str) -> Any:
+    if not os.path.exists(filepath):
+        return None
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return None
 
 
 DEFAULT_AGENT_CAPABILITIES: Dict[str, AgentCapability] = {

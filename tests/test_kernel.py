@@ -41,45 +41,83 @@ def test_kernel_formal_api_and_event_sourcing(tmp_path):
     assert disk_state.activeEvent == "triage_done"
 
 
+def test_kernel_request_transition_api_contract_strictness(tmp_path):
+    """Invariant: event_name is mandatory; from_state is an optional assertion. from_state only strictly BLOCKS."""
+    workspace = str(tmp_path)
+    runtime.initialize_state(workspace_dir=workspace, goal="Test API contract")
+
+    # 1. request_transition(event_name="triage_done") -> VALID (derives state from disk)
+    res1 = kernel_instance.request_transition(event_name="triage_done", workspace_dir=workspace)
+    assert res1["status"] == "APPROVED"
+    assert res1["currentPhase"] == "ANALYSIS"
+
+    # 2. request_transition(event_name="context_loaded", from_state="ANALYSIS") -> VALID (assertion matches)
+    res2 = kernel_instance.request_transition(event_name="context_loaded", from_state="ANALYSIS", workspace_dir=workspace)
+    assert res2["status"] == "APPROVED"
+    assert res2["currentPhase"] == "SPECIFICATION_SYNTHESIS"
+
+    # 3. request_transition(event_name="spec_synthesized", from_state="CODING") -> FAILS CLOSED (mismatched assertion)
+    with pytest.raises(ValueError, match="State mismatch: caller claims from_state='CODING'"):
+        kernel_instance.request_transition(event_name="spec_synthesized", from_state="CODING", workspace_dir=workspace)
+
+    # 4. request_transition(from_state="SPECIFICATION_SYNTHESIS") -> FAILS CLOSED (missing mandatory event_name)
+    with pytest.raises(ValueError, match="Missing mandatory 'event_name'"):
+        kernel_instance.request_transition(from_state="SPECIFICATION_SYNTHESIS", workspace_dir=workspace)
+
+    # 5. request_transition(from_state="SPECIFICATION_SYNTHESIS", event_name="") -> FAILS CLOSED (empty event_name)
+    with pytest.raises(ValueError, match="Missing mandatory 'event_name'"):
+        kernel_instance.request_transition(from_state="SPECIFICATION_SYNTHESIS", event_name="", workspace_dir=workspace)
+
+
 def test_kernel_multi_step_semantic_replay_and_checkpoint_equivalence(tmp_path):
-    """Semantic closure test: Multi-transition sequence A -> B -> C -> D -> E and checkpoint equivalence."""
+    """Semantic closure test: Multi-transition sequence A -> B -> C -> D -> E and natural checkpoint equivalence."""
     workspace = str(tmp_path)
     runtime.initialize_state(workspace_dir=workspace, goal="Test multi step replay")
 
-    # Sequence: TRIAGE -> ANALYSIS -> SPECIFICATION_SYNTHESIS -> DESIGN -> DEBATE -> TASK_COMPILATION
+    # Event 1: TRIAGE -> ANALYSIS
     res1 = kernel_instance.request_transition(from_state="TRIAGE", event_name="triage_done", workspace_dir=workspace, payload={"enforce_evidence": False})
     assert res1["currentPhase"] == "ANALYSIS"
 
+    # Event 2: ANALYSIS -> SPECIFICATION_SYNTHESIS
     res2 = kernel_instance.request_transition(from_state="ANALYSIS", event_name="context_loaded", workspace_dir=workspace, payload={"enforce_evidence": False})
     assert res2["currentPhase"] == "SPECIFICATION_SYNTHESIS"
 
+    # Capture the exact natural state after event 2 for checkpoint verification
+    state_after_ev2 = runtime.get_state(workspace)
+    assert state_after_ev2.currentPhase == "SPECIFICATION_SYNTHESIS"
+
+    # Event 3: SPECIFICATION_SYNTHESIS -> DESIGN
     res3 = kernel_instance.request_transition(from_state="SPECIFICATION_SYNTHESIS", event_name="spec_synthesized", workspace_dir=workspace, payload={"enforce_evidence": False})
     assert res3["currentPhase"] == "DESIGN"
 
+    # Event 4: DESIGN -> DEBATE
     res4 = kernel_instance.request_transition(from_state="DESIGN", event_name="design_drafted", workspace_dir=workspace, payload={"enforce_evidence": False})
     assert res4["currentPhase"] == "DEBATE"
 
+    # Event 5: DEBATE -> TASK_COMPILATION
     res5 = kernel_instance.request_transition(from_state="DEBATE", event_name="no_changes_required", workspace_dir=workspace, payload={"enforce_evidence": False})
     assert res5["currentPhase"] == "TASK_COMPILATION"
 
-    # 1. Full Event Replay: reconstructed phase must strictly equal "TASK_COMPILATION"
+    # 1. Full Event Replay (before snapshot): reconstructs from all 5 raw events
     recon_full = kernel_instance.reconstruct_state_from_event_store(workspace)
     assert recon_full["reconstructed"] is True
     assert recon_full["total_events"] == 5
     assert recon_full["currentPhase"] == "TASK_COMPILATION"
 
+    # 2. Live Runtime Disk State: strictly equals "TASK_COMPILATION"
     disk_state = runtime.get_state(workspace)
     assert disk_state.currentPhase == "TASK_COMPILATION"
     assert disk_state.activeEvent == "no_changes_required"
 
-    # 2. Checkpointed Replay Equivalence: snapshot at offset 2 + remaining events == TASK_COMPILATION
-    snap_state = runtime.asdict(disk_state)
-    snap_state["currentPhase"] = "SPECIFICATION_SYNTHESIS"
-    EventStore.create_checkpoint(snap_state, event_offset=2, workspace_dir=workspace)
+    # 3. Create Natural Checkpoint Snapshot from state_after_ev2 at offset 2
+    EventStore.create_checkpoint(runtime.asdict(state_after_ev2), event_offset=2, workspace_dir=workspace)
 
+    # 4. Checkpointed Replay Equivalence: replay from natural checkpoint (offset 2) + remaining events (3, 4, 5)
     recon_snap = kernel_instance.reconstruct_state_from_event_store(workspace)
     assert recon_snap["reconstructed"] is True
+    assert recon_snap["total_events"] == 3
     assert recon_snap["currentPhase"] == "TASK_COMPILATION"
+    assert recon_snap["currentPhase"] == recon_full["currentPhase"] == disk_state.currentPhase
 
 
 def test_context_compression_engine():

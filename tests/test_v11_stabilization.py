@@ -364,9 +364,12 @@ class TestV11StabilizationPass(unittest.TestCase):
     # P0-6: Dependency & Import Cycle Cleanliness
     # =========================================================================
 
-    def test_p0_6_clean_module_import_and_no_dependency_cycles(self):
-        """Invariant: All core modules import cleanly without circular dependency deadlocks."""
+    def test_p0_6_clean_module_import_and_ast_dependency_cycle_analysis(self):
+        """Invariant: True AST static analysis verifies no circular import cycles exist across core architecture modules."""
+        import ast
         import importlib
+        
+        plugin_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         core_modules = [
             "event_store",
             "runtime",
@@ -387,9 +390,52 @@ class TestV11StabilizationPass(unittest.TestCase):
             "spec_synthesis",
             "sclass_grill"
         ]
+
+        # 1. Dynamic import verification
         for mod_name in core_modules:
             mod = importlib.import_module(mod_name)
             self.assertIsNotNone(mod, f"Module '{mod_name}' failed to import")
+
+        # 2. True AST Dependency Graph Construction
+        dep_graph: Dict[str, Set[str]] = {mod: set() for mod in core_modules}
+
+        for mod_name in core_modules:
+            file_path = os.path.join(plugin_root, f"{mod_name}.py")
+            if not os.path.exists(file_path):
+                continue
+            with open(file_path, "r", encoding="utf-8") as f:
+                tree = ast.parse(f.read(), filename=file_path)
+
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        target = alias.name.split(".")[0]
+                        if target in core_modules and target != mod_name:
+                            dep_graph[mod_name].add(target)
+                elif isinstance(node, ast.ImportFrom):
+                    if node.module:
+                        target = node.module.split(".")[0]
+                        if target in core_modules and target != mod_name:
+                            dep_graph[mod_name].add(target)
+
+        # 3. Direct Circular Dependency Detection (DFS Path Cycle Detection)
+        cycles = []
+
+        def find_cycles(u, path, local_visited):
+            local_visited.add(u)
+            path.append(u)
+            for v in dep_graph.get(u, set()):
+                if v in path:
+                    cycle_start = path.index(v)
+                    cycles.append(" -> ".join(path[cycle_start:] + [v]))
+                elif v not in local_visited:
+                    find_cycles(v, path, local_visited)
+            path.pop()
+
+        for mod in core_modules:
+            find_cycles(mod, [], set())
+
+        self.assertEqual(len(cycles), 0, f"Detected prohibited circular dependency cycles: {cycles}")
 
 
 if __name__ == "__main__":
