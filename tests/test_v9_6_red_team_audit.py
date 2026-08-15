@@ -295,6 +295,40 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         self.assertTrue(gov_res_nonexistent.is_blocked, "ArtifactGovernor MUST block task with forged nonexistent parent references")
         self.assertEqual(gov_res_nonexistent.validation_status, ValidationStatus.INVALID)
 
+        # 8. Negative Attack Vector 3: Wrong-but-existing parent reference (Cross-Domain Lineage Hijack)
+        b_graph_multi = BehaviorGraph()
+        b_graph_multi.add_node(BehaviorNode(
+            id="cmd_dispatch", name="DispatchVehicle", behavior_type=BehaviorNodeType.COMMAND,
+            actor_id="dispatcher", target_entity_id="vehicle", epistemic_status=EpistemicStatus.EXPLICIT,
+            provenance=ProvenanceKind.EXPLICIT, confidence=1.0, evidence_ref="Dispatch vehicle"
+        ))
+        b_graph_multi.add_node(BehaviorNode(
+            id="cmd_payment", name="ProcessPayment", behavior_type=BehaviorNodeType.COMMAND,
+            actor_id="cashier", target_entity_id="payment", epistemic_status=EpistemicStatus.EXPLICIT,
+            provenance=ProvenanceKind.EXPLICIT, confidence=1.0, evidence_ref="Process payment"
+        ))
+        r_graph_multi = RequirementGraph.compile_from_behavior_graph(b_graph_multi)
+        hld_multi = HLDCompiler.compile_hld(r_graph_multi, b_graph_multi)
+        lld_multi = LLDCompiler.compile_lld(hld_multi, r_graph_multi, b_graph_multi)
+        tasks_multi = TaskCompiler.compile_tasks(lld_multi, r_graph_multi, b_graph_multi)
+
+        # Find two different components
+        vehicle_comp = next(c for c in lld_multi if "vehicle" in c.id.lower() or "vehicle" in c.name.lower())
+        payment_comp = next(c for c in lld_multi if "payment" in c.id.lower() or "payment" in c.name.lower())
+
+        # Forge a vehicle task pointing to payment component parent LLD
+        vehicle_task = next(t for t in tasks_multi if "vehicle" in t.id.lower() or "vehicle" in t.title.lower())
+        hijacked_task = TaskRecord(
+            id="TSK-HIJACKED", title="Hijacked Task", description="desc",
+            category=TaskCategory.API_ENDPOINT, parent_lld=payment_comp.id, # Wrong but existing LLD!
+            parent_hld=vehicle_task.parent_hld, parent_reqs=vehicle_task.parent_reqs,
+            parent_behaviors=vehicle_task.parent_behaviors
+        )
+        gov_res_wrong_existing = ArtifactGovernor.audit_task_governance([hijacked_task], r_graph_multi, lld_multi)
+        self.assertTrue(gov_res_wrong_existing.is_blocked, "ArtifactGovernor MUST block task pointing to wrong but existing LLD parent component!")
+        self.assertEqual(gov_res_wrong_existing.validation_status, ValidationStatus.INVALID)
+        self.assertTrue(any("semantic parent mismatch" in r for r in gov_res_wrong_existing.blocking_reasons))
+
     # -------------------------------------------------------------------------
     # Pillar 5: Disambiguated Evidence-Conditioned Security (AUTHORIZED_FOR vs String)
     # -------------------------------------------------------------------------
@@ -446,7 +480,29 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         self.assertTrue(gov_res_err.is_blocked, "Governance exception MUST fail closed and block transition")
         self.assertTrue(any("GOVERNANCE_AUDIT_ERROR" in r for r in gov_res_err.blocking_reasons))
 
-        # 6. Artifact Version Binding: Approval was for version 1; pipeline attempts to execute version 2 -> MUST BLOCK
+        # 6. Strict Governance: Missing 'version' inside HLDDesign must raise ValueError and fail closed
+        write_json_atomic(pipe_path, {
+            "version": 1,
+            "hld_design": {
+                "system_name": "HLD-001",
+                "architecture_style": "Modular Monolith",
+                "modules": [mod.to_dict()],
+                "adrs": [adr.to_dict()]
+                # Note: 'version' intentionally omitted inside hld_design
+            },
+            "blocked": False,
+            "hld_governance": {"is_blocked": False}
+        })
+        gov_res_no_ver = ArtifactGovernor.enforce_fsm_transition(
+            current_phase="DESIGN",
+            proposed_event="spec_approved",
+            target_phase="CODING",
+            workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res_no_ver.is_blocked, "Missing 'version' in strict governance HLD MUST fail closed")
+        self.assertTrue(any("GOVERNANCE_AUDIT_ERROR" in r for r in gov_res_no_ver.blocking_reasons))
+
+        # 7. Artifact Version Binding: Approval was for version 1; pipeline attempts to execute version 2 -> MUST BLOCK
         hld_v2 = HLDDesign(system_name="HLD-001", architecture_style="Modular Monolith", modules=[mod], adrs=[adr], version=2)
         write_json_atomic(pipe_path, {
             "version": 2,

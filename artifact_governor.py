@@ -488,12 +488,12 @@ class ArtifactGovernor:
     ) -> GovernanceGateResult:
         reasons: List[str] = []
         req_ids = set(r_graph.nodes.keys())
-        lld_ids = {c.id for c in lld_components} if lld_components else set()
+        lld_map = {c.id: c for c in lld_components} if lld_components else {}
 
         for t in tasks:
             if not t.parent_lld:
                 reasons.append(f"Task {t.id} ({t.title}) lacks parent LLD component reference.")
-            elif lld_ids and t.parent_lld not in lld_ids:
+            elif lld_map and t.parent_lld not in lld_map:
                 reasons.append(f"Task {t.id} ({t.title}) references nonexistent parent LLD component '{t.parent_lld}'.")
 
             if not t.parent_reqs:
@@ -501,6 +501,22 @@ class ArtifactGovernor:
             elif not set(t.parent_reqs).issubset(req_ids):
                 invalid_reqs = [r for r in t.parent_reqs if r not in req_ids]
                 reasons.append(f"Task {t.id} ({t.title}) references nonexistent upstream Requirement IDs: {invalid_reqs}.")
+
+            # Semantic Parent Compatibility (Wrong-but-existing parent detection)
+            if lld_map and t.parent_lld in lld_map:
+                parent_comp = lld_map[t.parent_lld]
+                if t.parent_hld and parent_comp.parent and parent_comp.parent.hld_id:
+                    if t.parent_hld != parent_comp.parent.hld_id:
+                        reasons.append(
+                            f"Task {t.id} ({t.title}) semantic parent mismatch: parent_hld '{t.parent_hld}' conflicts with parent LLD '{t.parent_lld}' HLD module '{parent_comp.parent.hld_id}'."
+                        )
+                if parent_comp.parent and parent_comp.parent.req_ids and t.parent_reqs:
+                    comp_reqs = set(parent_comp.parent.req_ids)
+                    task_reqs = set(t.parent_reqs)
+                    if not task_reqs.intersection(comp_reqs):
+                        reasons.append(
+                            f"Task {t.id} ({t.title}) semantic parent mismatch: requirements {sorted(list(task_reqs))} are not covered by parent LLD '{t.parent_lld}' scope {sorted(list(comp_reqs))}."
+                        )
 
         if reasons:
             return GovernanceGateResult(
