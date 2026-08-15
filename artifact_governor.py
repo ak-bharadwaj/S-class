@@ -545,7 +545,19 @@ class ArtifactGovernor:
                 )
             seen_task_ids.add(t.id)
 
-            # 0. Canonical Task Integrity and Upstream Lineage Verification
+            # 0. Canonical Task Integrity, Semantic Spec Hash, and Upstream Lineage Verification
+            if hasattr(t, "compute_spec_hash"):
+                expected_spec_hash = t.compute_spec_hash()
+                actual_spec_hash = getattr(t, "task_spec_hash", "")
+                if not actual_spec_hash:
+                    reasons.append(
+                        f"TASK_SPEC_HASH_MISSING: Task {t.id} ({t.title}) is missing mandatory authoritative 'task_spec_hash'!"
+                    )
+                elif actual_spec_hash != expected_spec_hash:
+                    reasons.append(
+                        f"TASK_SPEC_HASH_MISMATCH: Task {t.id} ({t.title}) task_spec_hash mismatch (actual: {actual_spec_hash[:8]}, computed: {expected_spec_hash[:8]})!"
+                    )
+
             if hasattr(t, "compute_canonical_hash"):
                 expected_task_hash = t.compute_canonical_hash()
                 actual_task_hash = getattr(t, "task_hash", "")

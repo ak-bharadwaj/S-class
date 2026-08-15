@@ -136,13 +136,13 @@ class TaskRecord:
             mandatory = [
                 "id", "title", "description", "category", "parent_lld", "parent_hld",
                 "parent_reqs", "parent_behaviors", "verification_criteria",
-                "source_lld_hash", "source_binding_hashes", "task_hash"
+                "source_lld_hash", "source_binding_hashes", "task_spec_hash", "task_hash"
             ]
             for field_name in mandatory:
                 if field_name not in data:
                     raise ValueError(f"Missing mandatory '{field_name}' in TaskRecord governed payload (strict mode)")
                 val = data[field_name]
-                if field_name in ["id", "title", "description", "category", "parent_lld", "parent_hld", "source_lld_hash", "task_hash"]:
+                if field_name in ["id", "title", "description", "category", "parent_lld", "parent_hld", "source_lld_hash", "task_spec_hash", "task_hash"]:
                     if not isinstance(val, str) or not val.strip():
                         raise ValueError(f"Field '{field_name}' must be a non-empty string in TaskRecord strict ingestion, got {val!r}")
                 elif field_name in ["parent_reqs", "parent_behaviors", "verification_criteria", "source_binding_hashes"]:
@@ -174,9 +174,13 @@ class TaskRecord:
                 verification_criteria=data["verification_criteria"],
                 source_lld_hash=data["source_lld_hash"],
                 source_binding_hashes=data["source_binding_hashes"],
-                task_spec_hash=data.get("task_spec_hash", ""),
+                task_spec_hash=data["task_spec_hash"],
                 task_hash=data["task_hash"]
             )
+
+            computed_spec_hash = task.compute_spec_hash()
+            if data["task_spec_hash"] != computed_spec_hash:
+                raise ValueError(f"TaskRecord '{task.id}' task_spec_hash mismatch (provided: {data['task_spec_hash'][:8]}, computed: {computed_spec_hash[:8]})")
 
             computed_hash = task.compute_canonical_hash()
             if data["task_hash"] != computed_hash:

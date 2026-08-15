@@ -1336,6 +1336,156 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
         self.assertTrue(gov_res.is_blocked)
         self.assertTrue(any("CHANGESET_EPOCH_ID_MISMATCH" in r for r in gov_res.blocking_reasons))
 
+    # -------------------------------------------------------------------------
+    # Test 27: Strict TaskRecord task_spec_hash Ingestion & Recomputation Invariant
+    # -------------------------------------------------------------------------
+    def test_v11_task_record_strict_task_spec_hash_ingestion_and_tamper_detection(self):
+        """Invariant: Governed TaskRecord ingestion strictly requires task_spec_hash and recomputes digest."""
+        task = self._create_governed_task("TASK-001")
+        raw_dict = task.to_dict()
+
+        # 1. Missing task_spec_hash raises ValueError
+        bad_missing = dict(raw_dict)
+        del bad_missing["task_spec_hash"]
+        with self.assertRaises(ValueError) as ctx1:
+            TaskRecord.from_governed_dict(bad_missing)
+        self.assertIn("Missing mandatory 'task_spec_hash'", str(ctx1.exception))
+
+        # 2. Tampered task_spec_hash raises ValueError
+        bad_tampered = dict(raw_dict)
+        bad_tampered["task_spec_hash"] = "tampered_spec_hash_00000000000000"
+        with self.assertRaises(ValueError) as ctx2:
+            TaskRecord.from_governed_dict(bad_tampered)
+        self.assertIn("task_spec_hash mismatch", str(ctx2.exception))
+
+        # 3. Governor audit detects missing or tampered task_spec_hash
+        b_graph = BehaviorGraph(version=1)
+        beh_node = BehaviorNode(
+            id="BEH-001",
+            name="ProcessData",
+            behavior_type=BehaviorNodeType.COMMAND,
+            actor_id="User",
+            target_entity_id="Data",
+            epistemic_status=EpistemicStatus.OBSERVED
+        )
+        b_graph.add_node(beh_node)
+        r_graph = RequirementGraph(version=1)
+        req_node = RequirementNode(
+            id="REQ-001",
+            kind=RequirementKind.FUNCTIONAL,
+            statement="System shall process data",
+            actor="User",
+            capability="ProcessData",
+            target="System",
+            source_behaviors=["BEH-001"]
+        )
+        r_graph.add_requirement(req_node)
+        hld_mod = HLDModule(
+            id="HLD-001",
+            name="AuthModule",
+            system_boundary="Core",
+            owned_entities=["Data"],
+            owned_capabilities=["ProcessData"]
+        )
+        hld = HLDDesign(
+            system_name="S",
+            architecture_style="Modular Monolith",
+            modules=[hld_mod],
+            adrs=[],
+            version=1
+        )
+        binding = CapabilityBinding(
+            behavior_id="BEH-001",
+            requirement_ids=["REQ-001"],
+            operation_class=OperationClass.COMMAND_MUTATION,
+            target_entity="Data",
+            hld_capability="ProcessData",
+            lld_component_id="LLD-001",
+            allowed_component_types=[LLDComponentType.SERVICE],
+            source_behavior_hash=beh_node.compute_canonical_hash(),
+            source_requirement_hash="req_hash",
+            source_hld_hash=hld_mod.compute_canonical_hash(),
+            source_behavior_graph_version="1",
+            source_requirement_graph_version="1",
+            source_hld_module_id="HLD-001",
+            source_hld_version=1
+        )
+        binding.binding_hash = binding.compute_hash()
+        lld_comp = LLDComponent(
+            id="LLD-001",
+            name="DataService",
+            component_type=LLDComponentType.SERVICE,
+            parent=LLDParentRef(
+                hld_id="HLD-001",
+                req_ids=["REQ-001"],
+                behavior_ids=["BEH-001"]
+            ),
+            role="service",
+            layout="standard",
+            owned_entities=["Data"],
+            owned_capabilities=["ProcessData"],
+            execution_capability=ComponentExecutionCapability.MUTATE,
+            capability_bindings=[binding]
+        )
+        lld_comp.component_hash = lld_comp.compute_canonical_hash()
+
+        task_missing_spec = self._create_governed_task("TASK-001")
+        task_missing_spec.task_spec_hash = ""
+
+        gov_res = ArtifactGovernor.audit_task_governance(
+            tasks=[task_missing_spec],
+            lld_components=[lld_comp],
+            r_graph=r_graph,
+            b_graph=b_graph,
+            hld_modules=hld.modules
+        )
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("TASK_SPEC_HASH_MISSING" in r for r in gov_res.blocking_reasons))
+
+    # -------------------------------------------------------------------------
+    # Test 28: Epoch Separation Invariant: ChangeSet cannot alter Pipeline Epoch
+    # -------------------------------------------------------------------------
+    def test_v11_pipeline_epoch_vs_changeset_separation_invariant(self):
+        """Invariant: Pipeline epoch captures specification authority; post-epoch pipeline mutation is strictly rejected."""
+        self._create_file("src/app.py", "def app(): pass")
+        anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+        self._create_file("src/app.py", "def app(): return True")
+        result = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        task = self._create_governed_task("TASK-001", target_files=["src/app.py"])
+        plan = self._create_governed_plan([task])
+
+        changeset = AuthorizedChangeSet(
+            changeset_id="CS-SEPARATION",
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash="pending_hash",
+            pipeline_epoch_id="pending_epoch_id",
+            source_task_hashes={task.id: task.task_spec_hash}
+        )
+        changeset.add_change(AuthorizedFileChange(
+            file_path="src/app.py",
+            operation=FileMutationOp.MODIFY,
+            authorized_by_tasks=["TASK-001"]
+        ))
+
+        self._write_mock_pipeline(anchor, changeset, tasks=[task], plan=plan)
+
+        # ATTACK: Attacker injects authorized_changeset into v7_refinement_pipeline.json post-lock
+        pipe_path = os.path.join(self.agents_dir, "v7_refinement_pipeline.json")
+        with open(pipe_path, "r", encoding="utf-8") as f:
+            pipe_data = json.load(f)
+        pipe_data["injected_post_epoch_mutation"] = {"malicious": True}
+        with open(pipe_path, "w", encoding="utf-8") as f:
+            json.dump(pipe_data, f)
+
+        gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
+            anchor, result, changeset, workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("PIPELINE_EPOCH_TAMPER_DETECTED" in r for r in gov_res.blocking_reasons))
+
 
 if __name__ == "__main__":
     unittest.main()
+
