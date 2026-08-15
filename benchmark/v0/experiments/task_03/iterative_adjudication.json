@@ -1,0 +1,102 @@
+{
+  "task_id": "TASK-03-HEALTHCARE-PHI-MASK",
+  "provenance": {
+    "adjudicator_id": "ADJ_ENG_CORE_01",
+    "adjudication_version": "3.0.0-gate1.3-iterative",
+    "adjudication_timestamp": "2026-08-16T00:10:00Z",
+    "generator_id": "gemini-flash-lite-latest (3-pass iterative runner)",
+    "adjudicator_is_generator": false,
+    "generator_had_access_to_adjudication": false,
+    "adjudicator_blinded_to_model_name": true
+  },
+  "candidate_adjudications": [
+    {
+      "candidate_id": "REQ-001",
+      "title": "Strip 18 HIPAA Safe Harbor Direct Identifiers",
+      "introduced_in_pass": 1,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": ["REQ-EXP-02", "REQ-DER-01"],
+      "rationale": "Directly matches ground truth requirement to strip all 18 HIPAA Safe Harbor direct identifiers."
+    },
+    {
+      "candidate_id": "REQ-002",
+      "title": "De-identification Validation and Audit Logging",
+      "introduced_in_pass": 1,
+      "label": "VALID_DERIVATION",
+      "ground_truth_id": null,
+      "rationale": "Valid domain derivation validating pipeline de-identification and maintaining audit logs."
+    },
+    {
+      "candidate_id": "REQ-003",
+      "title": "Analytics Ingestion Format Standard",
+      "introduced_in_pass": 1,
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "rationale": "Correctly flags unstated analytics storage format (Parquet/JSON) as UNKNOWN."
+    },
+    {
+      "candidate_id": "REQ-004",
+      "title": "Source Data Store and Access Mechanism",
+      "introduced_in_pass": 1,
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "rationale": "Correctly flags unstated source EHR database system as UNKNOWN."
+    },
+    {
+      "candidate_id": "REQ-005",
+      "title": "Dates of Service Generalization / Shifting Invariant",
+      "introduced_in_pass": 2,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-DER-03",
+      "rationale": "Matches ground truth requirement for date generalization and age capping above 89."
+    },
+    {
+      "candidate_id": "REQ-006",
+      "title": "Pipeline Failure Recovery and Partial Ingestion Poison Pill Protection",
+      "introduced_in_pass": 2,
+      "label": "VALID_DERIVATION",
+      "ground_truth_id": null,
+      "rationale": "Valid domain derivation providing fail-closed quarantine / poison pill protection on unmaskable records."
+    },
+    {
+      "candidate_id": "REQ-007",
+      "title": "Downstream Re-identification Risk & Quasi-Identifier Constraint Check",
+      "introduced_in_pass": 2,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-DER-02",
+      "rationale": "Matches ground truth geographic 3-digit ZIP truncation / quasi-identifier risk constraint."
+    },
+    {
+      "candidate_id": "REQ-008",
+      "title": "Graceful Shutdown and Power Loss State Recovery",
+      "introduced_in_pass": 3,
+      "label": "VALID_DERIVATION",
+      "ground_truth_id": null,
+      "rationale": "Valid domain derivation enforcing pipeline state checkpointing and recovery."
+    },
+    {
+      "candidate_id": "REQ-009",
+      "title": "Statutory Cryptographic In Transit and At Rest Boundary",
+      "introduced_in_pass": 3,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-SUP-01",
+      "rationale": "Matches ground truth requirement for cryptographic batch manifests and encryption."
+    },
+    {
+      "candidate_id": "REQ-010",
+      "title": "Unstated Cryptographic Tokenization Provider",
+      "introduced_in_pass": 3,
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "rationale": "Correctly flags unstated tokenization provider as UNKNOWN."
+    },
+    {
+      "candidate_id": "REQ-011",
+      "title": "Unstated Network Transport and Messaging Protocol",
+      "introduced_in_pass": 3,
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "rationale": "Correctly flags unstated messaging transport protocol as UNKNOWN."
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "experiment": "EXPERIMENT C \u2014 Pass 3 (Boundary & Completeness Verification)",
+  "task_id": "auth_identity_password_reset_invalidation",
+  "final_boundary_requirements": [
+    {
+      "requirement_id": "[REQ-BOUND-001]",
+      "title": "Crash Recovery and Blacklist State Rehydration",
+      "description": "Upon node restart or cluster crash recovery, the local revocation store or proxy cache must rehydrate blacklist state or block validation until synchronization with the authoritative global blacklist store is fully re-established.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "auth_identity",
+      "confidence": 0.95,
+      "justification": "Operational lifecycle boundary requiring secure behavior after a crash or power loss event to prevent temporary revocation bypass."
+    },
+    {
+      "requirement_id": "[REQ-BOUND-002]",
+      "title": "Cryptographic Algorithm and Hashing Standard for Blacklisted Tokens",
+      "description": "The specific cryptographic hashing algorithm (e.g., SHA-256, HMAC-SHA256) used to store or index revoked token identifiers (JTIs) in the blacklist store is unstated.",
+      "type": "SECURITY",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "Underspecified architectural technology choice concerning cryptographic implementation details for token identity storage."
+    },
+    {
+      "requirement_id": "[REQ-BOUND-003]",
+      "title": "Identity Provider and Directory Integration Protocol",
+      "description": "The upstream Identity Provider (IdP), directory service, or user store protocol (e.g., OIDC, SAML, LDAP) interfacing with the password reset trigger is unstated.",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "Underspecified upstream dependency and integration boundary for capturing password reset events."
+    }
+  ],
+  "provenance_metadata": {
+    "experiment_id": "EXPERIMENT_C_PASS_3_BOUNDARY_VERIFICATION",
+    "task_id": "TASK-02-AUTH-SESSION-REVOKE",
+    "runner_version": "2.0.0-gate1.2-provenance",
+    "git_commit": "53aa1bd3c06062b227f1acd75abc3ff4a76aec8d",
+    "timestamp_utc": "2026-08-15T18:35:11.343103+00:00",
+    "latency_ms": 2824.37,
+    "provider": "gemini",
+    "model": "gemini-flash-lite-latest",
+    "generation_settings": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "token_usage": {
+      "prompt_tokens": 881,
+      "completion_tokens": 508,
+      "total_tokens": 1389
+    },
+    "estimated_cost_usd": 0.000218,
+    "system_prompt": "You are the S-Class Grounded Domain Inference Engine (Pass 3 - Boundary & Completeness Verification).\nYour job is to perform a final completeness audit of the merged specification:\n\n1. Final Boundary Verification:\n   - Identify any remaining statutory regulatory invariants (e.g. HIPAA, DO-178C, PCI-DSS boundaries), operational lifecycle boundaries (graceful shutdown, power loss, crash recovery), or unstated operational decisions.\n   - Surface all unstated technology choices (storage engines, identity providers, network transports) explicitly as UNKNOWN.\n   - Do NOT repeat existing requirements from Pass 1 or Pass 2.\n\n2. Output Schema:\n{\n  \"experiment\": \"EXPERIMENT C \u2014 Pass 3 (Boundary & Completeness Verification)\",\n  \"task_id\": \"<TASK_ID>\",\n  \"final_boundary_requirements\": [\n    {\n      \"requirement_id\": \"<REQ_ID>\",\n      \"title\": \"<TITLE>\",\n      \"description\": \"<DESCRIPTION>\",\n      \"type\": \"FUNCTIONAL\" | \"NON_FUNCTIONAL\" | \"SECURITY\" | \"BEHAVIORAL\" | \"INVARIANT\",\n      \"epistemic_status\": \"DERIVED_JUSTIFIED\" | \"SUPPORTED\" | \"UNKNOWN\",\n      \"provenance\": \"<DOMAIN_PROVENANCE>\" | \"UNSUPPORTED\",\n      \"confidence\": <FLOAT_0_TO_1>,\n      \"justification\": \"<WHY_CHAIN_OR_RATIONALE>\"\n    }\n  ]\n}\n",
+    "user_prompt": "Original Prompt: \"Implement password reset session invalidation that blacklists active refresh tokens across all clusters.\"\nDomain: 'auth_identity'\n\nCurrent Merged Specification (Pass 1 + Pass 2):\n- [REQ-EXPLICIT-001] Password Reset Session Invalidation (EXPLICIT): Trigger invalidation of active user sessions upon a successful password reset event.\n- [REQ-EXPLICIT-002] Refresh Token Blacklisting Across Clusters (EXPLICIT): Blacklist active refresh tokens across all deployment clusters upon session invalidation triggered by password reset.\n- [REQ-DERIVED-001] Distributed Token Revocation Propagation (DERIVED_JUSTIFIED): Revocation lists or states must synchronize or be queryable across all independent clusters with bounded propagation latency.\n- [REQ-DERIVED-002] Token Identifier Uniqueness and Extraction (DERIVED_JUSTIFIED): Refresh tokens or their unique cryptographic identifiers (JTI) must be extractable and matched against the revocation blacklist during authentication verification.\n- [REQ-UNKNOWN-001] Token Storage Mechanism and Protocol Standards (UNKNOWN): The specific data store (e.g., Redis cluster, SQL database) and token format standards (e.g., JWT, opaque tokens) are unstated.\n- [REQ-UNKNOWN-002] Cross-Cluster Sync Latency and Consistency Model (UNKNOWN): The exact acceptable replication lag or consistency model (e.g., strong vs. eventual consistency) for multi-cluster sync is unstated.\n- [REQ-MISSING-001] Idempotent Blacklist Insertion and Storage Hygiene (DERIVED_JUSTIFIED): Blacklist state insertions for refresh token JTIs must be idempotent to prevent race conditions during concurrent reset events or duplicate propagation deliveries, and must incorporate token-lifetime-bound Time-To-Live (TTL) expiration.\n- [REQ-MISSING-002] Partition-Tolerant Fail-Closed Access Gate (DERIVED_JUSTIFIED): If a cluster loses connectivity to the cross-cluster revocation synchronization layer or blacklist store, authentication verification must enforce a fail-closed posture for refresh token validation to prevent revoked token reuse during network partitions.\n\nFinal Completeness Audit Directive:\n- Perform a final boundary and epistemic check for statutory safety rules, lifecycle boundaries (graceful shutdown / recovery), and unstated operational parameters.\n- Surface any unstated architecture decisions (storage engines, token formats, identity providers, protocols) explicitly as UNKNOWN.\n- Synthesize ONLY final missing boundary/unknown items. Do NOT duplicate existing items.\n\nReturn strictly valid JSON as specified in the system instructions.",
+    "input_context": {
+      "pass": 3,
+      "raw_prompt": "Implement password reset session invalidation that blacklists active refresh tokens across all clusters.",
+      "merged_count": 8
+    }
+  }
+}

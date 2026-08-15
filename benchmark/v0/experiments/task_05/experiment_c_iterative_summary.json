@@ -1,0 +1,175 @@
+{
+  "task_id": "TASK-05-EXAM-BROWSER-SANDBOX",
+  "domain": "edtech_security",
+  "raw_prompt": "Build a desktop examination lockdown sandbox that restricts dual-monitor mirroring and intercepts OS clipboard paste during active exam sessions.",
+  "passes": {
+    "pass_1": {
+      "generated_count": 6,
+      "latency_ms": 5169.71,
+      "total_tokens": 1619,
+      "estimated_cost_usd": 0.000353
+    },
+    "pass_2": {
+      "generated_count": 3,
+      "latency_ms": 4523.06,
+      "total_tokens": 1532,
+      "estimated_cost_usd": 0.000267
+    },
+    "pass_3": {
+      "generated_count": 4,
+      "latency_ms": 4140.17,
+      "total_tokens": 1617,
+      "estimated_cost_usd": 0.000267
+    }
+  },
+  "cumulative_progression": {
+    "pass_1_count": 6,
+    "pass_1_plus_2_count": 9,
+    "pass_1_plus_2_plus_3_count": 13
+  },
+  "cumulative_requirements": [
+    {
+      "requirement_id": "REQ-EXPLICIT-01",
+      "title": "Dual-Monitor Mirroring Restriction",
+      "description": "The desktop examination sandbox must restrict and disable dual-monitor setups and screen mirroring during active examination sessions to prevent external viewing or capture.",
+      "type": "SECURITY",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Directly stated in the user prompt requiring the restriction of dual-monitor mirroring.",
+      "introduced_in_pass": 1
+    },
+    {
+      "requirement_id": "REQ-EXPLICIT-02",
+      "title": "OS Clipboard Paste Interception",
+      "description": "The desktop application must intercept and block OS-level clipboard paste operations while an examination session is active.",
+      "type": "SECURITY",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Directly stated in the user prompt requiring the interception of OS clipboard paste.",
+      "introduced_in_pass": 1
+    },
+    {
+      "requirement_id": "REQ-DERIVED-01",
+      "title": "Low-Level Operating System Hook Integration for Clipboard Control",
+      "description": "The sandbox must implement low-level OS hooks (e.g., Win32 API hooks on Windows, Accessibility/Quartz services on macOS) to intercept clipboard events system-wide rather than strictly within application focus.",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "edtech_security",
+      "confidence": 0.95,
+      "justification": "Why 1: Relying solely on application-level focus events leaves external hotkeys and background processes capable of injecting clipboard data. Why 2: Low-level operating system hooks must be registered to capture global keystrokes and clipboard access requests before they reach the OS buffer. Why 3: Mandatory invariant: Clipboard isolation must be absolute across the entire desktop environment during an active session to prevent data exfiltration or ingestion.",
+      "introduced_in_pass": 1
+    },
+    {
+      "requirement_id": "REQ-DERIVED-02",
+      "title": "Display Enumeration and Topology Forcing",
+      "description": "The sandbox runtime must enumerate connected display devices upon session initialization and force a single-display fallback or terminate execution if multiple active displays are detected.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "edtech_security",
+      "confidence": 0.95,
+      "justification": "Why 1: Simply hiding an application window from a secondary display does not prevent OS-level screen mirroring or extension. Why 2: The platform display APIs must be queried at runtime to detect physical or virtual display topology changes. Why 3: Mandatory invariant: Active examinations must execute exclusively within a single, verified display constraint to comply with anti-mirroring policies.",
+      "introduced_in_pass": 1
+    },
+    {
+      "requirement_id": "REQ-UNKNOWN-01",
+      "title": "Target Operating System Architecture Support",
+      "description": "The specific target operating system versions (e.g., Windows 10/11, macOS versions, Linux distributions) and their corresponding sandbox implementation APIs are unstated.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "No specific OS versions or deployment platforms were mentioned in the prompt.",
+      "introduced_in_pass": 1
+    },
+    {
+      "requirement_id": "REQ-UNKNOWN-02",
+      "title": "Exam Backend Telemetry and Session Sync Protocol",
+      "description": "The network protocol, authentication mechanism, and backend endpoints used to report lockdown violations, session start/end states, and telemetry are unstated.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "The prompt specifies the local sandbox behavior but does not define any remote server integration, API schemas, or backend communication protocols.",
+      "introduced_in_pass": 1
+    },
+    {
+      "requirement_id": "REQ-MISSING-01",
+      "title": "Crash Recovery and Exam State Persistence",
+      "description": "The sandbox must persistently save exam state locally and safely handle unexpected OS crashes, forced reboots, or process termination without allowing bypass of the lockdown state upon restart.",
+      "type": "INVARIANT",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "Exam integrity and fault tolerance domain standards",
+      "confidence": 0.95,
+      "justification": "1. If an OS crash occurs during an active exam session, the sandbox process terminates. 2. Without persistent local state and automatic lockdown re-initialization upon reboot, a student could exploit a deliberate crash to escape the sandbox environment. 3. Therefore, the system must enforce strict state persistence and re-apply display/clipboard restrictions immediately upon recovery to maintain security invariants.",
+      "introduced_in_pass": 2
+    },
+    {
+      "requirement_id": "REQ-MISSING-02",
+      "title": "Anti-Tamper Process Watchdog and Debugger Detection",
+      "description": "The sandbox runtime must include a background watchdog mechanism to detect unauthorized debugging, memory injection, process termination attempts, or virtual machine instrumentation.",
+      "type": "SECURITY",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "Secure desktop application hardening standards",
+      "confidence": 0.92,
+      "justification": "1. A secure examination sandbox relies on continuous enforcement of clipboard and display restrictions. 2. Malicious users or advanced examinees may attempt to attach debuggers, terminate the sandbox watchdog process, or inject payloads to bypass hooks. 3. Therefore, anti-tamper safeguards and process monitoring are required to immediately terminate the exam session if tampering is detected.",
+      "introduced_in_pass": 2
+    },
+    {
+      "requirement_id": "REQ-MISSING-03",
+      "title": "Hotkey and Global Shortcut Suppression",
+      "description": "The sandbox must intercept and suppress global OS shortcuts (e.g., Alt+Tab, Win+Shift+S, PrintScreen, Cmd+Tab, Cmd+Space) that permit window switching, screenshot capture, or Mission Control.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "Standard secure browser and examination lockdown specifications",
+      "confidence": 0.98,
+      "justification": "1. Restricting dual-monitors and clipboard paste alone is insufficient to prevent cheating if users can invoke native OS screenshot tools or switch to unauthorized windows. 2. Operating systems provide global keyboard shortcuts for task switching and screen capture by default. 3. Therefore, the sandbox must intercept and suppress these system-level hotkeys to ensure complete session containment.",
+      "introduced_in_pass": 2
+    },
+    {
+      "requirement_id": "REQ-BOUNDARY-01",
+      "title": "Local Storage Engine for State Persistence",
+      "description": "The specific local storage engine, encryption mechanism (e.g., SQLite with AES-256, DPAPI), and key management strategy used to secure persisted exam state and telemetry logs across crashes remain unstated.",
+      "type": "SECURITY",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "Storage implementation details for crash recovery are unstated in the original prompt.",
+      "introduced_in_pass": 3
+    },
+    {
+      "requirement_id": "REQ-BOUNDARY-02",
+      "title": "Identity Provider and Authentication Token Format",
+      "description": "The identity provider, authentication protocol, and token format (e.g., OAuth2, JWT, mTLS client certificates) used to authenticate the examinee session and authorize sandbox execution remain unstated.",
+      "type": "SECURITY",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "Authentication and identity assertion mechanisms are missing from the base specification.",
+      "introduced_in_pass": 3
+    },
+    {
+      "requirement_id": "REQ-BOUNDARY-03",
+      "title": "Statutory Student Data Privacy and Telemetry Compliance",
+      "description": "The system must comply with applicable statutory data privacy regulations (e.g., FERPA, GDPR, COPPA) regarding the collection, transmission, and retention of student telemetry, hardware fingerprints, and monitoring logs.",
+      "type": "INVARIANT",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "edtech_security",
+      "confidence": 0.95,
+      "justification": "Educational technology software capturing system telemetry and enforcing lockdown must adhere to statutory educational privacy frameworks.",
+      "introduced_in_pass": 3
+    },
+    {
+      "requirement_id": "REQ-BOUNDARY-04",
+      "title": "Graceful Shutdown and Session Termination Protocol",
+      "description": "The sandbox must implement a secure, authenticated graceful shutdown workflow that permits exit from the lockdown state only upon verified receipt of exam submission confirmation from the authorized backend.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "edtech_security",
+      "confidence": 0.95,
+      "justification": "Lifecycle boundaries require explicit handling of normal session completion to prevent students from escaping the sandbox prematurely.",
+      "introduced_in_pass": 3
+    }
+  ]
+}

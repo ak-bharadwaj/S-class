@@ -1,0 +1,63 @@
+{
+  "experiment": "EXPERIMENT C \u2014 Pass 2 (Targeted Coverage Audit)",
+  "task_id": "edtech_security_lockdown_sandbox",
+  "missing_requirements": [
+    {
+      "requirement_id": "REQ-MISSING-01",
+      "title": "Crash Recovery and Exam State Persistence",
+      "description": "The sandbox must persistently save exam state locally and safely handle unexpected OS crashes, forced reboots, or process termination without allowing bypass of the lockdown state upon restart.",
+      "type": "INVARIANT",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "Exam integrity and fault tolerance domain standards",
+      "confidence": 0.95,
+      "justification": "1. If an OS crash occurs during an active exam session, the sandbox process terminates. 2. Without persistent local state and automatic lockdown re-initialization upon reboot, a student could exploit a deliberate crash to escape the sandbox environment. 3. Therefore, the system must enforce strict state persistence and re-apply display/clipboard restrictions immediately upon recovery to maintain security invariants."
+    },
+    {
+      "requirement_id": "REQ-MISSING-02",
+      "title": "Anti-Tamper Process Watchdog and Debugger Detection",
+      "description": "The sandbox runtime must include a background watchdog mechanism to detect unauthorized debugging, memory injection, process termination attempts, or virtual machine instrumentation.",
+      "type": "SECURITY",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "Secure desktop application hardening standards",
+      "confidence": 0.92,
+      "justification": "1. A secure examination sandbox relies on continuous enforcement of clipboard and display restrictions. 2. Malicious users or advanced examinees may attempt to attach debuggers, terminate the sandbox watchdog process, or inject payloads to bypass hooks. 3. Therefore, anti-tamper safeguards and process monitoring are required to immediately terminate the exam session if tampering is detected."
+    },
+    {
+      "requirement_id": "REQ-MISSING-03",
+      "title": "Hotkey and Global Shortcut Suppression",
+      "description": "The sandbox must intercept and suppress global OS shortcuts (e.g., Alt+Tab, Win+Shift+S, PrintScreen, Cmd+Tab, Cmd+Space) that permit window switching, screenshot capture, or Mission Control.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "Standard secure browser and examination lockdown specifications",
+      "confidence": 0.98,
+      "justification": "1. Restricting dual-monitors and clipboard paste alone is insufficient to prevent cheating if users can invoke native OS screenshot tools or switch to unauthorized windows. 2. Operating systems provide global keyboard shortcuts for task switching and screen capture by default. 3. Therefore, the sandbox must intercept and suppress these system-level hotkeys to ensure complete session containment."
+    }
+  ],
+  "provenance_metadata": {
+    "experiment_id": "EXPERIMENT_C_PASS_2_COVERAGE_AUDIT",
+    "task_id": "TASK-05-EXAM-BROWSER-SANDBOX",
+    "runner_version": "2.0.0-gate1.2-provenance",
+    "git_commit": "53aa1bd3c06062b227f1acd75abc3ff4a76aec8d",
+    "timestamp_utc": "2026-08-15T18:37:30.093599+00:00",
+    "latency_ms": 4523.06,
+    "provider": "gemini",
+    "model": "gemini-flash-lite-latest",
+    "generation_settings": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "token_usage": {
+      "prompt_tokens": 856,
+      "completion_tokens": 676,
+      "total_tokens": 1532
+    },
+    "estimated_cost_usd": 0.000267,
+    "system_prompt": "You are the S-Class Grounded Domain Inference Engine (Pass 2 - Targeted Coverage Audit).\nYour job is to analyze the requirements generated in Pass 1 and identify CRITICAL MISSING INVARIANTS AND GUARDS:\n\n1. Targeted Gap Analysis:\n   - What non-negotiable domain invariants, concurrency guards, failure recovery boundaries, data integrity rules, or edge-case behaviors are strictly required by the domain but MISSING from Pass 1?\n   - Formulate ONLY the missing requirements. Do NOT repeat or duplicate Pass 1 requirements.\n   - Every derived requirement must include a rigorous 3-step why-chain.\n\n2. Anti-Hallucination Barrier:\n   - Do NOT fabricate full-stack UI pages or arbitrary third-party providers.\n   - If an operational choice or standard is unstated, mark it explicitly as UNKNOWN.\n\n3. Output Schema:\n{\n  \"experiment\": \"EXPERIMENT C \u2014 Pass 2 (Targeted Coverage Audit)\",\n  \"task_id\": \"<TASK_ID>\",\n  \"missing_requirements\": [\n    {\n      \"requirement_id\": \"<REQ_ID>\",\n      \"title\": \"<TITLE>\",\n      \"description\": \"<DESCRIPTION>\",\n      \"type\": \"FUNCTIONAL\" | \"NON_FUNCTIONAL\" | \"SECURITY\" | \"BEHAVIORAL\" | \"INVARIANT\",\n      \"epistemic_status\": \"DERIVED_JUSTIFIED\" | \"SUPPORTED\" | \"UNKNOWN\",\n      \"provenance\": \"<DOMAIN_PROVENANCE>\" | \"UNSUPPORTED\",\n      \"confidence\": <FLOAT_0_TO_1>,\n      \"justification\": \"<WHY_CHAIN_OR_RATIONALE>\"\n    }\n  ]\n}\n",
+    "user_prompt": "Original Prompt: \"Build a desktop examination lockdown sandbox that restricts dual-monitor mirroring and intercepts OS clipboard paste during active exam sessions.\"\nDomain: 'edtech_security'\n\nPass 1 Requirements already synthesized:\n- [REQ-EXPLICIT-01] Dual-Monitor Mirroring Restriction (EXPLICIT): The desktop examination sandbox must restrict and disable dual-monitor setups and screen mirroring during active examination sessions to prevent external viewing or capture.\n- [REQ-EXPLICIT-02] OS Clipboard Paste Interception (EXPLICIT): The desktop application must intercept and block OS-level clipboard paste operations while an examination session is active.\n- [REQ-DERIVED-01] Low-Level Operating System Hook Integration for Clipboard Control (DERIVED_JUSTIFIED): The sandbox must implement low-level OS hooks (e.g., Win32 API hooks on Windows, Accessibility/Quartz services on macOS) to intercept clipboard events system-wide rather than strictly within application focus.\n- [REQ-DERIVED-02] Display Enumeration and Topology Forcing (DERIVED_JUSTIFIED): The sandbox runtime must enumerate connected display devices upon session initialization and force a single-display fallback or terminate execution if multiple active displays are detected.\n- [REQ-UNKNOWN-01] Target Operating System Architecture Support (UNKNOWN): The specific target operating system versions (e.g., Windows 10/11, macOS versions, Linux distributions) and their corresponding sandbox implementation APIs are unstated.\n- [REQ-UNKNOWN-02] Exam Backend Telemetry and Session Sync Protocol (UNKNOWN): The network protocol, authentication mechanism, and backend endpoints used to report lockdown violations, session start/end states, and telemetry are unstated.\n\nCoverage Audit Directive:\n- Analyze what critical domain invariants, edge cases, failure modes, data integrity rules, or concurrency controls are MISSING from the above list to fulfill the prompt completely.\n- Synthesize ONLY the missing requirements with 3-step why-chains.\n- Do NOT duplicate any requirement already in Pass 1.\n- Avoid hallucinating unrequested fullstack UI features (Student grading and gradebook UI, AI webcam face-tracking proctoring portal, Teacher classroom chat forum, Automated essay scoring engine).\n\nReturn strictly valid JSON as specified in the system instructions.",
+    "input_context": {
+      "pass": 2,
+      "raw_prompt": "Build a desktop examination lockdown sandbox that restricts dual-monitor mirroring and intercepts OS clipboard paste during active exam sessions.",
+      "pass1_count": 6
+    }
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "experiment": "EXPERIMENT C \u2014 Pass 1 (Grounded Core Extraction)",
+  "task_id": "auth_identity_ambiguous_token_revocation",
+  "inferred_requirements": [
+    {
+      "requirement_id": "REQ-EXPLICIT-001",
+      "title": "Authentication Platform Core",
+      "description": "The system must provide authentication capabilities to verify user identities.",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Directly stated in the prompt 'Build an authentication platform'."
+    },
+    {
+      "requirement_id": "REQ-EXPLICIT-002",
+      "title": "Token Revocation Mechanism",
+      "description": "The system must support the ability to revoke issued authentication tokens.",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Directly stated in the prompt 'with token revocation'."
+    },
+    {
+      "requirement_id": "REQ-DERIVED-001",
+      "title": "Token Blacklist or Validation State Store",
+      "description": "The system must maintain a state store (such as a revocation list or blacklist) to verify if an incoming token has been explicitly invalidated prior to its natural expiration.",
+      "type": "INVARIANT",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "Cryptographic Token Revocation Engineering Standards",
+      "confidence": 0.95,
+      "justification": "Why 1: Stateless tokens (e.g., JWTs) remain valid until expiration by design, creating a security risk upon logout or compromise. Why 2: A stateful lookup mechanism (e.g., revocation cache, token ID blacklist, or incremented token versioning) must intercept validation flows to check revocation status. Why 3: No token marked as revoked can ever be successfully accepted for authenticated operations."
+    },
+    {
+      "requirement_id": "REQ-UNKNOWN-001",
+      "title": "Token Format and Cryptographic Standard",
+      "description": "The specific token format (e.g., JWT, PASETO) and signing algorithm (e.g., Ed25519, RS256, HS256) are unstated.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "The prompt does not specify the token standard, cryptographic algorithms, or transport protocols."
+    },
+    {
+      "requirement_id": "REQ-UNKNOWN-002",
+      "title": "Storage Backend and Persistence Provider",
+      "description": "The underlying database or persistence engine for user credentials and revocation state is unstated.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "The prompt does not specify database engines (e.g., PostgreSQL, Redis, DynamoDB) for storing state."
+    }
+  ],
+  "provenance_metadata": {
+    "experiment_id": "EXPERIMENT_C_PASS_1_CORE_EXTRACTION",
+    "task_id": "TASK-07-AUTH-TOKEN-REVOCATION-AMBIGUOUS",
+    "runner_version": "2.0.0-gate1.2-provenance",
+    "git_commit": "53aa1bd3c06062b227f1acd75abc3ff4a76aec8d",
+    "timestamp_utc": "2026-08-15T18:38:56.925010+00:00",
+    "latency_ms": 4611.65,
+    "provider": "gemini",
+    "model": "gemini-flash-lite-latest",
+    "generation_settings": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "token_usage": {
+      "prompt_tokens": 583,
+      "completion_tokens": 785,
+      "total_tokens": 1368
+    },
+    "estimated_cost_usd": 0.000279,
+    "system_prompt": "You are the S-Class Grounded Domain Inference Engine (Pass 1 - Core Extraction).\nYour job is to synthesize software engineering requirements from the user prompt with STRICT EPISTEMIC SELF-RESTRAINT:\n\n1. Requirement Categorization:\n   - EXPLICIT: Requirements directly and unambiguously stated in the prompt.\n   - DERIVED_JUSTIFIED: Requirements strictly mathematically, architecturally, or operationally necessary to implement the stated goal without defect. Every DERIVED_JUSTIFIED requirement MUST include a rigorous 3-step why-chain (Why 1: Context/Risk -> Why 2: Technical Mechanism -> Why 3: Mandatory Invariant).\n   - SUPPORTED: Non-functional or platform constraints directly supporting the scope.\n   - UNKNOWN: Any operational parameter, storage choice, or protocol unstated in the prompt.\n\n2. Anti-Hallucination Barrier:\n   - DO NOT fabricate full-stack UI pages (e.g. login screens, dashboards, admin portals) unless explicitly requested.\n   - DO NOT fabricate arbitrary third-party providers (e.g. Stripe, Auth0, AWS) unless explicitly requested.\n\n3. Output Schema:\n{\n  \"experiment\": \"EXPERIMENT C \u2014 Pass 1 (Grounded Core Extraction)\",\n  \"task_id\": \"<TASK_ID>\",\n  \"inferred_requirements\": [\n    {\n      \"requirement_id\": \"<REQ_ID>\",\n      \"title\": \"<TITLE>\",\n      \"description\": \"<DESCRIPTION>\",\n      \"type\": \"FUNCTIONAL\" | \"NON_FUNCTIONAL\" | \"SECURITY\" | \"BEHAVIORAL\" | \"INVARIANT\",\n      \"epistemic_status\": \"EXPLICIT\" | \"DERIVED_JUSTIFIED\" | \"SUPPORTED\" | \"UNKNOWN\",\n      \"provenance\": \"USER_PROMPT\" | \"<DOMAIN_PROVENANCE>\" | \"UNSUPPORTED\",\n      \"confidence\": <FLOAT_0_TO_1>,\n      \"justification\": \"<WHY_CHAIN_OR_RATIONALE>\"\n    }\n  ]\n}\n",
+    "user_prompt": "Synthesize formal software engineering requirements for the following prompt in the domain of 'auth_identity_ambiguous':\nPrompt: \"Build an authentication platform with token revocation.\"\n\nDomain Guidance:\n- Enforce core invariants and essential derived domain rules.\n- Do not generate unrequested UI pages or hallucinate arbitrary features (specifically avoid: User registration web UI with password strength meters, Admin role management web dashboard, Specific third-party provider assumption (e.g. forced Auth0 / Firebase integration)).\n- If key operational choices, providers, or format standards are unstated, mark them explicitly as UNKNOWN.\n\nReturn strictly valid JSON as specified in the system instructions.",
+    "input_context": {
+      "pass": 1,
+      "raw_prompt": "Build an authentication platform with token revocation.",
+      "domain": "auth_identity_ambiguous"
+    }
+  }
+}

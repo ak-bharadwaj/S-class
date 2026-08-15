@@ -1,0 +1,63 @@
+{
+  "experiment": "EXPERIMENT C \u2014 Pass 2 (Targeted Coverage Audit)",
+  "task_id": "arinc429_fdr_power_loss",
+  "missing_requirements": [
+    {
+      "requirement_id": "REQ-DJ-003",
+      "title": "Dual-Bank Buffer Alternating Concurrency Guard",
+      "description": "The flight data recorder buffer must implement a dual-bank (ping-pong) or atomic ring-buffer architecture with explicit memory barrier synchronization to prevent race conditions and data corruption between the continuous ARINC 429 high-rate frame ingestion writer thread and the emergency power-loss flash memory serialization reader.",
+      "type": "INVARIANT",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "aerospace_avionics",
+      "confidence": 0.98,
+      "justification": "Step 1: Continuous ARINC 429 bus frame ingestion concurrently writes into volatile memory while an emergency power-loss event triggers an immediate read and flush operation. Step 2: Without strict concurrency isolation or dual-bank locking, simultaneous read-write access to the active buffer pointer will cause memory tearing, pointer corruption, and partial frame loss. Step 3: Therefore, a deterministic dual-bank memory switching invariant with hardware memory barriers is strictly required to guarantee zero data loss and bit-exact preservation during the transition."
+    },
+    {
+      "requirement_id": "REQ-DJ-004",
+      "title": "Flight Recorder Data Integrity Checksum and Framing Verification",
+      "description": "The system shall append cryptographic or cyclic redundancy check (CRC-32/ARINC) markers to every flushed block of ARINC 429 frames before committing to the solid-state crash-survivable memory to validate data integrity upon post-crash retrieval and readout analysis.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "aerospace_avionics",
+      "confidence": 0.95,
+      "justification": "Step 1: Crash-survivable memory units undergo extreme physical trauma, intense deceleration forces, and post-impact thermal exposure which can induce bit-flips or corruption in stored flash cells. Step 2: Merely dumping raw buffer bytes without validation metadata prevents investigators from verifying whether recovered frames are authentic or bit-corrupted. Step 3: Therefore, computing and embedding robust CRC checksums per data block is a mandatory aerospace engineering safety requirement for verifiable accident reconstruction."
+    },
+    {
+      "requirement_id": "REQ-DJ-005",
+      "title": "Emergency Flash Write Failure Recovery and Byte Retry Mechanism",
+      "description": "If a write or block erasure error occurs on the solid-state crash-survivable memory during the emergency power-loss flush sequence, the system must immediately attempt sector re-mapping or fallback retry sequences within the remaining hold-up power duration.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "aerospace_avionics",
+      "confidence": 0.92,
+      "justification": "Step 1: Non-volatile solid-state memory sectors can experience localized wear-out or transient hardware faults during high-g impact or sudden power failure transients. Step 2: A single unhandled write exception or hardware timeout during the emergency flush window would abort data persistence and result in catastrophic loss of flight recorder telemetry. Step 3: Therefore, an explicit fault-tolerant retry and sector-fallback protocol must be executed within the bounded hold-up window to ensure maximum survivability of critical flight parameters."
+    }
+  ],
+  "provenance_metadata": {
+    "experiment_id": "EXPERIMENT_C_PASS_2_COVERAGE_AUDIT",
+    "task_id": "TASK-04-AEROSPACE-BLACKBOX-TELEMETRY",
+    "runner_version": "2.0.0-gate1.2-provenance",
+    "git_commit": "53aa1bd3c06062b227f1acd75abc3ff4a76aec8d",
+    "timestamp_utc": "2026-08-15T18:36:36.938460+00:00",
+    "latency_ms": 5651.53,
+    "provider": "gemini",
+    "model": "gemini-flash-lite-latest",
+    "generation_settings": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "token_usage": {
+      "prompt_tokens": 855,
+      "completion_tokens": 830,
+      "total_tokens": 1685
+    },
+    "estimated_cost_usd": 0.000313,
+    "system_prompt": "You are the S-Class Grounded Domain Inference Engine (Pass 2 - Targeted Coverage Audit).\nYour job is to analyze the requirements generated in Pass 1 and identify CRITICAL MISSING INVARIANTS AND GUARDS:\n\n1. Targeted Gap Analysis:\n   - What non-negotiable domain invariants, concurrency guards, failure recovery boundaries, data integrity rules, or edge-case behaviors are strictly required by the domain but MISSING from Pass 1?\n   - Formulate ONLY the missing requirements. Do NOT repeat or duplicate Pass 1 requirements.\n   - Every derived requirement must include a rigorous 3-step why-chain.\n\n2. Anti-Hallucination Barrier:\n   - Do NOT fabricate full-stack UI pages or arbitrary third-party providers.\n   - If an operational choice or standard is unstated, mark it explicitly as UNKNOWN.\n\n3. Output Schema:\n{\n  \"experiment\": \"EXPERIMENT C \u2014 Pass 2 (Targeted Coverage Audit)\",\n  \"task_id\": \"<TASK_ID>\",\n  \"missing_requirements\": [\n    {\n      \"requirement_id\": \"<REQ_ID>\",\n      \"title\": \"<TITLE>\",\n      \"description\": \"<DESCRIPTION>\",\n      \"type\": \"FUNCTIONAL\" | \"NON_FUNCTIONAL\" | \"SECURITY\" | \"BEHAVIORAL\" | \"INVARIANT\",\n      \"epistemic_status\": \"DERIVED_JUSTIFIED\" | \"SUPPORTED\" | \"UNKNOWN\",\n      \"provenance\": \"<DOMAIN_PROVENANCE>\" | \"UNSUPPORTED\",\n      \"confidence\": <FLOAT_0_TO_1>,\n      \"justification\": \"<WHY_CHAIN_OR_RATIONALE>\"\n    }\n  ]\n}\n",
+    "user_prompt": "Original Prompt: \"Implement real-time flight data recorder buffer synchronization that flushes ARINC 429 bus frames to solid-state crash-survivable memory on power loss.\"\nDomain: 'aerospace_avionics'\n\nPass 1 Requirements already synthesized:\n- [REQ-EX-001] ARINC 429 Bus Frame Ingestion (EXPLICIT): The system shall ingest raw ARINC 429 bus frames continuously from designated avionic interfaces into an active volatile memory buffer.\n- [REQ-EX-002] Power Loss Buffer Synchronization and Flush (EXPLICIT): Upon detection of primary aircraft power loss, the system shall synchronize and flush the volatile flight data recorder buffer to solid-state crash-survivable memory.\n- [REQ-DJ-001] Hold-Up Power Supply and Flush Completion Guarantee (DERIVED_JUSTIFIED): The system architecture must include a dedicated hold-up energy storage mechanism sufficient to maintain control and power the non-volatile write cycle until complete data serialization and persistence are verified.\n- [REQ-DJ-002] Deterministic Real-Time Buffer Bounded Execution (DERIVED_JUSTIFIED): The buffer management implementation must execute within deterministic timing constraints to guarantee bounded latency during frame logging and prioritization.\n- [REQ-UK-001] Unspecified Solid-State Memory Interface Protocol (UNKNOWN): The specific hardware interface protocol, physical block addressing scheme, and manufacturer specifications for the solid-state crash-survivable memory are currently unstated.\n- [REQ-UK-002] Unspecified Power Loss Detection Threshold (UNKNOWN): The exact voltage drop threshold and hardware interrupt mechanism utilized to signal primary input power failure are currently unstated.\n\nCoverage Audit Directive:\n- Analyze what critical domain invariants, edge cases, failure modes, data integrity rules, or concurrency controls are MISSING from the above list to fulfill the prompt completely.\n- Synthesize ONLY the missing requirements with 3-step why-chains.\n- Do NOT duplicate any requirement already in Pass 1.\n- Avoid hallucinating unrequested fullstack UI features (Pilot HUD flight display UI, Flight route booking website, Air traffic control voice transcoding, 4K video streaming portal).\n\nReturn strictly valid JSON as specified in the system instructions.",
+    "input_context": {
+      "pass": 2,
+      "raw_prompt": "Implement real-time flight data recorder buffer synchronization that flushes ARINC 429 bus frames to solid-state crash-survivable memory on power loss.",
+      "pass1_count": 6
+    }
+  }
+}

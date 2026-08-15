@@ -1,0 +1,164 @@
+{
+  "task_id": "TASK-04-AEROSPACE-BLACKBOX-TELEMETRY",
+  "domain": "aerospace_avionics",
+  "raw_prompt": "Implement real-time flight data recorder buffer synchronization that flushes ARINC 429 bus frames to solid-state crash-survivable memory on power loss.",
+  "passes": {
+    "pass_1": {
+      "generated_count": 6,
+      "latency_ms": 5198.12,
+      "total_tokens": 1686,
+      "estimated_cost_usd": 0.000371
+    },
+    "pass_2": {
+      "generated_count": 3,
+      "latency_ms": 5651.53,
+      "total_tokens": 1685,
+      "estimated_cost_usd": 0.000313
+    },
+    "pass_3": {
+      "generated_count": 3,
+      "latency_ms": 3914.02,
+      "total_tokens": 1639,
+      "estimated_cost_usd": 0.000258
+    }
+  },
+  "cumulative_progression": {
+    "pass_1_count": 6,
+    "pass_1_plus_2_count": 9,
+    "pass_1_plus_2_plus_3_count": 12
+  },
+  "cumulative_requirements": [
+    {
+      "requirement_id": "REQ-EX-001",
+      "title": "ARINC 429 Bus Frame Ingestion",
+      "description": "The system shall ingest raw ARINC 429 bus frames continuously from designated avionic interfaces into an active volatile memory buffer.",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Directly stated in the prompt as flushing ARINC 429 bus frames.",
+      "introduced_in_pass": 1
+    },
+    {
+      "requirement_id": "REQ-EX-002",
+      "title": "Power Loss Buffer Synchronization and Flush",
+      "description": "Upon detection of primary aircraft power loss, the system shall synchronize and flush the volatile flight data recorder buffer to solid-state crash-survivable memory.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Directly stated core function of the flight data recorder buffer synchronization on power loss.",
+      "introduced_in_pass": 1
+    },
+    {
+      "requirement_id": "REQ-DJ-001",
+      "title": "Hold-Up Power Supply and Flush Completion Guarantee",
+      "description": "The system architecture must include a dedicated hold-up energy storage mechanism sufficient to maintain control and power the non-volatile write cycle until complete data serialization and persistence are verified.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "aerospace_avionics",
+      "confidence": 0.95,
+      "justification": "Why 1 (Context/Risk): Power loss events abruptly cut primary input voltage, risking incomplete write operations and data corruption in crash-survivable memory. Why 2 (Technical Mechanism): A dedicated auxiliary hold-up capacitor or battery circuit must bridge the transition interval to supply electrical energy during the flushing sequence. Why 3 (Mandatory Invariant): The system must never drop or truncate frames mid-flush upon power interruption, guaranteeing complete data persistence for post-incident analysis.",
+      "introduced_in_pass": 1
+    },
+    {
+      "requirement_id": "REQ-DJ-002",
+      "title": "Deterministic Real-Time Buffer Bounded Execution",
+      "description": "The buffer management implementation must execute within deterministic timing constraints to guarantee bounded latency during frame logging and prioritization.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "aerospace_avionics",
+      "confidence": 0.92,
+      "justification": "Why 1 (Context/Risk): Real-time avionic data processing requires absolute predictability to prevent buffer overflows during high-rate bus traffic. Why 2 (Technical Mechanism): Bounded memory allocation and lock-free ring buffer structures must be used to eliminate unpredictable garbage collection or thread contention delays. Why 3 (Mandatory Invariant): The real-time loop must never miss an incoming frame deadline or exceed deterministic execution windows.",
+      "introduced_in_pass": 1
+    },
+    {
+      "requirement_id": "REQ-UK-001",
+      "title": "Unspecified Solid-State Memory Interface Protocol",
+      "description": "The specific hardware interface protocol, physical block addressing scheme, and manufacturer specifications for the solid-state crash-survivable memory are currently unstated.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "The prompt references 'solid-state crash-survivable memory' generally without naming specific protocols (e.g., NVMe, Serial Flash, ARINC 757 physical layer standards).",
+      "introduced_in_pass": 1
+    },
+    {
+      "requirement_id": "REQ-UK-002",
+      "title": "Unspecified Power Loss Detection Threshold",
+      "description": "The exact voltage drop threshold and hardware interrupt mechanism utilized to signal primary input power failure are currently unstated.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "The prompt specifies 'on power loss' but omits the exact hardware sensor parameters, voltage monitoring ICs, or discrete interrupt lines used to detect the event.",
+      "introduced_in_pass": 1
+    },
+    {
+      "requirement_id": "REQ-DJ-003",
+      "title": "Dual-Bank Buffer Alternating Concurrency Guard",
+      "description": "The flight data recorder buffer must implement a dual-bank (ping-pong) or atomic ring-buffer architecture with explicit memory barrier synchronization to prevent race conditions and data corruption between the continuous ARINC 429 high-rate frame ingestion writer thread and the emergency power-loss flash memory serialization reader.",
+      "type": "INVARIANT",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "aerospace_avionics",
+      "confidence": 0.98,
+      "justification": "Step 1: Continuous ARINC 429 bus frame ingestion concurrently writes into volatile memory while an emergency power-loss event triggers an immediate read and flush operation. Step 2: Without strict concurrency isolation or dual-bank locking, simultaneous read-write access to the active buffer pointer will cause memory tearing, pointer corruption, and partial frame loss. Step 3: Therefore, a deterministic dual-bank memory switching invariant with hardware memory barriers is strictly required to guarantee zero data loss and bit-exact preservation during the transition.",
+      "introduced_in_pass": 2
+    },
+    {
+      "requirement_id": "REQ-DJ-004",
+      "title": "Flight Recorder Data Integrity Checksum and Framing Verification",
+      "description": "The system shall append cryptographic or cyclic redundancy check (CRC-32/ARINC) markers to every flushed block of ARINC 429 frames before committing to the solid-state crash-survivable memory to validate data integrity upon post-crash retrieval and readout analysis.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "aerospace_avionics",
+      "confidence": 0.95,
+      "justification": "Step 1: Crash-survivable memory units undergo extreme physical trauma, intense deceleration forces, and post-impact thermal exposure which can induce bit-flips or corruption in stored flash cells. Step 2: Merely dumping raw buffer bytes without validation metadata prevents investigators from verifying whether recovered frames are authentic or bit-corrupted. Step 3: Therefore, computing and embedding robust CRC checksums per data block is a mandatory aerospace engineering safety requirement for verifiable accident reconstruction.",
+      "introduced_in_pass": 2
+    },
+    {
+      "requirement_id": "REQ-DJ-005",
+      "title": "Emergency Flash Write Failure Recovery and Byte Retry Mechanism",
+      "description": "If a write or block erasure error occurs on the solid-state crash-survivable memory during the emergency power-loss flush sequence, the system must immediately attempt sector re-mapping or fallback retry sequences within the remaining hold-up power duration.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "aerospace_avionics",
+      "confidence": 0.92,
+      "justification": "Step 1: Non-volatile solid-state memory sectors can experience localized wear-out or transient hardware faults during high-g impact or sudden power failure transients. Step 2: A single unhandled write exception or hardware timeout during the emergency flush window would abort data persistence and result in catastrophic loss of flight recorder telemetry. Step 3: Therefore, an explicit fault-tolerant retry and sector-fallback protocol must be executed within the bounded hold-up window to ensure maximum survivability of critical flight parameters.",
+      "introduced_in_pass": 2
+    },
+    {
+      "requirement_id": "REQ-UK-003",
+      "title": "Unspecified Regulatory Compliance Standard and Certification Level",
+      "description": "The exact target aviation regulatory standards (e.g., FAA TSO-C124c, EUROCAE ED-112A) and software safety design assurance levels (e.g., DO-178C Level A) governing the crash-survivable memory subsystem are currently unstated.",
+      "type": "SECURITY",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "aerospace_avionics",
+      "confidence": 0.95,
+      "justification": "Safety-critical flight data recorders are subject to rigorous airworthiness and environmental certifications, but the specific standard governing this implementation has not been declared.",
+      "introduced_in_pass": 3
+    },
+    {
+      "requirement_id": "REQ-UK-004",
+      "title": "Unspecified Post-Crash Physical Extraction and Readout Protocol",
+      "description": "The physical data link, cryptographic keys, and logical file system parser format used by investigators to extract and decode data from the solid-state crash-survivable memory post-incident are currently unstated.",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "aerospace_avionics",
+      "confidence": 0.9,
+      "justification": "While data integrity and persistence are specified, the external interface protocol and readout toolchain parameters remain completely unspecified in the prompt.",
+      "introduced_in_pass": 3
+    },
+    {
+      "requirement_id": "REQ-DJ-006",
+      "title": "Post-Power-Restoration Initialization and Health Diagnostics",
+      "description": "Upon subsequent system power restoration following an emergency shutdown or crash event, the flight data recorder control logic shall execute a self-test diagnostic on the non-volatile memory and verify the integrity and completeness of the previously flushed ARINC 429 session logs before resetting the buffer state machine.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "aerospace_avionics",
+      "confidence": 0.92,
+      "justification": "Operational lifecycle completeness requires defining the system boundary state post-recovery to ensure previous emergency write sessions are cleanly closed, validated, and logged without corrupting subsequent logging cycles.",
+      "introduced_in_pass": 3
+    }
+  ]
+}

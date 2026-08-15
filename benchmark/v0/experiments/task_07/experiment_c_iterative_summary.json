@@ -1,0 +1,164 @@
+{
+  "task_id": "TASK-07-AUTH-TOKEN-REVOCATION-AMBIGUOUS",
+  "domain": "auth_identity_ambiguous",
+  "raw_prompt": "Build an authentication platform with token revocation.",
+  "passes": {
+    "pass_1": {
+      "generated_count": 5,
+      "latency_ms": 4611.65,
+      "total_tokens": 1368,
+      "estimated_cost_usd": 0.000279
+    },
+    "pass_2": {
+      "generated_count": 3,
+      "latency_ms": 4313.75,
+      "total_tokens": 1420,
+      "estimated_cost_usd": 0.000256
+    },
+    "pass_3": {
+      "generated_count": 4,
+      "latency_ms": 3284.02,
+      "total_tokens": 1501,
+      "estimated_cost_usd": 0.00026
+    }
+  },
+  "cumulative_progression": {
+    "pass_1_count": 5,
+    "pass_1_plus_2_count": 8,
+    "pass_1_plus_2_plus_3_count": 12
+  },
+  "cumulative_requirements": [
+    {
+      "requirement_id": "REQ-EXPLICIT-001",
+      "title": "Authentication Platform Core",
+      "description": "The system must provide authentication capabilities to verify user identities.",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Directly stated in the prompt 'Build an authentication platform'.",
+      "introduced_in_pass": 1
+    },
+    {
+      "requirement_id": "REQ-EXPLICIT-002",
+      "title": "Token Revocation Mechanism",
+      "description": "The system must support the ability to revoke issued authentication tokens.",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Directly stated in the prompt 'with token revocation'.",
+      "introduced_in_pass": 1
+    },
+    {
+      "requirement_id": "REQ-DERIVED-001",
+      "title": "Token Blacklist or Validation State Store",
+      "description": "The system must maintain a state store (such as a revocation list or blacklist) to verify if an incoming token has been explicitly invalidated prior to its natural expiration.",
+      "type": "INVARIANT",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "Cryptographic Token Revocation Engineering Standards",
+      "confidence": 0.95,
+      "justification": "Why 1: Stateless tokens (e.g., JWTs) remain valid until expiration by design, creating a security risk upon logout or compromise. Why 2: A stateful lookup mechanism (e.g., revocation cache, token ID blacklist, or incremented token versioning) must intercept validation flows to check revocation status. Why 3: No token marked as revoked can ever be successfully accepted for authenticated operations.",
+      "introduced_in_pass": 1
+    },
+    {
+      "requirement_id": "REQ-UNKNOWN-001",
+      "title": "Token Format and Cryptographic Standard",
+      "description": "The specific token format (e.g., JWT, PASETO) and signing algorithm (e.g., Ed25519, RS256, HS256) are unstated.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "The prompt does not specify the token standard, cryptographic algorithms, or transport protocols.",
+      "introduced_in_pass": 1
+    },
+    {
+      "requirement_id": "REQ-UNKNOWN-002",
+      "title": "Storage Backend and Persistence Provider",
+      "description": "The underlying database or persistence engine for user credentials and revocation state is unstated.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "The prompt does not specify database engines (e.g., PostgreSQL, Redis, DynamoDB) for storing state.",
+      "introduced_in_pass": 1
+    },
+    {
+      "requirement_id": "REQ-MISSING-001",
+      "title": "Token Revocation Propagation and Latency Boundary",
+      "description": "The system must define and enforce a strict upper bound on propagation latency for token revocation across all validation nodes to ensure revoked tokens are rejected immediately.",
+      "type": "INVARIANT",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "Distributed Systems Authorization Invariants",
+      "confidence": 0.95,
+      "justification": "1. When a token is revoked, distributed validation nodes evaluating incoming requests may cache validation results or lack synchronous updates; 2. Without a guaranteed synchronization bound or immediate check against a central revocation store, a compromised or logged-out token remains usable until cache expiration; 3. Therefore, a strict latency boundary or bypass check must be enforced to preserve the security guarantee of the revocation mechanism.",
+      "introduced_in_pass": 2
+    },
+    {
+      "requirement_id": "REQ-MISSING-002",
+      "title": "Revocation State Store Failure Mode and Fail-Closed Guard",
+      "description": "The system must enforce a fail-closed policy if the token revocation state store becomes unavailable or experiences a timeout during token validation.",
+      "type": "SECURITY",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "Zero-Trust Fail-Closed Security Principles",
+      "confidence": 0.98,
+      "justification": "1. State stores used for blacklisting or revocation checks can suffer network partitions, crashes, or timeouts; 2. If the system defaults to failing open (allowing tokens when the blacklist cannot be reached), an attacker could disrupt the state store to bypass revocation checks entirely; 3. Therefore, an explicit fail-closed guard is required to deny authentication when revocation state integrity cannot be verified.",
+      "introduced_in_pass": 2
+    },
+    {
+      "requirement_id": "REQ-MISSING-003",
+      "title": "Revocation Store Storage Exhaustion and Pruning Policy",
+      "description": "The system must implement a retention and pruning policy for the token revocation state store to prevent unbounded growth and storage exhaustion.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "Database Lifecycle Management and Hygiene",
+      "confidence": 0.92,
+      "justification": "1. Every token revocation adds an entry to the state store that must typically persist at least until the token's natural expiration timestamp; 2. Storing expired token identifiers indefinitely leads to uncontrolled database size inflation and degradation of lookup performance; 3. Therefore, an automated pruning policy tied to token expiration timestamps is mandatory to ensure long-term data integrity and system stability.",
+      "introduced_in_pass": 2
+    },
+    {
+      "requirement_id": "REQ-BOUNDARY-001",
+      "title": "Unstated Identity Provider Integration Boundary",
+      "description": "The external upstream identity providers, enterprise directories (e.g., LDAP, Active Directory), or federation protocols (e.g., OIDC, SAML 2.0) are unstated.",
+      "type": "SECURITY",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "No mention of upstream identity federation or source-of-truth directories exists in the baseline specification.",
+      "introduced_in_pass": 3
+    },
+    {
+      "requirement_id": "REQ-BOUNDARY-002",
+      "title": "Network Transport and API Protocol Unstated",
+      "description": "The specific network protocols and transport mechanisms (e.g., gRPC, HTTPS/REST, WebSockets) utilized for authentication requests and revocation checks are unstated.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "The specification lacks any reference to the communication protocol or interface layer specifications.",
+      "introduced_in_pass": 3
+    },
+    {
+      "requirement_id": "REQ-BOUNDARY-003",
+      "title": "Crash Recovery and Power Loss Invariant for Revocation State",
+      "description": "The system must guarantee that durable revocation state records are successfully synchronized or flushed to non-volatile storage prior to acknowledging token issuance or revocation confirmation, preventing post-crash revocation state amnesia.",
+      "type": "INVARIANT",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "Operational Lifecycle Boundary",
+      "confidence": 0.95,
+      "justification": "Without durability guarantees upon unexpected power loss or abrupt node termination, revoked tokens could become un-revoked after a system restart, compromising security.",
+      "introduced_in_pass": 3
+    },
+    {
+      "requirement_id": "REQ-BOUNDARY-004",
+      "title": "Graceful Shutdown and Drain Operational Boundary",
+      "description": "During a graceful shutdown or deployment lifecycle event, the authentication platform must drain in-flight validation requests and complete pending token revocation propagations before terminating worker processes.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "Operational Lifecycle Boundary",
+      "confidence": 0.9,
+      "justification": "To prevent request dropping or incomplete synchronization of revocation states during rolling deployments or scaling events, a graceful drain protocol is required.",
+      "introduced_in_pass": 3
+    }
+  ]
+}

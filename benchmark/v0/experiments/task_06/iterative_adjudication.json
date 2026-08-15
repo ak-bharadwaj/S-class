@@ -1,0 +1,118 @@
+{
+  "task_id": "TASK-06-PAYMENT-GATEWAY-AMBIGUOUS",
+  "provenance": {
+    "adjudicator_id": "ADJ_ENG_CORE_01",
+    "adjudication_version": "3.0.0-gate1.3-iterative",
+    "adjudication_timestamp": "2026-08-16T00:10:00Z",
+    "generator_id": "gemini-flash-lite-latest (3-pass iterative runner)",
+    "adjudicator_is_generator": false,
+    "generator_had_access_to_adjudication": false,
+    "adjudicator_blinded_to_model_name": true
+  },
+  "candidate_adjudications": [
+    {
+      "candidate_id": "REQ-EXPLICIT-001",
+      "title": "Secure Payment Processing",
+      "introduced_in_pass": 1,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-EXP-01",
+      "rationale": "Directly matches ground truth core requirement for payment processing."
+    },
+    {
+      "candidate_id": "REQ-DERIVED-001",
+      "title": "Idempotent Transaction Handling",
+      "introduced_in_pass": 1,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-DER-01",
+      "rationale": "Matches ground truth requirement for idempotency key deduplication to prevent double-charging."
+    },
+    {
+      "candidate_id": "REQ-DERIVED-002",
+      "title": "Data Encryption in Transit and at Rest",
+      "introduced_in_pass": 1,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-DER-02",
+      "rationale": "Matches ground truth requirement for TLS 1.3 transit encryption."
+    },
+    {
+      "candidate_id": "REQ-UNKNOWN-001",
+      "title": "Undefined Payment Gateway Provider",
+      "introduced_in_pass": 1,
+      "label": "UNKNOWN",
+      "ground_truth_id": "REQ-UNK-01",
+      "rationale": "Correctly flags unstated payment rail and gateway provider (Stripe/Adyen/internal) as UNKNOWN."
+    },
+    {
+      "candidate_id": "REQ-UNKNOWN-002",
+      "title": "Undefined User Interfaces and Dashboards",
+      "introduced_in_pass": 1,
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "rationale": "Correctly flags unstated UI requirements as UNKNOWN."
+    },
+    {
+      "candidate_id": "REQ-MISSING-001",
+      "title": "Atomic State Transition Guard for Ledger Settlement",
+      "introduced_in_pass": 2,
+      "label": "VALID_DERIVATION",
+      "ground_truth_id": null,
+      "rationale": "Valid domain derivation enforcing atomic state machine transitions across authorization, capture, and settlement."
+    },
+    {
+      "candidate_id": "REQ-MISSING-002",
+      "title": "Webhook Delivery Retry and Poison Message Isolation",
+      "introduced_in_pass": 2,
+      "label": "VALID_DERIVATION",
+      "ground_truth_id": null,
+      "rationale": "Valid payment domain derivation providing exponential backoff and dead-letter queue isolation for asynchronous merchant webhooks."
+    },
+    {
+      "candidate_id": "REQ-MISSING-003",
+      "title": "Cryptographic Audit Trail and Non-Repudiation Logging",
+      "introduced_in_pass": 2,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-DER-03",
+      "rationale": "Matches ground truth requirement for structured, immutable payment audit logging and non-repudiation."
+    },
+    {
+      "candidate_id": "REQ-BOUNDARY-001",
+      "title": "Graceful Shutdown and Crash Recovery Invariant",
+      "introduced_in_pass": 3,
+      "label": "VALID_DERIVATION",
+      "ground_truth_id": null,
+      "rationale": "Valid operational derivation ensuring in-flight payment settlement state resolution upon unexpected process termination."
+    },
+    {
+      "candidate_id": "REQ-BOUNDARY-002",
+      "title": "PCI-DSS Scope Minimization and Tokenization Boundary",
+      "introduced_in_pass": 3,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-DER-02",
+      "rationale": "Matches ground truth requirement for PCI-DSS scope isolation and zero plaintext PAN storage."
+    },
+    {
+      "candidate_id": "REQ-UNKNOWN-003",
+      "title": "Undefined Storage Engine and Database Technology",
+      "introduced_in_pass": 3,
+      "label": "UNKNOWN",
+      "ground_truth_id": "REQ-UNK-02",
+      "rationale": "Correctly flags unstated ledger storage and database technology as UNKNOWN."
+    },
+    {
+      "candidate_id": "REQ-UNKNOWN-004",
+      "title": "Undefined Cryptographic Token and Authentication Identity Provider",
+      "introduced_in_pass": 3,
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "rationale": "Correctly flags unstated API authentication and identity provider scheme as UNKNOWN."
+    },
+    {
+      "candidate_id": "REQ-UNKNOWN-005",
+      "title": "Undefined Network Transport and API Protocol",
+      "introduced_in_pass": 3,
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "rationale": "Correctly flags unstated network transport protocol as UNKNOWN."
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "experiment": "EXPERIMENT C \u2014 Pass 1 (Grounded Core Extraction)",
+  "task_id": "AEROSPACE-AVIONICS-001",
+  "inferred_requirements": [
+    {
+      "requirement_id": "REQ-EX-001",
+      "title": "ARINC 429 Bus Frame Ingestion",
+      "description": "The system shall ingest raw ARINC 429 bus frames continuously from designated avionic interfaces into an active volatile memory buffer.",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Directly stated in the prompt as flushing ARINC 429 bus frames."
+    },
+    {
+      "requirement_id": "REQ-EX-002",
+      "title": "Power Loss Buffer Synchronization and Flush",
+      "description": "Upon detection of primary aircraft power loss, the system shall synchronize and flush the volatile flight data recorder buffer to solid-state crash-survivable memory.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Directly stated core function of the flight data recorder buffer synchronization on power loss."
+    },
+    {
+      "requirement_id": "REQ-DJ-001",
+      "title": "Hold-Up Power Supply and Flush Completion Guarantee",
+      "description": "The system architecture must include a dedicated hold-up energy storage mechanism sufficient to maintain control and power the non-volatile write cycle until complete data serialization and persistence are verified.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "aerospace_avionics",
+      "confidence": 0.95,
+      "justification": "Why 1 (Context/Risk): Power loss events abruptly cut primary input voltage, risking incomplete write operations and data corruption in crash-survivable memory. Why 2 (Technical Mechanism): A dedicated auxiliary hold-up capacitor or battery circuit must bridge the transition interval to supply electrical energy during the flushing sequence. Why 3 (Mandatory Invariant): The system must never drop or truncate frames mid-flush upon power interruption, guaranteeing complete data persistence for post-incident analysis."
+    },
+    {
+      "requirement_id": "REQ-DJ-002",
+      "title": "Deterministic Real-Time Buffer Bounded Execution",
+      "description": "The buffer management implementation must execute within deterministic timing constraints to guarantee bounded latency during frame logging and prioritization.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "aerospace_avionics",
+      "confidence": 0.92,
+      "justification": "Why 1 (Context/Risk): Real-time avionic data processing requires absolute predictability to prevent buffer overflows during high-rate bus traffic. Why 2 (Technical Mechanism): Bounded memory allocation and lock-free ring buffer structures must be used to eliminate unpredictable garbage collection or thread contention delays. Why 3 (Mandatory Invariant): The real-time loop must never miss an incoming frame deadline or exceed deterministic execution windows."
+    },
+    {
+      "requirement_id": "REQ-UK-001",
+      "title": "Unspecified Solid-State Memory Interface Protocol",
+      "description": "The specific hardware interface protocol, physical block addressing scheme, and manufacturer specifications for the solid-state crash-survivable memory are currently unstated.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "The prompt references 'solid-state crash-survivable memory' generally without naming specific protocols (e.g., NVMe, Serial Flash, ARINC 757 physical layer standards)."
+    },
+    {
+      "requirement_id": "REQ-UK-002",
+      "title": "Unspecified Power Loss Detection Threshold",
+      "description": "The exact voltage drop threshold and hardware interrupt mechanism utilized to signal primary input power failure are currently unstated.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "The prompt specifies 'on power loss' but omits the exact hardware sensor parameters, voltage monitoring ICs, or discrete interrupt lines used to detect the event."
+    }
+  ],
+  "provenance_metadata": {
+    "experiment_id": "EXPERIMENT_C_PASS_1_CORE_EXTRACTION",
+    "task_id": "TASK-04-AEROSPACE-BLACKBOX-TELEMETRY",
+    "runner_version": "2.0.0-gate1.2-provenance",
+    "git_commit": "53aa1bd3c06062b227f1acd75abc3ff4a76aec8d",
+    "timestamp_utc": "2026-08-15T18:36:19.737517+00:00",
+    "latency_ms": 5198.12,
+    "provider": "gemini",
+    "model": "gemini-flash-lite-latest",
+    "generation_settings": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "token_usage": {
+      "prompt_tokens": 599,
+      "completion_tokens": 1087,
+      "total_tokens": 1686
+    },
+    "estimated_cost_usd": 0.000371,
+    "system_prompt": "You are the S-Class Grounded Domain Inference Engine (Pass 1 - Core Extraction).\nYour job is to synthesize software engineering requirements from the user prompt with STRICT EPISTEMIC SELF-RESTRAINT:\n\n1. Requirement Categorization:\n   - EXPLICIT: Requirements directly and unambiguously stated in the prompt.\n   - DERIVED_JUSTIFIED: Requirements strictly mathematically, architecturally, or operationally necessary to implement the stated goal without defect. Every DERIVED_JUSTIFIED requirement MUST include a rigorous 3-step why-chain (Why 1: Context/Risk -> Why 2: Technical Mechanism -> Why 3: Mandatory Invariant).\n   - SUPPORTED: Non-functional or platform constraints directly supporting the scope.\n   - UNKNOWN: Any operational parameter, storage choice, or protocol unstated in the prompt.\n\n2. Anti-Hallucination Barrier:\n   - DO NOT fabricate full-stack UI pages (e.g. login screens, dashboards, admin portals) unless explicitly requested.\n   - DO NOT fabricate arbitrary third-party providers (e.g. Stripe, Auth0, AWS) unless explicitly requested.\n\n3. Output Schema:\n{\n  \"experiment\": \"EXPERIMENT C \u2014 Pass 1 (Grounded Core Extraction)\",\n  \"task_id\": \"<TASK_ID>\",\n  \"inferred_requirements\": [\n    {\n      \"requirement_id\": \"<REQ_ID>\",\n      \"title\": \"<TITLE>\",\n      \"description\": \"<DESCRIPTION>\",\n      \"type\": \"FUNCTIONAL\" | \"NON_FUNCTIONAL\" | \"SECURITY\" | \"BEHAVIORAL\" | \"INVARIANT\",\n      \"epistemic_status\": \"EXPLICIT\" | \"DERIVED_JUSTIFIED\" | \"SUPPORTED\" | \"UNKNOWN\",\n      \"provenance\": \"USER_PROMPT\" | \"<DOMAIN_PROVENANCE>\" | \"UNSUPPORTED\",\n      \"confidence\": <FLOAT_0_TO_1>,\n      \"justification\": \"<WHY_CHAIN_OR_RATIONALE>\"\n    }\n  ]\n}\n",
+    "user_prompt": "Synthesize formal software engineering requirements for the following prompt in the domain of 'aerospace_avionics':\nPrompt: \"Implement real-time flight data recorder buffer synchronization that flushes ARINC 429 bus frames to solid-state crash-survivable memory on power loss.\"\n\nDomain Guidance:\n- Enforce core invariants and essential derived domain rules.\n- Do not generate unrequested UI pages or hallucinate arbitrary features (specifically avoid: Pilot HUD flight display UI, Flight route booking website, Air traffic control voice transcoding, 4K video streaming portal).\n- If key operational choices, providers, or format standards are unstated, mark them explicitly as UNKNOWN.\n\nReturn strictly valid JSON as specified in the system instructions.",
+    "input_context": {
+      "pass": 1,
+      "raw_prompt": "Implement real-time flight data recorder buffer synchronization that flushes ARINC 429 bus frames to solid-state crash-survivable memory on power loss.",
+      "domain": "aerospace_avionics"
+    }
+  }
+}

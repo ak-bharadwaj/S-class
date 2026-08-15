@@ -1,0 +1,63 @@
+{
+  "experiment": "EXPERIMENT C \u2014 Pass 2 (Targeted Coverage Audit)",
+  "task_id": "fintech_payments_ambiguous",
+  "missing_requirements": [
+    {
+      "requirement_id": "REQ-MISSING-001",
+      "title": "Atomic State Transition Guard for Ledger Settlement",
+      "description": "The payment processing service must enforce strict transactional atomicity and state machine guards (e.g., Pending -> Authorized -> Captured -> Settled / Failed) to prevent double-spending or unauthorized intermediate state updates.",
+      "type": "INVARIANT",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "Double-entry bookkeeping and financial transaction integrity principles",
+      "confidence": 0.99,
+      "justification": "Step 1: Financial ledgers require strict state machine transitions to prevent concurrent updates from moving a transaction from 'Failed' back to 'Authorized'. Step 2: Without explicit database-level isolation and state transition guards, race conditions under heavy load can lead to unverified state corruption or ledger imbalances. Step 3: Therefore, an atomic state transition invariant must be enforced at the database and application boundary to guarantee data integrity."
+    },
+    {
+      "requirement_id": "REQ-MISSING-002",
+      "title": "Webhook Delivery Retry and Poison Message Isolation",
+      "description": "The system must guarantee reliable asynchronous webhook notifications for payment lifecycle events using an exponential backoff retry mechanism, coupled with a dead-letter queue (DLQ) for poison messages exceeding maximum retry attempts.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "Distributed systems and asynchronous event-driven architecture standards",
+      "confidence": 0.95,
+      "justification": "Step 1: Payment processors must asynchronously notify downstream systems of state changes (e.g., charge success/failure). Step 2: Unreliable network conditions or failing downstream endpoints can cause message loss or endless retry loops that exhaust system resources. Step 3: Therefore, implementing bounded exponential backoff retries with dead-letter isolation is necessary to maintain system resilience and prevent processing bottlenecks."
+    },
+    {
+      "requirement_id": "REQ-MISSING-003",
+      "title": "Cryptographic Audit Trail and Non-Repudiation Logging",
+      "description": "All payment request payloads, authorization tokens, state transitions, and cryptographic verification receipts must be logged to an append-only, tamper-evident audit log to ensure non-repudiation and regulatory compliance.",
+      "type": "SECURITY",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "PCI-DSS compliance and financial audit requirements",
+      "confidence": 0.97,
+      "justification": "Step 1: Financial systems are subject to strict auditing and dispute resolution (chargebacks, fraud investigations). Step 2: Standard application logs can be altered or lack cryptographic chaining, failing to prove that transaction records were unmodified over time. Step 3: Therefore, an append-only audit trail with cryptographic integrity checks is mandatory to provide non-repudiation for all financial transactions."
+    }
+  ],
+  "provenance_metadata": {
+    "experiment_id": "EXPERIMENT_C_PASS_2_COVERAGE_AUDIT",
+    "task_id": "TASK-06-PAYMENT-GATEWAY-AMBIGUOUS",
+    "runner_version": "2.0.0-gate1.2-provenance",
+    "git_commit": "53aa1bd3c06062b227f1acd75abc3ff4a76aec8d",
+    "timestamp_utc": "2026-08-15T18:38:21.615903+00:00",
+    "latency_ms": 4269.92,
+    "provider": "gemini",
+    "model": "gemini-flash-lite-latest",
+    "generation_settings": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "token_usage": {
+      "prompt_tokens": 725,
+      "completion_tokens": 722,
+      "total_tokens": 1447
+    },
+    "estimated_cost_usd": 0.000271,
+    "system_prompt": "You are the S-Class Grounded Domain Inference Engine (Pass 2 - Targeted Coverage Audit).\nYour job is to analyze the requirements generated in Pass 1 and identify CRITICAL MISSING INVARIANTS AND GUARDS:\n\n1. Targeted Gap Analysis:\n   - What non-negotiable domain invariants, concurrency guards, failure recovery boundaries, data integrity rules, or edge-case behaviors are strictly required by the domain but MISSING from Pass 1?\n   - Formulate ONLY the missing requirements. Do NOT repeat or duplicate Pass 1 requirements.\n   - Every derived requirement must include a rigorous 3-step why-chain.\n\n2. Anti-Hallucination Barrier:\n   - Do NOT fabricate full-stack UI pages or arbitrary third-party providers.\n   - If an operational choice or standard is unstated, mark it explicitly as UNKNOWN.\n\n3. Output Schema:\n{\n  \"experiment\": \"EXPERIMENT C \u2014 Pass 2 (Targeted Coverage Audit)\",\n  \"task_id\": \"<TASK_ID>\",\n  \"missing_requirements\": [\n    {\n      \"requirement_id\": \"<REQ_ID>\",\n      \"title\": \"<TITLE>\",\n      \"description\": \"<DESCRIPTION>\",\n      \"type\": \"FUNCTIONAL\" | \"NON_FUNCTIONAL\" | \"SECURITY\" | \"BEHAVIORAL\" | \"INVARIANT\",\n      \"epistemic_status\": \"DERIVED_JUSTIFIED\" | \"SUPPORTED\" | \"UNKNOWN\",\n      \"provenance\": \"<DOMAIN_PROVENANCE>\" | \"UNSUPPORTED\",\n      \"confidence\": <FLOAT_0_TO_1>,\n      \"justification\": \"<WHY_CHAIN_OR_RATIONALE>\"\n    }\n  ]\n}\n",
+    "user_prompt": "Original Prompt: \"Build a secure payment processing service.\"\nDomain: 'fintech_payments_ambiguous'\n\nPass 1 Requirements already synthesized:\n- [REQ-EXPLICIT-001] Secure Payment Processing (EXPLICIT): The system must process payments securely.\n- [REQ-DERIVED-001] Idempotent Transaction Handling (DERIVED_JUSTIFIED): Payment requests must utilize idempotency keys to prevent duplicate charges upon network retries.\n- [REQ-DERIVED-002] Data Encryption in Transit and at Rest (DERIVED_JUSTIFIED): All sensitive financial data and payment credentials must be encrypted using industry-standard cryptographic algorithms.\n- [REQ-UNKNOWN-001] Undefined Payment Gateway Provider (UNKNOWN): The specific third-party payment processor, acquiring bank, or rail (e.g., Stripe, ACH, SWIFT) is unspecified.\n- [REQ-UNKNOWN-002] Undefined User Interfaces and Dashboards (UNKNOWN): No merchant onboarding web UIs, customer billing dashboards, or frontend interfaces are specified or required.\n\nCoverage Audit Directive:\n- Analyze what critical domain invariants, edge cases, failure modes, data integrity rules, or concurrency controls are MISSING from the above list to fulfill the prompt completely.\n- Synthesize ONLY the missing requirements with 3-step why-chains.\n- Do NOT duplicate any requirement already in Pass 1.\n- Avoid hallucinating unrequested fullstack UI features (Merchant onboarding web UI, Customer billing dashboard, Specific third-party provider assumption (e.g. forced Stripe integration without prompt instruction)).\n\nReturn strictly valid JSON as specified in the system instructions.",
+    "input_context": {
+      "pass": 2,
+      "raw_prompt": "Build a secure payment processing service.",
+      "pass1_count": 5
+    }
+  }
+}

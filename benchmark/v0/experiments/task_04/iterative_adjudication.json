@@ -1,0 +1,110 @@
+{
+  "task_id": "TASK-04-AEROSPACE-BLACKBOX-TELEMETRY",
+  "provenance": {
+    "adjudicator_id": "ADJ_ENG_CORE_01",
+    "adjudication_version": "3.0.0-gate1.3-iterative",
+    "adjudication_timestamp": "2026-08-16T00:10:00Z",
+    "generator_id": "gemini-flash-lite-latest (3-pass iterative runner)",
+    "adjudicator_is_generator": false,
+    "generator_had_access_to_adjudication": false,
+    "adjudicator_blinded_to_model_name": true
+  },
+  "candidate_adjudications": [
+    {
+      "candidate_id": "REQ-EX-001",
+      "title": "ARINC 429 Bus Frame Ingestion",
+      "introduced_in_pass": 1,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-EXP-01",
+      "rationale": "Directly matches ground truth mandate to continuously ingest and buffer ARINC 429 bus frames."
+    },
+    {
+      "candidate_id": "REQ-EX-002",
+      "title": "Power Loss Buffer Synchronization and Flush",
+      "introduced_in_pass": 1,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-EXP-02",
+      "rationale": "Directly matches ground truth mandate to flush buffered telemetry frames to crash-survivable memory on power loss."
+    },
+    {
+      "candidate_id": "REQ-DJ-001",
+      "title": "Hold-Up Power Supply and Flush Completion Guarantee",
+      "introduced_in_pass": 1,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-DER-02",
+      "rationale": "Matches ground truth requirement for hold-up capacitor energy reserve to power write operations during blackout."
+    },
+    {
+      "candidate_id": "REQ-DJ-002",
+      "title": "Deterministic Real-Time Buffer Bounded Execution",
+      "introduced_in_pass": 1,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-SUP-01",
+      "rationale": "Matches ground truth requirement for DO-178C static memory pre-allocation and deterministic bounds."
+    },
+    {
+      "candidate_id": "REQ-UK-001",
+      "title": "Unspecified Solid-State Memory Interface Protocol",
+      "introduced_in_pass": 1,
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "rationale": "Correctly flags unstated flash memory controller interface protocol as UNKNOWN."
+    },
+    {
+      "candidate_id": "REQ-UK-002",
+      "title": "Unspecified Power Loss Detection Threshold",
+      "introduced_in_pass": 1,
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "rationale": "Correctly flags unstated analog voltage drop sensing threshold as UNKNOWN."
+    },
+    {
+      "candidate_id": "REQ-DJ-003",
+      "title": "Dual-Bank Buffer Alternating Concurrency Guard",
+      "introduced_in_pass": 2,
+      "label": "VALID_DERIVATION",
+      "ground_truth_id": null,
+      "rationale": "Valid real-time avionics derivation providing alternating ping-pong buffers to prevent race conditions during interrupt flush."
+    },
+    {
+      "candidate_id": "REQ-DJ-004",
+      "title": "Flight Recorder Data Integrity Checksum and Framing Verification",
+      "introduced_in_pass": 2,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-DER-03",
+      "rationale": "Matches ground truth requirement for ARINC 429 parity bit checking and frame CRC validation."
+    },
+    {
+      "candidate_id": "REQ-DJ-005",
+      "title": "Emergency Flash Write Failure Recovery and Byte Retry Mechanism",
+      "introduced_in_pass": 2,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-DER-01",
+      "rationale": "Matches ground truth requirement for non-volatile flash wear-leveling and bad-block write recovery."
+    },
+    {
+      "candidate_id": "REQ-UK-003",
+      "title": "Unspecified Regulatory Compliance Standard and Certification Level",
+      "introduced_in_pass": 3,
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "rationale": "Correctly flags unstated specific airworthiness certification design assurance level (DAL A vs B) as UNKNOWN."
+    },
+    {
+      "candidate_id": "REQ-UK-004",
+      "title": "Unspecified Post-Crash Physical Extraction and Readout Protocol",
+      "introduced_in_pass": 3,
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "rationale": "Correctly flags unstated GSE ground support readout physical connector protocol as UNKNOWN."
+    },
+    {
+      "candidate_id": "REQ-DJ-006",
+      "title": "Post-Power-Restoration Initialization and Health Diagnostics",
+      "introduced_in_pass": 3,
+      "label": "VALID_DERIVATION",
+      "ground_truth_id": null,
+      "rationale": "Valid avionics lifecycle derivation enforcing Built-In Self-Test (BIST) upon power restoration."
+    }
+  ]
+}

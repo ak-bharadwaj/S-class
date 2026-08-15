@@ -1,0 +1,196 @@
+{
+  "benchmark": "S-Class Gate 1.3 Stage 1 Semantic Unit Classification Confusion Analysis",
+  "total_units_evaluated": 45,
+  "correct_units": 40,
+  "micro_accuracy": 88.89,
+  "macro_accuracy": 87.58,
+  "task_breakdown": {
+    "task_01": {
+      "total": 7,
+      "correct": 6,
+      "accuracy": 85.71
+    },
+    "task_02": {
+      "total": 8,
+      "correct": 8,
+      "accuracy": 100.0
+    },
+    "task_03": {
+      "total": 7,
+      "correct": 6,
+      "accuracy": 85.71
+    },
+    "task_04": {
+      "total": 8,
+      "correct": 8,
+      "accuracy": 100.0
+    },
+    "task_05": {
+      "total": 8,
+      "correct": 6,
+      "accuracy": 75.0
+    },
+    "task_06": {
+      "total": 3,
+      "correct": 2,
+      "accuracy": 66.67
+    },
+    "task_07": {
+      "total": 4,
+      "correct": 4,
+      "accuracy": 100.0
+    }
+  },
+  "confusion_matrix": {
+    "ENTITY": {
+      "ENTITY": 13,
+      "INVARIANT": 0,
+      "BEHAVIOR": 1,
+      "CONSTRAINT": 0,
+      "ATTRIBUTE": 0,
+      "NOISE": 0
+    },
+    "INVARIANT": {
+      "ENTITY": 0,
+      "INVARIANT": 3,
+      "BEHAVIOR": 0,
+      "CONSTRAINT": 1,
+      "ATTRIBUTE": 0,
+      "NOISE": 0
+    },
+    "BEHAVIOR": {
+      "ENTITY": 0,
+      "INVARIANT": 1,
+      "BEHAVIOR": 12,
+      "CONSTRAINT": 0,
+      "ATTRIBUTE": 0,
+      "NOISE": 0
+    },
+    "CONSTRAINT": {
+      "ENTITY": 0,
+      "INVARIANT": 1,
+      "BEHAVIOR": 0,
+      "CONSTRAINT": 4,
+      "ATTRIBUTE": 1,
+      "NOISE": 0
+    },
+    "ATTRIBUTE": {
+      "ENTITY": 0,
+      "INVARIANT": 0,
+      "BEHAVIOR": 0,
+      "CONSTRAINT": 0,
+      "ATTRIBUTE": 1,
+      "NOISE": 0
+    },
+    "NOISE": {
+      "ENTITY": 0,
+      "INVARIANT": 0,
+      "BEHAVIOR": 0,
+      "CONSTRAINT": 0,
+      "ATTRIBUTE": 0,
+      "NOISE": 7
+    }
+  },
+  "per_class_metrics": {
+    "ENTITY": {
+      "true_positive": 13,
+      "false_positive": 0,
+      "false_negative": 1,
+      "support": 14,
+      "precision": 100.0,
+      "recall": 92.86,
+      "f1_score": 96.3
+    },
+    "INVARIANT": {
+      "true_positive": 3,
+      "false_positive": 2,
+      "false_negative": 1,
+      "support": 4,
+      "precision": 60.0,
+      "recall": 75.0,
+      "f1_score": 66.67
+    },
+    "BEHAVIOR": {
+      "true_positive": 12,
+      "false_positive": 1,
+      "false_negative": 1,
+      "support": 13,
+      "precision": 92.31,
+      "recall": 92.31,
+      "f1_score": 92.31
+    },
+    "CONSTRAINT": {
+      "true_positive": 4,
+      "false_positive": 1,
+      "false_negative": 2,
+      "support": 6,
+      "precision": 80.0,
+      "recall": 66.67,
+      "f1_score": 72.73
+    },
+    "ATTRIBUTE": {
+      "true_positive": 1,
+      "false_positive": 1,
+      "false_negative": 0,
+      "support": 1,
+      "precision": 50.0,
+      "recall": 100.0,
+      "f1_score": 66.67
+    },
+    "NOISE": {
+      "true_positive": 7,
+      "false_positive": 0,
+      "false_negative": 0,
+      "support": 7,
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1_score": 100.0
+    }
+  },
+  "misclassifications": [
+    {
+      "task_id": "task_01",
+      "unit": "atomic",
+      "expected_class": "INVARIANT",
+      "predicted_class": "CONSTRAINT",
+      "confidence": 0.95,
+      "rationale": "Specifies an all-or-nothing transactional boundary constraint (ACID property) governing execution rather than a distinct domain object or functional logic."
+    },
+    {
+      "task_id": "task_03",
+      "unit": "analytics ingestion",
+      "expected_class": "ENTITY",
+      "predicted_class": "BEHAVIOR",
+      "confidence": 0.9,
+      "rationale": "Describes the workflow and integration operation of receiving processed data into the downstream analytics environment."
+    },
+    {
+      "task_id": "task_05",
+      "unit": "lockdown",
+      "expected_class": "BEHAVIOR",
+      "predicted_class": "INVARIANT",
+      "confidence": 0.91,
+      "rationale": "Specifies an immutable security enforcement state and non-negotiable safety invariant governing system operation."
+    },
+    {
+      "task_id": "task_05",
+      "unit": "dual-monitor mirroring",
+      "expected_class": "CONSTRAINT",
+      "predicted_class": "ATTRIBUTE",
+      "confidence": 0.89,
+      "rationale": "Identifies a specific multi-display hardware configuration property and topology state subject to inspection."
+    },
+    {
+      "task_id": "task_06",
+      "unit": "secure",
+      "expected_class": "CONSTRAINT",
+      "predicted_class": "INVARIANT",
+      "confidence": 0.92,
+      "rationale": "Specifies a non-negotiable security invariant and safety rule governing all data handling, transmission, and access control policies across the service."
+    }
+  ],
+  "epistemic_confidence_policy": {
+    "high_confidence_threshold": 0.85,
+    "rule": "If confidence >= 0.85 and category conforms to semantic lattice -> Accept. If confidence < 0.85 or cross-boundary (INVARIANT <-> CONSTRAINT) -> Flag as UNKNOWN / Clarification Candidate."
+  }
+}

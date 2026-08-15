@@ -1,0 +1,63 @@
+{
+  "experiment": "EXPERIMENT C \u2014 Pass 2 (Targeted Coverage Audit)",
+  "task_id": "fintech_banking_ledger_transaction",
+  "missing_requirements": [
+    {
+      "requirement_id": "REQ-DJ-003",
+      "title": "Account Balance Floor Enforcement and Overdraft Prevention",
+      "description": "The system must validate that source accounts do not violate minimum balance or overdraft limits prior to committing a debit entry, unless an explicit credit line or overdraft facility is authorized.",
+      "type": "INVARIANT",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "fintech_banking",
+      "confidence": 0.95,
+      "justification": "Step 1: The prompt mandates an atomic financial ledger transaction with debit/credit balance invariance. Step 2: In double-entry bookkeeping, balancing journal entries alone does not prevent individual accounts from dropping below legally or operationally mandated minimums (e.g., negative balances without credit facilities). Step 3: Therefore, a balance floor check must be integrated into the atomic transaction validation phase to maintain account solvency and domain invariants."
+    },
+    {
+      "requirement_id": "REQ-DJ-004",
+      "title": "Deadlock Prevention and Timeout Guard for Concurrent Ledger Locking",
+      "description": "The system must acquire account locks in a deterministic, globally sorted order (e.g., sorting account IDs lexicographically) and enforce strict statement timeouts to prevent circular wait deadlocks during concurrent multi-account transfers.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "fintech_banking",
+      "confidence": 0.92,
+      "justification": "Step 1: Concurrent transactions modifying overlapping sets of source and destination accounts under high isolation levels are prone to deadlocks. Step 2: Unmanaged deadlocks lead to transaction aborts, resource exhaustion, and degraded availability. Step 3: Therefore, deterministic lock ordering and timeout guards must be implemented to ensure safe and predictable concurrent execution."
+    },
+    {
+      "requirement_id": "REQ-DJ-005",
+      "title": "Immutable Ledger Audit Trail and Append-Only Enforcement",
+      "description": "The system must prohibit UPDATE and DELETE operations on committed ledger transaction rows, ensuring that any corrections or reversals are executed strictly via compensating entries.",
+      "type": "SECURITY",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "fintech_banking",
+      "confidence": 0.98,
+      "justification": "Step 1: Financial ledgers require strict regulatory compliance and tamper-evident audit trails. Step 2: Allowing direct modifications or deletions of committed ledger entries destroys historical provenance and breaks double-entry auditability. Step 3: Therefore, the database schema and application logic must enforce append-only immutability for all historical ledger records."
+    }
+  ],
+  "provenance_metadata": {
+    "experiment_id": "EXPERIMENT_C_PASS_2_COVERAGE_AUDIT",
+    "task_id": "TASK-01-FINTECH-LEDGER",
+    "runner_version": "2.0.0-gate1.2-provenance",
+    "git_commit": "53aa1bd3c06062b227f1acd75abc3ff4a76aec8d",
+    "timestamp_utc": "2026-08-15T18:34:09.880115+00:00",
+    "latency_ms": 3951.35,
+    "provider": "gemini",
+    "model": "gemini-flash-lite-latest",
+    "generation_settings": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "token_usage": {
+      "prompt_tokens": 824,
+      "completion_tokens": 672,
+      "total_tokens": 1496
+    },
+    "estimated_cost_usd": 0.000263,
+    "system_prompt": "You are the S-Class Grounded Domain Inference Engine (Pass 2 - Targeted Coverage Audit).\nYour job is to analyze the requirements generated in Pass 1 and identify CRITICAL MISSING INVARIANTS AND GUARDS:\n\n1. Targeted Gap Analysis:\n   - What non-negotiable domain invariants, concurrency guards, failure recovery boundaries, data integrity rules, or edge-case behaviors are strictly required by the domain but MISSING from Pass 1?\n   - Formulate ONLY the missing requirements. Do NOT repeat or duplicate Pass 1 requirements.\n   - Every derived requirement must include a rigorous 3-step why-chain.\n\n2. Anti-Hallucination Barrier:\n   - Do NOT fabricate full-stack UI pages or arbitrary third-party providers.\n   - If an operational choice or standard is unstated, mark it explicitly as UNKNOWN.\n\n3. Output Schema:\n{\n  \"experiment\": \"EXPERIMENT C \u2014 Pass 2 (Targeted Coverage Audit)\",\n  \"task_id\": \"<TASK_ID>\",\n  \"missing_requirements\": [\n    {\n      \"requirement_id\": \"<REQ_ID>\",\n      \"title\": \"<TITLE>\",\n      \"description\": \"<DESCRIPTION>\",\n      \"type\": \"FUNCTIONAL\" | \"NON_FUNCTIONAL\" | \"SECURITY\" | \"BEHAVIORAL\" | \"INVARIANT\",\n      \"epistemic_status\": \"DERIVED_JUSTIFIED\" | \"SUPPORTED\" | \"UNKNOWN\",\n      \"provenance\": \"<DOMAIN_PROVENANCE>\" | \"UNSUPPORTED\",\n      \"confidence\": <FLOAT_0_TO_1>,\n      \"justification\": \"<WHY_CHAIN_OR_RATIONALE>\"\n    }\n  ]\n}\n",
+    "user_prompt": "Original Prompt: \"Implement an atomic financial ledger transaction with debit/credit balance invariance and idempotency check.\"\nDomain: 'fintech_banking'\n\nPass 1 Requirements already synthesized:\n- [REQ-EX-001] Atomic Financial Ledger Transaction (EXPLICIT): The system must execute financial ledger entries as an atomic transaction ensuring all-or-nothing persistence across multi-legged entries.\n- [REQ-EX-002] Debit and Credit Balance Invariance (EXPLICIT): The system must enforce double-entry bookkeeping balance invariance where the sum of debits must equal the sum of credits for every committed transaction.\n- [REQ-EX-003] Idempotency Check (EXPLICIT): The system must perform an idempotency check prior to transaction processing to prevent duplicate execution of identical transaction requests.\n- [REQ-DJ-001] Idempotency Key Persistence and Uniqueness Constraint (DERIVED_JUSTIFIED): The system must store idempotency keys alongside request hashes with a strict database unique constraint.\n- [REQ-DJ-002] ACID Database Isolation for Balance Updates (DERIVED_JUSTIFIED): The system must execute balance reads and writes using serializable or repeatable read isolation levels to prevent lost updates.\n- [REQ-UN-001] Idempotency Key Expiration Window (UNKNOWN): The retention period or time-to-live (TTL) for idempotency keys is unstated.\n- [REQ-UN-002] Ledger Storage Technology and Schema (UNKNOWN): The specific database engine, storage provider, and schema design for the ledger are unstated.\n\nCoverage Audit Directive:\n- Analyze what critical domain invariants, edge cases, failure modes, data integrity rules, or concurrency controls are MISSING from the above list to fulfill the prompt completely.\n- Synthesize ONLY the missing requirements with 3-step why-chains.\n- Do NOT duplicate any requirement already in Pass 1.\n- Avoid hallucinating unrequested fullstack UI features (User profile management UI page, Customer KYC onboarding wizard, Credit card rewards portal).\n\nReturn strictly valid JSON as specified in the system instructions.",
+    "input_context": {
+      "pass": 2,
+      "raw_prompt": "Implement an atomic financial ledger transaction with debit/credit balance invariance and idempotency check.",
+      "pass1_count": 7
+    }
+  }
+}

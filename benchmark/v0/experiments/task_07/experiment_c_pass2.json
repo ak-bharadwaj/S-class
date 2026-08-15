@@ -1,0 +1,63 @@
+{
+  "experiment": "EXPERIMENT C \u2014 Pass 2 (Targeted Coverage Audit)",
+  "task_id": "auth_identity_ambiguous",
+  "missing_requirements": [
+    {
+      "requirement_id": "REQ-MISSING-001",
+      "title": "Token Revocation Propagation and Latency Boundary",
+      "description": "The system must define and enforce a strict upper bound on propagation latency for token revocation across all validation nodes to ensure revoked tokens are rejected immediately.",
+      "type": "INVARIANT",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "Distributed Systems Authorization Invariants",
+      "confidence": 0.95,
+      "justification": "1. When a token is revoked, distributed validation nodes evaluating incoming requests may cache validation results or lack synchronous updates; 2. Without a guaranteed synchronization bound or immediate check against a central revocation store, a compromised or logged-out token remains usable until cache expiration; 3. Therefore, a strict latency boundary or bypass check must be enforced to preserve the security guarantee of the revocation mechanism."
+    },
+    {
+      "requirement_id": "REQ-MISSING-002",
+      "title": "Revocation State Store Failure Mode and Fail-Closed Guard",
+      "description": "The system must enforce a fail-closed policy if the token revocation state store becomes unavailable or experiences a timeout during token validation.",
+      "type": "SECURITY",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "Zero-Trust Fail-Closed Security Principles",
+      "confidence": 0.98,
+      "justification": "1. State stores used for blacklisting or revocation checks can suffer network partitions, crashes, or timeouts; 2. If the system defaults to failing open (allowing tokens when the blacklist cannot be reached), an attacker could disrupt the state store to bypass revocation checks entirely; 3. Therefore, an explicit fail-closed guard is required to deny authentication when revocation state integrity cannot be verified."
+    },
+    {
+      "requirement_id": "REQ-MISSING-003",
+      "title": "Revocation Store Storage Exhaustion and Pruning Policy",
+      "description": "The system must implement a retention and pruning policy for the token revocation state store to prevent unbounded growth and storage exhaustion.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "Database Lifecycle Management and Hygiene",
+      "confidence": 0.92,
+      "justification": "1. Every token revocation adds an entry to the state store that must typically persist at least until the token's natural expiration timestamp; 2. Storing expired token identifiers indefinitely leads to uncontrolled database size inflation and degradation of lookup performance; 3. Therefore, an automated pruning policy tied to token expiration timestamps is mandatory to ensure long-term data integrity and system stability."
+    }
+  ],
+  "provenance_metadata": {
+    "experiment_id": "EXPERIMENT_C_PASS_2_COVERAGE_AUDIT",
+    "task_id": "TASK-07-AUTH-TOKEN-REVOCATION-AMBIGUOUS",
+    "runner_version": "2.0.0-gate1.2-provenance",
+    "git_commit": "53aa1bd3c06062b227f1acd75abc3ff4a76aec8d",
+    "timestamp_utc": "2026-08-15T18:39:13.539819+00:00",
+    "latency_ms": 4313.75,
+    "provider": "gemini",
+    "model": "gemini-flash-lite-latest",
+    "generation_settings": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "token_usage": {
+      "prompt_tokens": 756,
+      "completion_tokens": 664,
+      "total_tokens": 1420
+    },
+    "estimated_cost_usd": 0.000256,
+    "system_prompt": "You are the S-Class Grounded Domain Inference Engine (Pass 2 - Targeted Coverage Audit).\nYour job is to analyze the requirements generated in Pass 1 and identify CRITICAL MISSING INVARIANTS AND GUARDS:\n\n1. Targeted Gap Analysis:\n   - What non-negotiable domain invariants, concurrency guards, failure recovery boundaries, data integrity rules, or edge-case behaviors are strictly required by the domain but MISSING from Pass 1?\n   - Formulate ONLY the missing requirements. Do NOT repeat or duplicate Pass 1 requirements.\n   - Every derived requirement must include a rigorous 3-step why-chain.\n\n2. Anti-Hallucination Barrier:\n   - Do NOT fabricate full-stack UI pages or arbitrary third-party providers.\n   - If an operational choice or standard is unstated, mark it explicitly as UNKNOWN.\n\n3. Output Schema:\n{\n  \"experiment\": \"EXPERIMENT C \u2014 Pass 2 (Targeted Coverage Audit)\",\n  \"task_id\": \"<TASK_ID>\",\n  \"missing_requirements\": [\n    {\n      \"requirement_id\": \"<REQ_ID>\",\n      \"title\": \"<TITLE>\",\n      \"description\": \"<DESCRIPTION>\",\n      \"type\": \"FUNCTIONAL\" | \"NON_FUNCTIONAL\" | \"SECURITY\" | \"BEHAVIORAL\" | \"INVARIANT\",\n      \"epistemic_status\": \"DERIVED_JUSTIFIED\" | \"SUPPORTED\" | \"UNKNOWN\",\n      \"provenance\": \"<DOMAIN_PROVENANCE>\" | \"UNSUPPORTED\",\n      \"confidence\": <FLOAT_0_TO_1>,\n      \"justification\": \"<WHY_CHAIN_OR_RATIONALE>\"\n    }\n  ]\n}\n",
+    "user_prompt": "Original Prompt: \"Build an authentication platform with token revocation.\"\nDomain: 'auth_identity_ambiguous'\n\nPass 1 Requirements already synthesized:\n- [REQ-EXPLICIT-001] Authentication Platform Core (EXPLICIT): The system must provide authentication capabilities to verify user identities.\n- [REQ-EXPLICIT-002] Token Revocation Mechanism (EXPLICIT): The system must support the ability to revoke issued authentication tokens.\n- [REQ-DERIVED-001] Token Blacklist or Validation State Store (DERIVED_JUSTIFIED): The system must maintain a state store (such as a revocation list or blacklist) to verify if an incoming token has been explicitly invalidated prior to its natural expiration.\n- [REQ-UNKNOWN-001] Token Format and Cryptographic Standard (UNKNOWN): The specific token format (e.g., JWT, PASETO) and signing algorithm (e.g., Ed25519, RS256, HS256) are unstated.\n- [REQ-UNKNOWN-002] Storage Backend and Persistence Provider (UNKNOWN): The underlying database or persistence engine for user credentials and revocation state is unstated.\n\nCoverage Audit Directive:\n- Analyze what critical domain invariants, edge cases, failure modes, data integrity rules, or concurrency controls are MISSING from the above list to fulfill the prompt completely.\n- Synthesize ONLY the missing requirements with 3-step why-chains.\n- Do NOT duplicate any requirement already in Pass 1.\n- Avoid hallucinating unrequested fullstack UI features (User registration web UI with password strength meters, Admin role management web dashboard, Specific third-party provider assumption (e.g. forced Auth0 / Firebase integration)).\n\nReturn strictly valid JSON as specified in the system instructions.",
+    "input_context": {
+      "pass": 2,
+      "raw_prompt": "Build an authentication platform with token revocation.",
+      "pass1_count": 5
+    }
+  }
+}

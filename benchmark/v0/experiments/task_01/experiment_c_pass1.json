@@ -1,0 +1,103 @@
+{
+  "experiment": "EXPERIMENT C \u2014 Pass 1 (Grounded Core Extraction)",
+  "task_id": "fintech_banking_ledger_transaction",
+  "inferred_requirements": [
+    {
+      "requirement_id": "REQ-EX-001",
+      "title": "Atomic Financial Ledger Transaction",
+      "description": "The system must execute financial ledger entries as an atomic transaction ensuring all-or-nothing persistence across multi-legged entries.",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Directly requested in prompt: 'Implement an atomic financial ledger transaction'."
+    },
+    {
+      "requirement_id": "REQ-EX-002",
+      "title": "Debit and Credit Balance Invariance",
+      "description": "The system must enforce double-entry bookkeeping balance invariance where the sum of debits must equal the sum of credits for every committed transaction.",
+      "type": "INVARIANT",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Directly requested in prompt: 'debit/credit balance invariance'."
+    },
+    {
+      "requirement_id": "REQ-EX-003",
+      "title": "Idempotency Check",
+      "description": "The system must perform an idempotency check prior to transaction processing to prevent duplicate execution of identical transaction requests.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Directly requested in prompt: 'idempotency check'."
+    },
+    {
+      "requirement_id": "REQ-DJ-001",
+      "title": "Idempotency Key Persistence and Uniqueness Constraint",
+      "description": "The system must store idempotency keys alongside request hashes with a strict database unique constraint.",
+      "type": "SECURITY",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "fintech_banking_ledger_transaction",
+      "confidence": 0.95,
+      "justification": "Why 1 (Context/Risk): Without persistent uniqueness checks, concurrent duplicate requests can bypass application-layer memory checks.\nWhy 2 (Technical Mechanism): A unique database constraint on the idempotency key column guarantees database-level race condition prevention.\nWhy 3 (Mandatory Invariant): The system must never process duplicate transaction requests under concurrent load."
+    },
+    {
+      "requirement_id": "REQ-DJ-002",
+      "title": "ACID Database Isolation for Balance Updates",
+      "description": "The system must execute balance reads and writes using serializable or repeatable read isolation levels to prevent lost updates.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "fintech_banking_ledger_transaction",
+      "confidence": 0.95,
+      "justification": "Why 1 (Context/Risk): Concurrent transactions against the same account balances can introduce race conditions leading to negative balances or corrupt invariants.\nWhy 2 (Technical Mechanism): Utilizing row-level locking or strict database transaction isolation prevents interleaved updates.\nWhy 3 (Mandatory Invariant): Account balance invariants and double-entry balancing must hold true under high-concurrency conditions."
+    },
+    {
+      "requirement_id": "REQ-UN-001",
+      "title": "Idempotency Key Expiration Window",
+      "description": "The retention period or time-to-live (TTL) for idempotency keys is unstated.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "The prompt does not specify how long idempotency keys must be retained before expiration."
+    },
+    {
+      "requirement_id": "REQ-UN-002",
+      "title": "Ledger Storage Technology and Schema",
+      "description": "The specific database engine, storage provider, and schema design for the ledger are unstated.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "No specific database technology or schema layout was provided in the prompt."
+    }
+  ],
+  "provenance_metadata": {
+    "experiment_id": "EXPERIMENT_C_PASS_1_CORE_EXTRACTION",
+    "task_id": "TASK-01-FINTECH-LEDGER",
+    "runner_version": "2.0.0-gate1.2-provenance",
+    "git_commit": "53aa1bd3c06062b227f1acd75abc3ff4a76aec8d",
+    "timestamp_utc": "2026-08-15T18:33:52.313745+00:00",
+    "latency_ms": 5562.43,
+    "provider": "gemini",
+    "model": "gemini-flash-lite-latest",
+    "generation_settings": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "token_usage": {
+      "prompt_tokens": 573,
+      "completion_tokens": 1084,
+      "total_tokens": 1657
+    },
+    "estimated_cost_usd": 0.000368,
+    "system_prompt": "You are the S-Class Grounded Domain Inference Engine (Pass 1 - Core Extraction).\nYour job is to synthesize software engineering requirements from the user prompt with STRICT EPISTEMIC SELF-RESTRAINT:\n\n1. Requirement Categorization:\n   - EXPLICIT: Requirements directly and unambiguously stated in the prompt.\n   - DERIVED_JUSTIFIED: Requirements strictly mathematically, architecturally, or operationally necessary to implement the stated goal without defect. Every DERIVED_JUSTIFIED requirement MUST include a rigorous 3-step why-chain (Why 1: Context/Risk -> Why 2: Technical Mechanism -> Why 3: Mandatory Invariant).\n   - SUPPORTED: Non-functional or platform constraints directly supporting the scope.\n   - UNKNOWN: Any operational parameter, storage choice, or protocol unstated in the prompt.\n\n2. Anti-Hallucination Barrier:\n   - DO NOT fabricate full-stack UI pages (e.g. login screens, dashboards, admin portals) unless explicitly requested.\n   - DO NOT fabricate arbitrary third-party providers (e.g. Stripe, Auth0, AWS) unless explicitly requested.\n\n3. Output Schema:\n{\n  \"experiment\": \"EXPERIMENT C \u2014 Pass 1 (Grounded Core Extraction)\",\n  \"task_id\": \"<TASK_ID>\",\n  \"inferred_requirements\": [\n    {\n      \"requirement_id\": \"<REQ_ID>\",\n      \"title\": \"<TITLE>\",\n      \"description\": \"<DESCRIPTION>\",\n      \"type\": \"FUNCTIONAL\" | \"NON_FUNCTIONAL\" | \"SECURITY\" | \"BEHAVIORAL\" | \"INVARIANT\",\n      \"epistemic_status\": \"EXPLICIT\" | \"DERIVED_JUSTIFIED\" | \"SUPPORTED\" | \"UNKNOWN\",\n      \"provenance\": \"USER_PROMPT\" | \"<DOMAIN_PROVENANCE>\" | \"UNSUPPORTED\",\n      \"confidence\": <FLOAT_0_TO_1>,\n      \"justification\": \"<WHY_CHAIN_OR_RATIONALE>\"\n    }\n  ]\n}\n",
+    "user_prompt": "Synthesize formal software engineering requirements for the following prompt in the domain of 'fintech_banking':\nPrompt: \"Implement an atomic financial ledger transaction with debit/credit balance invariance and idempotency check.\"\n\nDomain Guidance:\n- Enforce core invariants and essential derived domain rules.\n- Do not generate unrequested UI pages or hallucinate arbitrary features (specifically avoid: User profile management UI page, Customer KYC onboarding wizard, Credit card rewards portal).\n- If key operational choices, providers, or format standards are unstated, mark them explicitly as UNKNOWN.\n\nReturn strictly valid JSON as specified in the system instructions.",
+    "input_context": {
+      "pass": 1,
+      "raw_prompt": "Implement an atomic financial ledger transaction with debit/credit balance invariance and idempotency check.",
+      "domain": "fintech_banking"
+    }
+  }
+}

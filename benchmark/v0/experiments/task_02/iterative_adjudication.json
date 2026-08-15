@@ -1,0 +1,102 @@
+{
+  "task_id": "TASK-02-AUTH-SESSION-REVOKE",
+  "provenance": {
+    "adjudicator_id": "ADJ_ENG_CORE_01",
+    "adjudication_version": "3.0.0-gate1.3-iterative",
+    "adjudication_timestamp": "2026-08-16T00:10:00Z",
+    "generator_id": "gemini-flash-lite-latest (3-pass iterative runner)",
+    "adjudicator_is_generator": false,
+    "generator_had_access_to_adjudication": false,
+    "adjudicator_blinded_to_model_name": true
+  },
+  "candidate_adjudications": [
+    {
+      "candidate_id": "REQ-EXPLICIT-001",
+      "title": "Password Reset Session Invalidation",
+      "introduced_in_pass": 1,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-EXP-01",
+      "rationale": "Directly matches ground truth mandate to invalidate sessions on password reset."
+    },
+    {
+      "candidate_id": "REQ-EXPLICIT-002",
+      "title": "Refresh Token Blacklisting Across Clusters",
+      "introduced_in_pass": 1,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-EXP-02",
+      "rationale": "Directly matches ground truth mandate for multi-cluster refresh token blacklisting."
+    },
+    {
+      "candidate_id": "REQ-DERIVED-001",
+      "title": "Distributed Token Revocation Propagation",
+      "introduced_in_pass": 1,
+      "label": "VALID_DERIVATION",
+      "ground_truth_id": null,
+      "rationale": "Valid architectural derivation enforcing distributed synchronization bus."
+    },
+    {
+      "candidate_id": "REQ-DERIVED-002",
+      "title": "Token Identifier Uniqueness and Extraction",
+      "introduced_in_pass": 1,
+      "label": "SUPPORTED_BUT_OUTSIDE_GT",
+      "ground_truth_id": null,
+      "rationale": "Supported token identifier extraction and handling constraint."
+    },
+    {
+      "candidate_id": "REQ-UNKNOWN-001",
+      "title": "Token Storage Mechanism and Protocol Standards",
+      "introduced_in_pass": 1,
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "rationale": "Correctly flags unstated storage tier and token format as UNKNOWN."
+    },
+    {
+      "candidate_id": "REQ-UNKNOWN-002",
+      "title": "Cross-Cluster Sync Latency and Consistency Model",
+      "introduced_in_pass": 1,
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "rationale": "Correctly flags unstated replication consistency model as UNKNOWN."
+    },
+    {
+      "candidate_id": "REQ-MISSING-001",
+      "title": "Idempotent Blacklist Insertion and Storage Hygiene",
+      "introduced_in_pass": 2,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-DER-01",
+      "rationale": "Matches ground truth requirement for TTL expiration / bounded retention on blacklist entries."
+    },
+    {
+      "candidate_id": "REQ-MISSING-002",
+      "title": "Partition-Tolerant Fail-Closed Access Gate",
+      "introduced_in_pass": 2,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-DER-03",
+      "rationale": "Matches ground truth requirement for immediate fail-closed token rejection upon revocation."
+    },
+    {
+      "candidate_id": "[REQ-BOUND-001]",
+      "title": "Crash Recovery and Blacklist State Rehydration",
+      "introduced_in_pass": 3,
+      "label": "VALID_DERIVATION",
+      "ground_truth_id": null,
+      "rationale": "Valid domain derivation providing restart/rehydration resilience for distributed revocation cache."
+    },
+    {
+      "candidate_id": "[REQ-BOUND-002]",
+      "title": "Cryptographic Algorithm and Hashing Standard for Blacklisted Tokens",
+      "introduced_in_pass": 3,
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "rationale": "Correctly flags unstated cryptographic hashing standard for token IDs as UNKNOWN."
+    },
+    {
+      "candidate_id": "[REQ-BOUND-003]",
+      "title": "Identity Provider and Directory Integration Protocol",
+      "introduced_in_pass": 3,
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "rationale": "Correctly flags unstated IdP directory integration protocol as UNKNOWN."
+    }
+  ]
+}

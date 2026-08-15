@@ -1,0 +1,53 @@
+{
+  "experiment": "EXPERIMENT C \u2014 Pass 2 (Targeted Coverage Audit)",
+  "task_id": "password_reset_invalidation",
+  "missing_requirements": [
+    {
+      "requirement_id": "REQ-MISSING-001",
+      "title": "Idempotent Blacklist Insertion and Storage Hygiene",
+      "description": "Blacklist state insertions for refresh token JTIs must be idempotent to prevent race conditions during concurrent reset events or duplicate propagation deliveries, and must incorporate token-lifetime-bound Time-To-Live (TTL) expiration.",
+      "type": "INVARIANT",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "Distributed Systems Data Integrity & Security Standards",
+      "confidence": 0.95,
+      "justification": "Step 1: If multiple concurrent password reset requests or redelivered synchronization events occur, non-idempotent insertions can cause distributed lock contention or state corruption. Step 2: Without automatic TTL expiration aligned with the token's remaining validity, the blacklist storage would grow unbounded, causing memory/storage exhaustion. Step 3: Therefore, enforcing idempotent writes and bounded TTL expiry preserves data integrity and prevents resource degradation across all clusters."
+    },
+    {
+      "requirement_id": "REQ-MISSING-002",
+      "title": "Partition-Tolerant Fail-Closed Access Gate",
+      "description": "If a cluster loses connectivity to the cross-cluster revocation synchronization layer or blacklist store, authentication verification must enforce a fail-closed posture for refresh token validation to prevent revoked token reuse during network partitions.",
+      "type": "SECURITY",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "Zero Trust Security Architecture & Distributed Failure Modes",
+      "confidence": 0.93,
+      "justification": "Step 1: During a network partition, isolated clusters cannot verify if a refresh token has been blacklisted due to a recent password reset. Step 2: A fail-open approach would allow compromised, pre-reset refresh tokens to successfully authenticate users during outages, defeating the security guarantee of the password reset. Step 3: Therefore, a fail-closed authorization gate must block refresh token validation when revocation status cannot be definitively confirmed."
+    }
+  ],
+  "provenance_metadata": {
+    "experiment_id": "EXPERIMENT_C_PASS_2_COVERAGE_AUDIT",
+    "task_id": "TASK-02-AUTH-SESSION-REVOKE",
+    "runner_version": "2.0.0-gate1.2-provenance",
+    "git_commit": "53aa1bd3c06062b227f1acd75abc3ff4a76aec8d",
+    "timestamp_utc": "2026-08-15T18:34:56.628415+00:00",
+    "latency_ms": 2711.31,
+    "provider": "gemini",
+    "model": "gemini-flash-lite-latest",
+    "generation_settings": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "token_usage": {
+      "prompt_tokens": 799,
+      "completion_tokens": 511,
+      "total_tokens": 1310
+    },
+    "estimated_cost_usd": 0.000213,
+    "system_prompt": "You are the S-Class Grounded Domain Inference Engine (Pass 2 - Targeted Coverage Audit).\nYour job is to analyze the requirements generated in Pass 1 and identify CRITICAL MISSING INVARIANTS AND GUARDS:\n\n1. Targeted Gap Analysis:\n   - What non-negotiable domain invariants, concurrency guards, failure recovery boundaries, data integrity rules, or edge-case behaviors are strictly required by the domain but MISSING from Pass 1?\n   - Formulate ONLY the missing requirements. Do NOT repeat or duplicate Pass 1 requirements.\n   - Every derived requirement must include a rigorous 3-step why-chain.\n\n2. Anti-Hallucination Barrier:\n   - Do NOT fabricate full-stack UI pages or arbitrary third-party providers.\n   - If an operational choice or standard is unstated, mark it explicitly as UNKNOWN.\n\n3. Output Schema:\n{\n  \"experiment\": \"EXPERIMENT C \u2014 Pass 2 (Targeted Coverage Audit)\",\n  \"task_id\": \"<TASK_ID>\",\n  \"missing_requirements\": [\n    {\n      \"requirement_id\": \"<REQ_ID>\",\n      \"title\": \"<TITLE>\",\n      \"description\": \"<DESCRIPTION>\",\n      \"type\": \"FUNCTIONAL\" | \"NON_FUNCTIONAL\" | \"SECURITY\" | \"BEHAVIORAL\" | \"INVARIANT\",\n      \"epistemic_status\": \"DERIVED_JUSTIFIED\" | \"SUPPORTED\" | \"UNKNOWN\",\n      \"provenance\": \"<DOMAIN_PROVENANCE>\" | \"UNSUPPORTED\",\n      \"confidence\": <FLOAT_0_TO_1>,\n      \"justification\": \"<WHY_CHAIN_OR_RATIONALE>\"\n    }\n  ]\n}\n",
+    "user_prompt": "Original Prompt: \"Implement password reset session invalidation that blacklists active refresh tokens across all clusters.\"\nDomain: 'auth_identity'\n\nPass 1 Requirements already synthesized:\n- [REQ-EXPLICIT-001] Password Reset Session Invalidation (EXPLICIT): Trigger invalidation of active user sessions upon a successful password reset event.\n- [REQ-EXPLICIT-002] Refresh Token Blacklisting Across Clusters (EXPLICIT): Blacklist active refresh tokens across all deployment clusters upon session invalidation triggered by password reset.\n- [REQ-DERIVED-001] Distributed Token Revocation Propagation (DERIVED_JUSTIFIED): Revocation lists or states must synchronize or be queryable across all independent clusters with bounded propagation latency.\n- [REQ-DERIVED-002] Token Identifier Uniqueness and Extraction (DERIVED_JUSTIFIED): Refresh tokens or their unique cryptographic identifiers (JTI) must be extractable and matched against the revocation blacklist during authentication verification.\n- [REQ-UNKNOWN-001] Token Storage Mechanism and Protocol Standards (UNKNOWN): The specific data store (e.g., Redis cluster, SQL database) and token format standards (e.g., JWT, opaque tokens) are unstated.\n- [REQ-UNKNOWN-002] Cross-Cluster Sync Latency and Consistency Model (UNKNOWN): The exact acceptable replication lag or consistency model (e.g., strong vs. eventual consistency) for multi-cluster sync is unstated.\n\nCoverage Audit Directive:\n- Analyze what critical domain invariants, edge cases, failure modes, data integrity rules, or concurrency controls are MISSING from the above list to fulfill the prompt completely.\n- Synthesize ONLY the missing requirements with 3-step why-chains.\n- Do NOT duplicate any requirement already in Pass 1.\n- Avoid hallucinating unrequested fullstack UI features (User avatar upload UI page, Social login OAuth provider UI, Credit card billing management).\n\nReturn strictly valid JSON as specified in the system instructions.",
+    "input_context": {
+      "pass": 2,
+      "raw_prompt": "Implement password reset session invalidation that blacklists active refresh tokens across all clusters.",
+      "pass1_count": 6
+    }
+  }
+}

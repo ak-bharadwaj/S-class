@@ -1,0 +1,73 @@
+{
+  "experiment": "EXPERIMENT C \u2014 Pass 3 (Boundary & Completeness Verification)",
+  "task_id": "edtech_security_lockdown_sandbox_pass3",
+  "final_boundary_requirements": [
+    {
+      "requirement_id": "REQ-BOUNDARY-01",
+      "title": "Local Storage Engine for State Persistence",
+      "description": "The specific local storage engine, encryption mechanism (e.g., SQLite with AES-256, DPAPI), and key management strategy used to secure persisted exam state and telemetry logs across crashes remain unstated.",
+      "type": "SECURITY",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "Storage implementation details for crash recovery are unstated in the original prompt."
+    },
+    {
+      "requirement_id": "REQ-BOUNDARY-02",
+      "title": "Identity Provider and Authentication Token Format",
+      "description": "The identity provider, authentication protocol, and token format (e.g., OAuth2, JWT, mTLS client certificates) used to authenticate the examinee session and authorize sandbox execution remain unstated.",
+      "type": "SECURITY",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "Authentication and identity assertion mechanisms are missing from the base specification."
+    },
+    {
+      "requirement_id": "REQ-BOUNDARY-03",
+      "title": "Statutory Student Data Privacy and Telemetry Compliance",
+      "description": "The system must comply with applicable statutory data privacy regulations (e.g., FERPA, GDPR, COPPA) regarding the collection, transmission, and retention of student telemetry, hardware fingerprints, and monitoring logs.",
+      "type": "INVARIANT",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "edtech_security",
+      "confidence": 0.95,
+      "justification": "Educational technology software capturing system telemetry and enforcing lockdown must adhere to statutory educational privacy frameworks."
+    },
+    {
+      "requirement_id": "REQ-BOUNDARY-04",
+      "title": "Graceful Shutdown and Session Termination Protocol",
+      "description": "The sandbox must implement a secure, authenticated graceful shutdown workflow that permits exit from the lockdown state only upon verified receipt of exam submission confirmation from the authorized backend.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "edtech_security",
+      "confidence": 0.95,
+      "justification": "Lifecycle boundaries require explicit handling of normal session completion to prevent students from escaping the sandbox prematurely."
+    }
+  ],
+  "provenance_metadata": {
+    "experiment_id": "EXPERIMENT_C_PASS_3_BOUNDARY_VERIFICATION",
+    "task_id": "TASK-05-EXAM-BROWSER-SANDBOX",
+    "runner_version": "2.0.0-gate1.2-provenance",
+    "git_commit": "53aa1bd3c06062b227f1acd75abc3ff4a76aec8d",
+    "timestamp_utc": "2026-08-15T18:37:46.619771+00:00",
+    "latency_ms": 4140.17,
+    "provider": "gemini",
+    "model": "gemini-flash-lite-latest",
+    "generation_settings": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "token_usage": {
+      "prompt_tokens": 971,
+      "completion_tokens": 646,
+      "total_tokens": 1617
+    },
+    "estimated_cost_usd": 0.000267,
+    "system_prompt": "You are the S-Class Grounded Domain Inference Engine (Pass 3 - Boundary & Completeness Verification).\nYour job is to perform a final completeness audit of the merged specification:\n\n1. Final Boundary Verification:\n   - Identify any remaining statutory regulatory invariants (e.g. HIPAA, DO-178C, PCI-DSS boundaries), operational lifecycle boundaries (graceful shutdown, power loss, crash recovery), or unstated operational decisions.\n   - Surface all unstated technology choices (storage engines, identity providers, network transports) explicitly as UNKNOWN.\n   - Do NOT repeat existing requirements from Pass 1 or Pass 2.\n\n2. Output Schema:\n{\n  \"experiment\": \"EXPERIMENT C \u2014 Pass 3 (Boundary & Completeness Verification)\",\n  \"task_id\": \"<TASK_ID>\",\n  \"final_boundary_requirements\": [\n    {\n      \"requirement_id\": \"<REQ_ID>\",\n      \"title\": \"<TITLE>\",\n      \"description\": \"<DESCRIPTION>\",\n      \"type\": \"FUNCTIONAL\" | \"NON_FUNCTIONAL\" | \"SECURITY\" | \"BEHAVIORAL\" | \"INVARIANT\",\n      \"epistemic_status\": \"DERIVED_JUSTIFIED\" | \"SUPPORTED\" | \"UNKNOWN\",\n      \"provenance\": \"<DOMAIN_PROVENANCE>\" | \"UNSUPPORTED\",\n      \"confidence\": <FLOAT_0_TO_1>,\n      \"justification\": \"<WHY_CHAIN_OR_RATIONALE>\"\n    }\n  ]\n}\n",
+    "user_prompt": "Original Prompt: \"Build a desktop examination lockdown sandbox that restricts dual-monitor mirroring and intercepts OS clipboard paste during active exam sessions.\"\nDomain: 'edtech_security'\n\nCurrent Merged Specification (Pass 1 + Pass 2):\n- [REQ-EXPLICIT-01] Dual-Monitor Mirroring Restriction (EXPLICIT): The desktop examination sandbox must restrict and disable dual-monitor setups and screen mirroring during active examination sessions to prevent external viewing or capture.\n- [REQ-EXPLICIT-02] OS Clipboard Paste Interception (EXPLICIT): The desktop application must intercept and block OS-level clipboard paste operations while an examination session is active.\n- [REQ-DERIVED-01] Low-Level Operating System Hook Integration for Clipboard Control (DERIVED_JUSTIFIED): The sandbox must implement low-level OS hooks (e.g., Win32 API hooks on Windows, Accessibility/Quartz services on macOS) to intercept clipboard events system-wide rather than strictly within application focus.\n- [REQ-DERIVED-02] Display Enumeration and Topology Forcing (DERIVED_JUSTIFIED): The sandbox runtime must enumerate connected display devices upon session initialization and force a single-display fallback or terminate execution if multiple active displays are detected.\n- [REQ-UNKNOWN-01] Target Operating System Architecture Support (UNKNOWN): The specific target operating system versions (e.g., Windows 10/11, macOS versions, Linux distributions) and their corresponding sandbox implementation APIs are unstated.\n- [REQ-UNKNOWN-02] Exam Backend Telemetry and Session Sync Protocol (UNKNOWN): The network protocol, authentication mechanism, and backend endpoints used to report lockdown violations, session start/end states, and telemetry are unstated.\n- [REQ-MISSING-01] Crash Recovery and Exam State Persistence (DERIVED_JUSTIFIED): The sandbox must persistently save exam state locally and safely handle unexpected OS crashes, forced reboots, or process termination without allowing bypass of the lockdown state upon restart.\n- [REQ-MISSING-02] Anti-Tamper Process Watchdog and Debugger Detection (DERIVED_JUSTIFIED): The sandbox runtime must include a background watchdog mechanism to detect unauthorized debugging, memory injection, process termination attempts, or virtual machine instrumentation.\n- [REQ-MISSING-03] Hotkey and Global Shortcut Suppression (DERIVED_JUSTIFIED): The sandbox must intercept and suppress global OS shortcuts (e.g., Alt+Tab, Win+Shift+S, PrintScreen, Cmd+Tab, Cmd+Space) that permit window switching, screenshot capture, or Mission Control.\n\nFinal Completeness Audit Directive:\n- Perform a final boundary and epistemic check for statutory safety rules, lifecycle boundaries (graceful shutdown / recovery), and unstated operational parameters.\n- Surface any unstated architecture decisions (storage engines, token formats, identity providers, protocols) explicitly as UNKNOWN.\n- Synthesize ONLY final missing boundary/unknown items. Do NOT duplicate existing items.\n\nReturn strictly valid JSON as specified in the system instructions.",
+    "input_context": {
+      "pass": 3,
+      "raw_prompt": "Build a desktop examination lockdown sandbox that restricts dual-monitor mirroring and intercepts OS clipboard paste during active exam sessions.",
+      "merged_count": 9
+    }
+  }
+}

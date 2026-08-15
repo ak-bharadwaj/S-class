@@ -1,0 +1,63 @@
+{
+  "experiment": "EXPERIMENT C \u2014 Pass 2 (Targeted Coverage Audit)",
+  "task_id": "healthcare_privacy_export_pipeline",
+  "missing_requirements": [
+    {
+      "requirement_id": "REQ-005",
+      "title": "Dates of Service Generalization / Shifting Invariant",
+      "description": "The pipeline must shift or truncate all ages over 89 and dates related to individuals (except year) to comply with HIPAA Safe Harbor date aggregation rules, preventing indirect re-identification through temporal precision.",
+      "type": "INVARIANT",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "HIPAA Privacy Rule 45 CFR \u00a7 164.514(b)(2)(i)(B)",
+      "confidence": 0.99,
+      "justification": "Step 1: HIPAA Safe Harbor requires removing or generalizing explicit dates and ages over 89. Step 2: The Pass 1 requirements only cover the 18 direct identifiers but omit temporal attributes like exact timestamps and ages which act as quasi-identifiers. Step 3: Therefore, a specific transformation guard for dates and ages must be enforced to prevent structural non-compliance."
+    },
+    {
+      "requirement_id": "REQ-006",
+      "title": "Pipeline Failure Recovery and Partial Ingestion Poison Pill Protection",
+      "description": "The pipeline must implement atomic transaction boundaries and dead-letter queue (DLQ) routing for records failing de-identification parsing, ensuring malformed or non-compliant records never leak into the analytics store.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "Data Engineering and HIPAA Minimum Necessary Standard",
+      "confidence": 0.95,
+      "justification": "Step 1: Export pipelines processing sensitive health data encounter malformed records or parsing exceptions. Step 2: Unhandled exceptions during stripping can lead to partial flushes or unredacted payloads bypassing the audit step. Step 3: Hence, a robust failure isolation mechanism (DLQ/atomic rollback) is mandatory to guarantee zero unredacted leaks upon pipeline crashes."
+    },
+    {
+      "requirement_id": "REQ-007",
+      "title": "Downstream Re-identification Risk & Quasi-Identifier Constraint Check",
+      "description": "The pipeline must evaluate residual re-identification risk (e.g., k-anonymity checks) for rare demographic combinations even after the 18 direct identifiers are stripped.",
+      "type": "SECURITY",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "NIST SP 800-188 De-Identification Guidelines",
+      "confidence": 0.9,
+      "justification": "Step 1: Safe Harbor mandates stripping 18 identifiers, but sparse combinations of remaining attributes can still uniquely identify individuals. Step 2: Relying solely on strict Safe Harbor stripping without verifying composite uniqueness leaves residual exposure to linkage attacks. Step 3: Therefore, a secondary safeguard validating quasi-identifier distribution is necessary for rigorous data protection."
+    }
+  ],
+  "provenance_metadata": {
+    "experiment_id": "EXPERIMENT_C_PASS_2_COVERAGE_AUDIT",
+    "task_id": "TASK-03-HEALTHCARE-PHI-MASK",
+    "runner_version": "2.0.0-gate1.2-provenance",
+    "git_commit": "53aa1bd3c06062b227f1acd75abc3ff4a76aec8d",
+    "timestamp_utc": "2026-08-15T18:35:45.323457+00:00",
+    "latency_ms": 4634.33,
+    "provider": "gemini",
+    "model": "gemini-flash-lite-latest",
+    "generation_settings": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "token_usage": {
+      "prompt_tokens": 709,
+      "completion_tokens": 717,
+      "total_tokens": 1426
+    },
+    "estimated_cost_usd": 0.000268,
+    "system_prompt": "You are the S-Class Grounded Domain Inference Engine (Pass 2 - Targeted Coverage Audit).\nYour job is to analyze the requirements generated in Pass 1 and identify CRITICAL MISSING INVARIANTS AND GUARDS:\n\n1. Targeted Gap Analysis:\n   - What non-negotiable domain invariants, concurrency guards, failure recovery boundaries, data integrity rules, or edge-case behaviors are strictly required by the domain but MISSING from Pass 1?\n   - Formulate ONLY the missing requirements. Do NOT repeat or duplicate Pass 1 requirements.\n   - Every derived requirement must include a rigorous 3-step why-chain.\n\n2. Anti-Hallucination Barrier:\n   - Do NOT fabricate full-stack UI pages or arbitrary third-party providers.\n   - If an operational choice or standard is unstated, mark it explicitly as UNKNOWN.\n\n3. Output Schema:\n{\n  \"experiment\": \"EXPERIMENT C \u2014 Pass 2 (Targeted Coverage Audit)\",\n  \"task_id\": \"<TASK_ID>\",\n  \"missing_requirements\": [\n    {\n      \"requirement_id\": \"<REQ_ID>\",\n      \"title\": \"<TITLE>\",\n      \"description\": \"<DESCRIPTION>\",\n      \"type\": \"FUNCTIONAL\" | \"NON_FUNCTIONAL\" | \"SECURITY\" | \"BEHAVIORAL\" | \"INVARIANT\",\n      \"epistemic_status\": \"DERIVED_JUSTIFIED\" | \"SUPPORTED\" | \"UNKNOWN\",\n      \"provenance\": \"<DOMAIN_PROVENANCE>\" | \"UNSUPPORTED\",\n      \"confidence\": <FLOAT_0_TO_1>,\n      \"justification\": \"<WHY_CHAIN_OR_RATIONALE>\"\n    }\n  ]\n}\n",
+    "user_prompt": "Original Prompt: \"Build an export pipeline that strips 18 HIPAA Safe Harbor direct identifiers before analytics ingestion.\"\nDomain: 'healthcare_privacy'\n\nPass 1 Requirements already synthesized:\n- [REQ-001] Strip 18 HIPAA Safe Harbor Direct Identifiers (EXPLICIT): The export pipeline must identify and remove or redact all 18 categories of direct identifiers specified under the HIPAA Safe Harbor method prior to analytics ingestion.\n- [REQ-002] De-identification Validation and Audit Logging (DERIVED_JUSTIFIED): The pipeline must generate an immutable audit log recording the timestamp, record count processed, and verification status confirming the complete removal of the 18 Safe Harbor identifiers before downstream transmission.\n- [REQ-003] Analytics Ingestion Format Standard (UNKNOWN): The precise serialization format, schema definitions, and ingestion protocol for the downstream analytics platform remain unstated.\n- [REQ-004] Source Data Store and Access Mechanism (UNKNOWN): The source database technology, connection protocol, and extraction schedule for raw health data remain unstated.\n\nCoverage Audit Directive:\n- Analyze what critical domain invariants, edge cases, failure modes, data integrity rules, or concurrency controls are MISSING from the above list to fulfill the prompt completely.\n- Synthesize ONLY the missing requirements with 3-step why-chains.\n- Do NOT duplicate any requirement already in Pass 1.\n- Avoid hallucinating unrequested fullstack UI features (Patient medical record portal UI, Doctor appointment booking UI, Clinical notes rich text editor).\n\nReturn strictly valid JSON as specified in the system instructions.",
+    "input_context": {
+      "pass": 2,
+      "raw_prompt": "Build an export pipeline that strips 18 HIPAA Safe Harbor direct identifiers before analytics ingestion.",
+      "pass1_count": 4
+    }
+  }
+}

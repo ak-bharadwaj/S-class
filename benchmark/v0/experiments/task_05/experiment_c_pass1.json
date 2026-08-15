@@ -1,0 +1,93 @@
+{
+  "experiment": "EXPERIMENT C \u2014 Pass 1 (Grounded Core Extraction)",
+  "task_id": "EDTECH_SEC_EXAM_SANDBOX_01",
+  "inferred_requirements": [
+    {
+      "requirement_id": "REQ-EXPLICIT-01",
+      "title": "Dual-Monitor Mirroring Restriction",
+      "description": "The desktop examination sandbox must restrict and disable dual-monitor setups and screen mirroring during active examination sessions to prevent external viewing or capture.",
+      "type": "SECURITY",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Directly stated in the user prompt requiring the restriction of dual-monitor mirroring."
+    },
+    {
+      "requirement_id": "REQ-EXPLICIT-02",
+      "title": "OS Clipboard Paste Interception",
+      "description": "The desktop application must intercept and block OS-level clipboard paste operations while an examination session is active.",
+      "type": "SECURITY",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Directly stated in the user prompt requiring the interception of OS clipboard paste."
+    },
+    {
+      "requirement_id": "REQ-DERIVED-01",
+      "title": "Low-Level Operating System Hook Integration for Clipboard Control",
+      "description": "The sandbox must implement low-level OS hooks (e.g., Win32 API hooks on Windows, Accessibility/Quartz services on macOS) to intercept clipboard events system-wide rather than strictly within application focus.",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "edtech_security",
+      "confidence": 0.95,
+      "justification": "Why 1: Relying solely on application-level focus events leaves external hotkeys and background processes capable of injecting clipboard data. Why 2: Low-level operating system hooks must be registered to capture global keystrokes and clipboard access requests before they reach the OS buffer. Why 3: Mandatory invariant: Clipboard isolation must be absolute across the entire desktop environment during an active session to prevent data exfiltration or ingestion."
+    },
+    {
+      "requirement_id": "REQ-DERIVED-02",
+      "title": "Display Enumeration and Topology Forcing",
+      "description": "The sandbox runtime must enumerate connected display devices upon session initialization and force a single-display fallback or terminate execution if multiple active displays are detected.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "edtech_security",
+      "confidence": 0.95,
+      "justification": "Why 1: Simply hiding an application window from a secondary display does not prevent OS-level screen mirroring or extension. Why 2: The platform display APIs must be queried at runtime to detect physical or virtual display topology changes. Why 3: Mandatory invariant: Active examinations must execute exclusively within a single, verified display constraint to comply with anti-mirroring policies."
+    },
+    {
+      "requirement_id": "REQ-UNKNOWN-01",
+      "title": "Target Operating System Architecture Support",
+      "description": "The specific target operating system versions (e.g., Windows 10/11, macOS versions, Linux distributions) and their corresponding sandbox implementation APIs are unstated.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "No specific OS versions or deployment platforms were mentioned in the prompt."
+    },
+    {
+      "requirement_id": "REQ-UNKNOWN-02",
+      "title": "Exam Backend Telemetry and Session Sync Protocol",
+      "description": "The network protocol, authentication mechanism, and backend endpoints used to report lockdown violations, session start/end states, and telemetry are unstated.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "The prompt specifies the local sandbox behavior but does not define any remote server integration, API schemas, or backend communication protocols."
+    }
+  ],
+  "provenance_metadata": {
+    "experiment_id": "EXPERIMENT_C_PASS_1_CORE_EXTRACTION",
+    "task_id": "TASK-05-EXAM-BROWSER-SANDBOX",
+    "runner_version": "2.0.0-gate1.2-provenance",
+    "git_commit": "53aa1bd3c06062b227f1acd75abc3ff4a76aec8d",
+    "timestamp_utc": "2026-08-15T18:37:12.920495+00:00",
+    "latency_ms": 5169.71,
+    "provider": "gemini",
+    "model": "gemini-flash-lite-latest",
+    "generation_settings": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "token_usage": {
+      "prompt_tokens": 589,
+      "completion_tokens": 1030,
+      "total_tokens": 1619
+    },
+    "estimated_cost_usd": 0.000353,
+    "system_prompt": "You are the S-Class Grounded Domain Inference Engine (Pass 1 - Core Extraction).\nYour job is to synthesize software engineering requirements from the user prompt with STRICT EPISTEMIC SELF-RESTRAINT:\n\n1. Requirement Categorization:\n   - EXPLICIT: Requirements directly and unambiguously stated in the prompt.\n   - DERIVED_JUSTIFIED: Requirements strictly mathematically, architecturally, or operationally necessary to implement the stated goal without defect. Every DERIVED_JUSTIFIED requirement MUST include a rigorous 3-step why-chain (Why 1: Context/Risk -> Why 2: Technical Mechanism -> Why 3: Mandatory Invariant).\n   - SUPPORTED: Non-functional or platform constraints directly supporting the scope.\n   - UNKNOWN: Any operational parameter, storage choice, or protocol unstated in the prompt.\n\n2. Anti-Hallucination Barrier:\n   - DO NOT fabricate full-stack UI pages (e.g. login screens, dashboards, admin portals) unless explicitly requested.\n   - DO NOT fabricate arbitrary third-party providers (e.g. Stripe, Auth0, AWS) unless explicitly requested.\n\n3. Output Schema:\n{\n  \"experiment\": \"EXPERIMENT C \u2014 Pass 1 (Grounded Core Extraction)\",\n  \"task_id\": \"<TASK_ID>\",\n  \"inferred_requirements\": [\n    {\n      \"requirement_id\": \"<REQ_ID>\",\n      \"title\": \"<TITLE>\",\n      \"description\": \"<DESCRIPTION>\",\n      \"type\": \"FUNCTIONAL\" | \"NON_FUNCTIONAL\" | \"SECURITY\" | \"BEHAVIORAL\" | \"INVARIANT\",\n      \"epistemic_status\": \"EXPLICIT\" | \"DERIVED_JUSTIFIED\" | \"SUPPORTED\" | \"UNKNOWN\",\n      \"provenance\": \"USER_PROMPT\" | \"<DOMAIN_PROVENANCE>\" | \"UNSUPPORTED\",\n      \"confidence\": <FLOAT_0_TO_1>,\n      \"justification\": \"<WHY_CHAIN_OR_RATIONALE>\"\n    }\n  ]\n}\n",
+    "user_prompt": "Synthesize formal software engineering requirements for the following prompt in the domain of 'edtech_security':\nPrompt: \"Build a desktop examination lockdown sandbox that restricts dual-monitor mirroring and intercepts OS clipboard paste during active exam sessions.\"\n\nDomain Guidance:\n- Enforce core invariants and essential derived domain rules.\n- Do not generate unrequested UI pages or hallucinate arbitrary features (specifically avoid: Student grading and gradebook UI, AI webcam face-tracking proctoring portal, Teacher classroom chat forum, Automated essay scoring engine).\n- If key operational choices, providers, or format standards are unstated, mark them explicitly as UNKNOWN.\n\nReturn strictly valid JSON as specified in the system instructions.",
+    "input_context": {
+      "pass": 1,
+      "raw_prompt": "Build a desktop examination lockdown sandbox that restricts dual-monitor mirroring and intercepts OS clipboard paste during active exam sessions.",
+      "domain": "edtech_security"
+    }
+  }
+}

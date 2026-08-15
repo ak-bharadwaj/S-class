@@ -1,0 +1,73 @@
+{
+  "experiment": "EXPERIMENT C \u2014 Pass 3 (Boundary & Completeness Verification)",
+  "task_id": "healthcare_privacy_export_pipeline_pass3",
+  "final_boundary_requirements": [
+    {
+      "requirement_id": "REQ-008",
+      "title": "Graceful Shutdown and Power Loss State Recovery",
+      "description": "The export pipeline must handle sudden termination signals (SIGTERM, SIGINT) and power loss events by flushing in-flight buffers, rolling back uncommitted source extraction transactions, and persisting execution cursors to ensure at-least-once or exactly-once processing without duplicate ingestion or data corruption.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "operational_lifecycle",
+      "confidence": 0.95,
+      "justification": "Ensures system resilience and prevents partial data writes or state loss during abrupt infrastructure scaling or maintenance cycles."
+    },
+    {
+      "requirement_id": "REQ-009",
+      "title": "Statutory Cryptographic In Transit and At Rest Boundary",
+      "description": "All data in transit across pipeline components and at rest in staging or dead-letter queues must be encrypted using FIPS 140-2/3 validated cryptographic modules to maintain HIPAA Security Rule compliance.",
+      "type": "SECURITY",
+      "epistemic_status": "INVARIANT",
+      "provenance": "HIPAA Security Rule 45 CFR \u00a7 164.312",
+      "confidence": 0.99,
+      "justification": "Statutory mandate requiring technical safeguards for protected health information (PHI) regardless of pipeline deployment architecture."
+    },
+    {
+      "requirement_id": "REQ-010",
+      "title": "Unstated Cryptographic Tokenization Provider",
+      "description": "The specific identity provider, hashing salt rotation mechanism, or cryptographic tokenization engine used for pseudonymization or pseudonym mapping storage remains unstated.",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "The prompt does not specify how persistent pseudonyms or reversible/irreversible token maps are managed across pipeline runs."
+    },
+    {
+      "requirement_id": "REQ-011",
+      "title": "Unstated Network Transport and Messaging Protocol",
+      "description": "The underlying message broker, streaming framework (e.g., Apache Kafka, AWS Kinesis), or RPC protocol used between pipeline stages remains unstated.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "No explicit architecture or transport protocol was mandated in the original prompt."
+    }
+  ],
+  "provenance_metadata": {
+    "experiment_id": "EXPERIMENT_C_PASS_3_BOUNDARY_VERIFICATION",
+    "task_id": "TASK-03-HEALTHCARE-PHI-MASK",
+    "runner_version": "2.0.0-gate1.2-provenance",
+    "git_commit": "53aa1bd3c06062b227f1acd75abc3ff4a76aec8d",
+    "timestamp_utc": "2026-08-15T18:36:01.960732+00:00",
+    "latency_ms": 3414.62,
+    "provider": "gemini",
+    "model": "gemini-flash-lite-latest",
+    "generation_settings": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "token_usage": {
+      "prompt_tokens": 848,
+      "completion_tokens": 669,
+      "total_tokens": 1517
+    },
+    "estimated_cost_usd": 0.000264,
+    "system_prompt": "You are the S-Class Grounded Domain Inference Engine (Pass 3 - Boundary & Completeness Verification).\nYour job is to perform a final completeness audit of the merged specification:\n\n1. Final Boundary Verification:\n   - Identify any remaining statutory regulatory invariants (e.g. HIPAA, DO-178C, PCI-DSS boundaries), operational lifecycle boundaries (graceful shutdown, power loss, crash recovery), or unstated operational decisions.\n   - Surface all unstated technology choices (storage engines, identity providers, network transports) explicitly as UNKNOWN.\n   - Do NOT repeat existing requirements from Pass 1 or Pass 2.\n\n2. Output Schema:\n{\n  \"experiment\": \"EXPERIMENT C \u2014 Pass 3 (Boundary & Completeness Verification)\",\n  \"task_id\": \"<TASK_ID>\",\n  \"final_boundary_requirements\": [\n    {\n      \"requirement_id\": \"<REQ_ID>\",\n      \"title\": \"<TITLE>\",\n      \"description\": \"<DESCRIPTION>\",\n      \"type\": \"FUNCTIONAL\" | \"NON_FUNCTIONAL\" | \"SECURITY\" | \"BEHAVIORAL\" | \"INVARIANT\",\n      \"epistemic_status\": \"DERIVED_JUSTIFIED\" | \"SUPPORTED\" | \"UNKNOWN\",\n      \"provenance\": \"<DOMAIN_PROVENANCE>\" | \"UNSUPPORTED\",\n      \"confidence\": <FLOAT_0_TO_1>,\n      \"justification\": \"<WHY_CHAIN_OR_RATIONALE>\"\n    }\n  ]\n}\n",
+    "user_prompt": "Original Prompt: \"Build an export pipeline that strips 18 HIPAA Safe Harbor direct identifiers before analytics ingestion.\"\nDomain: 'healthcare_privacy'\n\nCurrent Merged Specification (Pass 1 + Pass 2):\n- [REQ-001] Strip 18 HIPAA Safe Harbor Direct Identifiers (EXPLICIT): The export pipeline must identify and remove or redact all 18 categories of direct identifiers specified under the HIPAA Safe Harbor method prior to analytics ingestion.\n- [REQ-002] De-identification Validation and Audit Logging (DERIVED_JUSTIFIED): The pipeline must generate an immutable audit log recording the timestamp, record count processed, and verification status confirming the complete removal of the 18 Safe Harbor identifiers before downstream transmission.\n- [REQ-003] Analytics Ingestion Format Standard (UNKNOWN): The precise serialization format, schema definitions, and ingestion protocol for the downstream analytics platform remain unstated.\n- [REQ-004] Source Data Store and Access Mechanism (UNKNOWN): The source database technology, connection protocol, and extraction schedule for raw health data remain unstated.\n- [REQ-005] Dates of Service Generalization / Shifting Invariant (DERIVED_JUSTIFIED): The pipeline must shift or truncate all ages over 89 and dates related to individuals (except year) to comply with HIPAA Safe Harbor date aggregation rules, preventing indirect re-identification through temporal precision.\n- [REQ-006] Pipeline Failure Recovery and Partial Ingestion Poison Pill Protection (DERIVED_JUSTIFIED): The pipeline must implement atomic transaction boundaries and dead-letter queue (DLQ) routing for records failing de-identification parsing, ensuring malformed or non-compliant records never leak into the analytics store.\n- [REQ-007] Downstream Re-identification Risk & Quasi-Identifier Constraint Check (DERIVED_JUSTIFIED): The pipeline must evaluate residual re-identification risk (e.g., k-anonymity checks) for rare demographic combinations even after the 18 direct identifiers are stripped.\n\nFinal Completeness Audit Directive:\n- Perform a final boundary and epistemic check for statutory safety rules, lifecycle boundaries (graceful shutdown / recovery), and unstated operational parameters.\n- Surface any unstated architecture decisions (storage engines, token formats, identity providers, protocols) explicitly as UNKNOWN.\n- Synthesize ONLY final missing boundary/unknown items. Do NOT duplicate existing items.\n\nReturn strictly valid JSON as specified in the system instructions.",
+    "input_context": {
+      "pass": 3,
+      "raw_prompt": "Build an export pipeline that strips 18 HIPAA Safe Harbor direct identifiers before analytics ingestion.",
+      "merged_count": 7
+    }
+  }
+}

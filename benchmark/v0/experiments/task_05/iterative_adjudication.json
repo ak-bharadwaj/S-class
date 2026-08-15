@@ -1,0 +1,118 @@
+{
+  "task_id": "TASK-05-EXAM-BROWSER-SANDBOX",
+  "provenance": {
+    "adjudicator_id": "ADJ_ENG_CORE_01",
+    "adjudication_version": "3.0.0-gate1.3-iterative",
+    "adjudication_timestamp": "2026-08-16T00:10:00Z",
+    "generator_id": "gemini-flash-lite-latest (3-pass iterative runner)",
+    "adjudicator_is_generator": false,
+    "generator_had_access_to_adjudication": false,
+    "adjudicator_blinded_to_model_name": true
+  },
+  "candidate_adjudications": [
+    {
+      "candidate_id": "REQ-EXPLICIT-01",
+      "title": "Dual-Monitor Mirroring Restriction",
+      "introduced_in_pass": 1,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-EXP-01",
+      "rationale": "Directly matches ground truth mandate to restrict dual-monitor mirroring and external displays."
+    },
+    {
+      "candidate_id": "REQ-EXPLICIT-02",
+      "title": "OS Clipboard Paste Interception",
+      "introduced_in_pass": 1,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-EXP-02",
+      "rationale": "Directly matches ground truth mandate to intercept OS clipboard paste operations."
+    },
+    {
+      "candidate_id": "REQ-DERIVED-01",
+      "title": "Low-Level Operating System Hook Integration for Clipboard Control",
+      "introduced_in_pass": 1,
+      "label": "VALID_DERIVATION",
+      "ground_truth_id": null,
+      "rationale": "Valid domain derivation implementing native OS message hook listener for clipboard paste suppression."
+    },
+    {
+      "candidate_id": "REQ-DERIVED-02",
+      "title": "Display Enumeration and Topology Forcing",
+      "introduced_in_pass": 1,
+      "label": "VALID_DERIVATION",
+      "ground_truth_id": null,
+      "rationale": "Valid domain derivation enforcing single-display topology enumeration."
+    },
+    {
+      "candidate_id": "REQ-UNKNOWN-01",
+      "title": "Target Operating System Architecture Support",
+      "introduced_in_pass": 1,
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "rationale": "Correctly flags unstated target operating systems (Windows/macOS/Linux) as UNKNOWN."
+    },
+    {
+      "candidate_id": "REQ-UNKNOWN-02",
+      "title": "Exam Backend Telemetry and Session Sync Protocol",
+      "introduced_in_pass": 1,
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "rationale": "Correctly flags unstated assessment server payload structure and endpoints as UNKNOWN."
+    },
+    {
+      "candidate_id": "REQ-MISSING-01",
+      "title": "Crash Recovery and Exam State Persistence",
+      "introduced_in_pass": 2,
+      "label": "VALID_DERIVATION",
+      "ground_truth_id": null,
+      "rationale": "Valid assessment security derivation preserving active student response state across sudden OS crashes."
+    },
+    {
+      "candidate_id": "REQ-MISSING-02",
+      "title": "Anti-Tamper Process Watchdog and Debugger Detection",
+      "introduced_in_pass": 2,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-DER-02",
+      "rationale": "Matches ground truth requirement to detect and terminate prohibited background processes, screen recorders, and virtual machines."
+    },
+    {
+      "candidate_id": "REQ-MISSING-03",
+      "title": "Hotkey and Global Shortcut Suppression",
+      "introduced_in_pass": 2,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-DER-01",
+      "rationale": "Matches ground truth requirement to intercept and disable OS-level context switching shortcuts (Alt+Tab, Windows key)."
+    },
+    {
+      "candidate_id": "REQ-BOUNDARY-01",
+      "title": "Local Storage Engine for State Persistence",
+      "introduced_in_pass": 3,
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "rationale": "Correctly flags unstated local storage format (SQLite/encrypted file) as UNKNOWN."
+    },
+    {
+      "candidate_id": "REQ-BOUNDARY-02",
+      "title": "Identity Provider and Authentication Token Format",
+      "introduced_in_pass": 3,
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "rationale": "Correctly flags unstated identity provider and proctor authorization token scheme as UNKNOWN."
+    },
+    {
+      "candidate_id": "REQ-BOUNDARY-03",
+      "title": "Statutory Student Data Privacy and Telemetry Compliance",
+      "introduced_in_pass": 3,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-DER-03",
+      "rationale": "Matches ground truth requirement for security audit telemetry and compliance reporting."
+    },
+    {
+      "candidate_id": "REQ-BOUNDARY-04",
+      "title": "Graceful Shutdown and Session Termination Protocol",
+      "introduced_in_pass": 3,
+      "label": "EXACT_MATCH_TO_GT",
+      "ground_truth_id": "REQ-SUP-01",
+      "rationale": "Matches ground truth requirement for graceful OS state teardown and sandbox cleanup upon exam completion."
+    }
+  ]
+}
