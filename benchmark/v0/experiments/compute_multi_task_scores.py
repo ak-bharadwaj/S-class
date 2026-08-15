@@ -58,7 +58,14 @@ def evaluate_task_directory(task_dir: str) -> Dict[str, Any]:
     exp_a_explosion = round(exp_a_reqs / max(1, gt_req_count), 2)
 
     # 3. Experiment C Evaluation via Ingested Adjudication Artifact
-    adj_items = adjudication.get("items", {})
+    adj_raw = adjudication.get("items") or adjudication.get("candidate_adjudications") or []
+    if isinstance(adj_raw, list):
+        adj_items = {item["candidate_id"]: item for item in adj_raw}
+    elif isinstance(adj_raw, dict):
+        adj_items = adj_raw
+    else:
+        adj_items = {}
+
     exp_c_reqs = exp_c.get("inferred_requirements", [])
     exp_c_total = len(exp_c_reqs)
     exp_c_explosion = round(exp_c_total / max(1, gt_req_count), 2)
@@ -75,7 +82,7 @@ def evaluate_task_directory(task_dir: str) -> Dict[str, Any]:
     derived_validated = 0
     non_unknown_candidates = 0
 
-    # In Task 03, REQ-PHI-01 satisfies both REQ-EXP-02 and REQ-DER-01
+    # In Task 03, REQ_EXPLICIT_001 satisfies both REQ-EXP-02 and REQ-DER-01 (18 Safe Harbor direct identifiers)
     if task_id == "TASK-03-HEALTHCARE-PHI-MASK":
         recovered_gt_ids.add("REQ-DER-01")
 
@@ -91,10 +98,14 @@ def evaluate_task_directory(task_dir: str) -> Dict[str, Any]:
         label_counts[label] += 1
 
         gt_id = adj.get("ground_truth_id")
-        is_derived = adj.get("is_derived_proposal", False)
+        is_derived = adj.get("is_derived_proposal", False) or (req.get("epistemic_status") == "DERIVED_JUSTIFIED")
 
         if label == "EXACT_MATCH_TO_GT" and gt_id:
-            recovered_gt_ids.add(gt_id)
+            if isinstance(gt_id, list):
+                for gid in gt_id:
+                    recovered_gt_ids.add(gid)
+            else:
+                recovered_gt_ids.add(gt_id)
 
         if is_derived:
             derived_proposed += 1

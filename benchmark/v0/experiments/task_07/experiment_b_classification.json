@@ -1,30 +1,61 @@
 {
-  "experiment": "EXPERIMENT B — Controlled Semantic Unit Classification (Task 07)",
-  "task_id": "TASK-07-AUTH-TOKEN-REVOCATION-AMBIGUOUS",
+  "experiment": "EXPERIMENT B \u2014 Controlled Semantic Unit Classification",
+  "task_id": "TASK-AUTH-001",
   "classifications": [
     {
       "unit": "authentication platform",
       "class": "ENTITY",
       "confidence": 0.95,
-      "rationale": "'Authentication platform' designates the top-level domain bounded context and aggregate system container responsible for managing identity records, session states, and authentication lifecycle operations."
+      "rationale": "Represents the top-level architectural system aggregate and domain boundary responsible for identity verification and credential management."
     },
     {
       "unit": "token revocation",
       "class": "BEHAVIOR",
       "confidence": 0.98,
-      "rationale": "'Token revocation' specifies an active runtime workflow and state transition mechanism whereby an issued token's state changes from valid/active to invalidated/revoked."
+      "rationale": "Describes a dynamic system operation and state transition that invalidates an active security token prior to its natural expiration."
     },
     {
       "unit": "build",
       "class": "NOISE",
       "confidence": 0.99,
-      "rationale": "'Build' is an imperative prompt directive/instructional verb without domain-specific data modeling, business constraint, or architectural state semantics."
+      "rationale": "Generic imperative framing verb specifying implementation intent, carrying no domain or architectural requirement semantics."
     },
     {
       "unit": "token",
       "class": "ENTITY",
-      "confidence": 0.97,
-      "rationale": "'Token' constitutes a core domain entity / security credential data artifact that encapsulates cryptographic claims, subject identifiers, expiry metadata, and validity state."
+      "confidence": 0.96,
+      "rationale": "Core domain data artifact and authentication credential object subjected to lifecycle state transitions and validation."
     }
-  ]
+  ],
+  "provenance_metadata": {
+    "experiment_id": "EXPERIMENT_B_SEMANTIC_CLASSIFICATION",
+    "task_id": "TASK-07-AUTH-TOKEN-REVOCATION-AMBIGUOUS",
+    "runner_version": "2.0.0-gate1.2-provenance",
+    "git_commit": "700d94f059b0e35071b0d29f0c834e72ad43a636",
+    "timestamp_utc": "2026-08-15T18:19:26.793126+00:00",
+    "latency_ms": 5507.74,
+    "provider": "gemini",
+    "model": "gemini-flash-latest",
+    "generation_settings": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "token_usage": {
+      "prompt_tokens": 404,
+      "completion_tokens": 282,
+      "total_tokens": 686
+    },
+    "estimated_cost_usd": 0.000115,
+    "system_prompt": "You are the S-Class Semantic Unit Classifier.\nYour job is to analyze engineering requirements phrases and classify each extracted semantic unit into exactly one category:\n- ENTITY: Core domain data model, system aggregate, or persistence entity.\n- INVARIANT: Mathematical constraint, immutable safety rule, statutory regulatory requirement, or non-negotiable invariant.\n- BEHAVIOR: Dynamic action, system workflow, API operation, state transition, or event trigger.\n- CONSTRAINT: Timing/latency boundary, environmental fault trigger, hardware budget, or operational lifecycle constraint.\n- ATTRIBUTE: Specific data field, configuration property, or numeric measurement.\n- NOISE: Conversational filler, instructional directive, or generic procedural framing verb (e.g. \"build\", \"implement\").\n\nFor each candidate unit:\n1. Provide the exact category.\n2. Assign a confidence score between 0.0 and 1.0.\n3. Provide a step-by-step technical rationale explaining the classification.\n\nOutput strictly valid JSON adhering to this schema:\n{\n  \"experiment\": \"EXPERIMENT B \u2014 Controlled Semantic Unit Classification\",\n  \"task_id\": \"<TASK_ID>\",\n  \"classifications\": [\n    {\n      \"unit\": \"<SEMANTIC_UNIT_STRING>\",\n      \"class\": \"ENTITY\" | \"INVARIANT\" | \"BEHAVIOR\" | \"CONSTRAINT\" | \"ATTRIBUTE\" | \"NOISE\",\n      \"confidence\": <FLOAT_0_TO_1>,\n      \"rationale\": \"<TECHNICAL_RATIONALE>\"\n    }\n  ]\n}\n",
+    "user_prompt": "Analyze the following engineering prompt:\nPrompt: \"Build an authentication platform with token revocation.\"\n\nClassify the following semantic units extracted from the prompt:\n1. \"authentication platform\"\n2. \"token revocation\"\n3. \"build\"\n4. \"token\"\n\nReturn strictly valid JSON as specified in the system instructions.",
+    "input_context": {
+      "raw_prompt": "Build an authentication platform with token revocation.",
+      "units_to_classify": [
+        "authentication platform",
+        "token revocation",
+        "build",
+        "token"
+      ]
+    }
+  }
 }

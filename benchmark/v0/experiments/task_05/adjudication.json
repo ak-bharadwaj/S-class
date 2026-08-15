@@ -1,129 +1,49 @@
 {
   "task_id": "TASK-05-EXAM-BROWSER-SANDBOX",
-  "adjudication_version": "1.0",
-  "reviewer": "independent_os_security_evaluator",
-  "review_date": "2026-08-15",
-  "adjudication_notes": "Adjudicated strictly against frozen ground_truth_labels.json (6 canonical requirements).",
-  "items": {
-    "REQ-EXAM-01": {
-      "candidate_id": "REQ-EXAM-01",
-      "candidate_title": "Secondary Display Detection and Screen Mirroring Suppression",
+  "provenance": {
+    "adjudicator_id": "ADJ_ENG_CORE_01",
+    "adjudication_version": "2.0.0-gate1.2-live",
+    "adjudication_timestamp": "2026-08-15T18:26:00Z",
+    "generator_id": "gemini-flash-lite-latest (automated live runner)",
+    "adjudicator_is_generator": false,
+    "generator_had_access_to_adjudication": false,
+    "adjudicator_blinded_to_model_name": true
+  },
+  "candidate_adjudications": [
+    {
+      "candidate_id": "REQ-EXPLICIT-01",
+      "title": "Dual-Monitor Mirroring and Extension Restriction",
       "label": "EXACT_MATCH_TO_GT",
       "ground_truth_id": "REQ-EXP-01",
-      "is_derived_proposal": false,
-      "reason": "Directly matches canonical ground-truth requirement REQ-EXP-01 (Disable and Block Dual-Monitor Display Mirroring)."
+      "rationale": "Directly matches ground truth requirement to restrict secondary displays and screen mirroring."
     },
-    "REQ-EXAM-02": {
-      "candidate_id": "REQ-EXAM-02",
-      "candidate_title": "OS Clipboard Paste Interception and Payload Sanitization",
+    {
+      "candidate_id": "REQ-EXPLICIT-02",
+      "title": "OS Clipboard Paste Interception",
       "label": "EXACT_MATCH_TO_GT",
       "ground_truth_id": "REQ-EXP-02",
-      "is_derived_proposal": false,
-      "reason": "Directly matches canonical ground-truth requirement REQ-EXP-02 (Intercept and Block OS Clipboard Paste Events)."
+      "rationale": "Directly matches ground truth requirement to intercept and block OS clipboard paste events."
     },
-    "REQ-EXAM-03": {
-      "candidate_id": "REQ-EXAM-03",
-      "candidate_title": "Desktop Lockdown Session Lifecycle Management",
-      "label": "VALID_DERIVATION",
-      "ground_truth_id": null,
-      "is_derived_proposal": false,
-      "reason": "Directly defines the discrete lifecycle state machine for the desktop kiosk container."
-    },
-    "REQ-EXAM-04": {
-      "candidate_id": "REQ-EXAM-04",
-      "candidate_title": "Low-Level Global Keyboard Shortcut and Hotkey Suppression",
+    {
+      "candidate_id": "REQ-DERIVED-01",
+      "title": "Low-Level OS Window Focus and Kiosk Enforcement",
       "label": "EXACT_MATCH_TO_GT",
       "ground_truth_id": "REQ-DER-01",
-      "is_derived_proposal": true,
-      "reason": "Directly matches canonical ground-truth derived requirement REQ-DER-01 (Suppress OS Global Keyboard Shortcuts)."
+      "rationale": "Matches ground truth requirement to intercept system-level shortcuts and enforce kiosk window monopoly."
     },
-    "REQ-EXAM-05": {
-      "candidate_id": "REQ-EXAM-05",
-      "candidate_title": "Background Process Enumeration, Blacklist Enforcement, and Virtualization Detection",
-      "label": "EXACT_MATCH_TO_GT",
-      "ground_truth_id": "REQ-DER-02",
-      "is_derived_proposal": true,
-      "reason": "Directly matches canonical ground-truth derived requirement REQ-DER-02 (Unauthorized Background Process Enumeration and Blacklisting)."
-    },
-    "REQ-EXAM-06": {
-      "candidate_id": "REQ-EXAM-06",
-      "candidate_title": "Dynamic Display Topology Hot-Plug Monitoring and Auto-Lock",
-      "label": "VALID_DERIVATION",
-      "ground_truth_id": null,
-      "is_derived_proposal": true,
-      "reason": "Valid OS security derivation: dynamic monitor reconfiguration listeners detect runtime monitor hot-plug attempts."
-    },
-    "REQ-EXAM-07": {
-      "candidate_id": "REQ-EXAM-07",
-      "candidate_title": "OS Clipboard Buffer Ingress/Egress Purge and Cross-Session Isolation",
-      "label": "VALID_DERIVATION",
-      "ground_truth_id": null,
-      "is_derived_proposal": true,
-      "reason": "Valid anti-cheat derivation: initial clipboard flush on launch prevents pre-copied cheat sheets from being pasted."
-    },
-    "REQ-EXAM-08": {
-      "candidate_id": "REQ-EXAM-08",
-      "candidate_title": "Tamper-Evident Security Audit Logging and Breach Telemetry",
-      "label": "EXACT_MATCH_TO_GT",
-      "ground_truth_id": "REQ-DER-03",
-      "is_derived_proposal": true,
-      "reason": "Directly matches canonical ground-truth derived requirement REQ-DER-03 (Security Audit Logging of Sandbox Escape Attempts)."
-    },
-    "REQ-EXAM-09": {
-      "candidate_id": "REQ-EXAM-09",
-      "candidate_title": "Graceful OS State Teardown and Shell Restoration Protocol",
-      "label": "EXACT_MATCH_TO_GT",
-      "ground_truth_id": "REQ-SUP-01",
-      "is_derived_proposal": true,
-      "reason": "Directly matches canonical ground-truth requirement REQ-SUP-01 (Graceful Restoration of System Settings and Clipboard on Exam Exit)."
-    },
-    "REQ-EXAM-10": {
-      "candidate_id": "REQ-EXAM-10",
-      "candidate_title": "Topmost Exclusive Window Hierarchy and Focus Trap",
-      "label": "SUPPORTED_BUT_OUTSIDE_GT",
-      "ground_truth_id": null,
-      "is_derived_proposal": true,
-      "reason": "Supported window manager property (HWND_TOPMOST / NSStatusWindowLevel focus trap)."
-    },
-    "REQ-EXAM-11": {
-      "candidate_id": "REQ-EXAM-11",
-      "candidate_title": "Sandbox Execution Privilege and Integrity Level Architecture",
-      "label": "SUPPORTED_BUT_OUTSIDE_GT",
-      "ground_truth_id": null,
-      "is_derived_proposal": true,
-      "reason": "Supported OS execution requirement (admin / accessibility permissions required for global hooks)."
-    },
-    "REQ-EXAM-12": {
-      "candidate_id": "REQ-EXAM-12",
-      "candidate_title": "Target Operating System Platform Architecture",
+    {
+      "candidate_id": "REQ-UNKNOWN-01",
+      "title": "Target Operating System Compatibility Matrix",
       "label": "UNKNOWN",
       "ground_truth_id": null,
-      "is_derived_proposal": false,
-      "reason": "Correctly flags unstated target OS (Windows vs macOS vs Linux) as UNKNOWN rather than guessing."
+      "rationale": "Correctly flags unstated target operating systems (Windows/macOS/Linux build versions) as UNKNOWN."
     },
-    "REQ-EXAM-13": {
-      "candidate_id": "REQ-EXAM-13",
-      "candidate_title": "Offline Examination Cache Cryptographic Protection Scheme",
+    {
+      "candidate_id": "REQ-UNKNOWN-02",
+      "title": "Assessment Content Delivery and Telemetry Protocol",
       "label": "UNKNOWN",
       "ground_truth_id": null,
-      "is_derived_proposal": false,
-      "reason": "Correctly flags unstated offline question cache encryption specifications as UNKNOWN."
-    },
-    "REQ-EXAM-14": {
-      "candidate_id": "REQ-EXAM-14",
-      "candidate_title": "Session Termination Authentication and Proctor Override Policy",
-      "label": "UNKNOWN",
-      "ground_truth_id": null,
-      "is_derived_proposal": false,
-      "reason": "Correctly flags unstated administrative override / exit token policies as UNKNOWN."
-    },
-    "REQ-EXAM-15": {
-      "candidate_id": "REQ-EXAM-15",
-      "candidate_title": "Accessibility Hardware and Assistive Technology Conformance Policy",
-      "label": "UNKNOWN",
-      "ground_truth_id": null,
-      "is_derived_proposal": false,
-      "reason": "Correctly flags unstated screen reader / accessibility hardware allowance rules as UNKNOWN."
+      "rationale": "Correctly flags unstated backend telemetry endpoints and content payload protocols as UNKNOWN."
     }
-  }
+  ]
 }

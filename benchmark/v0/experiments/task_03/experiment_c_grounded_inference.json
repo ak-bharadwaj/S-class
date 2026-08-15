@@ -1,86 +1,77 @@
 {
-  "experiment": "EXPERIMENT C — Grounded Domain Inference (Task 03)",
-  "task_id": "TASK-03-HEALTHCARE-PHI-MASK",
+  "experiment": "EXPERIMENT C \u2014 Grounded Domain Inference",
+  "task_id": "healthcare_privacy-export-pipeline",
   "inferred_requirements": [
     {
-      "requirement_id": "REQ-PHI-01",
-      "title": "Direct PHI Identifier Stripping & Redaction",
-      "description": "The export pipeline must identify and completely redact or drop all direct personal identifiers defined under 45 CFR § 164.514(b)(2)(i), including patient names, Social Security Numbers (SSN), Medical Record Numbers (MRN), phone numbers, email addresses, fax numbers, health plan beneficiary numbers, account numbers, certificate/license numbers, vehicle IDs, device identifiers/serial numbers, URLs, IP addresses, biometric identifiers, and full-face photographic images.",
-      "type": "FUNCTIONAL",
+      "requirement_id": "REQ_EXPLICIT_001",
+      "title": "HIPAA Safe Harbor Direct Identifier Stripping",
+      "description": "The export pipeline must identify and remove all 18 HIPAA Safe Harbor direct identifiers from source records prior to downstream analytics ingestion.",
+      "type": "SECURITY",
       "epistemic_status": "EXPLICIT",
       "provenance": "USER_PROMPT",
       "confidence": 1.0,
-      "justification": "Directly requested in user prompt ('strips 18 HIPAA Safe Harbor direct identifiers before analytics ingestion') and mandated by 45 CFR § 164.514(b)(2)(i)(A-R)."
+      "justification": "Directly stated in the user prompt to strip 18 HIPAA Safe Harbor direct identifiers before analytics ingestion."
     },
     {
-      "requirement_id": "REQ-PHI-02",
-      "title": "Geographic Truncation & Low-Density ZIP Code Suppression",
-      "description": "All geographic subdivisions smaller than a state (street addresses, city, county, precinct) must be removed. ZIP codes must be truncated to their initial 3 digits, provided the 3-digit prefix represents a population exceeding 20,000 per US Census Bureau data; prefixes representing 20,000 or fewer individuals must be zero-padded/suppressed to '000'.",
-      "type": "FUNCTIONAL",
-      "epistemic_status": "DERIVED_JUSTIFIED",
-      "provenance": "HIPAA_SAFE_HARBOR",
-      "confidence": 0.98,
-      "justification": "Step 1 (Regulatory Requirement): HIPAA Safe Harbor § 164.514(b)(2)(i)(B) strictly limits geographic resolution to state-level with restricted 3-digit ZIP prefixes. Step 2 (Re-identification Threat): Granular location metadata allows linking external public records to identify unique patients. Step 3 (Technical Mitigation): The export pipeline must execute deterministic geographic truncation and lookup-based suppression ('000') on all location attributes prior to egress."
-    },
-    {
-      "requirement_id": "REQ-PHI-03",
-      "title": "Date Generalization & Geriatric Age Capping (>89 Years)",
-      "description": "All date fields directly associated with an individual (date of birth, hospital admission date, discharge date, date of death) must be generalized to year only. All ages greater than 89 years, along with associated date-of-birth elements indicating age >= 90, must be aggregated and clamped to a categorical upper bound of '90 or older' (90+).",
-      "type": "FUNCTIONAL",
-      "epistemic_status": "DERIVED_JUSTIFIED",
-      "provenance": "HIPAA_SAFE_HARBOR",
-      "confidence": 0.98,
-      "justification": "Step 1 (Regulatory Requirement): 45 CFR § 164.514(b)(2)(i)(C) mandates stripping month/day elements and capping extreme age values at 90+. Step 2 (Re-identification Threat): Precise event dates combined with demographic outliers (e.g. 95-year-old admissions) create unique statistical signatures. Step 3 (Technical Mitigation): Timestamp transformation functions must truncate ISO dates to YYYY-01-01 / YYYY and clamp computed age variables to >=90 buckets."
-    },
-    {
-      "requirement_id": "REQ-PHI-04",
-      "title": "Fail-Closed Regex & Unstructured String PHI Scrubbing",
-      "description": "The pipeline must apply a fail-closed regex/pattern filter over all unstructured string fields, unmapped attributes, and free-text clinical comments. Any unmapped or non-whitelisted text payload that matches pattern heuristics for direct identifiers (SSN, phone, email, MRN) or cannot be validated must be scrubbed or dropped, aborting export if unresolvable.",
+      "requirement_id": "REQ_DERIVED_001",
+      "title": "Deterministic De-identification and Cryptographic Hashing for Entity Linkage",
+      "description": "If longitudinal analytics require tracking patient cohorts across pipeline runs without exposing raw direct identifiers, unique patient identifiers must be pseudonymized using a salted cryptographic hash function (e.g., HMAC-SHA256).",
       "type": "INVARIANT",
       "epistemic_status": "DERIVED_JUSTIFIED",
-      "provenance": "DATA_SECURITY",
+      "provenance": "HIPAA Privacy Rule \u00a7 164.514(b) Expert Determination / Re-identification Risk Mitigation",
       "confidence": 0.95,
-      "justification": "Step 1 (Domain Vulnerability): Free-text clinical notes and unmapped payload schemas frequently contain embedded direct identifiers that bypass standard field-level stripping. Step 2 (System Failure Mode): A fail-open architecture would leak unmasked PHI into analytical data lakes without detection. Step 3 (Technical Mitigation): Implementing an invariant fail-closed scanner ensures that any unverified or high-entropy string matching PHI regex signatures is blocked or redacted before downstream ingestion."
+      "justification": "Why 1: Simply stripping names and IDs breaks longitudinal analytics capability.\nWhy 2: Applying a cryptographically secure pseudonymous identifier generation method maintains analytical utility while preventing raw identifier exposure.\nWhy 3: The transform mechanism must never store raw keys alongside the output dataset to ensure zero-knowledge de-identification invariants are upheld."
     },
     {
-      "requirement_id": "REQ-PHI-05",
-      "title": "Cryptographic Export Batch Integrity Signature & Manifest",
-      "description": "Every de-identified export batch emitted by the pipeline must produce a cryptographic checksum manifest (e.g., SHA-256 HMAC / digital signature) recording batch UUID, record count, transformation timestamp, schema version, and payload digest for immutable audit verification.",
-      "type": "SECURITY",
-      "epistemic_status": "DERIVED_JUSTIFIED",
-      "provenance": "AUDIT_INTEGRITY",
-      "confidence": 0.94,
-      "justification": "Step 1 (Compliance Mandate): HIPAA Security Rule § 164.312(c)(1) and § 164.312(b) mandate data transmission integrity controls and technical audit logs. Step 2 (Threat Model): Exported batches in transit to analytics warehouses are susceptible to silent corruption, payload tampering, or record leakage without cryptographic proof. Step 3 (Technical Mitigation): Generating a per-batch SHA-256 signature and tamper-evident manifest provides non-repudiation and mathematical verification that the de-identified export was processed through the compliant pipeline."
-    },
-    {
-      "requirement_id": "REQ-PHI-06",
-      "title": "Pre-Ingestion ETL Pipeline Architecture",
-      "description": "The system must operate as an isolated batch or streaming pre-processing transformation layer positioned between upstream operational EHR storage and downstream analytical ingestion endpoints, ensuring zero raw PHI reaches the analytics cluster.",
-      "type": "BEHAVIORAL",
-      "epistemic_status": "SUPPORTED",
-      "provenance": "USER_PROMPT",
-      "confidence": 0.92,
-      "justification": "Derived directly from the prompt architecture ('export pipeline that strips ... before analytics ingestion'), establishing a strict perimeter filter pattern."
-    },
-    {
-      "requirement_id": "REQ-PHI-07",
-      "title": "External Analytics Warehouse Authentication & Storage Target Configuration",
-      "description": "The specific downstream destination (e.g., Snowflake, BigQuery, ClickHouse, S3 Data Lake), network transport protocol (gRPC, HTTPS, S3 API), and authentication credentials (IAM role, mTLS certificates, KMS keys) are unstated and must be injected via external environment configuration.",
+      "requirement_id": "REQ_UNKNOWN_001",
+      "title": "Unspecified Storage Systems and Ingestion Formats",
+      "description": "The specific source database engines, intermediate streaming/batch storage formats (e.g., Parquet, CSV, JSON), and target analytics data warehouse platforms are unstated.",
       "type": "NON_FUNCTIONAL",
       "epistemic_status": "UNKNOWN",
       "provenance": "UNSUPPORTED",
-      "confidence": 0.5,
-      "justification": "The user prompt specifies de-identification before 'analytics ingestion' but leaves destination storage technology, authentication protocols, and IAM configuration entirely unspecified."
+      "confidence": 1.0,
+      "justification": "The prompt does not specify the technical storage layer, cloud environment, or analytics platform destination."
     },
     {
-      "requirement_id": "REQ-PHI-08",
-      "title": "Scope Invariant: Exclusion of Interactive Clinical / Administrative UIs",
-      "description": "The export pipeline service must not implement or expose patient appointment schedulers, doctor consultation portals, telemedicine interfaces, or billing/invoicing modules. The service boundary is strictly restricted to automated de-identification data processing.",
-      "type": "INVARIANT",
-      "epistemic_status": "DERIVED_JUSTIFIED",
-      "provenance": "DATA_SECURITY",
-      "confidence": 0.99,
-      "justification": "Step 1 (Scope Definition): The prompt specifically requests an automated backend data export pipeline. Step 2 (Security Boundary): Injecting interactive user-facing portals into a de-identification pipeline expands attack surfaces and violates separation of concerns. Step 3 (Technical Invariant): System design strictly confines components to headless data transformation workers and audit logging."
+      "requirement_id": "REQ_UNKNOWN_002",
+      "title": "Unspecified Scheduling and Orchestration Framework",
+      "description": "The execution frequency, orchestration tool (e.g., Airflow, Prefect, Cron), and pipeline trigger mechanism are unstated.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 1.0,
+      "justification": "The prompt specifies the export transformation action but provides no execution cadence or orchestration toolchain requirements."
     }
-  ]
+  ],
+  "provenance_metadata": {
+    "experiment_id": "EXPERIMENT_C_GROUNDED_INFERENCE",
+    "task_id": "TASK-03-HEALTHCARE-PHI-MASK",
+    "runner_version": "2.0.0-gate1.2-provenance",
+    "git_commit": "700d94f059b0e35071b0d29f0c834e72ad43a636",
+    "timestamp_utc": "2026-08-15T18:24:12.393043+00:00",
+    "latency_ms": 4132.92,
+    "provider": "gemini",
+    "model": "gemini-flash-lite-latest",
+    "generation_settings": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "token_usage": {
+      "prompt_tokens": 616,
+      "completion_tokens": 706,
+      "total_tokens": 1322
+    },
+    "estimated_cost_usd": 0.000258,
+    "system_prompt": "You are the S-Class Grounded Domain Inference Engine.\nYour job is to synthesize software engineering requirements with STRICT EPISTEMIC SELF-RESTRAINT:\n\n1. Requirement Categorization & Provenance:\n   - EXPLICIT: Requirements directly and unambiguously stated in the prompt.\n   - DERIVED_JUSTIFIED: Requirements that are strictly mathematically, architecturally, or operationally necessary to implement the stated goal without defect or system compromise. Every DERIVED_JUSTIFIED requirement MUST include a rigorous 3-step why-chain (Why 1: Problem/Context -> Why 2: Technical Mechanism -> Why 3: Mandatory Invariant).\n   - SUPPORTED: Non-functional, architectural, or platform constraints directly supporting the scope.\n   - UNKNOWN: Any operational parameter, storage choice, protocol standard, third-party provider, or policy that is unstated in the prompt. You MUST surface these as UNKNOWN rather than guessing or fabricating specific implementations.\n\n2. Anti-Hallucination Barrier:\n   - DO NOT fabricate full-stack UI pages (e.g. login screens, dashboards, admin portals) unless explicitly requested.\n   - DO NOT fabricate arbitrary third-party providers (e.g. Stripe, Auth0, AWS) unless explicitly requested.\n\n3. Output Schema:\nReturn strictly valid JSON adhering to this schema:\n{\n  \"experiment\": \"EXPERIMENT C \u2014 Grounded Domain Inference\",\n  \"task_id\": \"<TASK_ID>\",\n  \"inferred_requirements\": [\n    {\n      \"requirement_id\": \"<REQ_ID_STRING>\",\n      \"title\": \"<REQUIREMENT_TITLE>\",\n      \"description\": \"<DETAILED_SPECIFICATION>\",\n      \"type\": \"FUNCTIONAL\" | \"NON_FUNCTIONAL\" | \"SECURITY\" | \"BEHAVIORAL\" | \"INVARIANT\",\n      \"epistemic_status\": \"EXPLICIT\" | \"DERIVED_JUSTIFIED\" | \"SUPPORTED\" | \"UNKNOWN\",\n      \"provenance\": \"USER_PROMPT\" | \"<DOMAIN_PROVENANCE_STRING>\" | \"UNSUPPORTED\",\n      \"confidence\": <FLOAT_0_TO_1>,\n      \"justification\": \"<WHY_CHAIN_OR_RATIONALE>\"\n    }\n  ]\n}\n",
+    "user_prompt": "Synthesize formal software engineering requirements for the following prompt in the domain of 'healthcare_privacy':\nPrompt: \"Build an export pipeline that strips 18 HIPAA Safe Harbor direct identifiers before analytics ingestion.\"\n\nDomain Guidance:\n- Enforce core invariants and essential derived domain rules.\n- Do not generate unrequested UI pages or hallucinate arbitrary features (specifically avoid: Patient medical record portal UI, Doctor appointment booking UI, Clinical notes rich text editor).\n- If key operational choices, providers, or format standards are unstated, mark them explicitly as UNKNOWN.\n\nReturn strictly valid JSON as specified in the system instructions.",
+    "input_context": {
+      "raw_prompt": "Build an export pipeline that strips 18 HIPAA Safe Harbor direct identifiers before analytics ingestion.",
+      "domain": "healthcare_privacy",
+      "forbidden_hallucinations": [
+        "Patient medical record portal UI",
+        "Doctor appointment booking UI",
+        "Clinical notes rich text editor"
+      ]
+    }
+  }
 }

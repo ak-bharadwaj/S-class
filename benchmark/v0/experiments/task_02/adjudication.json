@@ -1,89 +1,49 @@
 {
   "task_id": "TASK-02-AUTH-SESSION-REVOKE",
-  "adjudication_version": "1.0",
-  "reviewer": "independent_security_evaluator",
-  "review_date": "2026-08-15",
-  "adjudication_notes": "Adjudicated strictly against frozen ground_truth_labels.json (6 canonical requirements).",
-  "items": {
-    "REQ-AUTH-01": {
-      "candidate_id": "REQ-AUTH-01",
-      "candidate_title": "Password Reset Session Invalidation Trigger",
+  "provenance": {
+    "adjudicator_id": "ADJ_ENG_CORE_01",
+    "adjudication_version": "2.0.0-gate1.2-live",
+    "adjudication_timestamp": "2026-08-15T18:26:00Z",
+    "generator_id": "gemini-flash-lite-latest (automated live runner)",
+    "adjudicator_is_generator": false,
+    "generator_had_access_to_adjudication": false,
+    "adjudicator_blinded_to_model_name": true
+  },
+  "candidate_adjudications": [
+    {
+      "candidate_id": "REQ-AUTH-001",
+      "title": "Password Reset Session Invalidation",
       "label": "EXACT_MATCH_TO_GT",
       "ground_truth_id": "REQ-EXP-01",
-      "is_derived_proposal": false,
-      "reason": "Directly matches canonical ground-truth requirement REQ-EXP-01 (Invalidate User Sessions on Password Reset)."
+      "rationale": "Directly matches ground truth requirement to invalidate sessions upon password reset."
     },
-    "REQ-AUTH-02": {
-      "candidate_id": "REQ-AUTH-02",
-      "candidate_title": "Multi-Cluster Refresh Token Blacklisting",
+    {
+      "candidate_id": "REQ-AUTH-002",
+      "title": "Cross-Cluster Token Blacklisting",
       "label": "EXACT_MATCH_TO_GT",
       "ground_truth_id": "REQ-EXP-02",
-      "is_derived_proposal": false,
-      "reason": "Directly matches canonical ground-truth requirement REQ-EXP-02 (Blacklist Active Refresh Tokens Across Clusters)."
+      "rationale": "Directly matches ground truth requirement for cross-cluster refresh token blacklisting."
     },
-    "REQ-AUTH-03": {
-      "candidate_id": "REQ-AUTH-03",
-      "candidate_title": "Blacklist TTL Bound to Maximum Token Lifespan",
-      "label": "EXACT_MATCH_TO_GT",
-      "ground_truth_id": "REQ-DER-01",
-      "is_derived_proposal": true,
-      "reason": "Directly matches canonical ground-truth derived requirement REQ-DER-01 (Token Blacklist TTL Bound to Max Token Lifetime)."
-    },
-    "REQ-AUTH-04": {
-      "candidate_id": "REQ-AUTH-04",
-      "candidate_title": "Cross-Cluster Invalidation Propagation & Synchronization",
+    {
+      "candidate_id": "REQ-AUTH-003",
+      "title": "Distributed Revocation Synchronization Mechanism",
       "label": "VALID_DERIVATION",
       "ground_truth_id": null,
-      "is_derived_proposal": true,
-      "reason": "Independently verified distributed systems requirement (cross-cluster pub/sub broadcast) to guarantee multi-cluster invalidation convergence."
+      "rationale": "Valid architectural derivation enforcing distributed synchronization mechanism across cluster boundaries."
     },
-    "REQ-AUTH-05": {
-      "candidate_id": "REQ-AUTH-05",
-      "candidate_title": "Immediate Token Verification Rejection Enforcement",
-      "label": "EXACT_MATCH_TO_GT",
-      "ground_truth_id": "REQ-DER-03",
-      "is_derived_proposal": true,
-      "reason": "Directly matches canonical ground-truth derived requirement REQ-DER-03 (Immediate Rejection of Revoked Tokens on Verification)."
+    {
+      "candidate_id": "REQ-AUTH-004",
+      "title": "Token Storage and Revocation Verification Format",
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "rationale": "Correctly flags unstated underlying storage tier and token format (opaque vs JWT) as UNKNOWN."
     },
-    "REQ-AUTH-06": {
-      "candidate_id": "REQ-AUTH-06",
-      "candidate_title": "Security Audit Telemetry & Event Emission",
-      "label": "EXACT_MATCH_TO_GT",
-      "ground_truth_id": "REQ-DER-02",
-      "is_derived_proposal": true,
-      "reason": "Directly matches canonical ground-truth derived requirement REQ-DER-02 (Emit Distributed Password Reset Audit Event)."
-    },
-    "REQ-AUTH-07": {
-      "candidate_id": "REQ-AUTH-07",
-      "candidate_title": "Low-Latency High-Throughput Blacklist Lookup Architecture",
+    {
+      "candidate_id": "REQ-AUTH-005",
+      "title": "Third-Party Authentication and Billing UI Exclusion",
       "label": "SUPPORTED_BUT_OUTSIDE_GT",
       "ground_truth_id": null,
-      "is_derived_proposal": true,
-      "reason": "Valid non-functional operational requirement ensuring low-latency cache resolution at auth gateways to prevent latency degradation."
-    },
-    "REQ-AUTH-08": {
-      "candidate_id": "REQ-AUTH-08",
-      "candidate_title": "Token Architecture & Revocation Strategy Selection",
-      "label": "UNKNOWN",
-      "ground_truth_id": null,
-      "is_derived_proposal": false,
-      "reason": "Correctly flags unstated token format (opaque database tokens vs stateless JWT JTI) as UNKNOWN rather than guessing."
-    },
-    "REQ-AUTH-09": {
-      "candidate_id": "REQ-AUTH-09",
-      "candidate_title": "Current Session Continuation vs Complete Disconnection Policy",
-      "label": "UNKNOWN",
-      "ground_truth_id": null,
-      "is_derived_proposal": false,
-      "reason": "Correctly flags unstated operational policy (disconnect all vs refresh resetting client) as UNKNOWN rather than guessing."
-    },
-    "REQ-AUTH-10": {
-      "candidate_id": "REQ-AUTH-10",
-      "candidate_title": "In-Flight Short-Lived Access Token Invalidation Scope",
-      "label": "UNKNOWN",
-      "ground_truth_id": null,
-      "is_derived_proposal": false,
-      "reason": "Correctly flags unstated scope (active gateway access token introspection vs standard short TTL expiry) as UNKNOWN."
+      "rationale": "Supported scope boundary constraint explicitly excluding unrequested fullstack UI features."
     }
-  }
+  ]
 }

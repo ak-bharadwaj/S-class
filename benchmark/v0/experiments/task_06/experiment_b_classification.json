@@ -1,24 +1,54 @@
 {
-  "experiment": "EXPERIMENT B — Controlled Semantic Unit Classification (Task 06)",
-  "task_id": "TASK-06-PAYMENT-GATEWAY-AMBIGUOUS",
+  "experiment": "EXPERIMENT B \u2014 Controlled Semantic Unit Classification",
+  "task_id": "TASK_PAYMENT_SERVICE_001",
   "classifications": [
     {
       "unit": "payment processing service",
       "class": "ENTITY",
       "confidence": 0.95,
-      "rationale": "Identifies the core domain aggregate boundary and system bounded context responsible for orchestrating transaction lifecycles, ledger mutations, and gateway communications."
+      "rationale": "Represents the core system boundary, domain model aggregate, and primary architectural entity responsible for payment domain operations."
     },
     {
       "unit": "secure",
-      "class": "CONSTRAINT",
-      "confidence": 0.95,
-      "rationale": "Specifies fundamental, non-negotiable security and regulatory rules (e.g., PCI-DSS compliance, payload encryption at rest and in transit, tokenization, mutual TLS) that must remain inviolable across all operational states."
+      "class": "INVARIANT",
+      "confidence": 0.92,
+      "rationale": "Specifies a non-negotiable security invariant and safety rule governing all data handling, transmission, and access control policies across the service."
     },
     {
       "unit": "build",
       "class": "NOISE",
       "confidence": 0.99,
-      "rationale": "An imperative prompt-scaffolding verb directing agent action; contains no domain semantics, data models, or runtime business constraints."
+      "rationale": "Constitutes a generic procedural framing verb and prompt instruction directive that carries no domain model specifications or technical requirements."
     }
-  ]
+  ],
+  "provenance_metadata": {
+    "experiment_id": "EXPERIMENT_B_SEMANTIC_CLASSIFICATION",
+    "task_id": "TASK-06-PAYMENT-GATEWAY-AMBIGUOUS",
+    "runner_version": "2.0.0-gate1.2-provenance",
+    "git_commit": "700d94f059b0e35071b0d29f0c834e72ad43a636",
+    "timestamp_utc": "2026-08-15T18:18:47.676504+00:00",
+    "latency_ms": 27111.91,
+    "provider": "gemini",
+    "model": "gemini-flash-latest",
+    "generation_settings": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "token_usage": {
+      "prompt_tokens": 397,
+      "completion_tokens": 240,
+      "total_tokens": 637
+    },
+    "estimated_cost_usd": 0.000102,
+    "system_prompt": "You are the S-Class Semantic Unit Classifier.\nYour job is to analyze engineering requirements phrases and classify each extracted semantic unit into exactly one category:\n- ENTITY: Core domain data model, system aggregate, or persistence entity.\n- INVARIANT: Mathematical constraint, immutable safety rule, statutory regulatory requirement, or non-negotiable invariant.\n- BEHAVIOR: Dynamic action, system workflow, API operation, state transition, or event trigger.\n- CONSTRAINT: Timing/latency boundary, environmental fault trigger, hardware budget, or operational lifecycle constraint.\n- ATTRIBUTE: Specific data field, configuration property, or numeric measurement.\n- NOISE: Conversational filler, instructional directive, or generic procedural framing verb (e.g. \"build\", \"implement\").\n\nFor each candidate unit:\n1. Provide the exact category.\n2. Assign a confidence score between 0.0 and 1.0.\n3. Provide a step-by-step technical rationale explaining the classification.\n\nOutput strictly valid JSON adhering to this schema:\n{\n  \"experiment\": \"EXPERIMENT B \u2014 Controlled Semantic Unit Classification\",\n  \"task_id\": \"<TASK_ID>\",\n  \"classifications\": [\n    {\n      \"unit\": \"<SEMANTIC_UNIT_STRING>\",\n      \"class\": \"ENTITY\" | \"INVARIANT\" | \"BEHAVIOR\" | \"CONSTRAINT\" | \"ATTRIBUTE\" | \"NOISE\",\n      \"confidence\": <FLOAT_0_TO_1>,\n      \"rationale\": \"<TECHNICAL_RATIONALE>\"\n    }\n  ]\n}\n",
+    "user_prompt": "Analyze the following engineering prompt:\nPrompt: \"Build a secure payment processing service.\"\n\nClassify the following semantic units extracted from the prompt:\n1. \"payment processing service\"\n2. \"secure\"\n3. \"build\"\n\nReturn strictly valid JSON as specified in the system instructions.",
+    "input_context": {
+      "raw_prompt": "Build a secure payment processing service.",
+      "units_to_classify": [
+        "payment processing service",
+        "secure",
+        "build"
+      ]
+    }
+  }
 }

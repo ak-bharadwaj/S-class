@@ -1,54 +1,89 @@
 {
-  "experiment": "EXPERIMENT B — Controlled Semantic Unit Classification (Task 02)",
-  "task_id": "TASK-02-AUTH-SESSION-REVOKE",
+  "experiment": "EXPERIMENT B \u2014 Controlled Semantic Unit Classification",
+  "task_id": "EXP-B-SESSION-INVALIDATION-001",
   "classifications": [
     {
       "unit": "password reset",
       "class": "BEHAVIOR",
       "confidence": 0.95,
-      "rationale": "Represents a dynamic authentication workflow and user credential state-transition process."
+      "rationale": "'password reset' represents a dynamic authentication workflow and triggering event that initiates downstream security actions."
     },
     {
       "unit": "session invalidation",
       "class": "BEHAVIOR",
-      "confidence": 0.94,
-      "rationale": "Represents the dynamic state transition and lifecycle action of terminating active user sessions."
-    },
-    {
-      "unit": "session",
-      "class": "ENTITY",
-      "confidence": 0.98,
-      "rationale": "Represents the core domain aggregate and data model tracking authenticated user state and context."
+      "confidence": 0.96,
+      "rationale": "'session invalidation' describes an explicit state transition and system operation that terminates active session validity."
     },
     {
       "unit": "blacklist",
       "class": "BEHAVIOR",
       "confidence": 0.92,
-      "rationale": "Represents the operational action and state transition of appending a compromised/revoked credential to a denial registry."
-    },
-    {
-      "unit": "token blacklist",
-      "class": "ENTITY",
-      "confidence": 0.96,
-      "rationale": "Represents the domain data structure and aggregate store holding revoked token identifiers."
+      "rationale": "In this context, 'blacklists' acts as an active API/system operation modifying the validation state of security artifacts."
     },
     {
       "unit": "refresh tokens",
       "class": "ENTITY",
       "confidence": 0.98,
-      "rationale": "Represents the domain data model and credential aggregate used to maintain long-lived authenticated sessions."
+      "rationale": "'refresh tokens' are core security credential data models and persistence entities within the identity management domain."
     },
     {
       "unit": "across all clusters",
       "class": "CONSTRAINT",
-      "confidence": 0.96,
-      "rationale": "Defines an architectural and distribution scope boundary requiring cross-cluster replication and synchronization."
+      "confidence": 0.94,
+      "rationale": "'across all clusters' defines an architectural and operational boundary requirement governing the scope of synchronization."
     },
     {
       "unit": "implement",
       "class": "NOISE",
       "confidence": 0.99,
-      "rationale": "Represents an imperative prompt command and meta-instruction with no domain modeling semantics."
+      "rationale": "'implement' is a generic procedural imperative verb serving as instructional framing rather than a functional domain requirement."
+    },
+    {
+      "unit": "session",
+      "class": "ENTITY",
+      "confidence": 0.97,
+      "rationale": "'session' is a fundamental domain aggregate representing an authenticated state and lifetime of a user interaction."
+    },
+    {
+      "unit": "token blacklist",
+      "class": "ENTITY",
+      "confidence": 0.95,
+      "rationale": "'token blacklist' refers to the persistence data structure/aggregate used to store and check revoked token identifiers."
     }
-  ]
+  ],
+  "provenance_metadata": {
+    "experiment_id": "EXPERIMENT_B_SEMANTIC_CLASSIFICATION",
+    "task_id": "TASK-02-AUTH-SESSION-REVOKE",
+    "runner_version": "2.0.0-gate1.2-provenance",
+    "git_commit": "700d94f059b0e35071b0d29f0c834e72ad43a636",
+    "timestamp_utc": "2026-08-15T18:17:19.158980+00:00",
+    "latency_ms": 12661.26,
+    "provider": "gemini",
+    "model": "gemini-flash-latest",
+    "generation_settings": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "token_usage": {
+      "prompt_tokens": 441,
+      "completion_tokens": 534,
+      "total_tokens": 975
+    },
+    "estimated_cost_usd": 0.000193,
+    "system_prompt": "You are the S-Class Semantic Unit Classifier.\nYour job is to analyze engineering requirements phrases and classify each extracted semantic unit into exactly one category:\n- ENTITY: Core domain data model, system aggregate, or persistence entity.\n- INVARIANT: Mathematical constraint, immutable safety rule, statutory regulatory requirement, or non-negotiable invariant.\n- BEHAVIOR: Dynamic action, system workflow, API operation, state transition, or event trigger.\n- CONSTRAINT: Timing/latency boundary, environmental fault trigger, hardware budget, or operational lifecycle constraint.\n- ATTRIBUTE: Specific data field, configuration property, or numeric measurement.\n- NOISE: Conversational filler, instructional directive, or generic procedural framing verb (e.g. \"build\", \"implement\").\n\nFor each candidate unit:\n1. Provide the exact category.\n2. Assign a confidence score between 0.0 and 1.0.\n3. Provide a step-by-step technical rationale explaining the classification.\n\nOutput strictly valid JSON adhering to this schema:\n{\n  \"experiment\": \"EXPERIMENT B \u2014 Controlled Semantic Unit Classification\",\n  \"task_id\": \"<TASK_ID>\",\n  \"classifications\": [\n    {\n      \"unit\": \"<SEMANTIC_UNIT_STRING>\",\n      \"class\": \"ENTITY\" | \"INVARIANT\" | \"BEHAVIOR\" | \"CONSTRAINT\" | \"ATTRIBUTE\" | \"NOISE\",\n      \"confidence\": <FLOAT_0_TO_1>,\n      \"rationale\": \"<TECHNICAL_RATIONALE>\"\n    }\n  ]\n}\n",
+    "user_prompt": "Analyze the following engineering prompt:\nPrompt: \"Implement password reset session invalidation that blacklists active refresh tokens across all clusters.\"\n\nClassify the following semantic units extracted from the prompt:\n1. \"password reset\"\n2. \"session invalidation\"\n3. \"blacklist\"\n4. \"refresh tokens\"\n5. \"across all clusters\"\n6. \"implement\"\n7. \"session\"\n8. \"token blacklist\"\n\nReturn strictly valid JSON as specified in the system instructions.",
+    "input_context": {
+      "raw_prompt": "Implement password reset session invalidation that blacklists active refresh tokens across all clusters.",
+      "units_to_classify": [
+        "password reset",
+        "session invalidation",
+        "blacklist",
+        "refresh tokens",
+        "across all clusters",
+        "implement",
+        "session",
+        "token blacklist"
+      ]
+    }
+  }
 }

@@ -1,106 +1,87 @@
 {
-  "experiment": "EXPERIMENT C — Grounded Domain Inference (Task 02)",
-  "task_id": "TASK-02-AUTH-SESSION-REVOKE",
+  "experiment": "EXPERIMENT C \u2014 Grounded Domain Inference",
+  "task_id": "auth_identity_password_reset_invalidation",
   "inferred_requirements": [
     {
-      "requirement_id": "REQ-AUTH-01",
-      "title": "Password Reset Session Invalidation Trigger",
-      "description": "Upon successful completion of a user password reset flow, the authentication service must immediately trigger revocation of all active sessions and refresh tokens tied to the target user identity.",
+      "requirement_id": "REQ-AUTH-001",
+      "title": "Password Reset Session Invalidation",
+      "description": "Upon a successful password reset event, the system must invalidate all active refresh tokens associated with the user identity.",
       "type": "FUNCTIONAL",
       "epistemic_status": "EXPLICIT",
       "provenance": "USER_PROMPT",
       "confidence": 1.0,
-      "justification": "Directly mandated by prompt specification: 'Implement password reset session invalidation'."
+      "justification": "Directly stated in the prompt requirements."
     },
     {
-      "requirement_id": "REQ-AUTH-02",
-      "title": "Multi-Cluster Refresh Token Blacklisting",
-      "description": "All active refresh tokens associated with the user must be committed to a distributed blacklist or revocation registry that is reachable and enforced across all operational infrastructure clusters.",
-      "type": "FUNCTIONAL",
+      "requirement_id": "REQ-AUTH-002",
+      "title": "Cross-Cluster Token Blacklisting",
+      "description": "Refresh token invalidation must propagate across all application clusters to ensure immediate revocation globally.",
+      "type": "NON_FUNCTIONAL",
       "epistemic_status": "EXPLICIT",
       "provenance": "USER_PROMPT",
       "confidence": 1.0,
-      "justification": "Directly mandated by prompt specification: 'blacklists active refresh tokens across all clusters'."
+      "justification": "Directly stated in the prompt requirements ('across all clusters')."
     },
     {
-      "requirement_id": "REQ-AUTH-03",
-      "title": "Blacklist TTL Bound to Maximum Token Lifespan",
-      "description": "Revocation entries stored in the distributed blacklist must have an eviction Time-To-Live (TTL) calibrated to the maximum remaining validity window of the active refresh tokens.",
-      "type": "NON_FUNCTIONAL",
+      "requirement_id": "REQ-AUTH-003",
+      "title": "Distributed Revocation Synchronization Mechanism",
+      "description": "The system requires a distributed state synchronization mechanism (e.g., distributed cache or event bus) to instantly synchronize token revocation states across cluster boundaries.",
+      "type": "INVARIANT",
       "epistemic_status": "DERIVED_JUSTIFIED",
-      "provenance": "SECURITY_ENFORCEMENT",
-      "confidence": 0.98,
-      "justification": "3-Step Why-Chain: (1) Why? Refresh tokens possess a finite cryptographic lifespan (expiry timestamp). (2) Why? Retaining blacklist entries indefinitely in distributed memory/storage causes unbounded state growth and degraded query performance. (3) Why? Once a token's intrinsic expiry timestamp has passed, standard expiration checks reject the token automatically, rendering blacklist retention strictly redundant beyond max token lifetime."
-    },
-    {
-      "requirement_id": "REQ-AUTH-04",
-      "title": "Cross-Cluster Invalidation Propagation & Synchronization",
-      "description": "Session revocation events must be broadcast across clusters via a reliable distributed pub/sub or event-streaming bus to invalidate cluster-local caches with low propagation latency.",
-      "type": "NON_FUNCTIONAL",
-      "epistemic_status": "DERIVED_JUSTIFIED",
-      "provenance": "DISTRIBUTED_PROPAGATION",
-      "confidence": 0.96,
-      "justification": "3-Step Why-Chain: (1) Why? Individual clusters maintain local cache layers to minimize token validation latency. (2) Why? Without cross-cluster event propagation, an attacker can replay a compromised refresh token against a cluster that has not locally observed the password reset. (3) Why? Rapid asynchronous or synchronous broadcast across clusters guarantees global convergence and eliminates replay vulnerability windows."
-    },
-    {
-      "requirement_id": "REQ-AUTH-05",
-      "title": "Immediate Token Verification Rejection Enforcement",
-      "description": "Any token refresh, exchange, or introspection request presenting a revoked refresh token must be rejected immediately with HTTP 401 Unauthorized / invalid_grant and denied downstream access token issuance.",
-      "type": "SECURITY",
-      "epistemic_status": "DERIVED_JUSTIFIED",
-      "provenance": "SECURITY_ENFORCEMENT",
-      "confidence": 0.99,
-      "justification": "3-Step Why-Chain: (1) Why? The security objective of session invalidation during password reset is to terminate unauthorized access persistence. (2) Why? If the refresh endpoint does not evaluate revocation state before issuing new access tokens, blacklisting fails to mitigate session hijacking. (3) Why? Immediate rejection at the authentication enforcement boundary halts token minting and severs the attacker's ongoing session."
-    },
-    {
-      "requirement_id": "REQ-AUTH-06",
-      "title": "Security Audit Telemetry & Event Emission",
-      "description": "All password reset revocations and subsequent attempts to utilize blacklisted refresh tokens must emit structured security audit log events containing user_id, token identifier/hash, client IP, user agent, timestamp, and cluster origin.",
-      "type": "SECURITY",
-      "epistemic_status": "DERIVED_JUSTIFIED",
-      "provenance": "SECURITY_AUDIT",
+      "provenance": "Distributed Systems Architecture",
       "confidence": 0.95,
-      "justification": "3-Step Why-Chain: (1) Why? Credential reset and session revocation represent critical security boundary state transitions. (2) Why? Security operations (SIEM/SOC) and compliance standards require full visibility into credential lifecycle events and unauthorized token replay attempts. (3) Why? Structured telemetry allows real-time threat response, anomaly detection, and compliance traceability."
+      "justification": "Why 1: Refresh tokens are verified locally across multiple clusters without central bottleneck. -> Why 2: A password reset in Cluster A must instantly prevent token reuse in Cluster B. -> Why 3: Mandatory Invariant: Revocation state must be globally consistent or use a distributed blacklist/revocation timestamp within bounded replication lag."
     },
     {
-      "requirement_id": "REQ-AUTH-07",
-      "title": "Low-Latency High-Throughput Blacklist Lookup Architecture",
-      "description": "Blacklist query resolution at auth gateways/endpoints must execute with sub-millisecond to low single-digit millisecond latency (e.g. Redis/Valkey cluster, Bloom filter pre-check, or user-level token epoch comparison) to prevent bottlenecking authentication throughput.",
+      "requirement_id": "REQ-AUTH-004",
+      "title": "Token Storage and Revocation Verification Format",
+      "description": "The exact storage engine, database schema, caching technology (e.g., Redis, PostgreSQL), and token format (e.g., JWT, opaque tokens) are not specified.",
       "type": "NON_FUNCTIONAL",
-      "epistemic_status": "SUPPORTED",
-      "provenance": "SECURITY_ENFORCEMENT",
-      "confidence": 0.92,
-      "justification": "Supported architectural pattern necessary to ensure multi-cluster token verification does not degrade API availability or introduce unacceptable latency overhead under heavy load."
-    },
-    {
-      "requirement_id": "REQ-AUTH-08",
-      "title": "Token Architecture & Revocation Strategy Selection",
-      "description": "Whether refresh tokens are stateful opaque strings (revoked via database record status update) or stateless signed JWTs (revoked via JTI blacklisting or user 'tokens_valid_after' epoch timestamp comparison) is unstated.",
-      "type": "BEHAVIORAL",
       "epistemic_status": "UNKNOWN",
       "provenance": "UNSUPPORTED",
-      "confidence": 0.85,
-      "justification": "Unstated domain configuration. The implementation should support either individual token identifier (JTI) blacklisting or user-level token versioning/epoch invalidation depending on the existing token schema."
+      "confidence": 1.0,
+      "justification": "The prompt does not state the underlying storage tier, caching provider, or token format standard."
     },
     {
-      "requirement_id": "REQ-AUTH-09",
-      "title": "Current Session Continuation vs Complete Disconnection Policy",
-      "description": "Whether the active session that successfully performed the password reset is retained (by immediately minting a replacement token pair) or all sessions including the initiator are revoked requiring re-login is unstated.",
-      "type": "BEHAVIORAL",
+      "requirement_id": "REQ-AUTH-005",
+      "title": "Third-Party Authentication and Billing UI",
+      "description": "User avatar upload interfaces, social login OAuth providers, and credit card billing management features are excluded.",
+      "type": "FUNCTIONAL",
       "epistemic_status": "UNKNOWN",
-      "provenance": "UNSUPPORTED",
-      "confidence": 0.88,
-      "justification": "Unstated operational policy. System behavior must be configurable to support either total logout across all devices or seamless rotation of the resetting client session."
-    },
-    {
-      "requirement_id": "REQ-AUTH-10",
-      "title": "In-Flight Short-Lived Access Token Invalidation Scope",
-      "description": "Whether already-issued short-lived access tokens (JWTs) must be actively revoked at API gateways or allowed to expire naturally via their brief TTL is unstated.",
-      "type": "SECURITY",
-      "epistemic_status": "UNKNOWN",
-      "provenance": "UNSUPPORTED",
-      "confidence": 0.82,
-      "justification": "Unstated architectural trade-off. The prompt explicitly specifies refresh token blacklisting; active access token introspection vs standard short TTL expiry depends on service performance budgets."
+      "provenance": "Domain Guidance Exclusion",
+      "confidence": 1.0,
+      "justification": "Explicitly restricted by domain guidance to prevent unrequested scope expansion."
     }
-  ]
+  ],
+  "provenance_metadata": {
+    "experiment_id": "EXPERIMENT_C_GROUNDED_INFERENCE",
+    "task_id": "TASK-02-AUTH-SESSION-REVOKE",
+    "runner_version": "2.0.0-gate1.2-provenance",
+    "git_commit": "700d94f059b0e35071b0d29f0c834e72ad43a636",
+    "timestamp_utc": "2026-08-15T18:23:56.978307+00:00",
+    "latency_ms": 3410.71,
+    "provider": "gemini",
+    "model": "gemini-flash-lite-latest",
+    "generation_settings": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "token_usage": {
+      "prompt_tokens": 614,
+      "completion_tokens": 753,
+      "total_tokens": 1367
+    },
+    "estimated_cost_usd": 0.000272,
+    "system_prompt": "You are the S-Class Grounded Domain Inference Engine.\nYour job is to synthesize software engineering requirements with STRICT EPISTEMIC SELF-RESTRAINT:\n\n1. Requirement Categorization & Provenance:\n   - EXPLICIT: Requirements directly and unambiguously stated in the prompt.\n   - DERIVED_JUSTIFIED: Requirements that are strictly mathematically, architecturally, or operationally necessary to implement the stated goal without defect or system compromise. Every DERIVED_JUSTIFIED requirement MUST include a rigorous 3-step why-chain (Why 1: Problem/Context -> Why 2: Technical Mechanism -> Why 3: Mandatory Invariant).\n   - SUPPORTED: Non-functional, architectural, or platform constraints directly supporting the scope.\n   - UNKNOWN: Any operational parameter, storage choice, protocol standard, third-party provider, or policy that is unstated in the prompt. You MUST surface these as UNKNOWN rather than guessing or fabricating specific implementations.\n\n2. Anti-Hallucination Barrier:\n   - DO NOT fabricate full-stack UI pages (e.g. login screens, dashboards, admin portals) unless explicitly requested.\n   - DO NOT fabricate arbitrary third-party providers (e.g. Stripe, Auth0, AWS) unless explicitly requested.\n\n3. Output Schema:\nReturn strictly valid JSON adhering to this schema:\n{\n  \"experiment\": \"EXPERIMENT C \u2014 Grounded Domain Inference\",\n  \"task_id\": \"<TASK_ID>\",\n  \"inferred_requirements\": [\n    {\n      \"requirement_id\": \"<REQ_ID_STRING>\",\n      \"title\": \"<REQUIREMENT_TITLE>\",\n      \"description\": \"<DETAILED_SPECIFICATION>\",\n      \"type\": \"FUNCTIONAL\" | \"NON_FUNCTIONAL\" | \"SECURITY\" | \"BEHAVIORAL\" | \"INVARIANT\",\n      \"epistemic_status\": \"EXPLICIT\" | \"DERIVED_JUSTIFIED\" | \"SUPPORTED\" | \"UNKNOWN\",\n      \"provenance\": \"USER_PROMPT\" | \"<DOMAIN_PROVENANCE_STRING>\" | \"UNSUPPORTED\",\n      \"confidence\": <FLOAT_0_TO_1>,\n      \"justification\": \"<WHY_CHAIN_OR_RATIONALE>\"\n    }\n  ]\n}\n",
+    "user_prompt": "Synthesize formal software engineering requirements for the following prompt in the domain of 'auth_identity':\nPrompt: \"Implement password reset session invalidation that blacklists active refresh tokens across all clusters.\"\n\nDomain Guidance:\n- Enforce core invariants and essential derived domain rules.\n- Do not generate unrequested UI pages or hallucinate arbitrary features (specifically avoid: User avatar upload UI page, Social login OAuth provider UI, Credit card billing management).\n- If key operational choices, providers, or format standards are unstated, mark them explicitly as UNKNOWN.\n\nReturn strictly valid JSON as specified in the system instructions.",
+    "input_context": {
+      "raw_prompt": "Implement password reset session invalidation that blacklists active refresh tokens across all clusters.",
+      "domain": "auth_identity",
+      "forbidden_hallucinations": [
+        "User avatar upload UI page",
+        "Social login OAuth provider UI",
+        "Credit card billing management"
+      ]
+    }
+  }
 }

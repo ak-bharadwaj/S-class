@@ -1,54 +1,89 @@
 {
-  "experiment": "EXPERIMENT B — Controlled Semantic Unit Classification (Task 05)",
-  "task_id": "TASK-05-EXAM-BROWSER-SANDBOX",
+  "experiment": "EXPERIMENT B \u2014 Controlled Semantic Unit Classification",
+  "task_id": "TASK-EXAM-LOCKDOWN-001",
   "classifications": [
     {
       "unit": "examination lockdown sandbox",
       "class": "ENTITY",
       "confidence": 0.98,
-      "rationale": "Represents the core domain entity and aggregate root—the secure desktop sandbox environment managing the lifecycle, runtime configuration, and security posture of the exam."
+      "rationale": "Represents the primary architectural domain aggregate, runtime container, and system execution boundary."
     },
     {
       "unit": "lockdown",
-      "class": "BEHAVIOR",
-      "confidence": 0.95,
-      "rationale": "Specifies process isolation and system privilege restriction action."
+      "class": "INVARIANT",
+      "confidence": 0.91,
+      "rationale": "Specifies an immutable security enforcement state and non-negotiable safety invariant governing system operation."
     },
     {
       "unit": "restricts",
       "class": "BEHAVIOR",
       "confidence": 0.96,
-      "rationale": "Denotes an active functional operation and runtime policy enforcement mechanism that dynamically prevents unauthorized display configurations."
+      "rationale": "Denotes an active system enforcement operation and policy evaluation mechanism applied to display hardware."
     },
     {
       "unit": "dual-monitor mirroring",
-      "class": "CONSTRAINT",
-      "confidence": 0.93,
-      "rationale": "Hardware display configuration constraint prohibited during proctored exams."
+      "class": "ATTRIBUTE",
+      "confidence": 0.89,
+      "rationale": "Identifies a specific multi-display hardware configuration property and topology state subject to inspection."
     },
     {
       "unit": "intercepts",
       "class": "BEHAVIOR",
-      "confidence": 0.98,
-      "rationale": "Represents a dynamic action and event-hooking workflow that captures OS clipboard paste operations before data insertion occurs."
+      "confidence": 0.97,
+      "rationale": "Defines an active runtime API hooking and event-handling workflow intercepting OS-level operations."
     },
     {
       "unit": "OS clipboard paste",
       "class": "BEHAVIOR",
-      "confidence": 0.94,
-      "rationale": "System clipboard transfer operation to be intercepted and sanitized/blocked."
+      "confidence": 0.92,
+      "rationale": "Represents an operating system event trigger and data transfer action targeted for runtime capture."
     },
     {
       "unit": "during active exam sessions",
       "class": "CONSTRAINT",
-      "confidence": 0.97,
-      "rationale": "Defines a temporal operational state and lifecycle boundary constraint that restricts the scope and activation window of sandbox enforcement rules."
+      "confidence": 0.95,
+      "rationale": "Establishes a strict temporal execution boundary and operational lifecycle scope for the enforcement behaviors."
     },
     {
       "unit": "build",
       "class": "NOISE",
       "confidence": 0.99,
-      "rationale": "An imperative prompt verb serving as conversational instruction with no domain semantic significance in the target system model."
+      "rationale": "Acts as an instructional imperative verb and generic procedural framing device devoid of domain semantics."
     }
-  ]
+  ],
+  "provenance_metadata": {
+    "experiment_id": "EXPERIMENT_B_SEMANTIC_CLASSIFICATION",
+    "task_id": "TASK-05-EXAM-BROWSER-SANDBOX",
+    "runner_version": "2.0.0-gate1.2-provenance",
+    "git_commit": "700d94f059b0e35071b0d29f0c834e72ad43a636",
+    "timestamp_utc": "2026-08-15T18:18:21.094143+00:00",
+    "latency_ms": 14577.11,
+    "provider": "gemini",
+    "model": "gemini-flash-latest",
+    "generation_settings": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "token_usage": {
+      "prompt_tokens": 453,
+      "completion_tokens": 524,
+      "total_tokens": 977
+    },
+    "estimated_cost_usd": 0.000191,
+    "system_prompt": "You are the S-Class Semantic Unit Classifier.\nYour job is to analyze engineering requirements phrases and classify each extracted semantic unit into exactly one category:\n- ENTITY: Core domain data model, system aggregate, or persistence entity.\n- INVARIANT: Mathematical constraint, immutable safety rule, statutory regulatory requirement, or non-negotiable invariant.\n- BEHAVIOR: Dynamic action, system workflow, API operation, state transition, or event trigger.\n- CONSTRAINT: Timing/latency boundary, environmental fault trigger, hardware budget, or operational lifecycle constraint.\n- ATTRIBUTE: Specific data field, configuration property, or numeric measurement.\n- NOISE: Conversational filler, instructional directive, or generic procedural framing verb (e.g. \"build\", \"implement\").\n\nFor each candidate unit:\n1. Provide the exact category.\n2. Assign a confidence score between 0.0 and 1.0.\n3. Provide a step-by-step technical rationale explaining the classification.\n\nOutput strictly valid JSON adhering to this schema:\n{\n  \"experiment\": \"EXPERIMENT B \u2014 Controlled Semantic Unit Classification\",\n  \"task_id\": \"<TASK_ID>\",\n  \"classifications\": [\n    {\n      \"unit\": \"<SEMANTIC_UNIT_STRING>\",\n      \"class\": \"ENTITY\" | \"INVARIANT\" | \"BEHAVIOR\" | \"CONSTRAINT\" | \"ATTRIBUTE\" | \"NOISE\",\n      \"confidence\": <FLOAT_0_TO_1>,\n      \"rationale\": \"<TECHNICAL_RATIONALE>\"\n    }\n  ]\n}\n",
+    "user_prompt": "Analyze the following engineering prompt:\nPrompt: \"Build a desktop examination lockdown sandbox that restricts dual-monitor mirroring and intercepts OS clipboard paste during active exam sessions.\"\n\nClassify the following semantic units extracted from the prompt:\n1. \"examination lockdown sandbox\"\n2. \"lockdown\"\n3. \"restricts\"\n4. \"dual-monitor mirroring\"\n5. \"intercepts\"\n6. \"OS clipboard paste\"\n7. \"during active exam sessions\"\n8. \"build\"\n\nReturn strictly valid JSON as specified in the system instructions.",
+    "input_context": {
+      "raw_prompt": "Build a desktop examination lockdown sandbox that restricts dual-monitor mirroring and intercepts OS clipboard paste during active exam sessions.",
+      "units_to_classify": [
+        "examination lockdown sandbox",
+        "lockdown",
+        "restricts",
+        "dual-monitor mirroring",
+        "intercepts",
+        "OS clipboard paste",
+        "during active exam sessions",
+        "build"
+      ]
+    }
+  }
 }

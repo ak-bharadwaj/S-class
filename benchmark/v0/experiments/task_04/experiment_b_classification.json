@@ -1,54 +1,89 @@
 {
-  "experiment": "EXPERIMENT B — Controlled Semantic Unit Classification (Task 04)",
-  "task_id": "TASK-04-AEROSPACE-BLACKBOX-TELEMETRY",
+  "experiment": "EXPERIMENT B \u2014 Controlled Semantic Unit Classification",
+  "task_id": "TASK-FDR-SYNC-001",
   "classifications": [
     {
       "unit": "flight data recorder",
       "class": "ENTITY",
       "confidence": 0.98,
-      "rationale": "Represents the primary physical/logical domain system aggregate responsible for capturing, processing, and preserving airborne telemetry."
+      "rationale": "Represents a primary domain aggregate and avionics hardware/software system responsible for telemetry capture."
     },
     {
       "unit": "buffer synchronization",
       "class": "BEHAVIOR",
       "confidence": 0.95,
-      "rationale": "Describes a dynamic coordination workflow and state management process that aligns volatile memory buffers with persistent storage."
+      "rationale": "Denotes an active system workflow and coordination mechanism that aligns volatile buffer state with persistent storage."
     },
     {
       "unit": "flushes",
       "class": "BEHAVIOR",
       "confidence": 0.99,
-      "rationale": "An operational action verb and state transition representing the physical/logical commit and writing of in-memory telemetry frames to non-volatile medium."
+      "rationale": "Specifies a dynamic write/transfer operation and state transition moving data from intermediate memory to non-volatile media."
     },
     {
       "unit": "ARINC 429 bus frames",
       "class": "ENTITY",
-      "confidence": 0.97,
-      "rationale": "Defines the core avionics domain data model and standardized 32-bit protocol transmission payload aggregate."
+      "confidence": 0.96,
+      "rationale": "Represents the core domain data model and structured transmission protocol packets being captured and recorded."
     },
     {
       "unit": "solid-state crash-survivable memory",
       "class": "ENTITY",
-      "confidence": 0.98,
-      "rationale": "Identifies the Crash-Survivable Memory Unit (CSMU) storage target aggregate engineered to withstand extreme mechanical impact and thermal shock."
+      "confidence": 0.97,
+      "rationale": "Represents a physical persistence entity and specialized non-volatile storage aggregate."
     },
     {
       "unit": "on power loss",
       "class": "CONSTRAINT",
-      "confidence": 0.96,
-      "rationale": "Specifies a critical hardware trigger boundary and environmental fault condition governing the exact execution window for emergency non-volatile write routines."
+      "confidence": 0.95,
+      "rationale": "Defines an environmental fault trigger and operational boundary condition under which emergency flush procedures must execute."
     },
     {
       "unit": "real-time",
       "class": "CONSTRAINT",
-      "confidence": 0.95,
-      "rationale": "Imposes a strict deterministic latency, timing, and SLA execution boundary ensuring bounded worst-case execution time within avionics deadlines."
+      "confidence": 0.94,
+      "rationale": "Imposes a strict deterministic timing and latency boundary on the execution of the buffer synchronization process."
     },
     {
       "unit": "implement",
       "class": "NOISE",
-      "confidence": 1.0,
-      "rationale": "Constitutes conversational prompt framing and imperative directive filler devoid of avionics domain semantics or architectural constraints."
+      "confidence": 0.99,
+      "rationale": "Serves as an imperative procedural instruction and task-framing verb with no domain-specific modeling semantics."
     }
-  ]
+  ],
+  "provenance_metadata": {
+    "experiment_id": "EXPERIMENT_B_SEMANTIC_CLASSIFICATION",
+    "task_id": "TASK-04-AEROSPACE-BLACKBOX-TELEMETRY",
+    "runner_version": "2.0.0-gate1.2-provenance",
+    "git_commit": "700d94f059b0e35071b0d29f0c834e72ad43a636",
+    "timestamp_utc": "2026-08-15T18:17:59.641947+00:00",
+    "latency_ms": 9447.06,
+    "provider": "gemini",
+    "model": "gemini-flash-latest",
+    "generation_settings": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "token_usage": {
+      "prompt_tokens": 475,
+      "completion_tokens": 541,
+      "total_tokens": 1016
+    },
+    "estimated_cost_usd": 0.000198,
+    "system_prompt": "You are the S-Class Semantic Unit Classifier.\nYour job is to analyze engineering requirements phrases and classify each extracted semantic unit into exactly one category:\n- ENTITY: Core domain data model, system aggregate, or persistence entity.\n- INVARIANT: Mathematical constraint, immutable safety rule, statutory regulatory requirement, or non-negotiable invariant.\n- BEHAVIOR: Dynamic action, system workflow, API operation, state transition, or event trigger.\n- CONSTRAINT: Timing/latency boundary, environmental fault trigger, hardware budget, or operational lifecycle constraint.\n- ATTRIBUTE: Specific data field, configuration property, or numeric measurement.\n- NOISE: Conversational filler, instructional directive, or generic procedural framing verb (e.g. \"build\", \"implement\").\n\nFor each candidate unit:\n1. Provide the exact category.\n2. Assign a confidence score between 0.0 and 1.0.\n3. Provide a step-by-step technical rationale explaining the classification.\n\nOutput strictly valid JSON adhering to this schema:\n{\n  \"experiment\": \"EXPERIMENT B \u2014 Controlled Semantic Unit Classification\",\n  \"task_id\": \"<TASK_ID>\",\n  \"classifications\": [\n    {\n      \"unit\": \"<SEMANTIC_UNIT_STRING>\",\n      \"class\": \"ENTITY\" | \"INVARIANT\" | \"BEHAVIOR\" | \"CONSTRAINT\" | \"ATTRIBUTE\" | \"NOISE\",\n      \"confidence\": <FLOAT_0_TO_1>,\n      \"rationale\": \"<TECHNICAL_RATIONALE>\"\n    }\n  ]\n}\n",
+    "user_prompt": "Analyze the following engineering prompt:\nPrompt: \"Implement real-time flight data recorder buffer synchronization that flushes ARINC 429 bus frames to solid-state crash-survivable memory on power loss.\"\n\nClassify the following semantic units extracted from the prompt:\n1. \"flight data recorder\"\n2. \"buffer synchronization\"\n3. \"flushes\"\n4. \"ARINC 429 bus frames\"\n5. \"solid-state crash-survivable memory\"\n6. \"on power loss\"\n7. \"real-time\"\n8. \"implement\"\n\nReturn strictly valid JSON as specified in the system instructions.",
+    "input_context": {
+      "raw_prompt": "Implement real-time flight data recorder buffer synchronization that flushes ARINC 429 bus frames to solid-state crash-survivable memory on power loss.",
+      "units_to_classify": [
+        "flight data recorder",
+        "buffer synchronization",
+        "flushes",
+        "ARINC 429 bus frames",
+        "solid-state crash-survivable memory",
+        "on power loss",
+        "real-time",
+        "implement"
+      ]
+    }
+  }
 }

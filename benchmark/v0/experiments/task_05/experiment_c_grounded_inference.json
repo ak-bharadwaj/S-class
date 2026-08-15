@@ -1,156 +1,88 @@
 {
-  "experiment": "EXPERIMENT C — Grounded Domain Inference (Task 05)",
-  "task_id": "TASK-05-EXAM-BROWSER-SANDBOX",
+  "experiment": "EXPERIMENT C \u2014 Grounded Domain Inference",
+  "task_id": "EDTECH_SEC_EXAM_SANDBOX_001",
   "inferred_requirements": [
     {
-      "requirement_id": "REQ-EXAM-01",
-      "title": "Secondary Display Detection and Screen Mirroring Suppression",
-      "description": "The sandbox must enumerate all connected physical and virtual display devices at startup and continuously monitor display topology. If secondary monitors, virtual display drivers, or cloned/mirrored display configurations are active or detected, the sandbox must suppress output to external screens, blank unauthorized displays, or refuse/halt exam execution until single-display topology is enforced.",
+      "requirement_id": "REQ-EXPLICIT-01",
+      "title": "Dual-Monitor Mirroring and Extension Restriction",
+      "description": "The desktop examination sandbox must detect and actively restrict dual-monitor configurations, external display connections, and screen mirroring/projection during active exam sessions.",
       "type": "SECURITY",
       "epistemic_status": "EXPLICIT",
       "provenance": "USER_PROMPT",
       "confidence": 1.0,
-      "justification": "Directly mandated by user prompt: 'restricts dual-monitor mirroring'."
+      "justification": "Directly stated in the prompt requirements."
     },
     {
-      "requirement_id": "REQ-EXAM-02",
-      "title": "OS Clipboard Paste Interception and Payload Sanitization",
-      "description": "The sandbox application must hook into OS-level clipboard events and input fields during an active exam session to intercept, inspect, and sanitize or block any external clipboard paste operations, preventing unauthorized external content from entering the exam document.",
+      "requirement_id": "REQ-EXPLICIT-02",
+      "title": "OS Clipboard Paste Interception",
+      "description": "The desktop application must intercept and block operating system clipboard paste events within the sandbox boundary during active exam sessions.",
       "type": "SECURITY",
       "epistemic_status": "EXPLICIT",
       "provenance": "USER_PROMPT",
       "confidence": 1.0,
-      "justification": "Directly mandated by user prompt: 'intercepts OS clipboard paste during active exam sessions'."
+      "justification": "Directly stated in the prompt requirements."
     },
     {
-      "requirement_id": "REQ-EXAM-03",
-      "title": "Desktop Lockdown Session Lifecycle Management",
-      "description": "The system must manage a discrete lockdown session state machine (INITIALIZING -> LOCKED_EXAM_ACTIVE -> VIOLATION_SUSPENDED -> CLEANUP_EXIT). The transition into LOCKED_EXAM_ACTIVE establishes OS restriction hooks, and exit transitions safely teardown sandbox restrictions.",
-      "type": "FUNCTIONAL",
-      "epistemic_status": "EXPLICIT",
-      "provenance": "USER_PROMPT",
-      "confidence": 1.0,
-      "justification": "Directly required by prompt scope: 'Build a desktop examination lockdown sandbox [...] during active exam sessions'."
-    },
-    {
-      "requirement_id": "REQ-EXAM-04",
-      "title": "Low-Level Global Keyboard Shortcut and Hotkey Suppression",
-      "description": "The sandbox must establish low-level OS keyboard hooks (e.g., WH_KEYBOARD_LL on Windows, CGEventTap on macOS) to intercept and swallow system hotkeys including task switching (Alt+Tab, Cmd+Tab), shell navigation (Windows Key, Super Key), screen capture keys (PrintScreen, Snipping Tool hotkeys), and developer/system interrupts (Ctrl+Shift+Esc, Alt+F4, Ctrl+Alt+Del interception or lockdown policy).",
-      "type": "SECURITY",
-      "epistemic_status": "DERIVED_JUSTIFIED",
-      "provenance": "SANDBOX_SECURITY",
-      "confidence": 0.98,
-      "justification": "Why 1 (Threat Vector): Examinees can exploit standard OS navigation hotkeys (Alt+Tab, WinKey) or screenshot keys (PrintScreen) to switch into unauthorized reference material or exfiltrate test content. | Why 2 (Technical Mechanism): Standard user-space window focus is insufficient to block OS-level shell shortcuts; the sandbox must install low-level global OS hooks to consume these specific scan codes before OS shell dispatch. | Why 3 (Sandbox Integrity): Uncompromising keyboard suppression guarantees that the student cannot break out of the active kiosk container or capture question assets."
-    },
-    {
-      "requirement_id": "REQ-EXAM-05",
-      "title": "Background Process Enumeration, Blacklist Enforcement, and Virtualization Detection",
-      "description": "The sandbox engine must scan the host OS process table prior to and periodically during the exam session to detect, report, and terminate unauthorized background software, specifically targeting screen recording software (OBS, Camtasia), remote desktop tools (AnyDesk, TeamViewer, RDP), hypervisors/virtual machines (VMware, VirtualBox, QEMU/KVM guest services), debuggers, and overlay software.",
-      "type": "SECURITY",
-      "epistemic_status": "DERIVED_JUSTIFIED",
-      "provenance": "ANTI_CHEAT_INTEGRITY",
-      "confidence": 0.96,
-      "justification": "Why 1 (Threat Vector): Background processes, remote desktop clients, and VM guest-host channels allow invisible third-party viewing, automated screen scraping, or remote proxy test-taking without direct user UI interactions. | Why 2 (Technical Mechanism): The sandbox must enumerate active process trees, inspect binary signatures/window classes, and check hardware hypervisor flags (CPUID hypervisor bits, SMBIOS artifacts) against a strict security blacklist. | Why 3 (Sandbox Integrity): Proactive termination of prohibited background processes ensures the integrity of the local execution boundary and prevents out-of-band screen broadcasting."
-    },
-    {
-      "requirement_id": "REQ-EXAM-06",
-      "title": "Dynamic Display Topology Hot-Plug Monitoring and Auto-Lock",
-      "description": "The sandbox must subscribe to OS-level display reconfiguration events (e.g., WM_DISPLAYCHANGE / CGDisplayRegisterReconfigurationCallback). If an external monitor (HDMI/DisplayPort), wireless display casting (Miracast/AirPlay), or virtual display stream is attached mid-session, the sandbox must instantly lock the UI, mute display output, and flag a security violation.",
-      "type": "BEHAVIORAL",
-      "epistemic_status": "DERIVED_JUSTIFIED",
-      "provenance": "SANDBOX_SECURITY",
-      "confidence": 0.97,
-      "justification": "Why 1 (Threat Vector): A candidate can bypass initial startup display checks by plugging in a secondary monitor or initiating wireless screen mirroring after the exam session has commenced. | Why 2 (Technical Mechanism): Static startup checks do not account for hot-plug events; the sandbox must register dynamic OS display listeners to detect runtime monitor enumeration changes in real time (<100ms). | Why 3 (Sandbox Integrity): Continuous topology surveillance ensures that any mid-session multi-monitor evasion attempt immediately suspends the exam interface."
-    },
-    {
-      "requirement_id": "REQ-EXAM-07",
-      "title": "OS Clipboard Buffer Ingress/Egress Purge and Cross-Session Isolation",
-      "description": "Upon entering lockdown mode, the sandbox must flush/purge existing host OS clipboard buffers to prevent pre-copied notes from being pasted. While active, any outbound copy/cut operations from the exam environment must be blocked or sanitized to prevent exam question exfiltration to external clipboards.",
-      "type": "SECURITY",
-      "epistemic_status": "DERIVED_JUSTIFIED",
-      "provenance": "ANTI_CHEAT_INTEGRITY",
-      "confidence": 0.95,
-      "justification": "Why 1 (Threat Vector): Examinees may populate the system clipboard with cheat sheets before launching the lockdown browser, or attempt to copy out exam questions into background buffers. | Why 2 (Technical Mechanism): The sandbox must invoke OS clipboard clearing APIs (e.g. EmptyClipboard on Win32 / clearContents on macOS) on session startup and disable copy/export clipboard event propagation during execution. | Why 3 (Sandbox Integrity): Complete clipboard isolation eliminates pre-existing buffer payloads and prevents content leaks across the exam boundary."
-    },
-    {
-      "requirement_id": "REQ-EXAM-08",
-      "title": "Tamper-Evident Security Audit Logging and Breach Telemetry",
-      "description": "The sandbox must maintain a structured, tamper-evident local audit log recording all security-relevant events, including session lifecycle changes, suppressed keystroke attempts, secondary monitor connection attempts, detected blacklisted processes, and unauthorized focus-lost events.",
-      "type": "SECURITY",
-      "epistemic_status": "DERIVED_JUSTIFIED",
-      "provenance": "AUDIT_TELEMETRY",
-      "confidence": 0.94,
-      "justification": "Why 1 (Threat Vector): Inconclusive cheating allegations require objective, forensic technical proof to substantiate intentional sandbox evasion attempts versus hardware malfunctions. | Why 2 (Technical Mechanism): The sandbox runtime must log timestamped event records (containing process identifiers, display IDs, and virtual key codes) to a local append-only, checksum-validated ledger. | Why 3 (Sandbox Integrity): Non-repudiable audit logging provides deterministic post-session integrity verification without relying on ungrounded invasive video monitoring."
-    },
-    {
-      "requirement_id": "REQ-EXAM-09",
-      "title": "Graceful OS State Teardown and Shell Restoration Protocol",
-      "description": "Upon authorized session exit, normal completion, or unexpected process termination (via OS crash handlers/hooks), the sandbox must guarantee the clean removal of all low-level keyboard/mouse hooks, restore OS taskbars/shells, re-enable standard display topologies, and release system hooks to prevent host OS instability.",
+      "requirement_id": "REQ-DERIVED-01",
+      "title": "Low-Level OS Window Focus and Kiosk Enforcement",
+      "description": "The sandbox must maintain exclusive window focus and suppress system-level shortcuts (e.g., Alt+Tab, Win/Cmd keys, Mission Control) to prevent escaping the assessment environment.",
       "type": "INVARIANT",
       "epistemic_status": "DERIVED_JUSTIFIED",
-      "provenance": "SANDBOX_SECURITY",
-      "confidence": 0.97,
-      "justification": "Why 1 (Threat Vector): A sandbox that leaves low-level keyboard hooks installed or shell components suppressed after termination or crash will render the student's personal computer unresponsive and unstable. | Why 2 (Technical Mechanism): The system must employ structured RAII/teardown handlers, OS signal hooks (SIGINT, SIGTERM, Structured Exception Handling), and watchdog recovery scripts to restore system state. | Why 3 (Sandbox Integrity): Guaranteed state restoration maintains non-destructive sandbox invariants, ensuring system stability on managed and BYOD machines alike."
+      "provenance": "Operating System API Architecture & Lockdown Mechanics",
+      "confidence": 0.95,
+      "justification": "Why 1: Restricting clipboard and monitors is ineffective if users can freely switch to unmonitored background applications. Why 2: Operating system hooks must be registered via native window management APIs to intercept shell-level context switches. Why 3: The sandbox must preserve strict foreground monopoly to ensure the test surface area remains completely isolated."
     },
     {
-      "requirement_id": "REQ-EXAM-10",
-      "title": "Topmost Exclusive Window Hierarchy and Focus Trap",
-      "description": "The exam window must run in exclusive borderless fullscreen mode pinned to the topmost Z-order (HWND_TOPMOST / NSStatusWindowLevel), continuously capturing pointer and keyboard focus and auto-reclaiming focus if deactivation is attempted.",
-      "type": "NON_FUNCTIONAL",
-      "epistemic_status": "SUPPORTED",
-      "provenance": "SANDBOX_SECURITY",
-      "confidence": 0.92,
-      "justification": "Architecturally supported requirement to maintain continuous user focus and prevent underlying windows from rendering over the exam environment."
-    },
-    {
-      "requirement_id": "REQ-EXAM-11",
-      "title": "Sandbox Execution Privilege and Integrity Level Architecture",
-      "description": "The lockdown client requires elevated OS execution privileges (Administrator on Windows, Accessibility/Input Monitoring permissions on macOS) or a background helper service to install system-wide low-level input hooks and query global process tables.",
-      "type": "NON_FUNCTIONAL",
-      "epistemic_status": "SUPPORTED",
-      "provenance": "SANDBOX_SECURITY",
-      "confidence": 0.91,
-      "justification": "Architecturally supported requirement; low-level keyboard hooks and global process inspection require appropriate OS security entitlements and integrity levels."
-    },
-    {
-      "requirement_id": "REQ-EXAM-12",
-      "title": "Target Operating System Platform Architecture",
-      "description": "The specific target desktop operating systems (e.g., Windows 10/11 Win32/UWP, macOS Ventura/Sonoma Cocoa/Quartz, Linux X11 vs Wayland) and their respective kernel/driver security interfaces are unstated in the prompt.",
+      "requirement_id": "REQ-UNKNOWN-01",
+      "title": "Target Operating System Compatibility Matrix",
+      "description": "Specific target desktop operating systems (e.g., Windows 10/11 versions, macOS versions, Linux distributions) and their exact build architectures are unstated.",
       "type": "NON_FUNCTIONAL",
       "epistemic_status": "UNKNOWN",
       "provenance": "UNSUPPORTED",
-      "confidence": 0.0,
-      "justification": "Unstated operational parameter: OS platform specificities (Windows vs macOS vs Linux) dictate whether Win32 hooks, Quartz event taps, or Wayland protocol extensions are used."
+      "confidence": 1.0,
+      "justification": "The prompt does not specify which desktop platforms must be supported for the sandbox implementation."
     },
     {
-      "requirement_id": "REQ-EXAM-13",
-      "title": "Offline Examination Cache Cryptographic Protection Scheme",
-      "description": "The exact cryptographic specifications for offline question storage and local response caching (e.g., AES-GCM-256 with TPM-sealed hardware keys vs OS DPAPI) are unstated in the prompt.",
-      "type": "SECURITY",
-      "epistemic_status": "UNKNOWN",
-      "provenance": "UNSUPPORTED",
-      "confidence": 0.0,
-      "justification": "Unstated operational parameter: The prompt specifies active exam session lockdown but does not state the offline local cache persistence or encryption requirements."
-    },
-    {
-      "requirement_id": "REQ-EXAM-14",
-      "title": "Session Termination Authentication and Proctor Override Policy",
-      "description": "The specific mechanism required to release the lockdown session (e.g., exam submission confirmation code, proctor master password, time-based cryptographic token, or emergency exit key sequence) is unstated.",
+      "requirement_id": "REQ-UNKNOWN-02",
+      "title": "Assessment Content Delivery and Telemetry Protocol",
+      "description": "The protocol, payload structure, and backend server endpoints for transmitting exam content, security violation logs, and session telemetry are unstated.",
       "type": "FUNCTIONAL",
       "epistemic_status": "UNKNOWN",
       "provenance": "UNSUPPORTED",
-      "confidence": 0.0,
-      "justification": "Unstated operational parameter: The authorization rule set governing administrative session unlock or emergency exit is not specified in the prompt."
-    },
-    {
-      "requirement_id": "REQ-EXAM-15",
-      "title": "Accessibility Hardware and Assistive Technology Conformance Policy",
-      "description": "The allowance rules and whitelist parameters for OS accessibility tools (screen readers like NVDA/JAWS, speech-to-text, assistive peripheral input hardware) within the lockdown environment are unstated.",
-      "type": "FUNCTIONAL",
-      "epistemic_status": "UNKNOWN",
-      "provenance": "UNSUPPORTED",
-      "confidence": 0.0,
-      "justification": "Unstated operational parameter: The prompt does not specify accessibility compliance rules or assistive peripheral whitelist configurations."
+      "confidence": 1.0,
+      "justification": "The prompt restricts scope strictly to desktop sandbox lockdown features without specifying network or server-side integration details."
     }
-  ]
+  ],
+  "provenance_metadata": {
+    "experiment_id": "EXPERIMENT_C_GROUNDED_INFERENCE",
+    "task_id": "TASK-05-EXAM-BROWSER-SANDBOX",
+    "runner_version": "2.0.0-gate1.2-provenance",
+    "git_commit": "700d94f059b0e35071b0d29f0c834e72ad43a636",
+    "timestamp_utc": "2026-08-15T18:24:45.464990+00:00",
+    "latency_ms": 6013.44,
+    "provider": "gemini",
+    "model": "gemini-flash-lite-latest",
+    "generation_settings": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "token_usage": {
+      "prompt_tokens": 631,
+      "completion_tokens": 789,
+      "total_tokens": 1420
+    },
+    "estimated_cost_usd": 0.000284,
+    "system_prompt": "You are the S-Class Grounded Domain Inference Engine.\nYour job is to synthesize software engineering requirements with STRICT EPISTEMIC SELF-RESTRAINT:\n\n1. Requirement Categorization & Provenance:\n   - EXPLICIT: Requirements directly and unambiguously stated in the prompt.\n   - DERIVED_JUSTIFIED: Requirements that are strictly mathematically, architecturally, or operationally necessary to implement the stated goal without defect or system compromise. Every DERIVED_JUSTIFIED requirement MUST include a rigorous 3-step why-chain (Why 1: Problem/Context -> Why 2: Technical Mechanism -> Why 3: Mandatory Invariant).\n   - SUPPORTED: Non-functional, architectural, or platform constraints directly supporting the scope.\n   - UNKNOWN: Any operational parameter, storage choice, protocol standard, third-party provider, or policy that is unstated in the prompt. You MUST surface these as UNKNOWN rather than guessing or fabricating specific implementations.\n\n2. Anti-Hallucination Barrier:\n   - DO NOT fabricate full-stack UI pages (e.g. login screens, dashboards, admin portals) unless explicitly requested.\n   - DO NOT fabricate arbitrary third-party providers (e.g. Stripe, Auth0, AWS) unless explicitly requested.\n\n3. Output Schema:\nReturn strictly valid JSON adhering to this schema:\n{\n  \"experiment\": \"EXPERIMENT C \u2014 Grounded Domain Inference\",\n  \"task_id\": \"<TASK_ID>\",\n  \"inferred_requirements\": [\n    {\n      \"requirement_id\": \"<REQ_ID_STRING>\",\n      \"title\": \"<REQUIREMENT_TITLE>\",\n      \"description\": \"<DETAILED_SPECIFICATION>\",\n      \"type\": \"FUNCTIONAL\" | \"NON_FUNCTIONAL\" | \"SECURITY\" | \"BEHAVIORAL\" | \"INVARIANT\",\n      \"epistemic_status\": \"EXPLICIT\" | \"DERIVED_JUSTIFIED\" | \"SUPPORTED\" | \"UNKNOWN\",\n      \"provenance\": \"USER_PROMPT\" | \"<DOMAIN_PROVENANCE_STRING>\" | \"UNSUPPORTED\",\n      \"confidence\": <FLOAT_0_TO_1>,\n      \"justification\": \"<WHY_CHAIN_OR_RATIONALE>\"\n    }\n  ]\n}\n",
+    "user_prompt": "Synthesize formal software engineering requirements for the following prompt in the domain of 'edtech_security':\nPrompt: \"Build a desktop examination lockdown sandbox that restricts dual-monitor mirroring and intercepts OS clipboard paste during active exam sessions.\"\n\nDomain Guidance:\n- Enforce core invariants and essential derived domain rules.\n- Do not generate unrequested UI pages or hallucinate arbitrary features (specifically avoid: Student grading and gradebook UI, AI webcam face-tracking proctoring portal, Teacher classroom chat forum, Automated essay scoring engine).\n- If key operational choices, providers, or format standards are unstated, mark them explicitly as UNKNOWN.\n\nReturn strictly valid JSON as specified in the system instructions.",
+    "input_context": {
+      "raw_prompt": "Build a desktop examination lockdown sandbox that restricts dual-monitor mirroring and intercepts OS clipboard paste during active exam sessions.",
+      "domain": "edtech_security",
+      "forbidden_hallucinations": [
+        "Student grading and gradebook UI",
+        "AI webcam face-tracking proctoring portal",
+        "Teacher classroom chat forum",
+        "Automated essay scoring engine"
+      ]
+    }
+  }
 }

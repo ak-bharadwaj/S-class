@@ -1,60 +1,82 @@
 {
+  "experiment": "EXPERIMENT B \u2014 Controlled Semantic Unit Classification",
+  "task_id": "TASK_FIN_LEDGER_001",
   "classifications": [
     {
-      "unit": "atomic financial ledger transaction",
-      "class": "ENTITY",
-      "confidence": 0.94,
-      "justification": "Refers to a core domain aggregate root and transactional data object within a financial ledger system with atomic execution semantics.",
-      "uncertainty": 0.06
-    },
-    {
-      "unit": "debit/credit balance invariance",
-      "class": "INVARIANT",
-      "confidence": 0.98,
-      "justification": "Specifies a formal mathematical/accounting rule (double-entry zero-sum equality) that must never be violated across ledger entries.",
-      "uncertainty": 0.02
-    },
-    {
-      "unit": "idempotency check",
-      "class": "BEHAVIOR",
-      "confidence": 0.95,
-      "justification": "Represents a dynamic system operational protocol and deduplication response mechanism to safely handle duplicate incoming requests.",
-      "uncertainty": 0.05
-    },
-    {
       "unit": "atomic",
-      "class": "INVARIANT",
-      "confidence": 0.91,
-      "justification": "Refers to the ACID atomicity property and integrity rule requiring that transactions execute all-or-nothing without partial state persistence.",
-      "uncertainty": 0.09
+      "class": "CONSTRAINT",
+      "confidence": 0.95,
+      "rationale": "Specifies an all-or-nothing transactional boundary constraint (ACID property) governing execution rather than a distinct domain object or functional logic."
     },
     {
       "unit": "financial ledger transaction",
       "class": "ENTITY",
-      "confidence": 0.97,
-      "justification": "A primary domain data object and transactional aggregate root representing a recorded financial transfer in the ledger.",
-      "uncertainty": 0.03
+      "confidence": 0.98,
+      "rationale": "Represents the core domain aggregate and persistence data model within the accounting system."
     },
     {
       "unit": "debit/credit",
       "class": "ATTRIBUTE",
       "confidence": 0.88,
-      "justification": "Represents the data fields, entry types, or financial properties associated with ledger entries.",
-      "uncertainty": 0.12
+      "rationale": "Represents structural accounting entry types or qualifiers applied to transaction line items."
     },
     {
       "unit": "balance invariance",
       "class": "INVARIANT",
-      "confidence": 0.97,
-      "justification": "Specifies a mathematical and logical integrity constraint requiring that account or ledger balances remain consistent without violation.",
-      "uncertainty": 0.03
+      "confidence": 0.99,
+      "rationale": "Represents a strict mathematical safety rule requiring sum equality across ledger states."
+    },
+    {
+      "unit": "idempotency check",
+      "class": "BEHAVIOR",
+      "confidence": 0.92,
+      "rationale": "Defines an active operational validation workflow designed to verify and prevent duplicate execution of requests."
     },
     {
       "unit": "implement",
       "class": "NOISE",
       "confidence": 0.99,
-      "justification": "A generic procedural verb/scaffolding term explicitly categorized as conversational noise in engineering requirements specification.",
-      "uncertainty": 0.01
+      "rationale": "Procedural framing directive with no domain-specific semantic value."
+    },
+    {
+      "unit": "debit/credit balance invariance",
+      "class": "INVARIANT",
+      "confidence": 0.99,
+      "rationale": "Constitutes the non-negotiable double-entry accounting rule requiring total debits to strictly equal total credits."
     }
-  ]
+  ],
+  "provenance_metadata": {
+    "experiment_id": "EXPERIMENT_B_SEMANTIC_CLASSIFICATION",
+    "task_id": "TASK-01-FINTECH-LEDGER",
+    "runner_version": "2.0.0-gate1.2-provenance",
+    "git_commit": "700d94f059b0e35071b0d29f0c834e72ad43a636",
+    "timestamp_utc": "2026-08-15T18:17:02.633933+00:00",
+    "latency_ms": 4520.32,
+    "provider": "gemini",
+    "model": "gemini-flash-latest",
+    "generation_settings": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "token_usage": {
+      "prompt_tokens": 443,
+      "completion_tokens": 468,
+      "total_tokens": 911
+    },
+    "estimated_cost_usd": 0.000174,
+    "system_prompt": "You are the S-Class Semantic Unit Classifier.\nYour job is to analyze engineering requirements phrases and classify each extracted semantic unit into exactly one category:\n- ENTITY: Core domain data model, system aggregate, or persistence entity.\n- INVARIANT: Mathematical constraint, immutable safety rule, statutory regulatory requirement, or non-negotiable invariant.\n- BEHAVIOR: Dynamic action, system workflow, API operation, state transition, or event trigger.\n- CONSTRAINT: Timing/latency boundary, environmental fault trigger, hardware budget, or operational lifecycle constraint.\n- ATTRIBUTE: Specific data field, configuration property, or numeric measurement.\n- NOISE: Conversational filler, instructional directive, or generic procedural framing verb (e.g. \"build\", \"implement\").\n\nFor each candidate unit:\n1. Provide the exact category.\n2. Assign a confidence score between 0.0 and 1.0.\n3. Provide a step-by-step technical rationale explaining the classification.\n\nOutput strictly valid JSON adhering to this schema:\n{\n  \"experiment\": \"EXPERIMENT B \u2014 Controlled Semantic Unit Classification\",\n  \"task_id\": \"<TASK_ID>\",\n  \"classifications\": [\n    {\n      \"unit\": \"<SEMANTIC_UNIT_STRING>\",\n      \"class\": \"ENTITY\" | \"INVARIANT\" | \"BEHAVIOR\" | \"CONSTRAINT\" | \"ATTRIBUTE\" | \"NOISE\",\n      \"confidence\": <FLOAT_0_TO_1>,\n      \"rationale\": \"<TECHNICAL_RATIONALE>\"\n    }\n  ]\n}\n",
+    "user_prompt": "Analyze the following engineering prompt:\nPrompt: \"Implement an atomic financial ledger transaction with debit/credit balance invariance and idempotency check.\"\n\nClassify the following semantic units extracted from the prompt:\n1. \"atomic\"\n2. \"financial ledger transaction\"\n3. \"debit/credit\"\n4. \"balance invariance\"\n5. \"idempotency check\"\n6. \"implement\"\n7. \"debit/credit balance invariance\"\n\nReturn strictly valid JSON as specified in the system instructions.",
+    "input_context": {
+      "raw_prompt": "Implement an atomic financial ledger transaction with debit/credit balance invariance and idempotency check.",
+      "units_to_classify": [
+        "atomic",
+        "financial ledger transaction",
+        "debit/credit",
+        "balance invariance",
+        "idempotency check",
+        "implement",
+        "debit/credit balance invariance"
+      ]
+    }
+  }
 }

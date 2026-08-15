@@ -1,48 +1,82 @@
 {
-  "experiment": "EXPERIMENT B — Controlled Semantic Unit Classification (Task 03)",
-  "task_id": "TASK-03-HEALTHCARE-PHI-MASK",
+  "experiment": "EXPERIMENT B \u2014 Controlled Semantic Unit Classification",
+  "task_id": "EXP-B-HIPAA-EXPORT-001",
   "classifications": [
     {
       "unit": "export pipeline",
       "class": "ENTITY",
       "confidence": 0.95,
-      "rationale": "Represents the structural system aggregate and data processing pipeline construct that encapsulates the ingestion, transformation, and distribution lifecycle."
+      "rationale": "Represents a primary architectural system component and data processing aggregate responsible for moving data between systems."
     },
     {
       "unit": "export",
       "class": "BEHAVIOR",
-      "confidence": 0.96,
-      "rationale": "Represents the dynamic action and system workflow of extracting and emitting data records from the EHR domain boundary."
+      "confidence": 0.9,
+      "rationale": "Denotes an active system operation and data transfer workflow from source to destination."
     },
     {
       "unit": "strips",
       "class": "BEHAVIOR",
-      "confidence": 0.94,
-      "rationale": "Denotes the active transformation and redaction mechanism/action executed on data payloads during transit."
+      "confidence": 0.95,
+      "rationale": "Defines a dynamic data transformation action that removes specific fields from incoming data streams."
     },
     {
       "unit": "18 HIPAA Safe Harbor direct identifiers",
       "class": "INVARIANT",
       "confidence": 0.98,
-      "rationale": "Refers to the strict statutory regulatory compliance specification (45 CFR § 164.514(b)(2)) requiring mandatory removal of all 18 direct PHI identifiers to achieve Safe Harbor de-identification status."
+      "rationale": "Represents a statutory regulatory compliance requirement and immutable rule governing the de-identification of data."
     },
     {
       "unit": "patient records",
       "class": "ENTITY",
-      "confidence": 0.97,
-      "rationale": "Represents the primary domain data model and core entity aggregate containing clinical and demographic Protected Health Information (PHI)."
+      "confidence": 0.92,
+      "rationale": "Identifies the core domain persistence entity containing sensitive health data subject to processing."
     },
     {
       "unit": "analytics ingestion",
-      "class": "ENTITY",
-      "confidence": 0.92,
-      "rationale": "Represents the downstream operational destination and analytical data store sink."
+      "class": "BEHAVIOR",
+      "confidence": 0.9,
+      "rationale": "Describes the workflow and integration operation of receiving processed data into the downstream analytics environment."
     },
     {
       "unit": "build",
       "class": "NOISE",
       "confidence": 0.99,
-      "rationale": "Imperative meta-prompt instruction verb requesting system creation, carrying no domain semantics, business logic, or runtime system constraints."
+      "rationale": "Serves as an instructional procedural framing verb that specifies task implementation rather than domain logic or system architecture."
     }
-  ]
+  ],
+  "provenance_metadata": {
+    "experiment_id": "EXPERIMENT_B_SEMANTIC_CLASSIFICATION",
+    "task_id": "TASK-03-HEALTHCARE-PHI-MASK",
+    "runner_version": "2.0.0-gate1.2-provenance",
+    "git_commit": "700d94f059b0e35071b0d29f0c834e72ad43a636",
+    "timestamp_utc": "2026-08-15T18:17:43.826391+00:00",
+    "latency_ms": 3810.04,
+    "provider": "gemini",
+    "model": "gemini-flash-latest",
+    "generation_settings": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "token_usage": {
+      "prompt_tokens": 440,
+      "completion_tokens": 463,
+      "total_tokens": 903
+    },
+    "estimated_cost_usd": 0.000172,
+    "system_prompt": "You are the S-Class Semantic Unit Classifier.\nYour job is to analyze engineering requirements phrases and classify each extracted semantic unit into exactly one category:\n- ENTITY: Core domain data model, system aggregate, or persistence entity.\n- INVARIANT: Mathematical constraint, immutable safety rule, statutory regulatory requirement, or non-negotiable invariant.\n- BEHAVIOR: Dynamic action, system workflow, API operation, state transition, or event trigger.\n- CONSTRAINT: Timing/latency boundary, environmental fault trigger, hardware budget, or operational lifecycle constraint.\n- ATTRIBUTE: Specific data field, configuration property, or numeric measurement.\n- NOISE: Conversational filler, instructional directive, or generic procedural framing verb (e.g. \"build\", \"implement\").\n\nFor each candidate unit:\n1. Provide the exact category.\n2. Assign a confidence score between 0.0 and 1.0.\n3. Provide a step-by-step technical rationale explaining the classification.\n\nOutput strictly valid JSON adhering to this schema:\n{\n  \"experiment\": \"EXPERIMENT B \u2014 Controlled Semantic Unit Classification\",\n  \"task_id\": \"<TASK_ID>\",\n  \"classifications\": [\n    {\n      \"unit\": \"<SEMANTIC_UNIT_STRING>\",\n      \"class\": \"ENTITY\" | \"INVARIANT\" | \"BEHAVIOR\" | \"CONSTRAINT\" | \"ATTRIBUTE\" | \"NOISE\",\n      \"confidence\": <FLOAT_0_TO_1>,\n      \"rationale\": \"<TECHNICAL_RATIONALE>\"\n    }\n  ]\n}\n",
+    "user_prompt": "Analyze the following engineering prompt:\nPrompt: \"Build an export pipeline that strips 18 HIPAA Safe Harbor direct identifiers before analytics ingestion.\"\n\nClassify the following semantic units extracted from the prompt:\n1. \"export pipeline\"\n2. \"export\"\n3. \"strips\"\n4. \"18 HIPAA Safe Harbor direct identifiers\"\n5. \"patient records\"\n6. \"analytics ingestion\"\n7. \"build\"\n\nReturn strictly valid JSON as specified in the system instructions.",
+    "input_context": {
+      "raw_prompt": "Build an export pipeline that strips 18 HIPAA Safe Harbor direct identifiers before analytics ingestion.",
+      "units_to_classify": [
+        "export pipeline",
+        "export",
+        "strips",
+        "18 HIPAA Safe Harbor direct identifiers",
+        "patient records",
+        "analytics ingestion",
+        "build"
+      ]
+    }
+  }
 }

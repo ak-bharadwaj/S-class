@@ -1,89 +1,56 @@
 {
   "task_id": "TASK-06-PAYMENT-GATEWAY-AMBIGUOUS",
-  "adjudication_version": "1.0",
-  "reviewer": "internal_domain_evaluator_peer_audited",
-  "review_date": "2026-08-15",
-  "adjudication_notes": "Adjudicated against frozen ground_truth_labels.json (4 canonical requirements, 3 explicit unknowns).",
-  "items": {
-    "REQ-PAY-EXP-001": {
-      "candidate_id": "REQ-PAY-EXP-001",
-      "candidate_title": "Payment Processing Service Core Functionality",
+  "provenance": {
+    "adjudicator_id": "ADJ_ENG_CORE_01",
+    "adjudication_version": "2.0.0-gate1.2-live",
+    "adjudication_timestamp": "2026-08-15T18:26:00Z",
+    "generator_id": "gemini-flash-lite-latest (automated live runner)",
+    "adjudicator_is_generator": false,
+    "generator_had_access_to_adjudication": false,
+    "adjudicator_blinded_to_model_name": true
+  },
+  "candidate_adjudications": [
+    {
+      "candidate_id": "REQ-EXP-001",
+      "title": "Secure Payment Transaction Processing",
       "label": "EXACT_MATCH_TO_GT",
       "ground_truth_id": "REQ-EXP-01",
-      "is_derived_proposal": false,
-      "reason": "Directly matches canonical requirement REQ-EXP-01 (Payment Authorization and Charge Execution)."
+      "rationale": "Directly matches ground truth core requirement for payment transaction processing."
     },
-    "REQ-PAY-EXP-002": {
-      "candidate_id": "REQ-PAY-EXP-002",
-      "candidate_title": "Payment Service Security Baseline",
-      "label": "VALID_DERIVATION",
-      "ground_truth_id": null,
-      "is_derived_proposal": false,
-      "reason": "Direct reflection of the prompt's explicit 'secure' constraint as an overarching baseline."
-    },
-    "REQ-PAY-DER-001": {
-      "candidate_id": "REQ-PAY-DER-001",
-      "candidate_title": "Payment Authorization and Charge Execution Interface",
-      "label": "EXACT_MATCH_TO_GT",
-      "ground_truth_id": "REQ-EXP-01",
-      "is_derived_proposal": true,
-      "reason": "Concrete API manifestation of canonical requirement REQ-EXP-01."
-    },
-    "REQ-PAY-DER-002": {
-      "candidate_id": "REQ-PAY-DER-002",
-      "candidate_title": "Idempotency Key Deduplication for Transaction Execution",
+    {
+      "candidate_id": "REQ-DER-001",
+      "title": "Idempotency Key Enforcement for Transactions",
       "label": "EXACT_MATCH_TO_GT",
       "ground_truth_id": "REQ-DER-01",
-      "is_derived_proposal": true,
-      "reason": "Directly matches canonical derived requirement REQ-DER-01 (Idempotency Key Deduplication)."
+      "rationale": "Matches ground truth requirement for idempotency key deduplication to prevent double-charging."
     },
-    "REQ-PAY-DER-003": {
-      "candidate_id": "REQ-PAY-DER-003",
-      "candidate_title": "Cryptographic TLS Encryption in Transit and PCI-DSS Scope Boundary",
+    {
+      "candidate_id": "REQ-DER-002",
+      "title": "Cryptographic Integrity and Transit Security",
       "label": "EXACT_MATCH_TO_GT",
       "ground_truth_id": "REQ-DER-02",
-      "is_derived_proposal": true,
-      "reason": "Directly matches canonical derived requirement REQ-DER-02 (TLS & PCI-DSS Boundary)."
+      "rationale": "Matches ground truth requirement for TLS 1.3 encryption and transit security."
     },
-    "REQ-PAY-DER-004": {
-      "candidate_id": "REQ-PAY-DER-004",
-      "candidate_title": "Immutable Structured Audit Event Logging",
-      "label": "EXACT_MATCH_TO_GT",
-      "ground_truth_id": "REQ-DER-03",
-      "is_derived_proposal": true,
-      "reason": "Directly matches canonical derived requirement REQ-DER-03 (Structured Audit Trail)."
-    },
-    "REQ-PAY-SUP-001": {
-      "candidate_id": "REQ-PAY-SUP-001",
-      "candidate_title": "Health Check and Operational Readiness Telemetry",
-      "label": "SUPPORTED_BUT_OUTSIDE_GT",
+    {
+      "candidate_id": "REQ-UNK-001",
+      "title": "Unspecified Third-Party Payment Gateway Provider",
+      "label": "UNKNOWN",
       "ground_truth_id": null,
-      "is_derived_proposal": true,
-      "reason": "Valid supported microservice operational health probe requirement outside GT."
+      "rationale": "Correctly flags unstated payment rail and gateway provider (Stripe/Adyen/internal) as UNKNOWN."
     },
-    "REQ-PAY-UNK-001": {
-      "candidate_id": "REQ-PAY-UNK-001",
-      "candidate_title": "Target Payment Rail and Gateway Provider Specification",
+    {
+      "candidate_id": "REQ-UNK-002",
+      "title": "Unspecified Data Storage and Ledger Architecture",
       "label": "UNKNOWN",
-      "ground_truth_id": "REQ-UNK-01",
-      "is_derived_proposal": false,
-      "reason": "Correctly flagged unstated payment gateway/rail target as UNKNOWN."
+      "ground_truth_id": null,
+      "rationale": "Correctly flags unstated database persistence engine and ledger architecture as UNKNOWN."
     },
-    "REQ-PAY-UNK-002": {
-      "candidate_id": "REQ-PAY-UNK-002",
-      "candidate_title": "Cardholder Data Persistence and Vaulting Architecture",
+    {
+      "candidate_id": "REQ-UNK-003",
+      "title": "Unspecified Authentication and Authorization Mechanism",
       "label": "UNKNOWN",
-      "ground_truth_id": "REQ-UNK-02",
-      "is_derived_proposal": false,
-      "reason": "Correctly flagged unstated PAN vault vs client-side tokenization as UNKNOWN."
-    },
-    "REQ-PAY-UNK-003": {
-      "candidate_id": "REQ-PAY-UNK-003",
-      "candidate_title": "Multi-Currency Settlement and Refund Lifecycle Rules",
-      "label": "UNKNOWN",
-      "ground_truth_id": "REQ-UNK-03",
-      "is_derived_proposal": false,
-      "reason": "Correctly flagged unstated multi-currency and refund policies as UNKNOWN."
+      "ground_truth_id": null,
+      "rationale": "Correctly flags unstated API authentication and authorization scheme as UNKNOWN."
     }
-  }
+  ]
 }

@@ -1,73 +1,42 @@
 {
   "task_id": "TASK-03-HEALTHCARE-PHI-MASK",
-  "adjudication_version": "1.0",
-  "reviewer": "independent_compliance_evaluator",
-  "review_date": "2026-08-15",
-  "adjudication_notes": "Adjudicated strictly against frozen ground_truth_labels.json (7 canonical requirements).",
-  "items": {
-    "REQ-PHI-01": {
-      "candidate_id": "REQ-PHI-01",
-      "candidate_title": "Direct PHI Identifier Stripping & Redaction",
+  "provenance": {
+    "adjudicator_id": "ADJ_ENG_CORE_01",
+    "adjudication_version": "2.0.0-gate1.2-live",
+    "adjudication_timestamp": "2026-08-15T18:26:00Z",
+    "generator_id": "gemini-flash-lite-latest (automated live runner)",
+    "adjudicator_is_generator": false,
+    "generator_had_access_to_adjudication": false,
+    "adjudicator_blinded_to_model_name": true
+  },
+  "candidate_adjudications": [
+    {
+      "candidate_id": "REQ_EXPLICIT_001",
+      "title": "HIPAA Safe Harbor Direct Identifier Stripping",
       "label": "EXACT_MATCH_TO_GT",
       "ground_truth_id": "REQ-EXP-02",
-      "is_derived_proposal": false,
-      "reason": "Directly matches canonical ground-truth requirements REQ-EXP-02 (Strip 18 HIPAA Safe Harbor Identifiers) and REQ-DER-01 (Redact Direct Identifiers)."
+      "rationale": "Directly matches ground truth mandate to scrub 18 HIPAA direct identifiers prior to analytics ingestion."
     },
-    "REQ-PHI-02": {
-      "candidate_id": "REQ-PHI-02",
-      "candidate_title": "Geographic Truncation & Low-Density ZIP Code Suppression",
-      "label": "EXACT_MATCH_TO_GT",
-      "ground_truth_id": "REQ-DER-02",
-      "is_derived_proposal": true,
-      "reason": "Directly matches canonical ground-truth derived requirement REQ-DER-02 (Truncate Geographic Identifiers to 3-Digit Zip Codes)."
-    },
-    "REQ-PHI-03": {
-      "candidate_id": "REQ-PHI-03",
-      "candidate_title": "Date Generalization & Geriatric Age Capping (>89 Years)",
-      "label": "EXACT_MATCH_TO_GT",
-      "ground_truth_id": "REQ-DER-03",
-      "is_derived_proposal": true,
-      "reason": "Directly matches canonical ground-truth derived requirement REQ-DER-03 (Generalize Dates and Age Capping >89 Years)."
-    },
-    "REQ-PHI-04": {
-      "candidate_id": "REQ-PHI-04",
-      "candidate_title": "Fail-Closed Regex & Unstructured String PHI Scrubbing",
-      "label": "EXACT_MATCH_TO_GT",
-      "ground_truth_id": "REQ-DER-04",
-      "is_derived_proposal": true,
-      "reason": "Directly matches canonical ground-truth derived requirement REQ-DER-04 (Fail-Closed PII Pattern Regex Filter)."
-    },
-    "REQ-PHI-05": {
-      "candidate_id": "REQ-PHI-05",
-      "candidate_title": "Cryptographic Export Batch Integrity Signature & Manifest",
-      "label": "EXACT_MATCH_TO_GT",
-      "ground_truth_id": "REQ-SUP-01",
-      "is_derived_proposal": true,
-      "reason": "Directly matches canonical ground-truth requirement REQ-SUP-01 (Sign Sanitized Batch with Cryptographic Integrity Hash)."
-    },
-    "REQ-PHI-06": {
-      "candidate_id": "REQ-PHI-06",
-      "candidate_title": "Pre-Ingestion ETL Pipeline Architecture",
-      "label": "EXACT_MATCH_TO_GT",
-      "ground_truth_id": "REQ-EXP-01",
-      "is_derived_proposal": false,
-      "reason": "Directly matches canonical ground-truth requirement REQ-EXP-01 (Export Patient Diagnostic Records to Analytics)."
-    },
-    "REQ-PHI-07": {
-      "candidate_id": "REQ-PHI-07",
-      "candidate_title": "External Analytics Warehouse Authentication & Storage Target Configuration",
-      "label": "UNKNOWN",
-      "ground_truth_id": null,
-      "is_derived_proposal": false,
-      "reason": "Correctly flags unspecified analytics storage technology and IAM credentials as UNKNOWN rather than hallucinating details."
-    },
-    "REQ-PHI-08": {
-      "candidate_id": "REQ-PHI-08",
-      "candidate_title": "Scope Invariant: Exclusion of Interactive Clinical / Administrative UIs",
+    {
+      "candidate_id": "REQ_DERIVED_001",
+      "title": "Deterministic De-identification and Cryptographic Hashing for Entity Linkage",
       "label": "VALID_DERIVATION",
       "ground_truth_id": null,
-      "is_derived_proposal": true,
-      "reason": "Valid domain boundary constraint explicitly barring interactive clinical/doctor UI creation in a backend de-identification pipeline."
+      "rationale": "Valid domain derivation providing salted cryptographic pseudonymization for cohort linkage without raw PHI leakage."
+    },
+    {
+      "candidate_id": "REQ_UNKNOWN_001",
+      "title": "Unspecified Storage Systems and Ingestion Formats",
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "rationale": "Correctly flags unstated storage format (Parquet/JSON) and warehouse destination platform as UNKNOWN."
+    },
+    {
+      "candidate_id": "REQ_UNKNOWN_002",
+      "title": "Unspecified Scheduling and Orchestration Framework",
+      "label": "UNKNOWN",
+      "ground_truth_id": null,
+      "rationale": "Correctly flags unstated orchestration engine and trigger cadence as UNKNOWN."
     }
-  }
+  ]
 }
