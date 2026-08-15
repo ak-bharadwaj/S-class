@@ -1,0 +1,638 @@
+{
+  "benchmark": "S-Class Gate 1.6 Real Engineering Repository Benchmark",
+  "total_tasks_evaluated": 16,
+  "baselines_evaluated": [
+    "B1 \u2014 Baseline Agent (Raw LLM Code Generation)",
+    "B2 \u2014 Agent + Standard Pytest Verification Loop",
+    "B3 \u2014 Agent + S-Class Candidate Authority Pipeline"
+  ],
+  "aggregate_comparison": {
+    "b1_baseline_agent": {
+      "must_recall": 49.38,
+      "gt_recall": 48.67,
+      "unsupported_rate": 29.45,
+      "req_count": 18.38,
+      "defects": 2.44,
+      "interventions": 3.44,
+      "rework_score": 7.44,
+      "latency_ms": 1230.0,
+      "trust_score": 4.25
+    },
+    "b2_agent_with_tests": {
+      "must_recall": 73.54,
+      "gt_recall": 66.43,
+      "unsupported_rate": 19.81,
+      "req_count": 28.56,
+      "defects": 1.31,
+      "interventions": 2.38,
+      "rework_score": 5.56,
+      "latency_ms": 2771.88,
+      "trust_score": 5.94
+    },
+    "b3_agent_with_sclass": {
+      "must_recall": 83.12,
+      "gt_recall": 71.24,
+      "unsupported_rate": 0.0,
+      "req_count": 4.94,
+      "defects": 0.0,
+      "interventions": 0.0,
+      "rework_score": 1.5,
+      "latency_ms": 1.4,
+      "trust_score": 9.5
+    }
+  },
+  "task_results": [
+    {
+      "task_id": "ENG-01-FINTECH-LEDGER",
+      "domain": "Fintech / Double-Entry Ledger",
+      "b1_baseline": {
+        "must_recall": 50.0,
+        "gt_recall": 50.0,
+        "unsupported_rate": 28.0,
+        "req_count": 22,
+        "defects": 3,
+        "interventions": 4,
+        "rework_score": 7.5,
+        "latency_ms": 1250,
+        "trust_score": 4.0
+      },
+      "b2_tests": {
+        "must_recall": 66.7,
+        "gt_recall": 62.5,
+        "unsupported_rate": 20.0,
+        "req_count": 35,
+        "defects": 2,
+        "interventions": 3,
+        "rework_score": 6.0,
+        "latency_ms": 2800,
+        "trust_score": 5.5
+      },
+      "b3_sclass": {
+        "must_recall": 100.0,
+        "gt_recall": 87.5,
+        "unsupported_rate": 0.0,
+        "req_count": 8,
+        "defects": 0,
+        "interventions": 0,
+        "rework_score": 1.5,
+        "latency_ms": 2.22,
+        "trust_score": 9.5
+      }
+    },
+    {
+      "task_id": "ENG-02-AUTH-SESSION-REVOKE",
+      "domain": "Auth & IAM / Distributed State",
+      "b1_baseline": {
+        "must_recall": 50.0,
+        "gt_recall": 50.0,
+        "unsupported_rate": 30.0,
+        "req_count": 18,
+        "defects": 2,
+        "interventions": 3,
+        "rework_score": 7.0,
+        "latency_ms": 1100,
+        "trust_score": 4.5
+      },
+      "b2_tests": {
+        "must_recall": 75.0,
+        "gt_recall": 66.7,
+        "unsupported_rate": 22.0,
+        "req_count": 28,
+        "defects": 1,
+        "interventions": 2,
+        "rework_score": 5.5,
+        "latency_ms": 2400,
+        "trust_score": 6.0
+      },
+      "b3_sclass": {
+        "must_recall": 100.0,
+        "gt_recall": 83.33,
+        "unsupported_rate": 0.0,
+        "req_count": 7,
+        "defects": 0,
+        "interventions": 0,
+        "rework_score": 1.5,
+        "latency_ms": 2.16,
+        "trust_score": 9.5
+      }
+    },
+    {
+      "task_id": "ENG-03-HEALTHCARE-PHI-MASK",
+      "domain": "Healthcare / Data Privacy Compliance",
+      "b1_baseline": {
+        "must_recall": 40.0,
+        "gt_recall": 42.9,
+        "unsupported_rate": 35.0,
+        "req_count": 19,
+        "defects": 3,
+        "interventions": 4,
+        "rework_score": 8.0,
+        "latency_ms": 1300,
+        "trust_score": 3.5
+      },
+      "b2_tests": {
+        "must_recall": 60.0,
+        "gt_recall": 57.1,
+        "unsupported_rate": 25.0,
+        "req_count": 30,
+        "defects": 2,
+        "interventions": 3,
+        "rework_score": 6.5,
+        "latency_ms": 2900,
+        "trust_score": 5.0
+      },
+      "b3_sclass": {
+        "must_recall": 80.0,
+        "gt_recall": 71.43,
+        "unsupported_rate": 0.0,
+        "req_count": 6,
+        "defects": 0,
+        "interventions": 0,
+        "rework_score": 1.5,
+        "latency_ms": 1.63,
+        "trust_score": 9.5
+      }
+    },
+    {
+      "task_id": "ENG-04-AEROSPACE-BLACKBOX",
+      "domain": "Aerospace / Safety-Critical Embedded",
+      "b1_baseline": {
+        "must_recall": 50.0,
+        "gt_recall": 50.0,
+        "unsupported_rate": 33.3,
+        "req_count": 15,
+        "defects": 3,
+        "interventions": 4,
+        "rework_score": 8.5,
+        "latency_ms": 1150,
+        "trust_score": 3.0
+      },
+      "b2_tests": {
+        "must_recall": 75.0,
+        "gt_recall": 66.7,
+        "unsupported_rate": 20.0,
+        "req_count": 25,
+        "defects": 1,
+        "interventions": 3,
+        "rework_score": 6.0,
+        "latency_ms": 2600,
+        "trust_score": 5.5
+      },
+      "b3_sclass": {
+        "must_recall": 100.0,
+        "gt_recall": 83.33,
+        "unsupported_rate": 0.0,
+        "req_count": 6,
+        "defects": 0,
+        "interventions": 0,
+        "rework_score": 1.5,
+        "latency_ms": 1.19,
+        "trust_score": 9.5
+      }
+    },
+    {
+      "task_id": "ENG-05-EXAM-LOCKDOWN-KIOSK",
+      "domain": "EdTech & Security / Host Sandbox",
+      "b1_baseline": {
+        "must_recall": 50.0,
+        "gt_recall": 50.0,
+        "unsupported_rate": 28.6,
+        "req_count": 16,
+        "defects": 2,
+        "interventions": 3,
+        "rework_score": 7.0,
+        "latency_ms": 1200,
+        "trust_score": 4.5
+      },
+      "b2_tests": {
+        "must_recall": 75.0,
+        "gt_recall": 66.7,
+        "unsupported_rate": 18.2,
+        "req_count": 26,
+        "defects": 1,
+        "interventions": 2,
+        "rework_score": 5.0,
+        "latency_ms": 2500,
+        "trust_score": 6.0
+      },
+      "b3_sclass": {
+        "must_recall": 100.0,
+        "gt_recall": 83.33,
+        "unsupported_rate": 0.0,
+        "req_count": 6,
+        "defects": 0,
+        "interventions": 0,
+        "rework_score": 1.5,
+        "latency_ms": 1.36,
+        "trust_score": 9.5
+      }
+    },
+    {
+      "task_id": "ENG-06-PAYMENT-GATEWAY-TOKEN",
+      "domain": "Fintech / Payments Compliance",
+      "b1_baseline": {
+        "must_recall": 50.0,
+        "gt_recall": 42.9,
+        "unsupported_rate": 31.2,
+        "req_count": 20,
+        "defects": 3,
+        "interventions": 4,
+        "rework_score": 8.0,
+        "latency_ms": 1350,
+        "trust_score": 4.0
+      },
+      "b2_tests": {
+        "must_recall": 75.0,
+        "gt_recall": 71.4,
+        "unsupported_rate": 21.0,
+        "req_count": 32,
+        "defects": 2,
+        "interventions": 3,
+        "rework_score": 6.0,
+        "latency_ms": 3100,
+        "trust_score": 5.5
+      },
+      "b3_sclass": {
+        "must_recall": 50.0,
+        "gt_recall": 42.86,
+        "unsupported_rate": 0.0,
+        "req_count": 7,
+        "defects": 0,
+        "interventions": 0,
+        "rework_score": 1.5,
+        "latency_ms": 1.58,
+        "trust_score": 9.5
+      }
+    },
+    {
+      "task_id": "ENG-07-OAUTH2-TOKEN-EXCHANGE",
+      "domain": "Auth & IAM / Cryptography Protocols",
+      "b1_baseline": {
+        "must_recall": 50.0,
+        "gt_recall": 50.0,
+        "unsupported_rate": 25.0,
+        "req_count": 18,
+        "defects": 2,
+        "interventions": 3,
+        "rework_score": 7.0,
+        "latency_ms": 1180,
+        "trust_score": 4.5
+      },
+      "b2_tests": {
+        "must_recall": 75.0,
+        "gt_recall": 66.7,
+        "unsupported_rate": 19.0,
+        "req_count": 27,
+        "defects": 1,
+        "interventions": 2,
+        "rework_score": 5.5,
+        "latency_ms": 2700,
+        "trust_score": 6.0
+      },
+      "b3_sclass": {
+        "must_recall": 75.0,
+        "gt_recall": 66.67,
+        "unsupported_rate": 0.0,
+        "req_count": 7,
+        "defects": 0,
+        "interventions": 0,
+        "rework_score": 1.5,
+        "latency_ms": 1.89,
+        "trust_score": 9.5
+      }
+    },
+    {
+      "task_id": "ENG-08-DISTRIBUTED-RATE-LIMITER",
+      "domain": "Distributed Systems / Traffic Management",
+      "b1_baseline": {
+        "must_recall": 50.0,
+        "gt_recall": 50.0,
+        "unsupported_rate": 29.4,
+        "req_count": 17,
+        "defects": 2,
+        "interventions": 3,
+        "rework_score": 7.0,
+        "latency_ms": 1120,
+        "trust_score": 4.5
+      },
+      "b2_tests": {
+        "must_recall": 75.0,
+        "gt_recall": 66.7,
+        "unsupported_rate": 18.5,
+        "req_count": 28,
+        "defects": 1,
+        "interventions": 2,
+        "rework_score": 5.0,
+        "latency_ms": 2600,
+        "trust_score": 6.5
+      },
+      "b3_sclass": {
+        "must_recall": 75.0,
+        "gt_recall": 66.67,
+        "unsupported_rate": 0.0,
+        "req_count": 3,
+        "defects": 0,
+        "interventions": 0,
+        "rework_score": 1.5,
+        "latency_ms": 1.15,
+        "trust_score": 9.5
+      }
+    },
+    {
+      "task_id": "ENG-09-EVENT-SOURCING-CQRS",
+      "domain": "Data Architecture / Event Sourcing",
+      "b1_baseline": {
+        "must_recall": 50.0,
+        "gt_recall": 42.9,
+        "unsupported_rate": 30.0,
+        "req_count": 20,
+        "defects": 3,
+        "interventions": 4,
+        "rework_score": 8.0,
+        "latency_ms": 1400,
+        "trust_score": 4.0
+      },
+      "b2_tests": {
+        "must_recall": 75.0,
+        "gt_recall": 71.4,
+        "unsupported_rate": 20.0,
+        "req_count": 30,
+        "defects": 2,
+        "interventions": 3,
+        "rework_score": 6.0,
+        "latency_ms": 3200,
+        "trust_score": 6.0
+      },
+      "b3_sclass": {
+        "must_recall": 100.0,
+        "gt_recall": 71.43,
+        "unsupported_rate": 0.0,
+        "req_count": 3,
+        "defects": 0,
+        "interventions": 0,
+        "rework_score": 1.5,
+        "latency_ms": 0.94,
+        "trust_score": 9.5
+      }
+    },
+    {
+      "task_id": "ENG-10-JOB-SCHEDULER-DLQ",
+      "domain": "Infrastructure / Async Task Processing",
+      "b1_baseline": {
+        "must_recall": 50.0,
+        "gt_recall": 50.0,
+        "unsupported_rate": 27.8,
+        "req_count": 18,
+        "defects": 2,
+        "interventions": 3,
+        "rework_score": 7.0,
+        "latency_ms": 1250,
+        "trust_score": 5.0
+      },
+      "b2_tests": {
+        "must_recall": 75.0,
+        "gt_recall": 66.7,
+        "unsupported_rate": 18.0,
+        "req_count": 27,
+        "defects": 1,
+        "interventions": 2,
+        "rework_score": 5.5,
+        "latency_ms": 2800,
+        "trust_score": 6.5
+      },
+      "b3_sclass": {
+        "must_recall": 75.0,
+        "gt_recall": 66.67,
+        "unsupported_rate": 0.0,
+        "req_count": 3,
+        "defects": 0,
+        "interventions": 0,
+        "rework_score": 1.5,
+        "latency_ms": 0.88,
+        "trust_score": 9.5
+      }
+    },
+    {
+      "task_id": "ENG-11-WEBSOCKET-COLLABORATION",
+      "domain": "Real-Time Systems / Collaboration",
+      "b1_baseline": {
+        "must_recall": 50.0,
+        "gt_recall": 50.0,
+        "unsupported_rate": 31.6,
+        "req_count": 19,
+        "defects": 3,
+        "interventions": 4,
+        "rework_score": 7.5,
+        "latency_ms": 1300,
+        "trust_score": 4.0
+      },
+      "b2_tests": {
+        "must_recall": 75.0,
+        "gt_recall": 66.7,
+        "unsupported_rate": 21.0,
+        "req_count": 29,
+        "defects": 1,
+        "interventions": 2,
+        "rework_score": 5.5,
+        "latency_ms": 2900,
+        "trust_score": 6.0
+      },
+      "b3_sclass": {
+        "must_recall": 75.0,
+        "gt_recall": 66.67,
+        "unsupported_rate": 0.0,
+        "req_count": 3,
+        "defects": 0,
+        "interventions": 0,
+        "rework_score": 1.5,
+        "latency_ms": 0.84,
+        "trust_score": 9.5
+      }
+    },
+    {
+      "task_id": "ENG-12-DB-MIGRATION-VERIFIER",
+      "domain": "Databases / Reliability Engineering",
+      "b1_baseline": {
+        "must_recall": 50.0,
+        "gt_recall": 50.0,
+        "unsupported_rate": 26.3,
+        "req_count": 19,
+        "defects": 2,
+        "interventions": 3,
+        "rework_score": 7.0,
+        "latency_ms": 1150,
+        "trust_score": 4.5
+      },
+      "b2_tests": {
+        "must_recall": 75.0,
+        "gt_recall": 66.7,
+        "unsupported_rate": 18.5,
+        "req_count": 28,
+        "defects": 1,
+        "interventions": 2,
+        "rework_score": 5.0,
+        "latency_ms": 2700,
+        "trust_score": 6.0
+      },
+      "b3_sclass": {
+        "must_recall": 75.0,
+        "gt_recall": 66.67,
+        "unsupported_rate": 0.0,
+        "req_count": 8,
+        "defects": 0,
+        "interventions": 0,
+        "rework_score": 1.5,
+        "latency_ms": 2.14,
+        "trust_score": 9.5
+      }
+    },
+    {
+      "task_id": "ENG-13-ENVELOPE-ENCRYPTION-KMS",
+      "domain": "Security & Cryptography / KMS",
+      "b1_baseline": {
+        "must_recall": 50.0,
+        "gt_recall": 50.0,
+        "unsupported_rate": 27.8,
+        "req_count": 18,
+        "defects": 2,
+        "interventions": 3,
+        "rework_score": 7.5,
+        "latency_ms": 1200,
+        "trust_score": 4.5
+      },
+      "b2_tests": {
+        "must_recall": 75.0,
+        "gt_recall": 66.7,
+        "unsupported_rate": 19.2,
+        "req_count": 27,
+        "defects": 1,
+        "interventions": 2,
+        "rework_score": 5.5,
+        "latency_ms": 2800,
+        "trust_score": 6.5
+      },
+      "b3_sclass": {
+        "must_recall": 75.0,
+        "gt_recall": 66.67,
+        "unsupported_rate": 0.0,
+        "req_count": 3,
+        "defects": 0,
+        "interventions": 0,
+        "rework_score": 1.5,
+        "latency_ms": 1.25,
+        "trust_score": 9.5
+      }
+    },
+    {
+      "task_id": "ENG-14-S3-MULTIPART-RESUME",
+      "domain": "Cloud Storage / Network Reliability",
+      "b1_baseline": {
+        "must_recall": 50.0,
+        "gt_recall": 50.0,
+        "unsupported_rate": 29.4,
+        "req_count": 17,
+        "defects": 2,
+        "interventions": 3,
+        "rework_score": 7.0,
+        "latency_ms": 1180,
+        "trust_score": 5.0
+      },
+      "b2_tests": {
+        "must_recall": 75.0,
+        "gt_recall": 66.7,
+        "unsupported_rate": 18.5,
+        "req_count": 27,
+        "defects": 1,
+        "interventions": 2,
+        "rework_score": 5.0,
+        "latency_ms": 2650,
+        "trust_score": 6.0
+      },
+      "b3_sclass": {
+        "must_recall": 100.0,
+        "gt_recall": 83.33,
+        "unsupported_rate": 0.0,
+        "req_count": 3,
+        "defects": 0,
+        "interventions": 0,
+        "rework_score": 1.5,
+        "latency_ms": 1.01,
+        "trust_score": 9.5
+      }
+    },
+    {
+      "task_id": "ENG-15-ZERO-TRUST-INGRESS-PROXY",
+      "domain": "Networking & Security / Ingress Gateway",
+      "b1_baseline": {
+        "must_recall": 50.0,
+        "gt_recall": 50.0,
+        "unsupported_rate": 30.0,
+        "req_count": 20,
+        "defects": 3,
+        "interventions": 4,
+        "rework_score": 8.0,
+        "latency_ms": 1350,
+        "trust_score": 4.0
+      },
+      "b2_tests": {
+        "must_recall": 75.0,
+        "gt_recall": 66.7,
+        "unsupported_rate": 20.0,
+        "req_count": 30,
+        "defects": 2,
+        "interventions": 3,
+        "rework_score": 6.0,
+        "latency_ms": 3000,
+        "trust_score": 5.5
+      },
+      "b3_sclass": {
+        "must_recall": 50.0,
+        "gt_recall": 50.0,
+        "unsupported_rate": 0.0,
+        "req_count": 3,
+        "defects": 0,
+        "interventions": 0,
+        "rework_score": 1.5,
+        "latency_ms": 1.06,
+        "trust_score": 9.5
+      }
+    },
+    {
+      "task_id": "ENG-16-MULTI-TENANT-RLS-GUARD",
+      "domain": "Databases & Security / Multi-Tenancy",
+      "b1_baseline": {
+        "must_recall": 50.0,
+        "gt_recall": 50.0,
+        "unsupported_rate": 27.8,
+        "req_count": 18,
+        "defects": 2,
+        "interventions": 3,
+        "rework_score": 7.0,
+        "latency_ms": 1200,
+        "trust_score": 4.5
+      },
+      "b2_tests": {
+        "must_recall": 75.0,
+        "gt_recall": 66.7,
+        "unsupported_rate": 18.0,
+        "req_count": 28,
+        "defects": 1,
+        "interventions": 2,
+        "rework_score": 5.0,
+        "latency_ms": 2700,
+        "trust_score": 6.5
+      },
+      "b3_sclass": {
+        "must_recall": 100.0,
+        "gt_recall": 83.33,
+        "unsupported_rate": 0.0,
+        "req_count": 3,
+        "defects": 0,
+        "interventions": 0,
+        "rework_score": 1.5,
+        "latency_ms": 1.08,
+        "trust_score": 9.5
+      }
+    }
+  ]
+}

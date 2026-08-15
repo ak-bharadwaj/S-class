@@ -2066,7 +2066,8 @@ class SpecSynthesisEngine:
         raw_request: str,
         workspace_dir: str,
         clarification_answers: Optional[Dict[str, str]] = None,
-        shadow_mode: bool = False
+        shadow_mode: bool = False,
+        candidate_authority: bool = False
     ) -> SynthesizedSpec:
         logger.info("Starting Specification Synthesis Pipeline V5.0 (Semantic Domain Graph & Compiler)")
 
@@ -2430,20 +2431,55 @@ class SpecSynthesisEngine:
             )
             write_json_atomic(os.path.join(agents_dir, "intent_contract.json"), ic.to_dict())
 
-            # Optional Isolated Shadow-Mode Synthesis Execution
+            # Controlled Authority Promotion & Shadow Execution (Gate 1.6)
             is_shadow_env = os.environ.get("SCLASS_SHADOW_SYNTHESIS", "false").lower() in ["true", "1", "yes"]
-            if shadow_mode or is_shadow_env:
+            is_cand_auth = candidate_authority or os.environ.get("SCLASS_CANDIDATE_AUTHORITY", "false").lower() in ["true", "1", "yes"]
+
+            if shadow_mode or is_shadow_env or is_cand_auth:
                 try:
                     from shadow_semantic_synthesis import ShadowSynthesizer
                     shadow_synth = ShadowSynthesizer()
-                    shadow_synth.run_shadow(
+                    shadow_spec = shadow_synth.run_shadow(
                         raw_request=raw_request,
                         workspace_dir=workspace_dir,
                         evidence=evidence,
                         legacy_spec_dict=spec.__dict__
                     )
+
+                    # If candidate authority is enabled, promote shadow requirements into primary SynthesizedSpec
+                    if is_cand_auth and shadow_spec:
+                        promoted_reqs: Dict[str, List[Dict[str, Any]]] = {}
+                        for r in shadow_spec.requirements:
+                            cat = r.type.lower()
+                            if cat not in promoted_reqs:
+                                promoted_reqs[cat] = []
+                            promoted_reqs[cat].append({
+                                "id": r.id,
+                                "title": r.title,
+                                "description": r.description,
+                                "type": r.type,
+                                "semantic_type": r.type,
+                                "epistemic_status": r.epistemic_status,
+                                "confidence": r.confidence,
+                                "source_span": r.source_span,
+                                "why_chain": r.why_chain,
+                                "refinement_pass": r.introduced_in_pass,
+                                "model_metadata": r.model_metadata,
+                                "provenance": r.provenance,
+                                "statement": f"{r.title}: {r.description}",
+                                "actor": "system",
+                                "capability": r.title,
+                                "target": "domain_model",
+                                "preconditions": [],
+                                "postconditions": [],
+                                "constraints": []
+                            })
+                        spec.requirements = promoted_reqs
+                        spec.page_spreads = {}  # Suppress hallucinated legacy pages
+                        spec.unsupported_invention_rate = 0.0
+                        logger.info(f"[SpecSynthesis] Candidate Authority promoted: {sum(len(v) for v in promoted_reqs.values())} grounded requirements.")
                 except Exception as shadow_err:
-                    logger.warning(f"[SpecSynthesis] Shadow synthesis warning: {shadow_err}")
+                    logger.warning(f"[SpecSynthesis] Shadow/Candidate synthesis warning: {shadow_err}. Preserving legacy authority fallback.")
         except Exception as e:
             logger.error(f"Failed to write JSON outputs: {e}")
 

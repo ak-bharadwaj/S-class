@@ -178,6 +178,11 @@ class RequirementNode:
     source_behaviors: List[str] = field(default_factory=list)
     assumptions: List[str] = field(default_factory=list)
     dependencies: List[str] = field(default_factory=list)
+    source_span: str = ""
+    semantic_type: str = "FUNCTIONAL"
+    why_chain: List[str] = field(default_factory=list)
+    refinement_pass: int = 1
+    model_metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         # Authoritative normalization boundary enforcing List[EvidenceItem] on all construction paths
@@ -261,6 +266,11 @@ class RequirementNode:
             "source_behaviors": self.source_behaviors,
             "assumptions": self.assumptions,
             "dependencies": self.dependencies,
+            "source_span": self.source_span,
+            "semantic_type": self.semantic_type,
+            "why_chain": self.why_chain,
+            "refinement_pass": self.refinement_pass,
+            "model_metadata": self.model_metadata,
             "semantic_hash": self.semantic_identity_hash(),
             "canonical_hash": self.canonical_hash()
         }
@@ -295,7 +305,12 @@ class RequirementNode:
             evidence=parsed_ev,
             source_behaviors=data.get("source_behaviors", []),
             assumptions=data.get("assumptions", []),
-            dependencies=data.get("dependencies", [])
+            dependencies=data.get("dependencies", []),
+            source_span=data.get("source_span", ""),
+            semantic_type=data.get("semantic_type", "FUNCTIONAL"),
+            why_chain=data.get("why_chain", []),
+            refinement_pass=data.get("refinement_pass", 1),
+            model_metadata=data.get("model_metadata", {})
         )
 
 
