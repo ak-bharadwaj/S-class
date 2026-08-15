@@ -1109,8 +1109,9 @@ class ArtifactGovernor:
     ) -> GovernanceGateResult:
         """
         V11.1 Authoritative Repository Snapshot Governance Gate:
-        Audits RepositorySnapshot for cryptographic Merkle tree integrity, canonical hashing,
-        evidence-backed file classifications, boundary separation, and live disk sync.
+        Audits RepositorySnapshot for cryptographic Merkle tree integrity, deterministic repository_state_hash,
+        canonical envelope hashing, evidence-backed file classifications, boundary partition completeness,
+        manifest identity reconciliation, summary recalculation, and live disk sync.
         """
         reasons: List[str] = []
 
@@ -1124,10 +1125,10 @@ class ArtifactGovernor:
             )
 
         from repository_snapshot import (
-            RepositorySnapshot, FileClassification, RepositorySnapshotEngine
+            RepositorySnapshot, FileClassification, LanguageKind, RepositorySnapshotEngine
         )
 
-        # 1. Cryptographic Tree & Canonical Hash Verification
+        # 1. Cryptographic Tree, State, and Envelope Hash Verification
         if hasattr(snapshot, "compute_tree_hash"):
             expected_tree_hash = snapshot.compute_tree_hash()
             if not getattr(snapshot, "tree_hash", ""):
@@ -1135,6 +1136,15 @@ class ArtifactGovernor:
             elif snapshot.tree_hash != expected_tree_hash:
                 reasons.append(
                     f"RepositorySnapshot tree_hash mismatch: computed '{expected_tree_hash[:8]}', got '{snapshot.tree_hash[:8]}'."
+                )
+
+        if hasattr(snapshot, "compute_repository_state_hash"):
+            expected_state_hash = snapshot.compute_repository_state_hash()
+            if not getattr(snapshot, "repository_state_hash", ""):
+                reasons.append("RepositorySnapshot is missing mandatory repository_state_hash.")
+            elif snapshot.repository_state_hash != expected_state_hash:
+                reasons.append(
+                    f"RepositorySnapshot repository_state_hash mismatch: computed '{expected_state_hash[:8]}', got '{snapshot.repository_state_hash[:8]}'."
                 )
 
         if hasattr(snapshot, "compute_canonical_hash"):
@@ -1146,43 +1156,63 @@ class ArtifactGovernor:
                     f"RepositorySnapshot canonical_hash mismatch: computed '{expected_canonical_hash[:8]}', got '{snapshot.canonical_hash[:8]}'."
                 )
 
-        # 2. File Manifest Integrity & Evidence Verification
+        # 2. File Manifest Integrity & Key Matching Verification (Blocker 4)
         if not snapshot.file_manifest:
             reasons.append("RepositorySnapshot file_manifest is empty.")
 
-        source_set = set(snapshot.boundary_manifest.source_paths)
-        locked_set = set(snapshot.boundary_manifest.locked_paths)
-        third_set = set(snapshot.boundary_manifest.third_party_paths)
-        gen_set = set(snapshot.boundary_manifest.generated_paths)
+        recomputed_summary: Dict[str, int] = {c.value: 0 for c in FileClassification}
+        recomputed_lang_map: Dict[str, List[str]] = {}
 
-        for rel_path, entry in snapshot.file_manifest.items():
+        for path_key, entry in snapshot.file_manifest.items():
             if not entry.rel_path:
-                reasons.append("FileEntry missing rel_path.")
+                reasons.append(f"FileEntry under key '{path_key}' is missing rel_path.")
+            elif entry.rel_path != path_key:
+                reasons.append(
+                    f"Manifest identity inconsistency: dictionary key '{path_key}' does not match FileEntry.rel_path '{entry.rel_path}'."
+                )
+
             if not entry.file_hash or len(entry.file_hash) != 64:
-                reasons.append(f"FileEntry '{rel_path}' has invalid SHA-256 file_hash.")
+                reasons.append(f"FileEntry '{path_key}' has invalid SHA-256 file_hash.")
             if not entry.classification_reason:
-                reasons.append(f"FileEntry '{rel_path}' missing mandatory evidence-backed classification_reason.")
+                reasons.append(f"FileEntry '{path_key}' missing mandatory evidence-backed classification_reason.")
 
-            # Boundary Separation Verification
-            if entry.classification == FileClassification.LOCKED:
-                if not entry.is_locked:
-                    reasons.append(f"FileEntry '{rel_path}' classified as LOCKED but is_locked flag is False.")
-                if rel_path in source_set:
-                    reasons.append(f"Boundary violation: locked file '{rel_path}' present in source_paths.")
+            # Flag Consistency
+            if entry.classification == FileClassification.LOCKED and not entry.is_locked:
+                reasons.append(f"FileEntry '{path_key}' classified as LOCKED but is_locked flag is False.")
+            if entry.classification == FileClassification.THIRD_PARTY and not entry.is_third_party:
+                reasons.append(f"FileEntry '{path_key}' classified as THIRD_PARTY but is_third_party flag is False.")
+            if entry.classification == FileClassification.GENERATED and not entry.is_generated:
+                reasons.append(f"FileEntry '{path_key}' classified as GENERATED but is_generated flag is False.")
 
-            if entry.classification == FileClassification.THIRD_PARTY:
-                if not entry.is_third_party:
-                    reasons.append(f"FileEntry '{rel_path}' classified as THIRD_PARTY but is_third_party flag is False.")
-                if rel_path in source_set:
-                    reasons.append(f"Boundary violation: third-party file '{rel_path}' present in source_paths.")
+            # Recompute summary and language map
+            recomputed_summary[entry.classification.value] += 1
+            lang_val = entry.language.value if hasattr(entry.language, "value") else str(entry.language)
+            if lang_val not in recomputed_lang_map:
+                recomputed_lang_map[lang_val] = []
+            recomputed_lang_map[lang_val].append(path_key)
 
-            if entry.classification == FileClassification.GENERATED:
-                if not entry.is_generated:
-                    reasons.append(f"FileEntry '{rel_path}' classified as GENERATED but is_generated flag is False.")
-                if rel_path in source_set:
-                    reasons.append(f"Boundary violation: generated file '{rel_path}' present in source_paths.")
+        # 3. Exact Partition Verification of Boundary Manifest (Blocker 5)
+        manifest_keys = set(snapshot.file_manifest.keys())
+        if hasattr(snapshot.boundary_manifest, "validate_exact_partition"):
+            is_partition_valid, partition_errors = snapshot.boundary_manifest.validate_exact_partition(manifest_keys)
+            if not is_partition_valid:
+                reasons.extend(partition_errors)
 
-        # 3. Live Disk Synchronization Verification (Drift Check)
+        # 4. Authoritative Summary & Language Map Recomputation (Item 6)
+        for k, v in snapshot.classification_summary.items():
+            if recomputed_summary.get(k, 0) != v:
+                reasons.append(
+                    f"RepositorySnapshot classification_summary mismatch for '{k}': claims {v}, recomputed from manifest is {recomputed_summary.get(k, 0)}."
+                )
+
+        for lang, paths in snapshot.language_map.items():
+            expected_paths = sorted(recomputed_lang_map.get(lang, []))
+            if sorted(paths) != expected_paths:
+                reasons.append(
+                    f"RepositorySnapshot language_map mismatch for '{lang}': paths disagree with file_manifest."
+                )
+
+        # 5. Live Disk Synchronization Verification (Drift Check)
         if repo_root:
             is_synced, drift_errors = RepositorySnapshotEngine.verify_snapshot_integrity(snapshot, repo_root)
             if not is_synced:
