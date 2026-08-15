@@ -103,7 +103,6 @@ def test_semantic_output_differ():
     assert diff.page_spread_hallucination_delta == 24
     assert len(diff.hallucinated_by_legacy) == 2
     assert len(diff.epistemic_unknowns_flagged) == 1
-    assert diff.semantic_integrity_score < 1.0
 
 
 def test_requirement_stability_and_convergence():

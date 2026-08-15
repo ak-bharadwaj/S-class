@@ -1,0 +1,353 @@
+{
+  "benchmark": "S-Class Gate 1.4 Diagnostic Closure & Miss Ledger",
+  "aggregate_summary": {
+    "total_canonical_requirements": 47,
+    "recovered_canonical_requirements": 34,
+    "micro_gt_recall": 72.34,
+    "total_must_invariants": 28,
+    "recovered_must_invariants": 25,
+    "micro_must_recall": 89.29,
+    "total_misses_count": 13,
+    "must_misses_count": 3,
+    "miss_taxonomy_counts": {
+      "DOMAIN_INFERENCE_MISS": 1,
+      "COVERAGE_AUDIT_MISS": 4,
+      "EPISTEMIC_OVER_RESTRAINT": 8
+    }
+  },
+  "task_breakdown": {
+    "task_01": {
+      "task_id": "TASK-01-FINTECH-LEDGER",
+      "domain": "fintech_banking",
+      "gt_count": 7,
+      "must_count": 6,
+      "recovered_gt": 6,
+      "recovered_must": 5,
+      "gt_recall": 85.71,
+      "must_recall": 83.33,
+      "miss_count": 1
+    },
+    "task_02": {
+      "task_id": "TASK-02-AUTH-SESSION-REVOKE",
+      "domain": "auth_identity",
+      "gt_count": 6,
+      "must_count": 3,
+      "recovered_gt": 4,
+      "recovered_must": 3,
+      "gt_recall": 66.67,
+      "must_recall": 100.0,
+      "miss_count": 2
+    },
+    "task_03": {
+      "task_id": "TASK-03-HEALTHCARE-PHI-MASK",
+      "domain": "healthcare_privacy",
+      "gt_count": 7,
+      "must_count": 5,
+      "recovered_gt": 5,
+      "recovered_must": 4,
+      "gt_recall": 71.43,
+      "must_recall": 80.0,
+      "miss_count": 2
+    },
+    "task_04": {
+      "task_id": "TASK-04-AEROSPACE-BLACKBOX-TELEMETRY",
+      "domain": "aerospace_avionics",
+      "gt_count": 6,
+      "must_count": 4,
+      "recovered_gt": 6,
+      "recovered_must": 4,
+      "gt_recall": 100.0,
+      "must_recall": 100.0,
+      "miss_count": 0
+    },
+    "task_05": {
+      "task_id": "TASK-05-EXAM-BROWSER-SANDBOX",
+      "domain": "edtech_security",
+      "gt_count": 6,
+      "must_count": 4,
+      "recovered_gt": 6,
+      "recovered_must": 4,
+      "gt_recall": 100.0,
+      "must_recall": 100.0,
+      "miss_count": 0
+    },
+    "task_06": {
+      "task_id": "TASK-06-PAYMENT-GATEWAY-AMBIGUOUS",
+      "domain": "fintech_payments_ambiguous",
+      "gt_count": 7,
+      "must_count": 3,
+      "recovered_gt": 4,
+      "recovered_must": 3,
+      "gt_recall": 57.14,
+      "must_recall": 100.0,
+      "miss_count": 3
+    },
+    "task_07": {
+      "task_id": "TASK-07-AUTH-TOKEN-REVOCATION-AMBIGUOUS",
+      "domain": "auth_identity_ambiguous",
+      "gt_count": 8,
+      "must_count": 3,
+      "recovered_gt": 3,
+      "recovered_must": 2,
+      "gt_recall": 37.5,
+      "must_recall": 66.67,
+      "miss_count": 5
+    }
+  },
+  "must_misses": [
+    {
+      "task_id": "task_01",
+      "task_name": "TASK-01-FINTECH-LEDGER",
+      "requirement_id": "REQ-DER-02",
+      "title": "Disallow Negative Amount / Non-Zero Transfer Guard",
+      "normative_level": "MUST",
+      "taxonomy": "DOMAIN_INFERENCE_MISS",
+      "stage_of_miss": "Stage 2 (Pass 2 Coverage Audit)",
+      "observed_candidate": "REQ-DJ-003: Account Balance Floor Enforcement and Overdraft Prevention",
+      "forensic_cause": "The model synthesized a post-state balance invariant (preventing balance < floor / overdraft), but omitted the pre-state transfer input validation predicate (transfer amount > 0 and non-negative). Coverage audit focused on account solvency rather than input quantity validation.",
+      "fix_path": "Enhance Stage 2 Pass 2 coverage audit prompt with explicit invariant duality check (pre-condition input guards vs post-condition state bounds)."
+    },
+    {
+      "task_id": "task_03",
+      "task_name": "TASK-03-HEALTHCARE-PHI-MASK",
+      "requirement_id": "REQ-EXP-01",
+      "title": "Export Patient Diagnostic Records to Analytics",
+      "normative_level": "MUST",
+      "taxonomy": "EPISTEMIC_OVER_RESTRAINT",
+      "stage_of_miss": "Stage 2 (Pass 1 Core Extraction)",
+      "observed_candidate": "REQ-001: Strip 18 HIPAA Safe Harbor Direct Identifiers & REQ-003: Analytics Ingestion Format Standard (UNKNOWN)",
+      "forensic_cause": "The prompt requested: 'Mask PHI data... before exporting to downstream analytics ingestion'. The model treated 'exporting' purely as background pipeline context and focused 100% of its explicit requirements on masking transformations and unstated format schemas, omitting the standalone export/dispatch action as an explicit requirement.",
+      "fix_path": "Ensure Stage 1 verb-action decomposition explicitly registers egress/export directives as primary functional requirements alongside transformation invariants."
+    },
+    {
+      "task_id": "task_07",
+      "task_name": "TASK-07-AUTH-TOKEN-REVOCATION-AMBIGUOUS",
+      "requirement_id": "REQ-DER-01",
+      "title": "Cryptographic Credential Hashing (Argon2id / bcrypt)",
+      "normative_level": "MUST",
+      "taxonomy": "EPISTEMIC_OVER_RESTRAINT",
+      "stage_of_miss": "Stage 2 (Pass 2 Coverage Audit)",
+      "observed_candidate": "REQ-BOUNDARY-001: Unstated Identity Provider Integration Boundary (UNKNOWN)",
+      "forensic_cause": "The ambiguous prompt ('We need an authentication platform with token revocation') led the model to reason that user authentication could be delegated to an external IdP (surfaced in Pass 3 as UNKNOWN). Consequently, it did not derive local password cryptographic hashing (Argon2id/bcrypt) because it refused to assume internal credential storage.",
+      "fix_path": "Structure Stage 2 Pass 2 gap analysis to evaluate conditional invariant trees: 'IF local credential store THEN enforce Argon2id hashing; ELSE IF external IdP THEN enforce OIDC/SAML token validation'."
+    }
+  ],
+  "all_misses": [
+    {
+      "task_id": "task_01",
+      "task_name": "TASK-01-FINTECH-LEDGER",
+      "requirement_id": "REQ-DER-02",
+      "title": "Disallow Negative Amount / Non-Zero Transfer Guard",
+      "normative_level": "MUST",
+      "taxonomy": "DOMAIN_INFERENCE_MISS",
+      "stage_of_miss": "Stage 2 (Pass 2 Coverage Audit)",
+      "observed_candidate": "REQ-DJ-003: Account Balance Floor Enforcement and Overdraft Prevention",
+      "forensic_cause": "The model synthesized a post-state balance invariant (preventing balance < floor / overdraft), but omitted the pre-state transfer input validation predicate (transfer amount > 0 and non-negative). Coverage audit focused on account solvency rather than input quantity validation.",
+      "fix_path": "Enhance Stage 2 Pass 2 coverage audit prompt with explicit invariant duality check (pre-condition input guards vs post-condition state bounds)."
+    },
+    {
+      "task_id": "task_02",
+      "task_name": "TASK-02-AUTH-SESSION-REVOKE",
+      "requirement_id": "REQ-DER-02",
+      "title": "Emit Distributed Password Reset Audit Event",
+      "normative_level": "SHOULD",
+      "taxonomy": "COVERAGE_AUDIT_MISS",
+      "stage_of_miss": "Stage 2 (Pass 2 Coverage Audit)",
+      "observed_candidate": "Omitted from explicit candidate list",
+      "forensic_cause": "Ground-truth requirement 'Emit Distributed Password Reset Audit Event' was not synthesized by the model.",
+      "fix_path": "Incorporate broader domain invariant coverage in Pass 2/3."
+    },
+    {
+      "task_id": "task_02",
+      "task_name": "TASK-02-AUTH-SESSION-REVOKE",
+      "requirement_id": "REQ-SUP-01",
+      "title": "Optionally Retain Administrative Reset Session Override",
+      "normative_level": "OPTIONAL",
+      "taxonomy": "COVERAGE_AUDIT_MISS",
+      "stage_of_miss": "Stage 2 (Pass 2 Coverage Audit)",
+      "observed_candidate": "Omitted from explicit candidate list",
+      "forensic_cause": "Ground-truth requirement 'Optionally Retain Administrative Reset Session Override' was not synthesized by the model.",
+      "fix_path": "Incorporate broader domain invariant coverage in Pass 2/3."
+    },
+    {
+      "task_id": "task_03",
+      "task_name": "TASK-03-HEALTHCARE-PHI-MASK",
+      "requirement_id": "REQ-EXP-01",
+      "title": "Export Patient Diagnostic Records to Analytics",
+      "normative_level": "MUST",
+      "taxonomy": "EPISTEMIC_OVER_RESTRAINT",
+      "stage_of_miss": "Stage 2 (Pass 1 Core Extraction)",
+      "observed_candidate": "REQ-001: Strip 18 HIPAA Safe Harbor Direct Identifiers & REQ-003: Analytics Ingestion Format Standard (UNKNOWN)",
+      "forensic_cause": "The prompt requested: 'Mask PHI data... before exporting to downstream analytics ingestion'. The model treated 'exporting' purely as background pipeline context and focused 100% of its explicit requirements on masking transformations and unstated format schemas, omitting the standalone export/dispatch action as an explicit requirement.",
+      "fix_path": "Ensure Stage 1 verb-action decomposition explicitly registers egress/export directives as primary functional requirements alongside transformation invariants."
+    },
+    {
+      "task_id": "task_03",
+      "task_name": "TASK-03-HEALTHCARE-PHI-MASK",
+      "requirement_id": "REQ-DER-04",
+      "title": "Fail-Closed PII Pattern Regex Filter on Free-Text Fields",
+      "normative_level": "SHOULD",
+      "taxonomy": "COVERAGE_AUDIT_MISS",
+      "stage_of_miss": "Stage 2 (Pass 2 Coverage Audit)",
+      "observed_candidate": "Omitted from explicit candidate list",
+      "forensic_cause": "Ground-truth requirement 'Fail-Closed PII Pattern Regex Filter on Free-Text Fields' was not synthesized by the model.",
+      "fix_path": "Incorporate broader domain invariant coverage in Pass 2/3."
+    },
+    {
+      "task_id": "task_06",
+      "task_name": "TASK-06-PAYMENT-GATEWAY-AMBIGUOUS",
+      "requirement_id": "REQ-UNK-01",
+      "title": "Target Payment Rail and Gateway Provider",
+      "normative_level": "UNKNOWN",
+      "taxonomy": "EPISTEMIC_OVER_RESTRAINT",
+      "stage_of_miss": "Stage 2 (Pass 3 Boundary)",
+      "observed_candidate": "Omitted from explicit candidate list",
+      "forensic_cause": "Ground-truth requirement 'Target Payment Rail and Gateway Provider' was not synthesized by the model.",
+      "fix_path": "Incorporate broader domain invariant coverage in Pass 2/3."
+    },
+    {
+      "task_id": "task_06",
+      "task_name": "TASK-06-PAYMENT-GATEWAY-AMBIGUOUS",
+      "requirement_id": "REQ-UNK-02",
+      "title": "Cardholder Data Persistence vs Gateway Tokenization Model",
+      "normative_level": "UNKNOWN",
+      "taxonomy": "EPISTEMIC_OVER_RESTRAINT",
+      "stage_of_miss": "Stage 2 (Pass 3 Boundary)",
+      "observed_candidate": "Omitted from explicit candidate list",
+      "forensic_cause": "Ground-truth requirement 'Cardholder Data Persistence vs Gateway Tokenization Model' was not synthesized by the model.",
+      "fix_path": "Incorporate broader domain invariant coverage in Pass 2/3."
+    },
+    {
+      "task_id": "task_06",
+      "task_name": "TASK-06-PAYMENT-GATEWAY-AMBIGUOUS",
+      "requirement_id": "REQ-UNK-03",
+      "title": "Multi-Currency Settlement and Refund Policy Architecture",
+      "normative_level": "UNKNOWN",
+      "taxonomy": "EPISTEMIC_OVER_RESTRAINT",
+      "stage_of_miss": "Stage 2 (Pass 3 Boundary)",
+      "observed_candidate": "Omitted from explicit candidate list",
+      "forensic_cause": "Ground-truth requirement 'Multi-Currency Settlement and Refund Policy Architecture' was not synthesized by the model.",
+      "fix_path": "Incorporate broader domain invariant coverage in Pass 2/3."
+    },
+    {
+      "task_id": "task_07",
+      "task_name": "TASK-07-AUTH-TOKEN-REVOCATION-AMBIGUOUS",
+      "requirement_id": "REQ-DER-01",
+      "title": "Cryptographic Credential Hashing (Argon2id / bcrypt)",
+      "normative_level": "MUST",
+      "taxonomy": "EPISTEMIC_OVER_RESTRAINT",
+      "stage_of_miss": "Stage 2 (Pass 2 Coverage Audit)",
+      "observed_candidate": "REQ-BOUNDARY-001: Unstated Identity Provider Integration Boundary (UNKNOWN)",
+      "forensic_cause": "The ambiguous prompt ('We need an authentication platform with token revocation') led the model to reason that user authentication could be delegated to an external IdP (surfaced in Pass 3 as UNKNOWN). Consequently, it did not derive local password cryptographic hashing (Argon2id/bcrypt) because it refused to assume internal credential storage.",
+      "fix_path": "Structure Stage 2 Pass 2 gap analysis to evaluate conditional invariant trees: 'IF local credential store THEN enforce Argon2id hashing; ELSE IF external IdP THEN enforce OIDC/SAML token validation'."
+    },
+    {
+      "task_id": "task_07",
+      "task_name": "TASK-07-AUTH-TOKEN-REVOCATION-AMBIGUOUS",
+      "requirement_id": "REQ-DER-03",
+      "title": "Authentication and Revocation Security Audit Logging",
+      "normative_level": "SHOULD",
+      "taxonomy": "COVERAGE_AUDIT_MISS",
+      "stage_of_miss": "Stage 2 (Pass 2 Coverage Audit)",
+      "observed_candidate": "Omitted from explicit candidate list",
+      "forensic_cause": "Ground-truth requirement 'Authentication and Revocation Security Audit Logging' was not synthesized by the model.",
+      "fix_path": "Incorporate broader domain invariant coverage in Pass 2/3."
+    },
+    {
+      "task_id": "task_07",
+      "task_name": "TASK-07-AUTH-TOKEN-REVOCATION-AMBIGUOUS",
+      "requirement_id": "REQ-UNK-01",
+      "title": "Token Format Architecture: Stateless JWT with Blacklist vs Stateful Opaque Tokens",
+      "normative_level": "UNKNOWN",
+      "taxonomy": "EPISTEMIC_OVER_RESTRAINT",
+      "stage_of_miss": "Stage 2 (Pass 3 Boundary)",
+      "observed_candidate": "Omitted from explicit candidate list",
+      "forensic_cause": "Ground-truth requirement 'Token Format Architecture: Stateless JWT with Blacklist vs Stateful Opaque Tokens' was not synthesized by the model.",
+      "fix_path": "Incorporate broader domain invariant coverage in Pass 2/3."
+    },
+    {
+      "task_id": "task_07",
+      "task_name": "TASK-07-AUTH-TOKEN-REVOCATION-AMBIGUOUS",
+      "requirement_id": "REQ-UNK-02",
+      "title": "Multi-Factor Authentication (MFA / WebAuthn / TOTP) Requirement",
+      "normative_level": "UNKNOWN",
+      "taxonomy": "EPISTEMIC_OVER_RESTRAINT",
+      "stage_of_miss": "Stage 2 (Pass 3 Boundary)",
+      "observed_candidate": "Omitted from explicit candidate list",
+      "forensic_cause": "Ground-truth requirement 'Multi-Factor Authentication (MFA / WebAuthn / TOTP) Requirement' was not synthesized by the model.",
+      "fix_path": "Incorporate broader domain invariant coverage in Pass 2/3."
+    },
+    {
+      "task_id": "task_07",
+      "task_name": "TASK-07-AUTH-TOKEN-REVOCATION-AMBIGUOUS",
+      "requirement_id": "REQ-UNK-03",
+      "title": "Identity Protocol Standard: OAuth2 / OIDC vs SAML vs Proprietary REST",
+      "normative_level": "UNKNOWN",
+      "taxonomy": "EPISTEMIC_OVER_RESTRAINT",
+      "stage_of_miss": "Stage 2 (Pass 3 Boundary)",
+      "observed_candidate": "Omitted from explicit candidate list",
+      "forensic_cause": "Ground-truth requirement 'Identity Protocol Standard: OAuth2 / OIDC vs SAML vs Proprietary REST' was not synthesized by the model.",
+      "fix_path": "Incorporate broader domain invariant coverage in Pass 2/3."
+    }
+  ],
+  "confusion_to_refinement_traces": [
+    {
+      "task_id": "task_01",
+      "unit": "atomic",
+      "gt_class": "INVARIANT",
+      "pred_class": "CONSTRAINT",
+      "confidence": 0.95,
+      "downstream_impact": "NONE (Harmonious)",
+      "trace_rationale": "Classified as CONSTRAINT in Stage 1, but correctly ingested into Requirement IR as an atomic transaction boundary (REQ-EX-001) with ACID isolation (REQ-DJ-002) in Pass 1."
+    },
+    {
+      "task_id": "task_03",
+      "unit": "analytics ingestion",
+      "gt_class": "ENTITY",
+      "pred_class": "BEHAVIOR",
+      "confidence": 0.9,
+      "downstream_impact": "LOW (Contextual framing)",
+      "trace_rationale": "Classified as BEHAVIOR in Stage 1. Led Stage 2 to treat ingestion format standard as an operational UNKNOWN requirement (REQ-003) rather than a domain entity aggregate."
+    },
+    {
+      "task_id": "task_05",
+      "unit": "lockdown",
+      "gt_class": "BEHAVIOR",
+      "pred_class": "INVARIANT",
+      "confidence": 0.91,
+      "downstream_impact": "NONE (Positive reinforcement)",
+      "trace_rationale": "Elevated 'lockdown' from behavior to invariant. Resulted in 100% MUST recall on Task 05 by strictly enforcing kiosk security boundaries (REQ-MISSING-02, REQ-MISSING-03)."
+    },
+    {
+      "task_id": "task_05",
+      "unit": "dual-monitor mirroring",
+      "gt_class": "CONSTRAINT",
+      "pred_class": "ATTRIBUTE",
+      "confidence": 0.89,
+      "downstream_impact": "NONE (Harmonious)",
+      "trace_rationale": "Classified as ATTRIBUTE in Stage 1, but accurately synthesized in Stage 2 Pass 1 as explicit restriction requirement (REQ-EXPLICIT-01)."
+    },
+    {
+      "task_id": "task_06",
+      "unit": "secure",
+      "gt_class": "CONSTRAINT",
+      "pred_class": "INVARIANT",
+      "confidence": 0.92,
+      "downstream_impact": "NONE (Positive reinforcement)",
+      "trace_rationale": "Elevated 'secure' to invariant. Ensured Stage 2 synthesized TLS 1.3 transit encryption and PCI-DSS scope tokenization boundaries (REQ-DERIVED-002, REQ-BOUNDARY-002)."
+    }
+  ],
+  "production_modification_ledger": {
+    "spec_synthesis_py": {
+      "semantics_changed": true,
+      "behavior_changed": false,
+      "added_parameters": [
+        "shadow_mode: bool = False in SpecSynthesisEngine.run_synthesis()"
+      ],
+      "added_blocks": [
+        "Conditional execution of ShadowSynthesizer writing .shadow.json, .shadow.md, .diff.json"
+      ],
+      "default_return_path": "Unmodified legacy SynthesizedSpec"
+    }
+  }
+}

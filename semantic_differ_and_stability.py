@@ -71,7 +71,6 @@ class SemanticDiffReport:
     hallucinated_by_legacy: List[str] = field(default_factory=list)
     conflated_invariants_count: int = 0
     epistemic_unknowns_flagged: List[Dict[str, Any]] = field(default_factory=list)
-    semantic_integrity_score: float = 1.0
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -87,8 +86,7 @@ class SemanticDiffReport:
             "hallucinated_by_legacy": self.hallucinated_by_legacy,
             "conflated_invariants_count": self.conflated_invariants_count,
             "epistemic_unknowns_flagged_count": len(self.epistemic_unknowns_flagged),
-            "epistemic_unknowns_flagged": self.epistemic_unknowns_flagged,
-            "semantic_integrity_score": self.semantic_integrity_score
+            "epistemic_unknowns_flagged": self.epistemic_unknowns_flagged
         }
 
 
@@ -293,10 +291,6 @@ class SemanticOutputDiffer:
             if s_r.get("epistemic_status") == "UNKNOWN"
         ]
 
-        # Semantic integrity score
-        integrity_penalty = (page_spread_hallucination_delta * 0.05) + (scope_explosion_delta * 0.01)
-        semantic_integrity = max(0.1, round(1.0 - min(0.9, integrity_penalty), 2))
-
         return SemanticDiffReport(
             legacy_requirement_count=legacy_req_count,
             shadow_requirement_count=shadow_req_count,
@@ -307,6 +301,5 @@ class SemanticOutputDiffer:
             omitted_by_legacy=omitted_by_legacy,
             hallucinated_by_legacy=hallucinated_by_legacy,
             conflated_invariants_count=len(omitted_by_legacy),
-            epistemic_unknowns_flagged=epistemic_unknowns,
-            semantic_integrity_score=semantic_integrity
+            epistemic_unknowns_flagged=epistemic_unknowns
         )

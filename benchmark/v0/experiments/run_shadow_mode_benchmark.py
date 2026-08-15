@@ -126,7 +126,7 @@ def run_shadow_benchmark(api_key: str = None, provider: str = None, model: str =
             "scope_explosion_delta": diff_report.get("scope_explosion_delta", 0),
             "hallucinated_pages_delta": diff_report.get("page_spread_hallucination_delta", 0),
             "omitted_by_legacy_count": diff_report.get("omitted_by_legacy_count", 0),
-            "semantic_integrity_score": diff_report.get("semantic_integrity_score", 1.0)
+            "epistemic_unknowns_count": diff_report.get("epistemic_unknowns_flagged_count", 0)
         })
 
     # Summary
@@ -178,11 +178,11 @@ def run_shadow_benchmark(api_key: str = None, provider: str = None, model: str =
         for r in task_reports:
             f.write(f"| **{r['task_id']}** | {r['domain']} | {r['legacy_requirements_count']} ({r['legacy_page_spreads_count']}) | {r['shadow_requirements_count']} ({r['shadow_page_spreads_count']}) | **{r['shadow_must_recall']}%** | **{r['shadow_gt_recall']}%** | {r['pass_stability_scores'][-1] if r['pass_stability_scores'] else 1.0} | `{r['convergence_state']}` |\n")
 
-        f.write("\n## 2. Output Diffing & Integrity Ledger\n\n")
-        f.write("| Task ID | Scope Explosion Delta | UI Pages Hallucinated by Legacy | Omitted by Legacy | Semantic Integrity Score |\n")
+        f.write("\n## 2. Output Diffing & Observable Gap Ledger\n\n")
+        f.write("| Task ID | Scope Explosion Delta | UI Pages Hallucinated by Legacy | Omitted Grounded Invariants | Epistemic UNKNOWNs Flagged |\n")
         f.write("| :--- | :---: | :---: | :---: | :---: |\n")
         for r in task_reports:
-            f.write(f"| **{r['task_id']}** | -{r['scope_explosion_delta']} reqs | {r['hallucinated_pages_delta']} pages | {r['omitted_by_legacy_count']} invariants | {r['semantic_integrity_score']} |\n")
+            f.write(f"| **{r['task_id']}** | -{r['scope_explosion_delta']} reqs | {r['hallucinated_pages_delta']} pages | {r['omitted_by_legacy_count']} invariants | {r['epistemic_unknowns_count']} unknowns |\n")
 
     print(f"[Shadow Benchmark] Complete. MUST Recall={micro_must_recall}%, GT Recall={micro_gt_recall}%, Stability={avg_stability}")
     return summary
