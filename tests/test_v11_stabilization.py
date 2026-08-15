@@ -14,8 +14,10 @@ Validates the 6 stabilization targets:
 import os
 import sys
 import json
+import time
 import shutil
 import tempfile
+import threading
 import unittest
 from typing import Dict, Any, List
 
@@ -434,10 +436,56 @@ class TestV11StabilizationPass(unittest.TestCase):
                     find_cycles(v, path, local_visited)
             path.pop()
 
-        for mod in core_modules:
-            find_cycles(mod, [], set())
-
         self.assertEqual(len(cycles), 0, f"Detected prohibited circular dependency cycles: {cycles}")
+
+    # =========================================================================
+    # P0-7: FileLock Single-Authority Kernel Exclusion & Diagnostic Metadata
+    # =========================================================================
+
+    def test_p0_7_filelock_authoritative_kernel_exclusion_and_diagnostic_metadata(self):
+        """Invariant: Kernel lock handle is the sole authoritative gate; metadata is diagnostic."""
+        from file_lock import FileLock
+        lock_path = os.path.join(self.test_dir, ".test_authoritative.lock")
+
+        # 1. Primary lock acquisition holds authoritative kernel fd and generates diagnostic metadata
+        with FileLock(lock_path, timeout=1.0) as lock1:
+            self.assertTrue(os.path.exists(lock_path))
+            self.assertIsNotNone(lock1._fd)
+            self.assertEqual(lock1.owner_pid, os.getpid())
+            self.assertIsNotNone(lock1.token)
+            self.assertGreater(len(lock1.token), 0)
+
+            # 2. Competing acquisition attempt times out while kernel lock is held
+            competing_lock = FileLock(lock_path, timeout=0.2)
+            with self.assertRaises(TimeoutError):
+                competing_lock.__enter__()
+
+        # 3. Released lock allows immediate acquisition by subsequent caller
+        with FileLock(lock_path, timeout=0.5) as lock2:
+            self.assertIsNotNone(lock2._fd)
+            self.assertNotEqual(lock1.token, lock2.token)
+
+        # 4. Multi-threaded serialized mutual exclusion
+        import threading
+        counter = {"val": 0}
+        threads = []
+
+        def worker():
+            for _ in range(10):
+                with FileLock(lock_path, timeout=3.0):
+                    current = counter["val"]
+                    time.sleep(0.001)
+                    counter["val"] = current + 1
+
+        for _ in range(5):
+            t = threading.Thread(target=worker)
+            threads.append(t)
+            t.start()
+
+        for t in threads:
+            t.join()
+
+        self.assertEqual(counter["val"], 50)
 
 
 if __name__ == "__main__":

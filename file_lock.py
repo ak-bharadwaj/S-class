@@ -2,13 +2,22 @@
 """
 S-Class EOS V11.2 - Canonical Hardware & OS Mutual Exclusion FileLock Engine (Layer 0)
 
-Provides:
-1. Kernel advisory mutual exclusion (msvcrt.locking / fcntl.flock)
-2. Atomic owner metadata (PID, hostname, start timestamp, UUID token)
-3. PID liveness audit & creation timestamp verification (detects OS PID reuse)
-4. Stale-lock reclamation
-5. Process-local thread-safe activation tracking
-6. Strict 0o700 directory and 0o600 file permissions
+Architecture & Contract:
+1. Authoritative Mutual Exclusion:
+   - The OS kernel advisory lock (msvcrt.locking on Windows, fcntl.flock on POSIX) is the
+     SOLE authoritative gate for mutual exclusion across processes.
+   - When a process exits, terminates, or crashes, the OS automatically closes file descriptors
+     and releases the kernel lock, guaranteeing crash resilience without unsafe secondary authorities.
+
+2. Diagnostic & Audit Metadata:
+   - On lock acquisition, owner metadata (PID, UUID token, hostname, timestamp) is written atomically
+     to the lock file while holding the kernel lock.
+   - This metadata is strictly for diagnostics, audit trails, and tooling (e.g. doctor, monitoring),
+     never as a secondary ownership authority.
+
+3. Process-Local Thread Safety:
+   - Process-local thread tracking (_active_local_locks) ensures concurrent threads within the same
+     Python runtime serialize access deterministically.
 """
 
 import os
@@ -28,7 +37,7 @@ _active_locks_guard = threading.Lock()
 
 
 def _process_exists(pid: int) -> bool:
-    """Verifies whether an OS process with the given PID is actively running."""
+    """Verifies whether an OS process with the given PID is actively running (diagnostic utility)."""
     if pid <= 0:
         return False
     if sys.platform == "win32":
@@ -60,7 +69,7 @@ def _process_exists(pid: int) -> bool:
 
 
 def _get_process_start_time(pid: int) -> Optional[float]:
-    """Retrieves process creation/start timestamp (epoch seconds) for PID reuse detection."""
+    """Retrieves process creation timestamp (epoch seconds) for diagnostic audit trails."""
     if pid <= 0:
         return None
     if sys.platform == "win32":
@@ -103,9 +112,8 @@ def _get_process_start_time(pid: int) -> Optional[float]:
 
 class FileLock:
     """
-    Canonical hardware-level and OS-native kernel advisory mutual exclusion file lock (msvcrt.locking / fcntl.flock)
-    with atomic owner metadata, PID liveness audit, process creation timestamp validation,
-    unique process token identity, and thread-safe local activation tracking.
+    Canonical OS-native kernel advisory mutual exclusion file lock (msvcrt.locking / fcntl.flock)
+    with diagnostic owner metadata and thread-safe local activation tracking.
     """
     def __init__(self, lock_path: str, timeout: float = 10.0, stale_ttl: float = 15.0, grace_period: float = 0.5):
         self.lock_path = os.path.abspath(lock_path)
