@@ -38,17 +38,21 @@ class TaskRecord:
     parent_hld: str
     parent_reqs: List[str]
     parent_behaviors: List[str]
+    target_files: List[str] = field(default_factory=list)
     verification_criteria: List[str] = field(default_factory=list)
     source_lld_hash: str = ""
     source_binding_hashes: List[str] = field(default_factory=list)
+    task_spec_hash: str = ""
     task_hash: str = ""
 
     def __post_init__(self):
+        if not self.task_spec_hash:
+            self.task_spec_hash = self.compute_spec_hash()
         if not self.task_hash:
-            self.task_hash = self.compute_canonical_hash()
+            self.task_hash = self.task_spec_hash
 
-    def compute_canonical_hash(self) -> str:
-        """Computes deterministic SHA-256 hash over all task fields, upstream LLD hash, and capability binding digests."""
+    def compute_spec_hash(self) -> str:
+        """Computes deterministic SHA-256 hash over immutable semantic specification fields."""
         cat_val = self.category.value if hasattr(self.category, "value") else str(self.category)
         payload = {
             "id": self.id,
@@ -59,12 +63,17 @@ class TaskRecord:
             "parent_hld": self.parent_hld,
             "parent_reqs": sorted(self.parent_reqs),
             "parent_behaviors": sorted(self.parent_behaviors),
+            "target_files": sorted(self.target_files),
             "verification_criteria": sorted(self.verification_criteria),
             "source_lld_hash": self.source_lld_hash,
             "source_binding_hashes": sorted(self.source_binding_hashes)
         }
         canonical_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+
+    def compute_canonical_hash(self) -> str:
+        """Returns the canonical semantic task hash."""
+        return self.compute_spec_hash()
 
     def to_dict(self) -> Dict[str, Any]:
         cat_val = self.category.value if hasattr(self.category, "value") else str(self.category)
@@ -77,10 +86,12 @@ class TaskRecord:
             "parent_hld": self.parent_hld,
             "parent_reqs": self.parent_reqs,
             "parent_behaviors": self.parent_behaviors,
+            "target_files": self.target_files,
             "verification_criteria": self.verification_criteria,
             "source_lld_hash": self.source_lld_hash,
             "source_binding_hashes": self.source_binding_hashes,
-            "task_hash": self.task_hash
+            "task_spec_hash": self.task_spec_hash or self.compute_spec_hash(),
+            "task_hash": self.task_hash or self.compute_canonical_hash()
         }
 
     @classmethod
@@ -121,9 +132,11 @@ class TaskRecord:
                 parent_hld=data["parent_hld"],
                 parent_reqs=data["parent_reqs"],
                 parent_behaviors=data["parent_behaviors"],
+                target_files=list(data.get("target_files", [])),
                 verification_criteria=data["verification_criteria"],
                 source_lld_hash=data["source_lld_hash"],
                 source_binding_hashes=data["source_binding_hashes"],
+                task_spec_hash=data.get("task_spec_hash", ""),
                 task_hash=data["task_hash"]
             )
 
@@ -148,9 +161,11 @@ class TaskRecord:
                 parent_hld=data.get("parent_hld", ""),
                 parent_reqs=data.get("parent_reqs", []),
                 parent_behaviors=data.get("parent_behaviors", []),
+                target_files=list(data.get("target_files", [])),
                 verification_criteria=data.get("verification_criteria", []),
                 source_lld_hash=data.get("source_lld_hash", ""),
                 source_binding_hashes=data.get("source_binding_hashes", []),
+                task_spec_hash=data.get("task_spec_hash", ""),
                 task_hash=data.get("task_hash", "")
             )
 

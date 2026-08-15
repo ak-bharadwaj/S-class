@@ -93,6 +93,7 @@ class AuthorizedChangeSet:
     source_task_hashes: Dict[str, str]  # Mapping task_id -> task_content_hash
     authorized_changes: Dict[str, AuthorizedFileChange] = field(default_factory=dict)
     source_snapshot_id: Optional[str] = None
+    source_pipeline_state_hash: Optional[str] = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat() + "Z")
     changeset_hash: str = ""
 
@@ -124,6 +125,7 @@ class AuthorizedChangeSet:
             "source_execution_plan_hash": self.source_execution_plan_hash,
             "source_task_hashes": sorted_task_hashes,
             "source_snapshot_id": self.source_snapshot_id or "",
+            "source_pipeline_state_hash": self.source_pipeline_state_hash or "",
             "changes": change_hashes
         }
         canonical_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
@@ -136,6 +138,7 @@ class AuthorizedChangeSet:
             "source_execution_plan_hash": self.source_execution_plan_hash,
             "source_task_hashes": {k: self.source_task_hashes[k] for k in sorted(self.source_task_hashes.keys())},
             "source_snapshot_id": self.source_snapshot_id,
+            "source_pipeline_state_hash": self.source_pipeline_state_hash,
             "created_at": self.created_at,
             "changeset_hash": self.changeset_hash or self.compute_canonical_hash(),
             "authorized_changes": {
@@ -162,6 +165,7 @@ class AuthorizedChangeSet:
             source_task_hashes=dict(d["source_task_hashes"]),
             authorized_changes=changes,
             source_snapshot_id=d.get("source_snapshot_id"),
+            source_pipeline_state_hash=d.get("source_pipeline_state_hash"),
             created_at=d.get("created_at", datetime.now(timezone.utc).isoformat() + "Z"),
             changeset_hash=d.get("changeset_hash", "")
         )

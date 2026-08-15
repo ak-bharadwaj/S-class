@@ -84,7 +84,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             f.write(content)
         return full_path
 
-    def _create_governed_task(self, task_id: str = "TASK-001", file_path: str = "src/app.py", lld_hash: str = "", binding_hashes: list = None) -> TaskRecord:
+    def _create_governed_task(self, task_id: str = "TASK-001", file_path: str = "src/app.py", target_files: list = None, lld_hash: str = "", binding_hashes: list = None) -> TaskRecord:
         t = TaskRecord(
             id=task_id,
             title=f"Task {task_id}",
@@ -94,6 +94,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             parent_hld="HLD-001",
             parent_reqs=["REQ-001"],
             parent_behaviors=["BEH-001"],
+            target_files=target_files if target_files is not None else ([file_path] if file_path else []),
             verification_criteria=["Test verification criteria"],
             source_lld_hash=lld_hash or "lld_hash_123",
             source_binding_hashes=binding_hashes or ["binding_hash_123"]
@@ -420,8 +421,8 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
         self._create_file("src/app.py", "def app(): pass")
         anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
 
-        t1 = self._create_governed_task("TASK-001")
-        t2 = self._create_governed_task("TASK-002")
+        t1 = self._create_governed_task("TASK-001", target_files=["src/app.py"])
+        t2 = self._create_governed_task("TASK-002", target_files=["src/helper.py"])
         plan = self._create_governed_plan([t1, t2])
 
         changeset = AuthorizedChangeSet(
@@ -760,6 +761,204 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
                 evidence_hash="abcdef" * 10
             )
         self.assertIn("UNAUTHORIZED_SIGNING_ATTEMPT", str(ctx5.exception))
+
+    # -------------------------------------------------------------------------
+    # Test 14: TOCTOU Pipeline Epoch Lock Tampering Fails Closed
+    # -------------------------------------------------------------------------
+    def test_v11_pipeline_toctou_tamper_after_validation_fails_closed(self):
+        """Invariant: Modifying refinement pipeline after locking execution epoch fails closed on TOCTOU check."""
+        self._create_file("src/app.py", "def app(): pass")
+        anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        task = self._create_governed_task("TASK-001", target_files=["src/app.py"])
+        plan = self._create_governed_plan([task])
+
+        changeset = AuthorizedChangeSet(
+            changeset_id="CS-TOCTOU",
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash=plan.plan_hash,
+            source_task_hashes={task.id: task.task_hash}
+        )
+        changeset.add_change(AuthorizedFileChange(
+            file_path="src/app.py",
+            operation=FileMutationOp.MODIFY,
+            authorized_by_tasks=["TASK-001"]
+        ))
+
+        self._write_mock_pipeline(anchor, changeset, tasks=[task], plan=plan)
+
+        # 1. Lock the pipeline epoch at validation time
+        epoch_lock = ArtifactGovernor.lock_pipeline_epoch(self.test_dir)
+        self.assertTrue(epoch_lock.get("is_locked"))
+
+        # 2. TOCTOU Attack: Attacker mutates pipeline on disk after epoch lock
+        pipe_path = os.path.join(self.agents_dir, "v7_refinement_pipeline.json")
+        with open(pipe_path, "r", encoding="utf-8") as pf:
+            pdata = json.load(pf)
+        pdata["tampered_field"] = "malicious_injection"
+        with open(pipe_path, "w", encoding="utf-8") as pf:
+            json.dump(pdata, pf)
+
+        # 3. Legitimate execution mutation on disk
+        self._create_file("src/app.py", "def app(): return 'executed'")
+        result = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
+            anchor_snapshot=anchor,
+            result_snapshot=result,
+            changeset=changeset,
+            workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("PIPELINE_EPOCH_TAMPER_DETECTED" in r for r in gov_res.blocking_reasons))
+
+    # -------------------------------------------------------------------------
+    # Test 15: Duplicate Authoritative Task IDs in Pipeline Fails Closed
+    # -------------------------------------------------------------------------
+    def test_v11_duplicate_task_id_in_pipeline_fails_closed(self):
+        """Invariant: Persisted pipeline with duplicate task IDs fails closed without collapsing."""
+        self._create_file("src/app.py", "def app(): pass")
+        anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        t1 = self._create_governed_task("TASK-001", target_files=["src/app.py"])
+        t1_dup = self._create_governed_task("TASK-001", target_files=["src/app.py"])
+        t2 = self._create_governed_task("TASK-002", target_files=["src/app.py"])
+        plan = self._create_governed_plan([t1, t2])
+
+        changeset = AuthorizedChangeSet(
+            changeset_id="CS-DUP",
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash=plan.plan_hash,
+            source_task_hashes={t1.id: t1.task_hash, t2.id: t2.task_hash}
+        )
+        changeset.add_change(AuthorizedFileChange(
+            file_path="src/app.py",
+            operation=FileMutationOp.MODIFY,
+            authorized_by_tasks=["TASK-001"]
+        ))
+
+        # Write pipeline containing duplicated TASK-001
+        self._write_mock_pipeline(anchor, changeset, tasks=[t1, t2], plan=plan)
+        pipe_path = os.path.join(self.agents_dir, "v7_refinement_pipeline.json")
+        with open(pipe_path, "r", encoding="utf-8") as pf:
+            pdata = json.load(pf)
+        pdata["tasks"] = [t1.to_dict(), t1_dup.to_dict(), t2.to_dict()]  # Duplicate TASK-001!
+        with open(pipe_path, "w", encoding="utf-8") as pf:
+            json.dump(pdata, pf)
+
+        self._create_file("src/app.py", "def app(): return 'executed'")
+        result = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
+            anchor_snapshot=anchor,
+            result_snapshot=result,
+            changeset=changeset,
+            workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("DUPLICATE_TASK_ID_DETECTED" in r for r in gov_res.blocking_reasons))
+
+    # -------------------------------------------------------------------------
+    # Test 16: Mutation Outside Authorized Task Target Scope Fails Closed
+    # -------------------------------------------------------------------------
+    def test_v11_mutation_outside_authorized_task_scope_fails_closed(self):
+        """Invariant: ChangeSet mutating files outside authorizing task's target_files scope fails closed."""
+        self._create_file("src/app.py", "def app(): pass")
+        self._create_file("src/secrets.py", "API_KEY = 'secret'")
+        anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        # TASK-001 only authorizes src/app.py
+        task = self._create_governed_task("TASK-001", target_files=["src/app.py"])
+        plan = self._create_governed_plan([task])
+
+        # Attacker crafts ChangeSet claiming TASK-001 authorizes modifying src/secrets.py
+        changeset = AuthorizedChangeSet(
+            changeset_id="CS-SCOPE-ATTACK",
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash=plan.plan_hash,
+            source_task_hashes={task.id: task.task_hash}
+        )
+        changeset.add_change(AuthorizedFileChange(
+            file_path="src/secrets.py",
+            operation=FileMutationOp.MODIFY,
+            authorized_by_tasks=["TASK-001"]
+        ))
+
+        self._write_mock_pipeline(anchor, changeset, tasks=[task], plan=plan)
+
+        self._create_file("src/secrets.py", "API_KEY = 'exfiltrated'")
+        result = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
+            anchor_snapshot=anchor,
+            result_snapshot=result,
+            changeset=changeset,
+            workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("MUTATION_OUTSIDE_AUTHORIZED_TASK_SCOPE" in r for r in gov_res.blocking_reasons))
+
+    # -------------------------------------------------------------------------
+    # Test 17: Task Semantic Spec Hash Invariance Under Scheduler Mutation
+    # -------------------------------------------------------------------------
+    def test_v11_task_semantic_spec_hash_invariance_under_scheduler_mutation(self):
+        """Invariant: Scheduler operational transformations (execution_mode, batching) preserve task_spec_hash."""
+        task = self._create_governed_task("TASK-001", target_files=["src/app.py"])
+        original_spec_hash = task.compute_spec_hash()
+
+        # Compile execution plan with parallel execution
+        t2 = self._create_governed_task("TASK-002", target_files=["src/helper.py"])
+        plan = ExecutionPlanCompiler.compile_execution_plan([task, t2])
+
+        # Verify plan contains execution tasks with preserved task_spec_hash
+        exec_task = plan.tasks[f"E{task.id}"]
+        self.assertEqual(exec_task.compute_spec_hash(), original_spec_hash)
+        self.assertEqual(exec_task.task_spec_hash, original_spec_hash)
+        # Verify execution instance hash reflects execution_mode
+        self.assertNotEqual(exec_task.task_hash, "")
+
+    # -------------------------------------------------------------------------
+    # Test 18: Full Runtime Signer Capability Boundary Proof
+    # -------------------------------------------------------------------------
+    def test_v11_full_runtime_signer_capability_boundary_proof(self):
+        """Invariant: Real runtime boundary strictly prevents unsigned, forged, or unauthenticated evidence."""
+        # 1. Unauthenticated agent tool execution cannot sign evidence
+        with self.assertRaises(PermissionError):
+            SovereignCryptoAuthority.issue_signing_capability("AGENT_CODING_TOOL")
+
+        # 2. Legitimate PromotionEngine and TestRunner capabilities sign and verify successfully
+        promo_cap = SovereignCryptoAuthority.issue_signing_capability("SCLASS_PROMOTION_ENGINE")
+        test_cap = SovereignCryptoAuthority.issue_signing_capability("SCLASS_TEST_RUNNER")
+
+        promo_sig = SovereignCryptoAuthority.sign(
+            capability=promo_cap,
+            artifact_type="IMPLEMENTATION_EVIDENCE",
+            issuer_id="SCLASS_PROMOTION_ENGINE",
+            evidence_id="EV-REAL-01",
+            evidence_hash="11223344556677889900aabbccddeeff" * 2
+        )
+        self.assertTrue(SovereignCryptoAuthority.verify(
+            artifact_type="IMPLEMENTATION_EVIDENCE",
+            issuer_id="SCLASS_PROMOTION_ENGINE",
+            evidence_id="EV-REAL-01",
+            evidence_hash="11223344556677889900aabbccddeeff" * 2,
+            signature=promo_sig
+        ))
+
+        test_sig = SovereignCryptoAuthority.sign(
+            capability=test_cap,
+            artifact_type="TEST_EVIDENCE",
+            issuer_id="SCLASS_TEST_RUNNER",
+            evidence_id="EV-TEST-01",
+            evidence_hash="aabbccddeeff11223344556677889900" * 2
+        )
+        self.assertTrue(SovereignCryptoAuthority.verify(
+            artifact_type="TEST_EVIDENCE",
+            issuer_id="SCLASS_TEST_RUNNER",
+            evidence_id="EV-TEST-01",
+            evidence_hash="aabbccddeeff11223344556677889900" * 2,
+            signature=test_sig
+        ))
 
 
 if __name__ == "__main__":

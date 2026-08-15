@@ -230,12 +230,15 @@ class ExecutionPlanCompiler:
                 required_agent_capability=req_agent_cap,
                 assigned_agent=None,
                 parent_lld_id=t.parent_lld,
+                parent_hld_id=getattr(t, "parent_hld", ""),
                 source_task_hash=t.task_hash,
                 source_lld_hash=t.source_lld_hash,
                 source_binding_hashes=list(t.source_binding_hashes),
                 parent_req_ids=list(t.parent_reqs),
                 parent_behavior_ids=list(t.parent_behaviors),
-                verification_criteria=list(t.verification_criteria)
+                target_files=list(getattr(t, "target_files", [])),
+                verification_criteria=list(t.verification_criteria),
+                task_spec_hash=getattr(t, "task_spec_hash", "") or t.compute_canonical_hash()
             )
             exec_t.task_hash = exec_t.compute_canonical_hash()
             exec_tasks[exec_t.id] = exec_t

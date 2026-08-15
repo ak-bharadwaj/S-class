@@ -278,13 +278,35 @@ class ExecutionTask:
     required_agent_capability: str = "general_coding"
     assigned_agent: Optional[AgentAssignment] = None
     parent_lld_id: str = ""
+    parent_hld_id: str = ""
     source_task_hash: str = ""
     source_lld_hash: str = ""
     source_binding_hashes: List[str] = field(default_factory=list)
     parent_req_ids: List[str] = field(default_factory=list)
     parent_behavior_ids: List[str] = field(default_factory=list)
+    target_files: List[str] = field(default_factory=list)
     verification_criteria: List[str] = field(default_factory=list)
+    task_spec_hash: str = ""
     task_hash: str = ""
+
+    def compute_spec_hash(self) -> str:
+        """Computes deterministic SHA-256 digest over semantic task specification fields."""
+        payload = {
+            "id": self.source_task_id or self.id,
+            "title": self.title,
+            "description": self.description,
+            "category": self.category,
+            "parent_lld": self.parent_lld_id,
+            "parent_hld": self.parent_hld_id,
+            "parent_reqs": sorted(self.parent_req_ids),
+            "parent_behaviors": sorted(self.parent_behavior_ids),
+            "target_files": sorted(self.target_files),
+            "verification_criteria": sorted(self.verification_criteria),
+            "source_lld_hash": self.source_lld_hash,
+            "source_binding_hashes": sorted(self.source_binding_hashes)
+        }
+        canonical_json = json.dumps(payload, sort_keys=True, separators=(',', ':'))
+        return hashlib.sha256(canonical_json.encode('utf-8')).hexdigest()
 
     def compute_canonical_hash(self) -> str:
         """Computes deterministic SHA-256 digest over complete execution task definition."""
@@ -302,11 +324,13 @@ class ExecutionTask:
             "required_agent_capability": self.required_agent_capability,
             "assigned_agent": self.assigned_agent.compute_canonical_hash() if self.assigned_agent else "",
             "parent_lld_id": self.parent_lld_id,
+            "parent_hld_id": self.parent_hld_id,
             "source_task_hash": self.source_task_hash,
             "source_lld_hash": self.source_lld_hash,
             "source_binding_hashes": sorted(self.source_binding_hashes),
             "parent_req_ids": sorted(self.parent_req_ids),
             "parent_behavior_ids": sorted(self.parent_behavior_ids),
+            "target_files": sorted(self.target_files),
             "verification_criteria": sorted(self.verification_criteria)
         }
         return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(',', ':')).encode('utf-8')).hexdigest()
@@ -327,12 +351,15 @@ class ExecutionTask:
             "required_agent_capability": self.required_agent_capability,
             "assigned_agent": self.assigned_agent.to_dict() if self.assigned_agent else None,
             "parent_lld_id": self.parent_lld_id,
+            "parent_hld_id": self.parent_hld_id,
             "source_task_hash": self.source_task_hash,
             "source_lld_hash": self.source_lld_hash,
             "source_binding_hashes": sorted(self.source_binding_hashes),
             "parent_req_ids": sorted(self.parent_req_ids),
             "parent_behavior_ids": sorted(self.parent_behavior_ids),
+            "target_files": sorted(self.target_files),
             "verification_criteria": sorted(self.verification_criteria),
+            "task_spec_hash": self.task_spec_hash or self.compute_spec_hash(),
             "task_hash": self.task_hash or self.compute_canonical_hash()
         }
 
@@ -369,12 +396,15 @@ class ExecutionTask:
             required_agent_capability=str(data.get("required_agent_capability", "general_coding")),
             assigned_agent=AgentAssignment.from_dict(data["assigned_agent"]) if data.get("assigned_agent") else None,
             parent_lld_id=str(data.get("parent_lld_id", "")),
+            parent_hld_id=str(data.get("parent_hld_id", "")),
             source_task_hash=str(data.get("source_task_hash", "")),
             source_lld_hash=str(data.get("source_lld_hash", "")),
             source_binding_hashes=list(data.get("source_binding_hashes", [])),
             parent_req_ids=list(data.get("parent_req_ids", [])),
             parent_behavior_ids=list(data.get("parent_behavior_ids", [])),
+            target_files=list(data.get("target_files", [])),
             verification_criteria=list(data.get("verification_criteria", [])),
+            task_spec_hash=str(data.get("task_spec_hash", "")),
             task_hash=str(data.get("task_hash", ""))
         )
 

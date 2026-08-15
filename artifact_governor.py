@@ -536,8 +536,15 @@ class ArtifactGovernor:
         req_ids = set(r_graph.nodes.keys())
         lld_map = {c.id: c for c in (lld_components or [])}
         b_map = b_graph.nodes if b_graph else {}
+        seen_task_ids = set()
 
         for t in tasks:
+            if t.id in seen_task_ids:
+                reasons.append(
+                    f"DUPLICATE_TASK_ID_DETECTED: Task collection contains duplicate authoritative task ID '{t.id}'."
+                )
+            seen_task_ids.add(t.id)
+
             # 0. Canonical Task Integrity and Upstream Lineage Verification
             if hasattr(t, "compute_canonical_hash"):
                 expected_task_hash = t.compute_canonical_hash()
@@ -1303,7 +1310,7 @@ class ArtifactGovernor:
                 f"does not match recomputed canonical hash '{recomputed_cs_hash[:8]}'."
             )
 
-        # 4. Authoritative Upstream Lineage & Exact Task-Set Reconciliation (Strict Governed Rehydration)
+        # 4. Authoritative Upstream Lineage, Pipeline Epoch Lock & Exact Task-Set Reconciliation (Strict Governed Rehydration)
         if workspace_dir:
             pipe_path = os.path.join(workspace_dir, ".agents", "v7_refinement_pipeline.json")
             if not os.path.exists(pipe_path):
@@ -1322,6 +1329,38 @@ class ArtifactGovernor:
                         from execution_ir import ExecutionPlan
                         from task_compiler import TaskRecord
 
+                        # 4-Epoch. Pipeline TOCTOU Execution Epoch Lock Verification
+                        current_pipe_canonical_hash = hashlib.sha256(
+                            json.dumps(pipe_data, sort_keys=True, separators=(",", ":")).encode("utf-8")
+                        ).hexdigest()
+
+                        epoch_lock_path = os.path.join(workspace_dir, ".agents", "pipeline_epoch_lock.json")
+                        if os.path.exists(epoch_lock_path):
+                            try:
+                                with open(epoch_lock_path, "r", encoding="utf-8") as elf:
+                                    epoch_lock_data = json.load(elf)
+                                locked_pipe_hash = epoch_lock_data.get("pipeline_canonical_hash", "")
+                                if locked_pipe_hash and locked_pipe_hash != current_pipe_canonical_hash:
+                                    reasons.append(
+                                        f"PIPELINE_EPOCH_TAMPER_DETECTED: Pipeline artifact '.agents/v7_refinement_pipeline.json' "
+                                        f"hash '{current_pipe_canonical_hash[:8]}' drifted from locked execution epoch '{locked_pipe_hash[:8]}'. TOCTOU violation."
+                                    )
+                                locked_plan_hash = epoch_lock_data.get("execution_plan_hash", "")
+                                if locked_plan_hash and locked_plan_hash != changeset.source_execution_plan_hash:
+                                    reasons.append(
+                                        f"PIPELINE_EPOCH_PLAN_MISMATCH: ChangeSet execution plan hash '{changeset.source_execution_plan_hash[:8]}' "
+                                        f"does not match locked execution epoch plan '{locked_plan_hash[:8]}'."
+                                    )
+                            except Exception as ex:
+                                reasons.append(f"PIPELINE_EPOCH_LOCK_CORRUPTED: Failed to read pipeline epoch lock: {ex}")
+
+                        if getattr(changeset, "source_pipeline_state_hash", None):
+                            if changeset.source_pipeline_state_hash != current_pipe_canonical_hash:
+                                reasons.append(
+                                    f"CHANGESET_PIPELINE_STATE_MISMATCH: ChangeSet source_pipeline_state_hash "
+                                    f"'{changeset.source_pipeline_state_hash[:8]}' does not match canonical pipeline hash '{current_pipe_canonical_hash[:8]}'."
+                                )
+
                         # 4a. Governed ExecutionPlan Deserialization & Integrity Verification
                         exec_plan_data = pipe_data.get("execution_plan")
                         if not exec_plan_data or not isinstance(exec_plan_data, dict):
@@ -1338,20 +1377,26 @@ class ArtifactGovernor:
                             except Exception as ex:
                                 reasons.append(f"UPSTREAM_PLAN_INTEGRITY_FAILED: Governed ExecutionPlan deserialization/validation failed closed: {ex}")
 
-                        # 4b. Governed Tasks Deserialization & Exact Task-Set Equality Reconciliation
+                        # 4b. Governed Tasks Deserialization, Duplicate ID Rejection & Exact Task-Set Equality
                         governed_tasks_list = pipe_data.get("tasks")
                         if governed_tasks_list is None or not isinstance(governed_tasks_list, list):
                             reasons.append("GOVERNED_TASKS_STRUCTURE_INVALID: Governed refinement pipeline missing 'tasks' list.")
                             governed_tasks_dict = {}
                         else:
                             governed_tasks_dict = {}
+                            seen_task_ids = set()
                             for idx, gt in enumerate(governed_tasks_list):
                                 if not isinstance(gt, dict):
                                     reasons.append(f"GOVERNED_TASK_INTEGRITY_FAILED: Task at index {idx} is not a valid dictionary.")
                                     continue
                                 try:
                                     task_record = TaskRecord.from_governed_dict(gt)
-                                    governed_tasks_dict[task_record.id] = task_record.task_hash
+                                    if task_record.id in seen_task_ids:
+                                        reasons.append(
+                                            f"DUPLICATE_TASK_ID_DETECTED: Governed pipeline contains duplicate authoritative task ID '{task_record.id}'."
+                                        )
+                                    seen_task_ids.add(task_record.id)
+                                    governed_tasks_dict[task_record.id] = task_record
                                 except Exception as ex:
                                     reasons.append(f"GOVERNED_TASK_INTEGRITY_FAILED: Task at index {idx} failed governed validation: {ex}")
 
@@ -1369,11 +1414,53 @@ class ArtifactGovernor:
                         for t_id, expected_th in governed_tasks_dict.items():
                             if t_id in changeset.source_task_hashes:
                                 actual_th = changeset.source_task_hashes[t_id]
-                                if actual_th != expected_th:
+                                if actual_th != expected_th.task_hash:
                                     reasons.append(
                                         f"CHANGESET_TASK_HASH_LINEAGE_MISMATCH: ChangeSet task '{t_id}' hash "
-                                        f"'{actual_th[:8]}' does not match governed TaskRecord task_hash '{expected_th[:8]}'."
+                                        f"'{actual_th[:8]}' does not match governed TaskRecord task_hash '{expected_th.task_hash[:8]}'."
                                     )
+
+                        # 4c. Task Scope -> ChangeSet Mutation Authorization Reconciliation
+                        for norm_path, change in changeset.authorized_changes.items():
+                            if not change.authorized_by_tasks:
+                                reasons.append(
+                                    f"CHANGESET_UNAUTHORIZED_MUTATION: File mutation on '{change.file_path}' has no authorizing tasks."
+                                )
+                                continue
+
+                            authorizing_task_objs = []
+                            for t_id in change.authorized_by_tasks:
+                                if t_id not in governed_tasks_dict:
+                                    reasons.append(
+                                        f"UNAUTHORIZED_TASK_REFERENCE: File mutation on '{change.file_path}' references unknown/unauthorized task ID '{t_id}'."
+                                    )
+                                else:
+                                    authorizing_task_objs.append(governed_tasks_dict[t_id])
+
+                            # If authorizing tasks specify explicit target_files scopes, verify inclusion
+                            scoped_tasks = [t for t in authorizing_task_objs if t.target_files]
+                            if scoped_tasks:
+                                permitted_files = set()
+                                for st in scoped_tasks:
+                                    for pf in st.target_files:
+                                        permitted_files.add(pf.replace("\\", "/").strip().lstrip("/"))
+                                if change.file_path not in permitted_files:
+                                    reasons.append(
+                                        f"MUTATION_OUTSIDE_AUTHORIZED_TASK_SCOPE: Mutation on '{change.file_path}' is outside the authorized target scopes of tasks {change.authorized_by_tasks} (permitted: {sorted(permitted_files)})."
+                                    )
+
+                        # Verify union of task scopes covers all ChangeSet mutations if tasks define scopes
+                        all_scoped_tasks = [t for t in governed_tasks_dict.values() if t.target_files]
+                        if all_scoped_tasks:
+                            union_permitted = set()
+                            for t in all_scoped_tasks:
+                                for pf in t.target_files:
+                                    union_permitted.add(pf.replace("\\", "/").strip().lstrip("/"))
+                            unscoped_mutations = set(changeset.authorized_changes.keys()) - union_permitted
+                            if unscoped_mutations:
+                                reasons.append(
+                                    f"CHANGESET_TARGETS_EXCEED_GOVERNED_TASK_SCOPES: ChangeSet targets files outside the union of all governed task scopes: {sorted(unscoped_mutations)}."
+                                )
                 except Exception as e:
                     reasons.append(f"UPSTREAM_PIPELINE_LOAD_ERROR: Failed to load upstream pipeline for lineage reconciliation: {e}")
         else:
@@ -1400,6 +1487,41 @@ class ArtifactGovernor:
             validation_status=ValidationStatus.VALID,
             approval_status=ApprovalStatus.APPROVED
         )
+
+    @classmethod
+    def lock_pipeline_epoch(cls, workspace_dir: str) -> Dict[str, Any]:
+        """
+        Locks and binds the validated refinement pipeline into an immutable execution epoch artifact.
+        Computes canonical SHA-256 digest of .agents/v7_refinement_pipeline.json and writes .agents/pipeline_epoch_lock.json.
+        """
+        agents_dir = os.path.join(workspace_dir, ".agents")
+        os.makedirs(agents_dir, exist_ok=True)
+        pipe_path = os.path.join(agents_dir, "v7_refinement_pipeline.json")
+        if not os.path.exists(pipe_path):
+            raise FileNotFoundError(f"Cannot lock execution epoch: refinement pipeline missing at '{pipe_path}'.")
+
+        with open(pipe_path, "r", encoding="utf-8") as pf:
+            pipe_data = json.load(pf)
+
+        pipe_canonical_hash = hashlib.sha256(
+            json.dumps(pipe_data, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+
+        exec_plan_data = pipe_data.get("execution_plan", {})
+        plan_hash = exec_plan_data.get("plan_hash", "")
+
+        lock_data = {
+            "epoch_id": f"EPOCH-{pipe_canonical_hash[:12]}",
+            "pipeline_canonical_hash": pipe_canonical_hash,
+            "execution_plan_hash": plan_hash,
+            "locked_at": datetime.now(timezone.utc).isoformat() + "Z",
+            "is_locked": True
+        }
+        lock_file_path = os.path.join(agents_dir, "pipeline_epoch_lock.json")
+        with open(lock_file_path, "w", encoding="utf-8") as lf:
+            json.dump(lock_data, lf, indent=2)
+
+        return lock_data
 
     @classmethod
     def audit_world_model_governance(
