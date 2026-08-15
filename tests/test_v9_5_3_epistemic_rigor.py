@@ -428,22 +428,28 @@ time.sleep(30)
         self.assertTrue(os.path.exists(lock_path), "Persistent lock file MUST remain intact on disk throughout concurrent releases")
 
     def test_lock_file_permissions_tightened_on_existing_file(self):
-        """Falsification Test: Pre-existing lock files with open permissions (0o644) MUST be explicitly tightened to 0o600 upon acquisition."""
+        """Falsification Test: Pre-existing lock files with open permissions (0o644) and directory (0o755) MUST be explicitly tightened to 0o600 / 0o700 upon acquisition."""
         import stat
-        lock_path = os.path.join(self.test_dir, ".agents", "existing_open.lock")
-        os.makedirs(os.path.dirname(lock_path), exist_ok=True)
+        dir_path = os.path.join(self.test_dir, ".agents")
+        lock_path = os.path.join(dir_path, "existing_open.lock")
+        os.makedirs(dir_path, exist_ok=True)
+        if os.name == "posix":
+            os.chmod(dir_path, 0o755)
 
         # Pre-create file with permissive mode (0o644)
         with open(lock_path, "w", encoding="utf-8") as f:
             f.write("{}")
-        os.chmod(lock_path, 0o644)
+        if os.name == "posix":
+            os.chmod(lock_path, 0o644)
 
         # Acquire lock
         with FileLock(lock_path, timeout=5.0):
-            # Assert file mode was explicitly tightened to 0o600 on POSIX platforms
+            # Assert file and directory modes were explicitly tightened on POSIX platforms
             if os.name == "posix":
-                mode = stat.S_IMODE(os.stat(lock_path).st_mode)
-                self.assertEqual(mode, 0o600, f"FileLock MUST tighten existing lock file mode from 0644 to 0600! Got {oct(mode)}")
+                file_mode = stat.S_IMODE(os.stat(lock_path).st_mode)
+                self.assertEqual(file_mode, 0o600, f"FileLock MUST tighten existing lock file mode from 0644 to 0600! Got {oct(file_mode)}")
+                dir_mode = stat.S_IMODE(os.stat(dir_path).st_mode)
+                self.assertEqual(dir_mode, 0o700, f"FileLock MUST tighten existing lock directory mode from 0755 to 0700! Got {oct(dir_mode)}")
             else:
                 self.assertTrue(os.path.exists(lock_path))
 

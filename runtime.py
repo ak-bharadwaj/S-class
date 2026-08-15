@@ -198,7 +198,12 @@ class FileLock:
             "process_start_time": self.owner_proc_start
         }).encode("utf-8")
 
-        os.makedirs(os.path.dirname(self.lock_path), mode=0o700, exist_ok=True)
+        dir_path = os.path.dirname(self.lock_path)
+        os.makedirs(dir_path, mode=0o700, exist_ok=True)
+        try:
+            os.chmod(dir_path, 0o700)
+        except OSError:
+            pass
 
         while True:
             # Enforce local thread-safe activation tracking within same process
