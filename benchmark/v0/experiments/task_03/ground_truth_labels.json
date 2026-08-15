@@ -1,0 +1,85 @@
+{
+  "task_id": "TASK-03-HEALTHCARE-PHI-MASK",
+  "domain": "healthcare_ehr",
+  "raw_prompt": "Build an export pipeline that strips 18 HIPAA Safe Harbor direct identifiers before analytics ingestion.",
+  "canonical_semantic_units": {
+    "export pipeline": {
+      "ground_truth_class": "ENTITY",
+      "rationale": "ETL batch processing worker / pipeline data transformation component."
+    },
+    "export": {
+      "ground_truth_class": "BEHAVIOR",
+      "rationale": "Data extraction and serialization operation."
+    },
+    "strips": {
+      "ground_truth_class": "BEHAVIOR",
+      "rationale": "Data redaction / filtering transformation action."
+    },
+    "18 HIPAA Safe Harbor direct identifiers": {
+      "ground_truth_class": "INVARIANT",
+      "rationale": "Regulatory compliance rule requiring complete elimination of 18 specific PII fields."
+    },
+    "patient records": {
+      "ground_truth_class": "ENTITY",
+      "rationale": "Clinical and demographic healthcare records aggregate root."
+    },
+    "analytics ingestion": {
+      "ground_truth_class": "ENTITY",
+      "rationale": "Target data warehouse / analytical downstream system."
+    },
+    "build": {
+      "ground_truth_class": "NOISE",
+      "rationale": "Imperative directive verb from user instruction."
+    }
+  },
+  "canonical_domain_requirements": {
+    "REQ-EXP-01": {
+      "title": "Export Patient Diagnostic Records",
+      "expected_type": "EXPLICIT",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT"
+    },
+    "REQ-EXP-02": {
+      "title": "Strip 18 HIPAA Safe Harbor Identifiers",
+      "expected_type": "EXPLICIT",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT"
+    },
+    "REQ-DER-01": {
+      "title": "Redact Direct Identifiers (SSN, Phone, Email, MRN, Names)",
+      "expected_type": "DERIVED_JUSTIFIED",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "HIPAA_SAFE_HARBOR_RULE"
+    },
+    "REQ-DER-02": {
+      "title": "Truncate Geographic Identifiers (3-Digit Zip Codes)",
+      "expected_type": "DERIVED_JUSTIFIED",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "HIPAA_SAFE_HARBOR_RULE"
+    },
+    "REQ-DER-03": {
+      "title": "Generalize Dates and Age Capping (>89 Years to Year Only)",
+      "expected_type": "DERIVED_JUSTIFIED",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "HIPAA_SAFE_HARBOR_RULE"
+    },
+    "REQ-DER-04": {
+      "title": "Fail-Closed PII Pattern Regex Filter",
+      "expected_type": "DERIVED_JUSTIFIED",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "DATA_SECURITY"
+    },
+    "REQ-SUP-01": {
+      "title": "Sign Sanitized Batch with Cryptographic Integrity Hash",
+      "expected_type": "SUPPORTED",
+      "epistemic_status": "SUPPORTED",
+      "provenance": "AUDIT_COMPLIANCE"
+    }
+  },
+  "forbidden_hallucinations": [
+    "Patient appointment scheduling UI",
+    "Doctor consultation chat room",
+    "Billing insurance claim form",
+    "Generic search UI for safe harbor rules"
+  ]
+}

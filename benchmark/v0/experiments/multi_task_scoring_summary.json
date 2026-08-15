@@ -1,0 +1,74 @@
+[
+  {
+    "task_id": "TASK-01-FINTECH-LEDGER",
+    "domain": "fintech",
+    "ground_truth_units_count": 7,
+    "ground_truth_reqs_count": 7,
+    "experiment_a": {
+      "total_requirements": 103,
+      "page_spreads": 48,
+      "explosion_factor": 14.71
+    },
+    "experiment_b": {
+      "accuracy_on_frozen_gt": 1.0,
+      "unscored_units_count": 1
+    },
+    "experiment_c": {
+      "total_inferred_requirements": 10,
+      "explosion_factor": 1.43,
+      "exact_gt_recall": 1.0,
+      "derived_inference_precision": 1.0,
+      "unsupported_inference_rate": 0.0,
+      "ambiguity_unknown_rate": 0.1,
+      "ui_hallucinations": 0
+    }
+  },
+  {
+    "task_id": "TASK-02-AUTH-SESSION-REVOKE",
+    "domain": "auth_iam",
+    "ground_truth_units_count": 8,
+    "ground_truth_reqs_count": 6,
+    "experiment_a": {
+      "total_requirements": 96,
+      "page_spreads": 23,
+      "explosion_factor": 16.0
+    },
+    "experiment_b": {
+      "accuracy_on_frozen_gt": 1.0,
+      "unscored_units_count": 0
+    },
+    "experiment_c": {
+      "total_inferred_requirements": 10,
+      "explosion_factor": 1.67,
+      "exact_gt_recall": 0.8333,
+      "derived_inference_precision": 1.0,
+      "unsupported_inference_rate": 0.0,
+      "ambiguity_unknown_rate": 0.3,
+      "ui_hallucinations": 0
+    }
+  },
+  {
+    "task_id": "TASK-03-HEALTHCARE-PHI-MASK",
+    "domain": "healthcare_ehr",
+    "ground_truth_units_count": 7,
+    "ground_truth_reqs_count": 7,
+    "experiment_a": {
+      "total_requirements": 76,
+      "page_spreads": 24,
+      "explosion_factor": 10.86
+    },
+    "experiment_b": {
+      "accuracy_on_frozen_gt": 1.0,
+      "unscored_units_count": 0
+    },
+    "experiment_c": {
+      "total_inferred_requirements": 8,
+      "explosion_factor": 1.14,
+      "exact_gt_recall": 1.0,
+      "derived_inference_precision": 1.0,
+      "unsupported_inference_rate": 0.0,
+      "ambiguity_unknown_rate": 0.125,
+      "ui_hallucinations": 0
+    }
+  }
+]

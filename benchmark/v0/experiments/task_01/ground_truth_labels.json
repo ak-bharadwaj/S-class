@@ -6,13 +6,9 @@
       "ground_truth_class": "INVARIANT",
       "rationale": "Atomicity is an ACID system invariant (all-or-nothing execution), not an entity or UI component."
     },
-    "financial ledger": {
+    "financial ledger transaction": {
       "ground_truth_class": "ENTITY",
-      "rationale": "Ledger is a core domain entity / aggregate root storing accounting records."
-    },
-    "transaction": {
-      "ground_truth_class": "ENTITY",
-      "rationale": "Transaction is a primary business entity representing a financial posting event."
+      "rationale": "Ledger transaction is a core domain entity / aggregate root storing accounting records."
     },
     "debit/credit": {
       "ground_truth_class": "ATTRIBUTE",
@@ -21,6 +17,10 @@
     "balance invariance": {
       "ground_truth_class": "INVARIANT",
       "rationale": "Debit sum must equal credit sum. A mathematical balance equation that must never be violated."
+    },
+    "debit/credit balance invariance": {
+      "ground_truth_class": "INVARIANT",
+      "rationale": "Double-entry zero-sum mathematical consistency rule."
     },
     "idempotency check": {
       "ground_truth_class": "BEHAVIOR",

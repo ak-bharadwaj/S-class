@@ -1,0 +1,86 @@
+{
+  "experiment": "EXPERIMENT C — Grounded Domain Inference (Task 03)",
+  "task_id": "TASK-03-HEALTHCARE-PHI-MASK",
+  "inferred_requirements": [
+    {
+      "requirement_id": "REQ-PHI-01",
+      "title": "Direct PHI Identifier Stripping & Redaction",
+      "description": "The export pipeline must identify and completely redact or drop all direct personal identifiers defined under 45 CFR § 164.514(b)(2)(i), including patient names, Social Security Numbers (SSN), Medical Record Numbers (MRN), phone numbers, email addresses, fax numbers, health plan beneficiary numbers, account numbers, certificate/license numbers, vehicle IDs, device identifiers/serial numbers, URLs, IP addresses, biometric identifiers, and full-face photographic images.",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Directly requested in user prompt ('strips 18 HIPAA Safe Harbor direct identifiers before analytics ingestion') and mandated by 45 CFR § 164.514(b)(2)(i)(A-R)."
+    },
+    {
+      "requirement_id": "REQ-PHI-02",
+      "title": "Geographic Truncation & Low-Density ZIP Code Suppression",
+      "description": "All geographic subdivisions smaller than a state (street addresses, city, county, precinct) must be removed. ZIP codes must be truncated to their initial 3 digits, provided the 3-digit prefix represents a population exceeding 20,000 per US Census Bureau data; prefixes representing 20,000 or fewer individuals must be zero-padded/suppressed to '000'.",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "HIPAA_SAFE_HARBOR",
+      "confidence": 0.98,
+      "justification": "Step 1 (Regulatory Requirement): HIPAA Safe Harbor § 164.514(b)(2)(i)(B) strictly limits geographic resolution to state-level with restricted 3-digit ZIP prefixes. Step 2 (Re-identification Threat): Granular location metadata allows linking external public records to identify unique patients. Step 3 (Technical Mitigation): The export pipeline must execute deterministic geographic truncation and lookup-based suppression ('000') on all location attributes prior to egress."
+    },
+    {
+      "requirement_id": "REQ-PHI-03",
+      "title": "Date Generalization & Geriatric Age Capping (>89 Years)",
+      "description": "All date fields directly associated with an individual (date of birth, hospital admission date, discharge date, date of death) must be generalized to year only. All ages greater than 89 years, along with associated date-of-birth elements indicating age >= 90, must be aggregated and clamped to a categorical upper bound of '90 or older' (90+).",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "HIPAA_SAFE_HARBOR",
+      "confidence": 0.98,
+      "justification": "Step 1 (Regulatory Requirement): 45 CFR § 164.514(b)(2)(i)(C) mandates stripping month/day elements and capping extreme age values at 90+. Step 2 (Re-identification Threat): Precise event dates combined with demographic outliers (e.g. 95-year-old admissions) create unique statistical signatures. Step 3 (Technical Mitigation): Timestamp transformation functions must truncate ISO dates to YYYY-01-01 / YYYY and clamp computed age variables to >=90 buckets."
+    },
+    {
+      "requirement_id": "REQ-PHI-04",
+      "title": "Fail-Closed Regex & Unstructured String PHI Scrubbing",
+      "description": "The pipeline must apply a fail-closed regex/pattern filter over all unstructured string fields, unmapped attributes, and free-text clinical comments. Any unmapped or non-whitelisted text payload that matches pattern heuristics for direct identifiers (SSN, phone, email, MRN) or cannot be validated must be scrubbed or dropped, aborting export if unresolvable.",
+      "type": "INVARIANT",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "DATA_SECURITY",
+      "confidence": 0.95,
+      "justification": "Step 1 (Domain Vulnerability): Free-text clinical notes and unmapped payload schemas frequently contain embedded direct identifiers that bypass standard field-level stripping. Step 2 (System Failure Mode): A fail-open architecture would leak unmasked PHI into analytical data lakes without detection. Step 3 (Technical Mitigation): Implementing an invariant fail-closed scanner ensures that any unverified or high-entropy string matching PHI regex signatures is blocked or redacted before downstream ingestion."
+    },
+    {
+      "requirement_id": "REQ-PHI-05",
+      "title": "Cryptographic Export Batch Integrity Signature & Manifest",
+      "description": "Every de-identified export batch emitted by the pipeline must produce a cryptographic checksum manifest (e.g., SHA-256 HMAC / digital signature) recording batch UUID, record count, transformation timestamp, schema version, and payload digest for immutable audit verification.",
+      "type": "SECURITY",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "AUDIT_INTEGRITY",
+      "confidence": 0.94,
+      "justification": "Step 1 (Compliance Mandate): HIPAA Security Rule § 164.312(c)(1) and § 164.312(b) mandate data transmission integrity controls and technical audit logs. Step 2 (Threat Model): Exported batches in transit to analytics warehouses are susceptible to silent corruption, payload tampering, or record leakage without cryptographic proof. Step 3 (Technical Mitigation): Generating a per-batch SHA-256 signature and tamper-evident manifest provides non-repudiation and mathematical verification that the de-identified export was processed through the compliant pipeline."
+    },
+    {
+      "requirement_id": "REQ-PHI-06",
+      "title": "Pre-Ingestion ETL Pipeline Architecture",
+      "description": "The system must operate as an isolated batch or streaming pre-processing transformation layer positioned between upstream operational EHR storage and downstream analytical ingestion endpoints, ensuring zero raw PHI reaches the analytics cluster.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "SUPPORTED",
+      "provenance": "USER_PROMPT",
+      "confidence": 0.92,
+      "justification": "Derived directly from the prompt architecture ('export pipeline that strips ... before analytics ingestion'), establishing a strict perimeter filter pattern."
+    },
+    {
+      "requirement_id": "REQ-PHI-07",
+      "title": "External Analytics Warehouse Authentication & Storage Target Configuration",
+      "description": "The specific downstream destination (e.g., Snowflake, BigQuery, ClickHouse, S3 Data Lake), network transport protocol (gRPC, HTTPS, S3 API), and authentication credentials (IAM role, mTLS certificates, KMS keys) are unstated and must be injected via external environment configuration.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 0.5,
+      "justification": "The user prompt specifies de-identification before 'analytics ingestion' but leaves destination storage technology, authentication protocols, and IAM configuration entirely unspecified."
+    },
+    {
+      "requirement_id": "REQ-PHI-08",
+      "title": "Scope Invariant: Exclusion of Interactive Clinical / Administrative UIs",
+      "description": "The export pipeline service must not implement or expose patient appointment schedulers, doctor consultation portals, telemedicine interfaces, or billing/invoicing modules. The service boundary is strictly restricted to automated de-identification data processing.",
+      "type": "INVARIANT",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "DATA_SECURITY",
+      "confidence": 0.99,
+      "justification": "Step 1 (Scope Definition): The prompt specifically requests an automated backend data export pipeline. Step 2 (Security Boundary): Injecting interactive user-facing portals into a de-identification pipeline expands attack surfaces and violates separation of concerns. Step 3 (Technical Invariant): System design strictly confines components to headless data transformation workers and audit logging."
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "experiment": "EXPERIMENT B — Controlled Semantic Unit Classification (Task 03)",
+  "task_id": "TASK-03-HEALTHCARE-PHI-MASK",
+  "classifications": [
+    {
+      "unit": "export pipeline",
+      "class": "ENTITY",
+      "confidence": 0.95,
+      "rationale": "Represents the structural system aggregate and data processing pipeline construct that encapsulates the ingestion, transformation, and distribution lifecycle."
+    },
+    {
+      "unit": "export",
+      "class": "BEHAVIOR",
+      "confidence": 0.96,
+      "rationale": "Represents the dynamic action and system workflow of extracting and emitting data records from the EHR domain boundary."
+    },
+    {
+      "unit": "strips",
+      "class": "BEHAVIOR",
+      "confidence": 0.94,
+      "rationale": "Denotes the active transformation and redaction mechanism/action executed on data payloads during transit."
+    },
+    {
+      "unit": "18 HIPAA Safe Harbor direct identifiers",
+      "class": "INVARIANT",
+      "confidence": 0.98,
+      "rationale": "Refers to the strict statutory regulatory compliance specification (45 CFR § 164.514(b)(2)) requiring mandatory removal of all 18 direct PHI identifiers to achieve Safe Harbor de-identification status."
+    },
+    {
+      "unit": "patient records",
+      "class": "ENTITY",
+      "confidence": 0.97,
+      "rationale": "Represents the primary domain data model and core entity aggregate containing clinical and demographic Protected Health Information (PHI)."
+    },
+    {
+      "unit": "analytics ingestion",
+      "class": "ENTITY",
+      "confidence": 0.92,
+      "rationale": "Represents the downstream operational destination and analytical data store sink."
+    },
+    {
+      "unit": "build",
+      "class": "NOISE",
+      "confidence": 0.99,
+      "rationale": "Imperative meta-prompt instruction verb requesting system creation, carrying no domain semantics, business logic, or runtime system constraints."
+    }
+  ]
+}

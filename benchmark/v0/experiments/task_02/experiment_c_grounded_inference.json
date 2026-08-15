@@ -1,0 +1,106 @@
+{
+  "experiment": "EXPERIMENT C — Grounded Domain Inference (Task 02)",
+  "task_id": "TASK-02-AUTH-SESSION-REVOKE",
+  "inferred_requirements": [
+    {
+      "requirement_id": "REQ-AUTH-01",
+      "title": "Password Reset Session Invalidation Trigger",
+      "description": "Upon successful completion of a user password reset flow, the authentication service must immediately trigger revocation of all active sessions and refresh tokens tied to the target user identity.",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Directly mandated by prompt specification: 'Implement password reset session invalidation'."
+    },
+    {
+      "requirement_id": "REQ-AUTH-02",
+      "title": "Multi-Cluster Refresh Token Blacklisting",
+      "description": "All active refresh tokens associated with the user must be committed to a distributed blacklist or revocation registry that is reachable and enforced across all operational infrastructure clusters.",
+      "type": "FUNCTIONAL",
+      "epistemic_status": "EXPLICIT",
+      "provenance": "USER_PROMPT",
+      "confidence": 1.0,
+      "justification": "Directly mandated by prompt specification: 'blacklists active refresh tokens across all clusters'."
+    },
+    {
+      "requirement_id": "REQ-AUTH-03",
+      "title": "Blacklist TTL Bound to Maximum Token Lifespan",
+      "description": "Revocation entries stored in the distributed blacklist must have an eviction Time-To-Live (TTL) calibrated to the maximum remaining validity window of the active refresh tokens.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "SECURITY_ENFORCEMENT",
+      "confidence": 0.98,
+      "justification": "3-Step Why-Chain: (1) Why? Refresh tokens possess a finite cryptographic lifespan (expiry timestamp). (2) Why? Retaining blacklist entries indefinitely in distributed memory/storage causes unbounded state growth and degraded query performance. (3) Why? Once a token's intrinsic expiry timestamp has passed, standard expiration checks reject the token automatically, rendering blacklist retention strictly redundant beyond max token lifetime."
+    },
+    {
+      "requirement_id": "REQ-AUTH-04",
+      "title": "Cross-Cluster Invalidation Propagation & Synchronization",
+      "description": "Session revocation events must be broadcast across clusters via a reliable distributed pub/sub or event-streaming bus to invalidate cluster-local caches with low propagation latency.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "DISTRIBUTED_PROPAGATION",
+      "confidence": 0.96,
+      "justification": "3-Step Why-Chain: (1) Why? Individual clusters maintain local cache layers to minimize token validation latency. (2) Why? Without cross-cluster event propagation, an attacker can replay a compromised refresh token against a cluster that has not locally observed the password reset. (3) Why? Rapid asynchronous or synchronous broadcast across clusters guarantees global convergence and eliminates replay vulnerability windows."
+    },
+    {
+      "requirement_id": "REQ-AUTH-05",
+      "title": "Immediate Token Verification Rejection Enforcement",
+      "description": "Any token refresh, exchange, or introspection request presenting a revoked refresh token must be rejected immediately with HTTP 401 Unauthorized / invalid_grant and denied downstream access token issuance.",
+      "type": "SECURITY",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "SECURITY_ENFORCEMENT",
+      "confidence": 0.99,
+      "justification": "3-Step Why-Chain: (1) Why? The security objective of session invalidation during password reset is to terminate unauthorized access persistence. (2) Why? If the refresh endpoint does not evaluate revocation state before issuing new access tokens, blacklisting fails to mitigate session hijacking. (3) Why? Immediate rejection at the authentication enforcement boundary halts token minting and severs the attacker's ongoing session."
+    },
+    {
+      "requirement_id": "REQ-AUTH-06",
+      "title": "Security Audit Telemetry & Event Emission",
+      "description": "All password reset revocations and subsequent attempts to utilize blacklisted refresh tokens must emit structured security audit log events containing user_id, token identifier/hash, client IP, user agent, timestamp, and cluster origin.",
+      "type": "SECURITY",
+      "epistemic_status": "DERIVED_JUSTIFIED",
+      "provenance": "SECURITY_AUDIT",
+      "confidence": 0.95,
+      "justification": "3-Step Why-Chain: (1) Why? Credential reset and session revocation represent critical security boundary state transitions. (2) Why? Security operations (SIEM/SOC) and compliance standards require full visibility into credential lifecycle events and unauthorized token replay attempts. (3) Why? Structured telemetry allows real-time threat response, anomaly detection, and compliance traceability."
+    },
+    {
+      "requirement_id": "REQ-AUTH-07",
+      "title": "Low-Latency High-Throughput Blacklist Lookup Architecture",
+      "description": "Blacklist query resolution at auth gateways/endpoints must execute with sub-millisecond to low single-digit millisecond latency (e.g. Redis/Valkey cluster, Bloom filter pre-check, or user-level token epoch comparison) to prevent bottlenecking authentication throughput.",
+      "type": "NON_FUNCTIONAL",
+      "epistemic_status": "SUPPORTED",
+      "provenance": "SECURITY_ENFORCEMENT",
+      "confidence": 0.92,
+      "justification": "Supported architectural pattern necessary to ensure multi-cluster token verification does not degrade API availability or introduce unacceptable latency overhead under heavy load."
+    },
+    {
+      "requirement_id": "REQ-AUTH-08",
+      "title": "Token Architecture & Revocation Strategy Selection",
+      "description": "Whether refresh tokens are stateful opaque strings (revoked via database record status update) or stateless signed JWTs (revoked via JTI blacklisting or user 'tokens_valid_after' epoch timestamp comparison) is unstated.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 0.85,
+      "justification": "Unstated domain configuration. The implementation should support either individual token identifier (JTI) blacklisting or user-level token versioning/epoch invalidation depending on the existing token schema."
+    },
+    {
+      "requirement_id": "REQ-AUTH-09",
+      "title": "Current Session Continuation vs Complete Disconnection Policy",
+      "description": "Whether the active session that successfully performed the password reset is retained (by immediately minting a replacement token pair) or all sessions including the initiator are revoked requiring re-login is unstated.",
+      "type": "BEHAVIORAL",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 0.88,
+      "justification": "Unstated operational policy. System behavior must be configurable to support either total logout across all devices or seamless rotation of the resetting client session."
+    },
+    {
+      "requirement_id": "REQ-AUTH-10",
+      "title": "In-Flight Short-Lived Access Token Invalidation Scope",
+      "description": "Whether already-issued short-lived access tokens (JWTs) must be actively revoked at API gateways or allowed to expire naturally via their brief TTL is unstated.",
+      "type": "SECURITY",
+      "epistemic_status": "UNKNOWN",
+      "provenance": "UNSUPPORTED",
+      "confidence": 0.82,
+      "justification": "Unstated architectural trade-off. The prompt explicitly specifies refresh token blacklisting; active access token introspection vs standard short TTL expiry depends on service performance budgets."
+    }
+  ]
+}

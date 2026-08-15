@@ -1,0 +1,54 @@
+{
+  "experiment": "EXPERIMENT B — Controlled Semantic Unit Classification (Task 02)",
+  "task_id": "TASK-02-AUTH-SESSION-REVOKE",
+  "classifications": [
+    {
+      "unit": "password reset",
+      "class": "BEHAVIOR",
+      "confidence": 0.95,
+      "rationale": "Represents a dynamic authentication workflow and user credential state-transition process."
+    },
+    {
+      "unit": "session invalidation",
+      "class": "BEHAVIOR",
+      "confidence": 0.94,
+      "rationale": "Represents the dynamic state transition and lifecycle action of terminating active user sessions."
+    },
+    {
+      "unit": "session",
+      "class": "ENTITY",
+      "confidence": 0.98,
+      "rationale": "Represents the core domain aggregate and data model tracking authenticated user state and context."
+    },
+    {
+      "unit": "blacklist",
+      "class": "BEHAVIOR",
+      "confidence": 0.92,
+      "rationale": "Represents the operational action and state transition of appending a compromised/revoked credential to a denial registry."
+    },
+    {
+      "unit": "token blacklist",
+      "class": "ENTITY",
+      "confidence": 0.96,
+      "rationale": "Represents the domain data structure and aggregate store holding revoked token identifiers."
+    },
+    {
+      "unit": "refresh tokens",
+      "class": "ENTITY",
+      "confidence": 0.98,
+      "rationale": "Represents the domain data model and credential aggregate used to maintain long-lived authenticated sessions."
+    },
+    {
+      "unit": "across all clusters",
+      "class": "CONSTRAINT",
+      "confidence": 0.96,
+      "rationale": "Defines an architectural and distribution scope boundary requiring cross-cluster replication and synchronization."
+    },
+    {
+      "unit": "implement",
+      "class": "NOISE",
+      "confidence": 0.99,
+      "rationale": "Represents an imperative prompt command and meta-instruction with no domain modeling semantics."
+    }
+  ]
+}
