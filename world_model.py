@@ -539,7 +539,7 @@ class VerificationEvidence:
             "repository_state_hash", "execution_result", "exit_code",
             "execution_receipt_hash", "timestamp", "evidence_signature"
         ]:
-            if req not in d or not d[req]:
+            if req not in d or d[req] is None or d[req] == "":
                 raise ValueError(f"VerificationEvidence missing mandatory field '{req}'")
         return cls(
             evidence_id=d.get("evidence_id", f"verif_ev_{uuid.uuid4().hex[:12]}"),
