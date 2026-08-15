@@ -202,7 +202,6 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             plan = self._create_governed_plan(tasks)
         changeset.source_execution_plan_hash = plan.plan_hash
         changeset.source_task_hashes = {t.id: t.task_hash for t in tasks}
-        changeset.changeset_hash = changeset.compute_canonical_hash()
 
         pipe_path = os.path.join(self.agents_dir, "v7_refinement_pipeline.json")
         with open(pipe_path, "w", encoding="utf-8") as f:
@@ -221,6 +220,17 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
                 "hld_governance": {"is_blocked": False}
             }, f)
 
+        epoch_lock = ArtifactGovernor.lock_pipeline_epoch(self.test_dir)
+        changeset.source_pipeline_state_hash = epoch_lock["pipeline_canonical_hash"]
+        changeset.pipeline_epoch_id = epoch_lock["epoch_id"]
+        changeset.changeset_hash = changeset.compute_canonical_hash()
+
+        RepositorySnapshotEngine.save_snapshot(anchor_snap, os.path.join(self.agents_dir, "planning_snapshot.json"))
+        with open(os.path.join(self.agents_dir, "authorized_changeset.json"), "w", encoding="utf-8") as cf:
+            json.dump(changeset.to_dict(), cf)
+
+        return epoch_lock
+
     # -------------------------------------------------------------------------
     # Test 1: Planning Snapshot Anchor Immutability & Tampering Detection
     # -------------------------------------------------------------------------
@@ -236,6 +246,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             changeset_id="CS-001",
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash="pending_epoch_hash",
             source_task_hashes={task.id: task.task_hash}
         )
         changeset.add_change(AuthorizedFileChange(
@@ -276,6 +287,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             changeset_id="CS-002",
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash="pending_epoch_hash",
             source_task_hashes={task.id: task.task_hash}
         )
         changeset.add_change(AuthorizedFileChange(
@@ -314,6 +326,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             changeset_id="CS-003",
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash="pending_epoch_hash",
             source_task_hashes={task.id: task.task_hash}
         )
         changeset.add_change(AuthorizedFileChange(
@@ -353,6 +366,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             changeset_id="CS-004",
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash="pending_epoch_hash",
             source_task_hashes={task.id: task.task_hash}
         )
         changeset.add_change(AuthorizedFileChange(
@@ -390,6 +404,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             changeset_id="CS-005",
             source_repository_state_hash=anchor_A.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash="pending_epoch_hash",
             source_task_hashes={task.id: task.task_hash}
         )
         changeset.add_change(AuthorizedFileChange(
@@ -429,6 +444,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             changeset_id="CS-006",
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash="pending_epoch_hash",
             source_task_hashes={t1.id: t1.task_hash, t2.id: t2.task_hash}
         )
         changeset.add_change(AuthorizedFileChange(
@@ -481,6 +497,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             changeset_id="CS-007",
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash="pending_epoch_hash",
             source_task_hashes={task.id: task.task_hash}
         )
         changeset.add_change(AuthorizedFileChange(
@@ -524,6 +541,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             changeset_id="CS-008",
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash="pending_epoch_hash",
             source_task_hashes={task.id: task.task_hash}
         )
         changeset.add_change(AuthorizedFileChange(
@@ -560,6 +578,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             changeset_id="CS-009",
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash="pending_epoch_hash",
             source_task_hashes={task.id: task.task_hash}
         )
         changeset.add_change(AuthorizedFileChange(
@@ -591,6 +610,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             changeset_id="CS-010",
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash="pending_epoch_hash",
             source_task_hashes={task.id: task.task_hash}
         )
         changeset.add_change(AuthorizedFileChange(
@@ -599,7 +619,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             authorized_by_tasks=["TASK-001"]
         ))
 
-        # ATTACK: Pipeline contains empty tasks list
+        # Pipeline contains empty tasks list
         pipe_path = os.path.join(self.agents_dir, "v7_refinement_pipeline.json")
         with open(pipe_path, "w", encoding="utf-8") as f:
             json.dump({
@@ -607,6 +627,9 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
                 "execution_plan": plan.to_dict(),
                 "tasks": []  # Empty!
             }, f)
+        epoch_lock = ArtifactGovernor.lock_pipeline_epoch(self.test_dir)
+        changeset.source_pipeline_state_hash = epoch_lock["pipeline_canonical_hash"]
+        changeset.changeset_hash = changeset.compute_canonical_hash()
 
         gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
             anchor, result, changeset, workspace_dir=self.test_dir
@@ -631,6 +654,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             changeset_id="CS-011",
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash="pending_epoch_hash",
             source_task_hashes={task.id: task.task_hash}
         )
         changeset.add_change(AuthorizedFileChange(
@@ -639,7 +663,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             authorized_by_tasks=["TASK-001"]
         ))
 
-        # ATTACK: Mutate plan structure without valid hash
+        # Mutate plan structure without valid hash
         tampered_plan_dict = plan.to_dict()
         tampered_plan_dict["version"] = 999  # Invalidates hash
 
@@ -650,6 +674,9 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
                 "execution_plan": tampered_plan_dict,
                 "tasks": [task.to_dict()]
             }, f)
+        epoch_lock = ArtifactGovernor.lock_pipeline_epoch(self.test_dir)
+        changeset.source_pipeline_state_hash = epoch_lock["pipeline_canonical_hash"]
+        changeset.changeset_hash = changeset.compute_canonical_hash()
 
         gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
             anchor, result, changeset, workspace_dir=self.test_dir
@@ -674,6 +701,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             changeset_id="CS-012",
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash="pending_epoch_hash",
             source_task_hashes={task.id: task.task_hash}
         )
         changeset.add_change(AuthorizedFileChange(
@@ -682,7 +710,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             authorized_by_tasks=["TASK-001"]
         ))
 
-        # ATTACK: Mutate task description without valid hash
+        # Mutate task description without valid hash
         tampered_task_dict = task.to_dict()
         tampered_task_dict["description"] = "Tampered description injected"
 
@@ -693,6 +721,9 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
                 "execution_plan": plan.to_dict(),
                 "tasks": [tampered_task_dict]
             }, f)
+        epoch_lock = ArtifactGovernor.lock_pipeline_epoch(self.test_dir)
+        changeset.source_pipeline_state_hash = epoch_lock["pipeline_canonical_hash"]
+        changeset.changeset_hash = changeset.compute_canonical_hash()
 
         gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
             anchor, result, changeset, workspace_dir=self.test_dir
@@ -777,6 +808,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             changeset_id="CS-TOCTOU",
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash="pending_epoch_hash",
             source_task_hashes={task.id: task.task_hash}
         )
         changeset.add_change(AuthorizedFileChange(
@@ -787,7 +819,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
 
         self._write_mock_pipeline(anchor, changeset, tasks=[task], plan=plan)
 
-        # 1. Lock the pipeline epoch at validation time
+        # 1. Pipeline epoch is locked
         epoch_lock = ArtifactGovernor.lock_pipeline_epoch(self.test_dir)
         self.assertTrue(epoch_lock.get("is_locked"))
 
@@ -810,7 +842,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             workspace_dir=self.test_dir
         )
         self.assertTrue(gov_res.is_blocked)
-        self.assertTrue(any("PIPELINE_EPOCH_TAMPER_DETECTED" in r for r in gov_res.blocking_reasons))
+        self.assertTrue(any("PIPELINE_EPOCH_TAMPER_DETECTED" in r or "CHANGESET_PIPELINE_STATE_MISMATCH" in r for r in gov_res.blocking_reasons))
 
     # -------------------------------------------------------------------------
     # Test 15: Duplicate Authoritative Task IDs in Pipeline Fails Closed
@@ -829,6 +861,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             changeset_id="CS-DUP",
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash="pending_epoch_hash",
             source_task_hashes={t1.id: t1.task_hash, t2.id: t2.task_hash}
         )
         changeset.add_change(AuthorizedFileChange(
@@ -845,6 +878,9 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
         pdata["tasks"] = [t1.to_dict(), t1_dup.to_dict(), t2.to_dict()]  # Duplicate TASK-001!
         with open(pipe_path, "w", encoding="utf-8") as pf:
             json.dump(pdata, pf)
+        epoch_lock = ArtifactGovernor.lock_pipeline_epoch(self.test_dir)
+        changeset.source_pipeline_state_hash = epoch_lock["pipeline_canonical_hash"]
+        changeset.changeset_hash = changeset.compute_canonical_hash()
 
         self._create_file("src/app.py", "def app(): return 'executed'")
         result = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
@@ -876,6 +912,7 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             changeset_id="CS-SCOPE-ATTACK",
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash="pending_epoch_hash",
             source_task_hashes={task.id: task.task_hash}
         )
         changeset.add_change(AuthorizedFileChange(
@@ -914,7 +951,6 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
         exec_task = plan.tasks[f"E{task.id}"]
         self.assertEqual(exec_task.compute_spec_hash(), original_spec_hash)
         self.assertEqual(exec_task.task_spec_hash, original_spec_hash)
-        # Verify execution instance hash reflects execution_mode
         self.assertNotEqual(exec_task.task_hash, "")
 
     # -------------------------------------------------------------------------
@@ -959,6 +995,236 @@ class TestV11ChangeSetGovernance(unittest.TestCase):
             evidence_hash="aabbccddeeff11223344556677889900" * 2,
             signature=test_sig
         ))
+
+    # -------------------------------------------------------------------------
+    # Test 19: Missing Execution Epoch Lock Fails Closed (🔴 Blocker 1)
+    # -------------------------------------------------------------------------
+    def test_v11_missing_epoch_lock_fails_closed(self):
+        """Invariant: Execution epoch lock is mandatory; missing lock file strictly blocks execution."""
+        self._create_file("src/app.py", "def app(): pass")
+        anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+        self._create_file("src/app.py", "def app(): return True")
+        result = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        task = self._create_governed_task("TASK-001", target_files=["src/app.py"])
+        plan = self._create_governed_plan([task])
+
+        changeset = AuthorizedChangeSet(
+            changeset_id="CS-NOLOCK",
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash="dummy_pipeline_hash",
+            source_task_hashes={task.id: task.task_hash}
+        )
+        changeset.add_change(AuthorizedFileChange(
+            file_path="src/app.py",
+            operation=FileMutationOp.MODIFY,
+            authorized_by_tasks=["TASK-001"]
+        ))
+
+        self._write_mock_pipeline(anchor, changeset, tasks=[task], plan=plan)
+
+        # ATTACK: Delete the epoch lock file
+        lock_path = os.path.join(self.agents_dir, "pipeline_epoch_lock.json")
+        if os.path.exists(lock_path):
+            os.remove(lock_path)
+
+        gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
+            anchor, result, changeset, workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("PIPELINE_EPOCH_LOCK_MISSING" in r for r in gov_res.blocking_reasons))
+
+    # -------------------------------------------------------------------------
+    # Test 20: Forged or Modified Epoch Lock Signature Fails Closed (🔴 Blocker 3)
+    # -------------------------------------------------------------------------
+    def test_v11_forged_epoch_lock_signature_fails_closed(self):
+        """Invariant: Tampering with or forging epoch lock signature is strictly rejected by cryptographic verification."""
+        self._create_file("src/app.py", "def app(): pass")
+        anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+        self._create_file("src/app.py", "def app(): return True")
+        result = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        task = self._create_governed_task("TASK-001", target_files=["src/app.py"])
+        plan = self._create_governed_plan([task])
+
+        changeset = AuthorizedChangeSet(
+            changeset_id="CS-FORGED-LOCK",
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash="pending_hash",
+            source_task_hashes={task.id: task.task_hash}
+        )
+        changeset.add_change(AuthorizedFileChange(
+            file_path="src/app.py",
+            operation=FileMutationOp.MODIFY,
+            authorized_by_tasks=["TASK-001"]
+        ))
+
+        self._write_mock_pipeline(anchor, changeset, tasks=[task], plan=plan)
+
+        # ATTACK: Tamper epoch lock signature
+        lock_path = os.path.join(self.agents_dir, "pipeline_epoch_lock.json")
+        with open(lock_path, "r", encoding="utf-8") as f:
+            lock_data = json.load(f)
+        lock_data["epoch_signature"] = "forged_epoch_hmac_signature_0000000000000000"
+        with open(lock_path, "w", encoding="utf-8") as f:
+            json.dump(lock_data, f)
+
+        gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
+            anchor, result, changeset, workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("PIPELINE_EPOCH_LOCK_SIGNATURE_INVALID" in r for r in gov_res.blocking_reasons))
+
+    # -------------------------------------------------------------------------
+    # Test 21: Stale Epoch Lock Plan Mismatch Fails Closed
+    # -------------------------------------------------------------------------
+    def test_v11_stale_epoch_lock_plan_mismatch_fails_closed(self):
+        """Invariant: ChangeSet execution plan differing from locked execution epoch plan is blocked."""
+        self._create_file("src/app.py", "def app(): pass")
+        anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+        self._create_file("src/app.py", "def app(): return True")
+        result = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        task = self._create_governed_task("TASK-001", target_files=["src/app.py"])
+        plan = self._create_governed_plan([task])
+
+        changeset = AuthorizedChangeSet(
+            changeset_id="CS-STALE-PLAN",
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash="pending_hash",
+            source_task_hashes={task.id: task.task_hash}
+        )
+        changeset.add_change(AuthorizedFileChange(
+            file_path="src/app.py",
+            operation=FileMutationOp.MODIFY,
+            authorized_by_tasks=["TASK-001"]
+        ))
+
+        self._write_mock_pipeline(anchor, changeset, tasks=[task], plan=plan)
+
+        # ATTACK: ChangeSet execution plan hash changed
+        changeset.source_execution_plan_hash = "other_stale_plan_hash_000000"
+        changeset.changeset_hash = changeset.compute_canonical_hash()
+
+        gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
+            anchor, result, changeset, workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("PIPELINE_EPOCH_PLAN_MISMATCH" in r for r in gov_res.blocking_reasons))
+
+    # -------------------------------------------------------------------------
+    # Test 22: Unscoped Task Code Mutation Attempt Fails Closed (🔴 Blocker 4)
+    # -------------------------------------------------------------------------
+    def test_v11_unscoped_task_mutation_attempt_fails_closed(self):
+        """Invariant: A task with empty target_files (UNRESOLVED scope) cannot authorize code mutations."""
+        self._create_file("src/app.py", "def app(): pass")
+        anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+        self._create_file("src/app.py", "def app(): return True")
+        result = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        # Task with EMPTY target_files
+        unscoped_task = self._create_governed_task("TASK-UNSCOPED", target_files=[])
+        plan = self._create_governed_plan([unscoped_task])
+
+        changeset = AuthorizedChangeSet(
+            changeset_id="CS-UNSCOPED-MUTATION",
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash="pending_hash",
+            source_task_hashes={unscoped_task.id: unscoped_task.task_hash}
+        )
+        changeset.add_change(AuthorizedFileChange(
+            file_path="src/app.py",
+            operation=FileMutationOp.MODIFY,
+            authorized_by_tasks=[unscoped_task.id]
+        ))
+
+        self._write_mock_pipeline(anchor, changeset, tasks=[unscoped_task], plan=plan)
+
+        gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
+            anchor, result, changeset, workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("TASK_TARGET_SCOPE_UNRESOLVED" in r for r in gov_res.blocking_reasons))
+
+    # -------------------------------------------------------------------------
+    # Test 23: ChangeSet Pipeline State Hash Mismatch Fails Closed (🔴 Blocker 2)
+    # -------------------------------------------------------------------------
+    def test_v11_changeset_pipeline_state_hash_mismatch_fails_closed(self):
+        """Invariant: ChangeSet carrying mismatched source_pipeline_state_hash is blocked."""
+        self._create_file("src/app.py", "def app(): pass")
+        anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+        self._create_file("src/app.py", "def app(): return True")
+        result = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        task = self._create_governed_task("TASK-001", target_files=["src/app.py"])
+        plan = self._create_governed_plan([task])
+
+        changeset = AuthorizedChangeSet(
+            changeset_id="CS-PIPE-MISMATCH",
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash="pending_hash",
+            source_task_hashes={task.id: task.task_hash}
+        )
+        changeset.add_change(AuthorizedFileChange(
+            file_path="src/app.py",
+            operation=FileMutationOp.MODIFY,
+            authorized_by_tasks=["TASK-001"]
+        ))
+
+        self._write_mock_pipeline(anchor, changeset, tasks=[task], plan=plan)
+
+        # ATTACK: Tamper source_pipeline_state_hash in ChangeSet
+        changeset.source_pipeline_state_hash = "forged_pipeline_canonical_hash_FAKE"
+        changeset.changeset_hash = changeset.compute_canonical_hash()
+
+        gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
+            anchor, result, changeset, workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("CHANGESET_PIPELINE_EPOCH_MISMATCH" in r or "CHANGESET_PIPELINE_STATE_MISMATCH" in r for r in gov_res.blocking_reasons))
+
+    # -------------------------------------------------------------------------
+    # Test 24: Task Identity Confusion Attack Fails Closed (🟠 Blocker 5)
+    # -------------------------------------------------------------------------
+    def test_v11_task_identity_confusion_fails_closed(self):
+        """Invariant: ChangeSet claiming an invalid or altered task_spec_hash is blocked."""
+        self._create_file("src/app.py", "def app(): pass")
+        anchor = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+        self._create_file("src/app.py", "def app(): return True")
+        result = RepositorySnapshotEngine.capture_snapshot(self.test_dir)
+
+        task = self._create_governed_task("TASK-001", target_files=["src/app.py"])
+        plan = self._create_governed_plan([task])
+
+        changeset = AuthorizedChangeSet(
+            changeset_id="CS-IDENTITY-CONFUSION",
+            source_repository_state_hash=anchor.repository_state_hash,
+            source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash="pending_hash",
+            source_task_hashes={task.id: task.task_hash}
+        )
+        changeset.add_change(AuthorizedFileChange(
+            file_path="src/app.py",
+            operation=FileMutationOp.MODIFY,
+            authorized_by_tasks=["TASK-001"]
+        ))
+
+        self._write_mock_pipeline(anchor, changeset, tasks=[task], plan=plan)
+
+        # ATTACK: ChangeSet provides confused/fake task hash
+        changeset.source_task_hashes = {task.id: "confused_fake_task_hash_999999"}
+        changeset.changeset_hash = changeset.compute_canonical_hash()
+
+        gov_res = ArtifactGovernor.audit_changeset_reconciliation_governance(
+            anchor, result, changeset, workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("CHANGESET_TASK_HASH_LINEAGE_MISMATCH" in r for r in gov_res.blocking_reasons))
 
 
 if __name__ == "__main__":

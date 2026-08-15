@@ -27,9 +27,26 @@ class TaskCategory(str, Enum):
     INTEGRATION_TEST = "integration_test"
 
 
+class TaskTargetScopeStatus(str, Enum):
+    """Authority status for task target files scope."""
+    EXPLICIT = "EXPLICIT"
+    DERIVED = "DERIVED"
+    UNRESOLVED = "UNRESOLVED"
+
+
 @dataclass
 class TaskRecord:
-    """An executable task with complete upstream architectural lineage, cryptographic integrity hash, and BDD acceptance criteria."""
+    """
+    An executable task with complete upstream architectural lineage, cryptographic integrity hash,
+    and BDD acceptance criteria.
+
+    Task Identity Contract:
+    - task_spec_hash: Immutable semantic specification digest over all specification fields
+      (id, title, description, category, parent_lld, parent_hld, parent_reqs, parent_behaviors,
+       target_files, verification_criteria, source_lld_hash, source_binding_hashes).
+      Consumed by: AuthorizedChangeSet lineage, ImplementationEvidence, WorldModel memory indexing.
+    - task_hash: Canonical semantic task hash (= task_spec_hash for TaskRecord).
+    """
     id: str
     title: str
     description: str
@@ -39,6 +56,7 @@ class TaskRecord:
     parent_reqs: List[str]
     parent_behaviors: List[str]
     target_files: List[str] = field(default_factory=list)
+    target_scope_status: TaskTargetScopeStatus = TaskTargetScopeStatus.UNRESOLVED
     verification_criteria: List[str] = field(default_factory=list)
     source_lld_hash: str = ""
     source_binding_hashes: List[str] = field(default_factory=list)
@@ -46,6 +64,18 @@ class TaskRecord:
     task_hash: str = ""
 
     def __post_init__(self):
+        if isinstance(self.target_scope_status, str):
+            try:
+                self.target_scope_status = TaskTargetScopeStatus(self.target_scope_status)
+            except ValueError:
+                self.target_scope_status = TaskTargetScopeStatus.UNRESOLVED
+
+        if self.target_files and len(self.target_files) > 0:
+            if self.target_scope_status == TaskTargetScopeStatus.UNRESOLVED:
+                self.target_scope_status = TaskTargetScopeStatus.EXPLICIT
+        else:
+            self.target_scope_status = TaskTargetScopeStatus.UNRESOLVED
+
         if not self.task_spec_hash:
             self.task_spec_hash = self.compute_spec_hash()
         if not self.task_hash:
@@ -87,6 +117,7 @@ class TaskRecord:
             "parent_reqs": self.parent_reqs,
             "parent_behaviors": self.parent_behaviors,
             "target_files": self.target_files,
+            "target_scope_status": self.target_scope_status.value if isinstance(self.target_scope_status, TaskTargetScopeStatus) else str(self.target_scope_status),
             "verification_criteria": self.verification_criteria,
             "source_lld_hash": self.source_lld_hash,
             "source_binding_hashes": self.source_binding_hashes,
@@ -123,6 +154,12 @@ class TaskRecord:
             except ValueError:
                 raise ValueError(f"Invalid TaskCategory '{data.get('category')}' in TaskRecord strict ingestion")
 
+            scope_raw = data.get("target_scope_status", "UNRESOLVED")
+            try:
+                scope_stat = TaskTargetScopeStatus(scope_raw)
+            except ValueError:
+                scope_stat = TaskTargetScopeStatus.UNRESOLVED
+
             task = cls(
                 id=data["id"],
                 title=data["title"],
@@ -133,6 +170,7 @@ class TaskRecord:
                 parent_reqs=data["parent_reqs"],
                 parent_behaviors=data["parent_behaviors"],
                 target_files=list(data.get("target_files", [])),
+                target_scope_status=scope_stat,
                 verification_criteria=data["verification_criteria"],
                 source_lld_hash=data["source_lld_hash"],
                 source_binding_hashes=data["source_binding_hashes"],
@@ -152,6 +190,12 @@ class TaskRecord:
             except ValueError:
                 cat = TaskCategory.API_ENDPOINT
 
+            scope_raw = data.get("target_scope_status", "UNRESOLVED")
+            try:
+                scope_stat = TaskTargetScopeStatus(scope_raw)
+            except ValueError:
+                scope_stat = TaskTargetScopeStatus.UNRESOLVED
+
             return cls(
                 id=data.get("id", ""),
                 title=data.get("title", ""),
@@ -162,6 +206,7 @@ class TaskRecord:
                 parent_reqs=data.get("parent_reqs", []),
                 parent_behaviors=data.get("parent_behaviors", []),
                 target_files=list(data.get("target_files", [])),
+                target_scope_status=scope_stat,
                 verification_criteria=data.get("verification_criteria", []),
                 source_lld_hash=data.get("source_lld_hash", ""),
                 source_binding_hashes=data.get("source_binding_hashes", []),

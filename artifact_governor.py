@@ -1301,6 +1301,8 @@ class ArtifactGovernor:
         # 3. Audit ChangeSet Canonical Integrity & Lineage
         if not getattr(changeset, "source_execution_plan_hash", None):
             reasons.append("CHANGESET_LINEAGE_MISSING: ChangeSet missing mandatory source_execution_plan_hash.")
+        if not getattr(changeset, "source_pipeline_state_hash", None):
+            reasons.append("CHANGESET_PIPELINE_STATE_HASH_MISSING: ChangeSet missing mandatory source_pipeline_state_hash.")
         if not getattr(changeset, "source_task_hashes", None):
             reasons.append("CHANGESET_LINEAGE_MISSING: ChangeSet missing mandatory source_task_hashes.")
         recomputed_cs_hash = changeset.compute_canonical_hash()
@@ -1310,8 +1312,54 @@ class ArtifactGovernor:
                 f"does not match recomputed canonical hash '{recomputed_cs_hash[:8]}'."
             )
 
-        # 4. Authoritative Upstream Lineage, Pipeline Epoch Lock & Exact Task-Set Reconciliation (Strict Governed Rehydration)
+        # 4. Authoritative Upstream Lineage, Mandatory Signed Pipeline Epoch Lock & Exact Task-Set Reconciliation (Strict Governed Rehydration)
         if workspace_dir:
+            from world_model import SovereignCryptoAuthority
+            from execution_ir import ExecutionPlan
+            from task_compiler import TaskRecord, TaskTargetScopeStatus
+
+            epoch_lock_path = os.path.join(workspace_dir, ".agents", "pipeline_epoch_lock.json")
+            if not os.path.exists(epoch_lock_path):
+                reasons.append(
+                    "PIPELINE_EPOCH_LOCK_MISSING: Mandatory pipeline execution epoch lock '.agents/pipeline_epoch_lock.json' "
+                    "missing from workspace; cannot verify authoritative execution epoch."
+                )
+                epoch_lock_data = None
+            else:
+                try:
+                    with open(epoch_lock_path, "r", encoding="utf-8") as elf:
+                        epoch_lock_data = json.load(elf)
+
+                    if not isinstance(epoch_lock_data, dict):
+                        reasons.append("PIPELINE_EPOCH_LOCK_CORRUPTED: Epoch lock payload is not a valid dictionary.")
+                        epoch_lock_data = None
+                    else:
+                        req_lock_fields = ["epoch_id", "pipeline_canonical_hash", "execution_plan_hash", "locked_at", "epoch_signature"]
+                        missing_lock_fields = [f for f in req_lock_fields if f not in epoch_lock_data or not epoch_lock_data[f]]
+                        if missing_lock_fields:
+                            reasons.append(f"PIPELINE_EPOCH_LOCK_CORRUPTED: Epoch lock missing mandatory fields: {missing_lock_fields}")
+                            epoch_lock_data = None
+                        else:
+                            # Verify cryptographic signature of epoch lock
+                            lock_digest = hashlib.sha256(
+                                f"{epoch_lock_data['epoch_id']}:{epoch_lock_data['pipeline_canonical_hash']}:{epoch_lock_data['execution_plan_hash']}:{epoch_lock_data['locked_at']}".encode("utf-8")
+                            ).hexdigest()
+                            issuer = epoch_lock_data.get("issuer_id", "SCLASS_PROMOTION_ENGINE")
+                            is_valid_sig = SovereignCryptoAuthority.verify(
+                                artifact_type="PIPELINE_EPOCH_LOCK",
+                                issuer_id=issuer,
+                                evidence_id=epoch_lock_data["epoch_id"],
+                                evidence_hash=lock_digest,
+                                signature=epoch_lock_data["epoch_signature"]
+                            )
+                            if not is_valid_sig:
+                                reasons.append(
+                                    "PIPELINE_EPOCH_LOCK_SIGNATURE_INVALID: Execution epoch lock has invalid or forged cryptographic signature. Sovereign execution barrier enforced."
+                                )
+                except Exception as ex:
+                    reasons.append(f"PIPELINE_EPOCH_LOCK_CORRUPTED: Failed to read pipeline epoch lock: {ex}")
+                    epoch_lock_data = None
+
             pipe_path = os.path.join(workspace_dir, ".agents", "v7_refinement_pipeline.json")
             if not os.path.exists(pipe_path):
                 reasons.append(
@@ -1326,33 +1374,29 @@ class ArtifactGovernor:
                     if not isinstance(pipe_data, dict):
                         reasons.append("UPSTREAM_PIPELINE_STRUCTURE_INVALID: Persisted refinement pipeline is not a valid dictionary.")
                     else:
-                        from execution_ir import ExecutionPlan
-                        from task_compiler import TaskRecord
-
-                        # 4-Epoch. Pipeline TOCTOU Execution Epoch Lock Verification
                         current_pipe_canonical_hash = hashlib.sha256(
                             json.dumps(pipe_data, sort_keys=True, separators=(",", ":")).encode("utf-8")
                         ).hexdigest()
 
-                        epoch_lock_path = os.path.join(workspace_dir, ".agents", "pipeline_epoch_lock.json")
-                        if os.path.exists(epoch_lock_path):
-                            try:
-                                with open(epoch_lock_path, "r", encoding="utf-8") as elf:
-                                    epoch_lock_data = json.load(elf)
-                                locked_pipe_hash = epoch_lock_data.get("pipeline_canonical_hash", "")
-                                if locked_pipe_hash and locked_pipe_hash != current_pipe_canonical_hash:
+                        if epoch_lock_data:
+                            locked_pipe_hash = epoch_lock_data.get("pipeline_canonical_hash", "")
+                            if locked_pipe_hash and locked_pipe_hash != current_pipe_canonical_hash:
+                                reasons.append(
+                                    f"PIPELINE_EPOCH_TAMPER_DETECTED: Pipeline artifact '.agents/v7_refinement_pipeline.json' "
+                                    f"hash '{current_pipe_canonical_hash[:8]}' drifted from locked execution epoch '{locked_pipe_hash[:8]}'. TOCTOU violation."
+                                )
+                            locked_plan_hash = epoch_lock_data.get("execution_plan_hash", "")
+                            if locked_plan_hash and locked_plan_hash != changeset.source_execution_plan_hash:
+                                reasons.append(
+                                    f"PIPELINE_EPOCH_PLAN_MISMATCH: ChangeSet execution plan hash '{changeset.source_execution_plan_hash[:8]}' "
+                                    f"does not match locked execution epoch plan '{locked_plan_hash[:8]}'."
+                                )
+                            if getattr(changeset, "source_pipeline_state_hash", None):
+                                if changeset.source_pipeline_state_hash != locked_pipe_hash:
                                     reasons.append(
-                                        f"PIPELINE_EPOCH_TAMPER_DETECTED: Pipeline artifact '.agents/v7_refinement_pipeline.json' "
-                                        f"hash '{current_pipe_canonical_hash[:8]}' drifted from locked execution epoch '{locked_pipe_hash[:8]}'. TOCTOU violation."
+                                        f"CHANGESET_PIPELINE_EPOCH_MISMATCH: ChangeSet source_pipeline_state_hash "
+                                        f"'{changeset.source_pipeline_state_hash[:8]}' does not match locked execution epoch pipeline hash '{locked_pipe_hash[:8]}'."
                                     )
-                                locked_plan_hash = epoch_lock_data.get("execution_plan_hash", "")
-                                if locked_plan_hash and locked_plan_hash != changeset.source_execution_plan_hash:
-                                    reasons.append(
-                                        f"PIPELINE_EPOCH_PLAN_MISMATCH: ChangeSet execution plan hash '{changeset.source_execution_plan_hash[:8]}' "
-                                        f"does not match locked execution epoch plan '{locked_plan_hash[:8]}'."
-                                    )
-                            except Exception as ex:
-                                reasons.append(f"PIPELINE_EPOCH_LOCK_CORRUPTED: Failed to read pipeline epoch lock: {ex}")
 
                         if getattr(changeset, "source_pipeline_state_hash", None):
                             if changeset.source_pipeline_state_hash != current_pipe_canonical_hash:
@@ -1410,17 +1454,17 @@ class ArtifactGovernor:
                                 f"do not exactly match Governed Plan tasks {sorted(governed_task_ids)}."
                             )
 
-                        # Individual Task Hash Integrity Check
-                        for t_id, expected_th in governed_tasks_dict.items():
+                        # Individual Task Hash Integrity Check (checks task_spec_hash and task_hash)
+                        for t_id, expected_t in governed_tasks_dict.items():
                             if t_id in changeset.source_task_hashes:
                                 actual_th = changeset.source_task_hashes[t_id]
-                                if actual_th != expected_th.task_hash:
+                                if actual_th != expected_t.task_spec_hash and actual_th != expected_t.task_hash:
                                     reasons.append(
                                         f"CHANGESET_TASK_HASH_LINEAGE_MISMATCH: ChangeSet task '{t_id}' hash "
-                                        f"'{actual_th[:8]}' does not match governed TaskRecord task_hash '{expected_th.task_hash[:8]}'."
+                                        f"'{actual_th[:8]}' does not match governed TaskRecord task_spec_hash '{expected_t.task_spec_hash[:8]}'."
                                     )
 
-                        # 4c. Task Scope -> ChangeSet Mutation Authorization Reconciliation
+                        # 4c. Task Scope -> ChangeSet Mutation Authorization Reconciliation with Unscoped Task Barrier
                         for norm_path, change in changeset.authorized_changes.items():
                             if not change.authorized_by_tasks:
                                 reasons.append(
@@ -1435,13 +1479,19 @@ class ArtifactGovernor:
                                         f"UNAUTHORIZED_TASK_REFERENCE: File mutation on '{change.file_path}' references unknown/unauthorized task ID '{t_id}'."
                                     )
                                 else:
-                                    authorizing_task_objs.append(governed_tasks_dict[t_id])
+                                    t_obj = governed_tasks_dict[t_id]
+                                    # Hard Unscoped Task Execution Barrier:
+                                    # Tasks with empty target_files or UNRESOLVED target scope cannot authorize code mutations
+                                    if not t_obj.target_files or getattr(t_obj, "target_scope_status", None) == TaskTargetScopeStatus.UNRESOLVED:
+                                        reasons.append(
+                                            f"TASK_TARGET_SCOPE_UNRESOLVED: Authorizing task '{t_obj.id}' has unresolved target scope (empty target_files). Autonomous code mutation is prohibited without explicit file scope."
+                                        )
+                                    else:
+                                        authorizing_task_objs.append(t_obj)
 
-                            # If authorizing tasks specify explicit target_files scopes, verify inclusion
-                            scoped_tasks = [t for t in authorizing_task_objs if t.target_files]
-                            if scoped_tasks:
+                            if authorizing_task_objs:
                                 permitted_files = set()
-                                for st in scoped_tasks:
+                                for st in authorizing_task_objs:
                                     for pf in st.target_files:
                                         permitted_files.add(pf.replace("\\", "/").strip().lstrip("/"))
                                 if change.file_path not in permitted_files:
@@ -1492,8 +1542,11 @@ class ArtifactGovernor:
     def lock_pipeline_epoch(cls, workspace_dir: str) -> Dict[str, Any]:
         """
         Locks and binds the validated refinement pipeline into an immutable execution epoch artifact.
-        Computes canonical SHA-256 digest of .agents/v7_refinement_pipeline.json and writes .agents/pipeline_epoch_lock.json.
+        Computes canonical SHA-256 digest of .agents/v7_refinement_pipeline.json, cryptographically signs
+        the epoch payload via SovereignCryptoAuthority, and writes .agents/pipeline_epoch_lock.json.
         """
+        from world_model import SovereignCryptoAuthority
+
         agents_dir = os.path.join(workspace_dir, ".agents")
         os.makedirs(agents_dir, exist_ok=True)
         pipe_path = os.path.join(agents_dir, "v7_refinement_pipeline.json")
@@ -1509,13 +1562,30 @@ class ArtifactGovernor:
 
         exec_plan_data = pipe_data.get("execution_plan", {})
         plan_hash = exec_plan_data.get("plan_hash", "")
+        epoch_id = f"EPOCH-{pipe_canonical_hash[:16]}"
+        locked_at = datetime.now(timezone.utc).isoformat() + "Z"
+
+        lock_digest = hashlib.sha256(
+            f"{epoch_id}:{pipe_canonical_hash}:{plan_hash}:{locked_at}".encode("utf-8")
+        ).hexdigest()
+
+        capability = SovereignCryptoAuthority.issue_signing_capability("SCLASS_PROMOTION_ENGINE")
+        epoch_signature = SovereignCryptoAuthority.sign(
+            capability=capability,
+            artifact_type="PIPELINE_EPOCH_LOCK",
+            issuer_id="SCLASS_PROMOTION_ENGINE",
+            evidence_id=epoch_id,
+            evidence_hash=lock_digest
+        )
 
         lock_data = {
-            "epoch_id": f"EPOCH-{pipe_canonical_hash[:12]}",
+            "epoch_id": epoch_id,
             "pipeline_canonical_hash": pipe_canonical_hash,
             "execution_plan_hash": plan_hash,
-            "locked_at": datetime.now(timezone.utc).isoformat() + "Z",
-            "is_locked": True
+            "locked_at": locked_at,
+            "is_locked": True,
+            "issuer_id": "SCLASS_PROMOTION_ENGINE",
+            "epoch_signature": epoch_signature
         }
         lock_file_path = os.path.join(agents_dir, "pipeline_epoch_lock.json")
         with open(lock_file_path, "w", encoding="utf-8") as lf:

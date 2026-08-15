@@ -711,6 +711,7 @@ class SpecificationCompiler:
                     changeset_id=f"CS-{int(datetime.now(timezone.utc).timestamp())}",
                     source_repository_state_hash=repo_snapshot.repository_state_hash,
                     source_execution_plan_hash=source_execution_plan_hash,
+                    source_pipeline_state_hash="PENDING_PIPELINE_EPOCH_LOCK",
                     source_task_hashes=source_task_hashes,
                     source_snapshot_id=repo_snapshot.snapshot_id
                 )
@@ -797,6 +798,17 @@ class SpecificationCompiler:
             cls.save_versioned_pipeline_artifact(res_dict, workspace_dir)
             if execution_plan:
                 ExecutionPlanCompiler.save_execution_plan(execution_plan, workspace_dir)
+
+            # Authoritative Execution Epoch Locking
+            epoch_lock = ArtifactGovernor.lock_pipeline_epoch(workspace_dir)
+            if authorized_changeset:
+                authorized_changeset.source_pipeline_state_hash = epoch_lock["pipeline_canonical_hash"]
+                authorized_changeset.pipeline_epoch_id = epoch_lock["epoch_id"]
+                authorized_changeset.changeset_hash = authorized_changeset.compute_canonical_hash()
+                cs_path = os.path.join(workspace_dir, ".agents", "authorized_changeset.json")
+                write_json_atomic(cs_path, authorized_changeset.to_dict())
+                res_dict["authorized_changeset"] = authorized_changeset.to_dict()
+
         return res_dict
 
     @classmethod

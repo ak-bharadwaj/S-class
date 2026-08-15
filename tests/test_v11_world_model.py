@@ -453,6 +453,7 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
             changeset_id="CS-001",
             source_repository_state_hash=before_snap.repository_state_hash,
             source_execution_plan_hash="plan_hash_1",
+            source_pipeline_state_hash="pipeline_state_hash_1",
             source_task_hashes={"TASK-001": "task_hash_1"},
             authorized_changes={
                 "src/a.py": AuthorizedFileChange(
@@ -628,6 +629,7 @@ class TestV11EngineeringWorldModel(unittest.TestCase):
             changeset_id="CS-BILL-01",
             source_repository_state_hash=before_snap.repository_state_hash,
             source_execution_plan_hash="plan_hash_bill",
+            source_pipeline_state_hash="pipeline_hash_bill",
             source_task_hashes={"TASK-BILL-01": "task_sha256_abc"},
             authorized_changes={
                 "src/billing.py": AuthorizedFileChange(
@@ -939,6 +941,7 @@ test('UserService returns user', async () => {
             "changeset_id": "CS-TEST",
             "source_repository_state_hash": "hash_123",
             "source_execution_plan_hash": "plan_123",
+            "source_pipeline_state_hash": "pipe_123",
             "source_task_hashes": {"TASK-001": "task_hash_1"},
             "authorized_changes": {}
         }
@@ -950,24 +953,36 @@ test('UserService returns user', async () => {
     # Test 25: ChangeSet Missing Mandatory Lineage Fails Closed
     # -------------------------------------------------------------------------
     def test_v11_world_model_changeset_missing_mandatory_lineage_fails_closed(self):
-        """Invariant: AuthorizedChangeSet missing execution plan hash or task hashes fails closed."""
+        """Invariant: AuthorizedChangeSet missing execution plan hash, pipeline state hash, or task hashes fails closed."""
         with self.assertRaises(ValueError) as ctx1:
             AuthorizedChangeSet(
                 changeset_id="CS-NOLINEAGE",
                 source_repository_state_hash="hash_123",
                 source_execution_plan_hash="",
+                source_pipeline_state_hash="pipe_123",
                 source_task_hashes={"TASK-001": "hash_1"}
             )
         self.assertIn("must carry non-empty source_execution_plan_hash", str(ctx1.exception))
 
         with self.assertRaises(ValueError) as ctx2:
             AuthorizedChangeSet(
+                changeset_id="CS-NOPIPE",
+                source_repository_state_hash="hash_123",
+                source_execution_plan_hash="plan_123",
+                source_pipeline_state_hash="",
+                source_task_hashes={"TASK-001": "hash_1"}
+            )
+        self.assertIn("must carry non-empty mandatory source_pipeline_state_hash", str(ctx2.exception))
+
+        with self.assertRaises(ValueError) as ctx3:
+            AuthorizedChangeSet(
                 changeset_id="CS-NOTASKS",
                 source_repository_state_hash="hash_123",
                 source_execution_plan_hash="plan_123",
+                source_pipeline_state_hash="pipe_123",
                 source_task_hashes={}
             )
-        self.assertIn("must carry non-empty source_task_hashes", str(ctx2.exception))
+        self.assertIn("must carry non-empty source_task_hashes", str(ctx3.exception))
 
     # -------------------------------------------------------------------------
     # Test 26: Domain Separation Prevents Cross-Type Replay Attack
@@ -1211,12 +1226,14 @@ test('UserService returns user', async () => {
         }
         with open(os.path.join(self.agents_dir, "v7_refinement_pipeline.json"), "w", encoding="utf-8") as pf:
             json.dump(pipeline_data, pf)
+        epoch_lock = ArtifactGovernor.lock_pipeline_epoch(self.test_dir)
 
         # ChangeSet carrying FAKE source_execution_plan_hash
         attacker_changeset = AuthorizedChangeSet(
             changeset_id="CS-ATTACK-01",
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash="fake_forged_plan_hash_FAKE",
+            source_pipeline_state_hash=epoch_lock["pipeline_canonical_hash"],
             source_task_hashes={task.id: task.task_hash}
         )
         attacker_changeset.add_change(AuthorizedFileChange(
@@ -1229,7 +1246,7 @@ test('UserService returns user', async () => {
             anchor, result, attacker_changeset, workspace_dir=self.test_dir
         )
         self.assertTrue(gov_res.is_blocked)
-        self.assertTrue(any("CHANGESET_EXECUTION_PLAN_LINEAGE_MISMATCH" in r for r in gov_res.blocking_reasons))
+        self.assertTrue(any("CHANGESET_EXECUTION_PLAN_LINEAGE_MISMATCH" in r or "PIPELINE_EPOCH_PLAN_MISMATCH" in r for r in gov_res.blocking_reasons))
 
     # -------------------------------------------------------------------------
     # Test 32: Governor Blocks Task-Set Mismatch (Dropped or Extra Tasks)
@@ -1253,12 +1270,14 @@ test('UserService returns user', async () => {
         }
         with open(os.path.join(self.agents_dir, "v7_refinement_pipeline.json"), "w", encoding="utf-8") as pf:
             json.dump(pipeline_data, pf)
+        epoch_lock = ArtifactGovernor.lock_pipeline_epoch(self.test_dir)
 
         # ATTACK: ChangeSet silently drops TASK-B
         dropped_task_cs = AuthorizedChangeSet(
             changeset_id="CS-DROP",
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash=epoch_lock["pipeline_canonical_hash"],
             source_task_hashes={"TASK-A": task_a.task_hash}  # Dropped TASK-B
         )
         dropped_task_cs.add_change(AuthorizedFileChange(
@@ -1293,12 +1312,14 @@ test('UserService returns user', async () => {
         }
         with open(os.path.join(self.agents_dir, "v7_refinement_pipeline.json"), "w", encoding="utf-8") as pf:
             json.dump(pipeline_data, pf)
+        epoch_lock = ArtifactGovernor.lock_pipeline_epoch(self.test_dir)
 
         # ATTACK: ChangeSet provides tampered task hash for TASK-A
         tampered_task_cs = AuthorizedChangeSet(
             changeset_id="CS-TAMPERED-TASK",
             source_repository_state_hash=anchor.repository_state_hash,
             source_execution_plan_hash=plan.plan_hash,
+            source_pipeline_state_hash=epoch_lock["pipeline_canonical_hash"],
             source_task_hashes={"TASK-A": "tampered_hash_A_fake"}
         )
         tampered_task_cs.add_change(AuthorizedFileChange(
