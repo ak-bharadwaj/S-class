@@ -160,8 +160,8 @@ class HLDDesign:
                     raise ValueError(f"Governance Deserialization Error: Missing required field '{k}'")
             if not isinstance(data["modules"], list) or not isinstance(data["adrs"], list):
                 raise ValueError("Governance Deserialization Error: 'modules' and 'adrs' must be lists")
-            if not isinstance(data["version"], int) or data["version"] < 1:
-                raise ValueError("Governance Deserialization Error: 'version' must be a positive integer")
+            if type(data["version"]) is not int or data["version"] < 1:
+                raise ValueError("Governance Deserialization Error: 'version' must be an integer >= 1 (bool not permitted)")
 
         modules = [HLDModule.from_dict(m) if isinstance(m, dict) else m for m in data.get("modules", [])]
         adrs = [ADRRecord.from_dict(a) if isinstance(a, dict) else a for a in data.get("adrs", [])]

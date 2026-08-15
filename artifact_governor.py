@@ -502,7 +502,7 @@ class ArtifactGovernor:
                 invalid_reqs = [r for r in t.parent_reqs if r not in req_ids]
                 reasons.append(f"Task {t.id} ({t.title}) references nonexistent upstream Requirement IDs: {invalid_reqs}.")
 
-            # Semantic Parent Compatibility (Wrong-but-existing parent detection)
+            # Semantic Parent Compatibility (Wrong-but-existing parent detection & strict subset requirement scope)
             if lld_map and t.parent_lld in lld_map:
                 parent_comp = lld_map[t.parent_lld]
                 if t.parent_hld and parent_comp.parent and parent_comp.parent.hld_id:
@@ -513,10 +513,15 @@ class ArtifactGovernor:
                 if parent_comp.parent and parent_comp.parent.req_ids and t.parent_reqs:
                     comp_reqs = set(parent_comp.parent.req_ids)
                     task_reqs = set(t.parent_reqs)
-                    if not task_reqs.intersection(comp_reqs):
+                    if not task_reqs.issubset(comp_reqs):
+                        uncovered = sorted(list(task_reqs - comp_reqs))
                         reasons.append(
-                            f"Task {t.id} ({t.title}) semantic parent mismatch: requirements {sorted(list(task_reqs))} are not covered by parent LLD '{t.parent_lld}' scope {sorted(list(comp_reqs))}."
+                            f"Task {t.id} ({t.title}) semantic parent mismatch: task requirements {uncovered} are not covered by parent LLD '{t.parent_lld}' scope {sorted(list(comp_reqs))}."
                         )
+                elif parent_comp.parent and not parent_comp.parent.req_ids:
+                    reasons.append(
+                        f"Task {t.id} ({t.title}) references ungrounded parent LLD '{t.parent_lld}' with zero requirement coverage."
+                    )
 
         if reasons:
             return GovernanceGateResult(

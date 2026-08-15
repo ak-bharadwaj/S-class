@@ -189,15 +189,10 @@ class LLDCompiler:
             if not mod_endpoints:
                 mod_endpoints.append("PROPOSED_CANDIDATE: NO_ENDPOINT_EVIDENCE")
 
-            if not mod_reqs and r_graph and r_graph.nodes:
-                mod_reqs = list(r_graph.nodes.keys())
-            if not mod_reqs:
-                mod_reqs = ["REQ-001"]
-
             parent_ref = LLDParentRef(
                 hld_id=mod.id,
-                req_ids=list(set(mod_reqs)),
-                behavior_ids=list(set(mod_behaviors))
+                req_ids=sorted(list(set(mod_reqs))),
+                behavior_ids=sorted(list(set(mod_behaviors)))
             )
 
             # Execution-Architecture Specific Component Generation

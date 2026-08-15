@@ -329,6 +329,32 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         self.assertEqual(gov_res_wrong_existing.validation_status, ValidationStatus.INVALID)
         self.assertTrue(any("semantic parent mismatch" in r for r in gov_res_wrong_existing.blocking_reasons))
 
+        # 9. Negative Attack Vector 4: Partial-Overlap Scope Attack ({REQ-A, REQ-UNOWNED} vs {REQ-A, REQ-B})
+        req_owned = vehicle_task.parent_reqs[0]
+        req_unowned = "REQ-UNOWNED-999"
+        # Add unowned requirement to r_graph_multi so it's a valid ID but NOT owned by vehicle_comp
+        r_graph_multi.add_requirement(RequirementNode(
+            id=req_unowned, kind=RequirementKind.FUNCTIONAL, statement="Unrelated requirement",
+            actor="admin", capability="unrelated_action", target="unrelated"
+        ))
+        partial_scope_task = TaskRecord(
+            id="TSK-PARTIAL", title="Partial Scope Task", description="desc",
+            category=TaskCategory.API_ENDPOINT, parent_lld=vehicle_comp.id,
+            parent_hld=vehicle_task.parent_hld, parent_reqs=[req_owned, req_unowned],
+            parent_behaviors=vehicle_task.parent_behaviors
+        )
+        gov_res_partial = ArtifactGovernor.audit_task_governance([partial_scope_task], r_graph_multi, lld_multi)
+        self.assertTrue(gov_res_partial.is_blocked, "ArtifactGovernor MUST block task when requirement scope is not a strict subset of parent LLD scope!")
+        self.assertEqual(gov_res_partial.validation_status, ValidationStatus.INVALID)
+        self.assertTrue(any("semantic parent mismatch" in r and req_unowned in r for r in gov_res_partial.blocking_reasons))
+
+        # 10. Invariant: LLDCompiler MUST NOT fabricate synthetic REQ-001 ancestry for ungrounded modules
+        empty_r_graph = RequirementGraph()
+        synthetic_mod = HLDModule(id="mod_synth", name="Synthetic", system_boundary="internal", owned_entities=["X"], owned_capabilities=["nonexistent_cap"])
+        synthetic_hld = HLDDesign(system_name="HLD-001", architecture_style="Modular Monolith", modules=[synthetic_mod], adrs=[], version=1)
+        synthetic_lld = LLDCompiler.compile_lld(synthetic_hld, empty_r_graph, BehaviorGraph())
+        self.assertEqual(len(synthetic_lld[0].parent.req_ids), 0, "LLDCompiler MUST NOT manufacture fallback 'REQ-001' or all-requirements ancestry!")
+
     # -------------------------------------------------------------------------
     # Pillar 5: Disambiguated Evidence-Conditioned Security (AUTHORIZED_FOR vs String)
     # -------------------------------------------------------------------------
@@ -502,7 +528,29 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         self.assertTrue(gov_res_no_ver.is_blocked, "Missing 'version' in strict governance HLD MUST fail closed")
         self.assertTrue(any("GOVERNANCE_AUDIT_ERROR" in r for r in gov_res_no_ver.blocking_reasons))
 
-        # 7. Artifact Version Binding: Approval was for version 1; pipeline attempts to execute version 2 -> MUST BLOCK
+        # 7. Strict Governance Schema: Boolean 'version: True' must be rejected (type(version) is int check)
+        write_json_atomic(pipe_path, {
+            "version": 1,
+            "hld_design": {
+                "system_name": "HLD-001",
+                "architecture_style": "Modular Monolith",
+                "modules": [mod.to_dict()],
+                "adrs": [adr.to_dict()],
+                "version": True  # Boolean instead of int!
+            },
+            "blocked": False,
+            "hld_governance": {"is_blocked": False}
+        })
+        gov_res_bool_ver = ArtifactGovernor.enforce_fsm_transition(
+            current_phase="DESIGN",
+            proposed_event="spec_approved",
+            target_phase="CODING",
+            workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res_bool_ver.is_blocked, "Boolean 'version: True' in strict governance HLD MUST fail closed")
+        self.assertTrue(any("GOVERNANCE_AUDIT_ERROR" in r for r in gov_res_bool_ver.blocking_reasons))
+
+        # 8. Artifact Version Binding: Approval was for version 1; pipeline attempts to execute version 2 -> MUST BLOCK
         hld_v2 = HLDDesign(system_name="HLD-001", architecture_style="Modular Monolith", modules=[mod], adrs=[adr], version=2)
         write_json_atomic(pipe_path, {
             "version": 2,
