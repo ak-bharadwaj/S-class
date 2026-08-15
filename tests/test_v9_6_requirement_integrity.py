@@ -169,6 +169,61 @@ class TestV96RequirementIntegrity(unittest.TestCase):
         self.assertEqual(res.provenance, ProvenanceKind.EXPLICIT, "EpistemicPrecedencePolicy MUST prevent EXPLICIT -> SPECULATIVE downgrade")
         self.assertEqual(res.confidence, 0.85, "Higher epistemic status confidence MUST be preserved")
 
+    def test_behavior_graph_to_requirement_graph_evidence_lineage(self):
+        """Integration Test: Compiling BehaviorGraph to RequirementGraph MUST preserve structured evidence without character splitting."""
+        from behavior_graph import BehaviorGraph, BehaviorNode, BehaviorNodeType, EpistemicStatus, ProvenanceKind
+        from requirement_ir import EvidenceItem
+        
+        b_graph = BehaviorGraph()
+        b_graph.add_node(BehaviorNode(
+            id="cmd_001",
+            name="ApproveLoan",
+            behavior_type=BehaviorNodeType.COMMAND,
+            actor_id="manager",
+            target_entity_id="loan_application",
+            epistemic_status=EpistemicStatus.EXPLICIT,
+            provenance=ProvenanceKind.EXPLICIT,
+            confidence=0.95,
+            evidence_ref="User explicitly requested loan approval workflow"
+        ))
+
+        r_graph = RequirementGraph.compile_from_behavior_graph(b_graph)
+        reqs = list(r_graph.nodes.values())
+        self.assertGreaterEqual(len(reqs), 1)
+
+        req = r_graph.nodes["REQ-001"]
+        self.assertEqual(len(req.evidence), 1, "Requirement evidence MUST contain exactly 1 EvidenceItem, not character-split list!")
+        self.assertIsInstance(req.evidence[0], EvidenceItem, "Evidence item MUST be a structured EvidenceItem instance")
+        self.assertEqual(req.evidence[0].content, "User explicitly requested loan approval workflow")
+
+    def test_normalize_evidence_boundary_variants(self):
+        """Unit Test: normalize_evidence boundary handles legacy string, EvidenceItem, dict, list, and invalid quality inputs cleanly."""
+        from requirement_ir import EvidenceItem, normalize_evidence
+
+        # 1. String normalization
+        ev_str = normalize_evidence("Grounded specification requirement")
+        self.assertEqual(len(ev_str), 1)
+        self.assertEqual(ev_str[0].content, "Grounded specification requirement")
+
+        # 2. EvidenceItem normalization
+        item = EvidenceItem(id="EV-1", content="Direct AST route", quality=0.85)
+        ev_item = normalize_evidence(item)
+        self.assertEqual(len(ev_item), 1)
+        self.assertEqual(ev_item[0].id, "EV-1")
+
+        # 3. Quality boundary clamping (0.0 <= quality <= 1.0)
+        invalid_q_nan = EvidenceItem(id="EV-2", quality=float("nan"))
+        self.assertEqual(invalid_q_nan.quality, 1.0)
+
+        invalid_q_inf = EvidenceItem(id="EV-3", quality=float("inf"))
+        self.assertEqual(invalid_q_inf.quality, 1.0)
+
+        invalid_q_neg = EvidenceItem(id="EV-4", quality=-5.0)
+        self.assertEqual(invalid_q_neg.quality, 0.0)
+
+        invalid_q_high = EvidenceItem(id="EV-5", quality=999.0)
+        self.assertEqual(invalid_q_high.quality, 1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

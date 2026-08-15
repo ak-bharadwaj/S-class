@@ -115,7 +115,8 @@ class TaskCompiler:
                                 incoming = b_graph._reverse_adjacency.get(b_node.id, [])
                                 has_auth_evidence = any(e.relation == BehaviorRelationType.AUTHORIZED_FOR for e in incoming)
 
-                        if has_auth_evidence or "role:" in (req.evidence or "").lower():
+                        ev_text = " ".join(e.content for e in (req.evidence or [])) if req.evidence else ""
+                        if has_auth_evidence or "role:" in ev_text.lower():
                             base_bdd.append(f"And unauthorized actor returns HTTP 403 Forbidden")
 
                         # Check if audit evidence exists before adding audit persistence assertion

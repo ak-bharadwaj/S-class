@@ -214,6 +214,10 @@ class FileLock:
             try:
                 # Open or create persistent lock file with owner-only permissions (0o600)
                 fd = os.open(self.lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+                try:
+                    os.chmod(self.lock_path, 0o600)
+                except OSError:
+                    pass
             except OSError:
                 if time.time() - start_time >= self.timeout:
                     raise TimeoutError(f"FileLock timeout opening persistent lock file: {self.lock_path}")

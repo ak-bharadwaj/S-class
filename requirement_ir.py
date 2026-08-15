@@ -40,6 +40,24 @@ class NFRCategory(str, Enum):
     DATA_INTEGRITY = "data_integrity"
 
 
+def normalize_evidence(val: Any) -> List["EvidenceItem"]:
+    """Authoritative evidence boundary normalizer guaranteeing List[EvidenceItem] output without character-splitting strings."""
+    if not val:
+        return []
+    if isinstance(val, EvidenceItem):
+        return [val]
+    if isinstance(val, str):
+        return [EvidenceItem.from_dict(val)]
+    if isinstance(val, dict):
+        return [EvidenceItem.from_dict(val)]
+    if isinstance(val, (list, tuple, set)):
+        res = []
+        for item in val:
+            res.extend(normalize_evidence(item))
+        return res
+    return [EvidenceItem.from_dict(str(val))]
+
+
 @dataclass
 class EvidenceItem:
     """Structured representation of grounded evidence backing a requirement or behavioral claim."""
@@ -50,6 +68,17 @@ class EvidenceItem:
     provenance: ProvenanceKind = ProvenanceKind.EXPLICIT
     quality: float = 1.0
     timestamp: str = ""
+
+    def __post_init__(self):
+        import math
+        try:
+            val = float(self.quality)
+            if math.isnan(val) or math.isinf(val):
+                self.quality = 1.0
+            else:
+                self.quality = max(0.0, min(1.0, val))
+        except (ValueError, TypeError):
+            self.quality = 1.0
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -109,10 +138,14 @@ class RequirementNode:
     epistemic_status: EpistemicStatus = EpistemicStatus.DERIVED
     provenance: ProvenanceKind = ProvenanceKind.STRONGLY_DERIVED
     confidence: float = 1.0
-    evidence: List[EvidenceItem] = field(default_factory=list)
+    evidence: Any = field(default_factory=list)
     source_behaviors: List[str] = field(default_factory=list)
     assumptions: List[str] = field(default_factory=list)
     dependencies: List[str] = field(default_factory=list)
+
+    def __post_init__(self):
+        # Authoritative normalization boundary enforcing List[EvidenceItem] on all construction paths
+        self.evidence = normalize_evidence(self.evidence)
 
     def semantic_identity_hash(self) -> str:
         """Computes a SHA-256 digest over core domain/contract identity fields (excluding evolving epistemic metadata like confidence)."""
