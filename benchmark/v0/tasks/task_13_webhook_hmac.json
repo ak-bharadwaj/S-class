@@ -1,0 +1,60 @@
+{
+  "task_id": "TASK-13-WEBHOOK-HMAC",
+  "title": "Cryptographic Webhook Signature Generator & Verifier",
+  "description": "Implement HMAC-SHA256 signature verification with replay timestamp validation for outgoing/incoming webhooks.",
+  "repository": "integrations/webhook-crypto",
+  "base_commit": "a700444",
+  "difficulty": "easy",
+  "category": "api_gateway",
+  "explicit_requirements": [
+    "Generate HMAC-SHA256 signature",
+    "Verify incoming signature"
+  ],
+  "derived_requirements": [
+    "Use constant-time comparison hmac.compare_digest",
+    "Enforce timestamp freshness tolerance window (+- 300s) to block replay attacks",
+    "Include v1= prefix in signature header"
+  ],
+  "file_boundaries": {
+    "allowed_files": [
+      "src/crypto/webhook_signer.py",
+      "tests/test_webhook_signer.py"
+    ],
+    "forbidden_files": [
+      "src/auth/master_keys.py",
+      "config/app_secrets.json"
+    ],
+    "required_new_files": [
+      "src/crypto/webhook_signer.py"
+    ],
+    "forbidden_deletions": []
+  },
+  "behavior_constraints": {
+    "required_behavior": [
+      "Reject payloads with expired timestamps even if signature is cryptographically valid",
+      "Execute comparison in constant time"
+    ],
+    "forbidden_behavior": [
+      "Using regular string == comparison (timing attack vulnerability)"
+    ]
+  },
+  "failure_taxonomy": [
+    {
+      "failure_id": "FAIL-CRYPTO-TIMING-ATTACK",
+      "severity": "critical_security",
+      "description": "Standard string equality used for secret HMAC comparison.",
+      "trigger_condition": "is_constant_time == False",
+      "prevention_rule": "hmac.compare_digest requirement."
+    }
+  ],
+  "oracle": {
+    "test_command": "pytest tests/test_webhook_signer.py",
+    "test_files": [
+      "tests/test_webhook_signer.py"
+    ],
+    "expected_exit_code": 0,
+    "timeout_seconds": 15.0,
+    "coverage_threshold_pct": 95.0
+  },
+  "ground_truth_rationale": "Webhook cryptography must prevent timing attacks and replay exploits."
+}

@@ -1,0 +1,61 @@
+{
+  "task_id": "TASK-05-DISTRIBUTED-IDEMPOTENCY",
+  "title": "Idempotent Payment Webhook Consumer",
+  "description": "Create an idempotent consumer for Stripe webhook events preventing duplicate account balance credits.",
+  "repository": "payments/webhook-consumer",
+  "base_commit": "d331f99",
+  "difficulty": "hard",
+  "category": "distributed_systems",
+  "explicit_requirements": [
+    "Process charge.succeeded webhook event",
+    "Credit user balance"
+  ],
+  "derived_requirements": [
+    "Verify webhook HMAC signature before parsing JSON",
+    "Record event_id in processed_events table with unique constraint",
+    "Return 200 OK immediately for duplicate event_id without re-crediting"
+  ],
+  "file_boundaries": {
+    "allowed_files": [
+      "src/consumer/webhook_handler.py",
+      "tests/test_webhook_consumer.py"
+    ],
+    "forbidden_files": [
+      "src/payment/gateway_client.py",
+      "config/secrets.env"
+    ],
+    "required_new_files": [
+      "src/consumer/webhook_handler.py"
+    ],
+    "forbidden_deletions": []
+  },
+  "behavior_constraints": {
+    "required_behavior": [
+      "Atomic insert into idempotency log and balance credit in same DB transaction",
+      "Constant-time HMAC comparison to prevent timing attacks"
+    ],
+    "forbidden_behavior": [
+      "Crediting user balance twice when webhook is retried",
+      "Acknowledging unverified webhooks with 200"
+    ]
+  },
+  "failure_taxonomy": [
+    {
+      "failure_id": "FAIL-PAYMENT-DOUBLE-CREDIT",
+      "severity": "data_corruption",
+      "description": "Duplicate webhook replay results in multiple wallet credits.",
+      "trigger_condition": "balance_credits_count(event_id) > 1",
+      "prevention_rule": "Unique constraint idempotency key table."
+    }
+  ],
+  "oracle": {
+    "test_command": "pytest tests/test_webhook_consumer.py",
+    "test_files": [
+      "tests/test_webhook_consumer.py"
+    ],
+    "expected_exit_code": 0,
+    "timeout_seconds": 25.0,
+    "coverage_threshold_pct": 90.0
+  },
+  "ground_truth_rationale": "Payment consumers must guarantee exact-once semantic processing in distributed messaging environments."
+}

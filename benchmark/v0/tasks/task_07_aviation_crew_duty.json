@@ -1,0 +1,61 @@
+{
+  "task_id": "TASK-07-AVIATION-CREW-DUTY",
+  "title": "FAA Part 117 Flight Crew Duty Time Calculator",
+  "description": "Implement FAA Part 117 flight duty period limits, rest intervals, and cumulative duty time validation.",
+  "repository": "aviation/crew-ops",
+  "base_commit": "a110777",
+  "difficulty": "extreme",
+  "category": "aviation_ops",
+  "explicit_requirements": [
+    "Calculate flight duty period",
+    "Validate rest intervals"
+  ],
+  "derived_requirements": [
+    "Enforce 30-hour consecutive rest rule per 168 consecutive hours",
+    "Block flight dispatch on duty limit violation",
+    "Calculate acclimatization time-zone shifts",
+    "Account for split duty extensions with suitable accommodation"
+  ],
+  "file_boundaries": {
+    "allowed_files": [
+      "src/crew/duty_calculator.py",
+      "tests/test_duty_calculator.py"
+    ],
+    "forbidden_files": [
+      "src/flight/nav_data.db",
+      "config/aircraft_registry.json"
+    ],
+    "required_new_files": [
+      "src/crew/duty_calculator.py"
+    ],
+    "forbidden_deletions": []
+  },
+  "behavior_constraints": {
+    "required_behavior": [
+      "Reject flight roster assignments violating legal cumulative duty hours",
+      "Log regulatory justification for split duty extensions"
+    ],
+    "forbidden_behavior": [
+      "Dispatching fatigued flight crew beyond Part 117 maximum limits"
+    ]
+  },
+  "failure_taxonomy": [
+    {
+      "failure_id": "FAIL-AVIATION-FATIGUE-DISPATCH",
+      "severity": "critical_security",
+      "description": "Flight crew dispatched in violation of statutory rest requirements.",
+      "trigger_condition": "is_legal_assignment == False and assigned == True",
+      "prevention_rule": "FAA Part 117 statutory rule engine."
+    }
+  ],
+  "oracle": {
+    "test_command": "pytest tests/test_duty_calculator.py",
+    "test_files": [
+      "tests/test_duty_calculator.py"
+    ],
+    "expected_exit_code": 0,
+    "timeout_seconds": 25.0,
+    "coverage_threshold_pct": 95.0
+  },
+  "ground_truth_rationale": "Aviation flight operations require zero-defect compliance with federal safety regulations."
+}

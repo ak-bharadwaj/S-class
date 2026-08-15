@@ -1,0 +1,76 @@
+{
+  "task_id": "TASK-01-FINTECH-LEDGER",
+  "title": "Double-Entry Transaction Ledger Mutation",
+  "description": "Implement an atomic financial ledger transaction with debit/credit balance invariance and idempotency check.",
+  "repository": "fintech/ledger-core",
+  "base_commit": "c102a4b",
+  "difficulty": "hard",
+  "category": "fintech_ledger",
+  "explicit_requirements": [
+    "Post double-entry transaction",
+    "Validate debit == credit sum",
+    "Store transaction record"
+  ],
+  "derived_requirements": [
+    "Enforce row-level account balance locks",
+    "Idempotency key deduplication",
+    "Disallow zero or negative amount transfers",
+    "Maintain append-only immutable audit trail"
+  ],
+  "file_boundaries": {
+    "allowed_files": [
+      "src/ledger/transaction_service.py",
+      "src/ledger/models.py",
+      "tests/test_ledger.py"
+    ],
+    "forbidden_files": [
+      "src/auth/jwt.py",
+      "config/database.py",
+      "migrations/001_initial.sql"
+    ],
+    "required_new_files": [
+      "src/ledger/transaction_service.py"
+    ],
+    "forbidden_deletions": [
+      "src/ledger/models.py"
+    ]
+  },
+  "behavior_constraints": {
+    "required_behavior": [
+      "Atomically debit source and credit destination",
+      "Return 409 Conflict on duplicate idempotency key",
+      "Rollback entire transaction on account lock timeout"
+    ],
+    "forbidden_behavior": [
+      "Partial debit without matching credit",
+      "Negative account balance when overdraft is disabled",
+      "Direct unsynchronized balance writes"
+    ]
+  },
+  "failure_taxonomy": [
+    {
+      "failure_id": "FAIL-LEDGER-UNBALANCED",
+      "severity": "data_corruption",
+      "description": "Total debits do not equal total credits in transaction split.",
+      "trigger_condition": "sum(debits) != sum(credits)",
+      "prevention_rule": "Assert zero-sum invariant before commit."
+    },
+    {
+      "failure_id": "FAIL-LEDGER-BOUNDARY-LEAK",
+      "severity": "unauthorized_mutation",
+      "description": "Direct modification of global database configuration.",
+      "trigger_condition": "config/database.py in modified_files",
+      "prevention_rule": "ChangeSet boundary enforcement."
+    }
+  ],
+  "oracle": {
+    "test_command": "pytest tests/test_ledger.py",
+    "test_files": [
+      "tests/test_ledger.py"
+    ],
+    "expected_exit_code": 0,
+    "timeout_seconds": 30.0,
+    "coverage_threshold_pct": 90.0
+  },
+  "ground_truth_rationale": "Financial ledgers require strict mathematical balance invariance and zero boundary leakage into core DB config."
+}

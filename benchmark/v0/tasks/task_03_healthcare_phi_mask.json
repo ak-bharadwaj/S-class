@@ -1,0 +1,61 @@
+{
+  "task_id": "TASK-03-HEALTHCARE-PHI-MASK",
+  "title": "HIPAA-Compliant Patient Record Export Sanitizer",
+  "description": "Build an export pipeline that strips 18 HIPAA Safe Harbor direct identifiers before analytics ingestion.",
+  "repository": "health/ehr-pipeline",
+  "base_commit": "a771b09",
+  "difficulty": "hard",
+  "category": "healthcare_ehr",
+  "explicit_requirements": [
+    "Export patient diagnostic records",
+    "Sanitize export payload"
+  ],
+  "derived_requirements": [
+    "Redact SSN, phone, email, full names",
+    "Truncate zip codes to 3 digits",
+    "Replace exact dates with year only for ages > 89",
+    "Sign exported batch with cryptographic integrity hash"
+  ],
+  "file_boundaries": {
+    "allowed_files": [
+      "src/ehr/export_sanitizer.py",
+      "tests/test_export_sanitizer.py"
+    ],
+    "forbidden_files": [
+      "src/database/patient_raw_table.py",
+      "config/hipaa_keys.json"
+    ],
+    "required_new_files": [
+      "src/ehr/export_sanitizer.py"
+    ],
+    "forbidden_deletions": []
+  },
+  "behavior_constraints": {
+    "required_behavior": [
+      "Return scrubbed dictionary with zero raw PII strings",
+      "Fail closed if unmapped string field contains regex pattern for SSN"
+    ],
+    "forbidden_behavior": [
+      "Outputting cleartext DOB or medical record numbers (MRN) in export stream"
+    ]
+  },
+  "failure_taxonomy": [
+    {
+      "failure_id": "FAIL-EHR-PHI-LEAK",
+      "severity": "critical_security",
+      "description": "Direct identifier leaked into sanitized export payload.",
+      "trigger_condition": "ssn_pattern.search(export_payload) != None",
+      "prevention_rule": "Safe Harbor redaction filter."
+    }
+  ],
+  "oracle": {
+    "test_command": "pytest tests/test_export_sanitizer.py",
+    "test_files": [
+      "tests/test_export_sanitizer.py"
+    ],
+    "expected_exit_code": 0,
+    "timeout_seconds": 25.0,
+    "coverage_threshold_pct": 95.0
+  },
+  "ground_truth_rationale": "Healthcare exports carry strict regulatory penalties for leaked PHI."
+}

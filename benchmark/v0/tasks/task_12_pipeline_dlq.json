@@ -1,0 +1,61 @@
+{
+  "task_id": "TASK-12-PIPELINE-DLQ",
+  "title": "Data Pipeline Dead-Letter Queue & Exponential Retry",
+  "description": "Build a robust retry wrapper for asynchronous event streaming that routes failed payloads to a DLQ.",
+  "repository": "pipeline/event-stream",
+  "base_commit": "f600333",
+  "difficulty": "medium",
+  "category": "data_pipeline",
+  "explicit_requirements": [
+    "Retry failed transformation jobs",
+    "Route to DLQ after 5 attempts"
+  ],
+  "derived_requirements": [
+    "Calculate exponential backoff with randomized jitter",
+    "Attach original error stack trace and attempt count to DLQ payload",
+    "Alert telemetry on persistent DLQ ingestion spikes"
+  ],
+  "file_boundaries": {
+    "allowed_files": [
+      "src/pipeline/retry_dlq_handler.py",
+      "tests/test_retry_dlq.py"
+    ],
+    "forbidden_files": [
+      "src/kafka/broker_config.py",
+      "config/cluster.yaml"
+    ],
+    "required_new_files": [
+      "src/pipeline/retry_dlq_handler.py"
+    ],
+    "forbidden_deletions": []
+  },
+  "behavior_constraints": {
+    "required_behavior": [
+      "Execute maximum 5 attempts with increasing delays",
+      "Publish exact original payload to dead_letter_queue topic"
+    ],
+    "forbidden_behavior": [
+      "Infinite retry loops blocking the consumer thread",
+      "Silently dropping unprocessable poison-pill messages"
+    ]
+  },
+  "failure_taxonomy": [
+    {
+      "failure_id": "FAIL-PIPELINE-POISON-PILL-DROP",
+      "severity": "data_corruption",
+      "description": "Corrupted event payload dropped without dead-letter audit record.",
+      "trigger_condition": "failed_events_dropped > 0",
+      "prevention_rule": "Mandatory DLQ routing gate."
+    }
+  ],
+  "oracle": {
+    "test_command": "pytest tests/test_retry_dlq.py",
+    "test_files": [
+      "tests/test_retry_dlq.py"
+    ],
+    "expected_exit_code": 0,
+    "timeout_seconds": 20.0,
+    "coverage_threshold_pct": 85.0
+  },
+  "ground_truth_rationale": "Streaming data pipelines must preserve data completeness and prevent thread blocking."
+}

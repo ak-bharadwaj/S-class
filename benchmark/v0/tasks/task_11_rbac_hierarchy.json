@@ -1,0 +1,61 @@
+{
+  "task_id": "TASK-11-RBAC-HIERARCHY",
+  "title": "Hierarchical Role-Based Access Control Evaluator",
+  "description": "Implement an RBAC evaluator that traverses role inheritance hierarchies with loop detection.",
+  "repository": "security/rbac-engine",
+  "base_commit": "e500222",
+  "difficulty": "medium",
+  "category": "auth_iam",
+  "explicit_requirements": [
+    "Evaluate user permissions",
+    "Support role inheritance"
+  ],
+  "derived_requirements": [
+    "Resolve inherited roles without infinite loops (cycle detection)",
+    "Deny by default on unknown permissions",
+    "Cache resolved permission sets with TTL invalidation on role update"
+  ],
+  "file_boundaries": {
+    "allowed_files": [
+      "src/security/rbac_evaluator.py",
+      "tests/test_rbac_evaluator.py"
+    ],
+    "forbidden_files": [
+      "src/identity/user_store.py",
+      "config/admin_whitelist.json"
+    ],
+    "required_new_files": [
+      "src/security/rbac_evaluator.py"
+    ],
+    "forbidden_deletions": []
+  },
+  "behavior_constraints": {
+    "required_behavior": [
+      "Detect circular role inheritance (A -> B -> A) and fail safely",
+      "Grant permission if any direct or inherited role possesses it"
+    ],
+    "forbidden_behavior": [
+      "Hanging in infinite recursion on circular role graphs",
+      "Allowing unauthorized actions on evaluation error"
+    ]
+  },
+  "failure_taxonomy": [
+    {
+      "failure_id": "FAIL-RBAC-CYCLE-HANG",
+      "severity": "logical_regression",
+      "description": "Circular role assignment causes stack overflow or hang.",
+      "trigger_condition": "recursion_depth > max_allowed_depth",
+      "prevention_rule": "Cycle detection visited set."
+    }
+  ],
+  "oracle": {
+    "test_command": "pytest tests/test_rbac_evaluator.py",
+    "test_files": [
+      "tests/test_rbac_evaluator.py"
+    ],
+    "expected_exit_code": 0,
+    "timeout_seconds": 20.0,
+    "coverage_threshold_pct": 85.0
+  },
+  "ground_truth_rationale": "Access control engines must be mathematically deterministic and fail-closed."
+}

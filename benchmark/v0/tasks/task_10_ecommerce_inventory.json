@@ -1,0 +1,62 @@
+{
+  "task_id": "TASK-10-ECOMMERCE-INVENTORY",
+  "title": "Atomic Inventory Reservation with Expiration TTL",
+  "description": "Implement inventory reservations during cart checkout with atomic decrement and automatic TTL release.",
+  "repository": "store/inventory-service",
+  "base_commit": "d400111",
+  "difficulty": "hard",
+  "category": "fintech_ledger",
+  "explicit_requirements": [
+    "Reserve stock for checkout",
+    "Release stock on cancel"
+  ],
+  "derived_requirements": [
+    "Atomic decrement with stock >= quantity guard",
+    "Schedule 15-minute auto-release timer for abandoned checkouts",
+    "Emit inventory.reserved and inventory.released telemetry",
+    "Prevent race conditions during flash sale concurrent checkouts"
+  ],
+  "file_boundaries": {
+    "allowed_files": [
+      "src/inventory/reservation_engine.py",
+      "tests/test_reservation_engine.py"
+    ],
+    "forbidden_files": [
+      "src/catalog/products.py",
+      "config/redis_master.env"
+    ],
+    "required_new_files": [
+      "src/inventory/reservation_engine.py"
+    ],
+    "forbidden_deletions": []
+  },
+  "behavior_constraints": {
+    "required_behavior": [
+      "Atomically check availability and decrement in single conditional query",
+      "Auto-reclaim unconfirmed reservations after 900 seconds"
+    ],
+    "forbidden_behavior": [
+      "Allowing negative stock under high concurrency",
+      "Holding abandoned reservations indefinitely"
+    ]
+  },
+  "failure_taxonomy": [
+    {
+      "failure_id": "FAIL-INVENTORY-OVERSOLD",
+      "severity": "data_corruption",
+      "description": "Concurrent checkout requests oversell remaining warehouse units.",
+      "trigger_condition": "available_stock < 0",
+      "prevention_rule": "Atomic conditional decrement."
+    }
+  ],
+  "oracle": {
+    "test_command": "pytest tests/test_reservation_engine.py",
+    "test_files": [
+      "tests/test_reservation_engine.py"
+    ],
+    "expected_exit_code": 0,
+    "timeout_seconds": 25.0,
+    "coverage_threshold_pct": 90.0
+  },
+  "ground_truth_rationale": "E-commerce checkout requires atomic concurrency guards to prevent physical overselling."
+}

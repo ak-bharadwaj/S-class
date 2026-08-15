@@ -1,0 +1,61 @@
+{
+  "task_id": "TASK-08-MULTITENANT-RLS",
+  "title": "Postgres Row-Level Security Tenant Context Injector",
+  "description": "Inject tenant_id into Postgres connection session state to enforce row-level security isolation.",
+  "repository": "saas/multi-tenant-core",
+  "base_commit": "b200888",
+  "difficulty": "hard",
+  "category": "multitenant_saas",
+  "explicit_requirements": [
+    "Set tenant_id on request",
+    "Filter query results"
+  ],
+  "derived_requirements": [
+    "Set local app.current_tenant_id in pooled connection transaction",
+    "Clear session setting on connection release to pool",
+    "Prevent tenant cross-talk during pooled connection reuse",
+    "Raise security exception if query executed without tenant context"
+  ],
+  "file_boundaries": {
+    "allowed_files": [
+      "src/db/tenant_middleware.py",
+      "tests/test_tenant_isolation.py"
+    ],
+    "forbidden_files": [
+      "migrations/000_superuser.sql",
+      "config/database_root.env"
+    ],
+    "required_new_files": [
+      "src/db/tenant_middleware.py"
+    ],
+    "forbidden_deletions": []
+  },
+  "behavior_constraints": {
+    "required_behavior": [
+      "Strict tenant isolation across parallel asynchronous queries",
+      "Reset session state before connection returns to pool"
+    ],
+    "forbidden_behavior": [
+      "Leaking Tenant A data to Tenant B under connection pooling"
+    ]
+  },
+  "failure_taxonomy": [
+    {
+      "failure_id": "FAIL-SAAS-CROSS-TENANT-LEAK",
+      "severity": "critical_security",
+      "description": "Pooled connection retains prior tenant context leaking private data.",
+      "trigger_condition": "queried_tenant_id != session_tenant_id",
+      "prevention_rule": "Row-level security context manager."
+    }
+  ],
+  "oracle": {
+    "test_command": "pytest tests/test_tenant_isolation.py",
+    "test_files": [
+      "tests/test_tenant_isolation.py"
+    ],
+    "expected_exit_code": 0,
+    "timeout_seconds": 20.0,
+    "coverage_threshold_pct": 90.0
+  },
+  "ground_truth_rationale": "Multi-tenant architectures require absolute cryptographic & session boundary isolation."
+}
