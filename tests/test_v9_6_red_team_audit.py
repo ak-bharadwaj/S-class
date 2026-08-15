@@ -3,12 +3,12 @@ S-Class EOS V9.6 - Comprehensive Full-System Red-Team Audit & Reliability Campai
 
 Executes non-tautological adversarial falsification testing across all 10 core architectural pillars:
 1. Pillar 1: Adversarial Grounding & Anti-Hallucination Isolation (Multi-Vector Matrix)
-2. Pillar 2: Epistemic Fail-Closed Evidence & Cross-Module Downstream Propagation
+2. Pillar 2: Epistemic Fail-Closed Evidence & Authoritative Pipeline Downstream Propagation
 3. Pillar 3: Requirement Graph Integrity, Precedence & DAG Cycle Rejection
-4. Pillar 4: Non-Tautological Architectural Lineage Traceability & Governor Rejection Attacks
+4. Pillar 4: Non-Tautological Architectural Lineage Traceability & 3-Vector Governor Attacks
 5. Pillar 5: Disambiguated Evidence-Conditioned Security (AUTHORIZED_FOR vs String Heuristic)
 6. Pillar 6: Architecture Debate Epistemic Sufficiency & Trade-off Completeness
-7. Pillar 7: Full End-to-End Cryptographic Governance Tamper Resistance & Dynamic FSM Blocking
+7. Pillar 7: Full End-to-End Cryptographic Governance Tamper Resistance, Fail-Closed Exceptions & Version Binding
 8. Pillar 8: 19-State FSM Control Plane & Illegal Transition Rejection
 9. Pillar 9: Persistent Inode Locking Lifecycle, Mutual Exclusion & Live Owner Protection
 10. Pillar 10: Production Mode Simulation Rejection & Multi-Version Lineage Chaining
@@ -137,7 +137,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         self.assertEqual(len(auth_edges), 0, "Prose text MUST NOT invent AUTHORIZED_FOR relation without explicit security evidence!")
 
     # -------------------------------------------------------------------------
-    # Pillar 2: Epistemic Fail-Closed Evidence & Cross-Module Propagation
+    # Pillar 2: Epistemic Fail-Closed Evidence & Authoritative Pipeline Propagation
     # -------------------------------------------------------------------------
     def test_pillar_2_fail_closed_evidence_and_downstream_propagation(self):
         """Pillar 2: Corrupted evidence quality/provenance fails closed and CANNOT satisfy downstream gates."""
@@ -157,11 +157,11 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         with self.assertRaises(TypeError):
             normalize_evidence(set([1, 2, 3]))
 
-        # 2. Downstream Debate Propagation: INVALID EvidenceItem passed through RequirementNode -> Claim -> Debate
+        # 2. Downstream Debate Propagation through the REAL production compiler and debate engine
         req_node = RequirementNode(
             id="REQ-INVALID-EVID",
             kind=RequirementKind.FUNCTIONAL,
-            statement="Execute high-privilege kernel mutation",
+            statement="Execute high-privilege kernel mutation with 100k scale",
             actor="unauthorized_actor",
             capability="kernel_mutation",
             target="kernel",
@@ -169,20 +169,23 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         )
         r_graph = RequirementGraph()
         r_graph.add_requirement(req_node)
+        b_graph = BehaviorGraph()
 
-        # Convert requirement evidence directly into DebateClaim's EvidenceQualityRecords
-        ev_records = []
-        for e in req_node.evidence:
-            state = EvidenceState.NO_EVIDENCE if e.provenance == ProvenanceKind.INVALID else EvidenceState.DIRECT_EVIDENCE
-            ev_records.append(EvidenceQualityRecord(e.id, state, e.source_type, e.content, e.quality, 0.0, 0.0, 0.0))
+        # Run authoritative HLD Compiler and Debate Engine directly
+        hld = HLDCompiler.compile_hld(r_graph, b_graph)
+        debate_result = ArchitectureDebateEngine.run_debate_cycle(
+            hld=hld,
+            r_graph=r_graph,
+            b_graph=b_graph,
+            raw_request="",
+            workspace_dir=self.test_dir,
+            is_debate_phase=True
+        )
 
-        claim = EngineeringClaim("CLAIM-INV", "ADR-INV", "Use Unvalidated Architecture", "Reason", [], [], [], [], [], [], ev_records, "auth_security", 0.0)
-        blast = {"blast_radius_score": 0.50}
-        risk_prof = DecisionRiskProfile("ADR-INV", "SECURITY", ["Authentication & Access Control"])
-        dim_gates = [DimensionGateResult("Authentication & Access Control", "FAIL", [], [], ["INVALID_EVIDENCE"], [])]
-
-        outcome, conf, metrics = DecisionSufficiencyGate.evaluate_sufficiency(claim, [], [], blast, dim_gates, risk_prof)
-        self.assertIn(outcome, [DecisionOutcome.INSUFFICIENT_DEBATE, DecisionOutcome.REJECT], "Downstream Debate Gate MUST reject claim backed by INVALID EvidenceItem!")
+        # Invariant: Authoritative Debate Pipeline MUST NOT accept any ADR backed by INVALID evidence
+        self.assertEqual(len(debate_result.accepted_adrs), 0, "Real Debate Pipeline MUST NOT accept ADRs backed by INVALID evidence!")
+        for dec_rec in debate_result.decision_records:
+            self.assertIn(dec_rec.decision_outcome, [DecisionOutcome.INSUFFICIENT_DEBATE, DecisionOutcome.REJECT], "Downstream DecisionOutcome must be INSUFFICIENT_DEBATE or REJECT")
 
     # -------------------------------------------------------------------------
     # Pillar 3: Requirement Graph Integrity, Precedence & Cycle Rejection
@@ -207,10 +210,10 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             r_graph.add_dependency("REQ-001", "REQ-002")
 
     # -------------------------------------------------------------------------
-    # Pillar 4: Non-Tautological Lineage Traceability & Governor Rejection Attacks
+    # Pillar 4: Non-Tautological Lineage Traceability & 3-Vector Governor Attacks
     # -------------------------------------------------------------------------
     def test_pillar_4_non_tautological_architectural_lineage(self):
-        """Pillar 4: Exact object lookup and set inclusion verifying unbroken 5-layer lineage and governor attacks."""
+        """Pillar 4: Exact object lookup and set inclusion verifying unbroken 5-layer lineage and 3-vector governor attacks."""
         b_graph = BehaviorGraph()
         b_node = BehaviorNode(
             id="cmd_dispatch", name="DispatchVehicle", behavior_type=BehaviorNodeType.COMMAND,
@@ -246,27 +249,27 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             # 5. Semantic capability consistency
             self.assertIn(b_node.id, task.parent_behaviors)
 
-        # 6. Negative Attack Vector A: Injected forged task lacking parent LLD reference submitted to ArtifactGovernor
-        forged_task_lld = TaskRecord(
-            id="TSK-FORGED-LLD", title="Forged Task", description="desc",
+        # 6. Negative Attack Vector 1: Missing parent reference (empty string)
+        forged_missing_parent = TaskRecord(
+            id="TSK-MISSING-PARENT", title="Missing Parent Task", description="desc",
             category=TaskCategory.API_ENDPOINT, parent_lld="",
-            parent_hld=tasks[0].parent_hld, parent_reqs=tasks[0].parent_reqs,
-            parent_behaviors=tasks[0].parent_behaviors
-        )
-        gov_res_lld = ArtifactGovernor.audit_task_governance([forged_task_lld], r_graph)
-        self.assertTrue(gov_res_lld.is_blocked, "ArtifactGovernor MUST block task lacking valid parent LLD reference")
-        self.assertEqual(gov_res_lld.validation_status, ValidationStatus.INVALID)
-
-        # 7. Negative Attack Vector B: Empty requirement lineage submitted to ArtifactGovernor with empty requirement graph
-        empty_r_graph = RequirementGraph()
-        forged_task_req = TaskRecord(
-            id="TSK-FORGED-REQ", title="Forged Task Req", description="desc",
-            category=TaskCategory.API_ENDPOINT, parent_lld=tasks[0].parent_lld,
             parent_hld=tasks[0].parent_hld, parent_reqs=[],
             parent_behaviors=tasks[0].parent_behaviors
         )
-        gov_res_req = ArtifactGovernor.audit_task_governance([forged_task_req], empty_r_graph)
-        self.assertTrue(gov_res_req.is_blocked, "ArtifactGovernor MUST block task when upstream Requirement IR lineage is missing")
+        gov_res_missing = ArtifactGovernor.audit_task_governance([forged_missing_parent], r_graph, lld_components)
+        self.assertTrue(gov_res_missing.is_blocked, "ArtifactGovernor MUST block task lacking parent references")
+        self.assertEqual(gov_res_missing.validation_status, ValidationStatus.INVALID)
+
+        # 7. Negative Attack Vector 2: Forged nonexistent parent reference
+        forged_nonexistent_parent = TaskRecord(
+            id="TSK-FORGED-PARENT", title="Forged Nonexistent Task", description="desc",
+            category=TaskCategory.API_ENDPOINT, parent_lld="LLD-FORGED-999",
+            parent_hld=tasks[0].parent_hld, parent_reqs=["REQ-NONEXISTENT-999"],
+            parent_behaviors=tasks[0].parent_behaviors
+        )
+        gov_res_nonexistent = ArtifactGovernor.audit_task_governance([forged_nonexistent_parent], r_graph, lld_components)
+        self.assertTrue(gov_res_nonexistent.is_blocked, "ArtifactGovernor MUST block task with forged nonexistent parent references")
+        self.assertEqual(gov_res_nonexistent.validation_status, ValidationStatus.INVALID)
 
     # -------------------------------------------------------------------------
     # Pillar 5: Disambiguated Evidence-Conditioned Security (AUTHORIZED_FOR vs String)
@@ -325,10 +328,10 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         self.assertEqual(outcome_un, DecisionOutcome.INSUFFICIENT_DEBATE)
 
     # -------------------------------------------------------------------------
-    # Pillar 7: Full End-to-End Cryptographic Governance Tamper Resistance & Dynamic FSM Blocking
+    # Pillar 7: Cryptographic Governance Tamper Resistance, Fail-Closed Exceptions & Version Binding
     # -------------------------------------------------------------------------
     def test_pillar_7_end_to_end_governance_tamper_blocking(self):
-        """Pillar 7: ArtifactGovernor blocks FSM transition to CODING when signed ADR content is tampered starting from blocked=False."""
+        """Pillar 7: ArtifactGovernor blocks FSM transition when signed ADR is tampered, audit fails, or artifact version mismatches."""
         initialize_state(self.test_dir)
         sec_key = ArtifactGovernor._get_governance_secret(self.test_dir)
         mod = HLDModule(id="mod_core", name="Core", system_boundary="internal", owned_entities=["Session"], owned_capabilities=["manage_session"])
@@ -365,7 +368,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         write_json_atomic(app_file, {"approval_records": [rec.to_dict()]})
 
         # 3. Initially write pipeline with blocked: False
-        hld_initial = HLDDesign(system_name="HLD-001", architecture_style="Modular Monolith", modules=[mod], adrs=[adr])
+        hld_initial = HLDDesign(system_name="HLD-001", architecture_style="Modular Monolith", modules=[mod], adrs=[adr], version=1)
         pipe_path = os.path.join(self.agents_dir, "v7_refinement_pipeline.json")
         write_json_atomic(pipe_path, {
             "version": 1,
@@ -386,7 +389,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
         # 4. Tamper ADR decision on disk while keeping pipeline blocked: False
         adr_tampered = ADRRecord.from_dict(adr.to_dict())
         adr_tampered.decision = "Adopt In-Memory Dict (TAMPERED)"
-        hld_tampered = HLDDesign(system_name="HLD-001", architecture_style="Modular Monolith", modules=[mod], adrs=[adr_tampered])
+        hld_tampered = HLDDesign(system_name="HLD-001", architecture_style="Modular Monolith", modules=[mod], adrs=[adr_tampered], version=1)
         write_json_atomic(pipe_path, {
             "version": 1,
             "hld_design": hld_tampered.to_dict(),
@@ -394,7 +397,7 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             "hld_governance": {"is_blocked": False}
         })
 
-        # 5. Governor enforcement MUST detect tampering dynamically and BLOCK transition to CODING
+        # Governor enforcement MUST detect tampering dynamically and BLOCK transition to CODING
         gov_res = ArtifactGovernor.enforce_fsm_transition(
             current_phase="DESIGN",
             proposed_event="spec_approved",
@@ -402,6 +405,39 @@ class TestV96FullSystemRedTeam(unittest.TestCase):
             workspace_dir=self.test_dir
         )
         self.assertTrue(gov_res.is_blocked, "ArtifactGovernor MUST dynamically detect ADR tampering and block FSM transition to CODING")
+
+        # 5. Fail-Closed Governance Audit Exception: malformed HLD on disk must fail closed (GOVERNANCE_AUDIT_ERROR)
+        write_json_atomic(pipe_path, {
+            "version": 1,
+            "hld_design": {"modules": "CORRUPT_NOT_A_LIST", "adrs": "MALFORMED"},
+            "blocked": False,
+            "hld_governance": {"is_blocked": False}
+        })
+        gov_res_err = ArtifactGovernor.enforce_fsm_transition(
+            current_phase="DESIGN",
+            proposed_event="spec_approved",
+            target_phase="CODING",
+            workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res_err.is_blocked, "Governance exception MUST fail closed and block transition")
+        self.assertTrue(any("GOVERNANCE_AUDIT_ERROR" in r for r in gov_res_err.blocking_reasons))
+
+        # 6. Artifact Version Binding: Approval was for version 1; pipeline attempts to execute version 2 -> MUST BLOCK
+        hld_v2 = HLDDesign(system_name="HLD-001", architecture_style="Modular Monolith", modules=[mod], adrs=[adr], version=2)
+        write_json_atomic(pipe_path, {
+            "version": 2,
+            "hld_design": hld_v2.to_dict(),
+            "blocked": False,
+            "hld_governance": {"is_blocked": False}
+        })
+        gov_res_v2 = ArtifactGovernor.enforce_fsm_transition(
+            current_phase="DESIGN",
+            proposed_event="spec_approved",
+            target_phase="CODING",
+            workspace_dir=self.test_dir
+        )
+        self.assertTrue(gov_res_v2.is_blocked, "ArtifactGovernor MUST block when executing artifact version 2 against version 1 approval")
+        self.assertTrue(any("artifact version mismatch" in r for r in gov_res_v2.blocking_reasons))
 
     # -------------------------------------------------------------------------
     # Pillar 8: 19-State FSM Control Plane & Illegal Transition Rejection

@@ -482,21 +482,24 @@ class ArtifactGovernor:
     def audit_task_governance(
         cls,
         tasks: List[TaskRecord],
-        r_graph: RequirementGraph
+        r_graph: RequirementGraph,
+        lld_components: Optional[List[LLDComponent]] = None
     ) -> GovernanceGateResult:
         reasons: List[str] = []
         req_ids = set(r_graph.nodes.keys())
+        lld_ids = {c.id for c in lld_components} if lld_components else set()
 
         for t in tasks:
             if not t.parent_lld:
                 reasons.append(f"Task {t.id} ({t.title}) lacks parent LLD component reference.")
+            elif lld_ids and t.parent_lld not in lld_ids:
+                reasons.append(f"Task {t.id} ({t.title}) references nonexistent parent LLD component '{t.parent_lld}'.")
+
             if not t.parent_reqs:
-                if req_ids:
-                    t.parent_reqs = [list(req_ids)[0]]
-                else:
-                    reasons.append(f"Task {t.id} ({t.title}) has no upstream Requirement IR lineage.")
-            elif req_ids and not any(r in req_ids for r in t.parent_reqs):
-                t.parent_reqs = [list(req_ids)[0]]
+                reasons.append(f"Task {t.id} ({t.title}) has no upstream Requirement IR lineage.")
+            elif not set(t.parent_reqs).issubset(req_ids):
+                invalid_reqs = [r for r in t.parent_reqs if r not in req_ids]
+                reasons.append(f"Task {t.id} ({t.title}) references nonexistent upstream Requirement IDs: {invalid_reqs}.")
 
         if reasons:
             return GovernanceGateResult(
@@ -523,7 +526,13 @@ class ArtifactGovernor:
         target_phase: str,
         workspace_dir: Optional[str] = None
     ) -> GovernanceGateResult:
-        """Authoritative Control Plane Gate: Hard-denies illegal FSM transitions if artifact governance is blocked."""
+        """
+        Enforces authoritative control-plane gate on FSM state transitions.
+        Blocks transition to downstream execution states (CODING, QA, RELEASE) if:
+        1. Any governed ADR is BLOCKED or missing cryptographic ApprovalRecord
+        2. Dynamic governance audit throws an exception or encounters malformed artifacts (FAILS CLOSED!)
+        3. Upstream compilation artifact is blocked or failed hard validation gates
+        """
         cwd = workspace_dir if workspace_dir else os.getcwd()
         pipeline_file = os.path.join(cwd, ".agents", "v7_refinement_pipeline.json")
 
@@ -532,16 +541,16 @@ class ArtifactGovernor:
                 return GovernanceGateResult(
                     is_blocked=False,
                     blocking_reasons=[],
-                    recommended_fsm_state=FSMTransitionTarget.DESIGN,
+                    recommended_fsm_state=FSMTransitionTarget(target_phase) if target_phase in [t.value for t in FSMTransitionTarget] else FSMTransitionTarget.DESIGN,
                     validation_status=ValidationStatus.VALID,
-                    approval_status=ApprovalStatus.NOT_REQUIRED
+                    approval_status=ApprovalStatus.APPROVED
                 )
             else:
                 return GovernanceGateResult(
                     is_blocked=True,
                     blocking_reasons=[f"Missing mandatory refinement pipeline artifact '.agents/v7_refinement_pipeline.json' for execution phase '{target_phase}'."],
                     recommended_fsm_state=FSMTransitionTarget.DESIGN,
-                    validation_status=ValidationStatus.INVALID,
+                    validation_status=ValidationStatus.BLOCKED,
                     approval_status=ApprovalStatus.REJECTED
                 )
 
@@ -552,7 +561,7 @@ class ArtifactGovernor:
             is_blocked = pipe_data.get("blocked", False)
             hld_gov = pipe_data.get("hld_governance", {})
 
-            # Dynamically audit HLD against cryptographic approval records
+            # Dynamically audit HLD against cryptographic approval records (FAIL CLOSED on error!)
             hld_data = pipe_data.get("hld_design", {})
             if hld_data and isinstance(hld_data, dict):
                 try:
@@ -561,8 +570,15 @@ class ArtifactGovernor:
                     hld_gov_dynamic = cls.audit_hld_governance(hld_obj, True, [], workspace_dir=workspace_dir)
                     is_blocked = hld_gov_dynamic.is_blocked
                     hld_gov = hld_gov_dynamic.to_dict()
-                except Exception:
-                    pass
+                except Exception as e:
+                    is_blocked = True
+                    hld_gov = {
+                        "is_blocked": True,
+                        "blocking_reasons": [f"GOVERNANCE_AUDIT_ERROR: Dynamic governance audit failed closed due to error: {e}"],
+                        "validation_status": "BLOCKED",
+                        "approval_status": "REJECTED",
+                        "recommended_fsm_state": "DEBATE"
+                    }
 
             if target_phase in ["TASK_COMPILATION", "CODING", "QA", "RELEASE"]:
                 if is_blocked or hld_gov.get("is_blocked", False):
