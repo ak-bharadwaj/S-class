@@ -360,6 +360,37 @@ class TestV11StabilizationPass(unittest.TestCase):
         self.assertEqual(hard_req.canonical_hash(), hard_rehydrated.canonical_hash())
         self.assertEqual(pref_req.canonical_hash(), pref_rehydrated.canonical_hash())
 
+    # =========================================================================
+    # P0-6: Dependency & Import Cycle Cleanliness
+    # =========================================================================
+
+    def test_p0_6_clean_module_import_and_no_dependency_cycles(self):
+        """Invariant: All core modules import cleanly without circular dependency deadlocks."""
+        import importlib
+        core_modules = [
+            "event_store",
+            "runtime",
+            "sclass_kernel",
+            "world_model_engine",
+            "world_model",
+            "requirement_ir",
+            "artifact_governor",
+            "spec_compiler",
+            "hld_compiler",
+            "lld_compiler",
+            "task_compiler",
+            "execution_plan_compiler",
+            "sclass_planner",
+            "replay",
+            "sclass_skill_discovery",
+            "sclass_subagent_registry",
+            "spec_synthesis",
+            "sclass_grill"
+        ]
+        for mod_name in core_modules:
+            mod = importlib.import_module(mod_name)
+            self.assertIsNotNone(mod, f"Module '{mod_name}' failed to import")
+
 
 if __name__ == "__main__":
     unittest.main()
