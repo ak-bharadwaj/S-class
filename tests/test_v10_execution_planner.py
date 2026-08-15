@@ -404,18 +404,25 @@ class TestV10ExecutionPlanner(unittest.TestCase):
         self.assertTrue(any("has no capable agent assignment supporting" in r for r in plan.validation_reasons))
 
         # Governor audit fails closed
-        gov_res = ArtifactGovernor.audit_execution_plan_governance(plan, [task], [comp])
+        b_node_o = BehaviorNode("cmd_order", "Order", BehaviorNodeType.COMMAND, "user", "order", EpistemicStatus.EXPLICIT, ProvenanceKind.EXPLICIT, 1.0)
+        b_graph_o = BehaviorGraph(version=1)
+        b_graph_o.add_node(b_node_o)
+        gov_res = ArtifactGovernor.audit_execution_plan_governance(plan, [task], [comp], b_graph=b_graph_o)
         self.assertTrue(gov_res.is_blocked)
 
     def test_v10_blocker_2_execution_task_source_task_hash_reconciliation_tamper(self):
         """Blocker 2: ExecutionTask source task hash/lld hash/binding hashes mismatch fails closed in Governor."""
+        b_node_u = BehaviorNode("cmd_user", "User", BehaviorNodeType.COMMAND, "user", "user", EpistemicStatus.EXPLICIT, ProvenanceKind.EXPLICIT, 1.0)
+        b_graph_u = BehaviorGraph(version=1)
+        b_graph_u.add_node(b_node_u)
+
         comp = LLDComponent("ctrl_user", "User Controller", LLDComponentType.CONTROLLER, LLDParentRef("mod_u", ["REQ-1"], ["cmd_user"]), "backend_controller", ComponentExecutionCapability.MUTATE, api_endpoints=["POST /api/user"])
         comp.component_hash = comp.compute_canonical_hash()
         task = TaskRecord("TSK-701", "Create User", "desc", TaskCategory.API_ENDPOINT, comp.id, "mod_u", ["REQ-1"], ["cmd_user"], source_lld_hash=comp.component_hash)
         task.task_hash = task.compute_canonical_hash()
 
-        plan = ExecutionPlanCompiler.compile_execution_plan([task], [comp])
-        gov_valid = ArtifactGovernor.audit_execution_plan_governance(plan, [task], [comp])
+        plan = ExecutionPlanCompiler.compile_execution_plan([task], [comp], b_graph=b_graph_u)
+        gov_valid = ArtifactGovernor.audit_execution_plan_governance(plan, [task], [comp], b_graph=b_graph_u)
         self.assertFalse(gov_valid.is_blocked)
 
         # 1. Tamper source_task_hash on ExecutionTask
@@ -424,24 +431,28 @@ class TestV10ExecutionPlanner(unittest.TestCase):
         exec_t.task_hash = exec_t.compute_canonical_hash()
         plan.plan_hash = plan.compute_canonical_hash()
 
-        gov_tampered = ArtifactGovernor.audit_execution_plan_governance(plan, [task], [comp])
+        gov_tampered = ArtifactGovernor.audit_execution_plan_governance(plan, [task], [comp], b_graph=b_graph_u)
         self.assertTrue(gov_tampered.is_blocked, "Governor MUST block ExecutionTask with tampered source_task_hash!")
         self.assertTrue(any("source_task_hash mismatch" in r for r in gov_tampered.blocking_reasons))
 
     def test_v10_blocker_3_execution_plan_source_tasks_hash_reconciliation(self):
         """Blocker 3: ExecutionPlan.source_tasks_hash is cryptographically verified against canonical tasks."""
+        b_node_i = BehaviorNode("cmd_inv", "Inventory", BehaviorNodeType.COMMAND, "user", "inv", EpistemicStatus.EXPLICIT, ProvenanceKind.EXPLICIT, 1.0)
+        b_graph_i = BehaviorGraph(version=1)
+        b_graph_i.add_node(b_node_i)
+
         comp = LLDComponent("ctrl_inv", "Inventory Controller", LLDComponentType.CONTROLLER, LLDParentRef("mod_i", ["REQ-1"], ["cmd_inv"]), "backend_controller", ComponentExecutionCapability.MUTATE, api_endpoints=["POST /api/inv"])
         comp.component_hash = comp.compute_canonical_hash()
         task = TaskRecord("TSK-801", "Inventory API", "desc", TaskCategory.API_ENDPOINT, comp.id, "mod_i", ["REQ-1"], ["cmd_inv"], source_lld_hash=comp.component_hash)
         task.task_hash = task.compute_canonical_hash()
 
-        plan = ExecutionPlanCompiler.compile_execution_plan([task], [comp])
+        plan = ExecutionPlanCompiler.compile_execution_plan([task], [comp], b_graph=b_graph_i)
 
         # Tamper source_tasks_hash while keeping plan_hash consistent
         plan.source_tasks_hash = "forged_source_tasks_hash_9999"
         plan.plan_hash = plan.compute_canonical_hash()
 
-        gov_res = ArtifactGovernor.audit_execution_plan_governance(plan, [task], [comp])
+        gov_res = ArtifactGovernor.audit_execution_plan_governance(plan, [task], [comp], b_graph=b_graph_i)
         self.assertTrue(gov_res.is_blocked, "Governor MUST block ExecutionPlan with forged source_tasks_hash!")
         self.assertTrue(any("source_tasks_hash mismatch" in r for r in gov_res.blocking_reasons))
 
@@ -472,7 +483,7 @@ class TestV10ExecutionPlanner(unittest.TestCase):
         """Blocker 5: Declared dependency to unknown task ID fails closed immediately."""
         task = ExecutionTask(
             id="ETSK-901", source_task_id="TSK-901", title="Task with Ghost Dependency", description="desc",
-            category="api_endpoint", execution_mode=ExecutionMode.SERIAL, risk_level=TaskRiskLevel.LOW,
+            category="api_endpoint", operation_class="command_mutation", execution_mode=ExecutionMode.SERIAL, risk_level=TaskRiskLevel.LOW,
             status=ExecutionTaskStatus.READY,
             dependencies=[ExecutionDependency("TSK-GHOST-999", "ETSK-901", DependencyType.HARD_PREREQUISITE, "Depends on ghost task")]
         )
@@ -535,12 +546,16 @@ class TestV10ExecutionPlanner(unittest.TestCase):
 
     def test_v10_final_unknown_agent_capability_id_fails_closed(self):
         """Final Hardening: Unknown/forged agent capability ID fails closed in Governor."""
+        b_node_t = BehaviorNode("cmd_1", "Test", BehaviorNodeType.COMMAND, "user", "test", EpistemicStatus.EXPLICIT, ProvenanceKind.EXPLICIT, 1.0)
+        b_graph_t = BehaviorGraph(version=1)
+        b_graph_t.add_node(b_node_t)
+
         comp = LLDComponent("ctrl_test", "Test Controller", LLDComponentType.CONTROLLER, LLDParentRef("mod_t", ["REQ-1"], ["cmd_1"]), "backend_controller", ComponentExecutionCapability.MUTATE, api_endpoints=["POST /api/test"])
         comp.component_hash = comp.compute_canonical_hash()
         task = TaskRecord("TSK-F1", "Test Task", "desc", TaskCategory.API_ENDPOINT, comp.id, "mod_t", ["REQ-1"], ["cmd_1"], source_lld_hash=comp.component_hash)
         task.task_hash = task.compute_canonical_hash()
 
-        plan = ExecutionPlanCompiler.compile_execution_plan([task], [comp])
+        plan = ExecutionPlanCompiler.compile_execution_plan([task], [comp], b_graph=b_graph_t)
 
         # Forge unknown agent_capability_id
         plan.tasks["ETSK-F1"].assigned_agent = AgentAssignment(
@@ -552,25 +567,29 @@ class TestV10ExecutionPlanner(unittest.TestCase):
         plan.tasks["ETSK-F1"].task_hash = plan.tasks["ETSK-F1"].compute_canonical_hash()
         plan.plan_hash = plan.compute_canonical_hash()
 
-        gov_res = ArtifactGovernor.audit_execution_plan_governance(plan, [task], [comp])
+        gov_res = ArtifactGovernor.audit_execution_plan_governance(plan, [task], [comp], b_graph=b_graph_t)
         self.assertTrue(gov_res.is_blocked, "Governor MUST block task with unknown agent capability ID!")
         self.assertTrue(any("is unknown in canonical capability registry" in r for r in gov_res.blocking_reasons))
 
     def test_v10_final_required_agent_capability_mismatch_fails_closed(self):
         """Final Hardening: required_agent_capability must match assigned agent role/capability."""
+        b_node_t = BehaviorNode("cmd_1", "Test", BehaviorNodeType.COMMAND, "user", "test", EpistemicStatus.EXPLICIT, ProvenanceKind.EXPLICIT, 1.0)
+        b_graph_t = BehaviorGraph(version=1)
+        b_graph_t.add_node(b_node_t)
+
         comp = LLDComponent("ctrl_test", "Test Controller", LLDComponentType.CONTROLLER, LLDParentRef("mod_t", ["REQ-1"], ["cmd_1"]), "backend_controller", ComponentExecutionCapability.MUTATE, api_endpoints=["POST /api/test"])
         comp.component_hash = comp.compute_canonical_hash()
         task = TaskRecord("TSK-F2", "Test Task", "desc", TaskCategory.API_ENDPOINT, comp.id, "mod_t", ["REQ-1"], ["cmd_1"], source_lld_hash=comp.component_hash)
         task.task_hash = task.compute_canonical_hash()
 
-        plan = ExecutionPlanCompiler.compile_execution_plan([task], [comp])
+        plan = ExecutionPlanCompiler.compile_execution_plan([task], [comp], b_graph=b_graph_t)
 
         # Mismatch required_agent_capability
         plan.tasks["ETSK-F2"].required_agent_capability = "security_auditor"
         plan.tasks["ETSK-F2"].task_hash = plan.tasks["ETSK-F2"].compute_canonical_hash()
         plan.plan_hash = plan.compute_canonical_hash()
 
-        gov_res = ArtifactGovernor.audit_execution_plan_governance(plan, [task], [comp])
+        gov_res = ArtifactGovernor.audit_execution_plan_governance(plan, [task], [comp], b_graph=b_graph_t)
         self.assertTrue(gov_res.is_blocked, "Governor MUST block task with mismatched required_agent_capability!")
         self.assertTrue(any("does not match assigned agent" in r for r in gov_res.blocking_reasons))
 
@@ -658,6 +677,65 @@ class TestV10ExecutionPlanner(unittest.TestCase):
 
         plan = ExecutionPlanCompiler.compile_execution_plan([task], [comp])
         self.assertFalse(plan.is_valid, "Plan MUST fail closed without inventing an operation class!")
+        self.assertTrue(any("has no authoritative operation class source" in r for r in plan.validation_reasons))
+
+    def test_v10_behavior_id_prefix_heuristic_rejected_when_graph_contradicts(self):
+        """Zero Heuristics: Behavior ID named 'query_export' but graph is COMMAND strictly derives command_mutation."""
+        b_cmd_named_query = BehaviorNode(
+            "query_payment_export", "Export Payments (Mutation Command)",
+            BehaviorNodeType.COMMAND, "admin", "payment",
+            EpistemicStatus.EXPLICIT, ProvenanceKind.EXPLICIT, 1.0
+        )
+        b_graph = BehaviorGraph(version=1)
+        b_graph.add_node(b_cmd_named_query)
+
+        comp = LLDComponent("ctrl_exp", "Export Controller", LLDComponentType.CONTROLLER, LLDParentRef("mod_p", ["REQ-1"], ["query_payment_export"]), "backend_controller")
+        comp.execution_capability = None
+        comp.component_hash = comp.compute_canonical_hash()
+
+        task = TaskRecord("TSK-EXP", "Export Task", "desc", TaskCategory.API_ENDPOINT, comp.id, "mod_p", ["REQ-1"], ["query_payment_export"], source_lld_hash=comp.component_hash)
+        task.task_hash = task.compute_canonical_hash()
+
+        # Compiler strictly derives from BehaviorNode.behavior_type (COMMAND -> command_mutation), ignoring 'query_' prefix!
+        plan = ExecutionPlanCompiler.compile_execution_plan([task], [comp], b_graph=b_graph)
+        self.assertTrue(plan.is_valid)
+        self.assertEqual(plan.tasks["ETSK-EXP"].operation_class, "command_mutation")
+
+        # If attacker attempts to claim 'read_query' because of the 'query_' name, Governor blocks!
+        plan.tasks["ETSK-EXP"].operation_class = "read_query"
+        plan.tasks["ETSK-EXP"].task_hash = plan.tasks["ETSK-EXP"].compute_canonical_hash()
+        plan.plan_hash = plan.compute_canonical_hash()
+
+        gov_res = ArtifactGovernor.audit_execution_plan_governance(plan, [task], [comp], b_graph=b_graph)
+        self.assertTrue(gov_res.is_blocked)
+        self.assertTrue(any("operation_class semantic mismatch" in r for r in gov_res.blocking_reasons))
+
+    def test_v10_missing_behavior_graph_fails_closed_in_governor(self):
+        """Mandatory Source: Governor audit with missing BehaviorGraph fails closed."""
+        comp = LLDComponent("ctrl_core", "Core", LLDComponentType.CONTROLLER, LLDParentRef("mod_c", ["REQ-1"], ["cmd_1"]), "backend_controller", ComponentExecutionCapability.MUTATE)
+        comp.component_hash = comp.compute_canonical_hash()
+        task = TaskRecord("TSK-C", "Core Task", "desc", TaskCategory.API_ENDPOINT, comp.id, "mod_c", ["REQ-1"], ["cmd_1"], source_lld_hash=comp.component_hash)
+        task.task_hash = task.compute_canonical_hash()
+
+        plan = ExecutionPlanCompiler.compile_execution_plan([task], [comp])
+
+        # Governor called with b_graph=None
+        gov_res = ArtifactGovernor.audit_execution_plan_governance(plan, [task], [comp], b_graph=None)
+        self.assertTrue(gov_res.is_blocked, "Governor MUST block execution plan audit when BehaviorGraph is absent!")
+        self.assertTrue(any("requires mandatory canonical BehaviorGraph" in r for r in gov_res.blocking_reasons))
+
+    def test_v10_forged_naming_convention_without_governed_source_fails_closed(self):
+        """Zero Guessing: Behavior ID 'cmd_fake' without CapabilityBinding or BehaviorNode cannot derive semantics."""
+        comp = LLDComponent("ctrl_fake", "Fake Controller", LLDComponentType.CONTROLLER, LLDParentRef("mod_f", [], []), "backend_controller")
+        comp.execution_capability = None
+        comp.component_hash = comp.compute_canonical_hash()
+
+        task = TaskRecord("TSK-FAKE", "Fake Task", "desc", TaskCategory.API_ENDPOINT, comp.id, "mod_f", [], ["cmd_fake"], source_lld_hash=comp.component_hash)
+        task.task_hash = task.compute_canonical_hash()
+
+        # No b_graph node, no binding, no component capability
+        plan = ExecutionPlanCompiler.compile_execution_plan([task], [comp], b_graph=BehaviorGraph(version=1))
+        self.assertFalse(plan.is_valid, "Plan MUST fail closed when behavior has no authoritative semantic node!")
         self.assertTrue(any("has no authoritative operation class source" in r for r in plan.validation_reasons))
 
 

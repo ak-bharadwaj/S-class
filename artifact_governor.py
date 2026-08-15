@@ -921,6 +921,23 @@ class ArtifactGovernor:
         """
         reasons: List[str] = []
 
+        # 0. Mandatory Canonical Context Verification (Fail Closed)
+        if tasks is None or not tasks:
+            reasons.append("Execution plan audit requires mandatory governed TaskRecords.")
+        if lld_components is None or not lld_components:
+            reasons.append("Execution plan audit requires mandatory governed LLDComponents.")
+        if b_graph is None or not getattr(b_graph, "nodes", None):
+            reasons.append("Execution plan audit requires mandatory canonical BehaviorGraph to authoritatively reconcile execution semantics.")
+
+        if reasons:
+            return GovernanceGateResult(
+                is_blocked=True,
+                blocking_reasons=reasons,
+                recommended_fsm_state=FSMTransitionTarget.TASK_COMPILATION,
+                validation_status=ValidationStatus.BLOCKED,
+                approval_status=ApprovalStatus.REJECTED
+            )
+
         # 1. Canonical Plan Hash Integrity Verification
         if hasattr(plan, "compute_canonical_hash"):
             expected_plan_hash = plan.compute_canonical_hash()

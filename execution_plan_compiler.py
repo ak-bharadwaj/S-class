@@ -143,25 +143,6 @@ class ExecutionPlanCompiler:
                 elif ec_val == "PROCESS_EVENT":
                     detected_op_classes.add("event_processing")
 
-        # 5. From Behavior ID Prefix Naming Conventions
-        if not detected_op_classes and task.parent_behaviors:
-            for bid in task.parent_behaviors:
-                b_lower = bid.lower()
-                if b_lower.startswith("cmd_") or b_lower.startswith("command_"):
-                    detected_op_classes.add("command_mutation")
-                elif b_lower.startswith("query_") or b_lower.startswith("read_") or b_lower.startswith("get_"):
-                    detected_op_classes.add("read_query")
-                elif b_lower.startswith("state_") or b_lower.startswith("transition_"):
-                    detected_op_classes.add("state_transition")
-                elif b_lower.startswith("event_"):
-                    detected_op_classes.add("event_processing")
-
-        # 6. From Task Category (state_transition, ui_component)
-        if not detected_op_classes:
-            task_cat = task.category.value if hasattr(task.category, "value") else str(task.category)
-            if task_cat in ["state_transition", "STATE_TRANSITION"]:
-                detected_op_classes.add("state_transition")
-
         if not detected_op_classes:
             return None, [
                 f"Task '{task.id}' ({task.title}) has no authoritative operation class source in capability bindings, behavior graph, or component capabilities. Unresolved semantic tasks cannot be executed."
