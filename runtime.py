@@ -232,54 +232,79 @@ class FileLock:
                 else:
                     os.close(fd)
             except FileExistsError:
-                # 2. File exists on disk — inspect owner payload and audit staleness
+                # 2. File exists on disk — ATTEMPT KERNEL ADVISORY LOCK FIRST on existing file descriptor!
                 try:
-                    lock_mtime = os.path.getmtime(self.lock_path)
-                    lock_age = time.time() - lock_mtime
+                    fd = os.open(self.lock_path, os.O_RDWR)
+                except OSError:
+                    if time.time() - start_time >= self.timeout:
+                        raise TimeoutError(f"FileLock timeout opening existing lock file: {self.lock_path}")
+                    time.sleep(0.05)
+                    continue
 
+                if not self._lock_handle(fd):
+                    # KERNEL ADVISORY LOCK DENIED! A live process holds the kernel lock on this file.
+                    # REGARDLESS of lock age, metadata content, or corruption, DO NOT UNLINK OR OVERWRITE!
+                    os.close(fd)
+                    if time.time() - start_time >= self.timeout:
+                        raise TimeoutError(f"FileLock timeout after {self.timeout}s waiting for live kernel lock owner: {self.lock_path}")
+                    time.sleep(0.05)
+                    continue
+
+                # KERNEL ADVISORY LOCK GRANTED! Nobody holds the OS kernel lock on this file descriptor.
+                try:
+                    # Read existing metadata to verify if another live process owns this lock file
+                    os.lseek(fd, 0, os.SEEK_SET)
+                    raw = os.read(fd, 4096).decode("utf-8", errors="ignore").strip()
                     lock_data = {}
-                    try:
-                        with open(self.lock_path, "r", encoding="utf-8") as f:
-                            raw = f.read().strip()
-                            if raw.startswith("{"):
+                    if raw:
+                        if raw.startswith("{"):
+                            try:
                                 lock_data = json.loads(raw)
-                            elif raw.isdigit():
-                                lock_data = {"pid": int(raw)}
-                    except Exception:
-                        pass
+                            except Exception:
+                                pass
+                        elif raw.isdigit():
+                            lock_data = {"pid": int(raw)}
 
                     pid = lock_data.get("pid")
-                    token = lock_data.get("token")
                     lock_proc_start = lock_data.get("process_start_time") or lock_data.get("start_time")
                     current_proc_start = _get_process_start_time(pid) if isinstance(pid, int) else None
 
-                    if isinstance(pid, int):
-                        if not _process_exists(pid):
-                            logger.warning(f"Stale lock detected for dead PID {pid}. Recovering: {self.lock_path}")
+                    # If metadata indicates another live process owns this lock file, DO NOT OVERWRITE!
+                    if isinstance(pid, int) and _process_exists(pid):
+                        is_reused_pid = bool(current_proc_start and lock_proc_start and current_proc_start > lock_proc_start + 1.0)
+                        if not is_reused_pid:
+                            # Live process owns this lock — unlock handle and keep waiting
+                            self._unlock_handle(fd)
                             try:
-                                os.unlink(self.lock_path)
+                                os.close(fd)
                             except OSError:
                                 pass
-                            continue
-                        elif current_proc_start and lock_proc_start and current_proc_start > lock_proc_start + 1.0:
-                            logger.warning(f"PID reuse detected for PID {pid} (lock start={lock_proc_start}, proc start={current_proc_start}). Recovering stale lock: {self.lock_path}")
-                            try:
-                                os.unlink(self.lock_path)
-                            except OSError:
-                                pass
+                            if time.time() - start_time >= self.timeout:
+                                raise TimeoutError(f"FileLock timeout after {self.timeout}s waiting for live owner PID {pid}: {self.lock_path}")
+                            time.sleep(0.05)
                             continue
                         else:
-                            # Live process holds lock — keep waiting
-                            pass
-                    elif lock_age >= self.stale_ttl:
-                        # Corrupt or unowned lock older than stale_ttl
-                        try:
-                            os.unlink(self.lock_path)
-                        except OSError:
-                            pass
-                        continue
-                except Exception as e:
-                    logger.debug(f"Lock audit note: {e}")
+                            logger.warning(f"PID reuse detected for PID {pid}. Recovering lock: {self.lock_path}")
+                    elif isinstance(pid, int) and not _process_exists(pid):
+                        logger.info(f"Recovered abandoned lock file from dead PID {pid}: {self.lock_path}")
+
+                    # Truncate and write new owner payload into kernel-locked handle
+                    os.ftruncate(fd, 0)
+                    os.lseek(fd, 0, os.SEEK_SET)
+                    os.write(fd, owner_payload)
+                    os.fsync(fd)
+                except (OSError, IOError) as err:
+                    self._unlock_handle(fd)
+                    try:
+                        os.close(fd)
+                    except OSError:
+                        pass
+                    raise err
+
+                self._fd = fd
+                with _active_locks_guard:
+                    _active_local_locks.add(self.lock_path)
+                return self
 
             except OSError:
                 pass

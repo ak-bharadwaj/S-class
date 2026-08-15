@@ -160,40 +160,40 @@ class RequirementNode:
         )
 
 
-EPISTEMIC_STATUS_RANK: Dict[Any, int] = {
-    EpistemicStatus.EXPLICIT: 4,
-    EpistemicStatus.CONFIRMED: 4,
-    EpistemicStatus.OBSERVED: 3,
-    EpistemicStatus.DERIVED: 3,
-    EpistemicStatus.PROPOSED: 2,
-    EpistemicStatus.REJECTED: 1,
+EPISTEMIC_STATUS_RANK: Dict[Any, float] = {
+    EpistemicStatus.CONFIRMED: 4.5,
+    EpistemicStatus.EXPLICIT: 4.0,
+    EpistemicStatus.OBSERVED: 3.5,
+    EpistemicStatus.DERIVED: 3.0,
+    EpistemicStatus.PROPOSED: 2.0,
+    EpistemicStatus.REJECTED: 1.0,
 }
 
-PROVENANCE_RANK: Dict[Any, int] = {
-    ProvenanceKind.EXPLICIT: 4,
-    ProvenanceKind.OBSERVED: 3,
-    ProvenanceKind.STRONGLY_DERIVED: 3,
-    ProvenanceKind.WEAKLY_DERIVED: 2,
-    ProvenanceKind.SPECULATIVE: 1,
+PROVENANCE_RANK: Dict[Any, float] = {
+    ProvenanceKind.EXPLICIT: 4.0,
+    ProvenanceKind.OBSERVED: 3.5,
+    ProvenanceKind.STRONGLY_DERIVED: 3.0,
+    ProvenanceKind.WEAKLY_DERIVED: 2.0,
+    ProvenanceKind.SPECULATIVE: 1.0,
 }
 
-def _get_epistemic_rank(status: Any) -> int:
+def _get_epistemic_rank(status: Any) -> float:
     if isinstance(status, EpistemicStatus):
-        return EPISTEMIC_STATUS_RANK.get(status, 1)
+        return EPISTEMIC_STATUS_RANK.get(status, 1.0)
     status_str = str(status).lower()
     for k, v in EPISTEMIC_STATUS_RANK.items():
         if k.value.lower() == status_str:
             return v
-    return 1
+    return 1.0
 
-def _get_provenance_rank(provenance: Any) -> int:
+def _get_provenance_rank(provenance: Any) -> float:
     if isinstance(provenance, ProvenanceKind):
-        return PROVENANCE_RANK.get(provenance, 1)
+        return PROVENANCE_RANK.get(provenance, 1.0)
     prov_str = str(provenance).lower()
     for k, v in PROVENANCE_RANK.items():
         if k.value.lower() == prov_str:
             return v
-    return 1
+    return 1.0
 
 
 class DuplicateIDConflictError(ValueError):

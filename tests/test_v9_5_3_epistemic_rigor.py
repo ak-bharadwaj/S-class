@@ -315,6 +315,51 @@ with FileLock(r'{lock_path}', timeout=5.0):
             if proc.poll() is None:
                 proc.kill()
 
+    def test_live_owner_with_corrupt_metadata_and_stale_ttl_is_never_stolen(self):
+        """Falsification Test: Process A holds OS kernel lock with corrupted metadata and old timestamp. Process B MUST NOT acquire lock or unlink file, regardless of stale_ttl."""
+        import subprocess, sys
+        lock_path = os.path.join(self.test_dir, ".agents", "corrupt_live.lock")
+        os.makedirs(os.path.dirname(lock_path), exist_ok=True)
+
+        repo_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+        code = f"""
+import sys, time, os
+sys.path.insert(0, r'{repo_dir}')
+from runtime import FileLock
+lock = FileLock(r'{lock_path}', timeout=5.0)
+lock.__enter__()
+
+# Corrupt metadata intentionally while holding kernel lock handle!
+if lock._fd is not None:
+    os.ftruncate(lock._fd, 0)
+    os.lseek(lock._fd, 0, os.SEEK_SET)
+    os.write(lock._fd, b"CORRUPT_GARBAGE_JSON_PAYLOAD_12345")
+    os.fsync(lock._fd)
+
+print("HELD", flush=True)
+time.sleep(30)
+"""
+        proc = subprocess.Popen([sys.executable, "-c", code], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            line = proc.stdout.readline()
+            self.assertIn("HELD", line, "Subprocess A must hold kernel lock first")
+
+            # Process B attempts to acquire with small timeout=0.4s and tiny stale_ttl=0.01s
+            start = time.time()
+            competer_blocked = False
+            try:
+                with FileLock(lock_path, timeout=0.4, stale_ttl=0.01):
+                    pass
+            except TimeoutError:
+                competer_blocked = True
+
+            self.assertTrue(competer_blocked, "Process B MUST NOT acquire lock while Process A holds kernel lock, even with corrupt metadata and exceeded stale_ttl!")
+            self.assertTrue(os.path.exists(lock_path), "Process B MUST NOT delete lock file owned by live process A!")
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+
 
 if __name__ == "__main__":
     unittest.main()
