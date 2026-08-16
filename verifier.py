@@ -467,8 +467,8 @@ class EvidenceVerifier:
         return errors, real_screenshots, required_min_screenshots
 
     @staticmethod
-    def verify_phase(current_phase: str, workspace_dir: Optional[str] = None, allow_soft: bool = True) -> VerificationResult:
-        """Verifies required evidence artifacts for the given phase."""
+    def verify_phase(current_phase: str, workspace_dir: Optional[str] = None, allow_soft: bool = False) -> VerificationResult:
+        """Verifies required evidence artifacts for the given phase. Defaults strictly to hard evidence enforcement (allow_soft=False)."""
         cwd = workspace_dir if workspace_dir else os.getcwd()
         state_dir = os.path.join(cwd, ".agents")
         state_file = os.path.join(state_dir, "orchestration_state.json")

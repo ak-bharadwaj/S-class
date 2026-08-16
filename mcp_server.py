@@ -44,7 +44,7 @@ def handle_tool_call(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any
 
     elif tool_name == "sclass_dispatch":
         event_name = arguments.get("event_name", "")
-        enforce_evidence = arguments.get("enforce_evidence", False)
+        enforce_evidence = arguments.get("enforce_evidence", True)
         res = sclass_kernel.kernel_instance.request_transition(event_name=event_name, workspace_dir=workspace_dir, payload={"enforce_evidence": enforce_evidence})
         state = runtime.get_state(workspace_dir)
         return {"status": "transitioned", "active_phase": state.currentPhase, "active_event": state.activeEvent, "kernel_receipt": res}

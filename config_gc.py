@@ -47,6 +47,14 @@ def run_gc(workspace_dir: str, state_max_age_days: int = 7, memory_max_age_days:
                         size = os.path.getsize(lock_file)
                         report.stale_locks_removed += 1
                         report.total_bytes_freed += size
+                        try:
+                            reclaim_payload = json.dumps({"status": "reclaimed_gc", "pid": os.getpid()}).encode("utf-8")
+                            os.ftruncate(lock._fd, 0)
+                            os.lseek(lock._fd, 0, os.SEEK_SET)
+                            os.write(lock._fd, reclaim_payload)
+                            os.fsync(lock._fd)
+                        except Exception:
+                            pass
             except TimeoutError:
                 # Active process holds the kernel lock on state.lock - preserve lock intact.
                 pass

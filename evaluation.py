@@ -75,7 +75,7 @@ class SelfEvaluator:
                 confidence_score=confidence_score,
                 goal_drift_detected=True,
                 suggested_profile="full",
-                reason="Goal expanded from bug fix to major refactor. Pivoting workflow profile to FULL 11-state pipeline."
+                reason="Goal expanded from bug fix to major refactor. Pivoting workflow profile to FULL 19-state pipeline."
             )
 
         # Normal Proceed

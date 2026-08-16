@@ -1,9 +1,8 @@
 """
-Meta-Planner Layer for S-Class V7.0
+S-Class Dynamic Workflow Meta-Planner
 
-Dynamically inspects incoming user goals and classifies them into tailored workflow profiles.
-Rather than forcing every task through the full 11-state pipeline, the Meta-Planner selects
-the shortest safe FSM path based on task intent and complexity.
+Rather than forcing every task through the full 19-state pipeline, the Meta-Planner selects
+the optimal workflow profile based on goal intent, project scale, and risk level.
 """
 
 from enum import Enum
@@ -13,7 +12,7 @@ import copy
 
 
 class WorkflowProfile(Enum):
-    FULL = "full"            # Full 11-state pipeline (New features, complex architecture)
+    FULL = "full"            # Full 19-state pipeline (New features, complex architecture)
     BUG_FIX = "bug_fix"      # Fast-track repair (TRIAGE -> ANALYSIS -> CODING -> INTEGRATION -> QA -> RELEASE -> DONE)
     RESEARCH = "research"    # Read-only audit (TRIAGE -> ANALYSIS -> DEBATE -> DONE)
     REFACTOR = "refactor"    # Structuring (TRIAGE -> ANALYSIS -> DESIGN -> CODING -> INTEGRATION -> QA -> RELEASE -> DONE)
@@ -140,7 +139,7 @@ class MetaPlanner:
                 rationale = "Goal indicates a research/audit request. Bypassing build and release execution."
             else:
                 profile = WorkflowProfile.FULL
-                rationale = "Goal requires comprehensive feature development through full 11-state pipeline."
+                rationale = "Goal requires comprehensive feature development through full 19-state pipeline."
 
         seq = PROFILE_SEQUENCES[profile]
         overrides = PROFILE_TRANSITIONS.get(profile, {})

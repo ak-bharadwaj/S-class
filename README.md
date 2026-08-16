@@ -97,7 +97,7 @@ S-Class V11.2 introduces dedicated command execution modes for developer workflo
 
 | Slash Command / Mode | Execution Purpose | Action Performed |
 | :--- | :--- | :--- |
-| **`/goal [objective]`** | **Autonomous Goal Execution** | Launches full 11-state FSM execution lifecycle with subagent worker swarms and visual release gates. |
+| **`/goal [objective]`** | **Autonomous Goal Execution** | Launches full 19-state FSM execution lifecycle with subagent worker swarms and visual release gates. |
 | **`/grill [spec/plan]`** | **Plan Red-Teaming Audit** | Runs `sclass_grill.py` to stress-test design specifications across 5 threat vectors before coding. |
 | **`/doubt [question]`** | **Non-Interrupting Inquiry** | Answers user questions about code or architecture using read-only tools **without pausing or resetting the main task**. |
 | **`/inquire [question]`** | **Read-Only Code Audit** | Queries workspace AST symbols and active FSM state safely in parallel with ongoing background tasks. |
@@ -184,7 +184,7 @@ print(f"Kernel Approved Mutation: '{res['previousPhase']}' ➔ '{res['currentPha
 
 ## 🧪 Comprehensive Automated Test Suite
 
-S-Class EOS V11.2 contains **390 automated test cases across 50 test suites** passing with 100% success across Python 3.10–3.14:
+S-Class EOS V11.2 contains **387 automated test cases across 48 test suites** passing with 100% success across Python 3.10–3.14:
 
 | Test Module Category | Test Count | Functionality Tested |
 | :--- | :--- | :--- |

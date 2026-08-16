@@ -218,8 +218,8 @@ class ArtifactGovernor:
                     record = ApprovalRecord.from_dict(r_dict)
                     if record.is_valid(secret_key):
                         verified_records[record.decision_id] = record
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"[ArtifactGovernor] Failed to load or verify cryptographic approvals from {app_file}: {e}")
 
         return verified_records
 
@@ -260,8 +260,8 @@ class ArtifactGovernor:
                 try:
                     with open(app_file, "r", encoding="utf-8") as f:
                         existing_data = json.load(f) or {"approval_records": []}
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"[ArtifactGovernor] Could not parse existing approvals.json during mint: {e}")
             recs = [r for r in existing_data.get("approval_records", []) if r.get("decision_id") != decision_id]
             recs.append(record.to_dict())
             existing_data["approval_records"] = recs
@@ -287,8 +287,11 @@ class ArtifactGovernor:
                     return mode_str
                 if mode_str in ["CLOSED LOOP", "CONVERGENCE"]:
                     return "SIMULATION"
-            except Exception:
-                pass
+                logger.error(f"[ArtifactGovernor] Invalid executionMode '{mode_str}' in {cfg_file}. Failing closed to CONFIGURATION_ERROR.")
+                return "CONFIGURATION_ERROR"
+            except Exception as e:
+                logger.error(f"[ArtifactGovernor] Malformed configuration file {cfg_file}: {e}. Failing closed to CONFIGURATION_ERROR.")
+                return "CONFIGURATION_ERROR"
 
         if workspace_dir:
             return "PRODUCTION"
@@ -316,8 +319,17 @@ class ArtifactGovernor:
         workspace_dir: Optional[str] = None
     ) -> GovernanceGateResult:
         reasons: List[str] = []
-        verified_approvals = cls._load_verified_approval_records(workspace_dir)
         exec_mode = cls._get_execution_mode(workspace_dir)
+        if exec_mode == "CONFIGURATION_ERROR":
+            return GovernanceGateResult(
+                is_blocked=True,
+                blocking_reasons=["Configuration Error: sclass.config.json is malformed or specifies an invalid executionMode. Governor fails closed."],
+                recommended_fsm_state=FSMTransitionTarget.TRIAGE,
+                validation_status=ValidationStatus.BLOCKED,
+                approval_status=ApprovalStatus.REJECTED
+            )
+
+        verified_approvals = cls._load_verified_approval_records(workspace_dir)
 
         current_artifact_id = hld.system_name or "HLD-001"
         current_artifact_version = getattr(hld, "version", 1)
