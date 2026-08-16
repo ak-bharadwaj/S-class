@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_2-03-PHI-SANITIZER-V2",
+  "category": "Privacy & Compliance",
+  "domain": "HIPAA Compliance",
+  "raw_prompt": "Implement PHISanitizerV2 in target_module.py. Redact SSNs (123-45-6789) and obfuscated SSNs (123 . 45 . 6789)."
+}

@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_2-01-SPIFFE-ROUTER-V2",
+  "category": "Security",
+  "domain": "Zero-Trust Routing",
+  "raw_prompt": "Implement SPIFFEMutualTLSRouterV2 in target_module.py. Validate validate_spiffe_id(spiffe_id) strictly against self.domain, blocking suffix/prefix spoofing."
+}

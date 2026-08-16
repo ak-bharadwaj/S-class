@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_2-05-MULTI-TENANT-RLS-V2",
+  "category": "Data Isolation",
+  "domain": "Tenant Security",
+  "raw_prompt": "Implement MultiTenantRLSV2 in target_module.py. Enforce tenant_id predicate and block SQL injection payloads."
+}

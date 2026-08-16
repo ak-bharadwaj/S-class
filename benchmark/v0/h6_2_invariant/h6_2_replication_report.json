@@ -1,0 +1,47 @@
+{
+  "title": "H6.2 Independent Replication Summary Report",
+  "sample_size_tasks": 12,
+  "total_executions": 24,
+  "bi_directional_pre_validation": "CERTIFIED_100_PERCENT_DISCRIMINATORY",
+  "paired_layer2_mcnemar": {
+    "contingency_table": {
+      "a_both_pass": 7,
+      "b_b2_pass_b4_fail": 0,
+      "c_b4_pass_b2_fail": 3,
+      "d_both_fail": 2,
+      "discordant_pairs": 3
+    },
+    "exact_p_value": 0.25,
+    "ci_stats": {
+      "delta_percentage": 25.0,
+      "ci_lower_percentage": -9.97,
+      "ci_upper_percentage": 59.97
+    }
+  },
+  "metrics": {
+    "B2_Model_Pytest": {
+      "l1_passed": 9,
+      "l1_pass_rate_pct": 75.0,
+      "l2_passed": 7,
+      "l2_pass_rate_pct": 58.33,
+      "false_confidence_count": 4,
+      "false_confidence_rate_pct": 33.33,
+      "total_cost_usd": 0.004522,
+      "cost_per_success_usd": 0.000502,
+      "calls_per_success": 2.44,
+      "latency_per_success_sec": 6.293
+    },
+    "B4_Model_SClass_Pytest": {
+      "l1_passed": 8,
+      "l1_pass_rate_pct": 66.67,
+      "l2_passed": 10,
+      "l2_pass_rate_pct": 83.33,
+      "false_confidence_count": 0,
+      "false_confidence_rate_pct": 0.0,
+      "total_cost_usd": 0.006057,
+      "cost_per_success_usd": 0.000757,
+      "calls_per_success": 3.38,
+      "latency_per_success_sec": 8.441
+    }
+  }
+}

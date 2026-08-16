@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_2-08-INVARIANT-REPLICATION-08",
+  "category": "Safety-Critical Controls",
+  "domain": "Safety-Critical Controls Module 08",
+  "raw_prompt": "Implement ModuleV2_08 in target_module.py under Safety-Critical Controls. Enforce check_invariant(p) returning True for p.get('valid')==True, raising InvariantErr on invalid."
+}

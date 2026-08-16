@@ -1,0 +1,71 @@
+{
+  "task_id": "H6_2-03-PHI-SANITIZER-V2",
+  "baseline": "B2",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "HIPAA Compliance",
+  "raw_prompt": "Implement PHISanitizerV2 in target_module.py. Redact SSNs (123-45-6789) and obfuscated SSNs (123 . 45 . 6789).",
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 1
+  },
+  "repository": {
+    "starting_tree_hash": "0efd0a93f6ebdc99c0e7ddde5ae89f9bfd2234d2961a2f5daad875225e88727f",
+    "final_tree_hash": "3175826bcb8b4b5279f0f64bc976c251d6efff1c28715445682dc89da84ddb35"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "Task Instruction:\nImplement PHISanitizerV2 in target_module.py. Redact SSNs (123-45-6789) and obfuscated SSNs (123 . 45 . 6789).\n\nExisting Code in target_module.py:\n```python\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nimport re\n\nclass PHISanitizerV2:\n    \"\"\"\n    Sanitizer for Protected Health Information (PHI), specifically targeting\n    standard SSNs and obfuscated SSNs.\n    \"\"\"\n    \n    # Standard SSN: 3 digits, hyphen, 2 digits, hyphen, 4 digits (e.g., 123-45-6789)\n    # Obfuscated SSN: digits separated by spaces, periods, or both, surrounded by optional spaces (e.g., 123 . 45 . 6789)\n    # We can use a regex that matches both patterns:\n    # Pattern explanation:\n    # \\d{3}            -> 3 digits\n    # \\s*[-.]\\s*       -> separator which can be a hyphen or dot, optionally surrounded by whitespace\n    # \\d{2}            -> 2 digits\n    # \\s*[-.]\\s*       -> separator\n    # \\d{4}            -> 4 digits\n    \n    SSN_PATTERN = re.compile(r'\\b\\d{3}\\s*[-.]\\s*\\d{2}\\s*[-.]\\s*\\d{4}\\b')\n\n    @classmethod\n    def sanitize(cls, text: str, replacement: str = \"[REDACTED]\") -> str:\n        \"\"\"\n        Scans the input text and replaces any found SSNs or obfuscated SSNs\n        with the specified replacement string.\n        \"\"\"\n        if not isinstance(text, str):\n            return text\n            \n        return cls.SSN_PATTERN.sub(replacement, text)\n```",
+      "latency_sec": 2.2892,
+      "prompt_tokens": 122,
+      "completion_tokens": 367,
+      "cost_usd": 0.000119,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpi_r_pul8\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_phi_l1 PASSED                                 [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.521,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "import re\n\nclass PHISanitizerV2:\n    \"\"\"\n    Sanitizer for Protected Health Information (PHI), specifically targeting\n    standard SSNs and obfuscated SSNs.\n    \"\"\"\n    \n    # Standard SSN: 3 digits, hyphen, 2 digits, hyphen, 4 digits (e.g., 123-45-6789)\n    # Obfuscated SSN: digits separated by spaces, periods, or both, surrounded by optional spaces (e.g., 123 . 45 . 6789)\n    # We can use a regex that matches both patterns:\n    # Pattern explanation:\n    # \\d{3}            -> 3 digits\n    # \\s*[-.]\\s*       -> separator which can be a hyphen or dot, optionally surrounded by whitespace\n    # \\d{2}            -> 2 digits\n    # \\s*[-.]\\s*       -> separator\n    # \\d{4}            -> 4 digits\n    \n    SSN_PATTERN = re.compile(r'\\b\\d{3}\\s*[-.]\\s*\\d{2}\\s*[-.]\\s*\\d{4}\\b')\n\n    @classmethod\n    def sanitize(cls, text: str, replacement: str = \"[REDACTED]\") -> str:\n        \"\"\"\n        Scans the input text and replaces any found SSNs or obfuscated SSNs\n        with the specified replacement string.\n        \"\"\"\n        if not isinstance(text, str):\n            return text\n            \n        return cls.SSN_PATTERN.sub(replacement, text)\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpi_r_pul8\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_phi_l1 PASSED                                 [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.521,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  },
+  "layer2_behavioral_adjudication": {
+    "layer2_passed": true,
+    "false_confidence_detected": false,
+    "l2_stdout_snippet": "============= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp5eqeuuvw\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_adversarial_invariants.py::test_phi_l2 PASSED                 [100%]\n\n============================== 1 passed in 0.03s ==============================\n\n",
+    "audit_trace_completeness_pct": 100.0
+  }
+}

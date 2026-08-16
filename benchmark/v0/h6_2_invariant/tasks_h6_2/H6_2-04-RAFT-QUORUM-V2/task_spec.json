@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_2-04-RAFT-QUORUM-V2",
+  "category": "Distributed Consistency",
+  "domain": "Raft Consensus",
+  "raw_prompt": "Implement RaftQuorumV2 in target_module.py. Enforce majority quorum (ack > size // 2) and matching term."
+}

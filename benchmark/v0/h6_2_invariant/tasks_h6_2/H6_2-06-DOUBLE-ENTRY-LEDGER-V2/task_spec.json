@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_2-06-DOUBLE-ENTRY-LEDGER-V2",
+  "category": "Financial Invariants",
+  "domain": "Fintech Balancing",
+  "raw_prompt": "Implement DoubleEntryLedgerV2 in target_module.py. Enforce sum(debits) == sum(credits) and raise LedgerError on mismatch."
+}

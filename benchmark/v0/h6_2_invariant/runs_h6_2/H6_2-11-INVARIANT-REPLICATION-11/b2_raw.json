@@ -1,0 +1,71 @@
+{
+  "task_id": "H6_2-11-INVARIANT-REPLICATION-11",
+  "baseline": "B2",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Distributed Consistency Module 11",
+  "raw_prompt": "Implement ModuleV2_11 in target_module.py under Distributed Consistency. Enforce check_invariant(p) returning True for p.get('valid')==True, raising InvariantErr on invalid.",
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 1
+  },
+  "repository": {
+    "starting_tree_hash": "1c0df7fbf7848931ddf59cad41c8bbf866a72efc82c692b4c0f8a2645b3910a3",
+    "final_tree_hash": "d53a15998abf01e6851f433c3dafa34f0a00b3ae27c558a006d59805f3287a1b"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "Task Instruction:\nImplement ModuleV2_11 in target_module.py under Distributed Consistency. Enforce check_invariant(p) returning True for p.get('valid')==True, raising InvariantErr on invalid.\n\nExisting Code in target_module.py:\n```python\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nclass InvariantErr(Exception):\n    \"\"\"Raised when an invariant check fails.\"\"\"\n    pass\n\n\nclass ModuleV2_11:\n    \"\"\"Distributed Consistency Module V2_11.\"\"\"\n\n    @staticmethod\n    def check_invariant(p: dict) -> bool:\n        \"\"\"\n        Enforces that check_invariant(p) returns True for p.get('valid') == True,\n        raising InvariantErr otherwise.\n        \"\"\"\n        if p.get('valid') is True:\n            return True\n        raise InvariantErr(\"Invariant check failed: 'valid' is not True.\")\n```",
+      "latency_sec": 1.6042,
+      "prompt_tokens": 114,
+      "completion_tokens": 135,
+      "cost_usd": 4.9e-05,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp6z2nib93\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_m_l1 PASSED                                   [100%]\n\n============================== 1 passed in 0.04s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.773,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "class InvariantErr(Exception):\n    \"\"\"Raised when an invariant check fails.\"\"\"\n    pass\n\n\nclass ModuleV2_11:\n    \"\"\"Distributed Consistency Module V2_11.\"\"\"\n\n    @staticmethod\n    def check_invariant(p: dict) -> bool:\n        \"\"\"\n        Enforces that check_invariant(p) returns True for p.get('valid') == True,\n        raising InvariantErr otherwise.\n        \"\"\"\n        if p.get('valid') is True:\n            return True\n        raise InvariantErr(\"Invariant check failed: 'valid' is not True.\")\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp6z2nib93\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_m_l1 PASSED                                   [100%]\n\n============================== 1 passed in 0.04s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.773,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  },
+  "layer2_behavioral_adjudication": {
+    "layer2_passed": false,
+    "false_confidence_detected": true,
+    "l2_stdout_snippet": "variant(p) returns True for p.get('valid') == True,\n        raising InvariantErr otherwise.\n        \"\"\"\n>       if p.get('valid') is True:\n           ^^^^^\nE       AttributeError: 'NoneType' object has no attribute 'get'\n\ntarget_module.py:15: AttributeError\n=========================== short test summary info ===========================\nFAILED tests/test_adversarial_invariants.py::test_m_l2 - AttributeError: 'Non...\n============================== 1 failed in 0.12s ==============================\n\n",
+    "audit_trace_completeness_pct": 100.0
+  }
+}

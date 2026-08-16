@@ -1,0 +1,71 @@
+{
+  "task_id": "H6_2-07-INVARIANT-REPLICATION-07",
+  "baseline": "B2",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Authorization Module 07",
+  "raw_prompt": "Implement ModuleV2_07 in target_module.py under Authorization. Enforce check_invariant(p) returning True for p.get('valid')==True, raising InvariantErr on invalid.",
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 1
+  },
+  "repository": {
+    "starting_tree_hash": "7c34222770e31a1e296ec49b94d5bdf4041daa22ef884e5c02d7c3325b7c968e",
+    "final_tree_hash": "b0157dbc6a70fd519ad1ce4eac338aef878a1f6db60ef7ac7aaeee03e15f93d4"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "Task Instruction:\nImplement ModuleV2_07 in target_module.py under Authorization. Enforce check_invariant(p) returning True for p.get('valid')==True, raising InvariantErr on invalid.\n\nExisting Code in target_module.py:\n```python\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nclass InvariantErr(Exception):\n    \"\"\"Exception raised when an invariant check fails.\"\"\"\n    pass\n\nclass ModuleV2_07:\n    \"\"\"Implementation of ModuleV2_07 under Authorization.\"\"\"\n    \n    @staticmethod\n    def check_invariant(p: dict) -> bool:\n        \"\"\"\n        Enforces that check_invariant(p) returns True for p.get('valid') == True,\n        and raises InvariantErr otherwise.\n        \"\"\"\n        if p.get('valid') is True:\n            return True\n        raise InvariantErr(\"Invariant violated: 'valid' must be True.\")\n```",
+      "latency_sec": 1.2607,
+      "prompt_tokens": 113,
+      "completion_tokens": 140,
+      "cost_usd": 5e-05,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpovvg6y0g\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_m_l1 PASSED                                   [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.63,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "class InvariantErr(Exception):\n    \"\"\"Exception raised when an invariant check fails.\"\"\"\n    pass\n\nclass ModuleV2_07:\n    \"\"\"Implementation of ModuleV2_07 under Authorization.\"\"\"\n    \n    @staticmethod\n    def check_invariant(p: dict) -> bool:\n        \"\"\"\n        Enforces that check_invariant(p) returns True for p.get('valid') == True,\n        and raises InvariantErr otherwise.\n        \"\"\"\n        if p.get('valid') is True:\n            return True\n        raise InvariantErr(\"Invariant violated: 'valid' must be True.\")\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpovvg6y0g\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_m_l1 PASSED                                   [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.63,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  },
+  "layer2_behavioral_adjudication": {
+    "layer2_passed": false,
+    "false_confidence_detected": true,
+    "l2_stdout_snippet": "iant(p) returns True for p.get('valid') == True,\n        and raises InvariantErr otherwise.\n        \"\"\"\n>       if p.get('valid') is True:\n           ^^^^^\nE       AttributeError: 'NoneType' object has no attribute 'get'\n\ntarget_module.py:14: AttributeError\n=========================== short test summary info ===========================\nFAILED tests/test_adversarial_invariants.py::test_m_l2 - AttributeError: 'Non...\n============================== 1 failed in 0.10s ==============================\n\n",
+    "audit_trace_completeness_pct": 100.0
+  }
+}

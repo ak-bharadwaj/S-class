@@ -1,0 +1,270 @@
+{
+  "task_id": "H6_2-06-DOUBLE-ENTRY-LEDGER-V2",
+  "baseline": "B4",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Fintech Balancing",
+  "raw_prompt": "Implement DoubleEntryLedgerV2 in target_module.py. Enforce sum(debits) == sum(credits) and raise LedgerError on mismatch.",
+  "sclass_governance": {
+    "semantic_requirements": [
+      {
+        "id": "REQ-SHADOW-001",
+        "title": "Atomic Ledger Transaction Boundary",
+        "description": "Execute financial entries inside an atomic all-or-nothing transaction boundary.",
+        "type": "FUNCTIONAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt mandates atomic financial transaction"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-002",
+        "title": "Double-Entry Balance Invariance",
+        "description": "Ensure sum of all debits strictly equals sum of all credits for every transaction.",
+        "type": "INVARIANT",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt mandates debit/credit balance invariance"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-003",
+        "title": "Idempotency Key Verification",
+        "description": "Verify idempotency keys to prevent duplicate execution of ledger transactions.",
+        "type": "BEHAVIORAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt mandates idempotency check"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-004",
+        "title": "Disallow Negative Amount / Non-Zero Transfer Guard",
+        "description": "Validate that transaction debit and credit amounts are strictly positive non-zero numbers before execution.",
+        "type": "INVARIANT",
+        "epistemic_status": "DERIVED_JUSTIFIED",
+        "confidence": 0.95,
+        "provenance": "PRECONDITION_GUARD",
+        "introduced_in_pass": 2,
+        "why_chain": [
+          "Negative transfer amounts invert accounting polarity",
+          "Pre-condition input validation protects balance integrity",
+          "Mandatory ledger entry invariant"
+        ],
+        "pass_history": [
+          2
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-005",
+        "title": "Row-Level Account Locking and Concurrency Control",
+        "description": "Acquire serializable row-level locks on affected account balances to prevent race conditions.",
+        "type": "INVARIANT",
+        "epistemic_status": "DERIVED_JUSTIFIED",
+        "confidence": 0.95,
+        "provenance": "CONCURRENCY_CONTROL",
+        "introduced_in_pass": 2,
+        "why_chain": [
+          "Concurrent transactions risk double spending",
+          "Row-level locking guarantees serializability",
+          "Mandatory balance consistency invariant"
+        ],
+        "pass_history": [
+          2
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-006",
+        "title": "Append-Only Immutable Audit Log",
+        "description": "Record all ledger entries to an append-only journal with zero in-place updates.",
+        "type": "INVARIANT",
+        "epistemic_status": "DERIVED_JUSTIFIED",
+        "confidence": 0.95,
+        "provenance": "AUDIT_COMPLIANCE",
+        "introduced_in_pass": 2,
+        "why_chain": [
+          "Financial compliance prohibits destructive edits",
+          "Append-only logs preserve forensic lineage",
+          "Mandatory immutable accounting invariant"
+        ],
+        "pass_history": [
+          2
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-007",
+        "title": "Underlying Storage Technology Specification",
+        "description": "The specific persistence engine and database backend are unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify database technology"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-008",
+        "title": "API Transport Protocol Specification",
+        "description": "The specific network transport protocol (gRPC vs REST) is unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify API protocol"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      }
+    ],
+    "epistemic_status": "CONFIRMED",
+    "gate_result": "PASS"
+  },
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 2
+  },
+  "repository": {
+    "starting_tree_hash": "c1a59a72ee7f3ccfab54b5df786bef30d9b26e53560f72ff21859153f3d9ab3c",
+    "final_tree_hash": "b45306dd00c3aa5f8c3d7797e89a718391236f9df59293094ad71de643475594"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "User Task Instruction:\nImplement DoubleEntryLedgerV2 in target_module.py. Enforce sum(debits) == sum(credits) and raise LedgerError on mismatch.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Atomic Ledger Transaction Boundary: Execute financial entries inside an atomic all-or-nothing transaction boundary.\n- [] Double-Entry Balance Invariance: Ensure sum of all debits strictly equals sum of all credits for every transaction.\n- [] Idempotency Key Verification: Verify idempotency keys to prevent duplicate execution of ledger transactions.\n- [] Disallow Negative Amount / Non-Zero Transfer Guard: Validate that transaction debit and credit amounts are strictly positive non-zero numbers before execution.\n- [] Row-Level Account Locking and Concurrency Control: Acquire serializable row-level locks on affected account balances to prevent race conditions.\n- [] Append-Only Immutable Audit Log: Record all ledger entries to an append-only journal with zero in-place updates.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nExisting Code in target_module.py:\n```python\n\n```\n\nImplement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block.",
+      "response_text": "```python\nimport threading\nfrom decimal import Decimal\nfrom typing import Dict, List, Optional\n\nclass LedgerError(Exception):\n    \"\"\"Raised when ledger constraints or invariants are violated.\"\"\"\n    pass\n\nclass DoubleEntryLedgerV2:\n    \"\"\"\n    An S-Class governed autonomous coding agent implementation of DoubleEntryLedgerV2.\n    Enforces atomic transactions, double-entry balance invariance, idempotency,\n    strict positive amounts, row-level concurrency control, and append-only auditing.\n    \"\"\"\n    \n    def __init__(self):\n        # Concurrency control: Global lock for transactional boundary and per-account locks\n        self._global_lock = threading.Lock()\n        self._account_locks: Dict[str, threading.Lock] = {}\n        self._account_locks_guard = threading.Lock()\n        \n        # State storage\n        self._balances: Dict[str, Decimal] = {}\n        self._idempotency_store: set = set()\n        self._audit_log: List[dict] = []\n\n    def _get_account_lock(self, account_id: str) -> threading.Lock:\n        with self._account_locks_guard:\n            if account_id not in self._account_locks:\n                self._account_locks[account_id] = threading.Lock()\n            return self._account_locks[account_id]\n\n    def execute_transaction(\n        self, \n        idempotency_key: str, \n        entries: List[dict]\n    ) -> bool:\n        \"\"\"\n        Executes an atomic double-entry ledger transaction.\n        \n        entries format: \n        [\n            {\"account_id\": \"A\", \"debit\": Decimal(\"100.00\"), \"credit\": Decimal(\"0.00\")},\n            {\"account_id\": \"B\", \"debit\": Decimal(\"0.00\"), \"credit\": Decimal(\"100.00\")}\n        ]\n        \"\"\"\n        # 1. Idempotency Key Verification\n        with self._global_lock:\n            if idempotency_key in self._idempotency_store:\n                # Already executed, idempotent success return\n                return True\n\n        # Validate entries structure and amounts\n        if not entries:\n            raise LedgerError(\"Transaction must contain at least one entry.\")\n\n        total_debits = Decimal(\"0.00\")\n        total_credits = Decimal(\"0.00\")\n        \n        processed_entries = []\n\n        for entry in entries:\n            account_id = entry.get(\"account_id\")\n            if not account_id:\n                raise LedgerError(\"Each entry must specify an 'account_id'.\")\n            \n            debit = Decimal(str(entry.get(\"debit\", \"0.00\")))\n            credit = Decimal(str(entry.get(\"credit\", \"0.00\")))\n\n            # 2. Disallow Negative Amount / Non-Zero Transfer Guard\n            if debit < 0 or credit < 0:\n                raise LedgerError(\"Negative amounts are strictly prohibited.\")\n            if debit == 0 and credit == 0:\n                raise LedgerError(\"Transfer amounts must be strictly non-zero.\")\n            if debit > 0 and credit > 0:\n                raise LedgerError(\"An entry cannot contain both debit and credit values.\")\n\n            total_debits += debit\n            total_credits += credit\n            \n            processed_entries.append({\n                \"account_id\": account_id,\n                \"debit\": debit,\n                \"credit\": credit\n            })\n\n        # 3. Double-Entry Balance Invariance\n        if total_debits != total_credits:\n            raise LedgerError(\n                f\"Double-entry balance invariance violation: \"\n                f\"Total debits ({total_debits}) do not equal total credits ({total_credits}).\"\n            )\n\n        # 4. Row-Level Account Locking and Concurrency Control\n        # Lock all distinct accounts involved in deterministic order to prevent deadlocks\n        involved_accounts = sorted(list({e[\"account_id\"] for e in processed_entries}))\n        \n        # Acquire global transaction boundary lock, then acquire row-level locks\n        with self._global_lock:\n            account_locks = [self._get_account_lock(acc_id) for acc_id in involved_accounts]\n            \n            # Context manager style locking for multiple locks (acquire sequentially)\n            # To avoid nested context manager complexity with dynamic lists, we acquire manually:\n            for lock in account_locks:\n                lock.acquire()\n            \n            try:\n                # Re-verify idempotency inside the locked critical section\n                if idempotency_key in self._idempotency_store:\n                    return True\n\n                # Perform balance checks & updates (Atomic Transaction Boundary)\n                account_deltas: Dict[str, Decimal] = {}\n                for entry in processed_entries:\n                    acc_id = entry[\"account_id\"]\n                    net_change = entry[\"debit\"] - entry[\"credit\"]  # Debit increases asset/decreases liability, simplified to net balance tracking\n                    # In a standard accounting ledger, Debit increases normal debit accounts, Credit increases normal credit accounts.\n                    # Here we track raw net change or absolute balances depending on convention. \n                    # Let's maintain a general balance where Debit adds and Credit subtracts (or vice versa, \n                    # but ensure conservation: sum(debits) == sum(credits) handles the mathematical equilibrium).\n                    # Let's define Balance = total_debits_applied - total_credits_applied per account.\n                    account_deltas[acc_id] = account_deltas.get(acc_id, Decimal(\"0.00\")) + (entry[\"debit\"] - entry[\"credit\"])\n\n                # Apply updates to working balances\n                for acc_id, delta in account_deltas.items():\n                    current_balance = self._balances.get(acc_id, Decimal(\"0.00\"))\n                    # Optional: Prevent negative balances if accounts are restricted, \n                    # but standard double-entry allows credit/debit balances. We just update.\n                    self._balances[acc_id] = current_balance + delta\n\n                # 5. Append-Only Immutable Audit Log\n                audit_record = {\n                    \"idempotency_key\": idempotency_key,\n                    \"entries\": processed_entries,\n                    \"total_amount\": total_debits\n                }\n                self._audit_log.append(audit_record)\n                self._idempotency_store.add(idempotency_key)\n\n            finally:\n                # Release row-level locks in reverse order\n                for lock in reversed(account_locks):\n                    lock.release()\n\n        return True\n\n    def get_balance(self, account_id: str) -> Decimal:\n        \"\"\"Retrieves the current balance for a specific account.\"\"\"\n        with self._get_account_lock(account_id):\n            return self._balances.get(account_id, Decimal(\"0.00\"))\n\n    def get_audit_log(self) -> List[dict]:\n        \"\"\"Returns a copy of the append-only immutable audit log.\"\"\"\n        with self._global_lock:\n            return list(self._audit_log)\n```",
+      "latency_sec": 5.7312,
+      "prompt_tokens": 334,
+      "completion_tokens": 1628,
+      "cost_usd": 0.000513,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpps2mjg3z\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_ledger_l1 FAILED                              [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_ledger_l1 ________________________________\ntests\\test_oracle.py:5: in test_ledger_l1\n    assert l.balance([100.0], [100.0]) is True\n           ^^^^^^^^^\nE   AttributeError: 'DoubleEntryLedgerV2' object has no attribute 'balance'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_ledger_l1 - AttributeError: 'DoubleEntryLed...\n============================== 1 failed in 0.12s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.596,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "User Task Instruction:\nImplement DoubleEntryLedgerV2 in target_module.py. Enforce sum(debits) == sum(credits) and raise LedgerError on mismatch.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Atomic Ledger Transaction Boundary: Execute financial entries inside an atomic all-or-nothing transaction boundary.\n- [] Double-Entry Balance Invariance: Ensure sum of all debits strictly equals sum of all credits for every transaction.\n- [] Idempotency Key Verification: Verify idempotency keys to prevent duplicate execution of ledger transactions.\n- [] Disallow Negative Amount / Non-Zero Transfer Guard: Validate that transaction debit and credit amounts are strictly positive non-zero numbers before execution.\n- [] Row-Level Account Locking and Concurrency Control: Acquire serializable row-level locks on affected account balances to prevent race conditions.\n- [] Append-Only Immutable Audit Log: Record all ledger entries to an append-only journal with zero in-place updates.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nYour previous implementation produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpps2mjg3z\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_ledger_l1 FAILED                              [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_ledger_l1 ________________________________\ntests\\test_oracle.py:5: in test_ledger_l1\n    assert l.balance([100.0], [100.0]) is True\n           ^^^^^^^^^\nE   AttributeError: 'DoubleEntryLedgerV2' object has no attribute 'balance'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_ledger_l1 - AttributeError: 'DoubleEntryLed...\n============================== 1 failed in 0.12s ==============================\n\n\n\nPrevious Code in target_module.py:\n```python\nimport threading\nfrom decimal import Decimal\nfrom typing import Dict, List, Optional\n\nclass LedgerError(Exception):\n    \"\"\"Raised when ledger constraints or invariants are violated.\"\"\"\n    pass\n\nclass DoubleEntryLedgerV2:\n    \"\"\"\n    An S-Class governed autonomous coding agent implementation of DoubleEntryLedgerV2.\n    Enforces atomic transactions, double-entry balance invariance, idempotency,\n    strict positive amounts, row-level concurrency control, and append-only auditing.\n    \"\"\"\n    \n    def __init__(self):\n        # Concurrency control: Global lock for transactional boundary and per-account locks\n        self._global_lock = threading.Lock()\n        self._account_locks: Dict[str, threading.Lock] = {}\n        self._account_locks_guard = threading.Lock()\n        \n        # State storage\n        self._balances: Dict[str, Decimal] = {}\n        self._idempotency_store: set = set()\n        self._audit_log: List[dict] = []\n\n    def _get_account_lock(self, account_id: str) -> threading.Lock:\n        with self._account_locks_guard:\n            if account_id not in self._account_locks:\n                self._account_locks[account_id] = threading.Lock()\n            return self._account_locks[account_id]\n\n    def execute_transaction(\n        self, \n        idempotency_key: str, \n        entries: List[dict]\n    ) -> bool:\n        \"\"\"\n        Executes an atomic double-entry ledger transaction.\n        \n        entries format: \n        [\n            {\"account_id\": \"A\", \"debit\": Decimal(\"100.00\"), \"credit\": Decimal(\"0.00\")},\n            {\"account_id\": \"B\", \"debit\": Decimal(\"0.00\"), \"credit\": Decimal(\"100.00\")}\n        ]\n        \"\"\"\n        # 1. Idempotency Key Verification\n        with self._global_lock:\n            if idempotency_key in self._idempotency_store:\n                # Already executed, idempotent success return\n                return True\n\n        # Validate entries structure and amounts\n        if not entries:\n            raise LedgerError(\"Transaction must contain at least one entry.\")\n\n        total_debits = Decimal(\"0.00\")\n        total_credits = Decimal(\"0.00\")\n        \n        processed_entries = []\n\n        for entry in entries:\n            account_id = entry.get(\"account_id\")\n            if not account_id:\n                raise LedgerError(\"Each entry must specify an 'account_id'.\")\n            \n            debit = Decimal(str(entry.get(\"debit\", \"0.00\")))\n            credit = Decimal(str(entry.get(\"credit\", \"0.00\")))\n\n            # 2. Disallow Negative Amount / Non-Zero Transfer Guard\n            if debit < 0 or credit < 0:\n                raise LedgerError(\"Negative amounts are strictly prohibited.\")\n            if debit == 0 and credit == 0:\n                raise LedgerError(\"Transfer amounts must be strictly non-zero.\")\n            if debit > 0 and credit > 0:\n                raise LedgerError(\"An entry cannot contain both debit and credit values.\")\n\n            total_debits += debit\n            total_credits += credit\n            \n            processed_entries.append({\n                \"account_id\": account_id,\n                \"debit\": debit,\n                \"credit\": credit\n            })\n\n        # 3. Double-Entry Balance Invariance\n        if total_debits != total_credits:\n            raise LedgerError(\n                f\"Double-entry balance invariance violation: \"\n                f\"Total debits ({total_debits}) do not equal total credits ({total_credits}).\"\n            )\n\n        # 4. Row-Level Account Locking and Concurrency Control\n        # Lock all distinct accounts involved in deterministic order to prevent deadlocks\n        involved_accounts = sorted(list({e[\"account_id\"] for e in processed_entries}))\n        \n        # Acquire global transaction boundary lock, then acquire row-level locks\n        with self._global_lock:\n            account_locks = [self._get_account_lock(acc_id) for acc_id in involved_accounts]\n            \n            # Context manager style locking for multiple locks (acquire sequentially)\n            # To avoid nested context manager complexity with dynamic lists, we acquire manually:\n            for lock in account_locks:\n                lock.acquire()\n            \n            try:\n                # Re-verify idempotency inside the locked critical section\n                if idempotency_key in self._idempotency_store:\n                    return True\n\n                # Perform balance checks & updates (Atomic Transaction Boundary)\n                account_deltas: Dict[str, Decimal] = {}\n                for entry in processed_entries:\n                    acc_id = entry[\"account_id\"]\n                    net_change = entry[\"debit\"] - entry[\"credit\"]  # Debit increases asset/decreases liability, simplified to net balance tracking\n                    # In a standard accounting ledger, Debit increases normal debit accounts, Credit increases normal credit accounts.\n                    # Here we track raw net change or absolute balances depending on convention. \n                    # Let's maintain a general balance where Debit adds and Credit subtracts (or vice versa, \n                    # but ensure conservation: sum(debits) == sum(credits) handles the mathematical equilibrium).\n                    # Let's define Balance = total_debits_applied - total_credits_applied per account.\n                    account_deltas[acc_id] = account_deltas.get(acc_id, Decimal(\"0.00\")) + (entry[\"debit\"] - entry[\"credit\"])\n\n                # Apply updates to working balances\n                for acc_id, delta in account_deltas.items():\n                    current_balance = self._balances.get(acc_id, Decimal(\"0.00\"))\n                    # Optional: Prevent negative balances if accounts are restricted, \n                    # but standard double-entry allows credit/debit balances. We just update.\n                    self._balances[acc_id] = current_balance + delta\n\n                # 5. Append-Only Immutable Audit Log\n                audit_record = {\n                    \"idempotency_key\": idempotency_key,\n                    \"entries\": processed_entries,\n                    \"total_amount\": total_debits\n                }\n                self._audit_log.append(audit_record)\n                self._idempotency_store.add(idempotency_key)\n\n            finally:\n                # Release row-level locks in reverse order\n                for lock in reversed(account_locks):\n                    lock.release()\n\n        return True\n\n    def get_balance(self, account_id: str) -> Decimal:\n        \"\"\"Retrieves the current balance for a specific account.\"\"\"\n        with self._get_account_lock(account_id):\n            return self._balances.get(account_id, Decimal(\"0.00\"))\n\n    def get_audit_log(self) -> List[dict]:\n        \"\"\"Returns a copy of the append-only immutable audit log.\"\"\"\n        with self._global_lock:\n            return list(self._audit_log)\n\n```\n\nAnalyze the test failures against the S-Class governance requirements and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nimport threading\nfrom decimal import Decimal\nfrom typing import Dict, List, Optional, Union\n\nclass LedgerError(Exception):\n    \"\"\"Raised when ledger constraints or invariants are violated.\"\"\"\n    pass\n\nclass DoubleEntryLedgerV2:\n    \"\"\"\n    An S-Class governed autonomous coding agent implementation of DoubleEntryLedgerV2.\n    Enforces atomic transactions, double-entry balance invariance, idempotency,\n    strict positive amounts, row-level concurrency control, and append-only auditing.\n    \"\"\"\n    \n    def __init__(self):\n        # Concurrency control: Global lock for transactional boundary and per-account locks\n        self._global_lock = threading.Lock()\n        self._account_locks: Dict[str, threading.Lock] = {}\n        self._account_locks_guard = threading.Lock()\n        \n        # State storage\n        self._balances: Dict[str, Decimal] = {}\n        self._idempotency_store: set = set()\n        self._audit_log: List[dict] = []\n\n    def _get_account_lock(self, account_id: str) -> threading.Lock:\n        with self._account_locks_guard:\n            if account_id not in self._account_locks:\n                self._account_locks[account_id] = threading.Lock()\n            return self._account_locks[account_id]\n\n    def balance(self, debits: List[Union[int, float, Decimal]], credits: List[Union[int, float, Decimal]]) -> bool:\n        \"\"\"\n        Validates that the sum of debits strictly equals the sum of credits.\n        Raises LedgerError or returns False/True depending on requirements.\n        The test specifically calls `l.balance([100.0], [100.0])` and expects True (or raises on mismatch).\n        \"\"\"\n        d_sum = sum(Decimal(str(d)) for d in debits)\n        c_sum = sum(Decimal(str(c)) for c in credits)\n        if d_sum != c_sum:\n            raise LedgerError(f\"Balance invariance violated: sum(debits)={d_sum} != sum(credits)={c_sum}\")\n        return True\n\n    def execute_transaction(\n        self, \n        idempotency_key: str, \n        entries: List[dict]\n    ) -> bool:\n        \"\"\"\n        Executes an atomic double-entry ledger transaction.\n        \n        entries format: \n        [\n            {\"account_id\": \"A\", \"debit\": Decimal(\"100.00\"), \"credit\": Decimal(\"0.00\")},\n            {\"account_id\": \"B\", \"debit\": Decimal(\"0.00\"), \"credit\": Decimal(\"100.00\")}\n        ]\n        \"\"\"\n        # 1. Idempotency Key Verification\n        with self._global_lock:\n            if idempotency_key in self._idempotency_store:\n                return True\n\n        # Validate entries structure and amounts\n        if not entries:\n            raise LedgerError(\"Transaction must contain at least one entry.\")\n\n        total_debits = Decimal(\"0.00\")\n        total_credits = Decimal(\"0.00\")\n        \n        processed_entries = []\n\n        for entry in entries:\n            account_id = entry.get(\"account_id\")\n            if not account_id:\n                raise LedgerError(\"Each entry must specify an 'account_id'.\")\n            \n            debit = Decimal(str(entry.get(\"debit\", \"0.00\")))\n            credit = Decimal(str(entry.get(\"credit\", \"0.00\")))\n\n            # 2. Disallow Negative Amount / Non-Zero Transfer Guard\n            if debit < 0 or credit < 0:\n                raise LedgerError(\"Negative amounts are strictly prohibited.\")\n            if debit == 0 and credit == 0:\n                raise LedgerError(\"Transfer amounts must be strictly non-zero.\")\n            if debit > 0 and credit > 0:\n                raise LedgerError(\"An entry cannot contain both debit and credit values.\")\n\n            total_debits += debit\n            total_credits += credit\n            \n            processed_entries.append({\n                \"account_id\": account_id,\n                \"debit\": debit,\n                \"credit\": credit\n            })\n\n        # 3. Double-Entry Balance Invariance\n        if total_debits != total_credits:\n            raise LedgerError(\n                f\"Double-entry balance invariance violation: \"\n                f\"Total debits ({total_debits}) do not equal total credits ({total_credits}).\"\n            )\n\n        # 4. Row-Level Account Locking and Concurrency Control\n        involved_accounts = sorted(list({e[\"account_id\"] for e in processed_entries}))\n        \n        with self._global_lock:\n            account_locks = [self._get_account_lock(acc_id) for acc_id in involved_accounts]\n            \n            for lock in account_locks:\n                lock.acquire()\n            \n            try:\n                if idempotency_key in self._idempotency_store:\n                    return True\n\n                account_deltas: Dict[str, Decimal] = {}\n                for entry in processed_entries:\n                    acc_id = entry[\"account_id\"]\n                    account_deltas[acc_id] = account_deltas.get(acc_id, Decimal(\"0.00\")) + (entry[\"debit\"] - entry[\"credit\"])\n\n                for acc_id, delta in account_deltas.items():\n                    current_balance = self._balances.get(acc_id, Decimal(\"0.00\"))\n                    self._balances[acc_id] = current_balance + delta\n\n                # 5. Append-Only Immutable Audit Log\n                audit_record = {\n                    \"idempotency_key\": idempotency_key,\n                    \"entries\": processed_entries,\n                    \"total_amount\": total_debits\n                }\n                self._audit_log.append(audit_record)\n                self._idempotency_store.add(idempotency_key)\n\n            finally:\n                for lock in reversed(account_locks):\n                    lock.release()\n\n        return True\n\n    def get_balance(self, account_id: str) -> Decimal:\n        \"\"\"Retrieves the current balance for a specific account.\"\"\"\n        with self._get_account_lock(account_id):\n            return self._balances.get(account_id, Decimal(\"0.00\"))\n\n    def get_audit_log(self) -> List[dict]:\n        \"\"\"Returns a copy of the append-only immutable audit log.\"\"\"\n        with self._global_lock:\n            return list(self._audit_log)\n```",
+      "latency_sec": 4.5707,
+      "prompt_tokens": 2267,
+      "completion_tokens": 1536,
+      "cost_usd": 0.000631,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpps2mjg3z\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_ledger_l1 PASSED                              [100%]\n\n============================== 1 passed in 0.08s ==============================\n",
+        "stderr": "",
+        "duration_sec": 2.73,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "import threading\nfrom decimal import Decimal\nfrom typing import Dict, List, Optional, Union\n\nclass LedgerError(Exception):\n    \"\"\"Raised when ledger constraints or invariants are violated.\"\"\"\n    pass\n\nclass DoubleEntryLedgerV2:\n    \"\"\"\n    An S-Class governed autonomous coding agent implementation of DoubleEntryLedgerV2.\n    Enforces atomic transactions, double-entry balance invariance, idempotency,\n    strict positive amounts, row-level concurrency control, and append-only auditing.\n    \"\"\"\n    \n    def __init__(self):\n        # Concurrency control: Global lock for transactional boundary and per-account locks\n        self._global_lock = threading.Lock()\n        self._account_locks: Dict[str, threading.Lock] = {}\n        self._account_locks_guard = threading.Lock()\n        \n        # State storage\n        self._balances: Dict[str, Decimal] = {}\n        self._idempotency_store: set = set()\n        self._audit_log: List[dict] = []\n\n    def _get_account_lock(self, account_id: str) -> threading.Lock:\n        with self._account_locks_guard:\n            if account_id not in self._account_locks:\n                self._account_locks[account_id] = threading.Lock()\n            return self._account_locks[account_id]\n\n    def balance(self, debits: List[Union[int, float, Decimal]], credits: List[Union[int, float, Decimal]]) -> bool:\n        \"\"\"\n        Validates that the sum of debits strictly equals the sum of credits.\n        Raises LedgerError or returns False/True depending on requirements.\n        The test specifically calls `l.balance([100.0], [100.0])` and expects True (or raises on mismatch).\n        \"\"\"\n        d_sum = sum(Decimal(str(d)) for d in debits)\n        c_sum = sum(Decimal(str(c)) for c in credits)\n        if d_sum != c_sum:\n            raise LedgerError(f\"Balance invariance violated: sum(debits)={d_sum} != sum(credits)={c_sum}\")\n        return True\n\n    def execute_transaction(\n        self, \n        idempotency_key: str, \n        entries: List[dict]\n    ) -> bool:\n        \"\"\"\n        Executes an atomic double-entry ledger transaction.\n        \n        entries format: \n        [\n            {\"account_id\": \"A\", \"debit\": Decimal(\"100.00\"), \"credit\": Decimal(\"0.00\")},\n            {\"account_id\": \"B\", \"debit\": Decimal(\"0.00\"), \"credit\": Decimal(\"100.00\")}\n        ]\n        \"\"\"\n        # 1. Idempotency Key Verification\n        with self._global_lock:\n            if idempotency_key in self._idempotency_store:\n                return True\n\n        # Validate entries structure and amounts\n        if not entries:\n            raise LedgerError(\"Transaction must contain at least one entry.\")\n\n        total_debits = Decimal(\"0.00\")\n        total_credits = Decimal(\"0.00\")\n        \n        processed_entries = []\n\n        for entry in entries:\n            account_id = entry.get(\"account_id\")\n            if not account_id:\n                raise LedgerError(\"Each entry must specify an 'account_id'.\")\n            \n            debit = Decimal(str(entry.get(\"debit\", \"0.00\")))\n            credit = Decimal(str(entry.get(\"credit\", \"0.00\")))\n\n            # 2. Disallow Negative Amount / Non-Zero Transfer Guard\n            if debit < 0 or credit < 0:\n                raise LedgerError(\"Negative amounts are strictly prohibited.\")\n            if debit == 0 and credit == 0:\n                raise LedgerError(\"Transfer amounts must be strictly non-zero.\")\n            if debit > 0 and credit > 0:\n                raise LedgerError(\"An entry cannot contain both debit and credit values.\")\n\n            total_debits += debit\n            total_credits += credit\n            \n            processed_entries.append({\n                \"account_id\": account_id,\n                \"debit\": debit,\n                \"credit\": credit\n            })\n\n        # 3. Double-Entry Balance Invariance\n        if total_debits != total_credits:\n            raise LedgerError(\n                f\"Double-entry balance invariance violation: \"\n                f\"Total debits ({total_debits}) do not equal total credits ({total_credits}).\"\n            )\n\n        # 4. Row-Level Account Locking and Concurrency Control\n        involved_accounts = sorted(list({e[\"account_id\"] for e in processed_entries}))\n        \n        with self._global_lock:\n            account_locks = [self._get_account_lock(acc_id) for acc_id in involved_accounts]\n            \n            for lock in account_locks:\n                lock.acquire()\n            \n            try:\n                if idempotency_key in self._idempotency_store:\n                    return True\n\n                account_deltas: Dict[str, Decimal] = {}\n                for entry in processed_entries:\n                    acc_id = entry[\"account_id\"]\n                    account_deltas[acc_id] = account_deltas.get(acc_id, Decimal(\"0.00\")) + (entry[\"debit\"] - entry[\"credit\"])\n\n                for acc_id, delta in account_deltas.items():\n                    current_balance = self._balances.get(acc_id, Decimal(\"0.00\"))\n                    self._balances[acc_id] = current_balance + delta\n\n                # 5. Append-Only Immutable Audit Log\n                audit_record = {\n                    \"idempotency_key\": idempotency_key,\n                    \"entries\": processed_entries,\n                    \"total_amount\": total_debits\n                }\n                self._audit_log.append(audit_record)\n                self._idempotency_store.add(idempotency_key)\n\n            finally:\n                for lock in reversed(account_locks):\n                    lock.release()\n\n        return True\n\n    def get_balance(self, account_id: str) -> Decimal:\n        \"\"\"Retrieves the current balance for a specific account.\"\"\"\n        with self._get_account_lock(account_id):\n            return self._balances.get(account_id, Decimal(\"0.00\"))\n\n    def get_audit_log(self) -> List[dict]:\n        \"\"\"Returns a copy of the append-only immutable audit log.\"\"\"\n        with self._global_lock:\n            return list(self._audit_log)\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpps2mjg3z\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_ledger_l1 PASSED                              [100%]\n\n============================== 1 passed in 0.08s ==============================\n",
+    "stderr": "",
+    "duration_sec": 2.73,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  },
+  "layer2_behavioral_adjudication": {
+    "layer2_passed": true,
+    "false_confidence_detected": false,
+    "l2_stdout_snippet": "============= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp5i8vus44\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_adversarial_invariants.py::test_ledger_l2 PASSED              [100%]\n\n============================== 1 passed in 0.05s ==============================\n\n",
+    "audit_trace_completeness_pct": 100.0
+  }
+}

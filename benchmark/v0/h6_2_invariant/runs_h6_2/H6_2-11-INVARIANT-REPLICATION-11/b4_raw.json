@@ -1,0 +1,140 @@
+{
+  "task_id": "H6_2-11-INVARIANT-REPLICATION-11",
+  "baseline": "B4",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Distributed Consistency Module 11",
+  "raw_prompt": "Implement ModuleV2_11 in target_module.py under Distributed Consistency. Enforce check_invariant(p) returning True for p.get('valid')==True, raising InvariantErr on invalid.",
+  "sclass_governance": {
+    "semantic_requirements": [
+      {
+        "id": "REQ-SHADOW-001",
+        "title": "Core Service Functionality",
+        "description": "Implement core processing logic for: Implement ModuleV2_11 in target_module.py under Distributed Consistency. Enforce check_invariant(p) returning True for p.get('valid')==True, raising InvariantErr on invalid.",
+        "type": "FUNCTIONAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt execution mandate"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-002",
+        "title": "Underlying Storage Technology Specification",
+        "description": "The specific persistence engine and database backend are unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify database technology"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-003",
+        "title": "API Transport Protocol Specification",
+        "description": "The specific network transport protocol (gRPC vs REST) is unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify API protocol"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      }
+    ],
+    "epistemic_status": "CONFIRMED",
+    "gate_result": "PASS"
+  },
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 1
+  },
+  "repository": {
+    "starting_tree_hash": "b25f3b654e4aab6cbacd9636cf145911511d212e4fd42f633749b4bfcd3e9907",
+    "final_tree_hash": "e2b25b68d7018c1b6fc1fb5c35c3d2cab1958f4116f8e28f484b98283f98ec8c"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "User Task Instruction:\nImplement ModuleV2_11 in target_module.py under Distributed Consistency. Enforce check_invariant(p) returning True for p.get('valid')==True, raising InvariantErr on invalid.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement ModuleV2_11 in target_module.py under Distributed Consistency. Enforce check_invariant(p) returning True for p.get('valid')==True, raising InvariantErr on invalid.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nExisting Code in target_module.py:\n```python\n\n```\n\nImplement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block.",
+      "response_text": "```python\nclass InvariantErr(Exception):\n    \"\"\"Raised when an invariant check fails under Distributed Consistency.\"\"\"\n    pass\n\n\nclass ModuleV2_11:\n    \"\"\"\n    ModuleV2_11 implementation under Distributed Consistency.\n    Enforces check_invariant(p) returning True for p.get('valid') == True,\n    raising InvariantErr on invalid.\n    \"\"\"\n\n    @staticmethod\n    def check_invariant(p: dict) -> bool:\n        \"\"\"\n        Validates that the given payload dictionary 'p' satisfies the invariant.\n        Returns True if p.get('valid') is True.\n        Raises InvariantErr otherwise.\n        \"\"\"\n        if not isinstance(p, dict) or p.get('valid') is not True:\n            raise InvariantErr(\"Invariant validation failed: 'valid' property must be True.\")\n        return True\n```",
+      "latency_sec": 1.6414,
+      "prompt_tokens": 247,
+      "completion_tokens": 193,
+      "cost_usd": 7.6e-05,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpdt5u7m5r\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_m_l1 PASSED                                   [100%]\n\n============================== 1 passed in 0.05s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.794,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "class InvariantErr(Exception):\n    \"\"\"Raised when an invariant check fails under Distributed Consistency.\"\"\"\n    pass\n\n\nclass ModuleV2_11:\n    \"\"\"\n    ModuleV2_11 implementation under Distributed Consistency.\n    Enforces check_invariant(p) returning True for p.get('valid') == True,\n    raising InvariantErr on invalid.\n    \"\"\"\n\n    @staticmethod\n    def check_invariant(p: dict) -> bool:\n        \"\"\"\n        Validates that the given payload dictionary 'p' satisfies the invariant.\n        Returns True if p.get('valid') is True.\n        Raises InvariantErr otherwise.\n        \"\"\"\n        if not isinstance(p, dict) or p.get('valid') is not True:\n            raise InvariantErr(\"Invariant validation failed: 'valid' property must be True.\")\n        return True\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpdt5u7m5r\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_m_l1 PASSED                                   [100%]\n\n============================== 1 passed in 0.05s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.794,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  },
+  "layer2_behavioral_adjudication": {
+    "layer2_passed": true,
+    "false_confidence_detected": false,
+    "l2_stdout_snippet": "============= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpqhnqs2a1\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_adversarial_invariants.py::test_m_l2 PASSED                   [100%]\n\n============================== 1 passed in 0.04s ==============================\n\n",
+    "audit_trace_completeness_pct": 100.0
+  }
+}

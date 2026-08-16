@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_2-11-INVARIANT-REPLICATION-11",
+  "category": "Distributed Consistency",
+  "domain": "Distributed Consistency Module 11",
+  "raw_prompt": "Implement ModuleV2_11 in target_module.py under Distributed Consistency. Enforce check_invariant(p) returning True for p.get('valid')==True, raising InvariantErr on invalid."
+}

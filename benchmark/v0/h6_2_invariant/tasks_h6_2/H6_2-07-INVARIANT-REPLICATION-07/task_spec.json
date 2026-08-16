@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_2-07-INVARIANT-REPLICATION-07",
+  "category": "Authorization",
+  "domain": "Authorization Module 07",
+  "raw_prompt": "Implement ModuleV2_07 in target_module.py under Authorization. Enforce check_invariant(p) returning True for p.get('valid')==True, raising InvariantErr on invalid."
+}

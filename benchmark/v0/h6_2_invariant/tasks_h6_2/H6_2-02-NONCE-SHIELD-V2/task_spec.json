@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_2-02-NONCE-SHIELD-V2",
+  "category": "Cryptography",
+  "domain": "AES-GCM Nonce Enforcement",
+  "raw_prompt": "Implement NonceShieldV2 in target_module.py. Track used 96-bit nonces and raise NonceReuseError on duplicate registration."
+}

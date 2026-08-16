@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_2-09-INVARIANT-REPLICATION-09",
+  "category": "Security",
+  "domain": "Security Module 09",
+  "raw_prompt": "Implement ModuleV2_09 in target_module.py under Security. Enforce check_invariant(p) returning True for p.get('valid')==True, raising InvariantErr on invalid."
+}

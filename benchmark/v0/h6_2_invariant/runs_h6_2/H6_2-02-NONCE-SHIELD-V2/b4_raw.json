@@ -1,0 +1,159 @@
+{
+  "task_id": "H6_2-02-NONCE-SHIELD-V2",
+  "baseline": "B4",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "AES-GCM Nonce Enforcement",
+  "raw_prompt": "Implement NonceShieldV2 in target_module.py. Track used 96-bit nonces and raise NonceReuseError on duplicate registration.",
+  "sclass_governance": {
+    "semantic_requirements": [
+      {
+        "id": "REQ-SHADOW-001",
+        "title": "Core Service Functionality",
+        "description": "Implement core processing logic for: Implement NonceShieldV2 in target_module.py. Track used 96-bit nonces and raise NonceReuseError on duplicate registration.",
+        "type": "FUNCTIONAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt execution mandate"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-002",
+        "title": "Underlying Storage Technology Specification",
+        "description": "The specific persistence engine and database backend are unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify database technology"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-003",
+        "title": "API Transport Protocol Specification",
+        "description": "The specific network transport protocol (gRPC vs REST) is unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify API protocol"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      }
+    ],
+    "epistemic_status": "CONFIRMED",
+    "gate_result": "PASS"
+  },
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 2
+  },
+  "repository": {
+    "starting_tree_hash": "cbe17c95b7486701be077c5602106e97bd07dc9aff857c8784eb7f9d52234faa",
+    "final_tree_hash": "e6c4827eb6f71935abfd624e8edc8f1f8c158bffa3a8c0951528ea1c8efd8143"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "User Task Instruction:\nImplement NonceShieldV2 in target_module.py. Track used 96-bit nonces and raise NonceReuseError on duplicate registration.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement NonceShieldV2 in target_module.py. Track used 96-bit nonces and raise NonceReuseError on duplicate registration.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nExisting Code in target_module.py:\n```python\n\n```\n\nImplement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block.",
+      "response_text": "```python\nclass NonceReuseError(Exception):\n    \"\"\"Raised when a 96-bit nonce has already been registered and is reused.\"\"\"\n    pass\n\n\nclass NonceShieldV2:\n    \"\"\"Tracks used 96-bit nonces to prevent replay attacks and nonce reuse.\"\"\"\n\n    def __init__(self):\n        # Using a set to store seen 96-bit nonces (typically represented as int, bytes, or hex str)\n        self._used_nonces = set()\n\n    def register(self, nonce) -> None:\n        \"\"\"Register a 96-bit nonce.\n\n        Raises:\n            NonceReuseError: If the nonce has already been registered.\n            ValueError: If the nonce is invalid or not 96 bits.\n        \"\"\"\n        # Validate nonce size if provided as bytes (96 bits = 12 bytes) or int (< 2^96)\n        if isinstance(nonce, bytes):\n            if len(nonce) != 12:\n                raise ValueError(\"Nonce must be exactly 96 bits (12 bytes).\")\n        elif isinstance(nonce, int):\n            if not (0 <= nonce < (1 << 96)):\n                raise ValueError(\"Nonce integer must fit within 96 bits.\")\n        elif isinstance(nonce, str):\n            # If hex string is passed, check length (12 bytes = 24 hex characters)\n            try:\n                decoded = bytes.fromhex(nonce)\n                if len(decoded) != 12:\n                    raise ValueError(\"Nonce hex string must represent 12 bytes (96 bits).\")\n            except ValueError as e:\n                if \"Nonce hex string\" in str(e):\n                    raise\n                raise ValueError(\"Invalid hex string for nonce.\") from e\n        else:\n            raise TypeError(\"Nonce must be of type bytes, int, or str (hex).\")\n\n        # Normalize representation for storage if desired, or keep as-is.\n        # Storing the normalized form or original form consistently.\n        if isinstance(nonce, str):\n            canonical_nonce = bytes.fromhex(nonce)\n        elif isinstance(nonce, int):\n            canonical_nonce = nonce.to_bytes(12, byteorder='big')\n        else:\n            canonical_nonce = nonce\n\n        if canonical_nonce in self._used_nonces:\n            raise NonceReuseError(f\"Nonce reuse detected: {nonce}\")\n\n        self._used_nonces.add(canonical_nonce)\n\n    def is_used(self, nonce) -> bool:\n        \"\"\"Check if a 96-bit nonce has already been registered without raising an error.\"\"\"\n        try:\n            if isinstance(nonce, str):\n                canonical_nonce = bytes.fromhex(nonce)\n            elif isinstance(nonce, int):\n                canonical_nonce = nonce.to_bytes(12, byteorder='big')\n            else:\n                canonical_nonce = nonce\n        except Exception:\n            return False\n\n        return canonical_nonce in self._used_nonces\n```",
+      "latency_sec": 2.7848,
+      "prompt_tokens": 223,
+      "completion_tokens": 679,
+      "cost_usd": 0.00022,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp0rlyiivo\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_nonce_l1 FAILED                               [100%]\n\n================================== FAILURES ===================================\n________________________________ test_nonce_l1 ________________________________\ntests\\test_oracle.py:5: in test_nonce_l1\n    s.register_nonce(b'123456789012')\n    ^^^^^^^^^^^^^^^^\nE   AttributeError: 'NonceShieldV2' object has no attribute 'register_nonce'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_nonce_l1 - AttributeError: 'NonceShieldV2' ...\n============================== 1 failed in 0.09s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.607,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "User Task Instruction:\nImplement NonceShieldV2 in target_module.py. Track used 96-bit nonces and raise NonceReuseError on duplicate registration.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement NonceShieldV2 in target_module.py. Track used 96-bit nonces and raise NonceReuseError on duplicate registration.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nYour previous implementation produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp0rlyiivo\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_nonce_l1 FAILED                               [100%]\n\n================================== FAILURES ===================================\n________________________________ test_nonce_l1 ________________________________\ntests\\test_oracle.py:5: in test_nonce_l1\n    s.register_nonce(b'123456789012')\n    ^^^^^^^^^^^^^^^^\nE   AttributeError: 'NonceShieldV2' object has no attribute 'register_nonce'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_nonce_l1 - AttributeError: 'NonceShieldV2' ...\n============================== 1 failed in 0.09s ==============================\n\n\n\nPrevious Code in target_module.py:\n```python\nclass NonceReuseError(Exception):\n    \"\"\"Raised when a 96-bit nonce has already been registered and is reused.\"\"\"\n    pass\n\n\nclass NonceShieldV2:\n    \"\"\"Tracks used 96-bit nonces to prevent replay attacks and nonce reuse.\"\"\"\n\n    def __init__(self):\n        # Using a set to store seen 96-bit nonces (typically represented as int, bytes, or hex str)\n        self._used_nonces = set()\n\n    def register(self, nonce) -> None:\n        \"\"\"Register a 96-bit nonce.\n\n        Raises:\n            NonceReuseError: If the nonce has already been registered.\n            ValueError: If the nonce is invalid or not 96 bits.\n        \"\"\"\n        # Validate nonce size if provided as bytes (96 bits = 12 bytes) or int (< 2^96)\n        if isinstance(nonce, bytes):\n            if len(nonce) != 12:\n                raise ValueError(\"Nonce must be exactly 96 bits (12 bytes).\")\n        elif isinstance(nonce, int):\n            if not (0 <= nonce < (1 << 96)):\n                raise ValueError(\"Nonce integer must fit within 96 bits.\")\n        elif isinstance(nonce, str):\n            # If hex string is passed, check length (12 bytes = 24 hex characters)\n            try:\n                decoded = bytes.fromhex(nonce)\n                if len(decoded) != 12:\n                    raise ValueError(\"Nonce hex string must represent 12 bytes (96 bits).\")\n            except ValueError as e:\n                if \"Nonce hex string\" in str(e):\n                    raise\n                raise ValueError(\"Invalid hex string for nonce.\") from e\n        else:\n            raise TypeError(\"Nonce must be of type bytes, int, or str (hex).\")\n\n        # Normalize representation for storage if desired, or keep as-is.\n        # Storing the normalized form or original form consistently.\n        if isinstance(nonce, str):\n            canonical_nonce = bytes.fromhex(nonce)\n        elif isinstance(nonce, int):\n            canonical_nonce = nonce.to_bytes(12, byteorder='big')\n        else:\n            canonical_nonce = nonce\n\n        if canonical_nonce in self._used_nonces:\n            raise NonceReuseError(f\"Nonce reuse detected: {nonce}\")\n\n        self._used_nonces.add(canonical_nonce)\n\n    def is_used(self, nonce) -> bool:\n        \"\"\"Check if a 96-bit nonce has already been registered without raising an error.\"\"\"\n        try:\n            if isinstance(nonce, str):\n                canonical_nonce = bytes.fromhex(nonce)\n            elif isinstance(nonce, int):\n                canonical_nonce = nonce.to_bytes(12, byteorder='big')\n            else:\n                canonical_nonce = nonce\n        except Exception:\n            return False\n\n        return canonical_nonce in self._used_nonces\n\n```\n\nAnalyze the test failures against the S-Class governance requirements and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nclass NonceReuseError(Exception):\n    \"\"\"Raised when a 96-bit nonce has already been registered and is reused.\"\"\"\n    pass\n\n\nclass NonceShieldV2:\n    \"\"\"Tracks used 96-bit nonces to prevent replay attacks and nonce reuse.\"\"\"\n\n    def __init__(self):\n        # Using a set to store seen 96-bit nonces (typically represented as int, bytes, or hex str)\n        self._used_nonces = set()\n\n    def register_nonce(self, nonce) -> None:\n        \"\"\"Alias for register to support tests calling register_nonce directly.\"\"\"\n        return self.register(nonce)\n\n    def register(self, nonce) -> None:\n        \"\"\"Register a 96-bit nonce.\n\n        Raises:\n            NonceReuseError: If the nonce has already been registered.\n            ValueError: If the nonce is invalid or not 96 bits.\n        \"\"\"\n        # Validate nonce size if provided as bytes (96 bits = 12 bytes) or int (< 2^96)\n        if isinstance(nonce, bytes):\n            if len(nonce) != 12:\n                raise ValueError(\"Nonce must be exactly 96 bits (12 bytes).\")\n        elif isinstance(nonce, int):\n            if not (0 <= nonce < (1 << 96)):\n                raise ValueError(\"Nonce integer must fit within 96 bits.\")\n        elif isinstance(nonce, str):\n            # If hex string is passed, check length (12 bytes = 24 hex characters)\n            try:\n                decoded = bytes.fromhex(nonce)\n                if len(decoded) != 12:\n                    raise ValueError(\"Nonce hex string must represent 12 bytes (96 bits).\")\n            except ValueError as e:\n                if \"Nonce hex string\" in str(e):\n                    raise\n                raise ValueError(\"Invalid hex string for nonce.\") from e\n        else:\n            raise TypeError(\"Nonce must be of type bytes, int, or str (hex).\")\n\n        # Normalize representation for storage if desired, or keep as-is.\n        if isinstance(nonce, str):\n            canonical_nonce = bytes.fromhex(nonce)\n        elif isinstance(nonce, int):\n            canonical_nonce = nonce.to_bytes(12, byteorder='big')\n        else:\n            canonical_nonce = nonce\n\n        if canonical_nonce in self._used_nonces:\n            raise NonceReuseError(f\"Nonce reuse detected: {nonce}\")\n\n        self._used_nonces.add(canonical_nonce)\n\n    def is_used(self, nonce) -> bool:\n        \"\"\"Check if a 96-bit nonce has already been registered without raising an error.\"\"\"\n        try:\n            if isinstance(nonce, str):\n                canonical_nonce = bytes.fromhex(nonce)\n            elif isinstance(nonce, int):\n                canonical_nonce = nonce.to_bytes(12, byteorder='big')\n            else:\n                canonical_nonce = nonce\n        except Exception:\n            return False\n\n        return canonical_nonce in self._used_nonces\n```",
+      "latency_sec": 2.6814,
+      "prompt_tokens": 1210,
+      "completion_tokens": 704,
+      "cost_usd": 0.000302,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp0rlyiivo\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_nonce_l1 PASSED                               [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.502,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "class NonceReuseError(Exception):\n    \"\"\"Raised when a 96-bit nonce has already been registered and is reused.\"\"\"\n    pass\n\n\nclass NonceShieldV2:\n    \"\"\"Tracks used 96-bit nonces to prevent replay attacks and nonce reuse.\"\"\"\n\n    def __init__(self):\n        # Using a set to store seen 96-bit nonces (typically represented as int, bytes, or hex str)\n        self._used_nonces = set()\n\n    def register_nonce(self, nonce) -> None:\n        \"\"\"Alias for register to support tests calling register_nonce directly.\"\"\"\n        return self.register(nonce)\n\n    def register(self, nonce) -> None:\n        \"\"\"Register a 96-bit nonce.\n\n        Raises:\n            NonceReuseError: If the nonce has already been registered.\n            ValueError: If the nonce is invalid or not 96 bits.\n        \"\"\"\n        # Validate nonce size if provided as bytes (96 bits = 12 bytes) or int (< 2^96)\n        if isinstance(nonce, bytes):\n            if len(nonce) != 12:\n                raise ValueError(\"Nonce must be exactly 96 bits (12 bytes).\")\n        elif isinstance(nonce, int):\n            if not (0 <= nonce < (1 << 96)):\n                raise ValueError(\"Nonce integer must fit within 96 bits.\")\n        elif isinstance(nonce, str):\n            # If hex string is passed, check length (12 bytes = 24 hex characters)\n            try:\n                decoded = bytes.fromhex(nonce)\n                if len(decoded) != 12:\n                    raise ValueError(\"Nonce hex string must represent 12 bytes (96 bits).\")\n            except ValueError as e:\n                if \"Nonce hex string\" in str(e):\n                    raise\n                raise ValueError(\"Invalid hex string for nonce.\") from e\n        else:\n            raise TypeError(\"Nonce must be of type bytes, int, or str (hex).\")\n\n        # Normalize representation for storage if desired, or keep as-is.\n        if isinstance(nonce, str):\n            canonical_nonce = bytes.fromhex(nonce)\n        elif isinstance(nonce, int):\n            canonical_nonce = nonce.to_bytes(12, byteorder='big')\n        else:\n            canonical_nonce = nonce\n\n        if canonical_nonce in self._used_nonces:\n            raise NonceReuseError(f\"Nonce reuse detected: {nonce}\")\n\n        self._used_nonces.add(canonical_nonce)\n\n    def is_used(self, nonce) -> bool:\n        \"\"\"Check if a 96-bit nonce has already been registered without raising an error.\"\"\"\n        try:\n            if isinstance(nonce, str):\n                canonical_nonce = bytes.fromhex(nonce)\n            elif isinstance(nonce, int):\n                canonical_nonce = nonce.to_bytes(12, byteorder='big')\n            else:\n                canonical_nonce = nonce\n        except Exception:\n            return False\n\n        return canonical_nonce in self._used_nonces\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp0rlyiivo\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_nonce_l1 PASSED                               [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.502,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  },
+  "layer2_behavioral_adjudication": {
+    "layer2_passed": true,
+    "false_confidence_detected": false,
+    "l2_stdout_snippet": "============= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpdafxt7vh\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_adversarial_invariants.py::test_nonce_l2 PASSED               [100%]\n\n============================== 1 passed in 0.03s ==============================\n\n",
+    "audit_trace_completeness_pct": 100.0
+  }
+}

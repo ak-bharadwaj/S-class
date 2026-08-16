@@ -1,0 +1,181 @@
+{
+  "task_id": "H6_2-01-SPIFFE-ROUTER-V2",
+  "baseline": "B4",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Zero-Trust Routing",
+  "raw_prompt": "Implement SPIFFEMutualTLSRouterV2 in target_module.py. Validate validate_spiffe_id(spiffe_id) strictly against self.domain, blocking suffix/prefix spoofing.",
+  "sclass_governance": {
+    "semantic_requirements": [
+      {
+        "id": "REQ-SHADOW-001",
+        "title": "Core Service Functionality",
+        "description": "Implement core processing logic for: Implement SPIFFEMutualTLSRouterV2 in target_module.py. Validate validate_spiffe_id(spiffe_id) strictly against self.domain, blocking suffix/prefix spoofing.",
+        "type": "FUNCTIONAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt execution mandate"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-002",
+        "title": "Underlying Storage Technology Specification",
+        "description": "The specific persistence engine and database backend are unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify database technology"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-003",
+        "title": "API Transport Protocol Specification",
+        "description": "The specific network transport protocol (gRPC vs REST) is unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify API protocol"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      }
+    ],
+    "epistemic_status": "CONFIRMED",
+    "gate_result": "PASS"
+  },
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 3
+  },
+  "repository": {
+    "starting_tree_hash": "473daa7d2c66931c6acfad6fa32e6df594f7574248e0ef741a57a7fdda0f28f6",
+    "final_tree_hash": "8703db05ab24e3efa072cb71b7f9914026b5ae629ab2d0a15381e889241446f0"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "User Task Instruction:\nImplement SPIFFEMutualTLSRouterV2 in target_module.py. Validate validate_spiffe_id(spiffe_id) strictly against self.domain, blocking suffix/prefix spoofing.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement SPIFFEMutualTLSRouterV2 in target_module.py. Validate validate_spiffe_id(spiffe_id) strictly against self.domain, blocking suffix/prefix spoofing.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nExisting Code in target_module.py:\n```python\n\n```\n\nImplement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block.",
+      "response_text": "```python\nimport re\nfrom typing import Optional\n\n\nclass SPIFFEMutualTLSRouterV2:\n    \"\"\"\n    SPIFFE Mutual TLS Router V2 that handles SPIFFE ID validation\n    against a configured trust domain, explicitly preventing prefix and\n    suffix spoofing attacks.\n    \"\"\"\n\n    def __init__(self, domain: str):\n        if not domain:\n            raise ValueError(\"Trust domain cannot be empty.\")\n        self.domain = domain\n\n    def validate_spiffe_id(self, spiffe_id: Optional[str]) -> bool:\n        \"\"\"\n        Strictly validates a SPIFFE ID against the configured trust domain.\n\n        A valid SPIFFE ID must conform to the format:\n            spiffe://<trust_domain>/<path>\n\n        To prevent suffix/prefix spoofing:\n        1. Must start with the exact scheme and trust domain prefix: 'spiffe://<domain>/'\n        2. The trust domain boundary must be strictly enforced using path separators.\n           For example, if domain is 'example.com', 'spiffe://example.com.evil.com/service'\n           must be rejected.\n        \"\"\"\n        if not spiffe_id or not isinstance(spiffe_id, str):\n            return False\n\n        # Construct the exact required prefix boundary\n        # A SPIFFE ID structure is: spiffe://<trust_domain>/<path>\n        expected_prefix = f\"spiffe://{self.domain}/\"\n\n        # Check if the SPIFFE ID starts with the exact prefix\n        if not spiffe_id.startswith(expected_prefix):\n            return False\n\n        # Additional structural validation to ensure no trailing/leading anomalies\n        # Regular expression to match valid SPIFFE ID format for the given domain:\n        # ^spiffe://<domain>/<path-segment>[/<path-segment>]*$\n        # Escaping the domain for regex safety\n        escaped_domain = re.escape(self.domain)\n        pattern = rf\"^spiffe://{escaped_domain}/.+$\"\n\n        return bool(re.match(pattern, spiffe_id))\n```",
+      "latency_sec": 2.5976,
+      "prompt_tokens": 247,
+      "completion_tokens": 468,
+      "cost_usd": 0.000159,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpb9r5cqkj\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_spiffe_l1 FAILED                              [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_spiffe_l1 ________________________________\ntests\\test_oracle.py:4: in test_spiffe_l1\n    assert r.validate_spiffe_id('spiffe://prod.net/svc') is True\nE   AssertionError: assert False is True\nE    +  where False = validate_spiffe_id('spiffe://prod.net/svc')\nE    +    where validate_spiffe_id = <target_module.SPIFFEMutualTLSRouterV2 object at 0x0000014E23C39160>.validate_spiffe_id\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_spiffe_l1 - AssertionError: assert False is...\n============================== 1 failed in 0.12s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.582,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "User Task Instruction:\nImplement SPIFFEMutualTLSRouterV2 in target_module.py. Validate validate_spiffe_id(spiffe_id) strictly against self.domain, blocking suffix/prefix spoofing.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement SPIFFEMutualTLSRouterV2 in target_module.py. Validate validate_spiffe_id(spiffe_id) strictly against self.domain, blocking suffix/prefix spoofing.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nYour previous implementation produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpb9r5cqkj\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_spiffe_l1 FAILED                              [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_spiffe_l1 ________________________________\ntests\\test_oracle.py:4: in test_spiffe_l1\n    assert r.validate_spiffe_id('spiffe://prod.net/svc') is True\nE   AssertionError: assert False is True\nE    +  where False = validate_spiffe_id('spiffe://prod.net/svc')\nE    +    where validate_spiffe_id = <target_module.SPIFFEMutualTLSRouterV2 object at 0x0000014E23C39160>.validate_spiffe_id\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_spiffe_l1 - AssertionError: assert False is...\n============================== 1 failed in 0.12s ==============================\n\n\n\nPrevious Code in target_module.py:\n```python\nimport re\nfrom typing import Optional\n\n\nclass SPIFFEMutualTLSRouterV2:\n    \"\"\"\n    SPIFFE Mutual TLS Router V2 that handles SPIFFE ID validation\n    against a configured trust domain, explicitly preventing prefix and\n    suffix spoofing attacks.\n    \"\"\"\n\n    def __init__(self, domain: str):\n        if not domain:\n            raise ValueError(\"Trust domain cannot be empty.\")\n        self.domain = domain\n\n    def validate_spiffe_id(self, spiffe_id: Optional[str]) -> bool:\n        \"\"\"\n        Strictly validates a SPIFFE ID against the configured trust domain.\n\n        A valid SPIFFE ID must conform to the format:\n            spiffe://<trust_domain>/<path>\n\n        To prevent suffix/prefix spoofing:\n        1. Must start with the exact scheme and trust domain prefix: 'spiffe://<domain>/'\n        2. The trust domain boundary must be strictly enforced using path separators.\n           For example, if domain is 'example.com', 'spiffe://example.com.evil.com/service'\n           must be rejected.\n        \"\"\"\n        if not spiffe_id or not isinstance(spiffe_id, str):\n            return False\n\n        # Construct the exact required prefix boundary\n        # A SPIFFE ID structure is: spiffe://<trust_domain>/<path>\n        expected_prefix = f\"spiffe://{self.domain}/\"\n\n        # Check if the SPIFFE ID starts with the exact prefix\n        if not spiffe_id.startswith(expected_prefix):\n            return False\n\n        # Additional structural validation to ensure no trailing/leading anomalies\n        # Regular expression to match valid SPIFFE ID format for the given domain:\n        # ^spiffe://<domain>/<path-segment>[/<path-segment>]*$\n        # Escaping the domain for regex safety\n        escaped_domain = re.escape(self.domain)\n        pattern = rf\"^spiffe://{escaped_domain}/.+$\"\n\n        return bool(re.match(pattern, spiffe_id))\n\n```\n\nAnalyze the test failures against the S-Class governance requirements and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nimport re\nfrom typing import Optional\n\n\nclass SPIFFEMutualTLSRouterV2:\n    \"\"\"\n    SPIFFE Mutual TLS Router V2 that handles SPIFFE ID validation\n    against a configured trust domain, explicitly preventing prefix and\n    suffix spoofing attacks.\n    \"\"\"\n\n    def __init__(self, domain: str):\n        if not domain:\n            raise ValueError(\"Trust domain cannot be empty.\")\n        self.domain = domain\n\n    def validate_spiffe_id(self, spiffe_id: Optional[str]) -> bool:\n        \"\"\"\n        Strictly validates a SPIFFE ID against the configured trust domain.\n\n        A valid SPIFFE ID must conform to the format:\n            spiffe://<trust_domain>/<path>\n\n        To prevent suffix/prefix spoofing:\n        1. Must start with the exact scheme and trust domain prefix: 'spiffe://<domain>/'\n        2. The trust domain boundary must be strictly enforced using path separators.\n           For example, if domain is 'example.com', 'spiffe://example.com.evil.com/service'\n           must be rejected.\n        \"\"\"\n        if not spiffe_id or not isinstance(spiffe_id, str):\n            return False\n\n        # Construct the exact required prefix boundary\n        # A SPIFFE ID structure is: spiffe://<trust_domain>/<path>\n        expected_prefix = f\"spiffe://{self.domain}/\"\n\n        # Check if the SPIFFE ID starts with the exact prefix\n        if not spiffe_id.startswith(expected_prefix):\n            return False\n\n        # Ensure that after the prefix there is at least one character for the path.\n        # This allows paths like 'spiffe://prod.net/svc' where len(spiffe_id) > len(expected_prefix).\n        if len(spiffe_id) <= len(expected_prefix):\n            return False\n\n        # Additional structural validation to ensure no trailing/leading anomalies\n        # Regular expression to match valid SPIFFE ID format for the given domain:\n        # ^spiffe://<domain>/<path>\n        escaped_domain = re.escape(self.domain)\n        pattern = rf\"^spiffe://{escaped_domain}/.+$\"\n\n        return bool(re.match(pattern, spiffe_id))\n```",
+      "latency_sec": 2.2594,
+      "prompt_tokens": 1088,
+      "completion_tokens": 520,
+      "cost_usd": 0.000238,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpb9r5cqkj\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_spiffe_l1 FAILED                              [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_spiffe_l1 ________________________________\ntests\\test_oracle.py:4: in test_spiffe_l1\n    assert r.validate_spiffe_id('spiffe://prod.net/svc') is True\nE   AssertionError: assert False is True\nE    +  where False = validate_spiffe_id('spiffe://prod.net/svc')\nE    +    where validate_spiffe_id = <target_module.SPIFFEMutualTLSRouterV2 object at 0x0000015A95029160>.validate_spiffe_id\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_spiffe_l1 - AssertionError: assert False is...\n============================== 1 failed in 0.07s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.53,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 3,
+      "prompt": "User Task Instruction:\nImplement SPIFFEMutualTLSRouterV2 in target_module.py. Validate validate_spiffe_id(spiffe_id) strictly against self.domain, blocking suffix/prefix spoofing.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement SPIFFEMutualTLSRouterV2 in target_module.py. Validate validate_spiffe_id(spiffe_id) strictly against self.domain, blocking suffix/prefix spoofing.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nYour previous implementation produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpb9r5cqkj\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_spiffe_l1 FAILED                              [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_spiffe_l1 ________________________________\ntests\\test_oracle.py:4: in test_spiffe_l1\n    assert r.validate_spiffe_id('spiffe://prod.net/svc') is True\nE   AssertionError: assert False is True\nE    +  where False = validate_spiffe_id('spiffe://prod.net/svc')\nE    +    where validate_spiffe_id = <target_module.SPIFFEMutualTLSRouterV2 object at 0x0000015A95029160>.validate_spiffe_id\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_spiffe_l1 - AssertionError: assert False is...\n============================== 1 failed in 0.07s ==============================\n\n\n\nPrevious Code in target_module.py:\n```python\nimport re\nfrom typing import Optional\n\n\nclass SPIFFEMutualTLSRouterV2:\n    \"\"\"\n    SPIFFE Mutual TLS Router V2 that handles SPIFFE ID validation\n    against a configured trust domain, explicitly preventing prefix and\n    suffix spoofing attacks.\n    \"\"\"\n\n    def __init__(self, domain: str):\n        if not domain:\n            raise ValueError(\"Trust domain cannot be empty.\")\n        self.domain = domain\n\n    def validate_spiffe_id(self, spiffe_id: Optional[str]) -> bool:\n        \"\"\"\n        Strictly validates a SPIFFE ID against the configured trust domain.\n\n        A valid SPIFFE ID must conform to the format:\n            spiffe://<trust_domain>/<path>\n\n        To prevent suffix/prefix spoofing:\n        1. Must start with the exact scheme and trust domain prefix: 'spiffe://<domain>/'\n        2. The trust domain boundary must be strictly enforced using path separators.\n           For example, if domain is 'example.com', 'spiffe://example.com.evil.com/service'\n           must be rejected.\n        \"\"\"\n        if not spiffe_id or not isinstance(spiffe_id, str):\n            return False\n\n        # Construct the exact required prefix boundary\n        # A SPIFFE ID structure is: spiffe://<trust_domain>/<path>\n        expected_prefix = f\"spiffe://{self.domain}/\"\n\n        # Check if the SPIFFE ID starts with the exact prefix\n        if not spiffe_id.startswith(expected_prefix):\n            return False\n\n        # Ensure that after the prefix there is at least one character for the path.\n        # This allows paths like 'spiffe://prod.net/svc' where len(spiffe_id) > len(expected_prefix).\n        if len(spiffe_id) <= len(expected_prefix):\n            return False\n\n        # Additional structural validation to ensure no trailing/leading anomalies\n        # Regular expression to match valid SPIFFE ID format for the given domain:\n        # ^spiffe://<domain>/<path>\n        escaped_domain = re.escape(self.domain)\n        pattern = rf\"^spiffe://{escaped_domain}/.+$\"\n\n        return bool(re.match(pattern, spiffe_id))\n\n```\n\nAnalyze the test failures against the S-Class governance requirements and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nimport re\nfrom typing import Optional\n\n\nclass SPIFFEMutualTLSRouterV2:\n    \"\"\"\n    SPIFFE Mutual TLS Router V2 that handles SPIFFE ID validation\n    against a configured trust domain, explicitly preventing prefix and\n    suffix spoofing attacks.\n    \"\"\"\n\n    def __init__(self, domain: str):\n        if not domain:\n            raise ValueError(\"Trust domain cannot be empty.\")\n        self.domain = domain\n\n    def validate_spiffe_id(self, spiffe_id: Optional[str]) -> bool:\n        \"\"\"\n        Strictly validates a SPIFFE ID against the configured trust domain.\n\n        A valid SPIFFE ID must conform to the format:\n            spiffe://<trust_domain>/<path>\n\n        To prevent suffix/prefix spoofing:\n        1. Must start with the exact scheme and trust domain prefix: 'spiffe://<domain>/'\n        2. The trust domain boundary must be strictly enforced using path separators.\n           For example, if domain is 'example.com', 'spiffe://example.com.evil.com/service'\n           must be rejected.\n        \"\"\"\n        if not spiffe_id or not isinstance(spiffe_id, str):\n            return False\n\n        # Construct the exact required prefix boundary\n        # A SPIFFE ID structure is: spiffe://<trust_domain>/<path>\n        expected_prefix = f\"spiffe://{self.domain}/\"\n\n        # Check if the SPIFFE ID starts with the exact prefix\n        if not spiffe_id.startswith(expected_prefix):\n            return False\n\n        # Ensure that after the prefix there is at least one character for the path.\n        if len(spiffe_id) <= len(expected_prefix):\n            return False\n\n        # Additional structural validation to ensure no trailing/leading anomalies\n        # Regular expression to match valid SPIFFE ID format for the given domain:\n        # ^spiffe://<domain>/<path>\n        escaped_domain = re.escape(self.domain)\n        pattern = rf\"^spiffe://{escaped_domain}/.+$\"\n\n        return bool(re.match(pattern, spiffe_id))\n```",
+      "latency_sec": 1.9284,
+      "prompt_tokens": 1140,
+      "completion_tokens": 488,
+      "cost_usd": 0.000232,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpb9r5cqkj\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_spiffe_l1 FAILED                              [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_spiffe_l1 ________________________________\ntests\\test_oracle.py:4: in test_spiffe_l1\n    assert r.validate_spiffe_id('spiffe://prod.net/svc') is True\nE   AssertionError: assert False is True\nE    +  where False = validate_spiffe_id('spiffe://prod.net/svc')\nE    +    where validate_spiffe_id = <target_module.SPIFFEMutualTLSRouterV2 object at 0x0000025F55C59160>.validate_spiffe_id\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_spiffe_l1 - AssertionError: assert False is...\n============================== 1 failed in 0.07s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.549,
+        "all_passed": false
+      }
+    }
+  ],
+  "final_code": "import re\nfrom typing import Optional\n\n\nclass SPIFFEMutualTLSRouterV2:\n    \"\"\"\n    SPIFFE Mutual TLS Router V2 that handles SPIFFE ID validation\n    against a configured trust domain, explicitly preventing prefix and\n    suffix spoofing attacks.\n    \"\"\"\n\n    def __init__(self, domain: str):\n        if not domain:\n            raise ValueError(\"Trust domain cannot be empty.\")\n        self.domain = domain\n\n    def validate_spiffe_id(self, spiffe_id: Optional[str]) -> bool:\n        \"\"\"\n        Strictly validates a SPIFFE ID against the configured trust domain.\n\n        A valid SPIFFE ID must conform to the format:\n            spiffe://<trust_domain>/<path>\n\n        To prevent suffix/prefix spoofing:\n        1. Must start with the exact scheme and trust domain prefix: 'spiffe://<domain>/'\n        2. The trust domain boundary must be strictly enforced using path separators.\n           For example, if domain is 'example.com', 'spiffe://example.com.evil.com/service'\n           must be rejected.\n        \"\"\"\n        if not spiffe_id or not isinstance(spiffe_id, str):\n            return False\n\n        # Construct the exact required prefix boundary\n        # A SPIFFE ID structure is: spiffe://<trust_domain>/<path>\n        expected_prefix = f\"spiffe://{self.domain}/\"\n\n        # Check if the SPIFFE ID starts with the exact prefix\n        if not spiffe_id.startswith(expected_prefix):\n            return False\n\n        # Ensure that after the prefix there is at least one character for the path.\n        if len(spiffe_id) <= len(expected_prefix):\n            return False\n\n        # Additional structural validation to ensure no trailing/leading anomalies\n        # Regular expression to match valid SPIFFE ID format for the given domain:\n        # ^spiffe://<domain>/<path>\n        escaped_domain = re.escape(self.domain)\n        pattern = rf\"^spiffe://{escaped_domain}/.+$\"\n\n        return bool(re.match(pattern, spiffe_id))\n",
+  "oracle_result": {
+    "exit_code": 1,
+    "passed_count": 0,
+    "failed_count": 1,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpb9r5cqkj\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_spiffe_l1 FAILED                              [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_spiffe_l1 ________________________________\ntests\\test_oracle.py:4: in test_spiffe_l1\n    assert r.validate_spiffe_id('spiffe://prod.net/svc') is True\nE   AssertionError: assert False is True\nE    +  where False = validate_spiffe_id('spiffe://prod.net/svc')\nE    +    where validate_spiffe_id = <target_module.SPIFFEMutualTLSRouterV2 object at 0x0000025F55C59160>.validate_spiffe_id\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_spiffe_l1 - AssertionError: assert False is...\n============================== 1 failed in 0.07s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.549,
+    "all_passed": false
+  },
+  "failure_taxonomy": {
+    "category": "implementation_bug",
+    "reason": "Runtime logic error or assertion failure: AssertionError: assert False is True",
+    "details": [
+      "AssertionError: assert False is True",
+      "AssertionError: assert False is..."
+    ]
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  },
+  "layer2_behavioral_adjudication": {
+    "layer2_passed": true,
+    "false_confidence_detected": false,
+    "l2_stdout_snippet": "============= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp0tmnmqh0\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_adversarial_invariants.py::test_spiffe_l2 PASSED              [100%]\n\n============================== 1 passed in 0.03s ==============================\n\n",
+    "audit_trace_completeness_pct": 100.0
+  }
+}
