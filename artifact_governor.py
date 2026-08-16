@@ -14,10 +14,13 @@ import json
 import hmac
 import hashlib
 import secrets
+import logging
 from datetime import datetime, timezone
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 from typing import Dict, List, Set, Any, Optional, Tuple
+
+logger = logging.getLogger("sclass_artifact_governor")
 
 from behavior_graph import BehaviorGraph, BehaviorNodeType, EpistemicStatus
 from requirement_ir import RequirementGraph, RequirementNode, ProvenanceKind
@@ -324,7 +327,7 @@ class ArtifactGovernor:
             return GovernanceGateResult(
                 is_blocked=True,
                 blocking_reasons=["Configuration Error: sclass.config.json is malformed or specifies an invalid executionMode. Governor fails closed."],
-                recommended_fsm_state=FSMTransitionTarget.TRIAGE,
+                recommended_fsm_state=FSMTransitionTarget.CLARIFICATION,
                 validation_status=ValidationStatus.BLOCKED,
                 approval_status=ApprovalStatus.REJECTED
             )

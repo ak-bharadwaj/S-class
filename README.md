@@ -184,7 +184,7 @@ print(f"Kernel Approved Mutation: '{res['previousPhase']}' ➔ '{res['currentPha
 
 ## 🧪 Comprehensive Automated Test Suite
 
-S-Class EOS V11.2 contains **387 automated test cases across 48 test suites** passing with 100% success across Python 3.10–3.14:
+S-Class EOS V11.2 contains **394 product regression test cases across 49 test suites** passing with 100% success across Python 3.10–3.14 (historical and research benchmarks isolated in `benchmark/v0/`):
 
 | Test Module Category | Test Count | Functionality Tested |
 | :--- | :--- | :--- |

@@ -81,7 +81,7 @@ def handle_tool_call(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any
             return {"security_report": report}
         return {"error": f"Target file '{target_file}' does not exist"}
 
-    elif tool_name == "sclass_strategy_planner":
+    elif tool_name in ["sclass_strategy_planner", "sclass_planner"]:
         goal = arguments.get("goal", "")
         exec_plan = ExecutionPlanner.create_plan(goal, workspace_dir=workspace_dir)
         plan = MetaPlanner.classify_goal(goal)
@@ -93,8 +93,9 @@ def handle_tool_call(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any
 
     elif tool_name == "sclass_spec_synthesis":
         from spec_synthesis import SpecSynthesisEngine
-        raw_intent = arguments.get("raw_intent", "Fullstack App Build")
-        spec = SpecSynthesisEngine.run_synthesis(raw_intent=raw_intent, workspace_dir=workspace_dir)
+        raw_intent = arguments.get("raw_intent", arguments.get("raw_request", "Fullstack App Build"))
+        engine = SpecSynthesisEngine()
+        spec = engine.run_synthesis(raw_request=raw_intent, workspace_dir=workspace_dir)
         if hasattr(spec, "to_dict"):
             spec_data = spec.to_dict()
         elif is_dataclass(spec):
