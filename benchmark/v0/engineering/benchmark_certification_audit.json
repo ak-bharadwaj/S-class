@@ -1,9 +1,9 @@
 {
-  "title": "Gate 1.6B Genuine Agent Benchmark Certification Audit",
+  "title": "Gate 1.6C Fair Treatment Benchmark Certification Audit",
   "certified": true,
   "status": "CERTIFIED_GENUINE_LIVE_BENCHMARK",
-  "total_runs": 48,
-  "real_runs": 48,
+  "total_runs": 64,
+  "real_runs": 64,
   "mock_runs": 0,
   "provider_types": [
     "gemini"
@@ -18,19 +18,19 @@
       "details": "Found 16 / 16 task directories."
     },
     {
-      "check_name": "48_runs_exist",
+      "check_name": "64_runs_exist",
       "passed": true,
-      "details": "Found 48 / 48 expected run artifacts."
+      "details": "Found 64 / 64 expected run artifacts."
     },
     {
       "check_name": "zero_mock_runs",
       "passed": true,
-      "details": "Real runs: 48/48, Mock runs detected: 0."
+      "details": "Real runs: 64/64, Mock runs detected: 0."
     },
     {
       "check_name": "valid_live_provider",
       "passed": true,
-      "details": "Observed providers: ['gemini'] (Allowed: ['anthropic', 'custom_http', 'gemini', 'openai'])."
+      "details": "Observed providers: ['gemini'] (Allowed: ['openai', 'anthropic', 'gemini', 'custom_http'])."
     },
     {
       "check_name": "uniform_model_configuration",
@@ -38,9 +38,14 @@
       "details": "Observed model names: ['gemini-3.5-flash-lite']."
     },
     {
-      "check_name": "complete_provenance",
+      "check_name": "equal_budget_enforcement",
       "passed": true,
-      "details": "Incomplete provenance runs: 0."
+      "details": "Runs violating equal budget (MAX_MODEL_CALLS=3): 0."
+    },
+    {
+      "check_name": "complete_provenance_and_taxonomy",
+      "passed": true,
+      "details": "Incomplete provenance: 0, Missing taxonomy: 0."
     }
   ]
 }

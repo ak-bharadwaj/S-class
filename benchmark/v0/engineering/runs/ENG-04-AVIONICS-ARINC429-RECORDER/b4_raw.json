@@ -1,0 +1,220 @@
+{
+  "task_id": "ENG-04-AVIONICS-ARINC429-RECORDER",
+  "baseline": "B4",
+  "runner_version": "gate-1.6c-fair-treatment-benchmark-v1",
+  "domain": "Avionics / Embedded Ring Buffer",
+  "raw_prompt": "Implement an ARINC-429 flight data ring-buffer blackbox recorder in `target_module.py` with fixed capacity, parity bit validation, and FIFO overwrite.",
+  "sclass_governance": {
+    "semantic_requirements": [
+      {
+        "id": "REQ-SHADOW-001",
+        "title": "ARINC 429 Telemetry Frame Ingestion",
+        "description": "Continuously ingest and buffer ARINC 429 avionics bus frames in memory.",
+        "type": "FUNCTIONAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt mandates ARINC 429 bus frame ingestion"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-002",
+        "title": "Emergency Memory Flush on Power Loss",
+        "description": "Execute emergency memory flush to crash-survivable memory when power loss is detected.",
+        "type": "BEHAVIORAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt mandates flush on power loss"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-003",
+        "title": "Hold-Up Capacitor Emergency Power Window",
+        "description": "Maintain auxiliary hold-up capacitor power reserve to guarantee write completion during blackout.",
+        "type": "INVARIANT",
+        "epistemic_status": "DERIVED_JUSTIFIED",
+        "confidence": 0.95,
+        "provenance": "AVIONICS_SURVIVABILITY",
+        "introduced_in_pass": 2,
+        "why_chain": [
+          "Flash writes require active power",
+          "Capacitor holds voltage during power interruption",
+          "Mandatory crash survivability invariant"
+        ],
+        "pass_history": [
+          2
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-004",
+        "title": "ARINC 429 Parity and CRC Validation",
+        "description": "Validate odd/even parity and cyclic redundancy check on all incoming telemetry frames.",
+        "type": "INVARIANT",
+        "epistemic_status": "DERIVED_JUSTIFIED",
+        "confidence": 0.95,
+        "provenance": "SIGNAL_INTEGRITY",
+        "introduced_in_pass": 2,
+        "why_chain": [
+          "Bus noise can corrupt telemetry words",
+          "Parity checking drops corrupted frames",
+          "Mandatory flight data integrity invariant"
+        ],
+        "pass_history": [
+          2
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-005",
+        "title": "Underlying Storage Technology Specification",
+        "description": "The specific persistence engine and database backend are unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify database technology"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-006",
+        "title": "API Transport Protocol Specification",
+        "description": "The specific network transport protocol (gRPC vs REST) is unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify API protocol"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      }
+    ],
+    "epistemic_status": "CONFIRMED",
+    "gate_result": "PASS"
+  },
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 2
+  },
+  "repository": {
+    "starting_tree_hash": "85691baeab26b25fbf6652eb67e2ef1e52c729883bc93cd31cd516493220c79e",
+    "final_tree_hash": "9d0c2337749cb730a3c88dce3c72f8110f0c55f6f9456d808293d776ad24a956"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "User Task Instruction:\nImplement an ARINC-429 flight data ring-buffer blackbox recorder in `target_module.py` with fixed capacity, parity bit validation, and FIFO overwrite.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] ARINC 429 Telemetry Frame Ingestion: Continuously ingest and buffer ARINC 429 avionics bus frames in memory.\n- [] Emergency Memory Flush on Power Loss: Execute emergency memory flush to crash-survivable memory when power loss is detected.\n- [] Hold-Up Capacitor Emergency Power Window: Maintain auxiliary hold-up capacitor power reserve to guarantee write completion during blackout.\n- [] ARINC 429 Parity and CRC Validation: Validate odd/even parity and cyclic redundancy check on all incoming telemetry frames.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nExisting Code in target_module.py:\n```python\n# target_module.py\nclass BlackboxBuffer:\n    def __init__(self, capacity: int = 4):\n        pass\n    def record(self, word: int) -> bool:\n        pass\n    def get_records(self) -> list:\n        pass\n\n```\n\nImplement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block.",
+      "response_text": "```python\n# target_module.py\nimport threading\nimport time\n\nclass BlackboxBuffer:\n    \"\"\"\n    ARINC-429 flight data ring-buffer blackbox recorder with fixed capacity,\n    parity bit validation, FIFO overwrite, and emergency power-loss flushing simulation.\n    \n    ARINC 429 32-bit word format:\n    - Bits 1-8 (LSB): Label (octal representation often, but raw value used here)\n    - Bits 9-31: Data / SDI / SSM\n    - Bit 32 (MSB): Odd Parity Bit (Number of 1s in the 32-bit word must be odd)\n    \"\"\"\n    def __init__(self, capacity: int = 4):\n        self.capacity = capacity\n        self.buffer = []\n        self.crash_survivable_memory = []\n        self._power_state = True\n        self._lock = threading.Lock()\n\n    def _validate_parity(self, word: int) -> bool:\n        \"\"\"\n        Validates ARINC 429 odd parity over the 32-bit word.\n        Returns True if the number of set bits is odd, False otherwise.\n        \"\"\"\n        # Count bits set to 1\n        set_bits = bin(word & 0xFFFFFFFF).count('1')\n        return (set_bits % 2) == 1\n\n    def record(self, word: int) -> bool:\n        \"\"\"\n        Ingests an ARINC 429 frame. Validates parity. If valid, pushes to ring-buffer\n        with FIFO overwrite if capacity is exceeded. If power is lost, rejects or flushes.\n        \"\"\"\n        with self._lock:\n            if not self._power_state:\n                return False\n\n            # Validate parity\n            if not self._validate_parity(word):\n                return False\n\n            # FIFO Overwrite buffer management\n            if len(self.buffer) >= self.capacity:\n                self.buffer.pop(0)  # Drop oldest\n            \n            self.buffer.append(word)\n            return True\n\n    def get_records(self) -> list:\n        \"\"\"\n        Returns the current records in the ring buffer (or crash-survivable memory if flushed).\n        \"\"\"\n        with self._lock:\n            if not self._power_state and self.crash_survivable_memory:\n                return list(self.crash_survivable_memory)\n            return list(self.buffer)\n\n    def simulate_power_loss(self) -> None:\n        \"\"\"\n        Executes emergency memory flush to crash-survivable memory utilizing \n        hold-up capacitor power reserve window.\n        \"\"\"\n        with self._lock:\n            # Hold-Up Capacitor Emergency Power Window simulation delay\n            time.sleep(0.001) \n            self._power_state = False\n            # Emergency flush transfer\n            self.crash_survivable_memory = list(self.buffer)\n```",
+      "latency_sec": 2.9942,
+      "prompt_tokens": 360,
+      "completion_tokens": 680,
+      "cost_usd": 0.000231,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpq0qxxbwi\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_parity_and_ring_capacity FAILED               [100%]\n\n================================== FAILURES ===================================\n________________________ test_parity_and_ring_capacity ________________________\ntests\\test_oracle.py:17: in test_parity_and_ring_capacity\n    with pytest.raises(ValueError):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^\nE   Failed: DID NOT RAISE <class 'ValueError'>\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_parity_and_ring_capacity - Failed: DID NOT ...\n============================== 1 failed in 0.08s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.556,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "User Task Instruction:\nImplement an ARINC-429 flight data ring-buffer blackbox recorder in `target_module.py` with fixed capacity, parity bit validation, and FIFO overwrite.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] ARINC 429 Telemetry Frame Ingestion: Continuously ingest and buffer ARINC 429 avionics bus frames in memory.\n- [] Emergency Memory Flush on Power Loss: Execute emergency memory flush to crash-survivable memory when power loss is detected.\n- [] Hold-Up Capacitor Emergency Power Window: Maintain auxiliary hold-up capacitor power reserve to guarantee write completion during blackout.\n- [] ARINC 429 Parity and CRC Validation: Validate odd/even parity and cyclic redundancy check on all incoming telemetry frames.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nYour previous implementation produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpq0qxxbwi\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_parity_and_ring_capacity FAILED               [100%]\n\n================================== FAILURES ===================================\n________________________ test_parity_and_ring_capacity ________________________\ntests\\test_oracle.py:17: in test_parity_and_ring_capacity\n    with pytest.raises(ValueError):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^\nE   Failed: DID NOT RAISE <class 'ValueError'>\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_parity_and_ring_capacity - Failed: DID NOT ...\n============================== 1 failed in 0.08s ==============================\n\n\n\nPrevious Code in target_module.py:\n```python\n# target_module.py\nimport threading\nimport time\n\nclass BlackboxBuffer:\n    \"\"\"\n    ARINC-429 flight data ring-buffer blackbox recorder with fixed capacity,\n    parity bit validation, FIFO overwrite, and emergency power-loss flushing simulation.\n    \n    ARINC 429 32-bit word format:\n    - Bits 1-8 (LSB): Label (octal representation often, but raw value used here)\n    - Bits 9-31: Data / SDI / SSM\n    - Bit 32 (MSB): Odd Parity Bit (Number of 1s in the 32-bit word must be odd)\n    \"\"\"\n    def __init__(self, capacity: int = 4):\n        self.capacity = capacity\n        self.buffer = []\n        self.crash_survivable_memory = []\n        self._power_state = True\n        self._lock = threading.Lock()\n\n    def _validate_parity(self, word: int) -> bool:\n        \"\"\"\n        Validates ARINC 429 odd parity over the 32-bit word.\n        Returns True if the number of set bits is odd, False otherwise.\n        \"\"\"\n        # Count bits set to 1\n        set_bits = bin(word & 0xFFFFFFFF).count('1')\n        return (set_bits % 2) == 1\n\n    def record(self, word: int) -> bool:\n        \"\"\"\n        Ingests an ARINC 429 frame. Validates parity. If valid, pushes to ring-buffer\n        with FIFO overwrite if capacity is exceeded. If power is lost, rejects or flushes.\n        \"\"\"\n        with self._lock:\n            if not self._power_state:\n                return False\n\n            # Validate parity\n            if not self._validate_parity(word):\n                return False\n\n            # FIFO Overwrite buffer management\n            if len(self.buffer) >= self.capacity:\n                self.buffer.pop(0)  # Drop oldest\n            \n            self.buffer.append(word)\n            return True\n\n    def get_records(self) -> list:\n        \"\"\"\n        Returns the current records in the ring buffer (or crash-survivable memory if flushed).\n        \"\"\"\n        with self._lock:\n            if not self._power_state and self.crash_survivable_memory:\n                return list(self.crash_survivable_memory)\n            return list(self.buffer)\n\n    def simulate_power_loss(self) -> None:\n        \"\"\"\n        Executes emergency memory flush to crash-survivable memory utilizing \n        hold-up capacitor power reserve window.\n        \"\"\"\n        with self._lock:\n            # Hold-Up Capacitor Emergency Power Window simulation delay\n            time.sleep(0.001) \n            self._power_state = False\n            # Emergency flush transfer\n            self.crash_survivable_memory = list(self.buffer)\n\n```\n\nAnalyze the test failures against the S-Class governance requirements and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\n# target_module.py\nimport threading\nimport time\n\nclass BlackboxBuffer:\n    \"\"\"\n    ARINC-429 flight data ring-buffer blackbox recorder with fixed capacity,\n    parity bit validation, FIFO overwrite, and emergency power-loss flushing simulation.\n    \n    ARINC 429 32-bit word format:\n    - Bits 1-8 (LSB): Label (octal representation often, but raw value used here)\n    - Bits 9-31: Data / SDI / SSM\n    - Bit 32 (MSB): Odd Parity Bit (Number of 1s in the 32-bit word must be odd)\n    \"\"\"\n    def __init__(self, capacity: int = 4):\n        self.capacity = capacity\n        self.buffer = []\n        self.crash_survivable_memory = []\n        self._power_state = True\n        self._lock = threading.Lock()\n\n    def _validate_parity(self, word: int) -> bool:\n        \"\"\"\n        Validates ARINC 429 odd parity over the 32-bit word.\n        Returns True if the number of set bits is odd, False otherwise.\n        \"\"\"\n        # Count bits set to 1\n        set_bits = bin(word & 0xFFFFFFFF).count('1')\n        return (set_bits % 2) == 1\n\n    def record(self, word: int) -> bool:\n        \"\"\"\n        Ingests an ARINC 429 frame. Validates parity. If invalid, raises ValueError.\n        If valid, pushes to ring-buffer with FIFO overwrite if capacity is exceeded.\n        If power is lost, returns False.\n        \"\"\"\n        with self._lock:\n            if not self._power_state:\n                return False\n\n            # Validate parity - raise ValueError if invalid according to test suite expectations\n            if not self._validate_parity(word):\n                raise ValueError(\"Invalid ARINC 429 parity bit\")\n\n            # FIFO Overwrite buffer management\n            if len(self.buffer) >= self.capacity:\n                self.buffer.pop(0)  # Drop oldest\n            \n            self.buffer.append(word)\n            return True\n\n    def get_records(self) -> list:\n        \"\"\"\n        Returns the current records in the ring buffer (or crash-survivable memory if flushed).\n        \"\"\"\n        with self._lock:\n            if not self._power_state and self.crash_survivable_memory:\n                return list(self.crash_survivable_memory)\n            return list(self.buffer)\n\n    def simulate_power_loss(self) -> None:\n        \"\"\"\n        Executes emergency memory flush to crash-survivable memory utilizing \n        hold-up capacitor power reserve window.\n        \"\"\"\n        with self._lock:\n            # Hold-Up Capacitor Emergency Power Window simulation delay\n            time.sleep(0.001) \n            self._power_state = False\n            # Emergency flush transfer\n            self.crash_survivable_memory = list(self.buffer)\n```",
+      "latency_sec": 2.5173,
+      "prompt_tokens": 1277,
+      "completion_tokens": 707,
+      "cost_usd": 0.000308,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpq0qxxbwi\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_parity_and_ring_capacity PASSED               [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.513,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "# target_module.py\nimport threading\nimport time\n\nclass BlackboxBuffer:\n    \"\"\"\n    ARINC-429 flight data ring-buffer blackbox recorder with fixed capacity,\n    parity bit validation, FIFO overwrite, and emergency power-loss flushing simulation.\n    \n    ARINC 429 32-bit word format:\n    - Bits 1-8 (LSB): Label (octal representation often, but raw value used here)\n    - Bits 9-31: Data / SDI / SSM\n    - Bit 32 (MSB): Odd Parity Bit (Number of 1s in the 32-bit word must be odd)\n    \"\"\"\n    def __init__(self, capacity: int = 4):\n        self.capacity = capacity\n        self.buffer = []\n        self.crash_survivable_memory = []\n        self._power_state = True\n        self._lock = threading.Lock()\n\n    def _validate_parity(self, word: int) -> bool:\n        \"\"\"\n        Validates ARINC 429 odd parity over the 32-bit word.\n        Returns True if the number of set bits is odd, False otherwise.\n        \"\"\"\n        # Count bits set to 1\n        set_bits = bin(word & 0xFFFFFFFF).count('1')\n        return (set_bits % 2) == 1\n\n    def record(self, word: int) -> bool:\n        \"\"\"\n        Ingests an ARINC 429 frame. Validates parity. If invalid, raises ValueError.\n        If valid, pushes to ring-buffer with FIFO overwrite if capacity is exceeded.\n        If power is lost, returns False.\n        \"\"\"\n        with self._lock:\n            if not self._power_state:\n                return False\n\n            # Validate parity - raise ValueError if invalid according to test suite expectations\n            if not self._validate_parity(word):\n                raise ValueError(\"Invalid ARINC 429 parity bit\")\n\n            # FIFO Overwrite buffer management\n            if len(self.buffer) >= self.capacity:\n                self.buffer.pop(0)  # Drop oldest\n            \n            self.buffer.append(word)\n            return True\n\n    def get_records(self) -> list:\n        \"\"\"\n        Returns the current records in the ring buffer (or crash-survivable memory if flushed).\n        \"\"\"\n        with self._lock:\n            if not self._power_state and self.crash_survivable_memory:\n                return list(self.crash_survivable_memory)\n            return list(self.buffer)\n\n    def simulate_power_loss(self) -> None:\n        \"\"\"\n        Executes emergency memory flush to crash-survivable memory utilizing \n        hold-up capacitor power reserve window.\n        \"\"\"\n        with self._lock:\n            # Hold-Up Capacitor Emergency Power Window simulation delay\n            time.sleep(0.001) \n            self._power_state = False\n            # Emergency flush transfer\n            self.crash_survivable_memory = list(self.buffer)\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpq0qxxbwi\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_parity_and_ring_capacity PASSED               [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.513,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  }
+}

@@ -1,50 +1,58 @@
 {
   "task_id": "ENG-08-DISTRIBUTED-RATE-LIMITER",
   "baseline": "B1",
-  "runner_version": "gate-1.6b-genuine-agent-benchmark-v1",
+  "runner_version": "gate-1.6c-fair-treatment-benchmark-v1",
   "domain": "Distributed Systems / Traffic Control",
   "raw_prompt": "Implement a sliding window log rate limiter in `target_module.py` enforcing request threshold caps per client window and automatic window sliding cleanup.",
   "model_metadata": {
     "provider_type": "gemini",
     "model_name": "gemini-3.5-flash-lite",
     "temperature": 0.2,
-    "is_mock": false
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 1,
+    "total_iterations": 1
   },
   "repository": {
     "starting_tree_hash": "bf03f3f18cffc118ac6ea0a7d182eab468eeb64a011013b03359cdada419db0e",
-    "final_tree_hash": "4e58a290e979ce69f49b28b4555e9ab401e7039bf33f021900fbf0fca98590e7"
+    "final_tree_hash": "ea5bd127caeef89e4bf11b62b1a7545e06874df798c520a76f5df9fc1235e4d0"
   },
   "execution_trace": [
     {
       "iteration": 1,
       "prompt": "Task Instruction:\nImplement a sliding window log rate limiter in `target_module.py` enforcing request threshold caps per client window and automatic window sliding cleanup.\n\nExisting Code in target_module.py:\n```python\n# target_module.py\nclass SlidingWindowRateLimiter:\n    def __init__(self, max_requests: int, window_sec: float):\n        pass\n    def allow_request(self, client_id: str, timestamp: float) -> bool:\n        pass\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
-      "response_text": "```python\n# target_module.py\nfrom collections import deque\nfrom typing import Dict\n\nclass SlidingWindowRateLimiter:\n    def __init__(self, max_requests: int, window_sec: float):\n        \"\"\"\n        Initializes the SlidingWindowRateLimiter.\n\n        :param max_requests: Maximum number of requests allowed within the window.\n        :param window_sec: The size of the sliding window in seconds.\n        \"\"\"\n        self.max_requests = max_requests\n        self.window_sec = window_sec\n        # Maps each client_id to a deque of timestamps representing their request log\n        self._client_logs: Dict[str, deque] = {}\n\n    def allow_request(self, client_id: str, timestamp: float) -> bool:\n        \"\"\"\n        Determines whether a request from a client should be allowed at the given timestamp.\n\n        :param client_id: Unique identifier for the client.\n        :param timestamp: The current timestamp of the incoming request.\n        :return: True if the request is allowed, False if the rate limit is exceeded.\n        \"\"\"\n        # Initialize deque for new clients\n        if client_id not in self._client_logs:\n            self._client_logs[client_id] = deque()\n\n        client_log = self._client_logs[client_id]\n        window_start = timestamp - self.window_sec\n\n        # Remove timestamps that fall outside the current sliding window\n        while client_log and client_log[0] <= window_start:\n            client_log.popleft()\n\n        # Check if the client has reached the request threshold cap\n        if len(client_log) < self.max_requests:\n            client_log.append(timestamp)\n            return True\n\n        return False\n```",
-      "latency_sec": 2.7908,
+      "response_text": "```python\n# target_module.py\nfrom collections import deque\nfrom typing import Dict\n\nclass SlidingWindowRateLimiter:\n    def __init__(self, max_requests: int, window_sec: float):\n        \"\"\"\n        Initializes the SlidingWindowRateLimiter.\n\n        :param max_requests: Maximum number of requests allowed within the window.\n        :param window_sec: The size of the sliding window in seconds.\n        \"\"\"\n        self.max_requests = max_requests\n        self.window_sec = window_sec\n        # Maps client_id to a deque of timestamps representing request logs\n        self._client_logs: Dict[str, deque] = {}\n\n    def allow_request(self, client_id: str, timestamp: float) -> bool:\n        \"\"\"\n        Determines if a request from a client should be allowed based on the sliding window log.\n\n        :param client_id: Unique identifier for the client.\n        :param timestamp: The current request timestamp (e.g., epoch time in seconds).\n        :return: True if the request is allowed, False if the rate limit is exceeded.\n        \"\"\"\n        if client_id not in self._client_logs:\n            self._client_logs[client_id] = deque()\n\n        window_log = self._client_logs[client_id]\n        cutoff_time = timestamp - self.window_sec\n\n        # 1. Automatic window sliding cleanup: Remove timestamps outside the current window\n        while window_log and window_log[0] <= cutoff_time:\n            window_log.popleft()\n\n        # 2. Check threshold cap\n        if len(window_log) < self.max_requests:\n            window_log.append(timestamp)\n            return True\n\n        return False\n```",
+      "latency_sec": 2.0414,
       "prompt_tokens": 158,
-      "completion_tokens": 401,
+      "completion_tokens": 400,
       "cost_usd": 0.000132,
       "pytest_result": {
         "exit_code": 0,
         "passed_count": 1,
         "failed_count": 0,
         "total_count": 1,
-        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp6zqpdr79\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_sliding_window_rate_limiter PASSED            [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpf0h8jh2r\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_sliding_window_rate_limiter PASSED            [100%]\n\n============================== 1 passed in 0.04s ==============================\n",
         "stderr": "",
-        "duration_sec": 0.648,
+        "duration_sec": 0.563,
         "all_passed": true
       }
     }
   ],
-  "final_code": "# target_module.py\nfrom collections import deque\nfrom typing import Dict\n\nclass SlidingWindowRateLimiter:\n    def __init__(self, max_requests: int, window_sec: float):\n        \"\"\"\n        Initializes the SlidingWindowRateLimiter.\n\n        :param max_requests: Maximum number of requests allowed within the window.\n        :param window_sec: The size of the sliding window in seconds.\n        \"\"\"\n        self.max_requests = max_requests\n        self.window_sec = window_sec\n        # Maps each client_id to a deque of timestamps representing their request log\n        self._client_logs: Dict[str, deque] = {}\n\n    def allow_request(self, client_id: str, timestamp: float) -> bool:\n        \"\"\"\n        Determines whether a request from a client should be allowed at the given timestamp.\n\n        :param client_id: Unique identifier for the client.\n        :param timestamp: The current timestamp of the incoming request.\n        :return: True if the request is allowed, False if the rate limit is exceeded.\n        \"\"\"\n        # Initialize deque for new clients\n        if client_id not in self._client_logs:\n            self._client_logs[client_id] = deque()\n\n        client_log = self._client_logs[client_id]\n        window_start = timestamp - self.window_sec\n\n        # Remove timestamps that fall outside the current sliding window\n        while client_log and client_log[0] <= window_start:\n            client_log.popleft()\n\n        # Check if the client has reached the request threshold cap\n        if len(client_log) < self.max_requests:\n            client_log.append(timestamp)\n            return True\n\n        return False\n",
+  "final_code": "# target_module.py\nfrom collections import deque\nfrom typing import Dict\n\nclass SlidingWindowRateLimiter:\n    def __init__(self, max_requests: int, window_sec: float):\n        \"\"\"\n        Initializes the SlidingWindowRateLimiter.\n\n        :param max_requests: Maximum number of requests allowed within the window.\n        :param window_sec: The size of the sliding window in seconds.\n        \"\"\"\n        self.max_requests = max_requests\n        self.window_sec = window_sec\n        # Maps client_id to a deque of timestamps representing request logs\n        self._client_logs: Dict[str, deque] = {}\n\n    def allow_request(self, client_id: str, timestamp: float) -> bool:\n        \"\"\"\n        Determines if a request from a client should be allowed based on the sliding window log.\n\n        :param client_id: Unique identifier for the client.\n        :param timestamp: The current request timestamp (e.g., epoch time in seconds).\n        :return: True if the request is allowed, False if the rate limit is exceeded.\n        \"\"\"\n        if client_id not in self._client_logs:\n            self._client_logs[client_id] = deque()\n\n        window_log = self._client_logs[client_id]\n        cutoff_time = timestamp - self.window_sec\n\n        # 1. Automatic window sliding cleanup: Remove timestamps outside the current window\n        while window_log and window_log[0] <= cutoff_time:\n            window_log.popleft()\n\n        # 2. Check threshold cap\n        if len(window_log) < self.max_requests:\n            window_log.append(timestamp)\n            return True\n\n        return False\n",
   "oracle_result": {
     "exit_code": 0,
     "passed_count": 1,
     "failed_count": 0,
     "total_count": 1,
-    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp6zqpdr79\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_sliding_window_rate_limiter PASSED            [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpf0h8jh2r\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_sliding_window_rate_limiter PASSED            [100%]\n\n============================== 1 passed in 0.04s ==============================\n",
     "stderr": "",
-    "duration_sec": 0.648,
+    "duration_sec": 0.563,
     "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
   },
   "human_evaluation": {
     "defects": null,

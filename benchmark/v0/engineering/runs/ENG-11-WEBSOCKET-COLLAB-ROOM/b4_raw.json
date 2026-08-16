@@ -1,0 +1,134 @@
+{
+  "task_id": "ENG-11-WEBSOCKET-COLLAB-ROOM",
+  "baseline": "B4",
+  "runner_version": "gate-1.6c-fair-treatment-benchmark-v1",
+  "domain": "Real-Time / State Synchronization",
+  "raw_prompt": "Implement a real-time collaborative document state synchronization engine in `target_module.py` using Vector Clocks to resolve concurrent update conflicts.",
+  "sclass_governance": {
+    "semantic_requirements": [
+      {
+        "id": "REQ-SHADOW-001",
+        "title": "Core Service Functionality",
+        "description": "Implement core processing logic for: Implement a real-time collaborative document state synchronization engine in `target_module.py` using Vector Clocks to resolve concurrent update conflicts.",
+        "type": "FUNCTIONAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt execution mandate"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-002",
+        "title": "Underlying Storage Technology Specification",
+        "description": "The specific persistence engine and database backend are unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify database technology"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-003",
+        "title": "API Transport Protocol Specification",
+        "description": "The specific network transport protocol (gRPC vs REST) is unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify API protocol"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      }
+    ],
+    "epistemic_status": "CONFIRMED",
+    "gate_result": "PASS"
+  },
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 1
+  },
+  "repository": {
+    "starting_tree_hash": "ec718633ea1293e0f5ce32580edd583829f588336a41eeaf7ed5ae865b7b5cca",
+    "final_tree_hash": "ce3da47253cddd2aaac1822318f8ef6a83d45728bfa2a16d4181a248a3f181b8"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "User Task Instruction:\nImplement a real-time collaborative document state synchronization engine in `target_module.py` using Vector Clocks to resolve concurrent update conflicts.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement a real-time collaborative document state synchronization engine in `target_module.py` using Vector Clocks to resolve concurrent update conflicts.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nExisting Code in target_module.py:\n```python\n# target_module.py\nclass CollabDocument:\n    def __init__(self):\n        pass\n    def apply_update(self, client_id: str, clock: dict, content: str) -> bool:\n        pass\n    def get_content(self) -> str:\n        pass\n\n```\n\nImplement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block.",
+      "response_text": "```python\n# target_module.py\nimport json\n\nclass CollabDocument:\n    def __init__(self):\n        # The current text content of the document\n        self.content: str = \"\"\n        # The vector clock representing the causal history of the document state: {client_id: logical_counter}\n        self.vector_clock: dict[str, int] = {}\n        # History log for potential inspection or conflict debugging if needed\n        self.history: list[tuple[str, dict[str, int], str]] = []\n\n    def apply_update(self, client_id: str, clock: dict[str, int], content: str) -> bool:\n        \"\"\"\n        Applies a client update to the document state using Vector Clocks to handle concurrency.\n        \n        Vector Clock Comparison Rules for an incoming update clock (C_in) vs current clock (C_cur):\n        1. C_in causally succeeds C_cur (C_in > C_cur): \n           - C_in has strictly greater or equal values for all known keys, and at least one strictly greater.\n           - Action: Accept update, advance local vector clock to C_in, update content.\n        2. C_in is concurrent with C_cur (C_in || C_cur):\n           - Neither is strictly greater than the other.\n           - Action: Resolve conflict deterministically (e.g., using Last-Write-Wins / lexicographical client_id tie-breaker),\n             merge vector clocks (take element-wise maximums), and update state if winning.\n        3. C_in is causally older or identical (C_in <= C_cur):\n           - C_cur has strictly greater or equal values for all keys.\n           - Action: Reject update (stale or duplicate).\n        \"\"\"\n        # Normalize incoming clock values to integers\n        incoming_clock = {k: int(v) for k, v in clock.items()}\n\n        # If document has no state yet, accept immediately\n        if not self.vector_clock:\n            self.vector_clock = incoming_clock.copy()\n            self.content = content\n            self.history.append((client_id, incoming_clock, content))\n            return True\n\n        relation = self._compare_clocks(incoming_clock, self.vector_clock)\n\n        if relation == \"AFTER\":\n            # Incoming causally succeeds current\n            self.vector_clock = incoming_clock.copy()\n            self.content = content\n            self.history.append((client_id, incoming_clock, content))\n            return True\n\n        elif relation == \"CONCURRENT\":\n            # Conflict detected: merge clocks via element-wise maximum\n            all_keys = set(self.vector_clock.keys()).union(set(incoming_clock.keys()))\n            merged_clock = {k: max(self.vector_clock.get(k, 0), incoming_clock.get(k, 0)) for k in all_keys}\n            \n            # Deterministic conflict resolution (Last-Write-Wins / Lexicographical client_id tie-breaker)\n            # If incoming client_id is lexicographically larger, it wins the conflict.\n            # Alternatively, compare total scalar sum or standard tie-breakers.\n            current_latest_client = self.history[-1][0] if self.history else \"\"\n            \n            # Tie-breaker rule: Higher client_id string wins concurrent updates\n            if client_id >= current_latest_client:\n                self.content = content\n                accepted = True\n            else:\n                accepted = False\n\n            self.vector_clock = merged_clock\n            self.history.append((client_id, incoming_clock, content))\n            return accepted\n\n        else:\n            # \"BEFORE\" or \"EQUAL\": incoming is stale or duplicate\n            return False\n\n    def get_content(self) -> str:\n        \"\"\"Returns the current synchronized content of the document.\"\"\"\n        return self.content\n\n    @staticmethod\n    def _compare_clocks(a: dict[str, int], b: dict[str, int]) -> str:\n        \"\"\"\n        Compares vector clock A with vector clock B.\n        Returns:\n            - \"AFTER\": A causally succeeds B (A > B)\n            - \"BEFORE\": A causally precedes B (A < B)\n            - \"EQUAL\": A equals B (A == B)\n            - \"CONCURRENT\": A and B are concurrent (A || B)\n        \"\"\"\n        keys = set(a.keys()).union(set(b.keys()))\n        \n        a_greater_or_equal = True\n        b_greater_or_equal = True\n\n        for k in keys:\n            val_a = a.get(k, 0)\n            val_b = b.get(k, 0)\n            \n            if val_a < val_b:\n                a_greater_or_equal = False\n            if val_b < val_a:\n                b_greater_or_equal = False\n\n        if a_greater_or_equal and b_greater_or_equal:\n            return \"EQUAL\"\n        elif a_greater_or_equal:\n            return \"AFTER\"\n        elif b_greater_or_equal:\n            return \"BEFORE\"\n        else:\n            return \"CONCURRENT\"\n```",
+      "latency_sec": 4.2045,
+      "prompt_tokens": 283,
+      "completion_tokens": 1203,
+      "cost_usd": 0.000382,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmprmsh_58f\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_vector_clock_causality PASSED                 [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.572,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "# target_module.py\nimport json\n\nclass CollabDocument:\n    def __init__(self):\n        # The current text content of the document\n        self.content: str = \"\"\n        # The vector clock representing the causal history of the document state: {client_id: logical_counter}\n        self.vector_clock: dict[str, int] = {}\n        # History log for potential inspection or conflict debugging if needed\n        self.history: list[tuple[str, dict[str, int], str]] = []\n\n    def apply_update(self, client_id: str, clock: dict[str, int], content: str) -> bool:\n        \"\"\"\n        Applies a client update to the document state using Vector Clocks to handle concurrency.\n        \n        Vector Clock Comparison Rules for an incoming update clock (C_in) vs current clock (C_cur):\n        1. C_in causally succeeds C_cur (C_in > C_cur): \n           - C_in has strictly greater or equal values for all known keys, and at least one strictly greater.\n           - Action: Accept update, advance local vector clock to C_in, update content.\n        2. C_in is concurrent with C_cur (C_in || C_cur):\n           - Neither is strictly greater than the other.\n           - Action: Resolve conflict deterministically (e.g., using Last-Write-Wins / lexicographical client_id tie-breaker),\n             merge vector clocks (take element-wise maximums), and update state if winning.\n        3. C_in is causally older or identical (C_in <= C_cur):\n           - C_cur has strictly greater or equal values for all keys.\n           - Action: Reject update (stale or duplicate).\n        \"\"\"\n        # Normalize incoming clock values to integers\n        incoming_clock = {k: int(v) for k, v in clock.items()}\n\n        # If document has no state yet, accept immediately\n        if not self.vector_clock:\n            self.vector_clock = incoming_clock.copy()\n            self.content = content\n            self.history.append((client_id, incoming_clock, content))\n            return True\n\n        relation = self._compare_clocks(incoming_clock, self.vector_clock)\n\n        if relation == \"AFTER\":\n            # Incoming causally succeeds current\n            self.vector_clock = incoming_clock.copy()\n            self.content = content\n            self.history.append((client_id, incoming_clock, content))\n            return True\n\n        elif relation == \"CONCURRENT\":\n            # Conflict detected: merge clocks via element-wise maximum\n            all_keys = set(self.vector_clock.keys()).union(set(incoming_clock.keys()))\n            merged_clock = {k: max(self.vector_clock.get(k, 0), incoming_clock.get(k, 0)) for k in all_keys}\n            \n            # Deterministic conflict resolution (Last-Write-Wins / Lexicographical client_id tie-breaker)\n            # If incoming client_id is lexicographically larger, it wins the conflict.\n            # Alternatively, compare total scalar sum or standard tie-breakers.\n            current_latest_client = self.history[-1][0] if self.history else \"\"\n            \n            # Tie-breaker rule: Higher client_id string wins concurrent updates\n            if client_id >= current_latest_client:\n                self.content = content\n                accepted = True\n            else:\n                accepted = False\n\n            self.vector_clock = merged_clock\n            self.history.append((client_id, incoming_clock, content))\n            return accepted\n\n        else:\n            # \"BEFORE\" or \"EQUAL\": incoming is stale or duplicate\n            return False\n\n    def get_content(self) -> str:\n        \"\"\"Returns the current synchronized content of the document.\"\"\"\n        return self.content\n\n    @staticmethod\n    def _compare_clocks(a: dict[str, int], b: dict[str, int]) -> str:\n        \"\"\"\n        Compares vector clock A with vector clock B.\n        Returns:\n            - \"AFTER\": A causally succeeds B (A > B)\n            - \"BEFORE\": A causally precedes B (A < B)\n            - \"EQUAL\": A equals B (A == B)\n            - \"CONCURRENT\": A and B are concurrent (A || B)\n        \"\"\"\n        keys = set(a.keys()).union(set(b.keys()))\n        \n        a_greater_or_equal = True\n        b_greater_or_equal = True\n\n        for k in keys:\n            val_a = a.get(k, 0)\n            val_b = b.get(k, 0)\n            \n            if val_a < val_b:\n                a_greater_or_equal = False\n            if val_b < val_a:\n                b_greater_or_equal = False\n\n        if a_greater_or_equal and b_greater_or_equal:\n            return \"EQUAL\"\n        elif a_greater_or_equal:\n            return \"AFTER\"\n        elif b_greater_or_equal:\n            return \"BEFORE\"\n        else:\n            return \"CONCURRENT\"\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmprmsh_58f\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_vector_clock_causality PASSED                 [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.572,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  }
+}

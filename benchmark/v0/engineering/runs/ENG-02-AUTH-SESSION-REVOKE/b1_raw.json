@@ -1,50 +1,58 @@
 {
   "task_id": "ENG-02-AUTH-SESSION-REVOKE",
   "baseline": "B1",
-  "runner_version": "gate-1.6b-genuine-agent-benchmark-v1",
+  "runner_version": "gate-1.6c-fair-treatment-benchmark-v1",
   "domain": "Auth & IAM / Distributed State",
   "raw_prompt": "Implement user password reset with active session token revocation and fail-closed token validation in `target_module.py`.",
   "model_metadata": {
     "provider_type": "gemini",
     "model_name": "gemini-3.5-flash-lite",
     "temperature": 0.2,
-    "is_mock": false
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 1,
+    "total_iterations": 1
   },
   "repository": {
     "starting_tree_hash": "2c9a1ccf16be171858b48517b234a720acb66d90c9dbaafdeeaa31411b4db5b7",
-    "final_tree_hash": "36bd8db3b14752e118bbe331a1b8d3be2117bee47553af03c3f3e0f93378ab94"
+    "final_tree_hash": "0e8adc65164fc00fe6098bbcb952e7130439e6027996a796468dba0544072967"
   },
   "execution_trace": [
     {
       "iteration": 1,
       "prompt": "Task Instruction:\nImplement user password reset with active session token revocation and fail-closed token validation in `target_module.py`.\n\nExisting Code in target_module.py:\n```python\n# target_module.py\nactive_tokens = {}\nblacklist = set()\n\ndef issue_token(user_id: str) -> str:\n    pass\n\ndef validate_token(token: str) -> bool:\n    pass\n\ndef reset_password(user_id: str, new_pass: str) -> None:\n    pass\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
-      "response_text": "```python\n# target_module.py\nimport secrets\nimport hashlib\nfrom typing import Dict, Set\n\n# In-memory stores for demonstration purposes\n# active_tokens maps token -> user_id\nactive_tokens: Dict[str, str] = {}\n# blacklist stores revoked tokens to prevent reuse\nblacklist: Set[str] = set()\n\ndef issue_token(user_id: str) -> str:\n    \"\"\"\n    Issues a cryptographically secure session token for a given user_id\n    and registers it in the active_tokens store.\n    \"\"\"\n    token = secrets.token_hex(32)\n    active_tokens[token] = user_id\n    return token\n\ndef validate_token(token: str) -> bool:\n    \"\"\"\n    Validates a session token using a fail-closed approach.\n    Returns True only if the token is present in active_tokens \n    and has not been blacklisted. Any error or invalid state \n    results in False.\n    \"\"\"\n    try:\n        # Fail-closed check: if token is empty/None or in blacklist, fail immediately\n        if not token or not isinstance(token, str):\n            return False\n            \n        if token in blacklist:\n            return False\n            \n        if token not in active_tokens:\n            return False\n            \n        return True\n    except Exception:\n        # Fail-closed on any unexpected exceptions\n        return False\n\ndef reset_password(user_id: str, new_pass: str) -> None:\n    \"\"\"\n    Resets the user's password and revokes all active session tokens \n    associated with that user_id by moving them to the blacklist.\n    \"\"\"\n    # In a real application, you would hash and update the password in the database here:\n    # hashed_password = hashlib.sha256(new_pass.encode('utf-8')).hexdigest()\n    # db.update_password(user_id, hashed_password)\n    \n    # Revoke all active session tokens for this user (fail-closed token revocation)\n    tokens_to_revoke = [\n        token for token, uid in active_tokens.items() \n        if uid == user_id\n    ]\n    \n    for token in tokens_to_revoke:\n        # Remove from active tokens and add to blacklist\n        active_tokens.pop(token, None)\n        blacklist.add(token)\n```",
-      "latency_sec": 2.7936,
+      "response_text": "```python\n# target_module.py\nimport secrets\n\nactive_tokens = {}\nblacklist = set()\n\ndef issue_token(user_id: str) -> str:\n    \"\"\"Issues a secure random session token for a user, revoking any existing token.\"\"\"\n    # Revoke any existing active token for this user to ensure only one active session\n    if user_id in active_tokens:\n        old_token = active_tokens[user_id]\n        blacklist.add(old_token)\n    \n    token = secrets.token_hex(32)\n    active_tokens[user_id] = token\n    return token\n\ndef validate_token(token: str) -> bool:\n    \"\"\"\n    Validates a token. \n    Implements fail-closed token validation: \n    - If the token is missing, empty, blacklisted, or not found in active tokens, return False.\n    \"\"\"\n    try:\n        # Fail-closed check: non-string tokens or empty strings are invalid\n        if not token or not isinstance(token, str):\n            return False\n        \n        # Check if token has been explicitly revoked/blacklisted\n        if token in blacklist:\n            return False\n        \n        # Check if token is currently active\n        if token not in active_tokens.values():\n            return False\n            \n        return True\n    except Exception:\n        # Fail-closed on any unexpected exception during validation\n        return False\n\ndef reset_password(user_id: str, new_pass: str) -> None:\n    \"\"\"\n    Resets the user's password and revokes all active session tokens \n    for that user by adding them to the blacklist and clearing active sessions.\n    \"\"\"\n    # Revoke active session token for the user if it exists\n    if user_id in active_tokens:\n        token = active_tokens.pop(user_id)\n        blacklist.add(token)\n    \n    # In a real-world application, hash the new_pass and update the database here.\n    # e.g., db.update_password(user_id, hash_password(new_pass))\n    pass\n```",
+      "latency_sec": 2.1655,
       "prompt_tokens": 166,
-      "completion_tokens": 541,
-      "cost_usd": 0.000175,
+      "completion_tokens": 481,
+      "cost_usd": 0.000157,
       "pytest_result": {
         "exit_code": 0,
         "passed_count": 1,
         "failed_count": 0,
         "total_count": 1,
-        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp6ozqhc46\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_session_revocation PASSED                     [100%]\n\n============================== 1 passed in 0.04s ==============================\n",
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp_rgqmw0r\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_session_revocation PASSED                     [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
         "stderr": "",
-        "duration_sec": 0.72,
+        "duration_sec": 0.643,
         "all_passed": true
       }
     }
   ],
-  "final_code": "# target_module.py\nimport secrets\nimport hashlib\nfrom typing import Dict, Set\n\n# In-memory stores for demonstration purposes\n# active_tokens maps token -> user_id\nactive_tokens: Dict[str, str] = {}\n# blacklist stores revoked tokens to prevent reuse\nblacklist: Set[str] = set()\n\ndef issue_token(user_id: str) -> str:\n    \"\"\"\n    Issues a cryptographically secure session token for a given user_id\n    and registers it in the active_tokens store.\n    \"\"\"\n    token = secrets.token_hex(32)\n    active_tokens[token] = user_id\n    return token\n\ndef validate_token(token: str) -> bool:\n    \"\"\"\n    Validates a session token using a fail-closed approach.\n    Returns True only if the token is present in active_tokens \n    and has not been blacklisted. Any error or invalid state \n    results in False.\n    \"\"\"\n    try:\n        # Fail-closed check: if token is empty/None or in blacklist, fail immediately\n        if not token or not isinstance(token, str):\n            return False\n            \n        if token in blacklist:\n            return False\n            \n        if token not in active_tokens:\n            return False\n            \n        return True\n    except Exception:\n        # Fail-closed on any unexpected exceptions\n        return False\n\ndef reset_password(user_id: str, new_pass: str) -> None:\n    \"\"\"\n    Resets the user's password and revokes all active session tokens \n    associated with that user_id by moving them to the blacklist.\n    \"\"\"\n    # In a real application, you would hash and update the password in the database here:\n    # hashed_password = hashlib.sha256(new_pass.encode('utf-8')).hexdigest()\n    # db.update_password(user_id, hashed_password)\n    \n    # Revoke all active session tokens for this user (fail-closed token revocation)\n    tokens_to_revoke = [\n        token for token, uid in active_tokens.items() \n        if uid == user_id\n    ]\n    \n    for token in tokens_to_revoke:\n        # Remove from active tokens and add to blacklist\n        active_tokens.pop(token, None)\n        blacklist.add(token)\n",
+  "final_code": "# target_module.py\nimport secrets\n\nactive_tokens = {}\nblacklist = set()\n\ndef issue_token(user_id: str) -> str:\n    \"\"\"Issues a secure random session token for a user, revoking any existing token.\"\"\"\n    # Revoke any existing active token for this user to ensure only one active session\n    if user_id in active_tokens:\n        old_token = active_tokens[user_id]\n        blacklist.add(old_token)\n    \n    token = secrets.token_hex(32)\n    active_tokens[user_id] = token\n    return token\n\ndef validate_token(token: str) -> bool:\n    \"\"\"\n    Validates a token. \n    Implements fail-closed token validation: \n    - If the token is missing, empty, blacklisted, or not found in active tokens, return False.\n    \"\"\"\n    try:\n        # Fail-closed check: non-string tokens or empty strings are invalid\n        if not token or not isinstance(token, str):\n            return False\n        \n        # Check if token has been explicitly revoked/blacklisted\n        if token in blacklist:\n            return False\n        \n        # Check if token is currently active\n        if token not in active_tokens.values():\n            return False\n            \n        return True\n    except Exception:\n        # Fail-closed on any unexpected exception during validation\n        return False\n\ndef reset_password(user_id: str, new_pass: str) -> None:\n    \"\"\"\n    Resets the user's password and revokes all active session tokens \n    for that user by adding them to the blacklist and clearing active sessions.\n    \"\"\"\n    # Revoke active session token for the user if it exists\n    if user_id in active_tokens:\n        token = active_tokens.pop(user_id)\n        blacklist.add(token)\n    \n    # In a real-world application, hash the new_pass and update the database here.\n    # e.g., db.update_password(user_id, hash_password(new_pass))\n    pass\n",
   "oracle_result": {
     "exit_code": 0,
     "passed_count": 1,
     "failed_count": 0,
     "total_count": 1,
-    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp6ozqhc46\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_session_revocation PASSED                     [100%]\n\n============================== 1 passed in 0.04s ==============================\n",
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp_rgqmw0r\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_session_revocation PASSED                     [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
     "stderr": "",
-    "duration_sec": 0.72,
+    "duration_sec": 0.643,
     "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
   },
   "human_evaluation": {
     "defects": null,

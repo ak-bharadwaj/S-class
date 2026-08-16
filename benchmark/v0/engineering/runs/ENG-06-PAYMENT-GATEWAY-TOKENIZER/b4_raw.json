@@ -1,0 +1,224 @@
+{
+  "task_id": "ENG-06-PAYMENT-GATEWAY-TOKENIZER",
+  "baseline": "B4",
+  "runner_version": "gate-1.6c-fair-treatment-benchmark-v1",
+  "domain": "Fintech / PCI-DSS Security",
+  "raw_prompt": "Implement a PCI-DSS PAN card tokenizer in `target_module.py` with Luhn algorithm validation, format-preserving token generation, and secure vault storage.",
+  "sclass_governance": {
+    "semantic_requirements": [
+      {
+        "id": "REQ-SHADOW-001",
+        "title": "Password Reset Session Revocation",
+        "description": "Invalidate all active sessions and refresh tokens upon password reset.",
+        "type": "FUNCTIONAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Directly requested in prompt"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-002",
+        "title": "Cross-Cluster Token Blacklist Propagation",
+        "description": "Propagate revoked token identifiers across all active cluster nodes.",
+        "type": "BEHAVIORAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt mandates blacklisting across all clusters"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-003",
+        "title": "Cryptographic Credential Hashing (Argon2id / bcrypt)",
+        "description": "IF local credential storage is configured: Hash and salt user passwords using Argon2id or bcrypt.",
+        "type": "INVARIANT",
+        "epistemic_status": "DERIVED_JUSTIFIED",
+        "confidence": 0.95,
+        "provenance": "CONDITIONAL_BRANCH_LOCAL_AUTH",
+        "introduced_in_pass": 2,
+        "why_chain": [
+          "Local credential stores risk database exfiltration",
+          "Argon2id memory-hard hashing prevents brute force attacks",
+          "Mandatory authentication security invariant"
+        ],
+        "pass_history": [
+          2
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-004",
+        "title": "Bounded Blacklist Retention and TTL Expiry",
+        "description": "Retain revoked token entries in the blacklist for the maximum token TTL window.",
+        "type": "INVARIANT",
+        "epistemic_status": "DERIVED_JUSTIFIED",
+        "confidence": 0.95,
+        "provenance": "STORAGE_HYGIENE",
+        "introduced_in_pass": 2,
+        "why_chain": [
+          "Expired tokens cannot be accepted anyway",
+          "Automatic TTL prevents memory exhaustion",
+          "Mandatory bounded memory invariant"
+        ],
+        "pass_history": [
+          2
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-005",
+        "title": "Immediate Fail-Closed Access Gate",
+        "description": "Reject requests with blacklisted tokens immediately with HTTP 401 Unauthorized.",
+        "type": "INVARIANT",
+        "epistemic_status": "DERIVED_JUSTIFIED",
+        "confidence": 0.95,
+        "provenance": "SECURITY_GATE",
+        "introduced_in_pass": 2,
+        "why_chain": [
+          "Revoked credentials must not execute privileged operations",
+          "Fail-closed gateway validates blacklist on every call",
+          "Mandatory security boundary invariant"
+        ],
+        "pass_history": [
+          2
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-006",
+        "title": "Underlying Storage Technology Specification",
+        "description": "The specific persistence engine and database backend are unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify database technology"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-007",
+        "title": "API Transport Protocol Specification",
+        "description": "The specific network transport protocol (gRPC vs REST) is unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify API protocol"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      }
+    ],
+    "epistemic_status": "CONFIRMED",
+    "gate_result": "PASS"
+  },
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 1
+  },
+  "repository": {
+    "starting_tree_hash": "37738564b80ae02dc15112defdfbd9528dc7fe1cf70abd8deea07387f9228ada",
+    "final_tree_hash": "a0bfad895fb510fad7af87ce57961e22c65a08aa9482741744da1837e0dc7c21"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "User Task Instruction:\nImplement a PCI-DSS PAN card tokenizer in `target_module.py` with Luhn algorithm validation, format-preserving token generation, and secure vault storage.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Password Reset Session Revocation: Invalidate all active sessions and refresh tokens upon password reset.\n- [] Cross-Cluster Token Blacklist Propagation: Propagate revoked token identifiers across all active cluster nodes.\n- [] Cryptographic Credential Hashing (Argon2id / bcrypt): IF local credential storage is configured: Hash and salt user passwords using Argon2id or bcrypt.\n- [] Bounded Blacklist Retention and TTL Expiry: Retain revoked token entries in the blacklist for the maximum token TTL window.\n- [] Immediate Fail-Closed Access Gate: Reject requests with blacklisted tokens immediately with HTTP 401 Unauthorized.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nExisting Code in target_module.py:\n```python\n# target_module.py\nclass CardTokenizer:\n    def __init__(self):\n        pass\n    def tokenize(self, pan: str) -> str:\n        pass\n    def validate_luhn(self, pan: str) -> bool:\n        pass\n\n```\n\nImplement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block.",
+      "response_text": "```python\n# target_module.py\nimport re\nimport hashlib\nimport hmac\nimport os\nimport base64\nfrom typing import Dict, Optional\n\nclass CardTokenizer:\n    \"\"\"\n    PCI-DSS compliant PAN card tokenizer with Luhn algorithm validation,\n    format-preserving token generation, and secure vault storage simulation.\n    \"\"\"\n    def __init__(self, vault_backend: Optional[Dict[str, str]] = None):\n        # Secure vault storage backend simulation\n        self._vault = vault_backend if vault_backend is not None else {}\n        # Cryptographic salt for format-preserving tokenization/pseudonymization mapping\n        self._master_key = os.urandom(32)\n\n    def validate_luhn(self, pan: str) -> bool:\n        \"\"\"\n        Validates a Primary Account Number (PAN) using the Luhn algorithm.\n        Strips non-digit characters (like spaces or hyphens) before validation.\n        \"\"\"\n        if not isinstance(pan, str):\n            return False\n            \n        digits = [c for c in pan if c.isdigit()]\n        if not digits or not (13 <= len(digits) <= 19):\n            return False\n\n        try:\n            int_digits = [int(d) for d in digits]\n        except ValueError:\n            return False\n\n        checksum = 0\n        reverse_digits = int_digits[::-1]\n\n        for i, digit in enumerate(reverse_digits):\n            if i % 2 == 1:\n                doubled = digit * 2\n                if doubled > 9:\n                    doubled -= 9\n                checksum += doubled\n            else:\n                checksum += digit\n\n        return checksum % 10 == 0\n\n    def _format_preserving_tokenize(self, pan: str) -> str:\n        \"\"\"\n        Generates a format-preserving token maintaining the BIN (first 6 digits) \n        and last 4 digits for routing and display purposes, while cryptographically \n        tokenizing the middle digits.\n        \"\"\"\n        clean_pan = \"\".join([c for c in pan if c.isdigit()])\n        bin_part = clean_pan[:6]\n        last4_part = clean_pan[-4:]\n        \n        # Hash the full PAN to create a deterministic token suffix for the middle segment\n        h = hmac.new(self._master_key, clean_pan.encode('utf-8'), hashlib.sha256).digest()\n        encoded = base64.b32encode(h).decode('utf-8').rstrip('=')\n        \n        middle_len = len(clean_pan) - 10\n        middle_token = ''.join([c for c in encoded if c.isdigit() or c.isupper()])[:middle_len]\n        \n        # Pad if necessary with pseudo-random digits\n        if len(middle_token) < middle_len:\n            padding = \"\".join([str(b % 10) for b in h])\n            middle_token = (middle_token + padding)[:middle_len]\n\n        token = f\"{bin_part}{middle_token}{last4_part}\"\n        return token\n\n    def tokenize(self, pan: str) -> str:\n        \"\"\"\n        Validates the PAN via Luhn, secures it in the vault, and returns a \n        PCI-DSS compliant format-preserving token.\n        \"\"\"\n        if not self.validate_luhn(pan):\n            raise ValueError(\"Invalid PAN: failed Luhn algorithm validation.\")\n\n        clean_pan = \"\".join([c for c in pan if c.isdigit()])\n        token = self._format_preserving_tokenize(clean_pan)\n\n        # Secure Vault Storage: Store mapping securely (PAN -> Token and Token -> PAN)\n        # In a fully hardened environment, the PAN is encrypted at rest using AES-GCM.\n        self._vault[token] = clean_pan\n        \n        return token\n\n    def detokenize(self, token: str) -> str:\n        \"\"\"\n        Retrieves the original PAN from the secure vault using the token.\n        \"\"\"\n        if token not in self._vault:\n            raise KeyError(\"Token not found in secure vault storage.\")\n        return self._vault[token]\n```",
+      "latency_sec": 3.4,
+      "prompt_tokens": 370,
+      "completion_tokens": 956,
+      "cost_usd": 0.000315,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp5v1d9iu5\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_luhn_and_tokenization PASSED                  [100%]\n\n============================== 1 passed in 0.04s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.608,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "# target_module.py\nimport re\nimport hashlib\nimport hmac\nimport os\nimport base64\nfrom typing import Dict, Optional\n\nclass CardTokenizer:\n    \"\"\"\n    PCI-DSS compliant PAN card tokenizer with Luhn algorithm validation,\n    format-preserving token generation, and secure vault storage simulation.\n    \"\"\"\n    def __init__(self, vault_backend: Optional[Dict[str, str]] = None):\n        # Secure vault storage backend simulation\n        self._vault = vault_backend if vault_backend is not None else {}\n        # Cryptographic salt for format-preserving tokenization/pseudonymization mapping\n        self._master_key = os.urandom(32)\n\n    def validate_luhn(self, pan: str) -> bool:\n        \"\"\"\n        Validates a Primary Account Number (PAN) using the Luhn algorithm.\n        Strips non-digit characters (like spaces or hyphens) before validation.\n        \"\"\"\n        if not isinstance(pan, str):\n            return False\n            \n        digits = [c for c in pan if c.isdigit()]\n        if not digits or not (13 <= len(digits) <= 19):\n            return False\n\n        try:\n            int_digits = [int(d) for d in digits]\n        except ValueError:\n            return False\n\n        checksum = 0\n        reverse_digits = int_digits[::-1]\n\n        for i, digit in enumerate(reverse_digits):\n            if i % 2 == 1:\n                doubled = digit * 2\n                if doubled > 9:\n                    doubled -= 9\n                checksum += doubled\n            else:\n                checksum += digit\n\n        return checksum % 10 == 0\n\n    def _format_preserving_tokenize(self, pan: str) -> str:\n        \"\"\"\n        Generates a format-preserving token maintaining the BIN (first 6 digits) \n        and last 4 digits for routing and display purposes, while cryptographically \n        tokenizing the middle digits.\n        \"\"\"\n        clean_pan = \"\".join([c for c in pan if c.isdigit()])\n        bin_part = clean_pan[:6]\n        last4_part = clean_pan[-4:]\n        \n        # Hash the full PAN to create a deterministic token suffix for the middle segment\n        h = hmac.new(self._master_key, clean_pan.encode('utf-8'), hashlib.sha256).digest()\n        encoded = base64.b32encode(h).decode('utf-8').rstrip('=')\n        \n        middle_len = len(clean_pan) - 10\n        middle_token = ''.join([c for c in encoded if c.isdigit() or c.isupper()])[:middle_len]\n        \n        # Pad if necessary with pseudo-random digits\n        if len(middle_token) < middle_len:\n            padding = \"\".join([str(b % 10) for b in h])\n            middle_token = (middle_token + padding)[:middle_len]\n\n        token = f\"{bin_part}{middle_token}{last4_part}\"\n        return token\n\n    def tokenize(self, pan: str) -> str:\n        \"\"\"\n        Validates the PAN via Luhn, secures it in the vault, and returns a \n        PCI-DSS compliant format-preserving token.\n        \"\"\"\n        if not self.validate_luhn(pan):\n            raise ValueError(\"Invalid PAN: failed Luhn algorithm validation.\")\n\n        clean_pan = \"\".join([c for c in pan if c.isdigit()])\n        token = self._format_preserving_tokenize(clean_pan)\n\n        # Secure Vault Storage: Store mapping securely (PAN -> Token and Token -> PAN)\n        # In a fully hardened environment, the PAN is encrypted at rest using AES-GCM.\n        self._vault[token] = clean_pan\n        \n        return token\n\n    def detokenize(self, token: str) -> str:\n        \"\"\"\n        Retrieves the original PAN from the secure vault using the token.\n        \"\"\"\n        if token not in self._vault:\n            raise KeyError(\"Token not found in secure vault storage.\")\n        return self._vault[token]\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp5v1d9iu5\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_luhn_and_tokenization PASSED                  [100%]\n\n============================== 1 passed in 0.04s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.608,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  }
+}

@@ -1,0 +1,239 @@
+{
+  "task_id": "ENG-03-HEALTHCARE-PHI-ANONYMIZER",
+  "baseline": "B4",
+  "runner_version": "gate-1.6c-fair-treatment-benchmark-v1",
+  "domain": "Healthcare PHI / Security",
+  "raw_prompt": "Implement a HIPAA-compliant PHI anonymizer in `target_module.py` that redacts SSN, replaces Patient Names with salted HMAC-SHA256 hashes, and preserves diagnostic code fields.",
+  "sclass_governance": {
+    "semantic_requirements": [
+      {
+        "id": "REQ-SHADOW-001",
+        "title": "Strip 18 HIPAA Safe Harbor Direct Identifiers",
+        "description": "Strip all 18 direct identifiers from health data records before export.",
+        "type": "SECURITY",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt mandates stripping 18 HIPAA Safe Harbor identifiers"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-002",
+        "title": "Export Patient Diagnostic Records to Analytics",
+        "description": "Dispatch de-identified patient diagnostic records to downstream analytics ingestion endpoints.",
+        "type": "FUNCTIONAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt explicitly mandates exporting masked records to analytics"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-003",
+        "title": "Geographic 3-Digit ZIP Code Truncation",
+        "description": "Truncate geographic postal codes to 3 digits and zero out sparsely populated areas.",
+        "type": "INVARIANT",
+        "epistemic_status": "DERIVED_JUSTIFIED",
+        "confidence": 0.95,
+        "provenance": "HIPAA_SAFE_HARBOR",
+        "introduced_in_pass": 2,
+        "why_chain": [
+          "Granular ZIP codes enable re-identification",
+          "Safe harbor requires 3-digit aggregation",
+          "Mandatory statutory privacy invariant"
+        ],
+        "pass_history": [
+          2
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-004",
+        "title": "Date of Service Year Generalization",
+        "description": "Generalize all dates of service to year only and cap ages above 89.",
+        "type": "INVARIANT",
+        "epistemic_status": "DERIVED_JUSTIFIED",
+        "confidence": 0.95,
+        "provenance": "HIPAA_SAFE_HARBOR",
+        "introduced_in_pass": 2,
+        "why_chain": [
+          "Specific birth/admission dates are direct quasi-identifiers",
+          "Year generalization preserves epidemiology",
+          "Mandatory statutory privacy invariant"
+        ],
+        "pass_history": [
+          2
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-005",
+        "title": "Underlying Storage Technology Specification",
+        "description": "The specific persistence engine and database backend are unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify database technology"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-006",
+        "title": "API Transport Protocol Specification",
+        "description": "The specific network transport protocol (gRPC vs REST) is unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify API protocol"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      }
+    ],
+    "epistemic_status": "CONFIRMED",
+    "gate_result": "PASS"
+  },
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 3
+  },
+  "repository": {
+    "starting_tree_hash": "35f4a2f63dd83db4fe104ff677bd98ffc4161ca0143c63405416dd20454a218f",
+    "final_tree_hash": "5b2a66cb68036308b3b99d7b4eb428b728662700d920f8bb07fb84eeed4a6ba4"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "User Task Instruction:\nImplement a HIPAA-compliant PHI anonymizer in `target_module.py` that redacts SSN, replaces Patient Names with salted HMAC-SHA256 hashes, and preserves diagnostic code fields.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Strip 18 HIPAA Safe Harbor Direct Identifiers: Strip all 18 direct identifiers from health data records before export.\n- [] Export Patient Diagnostic Records to Analytics: Dispatch de-identified patient diagnostic records to downstream analytics ingestion endpoints.\n- [] Geographic 3-Digit ZIP Code Truncation: Truncate geographic postal codes to 3 digits and zero out sparsely populated areas.\n- [] Date of Service Year Generalization: Generalize all dates of service to year only and cap ages above 89.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nExisting Code in target_module.py:\n```python\n# target_module.py\nimport hmac, hashlib\n\ndef anonymize_record(record: dict, salt: str) -> dict:\n    pass\n\n```\n\nImplement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block.",
+      "response_text": "```python\n# target_module.py\nimport hmac\nimport hashlib\nimport re\nfrom datetime import datetime\n\ndef anonymize_record(record: dict, salt: str) -> dict:\n    \"\"\"\n    HIPAA-compliant PHI anonymizer that implements the 18 Safe Harbor Direct Identifiers removal,\n    redacts SSN, replaces Patient Names with salted HMAC-SHA256 hashes, generalizes dates to year only,\n    truncates geographic ZIP codes, caps ages above 89, and preserves diagnostic code fields.\n    \"\"\"\n    if not isinstance(record, dict):\n        return {}\n\n    # Create a copy to prevent mutation of the original record\n    out = dict(record)\n\n    # 1. Names: Replace with salted HMAC-SHA256 hashes\n    # Look for common name fields or apply to specific identifier keys\n    name_fields = ['patient_name', 'name', 'first_name', 'last_name', 'full_name']\n    for field in name_fields:\n        if field in out and isinstance(out[field], str):\n            h = hmac.new(salt.encode('utf-8'), out[field].encode('utf-8'), hashlib.sha256)\n            out[field] = h.hexdigest()\n\n    # 2. SSN and other direct identifiers (Phone, Fax, Email, URLs, IP addresses, SSN, MRN, etc.)\n    # Redact SSN specifically as requested and clear out other direct contact/ID fields\n    ssn_pattern = re.compile(r'^\\d{3}-\\d{2}-\\d{4}$|^\\d{9}$')\n    for key, val in list(out.items()):\n        if isinstance(val, str):\n            if ssn_pattern.match(val.strip()) or 'ssn' in key.lower():\n                out[key] = '[REDACTED]'\n        \n        # Strip other explicit Safe Harbor direct identifiers if present in keys\n        lower_key = key.lower()\n        if any(id_key in lower_key for id_key in [\n            'phone', 'fax', 'email', 'url', 'ip_address', 'device_identifier', \n            'certificate', 'license', 'vehicle', 'account_number', 'mrn', \n            'medical_record_number', 'beneficiary'\n        ]):\n            out[key] = '[REDACTED]'\n\n    # 3. Geographic Data: Truncate geographic postal codes to 3 digits (and handle sparse areas if applicable)\n    # HIPAA Safe Harbor requires truncation of all geographic subdivisions smaller than a State, \n    # except for the first 3 digits of a ZIP if the geographic unit formed by combining 3-digit ZIPs contains >20,000 people.\n    zip_fields = ['zip', 'postal_code', 'zipcode']\n    for field in zip_fields:\n        if field in out and out[field] is not None:\n            zip_str = str(out[field]).strip()\n            # Extract first 3 digits if it's a standard US ZIP\n            if len(zip_str) >= 3:\n                prefix = zip_str[:3]\n                # Zero out sparsely populated areas (e.g., standard Safe Harbor rule for certain 3-digit prefixes like 036, 059, etc.)\n                sparse_prefixes = {'036', '059', '102', '203', '556', '692', '878', '879', '884', '893', '894', '897', '898'}\n                if prefix in sparse_prefixes:\n                    out[field] = '000'\n                else:\n                    out[field] = f\"{prefix}00\"[:len(zip_str)] if len(zip_str) > 3 else prefix\n            else:\n                out[field] = '[REDACTED]'\n\n    # Also redact full address lines, cities, and states if they represent smaller-than-state granularity without aggregation\n    address_fields = ['address', 'street', 'city', 'county', 'location']\n    for field in address_fields:\n        if field in out:\n            out[field] = '[REDACTED]'\n\n    # 4. Dates of Service & Age Generalization:\n    # Generalize all dates to year only. Cap ages above 89 to \"90+\".\n    date_fields = ['date', 'dob', 'date_of_service', 'admission_date', 'discharge_date', 'service_date']\n    for field in date_fields:\n        if field in out and out[field] is not None:\n            val = out[field]\n            if isinstance(val, datetime):\n                out[field] = str(val.year)\n            elif isinstance(val, str):\n                # Try parsing standard date formats to extract year\n                matched_year = False\n                for fmt in ('%Y-%m-%d', '%m/%d/%Y', '%Y/%m/%d', '%d-%m-%Y'):\n                    try:\n                        dt = datetime.strptime(val.strip(), fmt)\n                        out[field] = str(dt.year)\n                        matched_year = True\n                        break\n                    except ValueError:\n                        continue\n                if not matched_year:\n                    # If it's already just a year or unparsable, try regex for 4-digit year\n                    year_match = re.search(r'\\b(19|20)\\d{2}\\b', val)\n                    if year_match:\n                        out[field] = year_match.group(0)\n                    else:\n                        out[field] = '[REDACTED]'\n\n    # Age capping above 89\n    age_fields = ['age', 'patient_age']\n    for field in age_fields:\n        if field in out and out[field] is not None:\n            try:\n                age_val = int(out[field])\n                if age_val > 89:\n                    out[field] = '90+'\n                else:\n                    out[field] = str(age_val)\n            except (ValueError, TypeError):\n                pass\n\n    # 5. Preserve diagnostic code fields (ICD codes, diagnosis, symptoms, procedures)\n    # Ensure diagnostic fields remain intact and unredacted per requirements.\n    # Diagnostic fields typically include keys like 'icd', 'diagnosis', 'diag_code', 'cpt', 'procedures'.\n    # Since we preserve all keys by default unless explicitly targeted for PHI stripping above, \n    # diagnostic codes naturally pass through.\n\n    return out\n```",
+      "latency_sec": 5.9422,
+      "prompt_tokens": 330,
+      "completion_tokens": 1519,
+      "cost_usd": 0.00048,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp5rd1o8p9\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_phi_anonymization FAILED                      [100%]\n\n================================== FAILURES ===================================\n___________________________ test_phi_anonymization ____________________________\ntests\\test_oracle.py:7: in test_phi_anonymization\n    assert res['ssn'] == '[REDACTED_SSN]'\nE   AssertionError: assert '[REDACTED]' == '[REDACTED_SSN]'\nE     \nE     - [REDACTED_SSN]\nE     ?          ----\nE     + [REDACTED]\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_phi_anonymization - AssertionError: assert ...\n============================== 1 failed in 0.11s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.637,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "User Task Instruction:\nImplement a HIPAA-compliant PHI anonymizer in `target_module.py` that redacts SSN, replaces Patient Names with salted HMAC-SHA256 hashes, and preserves diagnostic code fields.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Strip 18 HIPAA Safe Harbor Direct Identifiers: Strip all 18 direct identifiers from health data records before export.\n- [] Export Patient Diagnostic Records to Analytics: Dispatch de-identified patient diagnostic records to downstream analytics ingestion endpoints.\n- [] Geographic 3-Digit ZIP Code Truncation: Truncate geographic postal codes to 3 digits and zero out sparsely populated areas.\n- [] Date of Service Year Generalization: Generalize all dates of service to year only and cap ages above 89.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nYour previous implementation produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp5rd1o8p9\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_phi_anonymization FAILED                      [100%]\n\n================================== FAILURES ===================================\n___________________________ test_phi_anonymization ____________________________\ntests\\test_oracle.py:7: in test_phi_anonymization\n    assert res['ssn'] == '[REDACTED_SSN]'\nE   AssertionError: assert '[REDACTED]' == '[REDACTED_SSN]'\nE     \nE     - [REDACTED_SSN]\nE     ?          ----\nE     + [REDACTED]\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_phi_anonymization - AssertionError: assert ...\n============================== 1 failed in 0.11s ==============================\n\n\n\nPrevious Code in target_module.py:\n```python\n# target_module.py\nimport hmac\nimport hashlib\nimport re\nfrom datetime import datetime\n\ndef anonymize_record(record: dict, salt: str) -> dict:\n    \"\"\"\n    HIPAA-compliant PHI anonymizer that implements the 18 Safe Harbor Direct Identifiers removal,\n    redacts SSN, replaces Patient Names with salted HMAC-SHA256 hashes, generalizes dates to year only,\n    truncates geographic ZIP codes, caps ages above 89, and preserves diagnostic code fields.\n    \"\"\"\n    if not isinstance(record, dict):\n        return {}\n\n    # Create a copy to prevent mutation of the original record\n    out = dict(record)\n\n    # 1. Names: Replace with salted HMAC-SHA256 hashes\n    # Look for common name fields or apply to specific identifier keys\n    name_fields = ['patient_name', 'name', 'first_name', 'last_name', 'full_name']\n    for field in name_fields:\n        if field in out and isinstance(out[field], str):\n            h = hmac.new(salt.encode('utf-8'), out[field].encode('utf-8'), hashlib.sha256)\n            out[field] = h.hexdigest()\n\n    # 2. SSN and other direct identifiers (Phone, Fax, Email, URLs, IP addresses, SSN, MRN, etc.)\n    # Redact SSN specifically as requested and clear out other direct contact/ID fields\n    ssn_pattern = re.compile(r'^\\d{3}-\\d{2}-\\d{4}$|^\\d{9}$')\n    for key, val in list(out.items()):\n        if isinstance(val, str):\n            if ssn_pattern.match(val.strip()) or 'ssn' in key.lower():\n                out[key] = '[REDACTED]'\n        \n        # Strip other explicit Safe Harbor direct identifiers if present in keys\n        lower_key = key.lower()\n        if any(id_key in lower_key for id_key in [\n            'phone', 'fax', 'email', 'url', 'ip_address', 'device_identifier', \n            'certificate', 'license', 'vehicle', 'account_number', 'mrn', \n            'medical_record_number', 'beneficiary'\n        ]):\n            out[key] = '[REDACTED]'\n\n    # 3. Geographic Data: Truncate geographic postal codes to 3 digits (and handle sparse areas if applicable)\n    # HIPAA Safe Harbor requires truncation of all geographic subdivisions smaller than a State, \n    # except for the first 3 digits of a ZIP if the geographic unit formed by combining 3-digit ZIPs contains >20,000 people.\n    zip_fields = ['zip', 'postal_code', 'zipcode']\n    for field in zip_fields:\n        if field in out and out[field] is not None:\n            zip_str = str(out[field]).strip()\n            # Extract first 3 digits if it's a standard US ZIP\n            if len(zip_str) >= 3:\n                prefix = zip_str[:3]\n                # Zero out sparsely populated areas (e.g., standard Safe Harbor rule for certain 3-digit prefixes like 036, 059, etc.)\n                sparse_prefixes = {'036', '059', '102', '203', '556', '692', '878', '879', '884', '893', '894', '897', '898'}\n                if prefix in sparse_prefixes:\n                    out[field] = '000'\n                else:\n                    out[field] = f\"{prefix}00\"[:len(zip_str)] if len(zip_str) > 3 else prefix\n            else:\n                out[field] = '[REDACTED]'\n\n    # Also redact full address lines, cities, and states if they represent smaller-than-state granularity without aggregation\n    address_fields = ['address', 'street', 'city', 'county', 'location']\n    for field in address_fields:\n        if field in out:\n            out[field] = '[REDACTED]'\n\n    # 4. Dates of Service & Age Generalization:\n    # Generalize all dates to year only. Cap ages above 89 to \"90+\".\n    date_fields = ['date', 'dob', 'date_of_service', 'admission_date', 'discharge_date', 'service_date']\n    for field in date_fields:\n        if field in out and out[field] is not None:\n            val = out[field]\n            if isinstance(val, datetime):\n                out[field] = str(val.year)\n            elif isinstance(val, str):\n                # Try parsing standard date formats to extract year\n                matched_year = False\n                for fmt in ('%Y-%m-%d', '%m/%d/%Y', '%Y/%m/%d', '%d-%m-%Y'):\n                    try:\n                        dt = datetime.strptime(val.strip(), fmt)\n                        out[field] = str(dt.year)\n                        matched_year = True\n                        break\n                    except ValueError:\n                        continue\n                if not matched_year:\n                    # If it's already just a year or unparsable, try regex for 4-digit year\n                    year_match = re.search(r'\\b(19|20)\\d{2}\\b', val)\n                    if year_match:\n                        out[field] = year_match.group(0)\n                    else:\n                        out[field] = '[REDACTED]'\n\n    # Age capping above 89\n    age_fields = ['age', 'patient_age']\n    for field in age_fields:\n        if field in out and out[field] is not None:\n            try:\n                age_val = int(out[field])\n                if age_val > 89:\n                    out[field] = '90+'\n                else:\n                    out[field] = str(age_val)\n            except (ValueError, TypeError):\n                pass\n\n    # 5. Preserve diagnostic code fields (ICD codes, diagnosis, symptoms, procedures)\n    # Ensure diagnostic fields remain intact and unredacted per requirements.\n    # Diagnostic fields typically include keys like 'icd', 'diagnosis', 'diag_code', 'cpt', 'procedures'.\n    # Since we preserve all keys by default unless explicitly targeted for PHI stripping above, \n    # diagnostic codes naturally pass through.\n\n    return out\n\n```\n\nAnalyze the test failures against the S-Class governance requirements and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\n# target_module.py\nimport hmac\nimport hashlib\nimport re\nfrom datetime import datetime\n\ndef anonymize_record(record: dict, salt: str) -> dict:\n    \"\"\"\n    HIPAA-compliant PHI anonymizer that implements the 18 Safe Harbor Direct Identifiers removal,\n    redacts SSN, replaces Patient Names with salted HMAC-SHA256 hashes, generalizes dates to year only,\n    truncates geographic ZIP codes, caps ages above 89, and preserves diagnostic code fields.\n    \"\"\"\n    if not isinstance(record, dict):\n        return {}\n\n    # Create a copy to prevent mutation of the original record\n    out = dict(record)\n\n    # 1. Names: Replace with salted HMAC-SHA256 hashes\n    name_fields = ['patient_name', 'name', 'first_name', 'last_name', 'full_name']\n    for field in name_fields:\n        if field in out and isinstance(out[field], str):\n            h = hmac.new(salt.encode('utf-8'), out[field].encode('utf-8'), hashlib.sha256)\n            out[field] = h.hexdigest()\n\n    # 2. SSN and other direct identifiers (Phone, Fax, Email, URLs, IP addresses, SSN, MRN, etc.)\n    ssn_pattern = re.compile(r'^\\d{3}-\\d{2}-\\d{4}$|^\\d{9}$')\n    for key, val in list(out.items()):\n        if isinstance(val, str):\n            if ssn_pattern.match(val.strip()) or 'ssn' in key.lower():\n                out[key] = '[REDACTED_SSN]'\n        \n        # Strip other explicit Safe Harbor direct identifiers if present in keys\n        lower_key = key.lower()\n        if any(id_key in lower_key for id_key in [\n            'phone', 'fax', 'email', 'url', 'ip_address', 'device_identifier', \n            'certificate', 'license', 'vehicle', 'account_number', 'mrn', \n            'medical_record_number', 'beneficiary'\n        ]) and 'ssn' not in lower_key:\n            out[key] = '[REDACTED]'\n\n    # 3. Geographic Data: Truncate geographic postal codes to 3 digits (and handle sparse areas if applicable)\n    zip_fields = ['zip', 'postal_code', 'zipcode']\n    for field in zip_fields:\n        if field in out and out[field] is not None:\n            zip_str = str(out[field]).strip()\n            if len(zip_str) >= 3:\n                prefix = zip_str[:3]\n                sparse_prefixes = {'036', '059', '102', '203', '556', '692', '878', '879', '884', '893', '894', '897', '898'}\n                if prefix in sparse_prefixes:\n                    out[field] = '000'\n                else:\n                    out[field] = f\"{prefix}00\"[:len(zip_str)] if len(zip_str) > 3 else prefix\n            else:\n                out[field] = '[REDACTED]'\n\n    address_fields = ['address', 'street', 'city', 'county', 'location']\n    for field in address_fields:\n        if field in out:\n            out[field] = '[REDACTED]'\n\n    # 4. Dates of Service & Age Generalization:\n    date_fields = ['date', 'dob', 'date_of_service', 'admission_date', 'discharge_date', 'service_date']\n    for field in date_fields:\n        if field in out and out[field] is not None:\n            val = out[field]\n            if isinstance(val, datetime):\n                out[field] = str(val.year)\n            elif isinstance(val, str):\n                matched_year = False\n                for fmt in ('%Y-%m-%d', '%m/%d/%Y', '%Y/%m/%d', '%d-%m-%Y'):\n                    try:\n                        dt = datetime.strptime(val.strip(), fmt)\n                        out[field] = str(dt.year)\n                        matched_year = True\n                        break\n                    except ValueError:\n                        continue\n                if not matched_year:\n                    year_match = re.search(r'\\b(19|20)\\d{2}\\b', val)\n                    if year_match:\n                        out[field] = year_match.group(0)\n                    else:\n                        out[field] = '[REDACTED]'\n\n    # Age capping above 89\n    age_fields = ['age', 'patient_age']\n    for field in age_fields:\n        if field in out and out[field] is not None:\n            try:\n                age_val = int(out[field])\n                if age_val > 89:\n                    out[field] = '90+'\n                else:\n                    out[field] = str(age_val)\n            except (ValueError, TypeError):\n                pass\n\n    return out\n```",
+      "latency_sec": 3.7449,
+      "prompt_tokens": 2142,
+      "completion_tokens": 1219,
+      "cost_usd": 0.000526,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp5rd1o8p9\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_phi_anonymization FAILED                      [100%]\n\n================================== FAILURES ===================================\n___________________________ test_phi_anonymization ____________________________\ntests\\test_oracle.py:8: in test_phi_anonymization\n    assert res['name'].startswith('ANON_')\nE   AssertionError: assert False\nE    +  where False = <built-in method startswith of str object at 0x00000287E7AAFAD0>('ANON_')\nE    +    where <built-in method startswith of str object at 0x00000287E7AAFAD0> = '61832d59717497988eb20d6fde1b52448e709e102dab941fafdf3d3d50a46f35'.startswith\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_phi_anonymization - AssertionError: assert ...\n============================== 1 failed in 0.09s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.644,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 3,
+      "prompt": "User Task Instruction:\nImplement a HIPAA-compliant PHI anonymizer in `target_module.py` that redacts SSN, replaces Patient Names with salted HMAC-SHA256 hashes, and preserves diagnostic code fields.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Strip 18 HIPAA Safe Harbor Direct Identifiers: Strip all 18 direct identifiers from health data records before export.\n- [] Export Patient Diagnostic Records to Analytics: Dispatch de-identified patient diagnostic records to downstream analytics ingestion endpoints.\n- [] Geographic 3-Digit ZIP Code Truncation: Truncate geographic postal codes to 3 digits and zero out sparsely populated areas.\n- [] Date of Service Year Generalization: Generalize all dates of service to year only and cap ages above 89.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nYour previous implementation produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp5rd1o8p9\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_phi_anonymization FAILED                      [100%]\n\n================================== FAILURES ===================================\n___________________________ test_phi_anonymization ____________________________\ntests\\test_oracle.py:8: in test_phi_anonymization\n    assert res['name'].startswith('ANON_')\nE   AssertionError: assert False\nE    +  where False = <built-in method startswith of str object at 0x00000287E7AAFAD0>('ANON_')\nE    +    where <built-in method startswith of str object at 0x00000287E7AAFAD0> = '61832d59717497988eb20d6fde1b52448e709e102dab941fafdf3d3d50a46f35'.startswith\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_phi_anonymization - AssertionError: assert ...\n============================== 1 failed in 0.09s ==============================\n\n\n\nPrevious Code in target_module.py:\n```python\n# target_module.py\nimport hmac\nimport hashlib\nimport re\nfrom datetime import datetime\n\ndef anonymize_record(record: dict, salt: str) -> dict:\n    \"\"\"\n    HIPAA-compliant PHI anonymizer that implements the 18 Safe Harbor Direct Identifiers removal,\n    redacts SSN, replaces Patient Names with salted HMAC-SHA256 hashes, generalizes dates to year only,\n    truncates geographic ZIP codes, caps ages above 89, and preserves diagnostic code fields.\n    \"\"\"\n    if not isinstance(record, dict):\n        return {}\n\n    # Create a copy to prevent mutation of the original record\n    out = dict(record)\n\n    # 1. Names: Replace with salted HMAC-SHA256 hashes\n    name_fields = ['patient_name', 'name', 'first_name', 'last_name', 'full_name']\n    for field in name_fields:\n        if field in out and isinstance(out[field], str):\n            h = hmac.new(salt.encode('utf-8'), out[field].encode('utf-8'), hashlib.sha256)\n            out[field] = h.hexdigest()\n\n    # 2. SSN and other direct identifiers (Phone, Fax, Email, URLs, IP addresses, SSN, MRN, etc.)\n    ssn_pattern = re.compile(r'^\\d{3}-\\d{2}-\\d{4}$|^\\d{9}$')\n    for key, val in list(out.items()):\n        if isinstance(val, str):\n            if ssn_pattern.match(val.strip()) or 'ssn' in key.lower():\n                out[key] = '[REDACTED_SSN]'\n        \n        # Strip other explicit Safe Harbor direct identifiers if present in keys\n        lower_key = key.lower()\n        if any(id_key in lower_key for id_key in [\n            'phone', 'fax', 'email', 'url', 'ip_address', 'device_identifier', \n            'certificate', 'license', 'vehicle', 'account_number', 'mrn', \n            'medical_record_number', 'beneficiary'\n        ]) and 'ssn' not in lower_key:\n            out[key] = '[REDACTED]'\n\n    # 3. Geographic Data: Truncate geographic postal codes to 3 digits (and handle sparse areas if applicable)\n    zip_fields = ['zip', 'postal_code', 'zipcode']\n    for field in zip_fields:\n        if field in out and out[field] is not None:\n            zip_str = str(out[field]).strip()\n            if len(zip_str) >= 3:\n                prefix = zip_str[:3]\n                sparse_prefixes = {'036', '059', '102', '203', '556', '692', '878', '879', '884', '893', '894', '897', '898'}\n                if prefix in sparse_prefixes:\n                    out[field] = '000'\n                else:\n                    out[field] = f\"{prefix}00\"[:len(zip_str)] if len(zip_str) > 3 else prefix\n            else:\n                out[field] = '[REDACTED]'\n\n    address_fields = ['address', 'street', 'city', 'county', 'location']\n    for field in address_fields:\n        if field in out:\n            out[field] = '[REDACTED]'\n\n    # 4. Dates of Service & Age Generalization:\n    date_fields = ['date', 'dob', 'date_of_service', 'admission_date', 'discharge_date', 'service_date']\n    for field in date_fields:\n        if field in out and out[field] is not None:\n            val = out[field]\n            if isinstance(val, datetime):\n                out[field] = str(val.year)\n            elif isinstance(val, str):\n                matched_year = False\n                for fmt in ('%Y-%m-%d', '%m/%d/%Y', '%Y/%m/%d', '%d-%m-%Y'):\n                    try:\n                        dt = datetime.strptime(val.strip(), fmt)\n                        out[field] = str(dt.year)\n                        matched_year = True\n                        break\n                    except ValueError:\n                        continue\n                if not matched_year:\n                    year_match = re.search(r'\\b(19|20)\\d{2}\\b', val)\n                    if year_match:\n                        out[field] = year_match.group(0)\n                    else:\n                        out[field] = '[REDACTED]'\n\n    # Age capping above 89\n    age_fields = ['age', 'patient_age']\n    for field in age_fields:\n        if field in out and out[field] is not None:\n            try:\n                age_val = int(out[field])\n                if age_val > 89:\n                    out[field] = '90+'\n                else:\n                    out[field] = str(age_val)\n            except (ValueError, TypeError):\n                pass\n\n    return out\n\n```\n\nAnalyze the test failures against the S-Class governance requirements and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\n# target_module.py\nimport hmac\nimport hashlib\nimport re\nfrom datetime import datetime\n\ndef anonymize_record(record: dict, salt: str) -> dict:\n    \"\"\"\n    HIPAA-compliant PHI anonymizer that implements the 18 Safe Harbor Direct Identifiers removal,\n    redacts SSN, replaces Patient Names with salted HMAC-SHA256 hashes prefixed with 'ANON_',\n    generalizes dates to year only, truncates geographic ZIP codes, caps ages above 89, \n    and preserves diagnostic code fields.\n    \"\"\"\n    if not isinstance(record, dict):\n        return {}\n\n    # Create a copy to prevent mutation of the original record\n    out = dict(record)\n\n    # 1. Names: Replace with salted HMAC-SHA256 hashes prefixed with 'ANON_'\n    name_fields = ['patient_name', 'name', 'first_name', 'last_name', 'full_name']\n    for field in name_fields:\n        if field in out and isinstance(out[field], str):\n            h = hmac.new(salt.encode('utf-8'), out[field].encode('utf-8'), hashlib.sha256)\n            out[field] = f\"ANON_{h.hexdigest()}\"\n\n    # 2. SSN and other direct identifiers (Phone, Fax, Email, URLs, IP addresses, SSN, MRN, etc.)\n    ssn_pattern = re.compile(r'^\\d{3}-\\d{2}-\\d{4}$|^\\d{9}$')\n    for key, val in list(out.items()):\n        if isinstance(val, str):\n            if ssn_pattern.match(val.strip()) or 'ssn' in key.lower():\n                out[key] = '[REDACTED_SSN]'\n        \n        # Strip other explicit Safe Harbor direct identifiers if present in keys\n        lower_key = key.lower()\n        if any(id_key in lower_key for id_key in [\n            'phone', 'fax', 'email', 'url', 'ip_address', 'device_identifier', \n            'certificate', 'license', 'vehicle', 'account_number', 'mrn', \n            'medical_record_number', 'beneficiary'\n        ]) and 'ssn' not in lower_key:\n            out[key] = '[REDACTED]'\n\n    # 3. Geographic Data: Truncate geographic postal codes to 3 digits (and handle sparse areas if applicable)\n    zip_fields = ['zip', 'postal_code', 'zipcode']\n    for field in zip_fields:\n        if field in out and out[field] is not None:\n            zip_str = str(out[field]).strip()\n            if len(zip_str) >= 3:\n                prefix = zip_str[:3]\n                sparse_prefixes = {'036', '059', '102', '203', '556', '692', '878', '879', '884', '893', '894', '897', '898'}\n                if prefix in sparse_prefixes:\n                    out[field] = '000'\n                else:\n                    out[field] = f\"{prefix}00\"[:len(zip_str)] if len(zip_str) > 3 else prefix\n            else:\n                out[field] = '[REDACTED]'\n\n    address_fields = ['address', 'street', 'city', 'county', 'location']\n    for field in address_fields:\n        if field in out:\n            out[field] = '[REDACTED]'\n\n    # 4. Dates of Service & Age Generalization:\n    date_fields = ['date', 'dob', 'date_of_service', 'admission_date', 'discharge_date', 'service_date']\n    for field in date_fields:\n        if field in out and out[field] is not None:\n            val = out[field]\n            if isinstance(val, datetime):\n                out[field] = str(val.year)\n            elif isinstance(val, str):\n                matched_year = False\n                for fmt in ('%Y-%m-%d', '%m/%d/%Y', '%Y/%m/%d', '%d-%m-%Y'):\n                    try:\n                        dt = datetime.strptime(val.strip(), fmt)\n                        out[field] = str(dt.year)\n                        matched_year = True\n                        break\n                    except ValueError:\n                        continue\n                if not matched_year:\n                    year_match = re.search(r'\\b(19|20)\\d{2}\\b', val)\n                    if year_match:\n                        out[field] = year_match.group(0)\n                    else:\n                        out[field] = '[REDACTED]'\n\n    # Age capping above 89\n    age_fields = ['age', 'patient_age']\n    for field in age_fields:\n        if field in out and out[field] is not None:\n            try:\n                age_val = int(out[field])\n                if age_val > 89:\n                    out[field] = '90+'\n                else:\n                    out[field] = str(age_val)\n            except (ValueError, TypeError):\n                pass\n\n    return out\n```",
+      "latency_sec": 3.1435,
+      "prompt_tokens": 1931,
+      "completion_tokens": 1240,
+      "cost_usd": 0.000517,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp5rd1o8p9\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_phi_anonymization PASSED                      [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.518,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "# target_module.py\nimport hmac\nimport hashlib\nimport re\nfrom datetime import datetime\n\ndef anonymize_record(record: dict, salt: str) -> dict:\n    \"\"\"\n    HIPAA-compliant PHI anonymizer that implements the 18 Safe Harbor Direct Identifiers removal,\n    redacts SSN, replaces Patient Names with salted HMAC-SHA256 hashes prefixed with 'ANON_',\n    generalizes dates to year only, truncates geographic ZIP codes, caps ages above 89, \n    and preserves diagnostic code fields.\n    \"\"\"\n    if not isinstance(record, dict):\n        return {}\n\n    # Create a copy to prevent mutation of the original record\n    out = dict(record)\n\n    # 1. Names: Replace with salted HMAC-SHA256 hashes prefixed with 'ANON_'\n    name_fields = ['patient_name', 'name', 'first_name', 'last_name', 'full_name']\n    for field in name_fields:\n        if field in out and isinstance(out[field], str):\n            h = hmac.new(salt.encode('utf-8'), out[field].encode('utf-8'), hashlib.sha256)\n            out[field] = f\"ANON_{h.hexdigest()}\"\n\n    # 2. SSN and other direct identifiers (Phone, Fax, Email, URLs, IP addresses, SSN, MRN, etc.)\n    ssn_pattern = re.compile(r'^\\d{3}-\\d{2}-\\d{4}$|^\\d{9}$')\n    for key, val in list(out.items()):\n        if isinstance(val, str):\n            if ssn_pattern.match(val.strip()) or 'ssn' in key.lower():\n                out[key] = '[REDACTED_SSN]'\n        \n        # Strip other explicit Safe Harbor direct identifiers if present in keys\n        lower_key = key.lower()\n        if any(id_key in lower_key for id_key in [\n            'phone', 'fax', 'email', 'url', 'ip_address', 'device_identifier', \n            'certificate', 'license', 'vehicle', 'account_number', 'mrn', \n            'medical_record_number', 'beneficiary'\n        ]) and 'ssn' not in lower_key:\n            out[key] = '[REDACTED]'\n\n    # 3. Geographic Data: Truncate geographic postal codes to 3 digits (and handle sparse areas if applicable)\n    zip_fields = ['zip', 'postal_code', 'zipcode']\n    for field in zip_fields:\n        if field in out and out[field] is not None:\n            zip_str = str(out[field]).strip()\n            if len(zip_str) >= 3:\n                prefix = zip_str[:3]\n                sparse_prefixes = {'036', '059', '102', '203', '556', '692', '878', '879', '884', '893', '894', '897', '898'}\n                if prefix in sparse_prefixes:\n                    out[field] = '000'\n                else:\n                    out[field] = f\"{prefix}00\"[:len(zip_str)] if len(zip_str) > 3 else prefix\n            else:\n                out[field] = '[REDACTED]'\n\n    address_fields = ['address', 'street', 'city', 'county', 'location']\n    for field in address_fields:\n        if field in out:\n            out[field] = '[REDACTED]'\n\n    # 4. Dates of Service & Age Generalization:\n    date_fields = ['date', 'dob', 'date_of_service', 'admission_date', 'discharge_date', 'service_date']\n    for field in date_fields:\n        if field in out and out[field] is not None:\n            val = out[field]\n            if isinstance(val, datetime):\n                out[field] = str(val.year)\n            elif isinstance(val, str):\n                matched_year = False\n                for fmt in ('%Y-%m-%d', '%m/%d/%Y', '%Y/%m/%d', '%d-%m-%Y'):\n                    try:\n                        dt = datetime.strptime(val.strip(), fmt)\n                        out[field] = str(dt.year)\n                        matched_year = True\n                        break\n                    except ValueError:\n                        continue\n                if not matched_year:\n                    year_match = re.search(r'\\b(19|20)\\d{2}\\b', val)\n                    if year_match:\n                        out[field] = year_match.group(0)\n                    else:\n                        out[field] = '[REDACTED]'\n\n    # Age capping above 89\n    age_fields = ['age', 'patient_age']\n    for field in age_fields:\n        if field in out and out[field] is not None:\n            try:\n                age_val = int(out[field])\n                if age_val > 89:\n                    out[field] = '90+'\n                else:\n                    out[field] = str(age_val)\n            except (ValueError, TypeError):\n                pass\n\n    return out\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp5rd1o8p9\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_phi_anonymization PASSED                      [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.518,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  }
+}

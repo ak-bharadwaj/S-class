@@ -1,0 +1,134 @@
+{
+  "task_id": "ENG-13-MULTI-REGION-KMS-SECRETS",
+  "baseline": "B4",
+  "runner_version": "gate-1.6c-fair-treatment-benchmark-v1",
+  "domain": "Cloud Security / KMS Cryptography",
+  "raw_prompt": "Implement an envelope encryption manager in `target_module.py` with AES-256 data key generation, Key Encryption Key (KEK) wrapping, and automated key rotation.",
+  "sclass_governance": {
+    "semantic_requirements": [
+      {
+        "id": "REQ-SHADOW-001",
+        "title": "Core Service Functionality",
+        "description": "Implement core processing logic for: Implement an envelope encryption manager in `target_module.py` with AES-256 data key generation, Key Encryption Key (KEK) wrapping, and automated key rotation.",
+        "type": "FUNCTIONAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt execution mandate"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-002",
+        "title": "Underlying Storage Technology Specification",
+        "description": "The specific persistence engine and database backend are unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify database technology"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-003",
+        "title": "API Transport Protocol Specification",
+        "description": "The specific network transport protocol (gRPC vs REST) is unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify API protocol"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      }
+    ],
+    "epistemic_status": "CONFIRMED",
+    "gate_result": "PASS"
+  },
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 1
+  },
+  "repository": {
+    "starting_tree_hash": "85cca8a308d26c5a57866df8643d9d2b172080932efb2b63aa69fc043dd99297",
+    "final_tree_hash": "abf5b480e95aaef611d7aecf857666eabab0f8171099d4ce62fe6c9956322ba1"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "User Task Instruction:\nImplement an envelope encryption manager in `target_module.py` with AES-256 data key generation, Key Encryption Key (KEK) wrapping, and automated key rotation.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement an envelope encryption manager in `target_module.py` with AES-256 data key generation, Key Encryption Key (KEK) wrapping, and automated key rotation.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nExisting Code in target_module.py:\n```python\n# target_module.py\nclass EnvelopeKMS:\n    def __init__(self, kek_secret: str):\n        pass\n    def encrypt_secret(self, plaintext: str) -> dict:\n        pass\n    def decrypt_secret(self, encrypted_payload: dict) -> str:\n        pass\n\n```\n\nImplement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block.",
+      "response_text": "```python\n# target_module.py\nimport os\nimport base64\nimport time\nfrom typing import Dict, Any\nfrom cryptography.hazmat.primitives.ciphers.aead import AESGCM\nfrom cryptography.hazmat.primitives.kdf.hkdf import HKDF\nfrom cryptography.hazmat.primitives import hashes\n\nclass EnvelopeKMS:\n    \"\"\"\n    An enterprise-grade envelope encryption manager providing AES-256 data key generation,\n    Key Encryption Key (KEK) wrapping using HKDF-derived keys and AES-GCM, and automated\n    time-based key rotation.\n    \"\"\"\n    def __init__(self, kek_secret: str, rotation_interval_seconds: int = 86400):\n        self.kek_secret = kek_secret.encode('utf-8')\n        self.rotation_interval = rotation_interval_seconds\n        self.current_key_version = 1\n        self.last_rotation_time = time.time()\n        \n        # Initialize KEK store mapping version -> raw 32-byte wrapping key\n        self._kek_store: Dict[int, bytes] = {}\n        self._kek_store[self.current_key_version] = self._derive_kek(self.kek_secret, self.current_key_version)\n\n    def _derive_kek(self, secret: bytes, version: int) -> bytes:\n        \"\"\"Derives a 256-bit KEK from the base secret and a version salt using HKDF.\"\"\"\n        hkdf = HKDF(\n            algorithm=hashes.SHA256(),\n            length=32,\n            salt=f\"envelope-kms-version-{version}\".encode('utf-8'),\n            info=b\"kek-derivation\"\n        )\n        return hkdf.derive(secret)\n\n    def _check_rotation(self) -> None:\n        \"\"\"Checks if the KEK rotation interval has passed, and rotates if necessary.\"\"\"\n        if time.time() - self.last_rotation_time > self.rotation_interval:\n            self.current_key_version += 1\n            self._kek_store[self.current_key_version] = self._derive_kek(self.kek_secret, self.current_key_version)\n            self.last_rotation_time = time.time()\n\n    def encrypt_secret(self, plaintext: str) -> Dict[str, Any]:\n        \"\"\"\n        Encrypts plaintext using an ephemeral AES-256 Data Encryption Key (DEK),\n        then wraps (encrypts) the DEK using the active KEK (with automated rotation check).\n        \n        Returns a dictionary payload containing the ciphertext, wrapped DEK, IVs, and key version.\n        \"\"\"\n        self._check_rotation()\n        active_version = self.current_key_version\n        active_kek = self._kek_store[active_version]\n\n        # 1. Generate ephemeral 256-bit DEK\n        dek = AESGCM.generate_key(bit_length=256)\n        aesgcm_dek = AESGCM(dek)\n\n        # 2. Encrypt plaintext with DEK\n        dek_iv = os.urandom(12)\n        ciphertext = aesgcm_dek.encrypt(dek_iv, plaintext.encode('utf-8'), None)\n\n        # 3. Wrap DEK with active KEK\n        aesgcm_kek = AESGCM(active_kek)\n        kek_iv = os.urandom(12)\n        wrapped_dek = aesgcm_kek.encrypt(kek_iv, dek, None)\n\n        return {\n            \"ciphertext\": base64.b64encode(ciphertext).decode('utf-8'),\n            \"wrapped_dek\": base64.b64encode(wrapped_dek).decode('utf-8'),\n            \"dek_iv\": base64.b64encode(dek_iv).decode('utf-8'),\n            \"kek_iv\": base64.b64encode(kek_iv).decode('utf-8'),\n            \"key_version\": active_version\n        }\n\n    def decrypt_secret(self, encrypted_payload: Dict[str, Any]) -> str:\n        \"\"\"\n        Decrypts an encrypted payload by unwrapping the DEK using the appropriate KEK version\n        and subsequently decrypting the ciphertext to recover the original plaintext.\n        \"\"\"\n        version = encrypted_payload[\"key_version\"]\n        if version not in self._kek_store:\n            raise ValueError(f\"Unknown or expired KEK version: {version}\")\n\n        kek = self._kek_store[version]\n\n        ciphertext = base64.b64decode(encrypted_payload[\"ciphertext\"])\n        wrapped_dek = base64.b64decode(encrypted_payload[\"wrapped_dek\"])\n        dek_iv = base64.b64decode(encrypted_payload[\"dek_iv\"])\n        kek_iv = base64.b64decode(encrypted_payload[\"kek_iv\"])\n\n        # 1. Unwrap DEK using KEK\n        aesgcm_kek = AESGCM(kek)\n        dek = aesgcm_kek.decrypt(kek_iv, wrapped_dek, None)\n\n        # 2. Decrypt ciphertext using DEK\n        aesgcm_dek = AESGCM(dek)\n        plaintext_bytes = aesgcm_dek.decrypt(dek_iv, ciphertext, None)\n\n        return plaintext_bytes.decode('utf-8')\n```",
+      "latency_sec": 4.0921,
+      "prompt_tokens": 303,
+      "completion_tokens": 1256,
+      "cost_usd": 0.0004,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpte4gi1co\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_kms_envelope_encryption PASSED                [100%]\n\n============================== 1 passed in 0.08s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.587,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "# target_module.py\nimport os\nimport base64\nimport time\nfrom typing import Dict, Any\nfrom cryptography.hazmat.primitives.ciphers.aead import AESGCM\nfrom cryptography.hazmat.primitives.kdf.hkdf import HKDF\nfrom cryptography.hazmat.primitives import hashes\n\nclass EnvelopeKMS:\n    \"\"\"\n    An enterprise-grade envelope encryption manager providing AES-256 data key generation,\n    Key Encryption Key (KEK) wrapping using HKDF-derived keys and AES-GCM, and automated\n    time-based key rotation.\n    \"\"\"\n    def __init__(self, kek_secret: str, rotation_interval_seconds: int = 86400):\n        self.kek_secret = kek_secret.encode('utf-8')\n        self.rotation_interval = rotation_interval_seconds\n        self.current_key_version = 1\n        self.last_rotation_time = time.time()\n        \n        # Initialize KEK store mapping version -> raw 32-byte wrapping key\n        self._kek_store: Dict[int, bytes] = {}\n        self._kek_store[self.current_key_version] = self._derive_kek(self.kek_secret, self.current_key_version)\n\n    def _derive_kek(self, secret: bytes, version: int) -> bytes:\n        \"\"\"Derives a 256-bit KEK from the base secret and a version salt using HKDF.\"\"\"\n        hkdf = HKDF(\n            algorithm=hashes.SHA256(),\n            length=32,\n            salt=f\"envelope-kms-version-{version}\".encode('utf-8'),\n            info=b\"kek-derivation\"\n        )\n        return hkdf.derive(secret)\n\n    def _check_rotation(self) -> None:\n        \"\"\"Checks if the KEK rotation interval has passed, and rotates if necessary.\"\"\"\n        if time.time() - self.last_rotation_time > self.rotation_interval:\n            self.current_key_version += 1\n            self._kek_store[self.current_key_version] = self._derive_kek(self.kek_secret, self.current_key_version)\n            self.last_rotation_time = time.time()\n\n    def encrypt_secret(self, plaintext: str) -> Dict[str, Any]:\n        \"\"\"\n        Encrypts plaintext using an ephemeral AES-256 Data Encryption Key (DEK),\n        then wraps (encrypts) the DEK using the active KEK (with automated rotation check).\n        \n        Returns a dictionary payload containing the ciphertext, wrapped DEK, IVs, and key version.\n        \"\"\"\n        self._check_rotation()\n        active_version = self.current_key_version\n        active_kek = self._kek_store[active_version]\n\n        # 1. Generate ephemeral 256-bit DEK\n        dek = AESGCM.generate_key(bit_length=256)\n        aesgcm_dek = AESGCM(dek)\n\n        # 2. Encrypt plaintext with DEK\n        dek_iv = os.urandom(12)\n        ciphertext = aesgcm_dek.encrypt(dek_iv, plaintext.encode('utf-8'), None)\n\n        # 3. Wrap DEK with active KEK\n        aesgcm_kek = AESGCM(active_kek)\n        kek_iv = os.urandom(12)\n        wrapped_dek = aesgcm_kek.encrypt(kek_iv, dek, None)\n\n        return {\n            \"ciphertext\": base64.b64encode(ciphertext).decode('utf-8'),\n            \"wrapped_dek\": base64.b64encode(wrapped_dek).decode('utf-8'),\n            \"dek_iv\": base64.b64encode(dek_iv).decode('utf-8'),\n            \"kek_iv\": base64.b64encode(kek_iv).decode('utf-8'),\n            \"key_version\": active_version\n        }\n\n    def decrypt_secret(self, encrypted_payload: Dict[str, Any]) -> str:\n        \"\"\"\n        Decrypts an encrypted payload by unwrapping the DEK using the appropriate KEK version\n        and subsequently decrypting the ciphertext to recover the original plaintext.\n        \"\"\"\n        version = encrypted_payload[\"key_version\"]\n        if version not in self._kek_store:\n            raise ValueError(f\"Unknown or expired KEK version: {version}\")\n\n        kek = self._kek_store[version]\n\n        ciphertext = base64.b64decode(encrypted_payload[\"ciphertext\"])\n        wrapped_dek = base64.b64decode(encrypted_payload[\"wrapped_dek\"])\n        dek_iv = base64.b64decode(encrypted_payload[\"dek_iv\"])\n        kek_iv = base64.b64decode(encrypted_payload[\"kek_iv\"])\n\n        # 1. Unwrap DEK using KEK\n        aesgcm_kek = AESGCM(kek)\n        dek = aesgcm_kek.decrypt(kek_iv, wrapped_dek, None)\n\n        # 2. Decrypt ciphertext using DEK\n        aesgcm_dek = AESGCM(dek)\n        plaintext_bytes = aesgcm_dek.decrypt(dek_iv, ciphertext, None)\n\n        return plaintext_bytes.decode('utf-8')\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpte4gi1co\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_kms_envelope_encryption PASSED                [100%]\n\n============================== 1 passed in 0.08s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.587,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  }
+}

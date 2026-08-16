@@ -46,12 +46,12 @@ class GenuineBenchmarkCertifier:
         provider_types = set()
         model_names = set()
         incomplete_provenance = 0
-
-        runs_detail = []
+        invalid_budget_runs = 0
+        missing_taxonomy_runs = 0
 
         for task_id in task_ids:
             truns_dir = os.path.join(self.runs_dir, task_id)
-            for b in ["b1", "b2", "b3"]:
+            for b in ["b1", "b2", "b3", "b4"]:
                 rfile = os.path.join(truns_dir, f"{b}_raw.json")
                 if not os.path.exists(rfile):
                     continue
@@ -65,6 +65,7 @@ class GenuineBenchmarkCertifier:
                     is_mock = meta.get("is_mock", True)
                     ptype = meta.get("provider_type", "unknown")
                     mname = meta.get("model_name", "unknown")
+                    budget = meta.get("model_call_budget", 1)
 
                     if is_mock or ptype == "mock_test":
                         mock_runs += 1
@@ -74,6 +75,14 @@ class GenuineBenchmarkCertifier:
                     provider_types.add(ptype)
                     model_names.add(mname)
 
+                    # Equal Budget Check (B2, B3, B4 must have model_call_budget == 3)
+                    if b in ["b2", "b3", "b4"] and budget != 3:
+                        invalid_budget_runs += 1
+
+                    # Failure Taxonomy Check
+                    if "failure_taxonomy" not in data:
+                        missing_taxonomy_runs += 1
+
                     # Provenance integrity check
                     repo = data.get("repository", {})
                     oracle = data.get("oracle_result", {})
@@ -82,25 +91,16 @@ class GenuineBenchmarkCertifier:
                     if not repo.get("starting_tree_hash") or not repo.get("final_tree_hash") or not oracle or not trace:
                         incomplete_provenance += 1
 
-                    runs_detail.append({
-                        "task_id": task_id,
-                        "baseline": b.upper(),
-                        "is_mock": is_mock,
-                        "provider_type": ptype,
-                        "model_name": mname,
-                        "passed": oracle.get("all_passed", False)
-                    })
-
                 except Exception as e:
                     mock_runs += 1
                     incomplete_provenance += 1
 
-        # Check 2: 48 / 48 Runs Exist
-        c2 = CertificationCheck("48_runs_exist", total_runs == 48, f"Found {total_runs} / 48 expected run artifacts.")
+        # Check 2: 64 / 64 Runs Exist
+        c2 = CertificationCheck("64_runs_exist", total_runs == 64, f"Found {total_runs} / 64 expected run artifacts.")
         checks.append(c2)
 
         # Check 3: 0 Mock Runs
-        c3 = CertificationCheck("zero_mock_runs", mock_runs == 0 and real_runs == 48, f"Real runs: {real_runs}/48, Mock runs detected: {mock_runs}.")
+        c3 = CertificationCheck("zero_mock_runs", mock_runs == 0 and real_runs == 64, f"Real runs: {real_runs}/64, Mock runs detected: {mock_runs}.")
         checks.append(c3)
 
         # Check 4: Valid Live Provider
@@ -112,14 +112,18 @@ class GenuineBenchmarkCertifier:
         c5 = CertificationCheck("uniform_model_configuration", len(model_names) == 1, f"Observed model names: {list(model_names)}.")
         checks.append(c5)
 
-        # Check 6: 100% Complete Provenance
-        c6 = CertificationCheck("complete_provenance", incomplete_provenance == 0, f"Incomplete provenance runs: {incomplete_provenance}.")
+        # Check 6: Equal Model Call Budget Invariant across B2, B3, B4
+        c6 = CertificationCheck("equal_budget_enforcement", invalid_budget_runs == 0, f"Runs violating equal budget (MAX_MODEL_CALLS=3): {invalid_budget_runs}.")
         checks.append(c6)
+
+        # Check 7: 100% Complete Provenance & Taxonomy
+        c7 = CertificationCheck("complete_provenance_and_taxonomy", incomplete_provenance == 0 and missing_taxonomy_runs == 0, f"Incomplete provenance: {incomplete_provenance}, Missing taxonomy: {missing_taxonomy_runs}.")
+        checks.append(c7)
 
         is_certified = all(c.passed for c in checks)
 
         cert_report = {
-            "title": "Gate 1.6B Genuine Agent Benchmark Certification Audit",
+            "title": "Gate 1.6C Fair Treatment Benchmark Certification Audit",
             "certified": is_certified,
             "status": "CERTIFIED_GENUINE_LIVE_BENCHMARK" if is_certified else "UNCERTIFIED_CONTAMINATED_OR_INCOMPLETE",
             "total_runs": total_runs,
@@ -137,12 +141,12 @@ class GenuineBenchmarkCertifier:
             json.dump(cert_report, f, indent=2)
 
         md_lines = [
-            "# Gate 1.6B Genuine Agent Benchmark Certification Audit",
+            "# Gate 1.6C Fair Treatment Benchmark Certification Audit",
             "",
             f"- **Status**: `{cert_report['status']}`",
             f"- **Certified**: `{'YES - 100% GENUINE LIVE' if cert_report['certified'] else 'NO - UNCERTIFIED'}`",
-            f"- **Total Runs**: {cert_report['total_runs']} / 48",
-            f"- **Real Live Runs**: {cert_report['real_runs']} / 48",
+            f"- **Total Runs**: {cert_report['total_runs']} / 64",
+            f"- **Real Live Runs**: {cert_report['real_runs']} / 64",
             f"- **Mock Runs**: {cert_report['mock_runs']} (Must be 0)",
             f"- **Model Version**: `{list(cert_report['model_names'])[0] if cert_report['model_names'] else 'NONE'}`",
             "",
@@ -171,10 +175,10 @@ def main():
     certifier.write_reports(cert_report, json_path, md_path)
 
     if not is_certified:
-        print(f"\n[REJECTED] Gate 1.6B Certification FAILED. Status: {cert_report['status']}")
+        print(f"\n[REJECTED] Gate 1.6C Certification FAILED. Status: {cert_report['status']}")
         sys.exit(1)
     else:
-        print(f"\n[CERTIFIED] Gate 1.6B Certified 100% Genuine Live Benchmark!")
+        print(f"\n[CERTIFIED] Gate 1.6C Certified 100% Genuine Live Benchmark!")
         sys.exit(0)
 
 if __name__ == "__main__":

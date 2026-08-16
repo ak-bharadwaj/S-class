@@ -1,6 +1,6 @@
 {
   "task_id": "ENG-05-KIOSK-LOCKDOWN-SANDBOX",
-  "baseline": "B3",
+  "baseline": "B4",
   "runner_version": "gate-1.6c-fair-treatment-benchmark-v1",
   "domain": "OS & Containment / Kiosk Security",
   "raw_prompt": "Implement a process containment syscall sanitizer guard in `target_module.py` that enforces an explicit syscall whitelist and denies unauthorized filesystem access outside `/tmp/sandbox`.",
@@ -174,38 +174,38 @@
   },
   "repository": {
     "starting_tree_hash": "063891f0e86627344c4f922b78a4c2e39dcef6013d26e8fddc75e8b1fd6be8af",
-    "final_tree_hash": "408fdb75262363cac0134bb1d2746cfc0241e22771a8095a33982ead49b054ef"
+    "final_tree_hash": "2c0b0135c6bf5f8106a54c03d0c231b7288a250dba4b6500f7f862bee489a137"
   },
   "execution_trace": [
     {
       "iteration": 1,
       "prompt": "User Task Instruction:\nImplement a process containment syscall sanitizer guard in `target_module.py` that enforces an explicit syscall whitelist and denies unauthorized filesystem access outside `/tmp/sandbox`.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Password Reset Session Revocation: Invalidate all active sessions and refresh tokens upon password reset.\n- [] Cross-Cluster Token Blacklist Propagation: Propagate revoked token identifiers across all active cluster nodes.\n- [] Cryptographic Credential Hashing (Argon2id / bcrypt): IF local credential storage is configured: Hash and salt user passwords using Argon2id or bcrypt.\n- [] Bounded Blacklist Retention and TTL Expiry: Retain revoked token entries in the blacklist for the maximum token TTL window.\n- [] Immediate Fail-Closed Access Gate: Reject requests with blacklisted tokens immediately with HTTP 401 Unauthorized.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nExisting Code in target_module.py:\n```python\n# target_module.py\nALLOWED_SYSCALLS = {'read', 'write', 'stat', 'exit'}\n\ndef is_syscall_allowed(syscall_name: str, path_arg: str) -> bool:\n    pass\n\n```\n\nImplement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block.",
-      "response_text": "```python\n# target_module.py\nimport os\nfrom typing import Set\n\nALLOWED_SYSCALLS: Set[str] = {'read', 'write', 'stat', 'exit'}\nSANDBOX_ROOT: str = os.path.abspath('/tmp/sandbox')\n\ndef is_syscall_allowed(syscall_name: str, path_arg: str = \"\") -> bool:\n    \"\"\"\n    Enforces an explicit syscall whitelist and denies unauthorized filesystem\n    access outside /tmp/sandbox.\n    \"\"\"\n    # Validate syscall against the explicit whitelist\n    if syscall_name not in ALLOWED_SYSCALLS:\n        return False\n\n    # If the syscall involves a path argument, enforce containment within /tmp/sandbox\n    if path_arg:\n        # Resolve absolute path to prevent traversal attacks (e.g., ../)\n        try:\n            absolute_path = os.path.abspath(path_arg)\n        except Exception:\n            return False\n\n        # Ensure the path strictly resides within the SANDBOX_ROOT directory\n        if not absolute_path.startswith(SANDBOX_ROOT + os.sep) and absolute_path != SANDBOX_ROOT:\n            return False\n\n    return True\n```",
-      "latency_sec": 1.5351,
-      "prompt_tokens": 359,
-      "completion_tokens": 265,
-      "cost_usd": 0.000106,
+      "response_text": "```python\n# target_module.py\nimport os\nimport os.path\nfrom typing import Optional\n\nALLOWED_SYSCALLS = {'read', 'write', 'stat', 'exit'}\nSANDBOX_DIR = os.path.abspath('/tmp/sandbox')\n\ndef is_syscall_allowed(syscall_name: str, path_arg: Optional[str] = None) -> bool:\n    \"\"\"\n    Enforces an explicit syscall whitelist and denies unauthorized filesystem access \n    outside /tmp/sandbox.\n    \"\"\"\n    if syscall_name not in ALLOWED_SYSCALLS:\n        return False\n\n    if path_arg is not None:\n        # Resolve absolute path to prevent traversal attacks (e.g., ../)\n        try:\n            abs_path = os.path.abspath(path_arg)\n            sandbox_path = os.path.abspath(SANDBOX_DIR)\n            \n            # Ensure the path starts with the sandbox directory path\n            # Using commonpath ensures strict containment under the sandbox root\n            common = os.path.commonpath([abs_path, sandbox_path])\n            if common != sandbox_path:\n                return False\n        except (ValueError, TypeError):\n            # If path resolution fails, fail-closed\n            return False\n\n    return True\n```",
+      "latency_sec": 1.5163,
+      "prompt_tokens": 362,
+      "completion_tokens": 286,
+      "cost_usd": 0.000113,
       "pytest_result": {
         "exit_code": 0,
         "passed_count": 1,
         "failed_count": 0,
         "total_count": 1,
-        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpziu14i33\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_sandbox_containment PASSED                    [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpvkfhi0wz\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_sandbox_containment PASSED                    [100%]\n\n============================== 1 passed in 0.04s ==============================\n",
         "stderr": "",
-        "duration_sec": 0.521,
+        "duration_sec": 0.613,
         "all_passed": true
       }
     }
   ],
-  "final_code": "# target_module.py\nimport os\nfrom typing import Set\n\nALLOWED_SYSCALLS: Set[str] = {'read', 'write', 'stat', 'exit'}\nSANDBOX_ROOT: str = os.path.abspath('/tmp/sandbox')\n\ndef is_syscall_allowed(syscall_name: str, path_arg: str = \"\") -> bool:\n    \"\"\"\n    Enforces an explicit syscall whitelist and denies unauthorized filesystem\n    access outside /tmp/sandbox.\n    \"\"\"\n    # Validate syscall against the explicit whitelist\n    if syscall_name not in ALLOWED_SYSCALLS:\n        return False\n\n    # If the syscall involves a path argument, enforce containment within /tmp/sandbox\n    if path_arg:\n        # Resolve absolute path to prevent traversal attacks (e.g., ../)\n        try:\n            absolute_path = os.path.abspath(path_arg)\n        except Exception:\n            return False\n\n        # Ensure the path strictly resides within the SANDBOX_ROOT directory\n        if not absolute_path.startswith(SANDBOX_ROOT + os.sep) and absolute_path != SANDBOX_ROOT:\n            return False\n\n    return True\n",
+  "final_code": "# target_module.py\nimport os\nimport os.path\nfrom typing import Optional\n\nALLOWED_SYSCALLS = {'read', 'write', 'stat', 'exit'}\nSANDBOX_DIR = os.path.abspath('/tmp/sandbox')\n\ndef is_syscall_allowed(syscall_name: str, path_arg: Optional[str] = None) -> bool:\n    \"\"\"\n    Enforces an explicit syscall whitelist and denies unauthorized filesystem access \n    outside /tmp/sandbox.\n    \"\"\"\n    if syscall_name not in ALLOWED_SYSCALLS:\n        return False\n\n    if path_arg is not None:\n        # Resolve absolute path to prevent traversal attacks (e.g., ../)\n        try:\n            abs_path = os.path.abspath(path_arg)\n            sandbox_path = os.path.abspath(SANDBOX_DIR)\n            \n            # Ensure the path starts with the sandbox directory path\n            # Using commonpath ensures strict containment under the sandbox root\n            common = os.path.commonpath([abs_path, sandbox_path])\n            if common != sandbox_path:\n                return False\n        except (ValueError, TypeError):\n            # If path resolution fails, fail-closed\n            return False\n\n    return True\n",
   "oracle_result": {
     "exit_code": 0,
     "passed_count": 1,
     "failed_count": 0,
     "total_count": 1,
-    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpziu14i33\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_sandbox_containment PASSED                    [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpvkfhi0wz\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_sandbox_containment PASSED                    [100%]\n\n============================== 1 passed in 0.04s ==============================\n",
     "stderr": "",
-    "duration_sec": 0.521,
+    "duration_sec": 0.613,
     "all_passed": true
   },
   "failure_taxonomy": {

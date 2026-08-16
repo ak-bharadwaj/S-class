@@ -1,0 +1,65 @@
+{
+  "title": "Gate 1.6C Fair Treatment Benchmark Summary Report",
+  "runner_version": "gate-1.6c-fair-treatment-benchmark-v1",
+  "total_tasks": 16,
+  "baselines": {
+    "B1_Prompt_Only": {
+      "passed": 7,
+      "total": 16,
+      "pass_rate": 43.75,
+      "avg_latency_sec": 3.24,
+      "total_cost_usd": 0.00408
+    },
+    "B2_Agent_Test_Loop": {
+      "passed": 10,
+      "total": 16,
+      "pass_rate": 62.5,
+      "avg_latency_sec": 3.137,
+      "total_cost_usd": 0.011805
+    },
+    "B3_Agent_SClass_Governance": {
+      "passed": 7,
+      "total": 16,
+      "pass_rate": 43.75,
+      "avg_latency_sec": 3.554,
+      "total_cost_usd": 0.013272
+    },
+    "B4_Agent_SClass_Test_Loop": {
+      "passed": 11,
+      "total": 16,
+      "pass_rate": 68.75,
+      "avg_latency_sec": 3.487,
+      "total_cost_usd": 0.011708
+    }
+  },
+  "failure_taxonomy_breakdown": {
+    "B1_Prompt_Only": {
+      "wrong_requirement": 6,
+      "missing_requirement": 0,
+      "implementation_bug": 3,
+      "test_api_mismatch": 0,
+      "environment_failure": 0
+    },
+    "B2_Agent_Test_Loop": {
+      "wrong_requirement": 4,
+      "missing_requirement": 0,
+      "implementation_bug": 2,
+      "test_api_mismatch": 0,
+      "environment_failure": 0
+    },
+    "B3_Agent_SClass_Governance": {
+      "wrong_requirement": 4,
+      "missing_requirement": 0,
+      "implementation_bug": 5,
+      "test_api_mismatch": 0,
+      "environment_failure": 0
+    },
+    "B4_Agent_SClass_Test_Loop": {
+      "wrong_requirement": 3,
+      "missing_requirement": 0,
+      "implementation_bug": 2,
+      "test_api_mismatch": 0,
+      "environment_failure": 0
+    }
+  }
+}

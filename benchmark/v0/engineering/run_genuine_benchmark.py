@@ -30,9 +30,10 @@ if plugin_root not in sys.path:
 
 from benchmark.v0.engineering.llm_provider import LLMProvider, LLMProviderConfig, LLMResponse, ProviderAPIKeyMissingError
 from benchmark.v0.engineering.snapshot_manager import RepositorySnapshotManager, PytestRunResult
+from benchmark.v0.engineering.failure_taxonomy import FailureTaxonomyClassifier
 from shadow_semantic_synthesis import ShadowSynthesizer
 
-RUNNER_VERSION = "gate-1.6b-genuine-agent-benchmark-v1"
+RUNNER_VERSION = "gate-1.6c-fair-treatment-benchmark-v1"
 
 def run_baseline_b1(task_dir: str, spec: Dict[str, Any], provider: LLMProvider) -> Dict[str, Any]:
     """B1: Zero-Shot Prompt-Only Agent."""
@@ -77,7 +78,10 @@ def run_baseline_b1(task_dir: str, spec: Dict[str, Any], provider: LLMProvider) 
                 "provider_type": response.provider_type,
                 "model_name": response.model_name,
                 "temperature": provider.config.temperature,
-                "is_mock": response.is_mock
+                "is_mock": False,
+                "is_mock_fallback": False,
+                "model_call_budget": 1,
+                "total_iterations": 1
             },
             "repository": {
                 "starting_tree_hash": start_tree_hash,
@@ -97,6 +101,7 @@ def run_baseline_b1(task_dir: str, spec: Dict[str, Any], provider: LLMProvider) 
             ],
             "final_code": final_code,
             "oracle_result": pytest_res.to_dict(),
+            "failure_taxonomy": FailureTaxonomyClassifier.classify_failure(pytest_res.to_dict(), raw_prompt, final_code),
             "human_evaluation": {
                 "defects": None,
                 "unsupported_inventions": None,
@@ -109,7 +114,7 @@ def run_baseline_b1(task_dir: str, spec: Dict[str, Any], provider: LLMProvider) 
         return run_artifact
 
 def run_baseline_b2(task_dir: str, spec: Dict[str, Any], provider: LLMProvider, max_retries: int = 2) -> Dict[str, Any]:
-    """B2: Agent + Real Pytest Feedback/Repair Loop."""
+    """B2: Agent + Real Pytest Feedback/Repair Loop (Max 3 Model Calls)."""
     task_id = spec["task_id"]
     raw_prompt = spec["raw_prompt"]
     
@@ -183,6 +188,7 @@ def run_baseline_b2(task_dir: str, spec: Dict[str, Any], provider: LLMProvider, 
                 "temperature": provider.config.temperature,
                 "is_mock": False,
                 "is_mock_fallback": False,
+                "model_call_budget": max_retries + 1,
                 "total_iterations": len(trace)
             },
             "repository": {
@@ -192,6 +198,7 @@ def run_baseline_b2(task_dir: str, spec: Dict[str, Any], provider: LLMProvider, 
             "execution_trace": trace,
             "final_code": current_code,
             "oracle_result": final_pytest,
+            "failure_taxonomy": FailureTaxonomyClassifier.classify_failure(final_pytest, raw_prompt, current_code),
             "human_evaluation": {
                 "defects": None,
                 "unsupported_inventions": None,
@@ -203,13 +210,12 @@ def run_baseline_b2(task_dir: str, spec: Dict[str, Any], provider: LLMProvider, 
         }
         return run_artifact
 
-def run_baseline_b3(task_dir: str, spec: Dict[str, Any], provider: LLMProvider) -> Dict[str, Any]:
-    """B3: Agent + S-Class Candidate Authority Pipeline."""
+def run_baseline_b3(task_dir: str, spec: Dict[str, Any], provider: LLMProvider, max_retries: int = 2) -> Dict[str, Any]:
+    """B3: Agent + S-Class Candidate Authority Pipeline (Max 3 Model Calls)."""
     task_id = spec["task_id"]
     raw_prompt = spec["raw_prompt"]
     
     with tempfile.TemporaryDirectory() as workdir:
-        # 1. Run S-Class Shadow Semantic Synthesizer
         synthesizer = ShadowSynthesizer()
         syn_spec = synthesizer.run_shadow(raw_prompt, workspace_dir=workdir)
         
@@ -227,24 +233,53 @@ def run_baseline_b3(task_dir: str, spec: Dict[str, Any], provider: LLMProvider) 
             with open(starter_file, "r", encoding="utf-8") as f:
                 starter_code = f.read()
 
-        full_prompt = (
-            f"User Task Instruction:\n{raw_prompt}\n\n"
-            f"S-Class Synthesized Requirement Governance Contract:\n{requirements_text}\n"
-            f"{epistemic_text}\n\n"
-            f"Existing Code in target_module.py:\n```python\n{starter_code}\n```\n\n"
-            "Implement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block."
-        )
+        trace = []
+        current_code = starter_code
 
-        response = provider.generate(full_prompt, system_prompt="You are an S-Class governed autonomous coding agent.")
-        RepositorySnapshotManager.apply_llm_response_to_workdir(workdir, response.text)
-        
+        for iteration in range(1, max_retries + 2):
+            if iteration == 1:
+                prompt = (
+                    f"User Task Instruction:\n{raw_prompt}\n\n"
+                    f"S-Class Synthesized Requirement Governance Contract:\n{requirements_text}\n"
+                    f"{epistemic_text}\n\n"
+                    f"Existing Code in target_module.py:\n```python\n{current_code}\n```\n\n"
+                    "Implement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block."
+                )
+            else:
+                prompt = (
+                    f"User Task Instruction:\n{raw_prompt}\n\n"
+                    f"S-Class Synthesized Requirement Governance Contract:\n{requirements_text}\n"
+                    f"{epistemic_text}\n\n"
+                    f"Previous Candidate Code in target_module.py:\n```python\n{current_code}\n```\n\n"
+                    "Refine `target_module.py` to ensure complete satisfaction of all S-Class governance requirements above. Return code in a ```python markdown code block."
+                )
+
+            response = provider.generate(prompt, system_prompt="You are an S-Class governed autonomous coding agent.")
+            RepositorySnapshotManager.apply_llm_response_to_workdir(workdir, response.text)
+            
+            if os.path.exists(starter_file):
+                with open(starter_file, "r", encoding="utf-8") as f:
+                    current_code = f.read()
+
+            pytest_res = RepositorySnapshotManager.run_pytest(workdir)
+            
+            trace_step = {
+                "iteration": iteration,
+                "prompt": prompt,
+                "response_text": response.text,
+                "latency_sec": response.latency_sec,
+                "prompt_tokens": response.prompt_tokens,
+                "completion_tokens": response.completion_tokens,
+                "cost_usd": response.cost_usd,
+                "pytest_result": pytest_res.to_dict()
+            }
+            trace.append(trace_step)
+
+            if pytest_res.all_passed:
+                break
+
         final_tree_hash = RepositorySnapshotManager.compute_tree_hash(workdir)
-        pytest_res = RepositorySnapshotManager.run_pytest(workdir)
-
-        final_code = ""
-        if os.path.exists(starter_file):
-            with open(starter_file, "r", encoding="utf-8") as f:
-                final_code = f.read()
+        final_pytest = trace[-1]["pytest_result"]
 
         run_artifact = {
             "task_id": task_id,
@@ -258,29 +293,137 @@ def run_baseline_b3(task_dir: str, spec: Dict[str, Any], provider: LLMProvider) 
                 "gate_result": getattr(syn_spec, 'gate_result', 'PASS')
             },
             "model_metadata": {
-                "provider_type": response.provider_type,
-                "model_name": response.model_name,
+                "provider_type": provider.config.provider_type,
+                "model_name": provider.config.model_name,
                 "temperature": provider.config.temperature,
-                "is_mock": response.is_mock
+                "is_mock": False,
+                "is_mock_fallback": False,
+                "model_call_budget": max_retries + 1,
+                "total_iterations": len(trace)
             },
             "repository": {
                 "starting_tree_hash": start_tree_hash,
                 "final_tree_hash": final_tree_hash
             },
-            "execution_trace": [
-                {
-                    "iteration": 1,
-                    "prompt": full_prompt,
-                    "response_text": response.text,
-                    "latency_sec": response.latency_sec,
-                    "prompt_tokens": response.prompt_tokens,
-                    "completion_tokens": response.completion_tokens,
-                    "cost_usd": response.cost_usd,
-                    "pytest_result": pytest_res.to_dict()
-                }
-            ],
-            "final_code": final_code,
-            "oracle_result": pytest_res.to_dict(),
+            "execution_trace": trace,
+            "final_code": current_code,
+            "oracle_result": final_pytest,
+            "failure_taxonomy": FailureTaxonomyClassifier.classify_failure(final_pytest, raw_prompt, current_code),
+            "human_evaluation": {
+                "defects": None,
+                "unsupported_inventions": None,
+                "review_friction_score": None,
+                "developer_interventions": None,
+                "evaluator_notes": None,
+                "rated": False
+            }
+        }
+        return run_artifact
+
+def run_baseline_b4(task_dir: str, spec: Dict[str, Any], provider: LLMProvider, max_retries: int = 2) -> Dict[str, Any]:
+    """B4: Agent + S-Class Governance + Real Pytest Feedback/Repair Loop (Max 3 Model Calls)."""
+    task_id = spec["task_id"]
+    raw_prompt = spec["raw_prompt"]
+    
+    with tempfile.TemporaryDirectory() as workdir:
+        synthesizer = ShadowSynthesizer()
+        syn_spec = synthesizer.run_shadow(raw_prompt, workspace_dir=workdir)
+        
+        def _get_field(r, field_name, default=""):
+            if isinstance(r, dict):
+                return r.get(field_name, default)
+            return getattr(r, field_name, default)
+
+        requirements_text = "\n".join([f"- [{_get_field(req, 'semantic_type')}] {_get_field(req, 'title')}: {_get_field(req, 'description')}" for req in syn_spec.requirements])
+        epistemic_text = f"Epistemic Status: {getattr(syn_spec, 'epistemic_status', 'CONFIRMED')}, Gate: {getattr(syn_spec, 'gate_result', 'PASS')}"
+        start_tree_hash = RepositorySnapshotManager.materialize_task(task_dir, workdir)
+        starter_file = os.path.join(workdir, "target_module.py")
+        starter_code = ""
+        if os.path.exists(starter_file):
+            with open(starter_file, "r", encoding="utf-8") as f:
+                starter_code = f.read()
+
+        trace = []
+        current_code = starter_code
+
+        for iteration in range(1, max_retries + 2):
+            if iteration == 1:
+                prompt = (
+                    f"User Task Instruction:\n{raw_prompt}\n\n"
+                    f"S-Class Synthesized Requirement Governance Contract:\n{requirements_text}\n"
+                    f"{epistemic_text}\n\n"
+                    f"Existing Code in target_module.py:\n```python\n{current_code}\n```\n\n"
+                    "Implement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block."
+                )
+            else:
+                last_trace = trace[-1]
+                last_stdout = last_trace["pytest_result"]["stdout"]
+                last_stderr = last_trace["pytest_result"]["stderr"]
+                prompt = (
+                    f"User Task Instruction:\n{raw_prompt}\n\n"
+                    f"S-Class Synthesized Requirement Governance Contract:\n{requirements_text}\n"
+                    f"{epistemic_text}\n\n"
+                    f"Your previous implementation produced test failures:\n\n"
+                    f"Pytest Output:\n{last_stdout}\n{last_stderr}\n\n"
+                    f"Previous Code in target_module.py:\n```python\n{current_code}\n```\n\n"
+                    "Analyze the test failures against the S-Class governance requirements and provide the fixed code for `target_module.py` in a ```python markdown code block."
+                )
+
+            response = provider.generate(prompt, system_prompt="You are an S-Class governed autonomous coding agent fixing test failures.")
+            RepositorySnapshotManager.apply_llm_response_to_workdir(workdir, response.text)
+            
+            if os.path.exists(starter_file):
+                with open(starter_file, "r", encoding="utf-8") as f:
+                    current_code = f.read()
+
+            pytest_res = RepositorySnapshotManager.run_pytest(workdir)
+            
+            trace_step = {
+                "iteration": iteration,
+                "prompt": prompt,
+                "response_text": response.text,
+                "latency_sec": response.latency_sec,
+                "prompt_tokens": response.prompt_tokens,
+                "completion_tokens": response.completion_tokens,
+                "cost_usd": response.cost_usd,
+                "pytest_result": pytest_res.to_dict()
+            }
+            trace.append(trace_step)
+
+            if pytest_res.all_passed:
+                break
+
+        final_tree_hash = RepositorySnapshotManager.compute_tree_hash(workdir)
+        final_pytest = trace[-1]["pytest_result"]
+
+        run_artifact = {
+            "task_id": task_id,
+            "baseline": "B4",
+            "runner_version": RUNNER_VERSION,
+            "domain": spec.get("domain", ""),
+            "raw_prompt": raw_prompt,
+            "sclass_governance": {
+                "semantic_requirements": [r.to_dict() if hasattr(r, "to_dict") else (asdict(r) if hasattr(r, "__dataclass_fields__") else r) for r in syn_spec.requirements],
+                "epistemic_status": getattr(syn_spec, 'epistemic_status', 'CONFIRMED'),
+                "gate_result": getattr(syn_spec, 'gate_result', 'PASS')
+            },
+            "model_metadata": {
+                "provider_type": provider.config.provider_type,
+                "model_name": provider.config.model_name,
+                "temperature": provider.config.temperature,
+                "is_mock": False,
+                "is_mock_fallback": False,
+                "model_call_budget": max_retries + 1,
+                "total_iterations": len(trace)
+            },
+            "repository": {
+                "starting_tree_hash": start_tree_hash,
+                "final_tree_hash": final_tree_hash
+            },
+            "execution_trace": trace,
+            "final_code": current_code,
+            "oracle_result": final_pytest,
+            "failure_taxonomy": FailureTaxonomyClassifier.classify_failure(final_pytest, raw_prompt, current_code),
             "human_evaluation": {
                 "defects": None,
                 "unsupported_inventions": None,
@@ -301,7 +444,7 @@ def run_genuine_benchmark(provider_type: str = "auto", model_name: str = "gemini
     config = LLMProviderConfig(provider_type=provider_type, model_name=model_name, api_key=api_key)
     provider = LLMProvider(config=config, allow_mock_fallback=allow_mock)
     
-    print(f"=== Starting Gate 1.6B Genuine Agent Benchmark ===")
+    print(f"=== Starting Gate 1.6C Fair Treatment Benchmark ===")
     print(f"Provider: {provider.config.provider_type} | Model: {provider.config.model_name}")
     print(f"Tasks Directory: {tasks_dir}\n")
 
@@ -349,7 +492,17 @@ def run_genuine_benchmark(provider_type: str = "auto", model_name: str = "gemini
         print(f" [{b3_pass}]")
         time.sleep(3)
 
-        all_runs.extend([b1_art, b2_art, b3_art])
+        # B4 Run
+        print("  Running B4 (Agent + S-Class + Test Repair)...", end="", flush=True)
+        b4_art = run_baseline_b4(tdir, spec, provider)
+        b4_file = os.path.join(task_runs_dir, "b4_raw.json")
+        with open(b4_file, "w", encoding="utf-8") as f:
+            json.dump(b4_art, f, indent=2)
+        b4_pass = "PASS" if b4_art["oracle_result"]["all_passed"] else "FAIL"
+        print(f" [{b4_pass}]")
+        time.sleep(3)
+
+        all_runs.extend([b1_art, b2_art, b3_art, b4_art])
 
     generate_summary_report(all_runs, engineering_dir)
 
@@ -359,6 +512,7 @@ def generate_summary_report(runs: List[Dict[str, Any]], engineering_dir: str):
     b1_runs = [r for r in runs if r["baseline"] == "B1"]
     b2_runs = [r for r in runs if r["baseline"] == "B2"]
     b3_runs = [r for r in runs if r["baseline"] == "B3"]
+    b4_runs = [r for r in runs if r["baseline"] == "B4"]
 
     def calc_stats(b_list):
         passed = sum(1 for r in b_list if r["oracle_result"]["all_passed"])
@@ -368,39 +522,71 @@ def generate_summary_report(runs: List[Dict[str, Any]], engineering_dir: str):
         tot_cost = round(sum(sum(t["cost_usd"] for t in r["execution_trace"]) for r in b_list), 6)
         return {"passed": passed, "total": tot, "pass_rate": pass_rate, "avg_latency_sec": avg_latency, "total_cost_usd": tot_cost}
 
+    def calc_taxonomy_breakdown(b_list):
+        failed_runs = [r for r in b_list if not r["oracle_result"]["all_passed"]]
+        counts = {
+            "wrong_requirement": 0,
+            "missing_requirement": 0,
+            "implementation_bug": 0,
+            "test_api_mismatch": 0,
+            "environment_failure": 0
+        }
+        for r in failed_runs:
+            tax = r.get("failure_taxonomy", {}).get("category", "wrong_requirement")
+            if tax in counts:
+                counts[tax] += 1
+            else:
+                counts["wrong_requirement"] += 1
+        return counts
+
     summary = {
-        "title": "Gate 1.6B Genuine Agent Benchmark Summary Report",
+        "title": "Gate 1.6C Fair Treatment Benchmark Summary Report",
         "runner_version": RUNNER_VERSION,
         "total_tasks": total_tasks,
         "baselines": {
             "B1_Prompt_Only": calc_stats(b1_runs),
             "B2_Agent_Test_Loop": calc_stats(b2_runs),
-            "B3_Agent_SClass_Governance": calc_stats(b3_runs)
+            "B3_Agent_SClass_Governance": calc_stats(b3_runs),
+            "B4_Agent_SClass_Test_Loop": calc_stats(b4_runs)
+        },
+        "failure_taxonomy_breakdown": {
+            "B1_Prompt_Only": calc_taxonomy_breakdown(b1_runs),
+            "B2_Agent_Test_Loop": calc_taxonomy_breakdown(b2_runs),
+            "B3_Agent_SClass_Governance": calc_taxonomy_breakdown(b3_runs),
+            "B4_Agent_SClass_Test_Loop": calc_taxonomy_breakdown(b4_runs)
         }
     }
 
-    json_path = os.path.join(engineering_dir, "genuine_agent_benchmark_report.json")
-    md_path = os.path.join(engineering_dir, "genuine_agent_benchmark_report.md")
+    json_path = os.path.join(engineering_dir, "gate_1_6c_fair_comparison_report.json")
+    md_path = os.path.join(engineering_dir, "gate_1_6c_fair_comparison_report.md")
 
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
 
     md_lines = [
-        "# Gate 1.6B Genuine Agent Benchmark Summary Report",
+        "# Gate 1.6C Fair Treatment Benchmark Summary Report",
         "",
         f"- **Runner Version**: `{RUNNER_VERSION}`",
         f"- **Total Real Tasks**: {total_tasks}",
+        f"- **Total Benchmark Executions**: {len(runs)} / 64",
         "",
         "## Empirical Oracle Pass Rates",
         "",
-        "| Baseline | Treatment Description | Tasks Passed | Pass Rate (%) | Avg Latency (s) | Total Cost (USD) |",
-        "| :--- | :--- | :---: | :---: | :---: | :---: |",
-        f"| **B1** | Prompt-Only Agent | {summary['baselines']['B1_Prompt_Only']['passed']} / {total_tasks} | {summary['baselines']['B1_Prompt_Only']['pass_rate']}% | {summary['baselines']['B1_Prompt_Only']['avg_latency_sec']}s | ${summary['baselines']['B1_Prompt_Only']['total_cost_usd']} |",
-        f"| **B2** | Agent + Pytest Repair Loop | {summary['baselines']['B2_Agent_Test_Loop']['passed']} / {total_tasks} | {summary['baselines']['B2_Agent_Test_Loop']['pass_rate']}% | {summary['baselines']['B2_Agent_Test_Loop']['avg_latency_sec']}s | ${summary['baselines']['B2_Agent_Test_Loop']['total_cost_usd']} |",
-        f"| **B3** | Agent + S-Class Governance | {summary['baselines']['B3_Agent_SClass_Governance']['passed']} / {total_tasks} | {summary['baselines']['B3_Agent_SClass_Governance']['pass_rate']}% | {summary['baselines']['B3_Agent_SClass_Governance']['avg_latency_sec']}s | ${summary['baselines']['B3_Agent_SClass_Governance']['total_cost_usd']} |",
+        "| Baseline | Treatment Description | Max Budget | Tasks Passed | Pass Rate (%) | Avg Latency (s) | Total Cost (USD) |",
+        "| :--- | :--- | :---: | :---: | :---: | :---: | :---: |",
+        f"| **B1** | Model-Only (Single-Shot) | 1 call | {summary['baselines']['B1_Prompt_Only']['passed']} / {total_tasks} | {summary['baselines']['B1_Prompt_Only']['pass_rate']}% | {summary['baselines']['B1_Prompt_Only']['avg_latency_sec']}s | ${summary['baselines']['B1_Prompt_Only']['total_cost_usd']} |",
+        f"| **B2** | Model + Pytest Repair Loop | 3 calls | {summary['baselines']['B2_Agent_Test_Loop']['passed']} / {total_tasks} | {summary['baselines']['B2_Agent_Test_Loop']['pass_rate']}% | {summary['baselines']['B2_Agent_Test_Loop']['avg_latency_sec']}s | ${summary['baselines']['B2_Agent_Test_Loop']['total_cost_usd']} |",
+        f"| **B3** | Model + S-Class Candidate Authority | 3 calls | {summary['baselines']['B3_Agent_SClass_Governance']['passed']} / {total_tasks} | {summary['baselines']['B3_Agent_SClass_Governance']['pass_rate']}% | {summary['baselines']['B3_Agent_SClass_Governance']['avg_latency_sec']}s | ${summary['baselines']['B3_Agent_SClass_Governance']['total_cost_usd']} |",
+        f"| **B4** | Model + S-Class + Pytest Repair Loop | 3 calls | {summary['baselines']['B4_Agent_SClass_Test_Loop']['passed']} / {total_tasks} | {summary['baselines']['B4_Agent_SClass_Test_Loop']['pass_rate']}% | {summary['baselines']['B4_Agent_SClass_Test_Loop']['avg_latency_sec']}s | ${summary['baselines']['B4_Agent_SClass_Test_Loop']['total_cost_usd']} |",
         "",
-        "## Human Evaluator Scoring (Awaiting Rated JSON Run Artifacts)",
-        "- Human metrics (defects, review friction, developer interventions, unsupported inventions) are captured directly in each `runs/{task_id}/b{1,2,3}_raw.json` file."
+        "## Failure Taxonomy Classification Breakdown",
+        "",
+        "| Baseline | Wrong Req | Missing Req | Implementation Bug | Test / API Mismatch | Env Failure |",
+        "| :--- | :---: | :---: | :---: | :---: | :---: |",
+        f"| **B1** | {summary['failure_taxonomy_breakdown']['B1_Prompt_Only']['wrong_requirement']} | {summary['failure_taxonomy_breakdown']['B1_Prompt_Only']['missing_requirement']} | {summary['failure_taxonomy_breakdown']['B1_Prompt_Only']['implementation_bug']} | {summary['failure_taxonomy_breakdown']['B1_Prompt_Only']['test_api_mismatch']} | {summary['failure_taxonomy_breakdown']['B1_Prompt_Only']['environment_failure']} |",
+        f"| **B2** | {summary['failure_taxonomy_breakdown']['B2_Agent_Test_Loop']['wrong_requirement']} | {summary['failure_taxonomy_breakdown']['B2_Agent_Test_Loop']['missing_requirement']} | {summary['failure_taxonomy_breakdown']['B2_Agent_Test_Loop']['implementation_bug']} | {summary['failure_taxonomy_breakdown']['B2_Agent_Test_Loop']['test_api_mismatch']} | {summary['failure_taxonomy_breakdown']['B2_Agent_Test_Loop']['environment_failure']} |",
+        f"| **B3** | {summary['failure_taxonomy_breakdown']['B3_Agent_SClass_Governance']['wrong_requirement']} | {summary['failure_taxonomy_breakdown']['B3_Agent_SClass_Governance']['missing_requirement']} | {summary['failure_taxonomy_breakdown']['B3_Agent_SClass_Governance']['implementation_bug']} | {summary['failure_taxonomy_breakdown']['B3_Agent_SClass_Governance']['test_api_mismatch']} | {summary['failure_taxonomy_breakdown']['B3_Agent_SClass_Governance']['environment_failure']} |",
+        f"| **B4** | {summary['failure_taxonomy_breakdown']['B4_Agent_SClass_Test_Loop']['wrong_requirement']} | {summary['failure_taxonomy_breakdown']['B4_Agent_SClass_Test_Loop']['missing_requirement']} | {summary['failure_taxonomy_breakdown']['B4_Agent_SClass_Test_Loop']['implementation_bug']} | {summary['failure_taxonomy_breakdown']['B4_Agent_SClass_Test_Loop']['test_api_mismatch']} | {summary['failure_taxonomy_breakdown']['B4_Agent_SClass_Test_Loop']['environment_failure']} |",
     ]
 
     with open(md_path, "w", encoding="utf-8") as f:
@@ -409,7 +595,7 @@ def generate_summary_report(runs: List[Dict[str, Any]], engineering_dir: str):
     print(f"\nSummary Report saved to {json_path} and {md_path}")
 
 def main():
-    parser = argparse.ArgumentParser(description="Gate 1.6B Genuine Agent Benchmark Runner")
+    parser = argparse.ArgumentParser(description="Gate 1.6C Fair Treatment Benchmark Runner")
     parser.add_argument("--provider", type=str, default="auto", help="Provider type (auto, gemini, openai, anthropic, custom_http, mock_test)")
     parser.add_argument("--model", type=str, default="gemini-3.5-flash-lite", help="Model name")
     parser.add_argument("--api-key", type=str, default=None, help="LLM Provider API Key")
@@ -430,10 +616,10 @@ def main():
         certifier.write_reports(cert_report, json_path, md_path)
 
         if not is_certified:
-            print(f"\n[REJECTED] Gate 1.6B Certification Failed. Status: {cert_report['status']}")
+            print(f"\n[REJECTED] Gate 1.6C Certification Failed. Status: {cert_report['status']}")
             sys.exit(1)
         else:
-            print(f"\n[CERTIFIED] Gate 1.6B Certified 100% Genuine Live Benchmark!")
+            print(f"\n[CERTIFIED] Gate 1.6C Certified 100% Genuine Live Benchmark!")
             sys.exit(0)
 
     except ProviderAPIKeyMissingError as e:

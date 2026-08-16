@@ -1,50 +1,58 @@
 {
   "task_id": "ENG-05-KIOSK-LOCKDOWN-SANDBOX",
   "baseline": "B1",
-  "runner_version": "gate-1.6b-genuine-agent-benchmark-v1",
+  "runner_version": "gate-1.6c-fair-treatment-benchmark-v1",
   "domain": "OS & Containment / Kiosk Security",
   "raw_prompt": "Implement a process containment syscall sanitizer guard in `target_module.py` that enforces an explicit syscall whitelist and denies unauthorized filesystem access outside `/tmp/sandbox`.",
   "model_metadata": {
     "provider_type": "gemini",
     "model_name": "gemini-3.5-flash-lite",
     "temperature": 0.2,
-    "is_mock": false
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 1,
+    "total_iterations": 1
   },
   "repository": {
     "starting_tree_hash": "192ccc513b1a34af73695858f05079ae2ddc56f02a787288073b9922684b0738",
-    "final_tree_hash": "97b4b3f6d894a9c6e23a87506a807e6975a1bcf0d21e6a097c69c7caebd51c7a"
+    "final_tree_hash": "00cae1e5764dc26a9f9d279d9437cf898666cb925944e3dff5de594a6e05a464"
   },
   "execution_trace": [
     {
       "iteration": 1,
       "prompt": "Task Instruction:\nImplement a process containment syscall sanitizer guard in `target_module.py` that enforces an explicit syscall whitelist and denies unauthorized filesystem access outside `/tmp/sandbox`.\n\nExisting Code in target_module.py:\n```python\n# target_module.py\nALLOWED_SYSCALLS = {'read', 'write', 'stat', 'exit'}\n\ndef is_syscall_allowed(syscall_name: str, path_arg: str) -> bool:\n    pass\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
-      "response_text": "```python\n# target_module.py\nimport os\n\nALLOWED_SYSCALLS = {'read', 'write', 'stat', 'exit'}\n\n# Define the mandatory sandbox path boundary\nSANDBOX_PATH = os.path.abspath('/tmp/sandbox')\n\ndef is_syscall_allowed(syscall_name: str, path_arg: str) -> bool:\n    \"\"\"\n    Validates if a given syscall and its associated path argument are authorized.\n    \n    Rules:\n    1. The syscall must be explicitly present in the ALLOWED_SYSCALLS whitelist.\n    2. If the syscall takes a filesystem path argument, it must be strictly \n       contained within the /tmp/sandbox directory to prevent path traversal.\n    \"\"\"\n    # 1. Check syscall whitelist\n    if syscall_name not in ALLOWED_SYSCALLS:\n        return False\n    \n    # 2. If a path argument is provided, enforce containment within /tmp/sandbox\n    if path_arg is not None:\n        try:\n            # Resolve absolute path to handle relative components like '..' or '.'\n            absolute_path = os.path.abspath(path_arg)\n            \n            # Ensure the path starts with the sandbox path boundary\n            # Using commonpath or commonprefix to safely check containment\n            common = os.path.commonpath([SANDBOX_PATH, absolute_path])\n            if common != SANDBOX_PATH:\n                return False\n        except (ValueError, TypeError):\n            # If path resolution fails, deny access defensively\n            return False\n            \n    return True\n```",
-      "latency_sec": 2.6077,
+      "response_text": "```python\n# target_module.py\nimport os\n\nALLOWED_SYSCALLS = {'read', 'write', 'stat', 'exit'}\nSANDBOX_DIR = os.path.realpath('/tmp/sandbox')\n\ndef is_syscall_allowed(syscall_name: str, path_arg: str = None) -> bool:\n    \"\"\"\n    Enforces an explicit syscall whitelist and denies unauthorized \n    filesystem access outside /tmp/sandbox.\n    \"\"\"\n    # 1. Check if the syscall is in the allowed whitelist\n    if syscall_name not in ALLOWED_SYSCALLS:\n        return False\n        \n    # 2. If the syscall involves a path argument, enforce sandbox boundaries\n    if path_arg is not None:\n        try:\n            # Resolve the absolute, canonicalized path\n            real_path = os.path.realpath(path_arg)\n            \n            # Ensure the resolved path starts with the sandbox directory path\n            # and is either the sandbox itself or a subpath (to prevent prefix exploits like /tmp/sandbox-evil)\n            if not (real_path == SANDBOX_DIR or real_path.startswith(SANDBOX_DIR + os.sep)):\n                return False\n        except (TypeError, ValueError, OSError):\n            # If path resolution fails for any reason, deny access securely\n            return False\n            \n    return True\n```",
+      "latency_sec": 1.8066,
       "prompt_tokens": 152,
-      "completion_tokens": 349,
-      "cost_usd": 0.000116,
+      "completion_tokens": 305,
+      "cost_usd": 0.000103,
       "pytest_result": {
         "exit_code": 0,
         "passed_count": 1,
         "failed_count": 0,
         "total_count": 1,
-        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp871xv29o\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_sandbox_containment PASSED                    [100%]\n\n============================== 1 passed in 0.04s ==============================\n",
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpu3lk_arp\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_sandbox_containment PASSED                    [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
         "stderr": "",
-        "duration_sec": 0.68,
+        "duration_sec": 0.496,
         "all_passed": true
       }
     }
   ],
-  "final_code": "# target_module.py\nimport os\n\nALLOWED_SYSCALLS = {'read', 'write', 'stat', 'exit'}\n\n# Define the mandatory sandbox path boundary\nSANDBOX_PATH = os.path.abspath('/tmp/sandbox')\n\ndef is_syscall_allowed(syscall_name: str, path_arg: str) -> bool:\n    \"\"\"\n    Validates if a given syscall and its associated path argument are authorized.\n    \n    Rules:\n    1. The syscall must be explicitly present in the ALLOWED_SYSCALLS whitelist.\n    2. If the syscall takes a filesystem path argument, it must be strictly \n       contained within the /tmp/sandbox directory to prevent path traversal.\n    \"\"\"\n    # 1. Check syscall whitelist\n    if syscall_name not in ALLOWED_SYSCALLS:\n        return False\n    \n    # 2. If a path argument is provided, enforce containment within /tmp/sandbox\n    if path_arg is not None:\n        try:\n            # Resolve absolute path to handle relative components like '..' or '.'\n            absolute_path = os.path.abspath(path_arg)\n            \n            # Ensure the path starts with the sandbox path boundary\n            # Using commonpath or commonprefix to safely check containment\n            common = os.path.commonpath([SANDBOX_PATH, absolute_path])\n            if common != SANDBOX_PATH:\n                return False\n        except (ValueError, TypeError):\n            # If path resolution fails, deny access defensively\n            return False\n            \n    return True\n",
+  "final_code": "# target_module.py\nimport os\n\nALLOWED_SYSCALLS = {'read', 'write', 'stat', 'exit'}\nSANDBOX_DIR = os.path.realpath('/tmp/sandbox')\n\ndef is_syscall_allowed(syscall_name: str, path_arg: str = None) -> bool:\n    \"\"\"\n    Enforces an explicit syscall whitelist and denies unauthorized \n    filesystem access outside /tmp/sandbox.\n    \"\"\"\n    # 1. Check if the syscall is in the allowed whitelist\n    if syscall_name not in ALLOWED_SYSCALLS:\n        return False\n        \n    # 2. If the syscall involves a path argument, enforce sandbox boundaries\n    if path_arg is not None:\n        try:\n            # Resolve the absolute, canonicalized path\n            real_path = os.path.realpath(path_arg)\n            \n            # Ensure the resolved path starts with the sandbox directory path\n            # and is either the sandbox itself or a subpath (to prevent prefix exploits like /tmp/sandbox-evil)\n            if not (real_path == SANDBOX_DIR or real_path.startswith(SANDBOX_DIR + os.sep)):\n                return False\n        except (TypeError, ValueError, OSError):\n            # If path resolution fails for any reason, deny access securely\n            return False\n            \n    return True\n",
   "oracle_result": {
     "exit_code": 0,
     "passed_count": 1,
     "failed_count": 0,
     "total_count": 1,
-    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp871xv29o\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_sandbox_containment PASSED                    [100%]\n\n============================== 1 passed in 0.04s ==============================\n",
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpu3lk_arp\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_sandbox_containment PASSED                    [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
     "stderr": "",
-    "duration_sec": 0.68,
+    "duration_sec": 0.496,
     "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
   },
   "human_evaluation": {
     "defects": null,

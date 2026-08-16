@@ -1,0 +1,134 @@
+{
+  "task_id": "ENG-08-DISTRIBUTED-RATE-LIMITER",
+  "baseline": "B4",
+  "runner_version": "gate-1.6c-fair-treatment-benchmark-v1",
+  "domain": "Distributed Systems / Traffic Control",
+  "raw_prompt": "Implement a sliding window log rate limiter in `target_module.py` enforcing request threshold caps per client window and automatic window sliding cleanup.",
+  "sclass_governance": {
+    "semantic_requirements": [
+      {
+        "id": "REQ-SHADOW-001",
+        "title": "Core Service Functionality",
+        "description": "Implement core processing logic for: Implement a sliding window log rate limiter in `target_module.py` enforcing request threshold caps per client window and automatic window sliding cleanup.",
+        "type": "FUNCTIONAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt execution mandate"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-002",
+        "title": "Underlying Storage Technology Specification",
+        "description": "The specific persistence engine and database backend are unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify database technology"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-003",
+        "title": "API Transport Protocol Specification",
+        "description": "The specific network transport protocol (gRPC vs REST) is unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify API protocol"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      }
+    ],
+    "epistemic_status": "CONFIRMED",
+    "gate_result": "PASS"
+  },
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 1
+  },
+  "repository": {
+    "starting_tree_hash": "7a0ed799fadbc24c63faabba64fd54037c45f0d47e5bcf446a81b79afdef0a0d",
+    "final_tree_hash": "4701b74ed49758ca90f805bc1c047a510d3a57f5ff5e0ba020b4b6ee3365ad80"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "User Task Instruction:\nImplement a sliding window log rate limiter in `target_module.py` enforcing request threshold caps per client window and automatic window sliding cleanup.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement a sliding window log rate limiter in `target_module.py` enforcing request threshold caps per client window and automatic window sliding cleanup.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nExisting Code in target_module.py:\n```python\n# target_module.py\nclass SlidingWindowRateLimiter:\n    def __init__(self, max_requests: int, window_sec: float):\n        pass\n    def allow_request(self, client_id: str, timestamp: float) -> bool:\n        pass\n\n```\n\nImplement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block.",
+      "response_text": "```python\n# target_module.py\nimport time\nfrom collections import deque\nfrom typing import Dict, Deque\n\nclass SlidingWindowRateLimiter:\n    \"\"\"\n    A sliding window log rate limiter that enforces request threshold caps\n    per client within a sliding time window and automatically cleans up expired timestamps.\n    \"\"\"\n    def __init__(self, max_requests: int, window_sec: float):\n        if max_requests <= 0:\n            raise ValueError(\"max_requests must be greater than 0\")\n        if window_sec <= 0:\n            raise ValueError(\"window_sec must be greater than 0\")\n            \n        self.max_requests = max_requests\n        self.window_sec = window_sec\n        # Maps client_id to a deque of request timestamps\n        self.client_logs: Dict[str, Deque[float]] = {}\n\n    def allow_request(self, client_id: str, timestamp: float) -> bool:\n        \"\"\"\n        Determines whether a request from a client should be allowed at the given timestamp.\n        \n        Args:\n            client_id: Unique identifier for the client.\n            timestamp: The current timestamp of the request.\n            \n        Returns:\n            True if the request is allowed (under the limit), False otherwise.\n        \"\"\"\n        if client_id not in self.client_logs:\n            self.client_logs[client_id] = deque()\n\n        logs = self.client_logs[client_id]\n        window_start = timestamp - self.window_sec\n\n        # Automatic window sliding: remove timestamps outside the current sliding window\n        while logs and logs[0] <= window_start:\n            logs.popleft()\n\n        # Check if the client has reached the threshold cap\n        if len(logs) < self.max_requests:\n            logs.append(timestamp)\n            return True\n\n        return False\n```",
+      "latency_sec": 2.0106,
+      "prompt_tokens": 278,
+      "completion_tokens": 426,
+      "cost_usd": 0.000149,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpmwv4mvzo\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_sliding_window_rate_limiter PASSED            [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.609,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "# target_module.py\nimport time\nfrom collections import deque\nfrom typing import Dict, Deque\n\nclass SlidingWindowRateLimiter:\n    \"\"\"\n    A sliding window log rate limiter that enforces request threshold caps\n    per client within a sliding time window and automatically cleans up expired timestamps.\n    \"\"\"\n    def __init__(self, max_requests: int, window_sec: float):\n        if max_requests <= 0:\n            raise ValueError(\"max_requests must be greater than 0\")\n        if window_sec <= 0:\n            raise ValueError(\"window_sec must be greater than 0\")\n            \n        self.max_requests = max_requests\n        self.window_sec = window_sec\n        # Maps client_id to a deque of request timestamps\n        self.client_logs: Dict[str, Deque[float]] = {}\n\n    def allow_request(self, client_id: str, timestamp: float) -> bool:\n        \"\"\"\n        Determines whether a request from a client should be allowed at the given timestamp.\n        \n        Args:\n            client_id: Unique identifier for the client.\n            timestamp: The current timestamp of the request.\n            \n        Returns:\n            True if the request is allowed (under the limit), False otherwise.\n        \"\"\"\n        if client_id not in self.client_logs:\n            self.client_logs[client_id] = deque()\n\n        logs = self.client_logs[client_id]\n        window_start = timestamp - self.window_sec\n\n        # Automatic window sliding: remove timestamps outside the current sliding window\n        while logs and logs[0] <= window_start:\n            logs.popleft()\n\n        # Check if the client has reached the threshold cap\n        if len(logs) < self.max_requests:\n            logs.append(timestamp)\n            return True\n\n        return False\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpmwv4mvzo\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_sliding_window_rate_limiter PASSED            [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.609,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  }
+}
