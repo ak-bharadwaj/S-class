@@ -1,13 +1,10 @@
 """
-Strict Current-vs-Candidate Contract Differential Harness & Failure Injection Suite.
+Strict FileLock Contract Parity & Failure Injection Regression Suite.
 
-This module systematically executes identical scenarios against BOTH:
-1. Current S-Class FileLock (`FileLock`)
-2. Experimental Candidate (`ExperimentalFileLock`)
+This module systematically executes contract verification and failure injection scenarios against:
+Production S-Class FileLock (`FileLock`).
 
-and directly compares their normalized contract observations.
-
-Dimensions Differentially Verified:
+Dimensions Verified:
 1. Schema & Field Type Parity (Enter, Released, and Idle/Reclaim states).
 2. Process-Local Thread Serialization (_active_local_locks parity).
 3. Multiprocessing Mutual Exclusion.
@@ -22,7 +19,6 @@ import os
 import sys
 import json
 import time
-import uuid
 import tempfile
 import threading
 import subprocess
@@ -33,6 +29,7 @@ from unittest.mock import patch
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from file_lock import (
     FileLock,
+    _write_metadata_atomic_exact,
     _CACHED_PID,
     _CACHED_HOSTNAME,
     _CACHED_PROC_START,
@@ -44,107 +41,8 @@ from file_lock import (
 )
 from config_gc import run_gc
 
-
-def _write_metadata_atomic_exact(fd: int, payload: bytes) -> None:
-    """
-    Robust POSIX/OS positional metadata writer.
-    - Writes exact byte sequence starting at byte offset 0, handling partial writes.
-    - Truncates file to exact payload length to prevent stale trailing byte corruption.
-    - Propagates all OS write/truncate errors deterministically.
-    """
-    total_written = 0
-    payload_len = len(payload)
-    if hasattr(os, "pwrite"):
-        while total_written < payload_len:
-            written = os.pwrite(fd, payload[total_written:], total_written)
-            if written == 0:
-                raise IOError("os.pwrite wrote 0 bytes to lock file")
-            total_written += written
-    else:
-        os.lseek(fd, 0, os.SEEK_SET)
-        while total_written < payload_len:
-            written = os.write(fd, payload[total_written:])
-            if written == 0:
-                raise IOError("os.write wrote 0 bytes to lock file")
-            total_written += written
-    os.ftruncate(fd, payload_len)
-
-
-class ExperimentalFileLock:
-    """
-    Experimental candidate testing robust positional write + ftruncate + active_local_locks thread safety.
-    """
-    def __init__(self, lock_path: str, timeout: float = 10.0, poll_interval: float = 0.05):
-        self.lock_path = os.path.abspath(lock_path)
-        self.timeout = timeout
-        self.poll_interval = poll_interval
-        self.token = uuid.uuid4().hex
-        self.owner_pid = _CACHED_PID
-        self.owner_proc_start = _CACHED_PROC_START
-        self._fd = None
-
-    def __enter__(self):
-        start_time = time.time()
-        owner_payload = f'{_META_PREFIX}{self.token}", "start_time": {start_time}}}'.encode("utf-8")
-
-        while True:
-            # 1. Process-local thread serialization
-            with _active_locks_guard:
-                is_locally_active = self.lock_path in _active_local_locks
-
-            if is_locally_active:
-                if time.time() - start_time >= self.timeout:
-                    raise TimeoutError(f"ExperimentalFileLock thread timeout waiting for {self.lock_path}")
-                time.sleep(self.poll_interval)
-                continue
-
-            try:
-                fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT, 0o600)
-            except OSError:
-                if time.time() - start_time >= self.timeout:
-                    raise TimeoutError(f"ExperimentalFileLock timeout opening {self.lock_path}")
-                time.sleep(self.poll_interval)
-                continue
-
-            if _lock_fd(fd):
-                try:
-                    _write_metadata_atomic_exact(fd, owner_payload)
-                except Exception as err:
-                    _unlock_fd(fd)
-                    os.close(fd)
-                    raise err
-
-                self._fd = fd
-                with _active_locks_guard:
-                    _active_local_locks.add(self.lock_path)
-                return self
-
-            os.close(fd)
-            if time.time() - start_time >= self.timeout:
-                raise TimeoutError(f"ExperimentalFileLock timeout waiting for live lock: {self.lock_path}")
-            time.sleep(self.poll_interval)
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        try:
-            if self._fd is not None:
-                rel_status = getattr(self, "_release_status", "released")
-                if rel_status == "idle":
-                    rel_payload = f'{{"status": "idle", "pid": {self.owner_pid}, "token": "{self.token}", "reclaimed_at": {time.time()}}}'.encode("utf-8")
-                else:
-                    rel_payload = f'{{"status": "released", "pid": {self.owner_pid}, "token": "{self.token}"}}'.encode("utf-8")
-
-                try:
-                    _write_metadata_atomic_exact(self._fd, rel_payload)
-                except OSError as err:
-                    if exc_type is None:
-                        raise err
-
-                _unlock_fd(self._fd)
-                os.close(self._fd)
-                self._fd = None
-        finally:
-            with _active_locks_guard:
-                _active_local_locks.discard(self.lock_path)
+# Alias ExperimentalFileLock directly to production FileLock after successful integration
+ExperimentalFileLock = FileLock
 
 
 def _read_metadata_safe(lock_obj, path: str) -> dict:
@@ -219,15 +117,15 @@ def test_differential_schema_normalization_enter_released_idle():
         # Direct Normalized Contract Comparison
         norm_cur_enter = _normalize_metadata(meta_cur_enter)
         norm_exp_enter = _normalize_metadata(meta_exp_enter)
-        assert norm_cur_enter == norm_exp_enter, f"Enter metadata schema mismatch!\nCurrent: {norm_cur_enter}\nCandidate: {norm_exp_enter}"
+        assert norm_cur_enter == norm_exp_enter
 
         norm_cur_rel = _normalize_metadata(meta_cur_rel)
         norm_exp_rel = _normalize_metadata(meta_exp_rel)
-        assert norm_cur_rel == norm_exp_rel, f"Released metadata schema mismatch!\nCurrent: {norm_cur_rel}\nCandidate: {norm_exp_rel}"
+        assert norm_cur_rel == norm_exp_rel
 
         norm_cur_idle = _normalize_metadata(meta_cur_idle)
         norm_exp_idle = _normalize_metadata(meta_exp_idle)
-        assert norm_cur_idle == norm_exp_idle, f"Idle metadata schema mismatch!\nCurrent: {norm_cur_idle}\nCandidate: {norm_exp_idle}"
+        assert norm_cur_idle == norm_exp_idle
 
 
 # ============================================================================
@@ -262,10 +160,7 @@ def test_differential_thread_serialization():
 # 3. Differential Multiprocessing Exclusion (Current vs Candidate)
 # ============================================================================
 def _mp_generic_worker(lock_cls_name, lock_path, count_file, increments):
-    if lock_cls_name == "FileLock":
-        cls = FileLock
-    else:
-        cls = ExperimentalFileLock
+    cls = FileLock
 
     for _ in range(increments):
         with cls(lock_path, timeout=10.0):
@@ -314,9 +209,8 @@ def test_differential_crash_recovery():
 
         cmd = [
             sys.executable, "-c",
-            f"import os, time; from tests.test_experimental_metadata_writer import FileLock, ExperimentalFileLock; "
-            f"cls = FileLock if '{lock_cls_name}' == 'FileLock' else ExperimentalFileLock; "
-            f"fl = cls(r'{lock_path}'); fl.__enter__(); "
+            f"import os, time; from file_lock import FileLock; "
+            f"fl = FileLock(r'{lock_path}'); fl.__enter__(); "
             f"open(r'{ready_file}', 'w').write('OK'); time.sleep(0.1); os._exit(0)"
         ]
         proc = subprocess.Popen(cmd)
@@ -324,9 +218,8 @@ def test_differential_crash_recovery():
             time.sleep(0.01)
         proc.wait(timeout=5.0)
 
-        cls = FileLock if lock_cls_name == "FileLock" else ExperimentalFileLock
         t0 = time.perf_counter()
-        with cls(lock_path, timeout=2.0):
+        with FileLock(lock_path, timeout=2.0):
             t1 = time.perf_counter()
 
         return (t1 - t0)
@@ -487,21 +380,14 @@ def test_failure_injection_pwrite_and_ftruncate_errors():
 
 def _crash_window_worker(lock_cls_name, lock_path, ready_file):
     """
-    Worker process that acquires lock using specified implementation (FileLock or ExperimentalFileLock),
+    Worker process that acquires lock using FileLock,
     writes an untruncated long metadata payload without releasing or truncating, signals barrier, and abruptly dies (os._exit).
     """
     long_payload = b'{"status": "active", "pid": 99999999, "token": "crash-window-long-untruncated-payload-999999999999999999999999999999"}'
 
-    if lock_cls_name == "FileLock":
-        fl = FileLock(lock_path, timeout=5.0)
-        fl.__enter__()
-        if hasattr(fl, "_file") and fl._file is not None:
-            fl._file.seek(0)
-            fl._file.write(long_payload)
-            fl._file.flush()
-    else:
-        fl = ExperimentalFileLock(lock_path, timeout=5.0)
-        fl.__enter__()
+    fl = FileLock(lock_path, timeout=5.0)
+    fl.__enter__()
+    if hasattr(fl, "_fd") and fl._fd is not None:
         if hasattr(os, "pwrite"):
             os.pwrite(fl._fd, long_payload, 0)
         else:
@@ -516,37 +402,35 @@ def _crash_window_worker(lock_cls_name, lock_path, ready_file):
 
 def test_crash_window_between_pwrite_and_ftruncate():
     """
-    Comparative Current-vs-Candidate Crash Window Recovery & Exact Byte Content Integrity Test.
-    Simulates process crash AFTER write completes but BEFORE truncate/release executes for BOTH FileLock and ExperimentalFileLock:
-    1. Current FileLock writer interrupted -> Current FileLock contender recovers.
-    2. Candidate ExperimentalFileLock writer interrupted -> Candidate ExperimentalFileLock contender recovers.
-    3. Strict Content & Length Assertions:
+    Crash Window Recovery & Exact Byte Content Integrity Test.
+    Simulates process crash AFTER write completes but BEFORE truncate/release executes:
+    1. FileLock writer interrupted -> FileLock contender recovers.
+    2. Strict Content & Length Assertions:
        - Valid JSON parsing
        - Expected status ('released')
        - Expected PID (os.getpid()) and token presence
        - Exact disk payload match (raw_bytes == json.dumps(parsed).encode('utf-8')) with zero trailing bytes
-    4. Normalized Schema Equality between Current and Candidate crash recovery observations.
     """
-    def run_recovery(lock_cls_name, lock_cls, tmpdir):
-        lock_path = os.path.join(tmpdir, f"{lock_cls_name}_crash_window.lock")
-        ready_file = os.path.join(tmpdir, f"{lock_cls_name}_write_done.marker")
+    with tempfile.TemporaryDirectory() as tmpdir:
+        lock_path = os.path.join(tmpdir, "crash_window.lock")
+        ready_file = os.path.join(tmpdir, "write_done.marker")
 
         cmd = [
             sys.executable, "-c",
             f"from tests.test_experimental_metadata_writer import _crash_window_worker; "
-            f"_crash_window_worker('{lock_cls_name}', r'{lock_path}', r'{ready_file}')"
+            f"_crash_window_worker('FileLock', r'{lock_path}', r'{ready_file}')"
         ]
         proc = subprocess.Popen(cmd)
 
         start = time.time()
         while not os.path.exists(ready_file) and time.time() - start < 5.0:
             time.sleep(0.01)
-        assert os.path.exists(ready_file), f"Child process failed to signal barrier for {lock_cls_name}"
+        assert os.path.exists(ready_file), "Child process failed to signal barrier"
 
         proc.wait(timeout=5.0)
 
         # Contender acquires lock over the untruncated crash file
-        with lock_cls(lock_path, timeout=2.0) as fl:
+        with FileLock(lock_path, timeout=2.0) as fl:
             meta = _read_metadata_safe(fl, lock_path)
 
         # Read raw disk bytes after release
@@ -559,13 +443,3 @@ def test_crash_window_between_pwrite_and_ftruncate():
         assert raw_bytes == expected_bytes, f"Raw disk bytes do not match expected JSON payload!\nRaw: {raw_bytes!r}\nExpected: {expected_bytes!r}"
         assert parsed["pid"] == os.getpid()
         assert parsed["status"] == "released"
-
-        return _normalize_metadata(meta), _normalize_metadata(parsed)
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        cur_enter_norm, cur_rel_norm = run_recovery("FileLock", FileLock, tmpdir)
-        exp_enter_norm, exp_rel_norm = run_recovery("ExperimentalFileLock", ExperimentalFileLock, tmpdir)
-
-        # Direct Comparative Contract Normalization Assertions
-        assert cur_enter_norm == exp_enter_norm, f"Crash recovery enter schema mismatch!\nCurrent: {cur_enter_norm}\nCandidate: {exp_enter_norm}"
-        assert cur_rel_norm == exp_rel_norm, f"Crash recovery released schema mismatch!\nCurrent: {cur_rel_norm}\nCandidate: {exp_rel_norm}"
