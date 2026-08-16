@@ -384,7 +384,7 @@ time.sleep(30)
             os.lseek(b_lock._fd, 0, os.SEEK_SET)
             raw = os.read(b_lock._fd, 4096).decode("utf-8")
             data2 = json.loads(raw)
-            self.assertNotIn("status", data2)
+            self.assertEqual(data2.get("status"), "active")
             self.assertEqual(data2.get("pid"), os.getpid())
 
         # 4. Strict Mutual Exclusion Verification across 5 concurrent workers

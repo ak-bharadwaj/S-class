@@ -377,7 +377,7 @@ def initialize_workspace_wizard(workspace_dir: Optional[str] = None) -> Dict[str
     
     config = {
         "pipeline": "sclass-v5",
-        "executionMode": "Closed Loop",
+        "executionMode": "TEST",
         "loopMode": "closed-loop",
         "projectType": "unknown",
         "topology": "hierarchical",

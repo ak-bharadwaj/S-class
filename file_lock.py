@@ -280,6 +280,16 @@ class FileLock:
                 self.profile_timings["lock_ns"] = time.perf_counter_ns() - t_lock0
 
             # KERNEL ADVISORY LOCK GRANTED!
+            if sys.platform != "win32":
+                try:
+                    os.fchmod(fd, 0o600)
+                except OSError:
+                    pass
+                try:
+                    os.chmod(os.path.dirname(self.lock_path), 0o700)
+                except OSError:
+                    pass
+
             t_write0 = time.perf_counter_ns() if self.enable_profiling else 0
             try:
                 _write_metadata_atomic_exact(fd, owner_payload)
