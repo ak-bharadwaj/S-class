@@ -58,21 +58,21 @@ def flawed_phi_sanitizer(text: str) -> str:
 
 def reference_ledger(entries: List[Tuple[str, str, float]]) -> Dict[str, float]:
     """Reference implementation: perfectly conserves debit/credit balances."""
-    balances: Dict[str, float] = {a: 0.0 for a in ["ASSETS", "LIABILITIES", "EQUITY", "REVENUE", "EXPENSES"]}
+    balances: Dict[str, float] = {}
     for src, dst, amt in entries:
         amt_f = float(amt)
-        balances[src] -= amt_f
-        balances[dst] += amt_f
+        balances[src] = balances.get(src, 0.0) - amt_f
+        balances[dst] = balances.get(dst, 0.0) + amt_f
     return balances
 
 
 def flawed_ledger(entries: List[Tuple[str, str, float]]) -> Dict[str, float]:
     """Flawed implementation: skims 5% fee without offsetting account, violating zero-sum conservation."""
-    balances: Dict[str, float] = {a: 0.0 for a in ["ASSETS", "LIABILITIES", "EQUITY", "REVENUE", "EXPENSES"]}
+    balances: Dict[str, float] = {}
     for src, dst, amt in entries:
         amt_f = float(amt)
-        balances[src] -= amt_f
-        balances[dst] += (amt_f * 0.95)  # 5% leakage
+        balances[src] = balances.get(src, 0.0) - amt_f
+        balances[dst] = balances.get(dst, 0.0) + (amt_f * 0.95)  # 5% leakage
     return balances
 
 
@@ -128,8 +128,8 @@ def test_ledger_flawed_fails_and_captures_counterexample():
     assert receipt.passed is False
     assert receipt.shrunk_counterexample is not None
     assert isinstance(receipt.shrunk_counterexample, dict)
-    assert "entries" in receipt.shrunk_counterexample
-    assert "Non-zero ledger balance sum" in str(receipt.error_message)
+    assert "transactions" in receipt.shrunk_counterexample
+    assert "Double-entry ledger invariant violated" in str(receipt.error_message)
 
 
 def test_property_evidence_persistence():
@@ -141,3 +141,19 @@ def test_property_evidence_persistence():
             data = json.load(f)
         assert data["obligation_id"] == "OBL-SEC-SPIFFE-001"
         assert data["provenance_hash"] == receipt.provenance_hash
+
+
+def test_property_common_ir_conversion():
+    receipt = PropertyVerificationAdapter.verify_spiffe_parser(reference_spiffe_parser, max_examples=20)
+    ir = receipt.to_ir()
+    assert ir.obligation_id == receipt.obligation_id
+    assert ir.passed is True
+    assert ir.engine_name == "Hypothesis"
+    assert ir.provenance_hash == receipt.provenance_hash
+    assert ir.execution_metadata["cases_generated"] >= 20
+
+    flawed_receipt = PropertyVerificationAdapter.verify_spiffe_parser(flawed_spiffe_parser, max_examples=20)
+    flawed_ir = flawed_receipt.to_ir()
+    assert flawed_ir.passed is False
+    assert len(flawed_ir.reproducible_cases) == 1
+    assert len(flawed_ir.diagnostics) == 1

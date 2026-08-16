@@ -139,3 +139,28 @@ def test_persistence_and_provenance():
         finally:
             if os.path.exists(f_name):
                 os.unlink(f_name)
+
+
+def test_common_ir_conversion():
+    with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False) as f:
+        f.write(CLEAN_PYTHON_CODE)
+        f_name = f.name
+
+    try:
+        type_receipt = TypeVerificationProvider.run_type_check(f_name)
+        ir = type_receipt.to_ir()
+        assert ir.obligation_id == type_receipt.obligation_id
+        assert ir.passed is True
+        assert "Pyright" in ir.engine_name
+        assert ir.provenance_hash == type_receipt.provenance_hash
+        assert len(ir.target_source_hash) == 64
+
+        static_receipt = StaticAnalysisProvider.run_ruff_audit(f_name)
+        static_ir = static_receipt.to_ir()
+        assert static_ir.obligation_id == static_receipt.obligation_id
+        assert static_ir.passed is True
+        assert "Ruff" in static_ir.engine_name
+        assert static_ir.provenance_hash == static_receipt.provenance_hash
+    finally:
+        if os.path.exists(f_name):
+            os.unlink(f_name)

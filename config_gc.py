@@ -11,6 +11,8 @@ logger = logging.getLogger("sclass_gc")
 @dataclass
 class GCReport:
     stale_locks_reclaimed: int = 0
+    stale_lock_records_reclaimed: int = 0
+    stale_lock_bytes_rewritten: int = 0
     expired_states_removed: int = 0
     orphaned_screenshots_removed: int = 0
     expired_memory_entries_pruned: int = 0
@@ -62,7 +64,9 @@ def run_gc(workspace_dir: str, state_max_age_days: int = 7, memory_max_age_days:
                         except OSError:
                             size = 0
                         report.stale_locks_reclaimed += 1
-                        report.total_bytes_freed += size
+                        report.stale_lock_records_reclaimed += 1
+                        report.stale_lock_bytes_rewritten += size
+                        # Note: total_bytes_freed is NOT incremented because persistent lock files remain on disk
                 except TimeoutError:
                     # An active live process holds the kernel lock on state.lock - do not touch it
                     logger.debug(f"Lock file {lock_file} is held by active process; skipping reclamation.")

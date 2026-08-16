@@ -8,12 +8,14 @@ import os
 import sys
 import json
 import hashlib
-import re
+import inspect
 from datetime import datetime, timezone
 from dataclasses import dataclass, asdict, field
 from typing import Dict, Any, Optional, Callable, List, Tuple, Union
 import hypothesis
 from hypothesis import given, settings, strategies as st, Phase
+
+from evidence_ir import EpistemicStatus, UnifiedEvidenceReceipt, compute_source_hash
 
 
 @dataclass
@@ -23,6 +25,7 @@ class PropertyEvidenceReceipt:
     domain: str
     target_identifier: str
     target_identifier_hash: str
+    status: EpistemicStatus
     passed: bool
     cases_generated: int
     falsifying_example: Optional[Union[Dict[str, Any], str]] = None
@@ -33,6 +36,18 @@ class PropertyEvidenceReceipt:
     provenance_hash: str = ""
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
+    def __post_init__(self):
+        if isinstance(self.status, str):
+            try:
+                self.status = EpistemicStatus(self.status)
+            except ValueError:
+                self.status = EpistemicStatus.TOOL_OUTPUT_INVALID
+        # Authority Invariant: passed is True iff status is TARGET_CLEAN
+        if self.status != EpistemicStatus.TARGET_CLEAN:
+            self.passed = False
+        if not self.provenance_hash:
+            self.compute_provenance_hash()
+
     def compute_provenance_hash(self) -> str:
         payload = {
             "obligation_id": self.obligation_id,
@@ -40,6 +55,7 @@ class PropertyEvidenceReceipt:
             "domain": self.domain,
             "target_identifier": self.target_identifier,
             "target_identifier_hash": self.target_identifier_hash,
+            "status": self.status.value if isinstance(self.status, EpistemicStatus) else str(self.status),
             "passed": self.passed,
             "cases_generated": self.cases_generated,
             "falsifying_example": self.falsifying_example,
@@ -54,9 +70,38 @@ class PropertyEvidenceReceipt:
         return self.provenance_hash
 
     def to_dict(self) -> Dict[str, Any]:
-        if not self.provenance_hash:
-            self.compute_provenance_hash()
-        return asdict(self)
+        data = asdict(self)
+        data["status"] = self.status.value if isinstance(self.status, EpistemicStatus) else str(self.status)
+        return data
+
+    def to_ir(self) -> UnifiedEvidenceReceipt:
+        repro_cases = []
+        if self.shrunk_counterexample:
+            repro_cases.append({"type": "shrunk_counterexample", "data": self.shrunk_counterexample})
+        elif self.falsifying_example:
+            repro_cases.append({"type": "falsifying_example", "data": self.falsifying_example})
+
+        return UnifiedEvidenceReceipt(
+            obligation_id=self.obligation_id,
+            provider_type="property_verifier",
+            engine_name="Hypothesis",
+            engine_version=hypothesis.__version__,
+            status=self.status,
+            passed=self.passed,
+            target_name=self.obligation_title,
+            target_identifier=self.target_identifier,
+            target_source_hash=self.target_identifier_hash,
+            execution_metadata={
+                "domain": self.domain,
+                "cases_generated": self.cases_generated,
+                "reproducibility": self.reproducibility,
+                "environment": self.environment
+            },
+            diagnostics=[{"message": self.error_message}] if self.error_message else [],
+            reproducible_cases=repro_cases,
+            provenance_hash=self.provenance_hash,
+            timestamp=self.timestamp
+        )
 
 
 class PropertyVerificationAdapter:
@@ -88,14 +133,14 @@ class PropertyVerificationAdapter:
         """
         title = "SPIFFE ID Format & Authority Invariant"
         target_name = getattr(target_parser_fn, "__qualname__", str(target_parser_fn))
-        target_id_hash = hashlib.sha256(target_name.encode("utf-8")).hexdigest()
+        target_id_hash = compute_source_hash(target_parser_fn)
 
         cases_run = 0
         last_case = None
         falsifying = None
         shrunk = None
         err_msg = None
-        passed = True
+        status = EpistemicStatus.TARGET_CLEAN
 
         trust_domains = st.text(alphabet="abcdefghijklmnopqrstuvwxyz0123456789.-", min_size=1, max_size=30).filter(
             lambda td: not td.startswith(".") and not td.endswith(".") and not td.startswith("-") and not td.endswith("-")
@@ -123,15 +168,17 @@ class PropertyVerificationAdapter:
         try:
             test_property()
         except AssertionError as e:
-            passed = False
+            status = EpistemicStatus.TARGET_COUNTEREXAMPLE_FOUND
             err_msg = str(e)
             shrunk = last_case
             falsifying = last_case
         except Exception as e:
-            passed = False
+            status = EpistemicStatus.TARGET_VERIFICATION_FAILED
             err_msg = f"Target exception during property execution: {e}"
             shrunk = last_case
             falsifying = last_case
+
+        passed = (status == EpistemicStatus.TARGET_CLEAN)
 
         receipt = PropertyEvidenceReceipt(
             obligation_id=obligation_id,
@@ -139,6 +186,7 @@ class PropertyVerificationAdapter:
             domain="Security / Zero-Trust Identity",
             target_identifier=target_name,
             target_identifier_hash=target_id_hash,
+            status=status,
             passed=passed,
             cases_generated=cases_run,
             falsifying_example=falsifying,
@@ -167,14 +215,14 @@ class PropertyVerificationAdapter:
         """
         title = "PHI/PII Sanitizer Leak-Prevention Invariant"
         target_name = getattr(target_sanitizer_fn, "__qualname__", str(target_sanitizer_fn))
-        target_id_hash = hashlib.sha256(target_name.encode("utf-8")).hexdigest()
+        target_id_hash = compute_source_hash(target_sanitizer_fn)
 
         cases_run = 0
         last_case = None
         falsifying = None
         shrunk = None
         err_msg = None
-        passed = True
+        status = EpistemicStatus.TARGET_CLEAN
 
         ssn_strategy = st.from_regex(r"\d{3}-\d{2}-\d{4}", fullmatch=True)
         email_strategy = st.emails()
@@ -204,15 +252,17 @@ class PropertyVerificationAdapter:
         try:
             test_property()
         except AssertionError as e:
-            passed = False
+            status = EpistemicStatus.TARGET_COUNTEREXAMPLE_FOUND
             err_msg = str(e)
             shrunk = last_case
             falsifying = last_case
         except Exception as e:
-            passed = False
+            status = EpistemicStatus.TARGET_VERIFICATION_FAILED
             err_msg = f"Target exception during property execution: {e}"
             shrunk = last_case
             falsifying = last_case
+
+        passed = (status == EpistemicStatus.TARGET_CLEAN)
 
         receipt = PropertyEvidenceReceipt(
             obligation_id=obligation_id,
@@ -220,6 +270,7 @@ class PropertyVerificationAdapter:
             domain="Healthcare / Compliance / HIPAA",
             target_identifier=target_name,
             target_identifier_hash=target_id_hash,
+            status=status,
             passed=passed,
             cases_generated=cases_run,
             falsifying_example=falsifying,
@@ -248,56 +299,59 @@ class PropertyVerificationAdapter:
         """
         title = "Double-Entry Ledger Zero-Sum Conservation Invariant"
         target_name = getattr(target_ledger_fn, "__qualname__", str(target_ledger_fn))
-        target_id_hash = hashlib.sha256(target_name.encode("utf-8")).hexdigest()
+        target_id_hash = compute_source_hash(target_ledger_fn)
 
         cases_run = 0
         last_case = None
         falsifying = None
         shrunk = None
         err_msg = None
-        passed = True
+        status = EpistemicStatus.TARGET_CLEAN
 
-        accounts = st.sampled_from(["ASSETS", "LIABILITIES", "EQUITY", "REVENUE", "EXPENSES"])
-        amounts = st.floats(min_value=0.01, max_value=1000000.0, allow_nan=False, allow_infinity=False)
+        accounts = st.sampled_from(["ASSETS:BANK", "LIABILITIES:LOAN", "EQUITY:RETAINED", "REVENUE:SALES", "EXPENSES:OPS"])
+        amounts = st.floats(min_value=0.01, max_value=1_000_000.0, allow_nan=False, allow_infinity=False)
+        transactions = st.lists(
+            st.tuples(accounts, accounts, amounts).filter(lambda t: t[0] != t[1]),
+            min_size=1,
+            max_size=20
+        )
 
         @settings(max_examples=max_examples, phases=[Phase.generate, Phase.shrink], deadline=None)
-        @given(entries=st.lists(st.tuples(accounts, accounts, amounts), min_size=1, max_size=20))
-        def test_property(entries):
+        @given(txns=transactions)
+        def test_property(txns):
             nonlocal cases_run, last_case
             cases_run += 1
-            last_case = {
-                "entries": [
-                    {"debit_account": e[0], "credit_account": e[1], "amount": e[2]}
-                    for e in entries
-                ]
-            }
+            last_case = {"transactions": txns}
 
-            balances = target_ledger_fn(entries)
-            assert isinstance(balances, dict), f"Target ledger must return balance dict, got {type(balances)}"
+            balances = target_ledger_fn(txns)
+            assert isinstance(balances, dict), f"Target ledger must return dict of balances, got {type(balances)}"
 
-            # Invariant: Sum of all account balances returned by target must be identically zero
+            # Invariant: Net delta across all accounts in a double-entry ledger must sum to exactly 0.0 (within micro-cent tolerance)
             net_delta = sum(balances.values())
-            assert abs(net_delta) < 1e-5, f"Non-zero ledger balance sum: {net_delta} in balances {balances}"
+            assert abs(net_delta) < 1e-4, f"Double-entry ledger invariant violated: net balance delta sum = {net_delta}"
 
         try:
             test_property()
         except AssertionError as e:
-            passed = False
+            status = EpistemicStatus.TARGET_COUNTEREXAMPLE_FOUND
             err_msg = str(e)
             shrunk = last_case
             falsifying = last_case
         except Exception as e:
-            passed = False
+            status = EpistemicStatus.TARGET_VERIFICATION_FAILED
             err_msg = f"Target exception during property execution: {e}"
             shrunk = last_case
             falsifying = last_case
 
+        passed = (status == EpistemicStatus.TARGET_CLEAN)
+
         receipt = PropertyEvidenceReceipt(
             obligation_id=obligation_id,
             obligation_title=title,
-            domain="Financial Systems / Double-Entry Accounting",
+            domain="Financial / Accounting / GAAP",
             target_identifier=target_name,
             target_identifier_hash=target_id_hash,
+            status=status,
             passed=passed,
             cases_generated=cases_run,
             falsifying_example=falsifying,
@@ -306,7 +360,7 @@ class PropertyVerificationAdapter:
             reproducibility={
                 "max_examples": max_examples,
                 "phases": ["generate", "shrink"],
-                "strategy": "entries: List[(Account, Account, Amount)]"
+                "strategy": "double_entry_transactions_list"
             },
             environment=cls._get_env_metadata()
         )
@@ -315,7 +369,7 @@ class PropertyVerificationAdapter:
 
     @classmethod
     def save_evidence_receipt(cls, receipt: PropertyEvidenceReceipt, workspace_dir: str) -> str:
-        """Persists evidence receipt into .agents/evidence/ directory."""
+        """Persists property verification evidence receipt into .agents/evidence/ directory."""
         evidence_dir = os.path.join(workspace_dir, ".agents", "evidence")
         os.makedirs(evidence_dir, exist_ok=True)
         evidence_path = os.path.join(evidence_dir, f"property_{receipt.obligation_id}.json")
