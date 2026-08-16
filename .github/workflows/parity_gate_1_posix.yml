@@ -1,0 +1,56 @@
+name: OSS Parity Gate 1 - POSIX / Linux Certification
+
+on:
+  push:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  certify-posix-gate-1:
+    name: POSIX Parity Certification (Ubuntu 24.04 / Python 3.12)
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout S-Class Plugin Repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest portalocker==4.1.0 psutil
+
+    - name: Run Full POSIX Parity Benchmark Harness
+      run: |
+        python benchmark/parity/file_lock_harness.py
+
+    - name: Verify POSIX Parity Certificate Generated
+      run: |
+        ls -la benchmark/parity/
+        test -f benchmark/parity/gate_1_parity_certificate_posix.json
+        cat benchmark/parity/gate_1_parity_certificate_posix.json
+
+    - name: Run Pytest Test Suite
+      run: |
+        python -m pytest tests/ -v
+
+    - name: Commit and Push POSIX Parity Certificate
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add benchmark/parity/gate_1_parity_certificate_posix.json benchmark/parity/parity_gate_1_raw_results.json
+        if git diff --staged --quiet; then
+          echo "No new certificate changes to commit."
+        else
+          git commit -m "feat(parity): certified OSS-PARITY-GATE-1-FILELOCK-POSIX on Ubuntu runner"
+          git push origin HEAD:${{ github.ref_name }}
+        fi

@@ -223,13 +223,55 @@ def get_system_environment_info() -> Dict[str, Any]:
         except Exception:
             p_ver = "UNKNOWN"
 
+    # Git commit provenance
+    commit_sha = "UNKNOWN"
+    try:
+        res = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, timeout=5)
+        if res.returncode == 0:
+            commit_sha = res.stdout.strip()
+    except Exception:
+        pass
+
+    # Total RAM in bytes
+    total_ram_bytes = 0
+    if sys.platform == "win32":
+        try:
+            class MEMORYSTATUSEX(ctypes.Structure):
+                _fields_ = [
+                    ('dwLength', ctypes.c_ulong),
+                    ('dwMemoryLoad', ctypes.c_ulong),
+                    ('ullTotalPhys', ctypes.c_ulonglong),
+                    ('ullAvailPhys', ctypes.c_ulonglong),
+                    ('ullTotalPageFile', ctypes.c_ulonglong),
+                    ('ullAvailPageFile', ctypes.c_ulonglong),
+                    ('ullTotalVirtual', ctypes.c_ulonglong),
+                    ('ullAvailVirtual', ctypes.c_ulonglong),
+                    ('sullAvailExtendedVirtual', ctypes.c_ulonglong),
+                ]
+            stat = MEMORYSTATUSEX()
+            stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat)):
+                total_ram_bytes = int(stat.ullTotalPhys)
+        except Exception:
+            pass
+    else:
+        try:
+            total_ram_bytes = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
+        except Exception:
+            pass
+
+    import platform
     return {
         "os_platform": sys.platform,
-        "os_version": os.name,
+        "os_system": platform.system(),
+        "os_release": platform.release(),
+        "os_version": platform.version(),
         "python_version": sys.version,
         "cpu_count_logical": os.cpu_count(),
+        "total_ram_bytes": total_ram_bytes,
         "portalocker_version": p_ver if p_ver else "UNKNOWN",
         "hostname": socket.gethostname(),
+        "git_commit_sha": commit_sha,
         "timestamp_utc": time.time()
     }
 
