@@ -1,0 +1,5 @@
+{
+  "task_id": "HOLDOUT-09-GEOSPATIAL-RTREE-INDEX",
+  "domain": "Algorithms & Spatial / R-Tree Spatial Index",
+  "raw_prompt": "Implement RTreeSpatialIndex in target_module.py that indexes 2D bounding boxes (min_x, min_y, max_x, max_y) and supports spatial range queries and nearest-neighbor search. Must support insert(item_id, bbox), and search(query_bbox)."
+}

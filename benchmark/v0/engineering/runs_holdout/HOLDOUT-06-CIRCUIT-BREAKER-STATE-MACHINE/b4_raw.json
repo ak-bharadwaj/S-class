@@ -1,0 +1,134 @@
+{
+  "task_id": "HOLDOUT-06-CIRCUIT-BREAKER-STATE-MACHINE",
+  "baseline": "B4",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Resiliency Architecture / FSM State Machine",
+  "raw_prompt": "Implement CircuitBreakerStateMachine in target_module.py supporting CLOSED, OPEN, and HALF_OPEN states with failure thresholds, recovery timeout, and consecutive success counts. Must support call(fn, *args), get_state(), and reset().",
+  "sclass_governance": {
+    "semantic_requirements": [
+      {
+        "id": "REQ-SHADOW-001",
+        "title": "Core Service Functionality",
+        "description": "Implement core processing logic for: Implement CircuitBreakerStateMachine in target_module.py supporting CLOSED, OPEN, and HALF_OPEN states with failure thresholds, recovery timeout, and consecutive success counts. Must support call(fn, *args), get_state(), and reset().",
+        "type": "FUNCTIONAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt execution mandate"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-002",
+        "title": "Underlying Storage Technology Specification",
+        "description": "The specific persistence engine and database backend are unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify database technology"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-003",
+        "title": "API Transport Protocol Specification",
+        "description": "The specific network transport protocol (gRPC vs REST) is unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify API protocol"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      }
+    ],
+    "epistemic_status": "CONFIRMED",
+    "gate_result": "PASS"
+  },
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 1
+  },
+  "repository": {
+    "starting_tree_hash": "d5a0871cc99c21ea1c63f3e8ea317eb213e86c0fd6ae45d014c9e1050d84faa3",
+    "final_tree_hash": "b68c9a74f588c484cbe032f943d153fd2be5bd54c68c4f69426ace1d3fc0b209"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "User Task Instruction:\nImplement CircuitBreakerStateMachine in target_module.py supporting CLOSED, OPEN, and HALF_OPEN states with failure thresholds, recovery timeout, and consecutive success counts. Must support call(fn, *args), get_state(), and reset().\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement CircuitBreakerStateMachine in target_module.py supporting CLOSED, OPEN, and HALF_OPEN states with failure thresholds, recovery timeout, and consecutive success counts. Must support call(fn, *args), get_state(), and reset().\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nExisting Code in target_module.py:\n```python\n\n```\n\nImplement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block.",
+      "response_text": "```python\nimport time\nfrom enum import Enum\nfrom typing import Callable, Any, Optional\n\nclass CircuitState(Enum):\n    CLOSED = \"CLOSED\"\n    OPEN = \"OPEN\"\n    HALF_OPEN = \"HALF_OPEN\"\n\nclass CircuitOpenError(Exception):\n    \"\"\"Raised when an execution is attempted while the circuit breaker is OPEN.\"\"\"\n    pass\n\nclass CircuitBreakerStateMachine:\n    def __init__(\n        self,\n        failure_threshold: int = 5,\n        recovery_timeout: float = 60.0,\n        success_threshold: int = 2\n    ):\n        \"\"\"\n        Initializes the Circuit Breaker State Machine.\n\n        :param failure_threshold: Number of consecutive failures needed to transition from CLOSED to OPEN.\n        :param recovery_timeout: Time in seconds to wait in OPEN state before transitioning to HALF_OPEN.\n        :param success_threshold: Number of consecutive successes needed in HALF_OPEN to transition back to CLOSED.\n        \"\"\"\n        self.failure_threshold = failure_threshold\n        self.recovery_timeout = recovery_timeout\n        self.success_threshold = success_threshold\n\n        self._state = CircuitState.CLOSED\n        self._failure_count = 0\n        self._success_count = 0\n        self._last_state_change_time = time.time()\n\n    def get_state(self) -> str:\n        \"\"\"\n        Returns the current state of the circuit breaker as a string.\n        Automatically evaluates timeout conditions if currently in the OPEN state.\n        \"\"\"\n        if self._state == CircuitState.OPEN:\n            if time.time() - self._last_state_change_time >= self.recovery_timeout:\n                self._transition_to(CircuitState.HALF_OPEN)\n        \n        return self._state.value\n\n    def call(self, fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:\n        \"\"\"\n        Executes the given function `fn` with `*args` and `**kwargs` according to \n        the rules of the circuit breaker state machine.\n\n        :raises CircuitOpenError: If the circuit is OPEN and recovery timeout has not elapsed.\n        :raises Exception: Any exception raised by `fn` will be recorded as a failure.\n        \"\"\"\n        # Evaluate state transitions (e.g., OPEN -> HALF_OPEN if timeout expired)\n        self.get_state()\n\n        if self._state == CircuitState.OPEN:\n            raise CircuitOpenError(\"Circuit breaker is OPEN. Execution blocked.\")\n\n        try:\n            result = fn(*args, **kwargs)\n        except Exception as e:\n            self._handle_failure()\n            raise e\n        else:\n            self._handle_success()\n            return result\n\n    def reset(self) -> None:\n        \"\"\"\n        Resets the circuit breaker state machine back to the initial CLOSED state\n        and clears all counters.\n        \"\"\"\n        self._state = CircuitState.CLOSED\n        self._failure_count = 0\n        self._success_count = 0\n        self._last_state_change_time = time.time()\n\n    def _transition_to(self, new_state: CircuitState) -> None:\n        if self._state != new_state:\n            self._state = new_state\n            self._last_state_change_time = time.time()\n            if new_state == CircuitState.HALF_OPEN:\n                self._success_count = 0\n            elif new_state == CircuitState.CLOSED:\n                self._failure_count = 0\n                self._success_count = 0\n            elif new_state == CircuitState.OPEN:\n                self._failure_count = 0\n\n    def _handle_failure(self) -> None:\n        if self._state == CircuitState.HALF_OPEN:\n            # Any failure in HALF_OPEN immediately trips back to OPEN\n            self._transition_to(CircuitState.OPEN)\n        elif self._state == CircuitState.CLOSED:\n            self._failure_count += 1\n            if self._failure_count >= self.failure_threshold:\n                self._transition_to(CircuitState.OPEN)\n\n    def _handle_success(self) -> None:\n        if self._state == CircuitState.HALF_OPEN:\n            self._success_count += 1\n            if self._success_count >= self.success_threshold:\n                self._transition_to(CircuitState.CLOSED)\n        elif self._state == CircuitState.CLOSED:\n            # Reset consecutive failures on success while closed\n            self._failure_count = 0\n```",
+      "latency_sec": 3.3087,
+      "prompt_tokens": 257,
+      "completion_tokens": 1034,
+      "cost_usd": 0.000329,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp0c4946d2\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_circuit_breaker_closed_to_open PASSED         [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.599,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "import time\nfrom enum import Enum\nfrom typing import Callable, Any, Optional\n\nclass CircuitState(Enum):\n    CLOSED = \"CLOSED\"\n    OPEN = \"OPEN\"\n    HALF_OPEN = \"HALF_OPEN\"\n\nclass CircuitOpenError(Exception):\n    \"\"\"Raised when an execution is attempted while the circuit breaker is OPEN.\"\"\"\n    pass\n\nclass CircuitBreakerStateMachine:\n    def __init__(\n        self,\n        failure_threshold: int = 5,\n        recovery_timeout: float = 60.0,\n        success_threshold: int = 2\n    ):\n        \"\"\"\n        Initializes the Circuit Breaker State Machine.\n\n        :param failure_threshold: Number of consecutive failures needed to transition from CLOSED to OPEN.\n        :param recovery_timeout: Time in seconds to wait in OPEN state before transitioning to HALF_OPEN.\n        :param success_threshold: Number of consecutive successes needed in HALF_OPEN to transition back to CLOSED.\n        \"\"\"\n        self.failure_threshold = failure_threshold\n        self.recovery_timeout = recovery_timeout\n        self.success_threshold = success_threshold\n\n        self._state = CircuitState.CLOSED\n        self._failure_count = 0\n        self._success_count = 0\n        self._last_state_change_time = time.time()\n\n    def get_state(self) -> str:\n        \"\"\"\n        Returns the current state of the circuit breaker as a string.\n        Automatically evaluates timeout conditions if currently in the OPEN state.\n        \"\"\"\n        if self._state == CircuitState.OPEN:\n            if time.time() - self._last_state_change_time >= self.recovery_timeout:\n                self._transition_to(CircuitState.HALF_OPEN)\n        \n        return self._state.value\n\n    def call(self, fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:\n        \"\"\"\n        Executes the given function `fn` with `*args` and `**kwargs` according to \n        the rules of the circuit breaker state machine.\n\n        :raises CircuitOpenError: If the circuit is OPEN and recovery timeout has not elapsed.\n        :raises Exception: Any exception raised by `fn` will be recorded as a failure.\n        \"\"\"\n        # Evaluate state transitions (e.g., OPEN -> HALF_OPEN if timeout expired)\n        self.get_state()\n\n        if self._state == CircuitState.OPEN:\n            raise CircuitOpenError(\"Circuit breaker is OPEN. Execution blocked.\")\n\n        try:\n            result = fn(*args, **kwargs)\n        except Exception as e:\n            self._handle_failure()\n            raise e\n        else:\n            self._handle_success()\n            return result\n\n    def reset(self) -> None:\n        \"\"\"\n        Resets the circuit breaker state machine back to the initial CLOSED state\n        and clears all counters.\n        \"\"\"\n        self._state = CircuitState.CLOSED\n        self._failure_count = 0\n        self._success_count = 0\n        self._last_state_change_time = time.time()\n\n    def _transition_to(self, new_state: CircuitState) -> None:\n        if self._state != new_state:\n            self._state = new_state\n            self._last_state_change_time = time.time()\n            if new_state == CircuitState.HALF_OPEN:\n                self._success_count = 0\n            elif new_state == CircuitState.CLOSED:\n                self._failure_count = 0\n                self._success_count = 0\n            elif new_state == CircuitState.OPEN:\n                self._failure_count = 0\n\n    def _handle_failure(self) -> None:\n        if self._state == CircuitState.HALF_OPEN:\n            # Any failure in HALF_OPEN immediately trips back to OPEN\n            self._transition_to(CircuitState.OPEN)\n        elif self._state == CircuitState.CLOSED:\n            self._failure_count += 1\n            if self._failure_count >= self.failure_threshold:\n                self._transition_to(CircuitState.OPEN)\n\n    def _handle_success(self) -> None:\n        if self._state == CircuitState.HALF_OPEN:\n            self._success_count += 1\n            if self._success_count >= self.success_threshold:\n                self._transition_to(CircuitState.CLOSED)\n        elif self._state == CircuitState.CLOSED:\n            # Reset consecutive failures on success while closed\n            self._failure_count = 0\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp0c4946d2\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_circuit_breaker_closed_to_open PASSED         [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.599,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  }
+}

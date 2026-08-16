@@ -1,0 +1,67 @@
+{
+  "task_id": "HOLDOUT-09-GEOSPATIAL-RTREE-INDEX",
+  "baseline": "B1",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Algorithms & Spatial / R-Tree Spatial Index",
+  "raw_prompt": "Implement RTreeSpatialIndex in target_module.py that indexes 2D bounding boxes (min_x, min_y, max_x, max_y) and supports spatial range queries and nearest-neighbor search. Must support insert(item_id, bbox), and search(query_bbox).",
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 1,
+    "total_iterations": 1
+  },
+  "repository": {
+    "starting_tree_hash": "d5715d270358eb9ebf79765169203c0a2fdd173251f30786a50621cd075845b7",
+    "final_tree_hash": "a7c2661ea907928f847c57bc93b3ce6df8c91833b628dbb8838c41d3314c81bb"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "Task Instruction:\nImplement RTreeSpatialIndex in target_module.py that indexes 2D bounding boxes (min_x, min_y, max_x, max_y) and supports spatial range queries and nearest-neighbor search. Must support insert(item_id, bbox), and search(query_bbox).\n\nExisting Code in target_module.py:\n```python\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nfrom typing import Any, List, Tuple\nfrom rtree import index\n\n# Define type aliases for clarity\nBBox = Tuple[float, float, float, float]  # (min_x, min_y, max_x, max_y)\n\n\nclass RTreeSpatialIndex:\n    \"\"\"A spatial index for 2D bounding boxes using the R-Tree data structure.\n\n    Supports insertion, spatial range queries (intersection), and\n    nearest-neighbor searches based on spatial distance/proximity.\n    \"\"\"\n\n    def __init__(self) -> None:\n        # Initialize the R-tree index.\n        # We use rtree.index.Index() which wraps spatialindex C++ library.\n        self._idx = index.Index()\n\n    def insert(self, item_id: int, bbox: BBox) -> None:\n        \"\"\"Inserts an item with a unique integer ID and a 2D bounding box.\n\n        Parameters:\n        - item_id: Unique integer identifier for the item.\n        - bbox: A tuple of (min_x, min_y, max_x, max_y).\n        \"\"\"\n        # rtree expects coordinates as a sequence: (minx, miny, maxx, maxy)\n        self._idx.insert(item_id, bbox)\n\n    def search(self, query_bbox: BBox) -> List[int]:\n        \"\"\"Performs a spatial range query, returning all item IDs whose\n\n        bounding boxes intersect with the query_bbox.\n\n        Parameters:\n        - query_bbox: A tuple of (min_x, min_y, max_x, max_y) representing the\n          search window.\n\n        Returns:\n        - A list of item IDs whose bounding boxes intersect the query_bbox.\n        \"\"\"\n        # intersection query (default behavior of rtree.index.Index.intersection)\n        return list(self._idx.intersection(query_bbox))\n\n    def nearest_neighbor(self, query_bbox: BBox, num_results: int = 1) -> List[int]:\n        \"\"\"Performs a nearest-neighbor search based on minimum bounding box distance.\n\n        Parameters:\n        - query_bbox: A tuple of (min_x, min_y, max_x, max_y) to find the nearest\n          items to.\n        - num_results: The maximum number of nearest neighbors to return.\n\n        Returns:\n        - A list of item IDs ordered from nearest to farthest.\n        \"\"\"\n        return list(self._idx.nearest(query_bbox, num_results=num_results))\n```",
+      "latency_sec": 4.1873,
+      "prompt_tokens": 130,
+      "completion_tokens": 576,
+      "cost_usd": 0.000183,
+      "pytest_result": {
+        "exit_code": 2,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp58tnwche\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 0 items / 1 error\n\n=================================== ERRORS ====================================\n____________________ ERROR collecting tests/test_oracle.py ____________________\nImportError while importing test module 'C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp58tnwche\\tests\\test_oracle.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n..\\..\\Python\\pythoncore-3.14-64\\Lib\\importlib\\__init__.py:88: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests\\test_oracle.py:1: in <module>\n    from target_module import RTreeSpatialIndex\ntarget_module.py:2: in <module>\n    from rtree import index\nE   ModuleNotFoundError: No module named 'rtree'\n=========================== short test summary info ===========================\nERROR tests/test_oracle.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n============================== 1 error in 0.17s ===============================\n",
+        "stderr": "",
+        "duration_sec": 0.669,
+        "all_passed": false
+      }
+    }
+  ],
+  "final_code": "from typing import Any, List, Tuple\nfrom rtree import index\n\n# Define type aliases for clarity\nBBox = Tuple[float, float, float, float]  # (min_x, min_y, max_x, max_y)\n\n\nclass RTreeSpatialIndex:\n    \"\"\"A spatial index for 2D bounding boxes using the R-Tree data structure.\n\n    Supports insertion, spatial range queries (intersection), and\n    nearest-neighbor searches based on spatial distance/proximity.\n    \"\"\"\n\n    def __init__(self) -> None:\n        # Initialize the R-tree index.\n        # We use rtree.index.Index() which wraps spatialindex C++ library.\n        self._idx = index.Index()\n\n    def insert(self, item_id: int, bbox: BBox) -> None:\n        \"\"\"Inserts an item with a unique integer ID and a 2D bounding box.\n\n        Parameters:\n        - item_id: Unique integer identifier for the item.\n        - bbox: A tuple of (min_x, min_y, max_x, max_y).\n        \"\"\"\n        # rtree expects coordinates as a sequence: (minx, miny, maxx, maxy)\n        self._idx.insert(item_id, bbox)\n\n    def search(self, query_bbox: BBox) -> List[int]:\n        \"\"\"Performs a spatial range query, returning all item IDs whose\n\n        bounding boxes intersect with the query_bbox.\n\n        Parameters:\n        - query_bbox: A tuple of (min_x, min_y, max_x, max_y) representing the\n          search window.\n\n        Returns:\n        - A list of item IDs whose bounding boxes intersect the query_bbox.\n        \"\"\"\n        # intersection query (default behavior of rtree.index.Index.intersection)\n        return list(self._idx.intersection(query_bbox))\n\n    def nearest_neighbor(self, query_bbox: BBox, num_results: int = 1) -> List[int]:\n        \"\"\"Performs a nearest-neighbor search based on minimum bounding box distance.\n\n        Parameters:\n        - query_bbox: A tuple of (min_x, min_y, max_x, max_y) to find the nearest\n          items to.\n        - num_results: The maximum number of nearest neighbors to return.\n\n        Returns:\n        - A list of item IDs ordered from nearest to farthest.\n        \"\"\"\n        return list(self._idx.nearest(query_bbox, num_results=num_results))\n",
+  "oracle_result": {
+    "exit_code": 2,
+    "passed_count": 0,
+    "failed_count": 1,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp58tnwche\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 0 items / 1 error\n\n=================================== ERRORS ====================================\n____________________ ERROR collecting tests/test_oracle.py ____________________\nImportError while importing test module 'C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp58tnwche\\tests\\test_oracle.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n..\\..\\Python\\pythoncore-3.14-64\\Lib\\importlib\\__init__.py:88: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests\\test_oracle.py:1: in <module>\n    from target_module import RTreeSpatialIndex\ntarget_module.py:2: in <module>\n    from rtree import index\nE   ModuleNotFoundError: No module named 'rtree'\n=========================== short test summary info ===========================\nERROR tests/test_oracle.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n============================== 1 error in 0.17s ===============================\n",
+    "stderr": "",
+    "duration_sec": 0.669,
+    "all_passed": false
+  },
+  "failure_taxonomy": {
+    "category": "wrong_requirement",
+    "reason": "Failed oracle assertions without explicit exception traceback.",
+    "details": [
+      "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp58tnwche\nplugins: any"
+    ]
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  }
+}

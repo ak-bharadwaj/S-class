@@ -1,0 +1,5 @@
+{
+  "task_id": "HOLDOUT-08-EVENT-DRIVEN-SAGA-ORCHESTRATOR",
+  "domain": "Distributed Transactions / Compensation Logic",
+  "raw_prompt": "Implement SagaOrchestrator in target_module.py that executes multi-step distributed sagas and automatically triggers compensating transactions in reverse order upon step failure. Must support add_step(name, action, compensate), execute(saga_data), and get_status()."
+}

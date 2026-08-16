@@ -1,9 +1,10 @@
 {
-  "title": "Gate 1.6C Fair Treatment Benchmark Certification Audit",
+  "title": "Gate 1.6D Holdout Task Replication Certification Audit",
   "certified": true,
+  "is_holdout_replication": true,
   "status": "CERTIFIED_GENUINE_LIVE_BENCHMARK",
-  "total_runs": 64,
-  "real_runs": 64,
+  "total_runs": 48,
+  "real_runs": 48,
   "mock_runs": 0,
   "provider_types": [
     "gemini"
@@ -13,24 +14,24 @@
   ],
   "checks": [
     {
-      "check_name": "16_tasks_exist",
+      "check_name": "12_tasks_exist",
       "passed": true,
-      "details": "Found 16 / 16 task directories."
+      "details": "Found 12 / 12 task directories."
     },
     {
-      "check_name": "64_runs_exist",
+      "check_name": "48_runs_exist",
       "passed": true,
-      "details": "Found 64 / 64 expected run artifacts."
+      "details": "Found 48 / 48 expected run artifacts."
     },
     {
       "check_name": "zero_mock_runs",
       "passed": true,
-      "details": "Real runs: 64/64, Mock runs detected: 0."
+      "details": "Real runs: 48/48, Mock runs detected: 0."
     },
     {
       "check_name": "valid_live_provider",
       "passed": true,
-      "details": "Observed providers: ['gemini'] (Allowed: ['openai', 'anthropic', 'gemini', 'custom_http'])."
+      "details": "Observed providers: ['gemini'] (Allowed: ['gemini', 'anthropic', 'openai', 'custom_http'])."
     },
     {
       "check_name": "uniform_model_configuration",

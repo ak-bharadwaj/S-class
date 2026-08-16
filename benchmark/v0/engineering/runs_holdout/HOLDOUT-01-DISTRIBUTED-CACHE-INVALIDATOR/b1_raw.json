@@ -1,0 +1,65 @@
+{
+  "task_id": "HOLDOUT-01-DISTRIBUTED-CACHE-INVALIDATOR",
+  "baseline": "B1",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Distributed Systems / Cache Invalidation",
+  "raw_prompt": "Implement a DistributedCacheInvalidator class in target_module.py that manages multi-node cache invalidation with version vectors, ttl expiry, and event pub-sub notifications. Must support invalidate(key, version), get(key), set(key, value, version, ttl_sec), and sync_nodes(remote_node).",
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 1,
+    "total_iterations": 1
+  },
+  "repository": {
+    "starting_tree_hash": "de6e80abc0c9007491c7dd0f15fd6fce1b3935f9e23c6f6a41b76adbb0e42fc4",
+    "final_tree_hash": "3dcfae6c4519df820443b20bacd488a09a30d04042f46e826874814e0aa7c8cb"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "Task Instruction:\nImplement a DistributedCacheInvalidator class in target_module.py that manages multi-node cache invalidation with version vectors, ttl expiry, and event pub-sub notifications. Must support invalidate(key, version), get(key), set(key, value, version, ttl_sec), and sync_nodes(remote_node).\n\nExisting Code in target_module.py:\n```python\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nimport time\nimport threading\nfrom typing import Any, Dict, Optional, Set, Tuple\n\n\nclass DistributedCacheInvalidator:\n    \"\"\"A distributed cache invalidation manager supporting version vectors,\n\n    TTL expiry, and thread-safe multi-node synchronization.\n    \"\"\"\n\n    def __init__(self, node_id: str) -> None:\n        self.node_id = node_id\n        # Stores: key -> (value, expiry_timestamp, version)\n        self._cache: Dict[str, Tuple[Any, float, int]] = {}\n        # Stores: key -> highest_seen_version\n        self._versions: Dict[str, int] = {}\n        # Set of connected remote peer instances/nodes\n        self._peers: Set[\"DistributedCacheInvalidator\"] = set()\n        # Thread lock for thread-safe cache operations\n        self._lock = threading.Lock()\n\n    def set(self, key: str, value: Any, version: int, ttl_sec: float) -> bool:\n        \"\"\"Sets a key in the cache with a specific version and TTL.\n\n        If the provided version is lower than or equal to the currently known\n        version for this key, the update is rejected to prevent stale data.\n        \"\"\"\n        with self._lock:\n            current_version = self._versions.get(key, -1)\n            if version <= current_version:\n                return False\n\n            expiry = time.time() + ttl_sec if ttl_sec > 0 else float(\"inf\")\n            self._cache[key] = (value, expiry, version)\n            self._versions[key] = version\n            return True\n\n    def get(self, key: str) -> Optional[Any]:\n        \"\"\"Retrieves a value for a key if it exists and has not expired.\n\n        If expired, it cleans up the entry and returns None.\n        \"\"\"\n        with self._lock:\n            if key not in self._cache:\n                return None\n\n            value, expiry, version = self._cache[key]\n            if time.time() > expiry:\n                # Expired\n                del self._cache[key]\n                return None\n\n            return value\n\n    def invalidate(self, key: str, version: int) -> bool:\n        \"\"\"Invalidates (removes) a key from the cache if the incoming version\n\n        is greater than or equal to the current version. Propagates the\n        invalidation event to connected peers (pub-sub notification).\n        \"\"\"\n        with self._lock:\n            current_version = self._versions.get(key, -1)\n            if version < current_version:\n                return False\n\n            self._versions[key] = version\n            existed = key in self._cache\n            if existed:\n                del self._cache[key]\n\n            # Broadcast invalidation event to all known peers\n            for peer in self._peers:\n                if peer is not self:\n                    # Avoid recursive loops by checking version first\n                    peer._receive_invalidation(key, version, self.node_id)\n\n            return True or existed\n\n    def _receive_invalidation(self, key: str, version: int, source_node: str) -> None:\n        \"\"\"Internal helper to handle incoming invalidation events from peers.\"\"\"\n        with self._lock:\n            current_version = self._versions.get(key, -1)\n            if version >= current_version:\n                self._versions[key] = version\n                if key in self._cache:\n                    del self._cache[key]\n\n    def sync_nodes(self, remote_node: \"DistributedCacheInvalidator\") -> None:\n        \"\"\"Registers a remote node as a peer for bidirectional event pub-sub\n\n        notifications and synchronizes state (reconciling versions).\n        \"\"\"\n        with self._lock:\n            self._peers.add(remote_node)\n            # Ensure bidirectional syncing\n            if self not in remote_node._peers:\n                remote_node.sync_nodes(self)\n\n            # Reconcile state: pull newer or equal versions/keys from remote node\n            for key, (r_val, r_expiry, r_ver) in list(remote_node._cache.items()):\n                local_ver = self._versions.get(key, -1)\n                if r_ver > local_ver:\n                    # Remote has a newer version, adopt it\n                    self._cache[key] = (r_val, r_expiry, r_ver)\n                    self._versions[key] = r_ver\n                elif r_ver == local_ver and key not in self._cache and key in remote_node._cache:\n                    # If versions match but local doesn't have it (invalidated)\n                    if key in self._cache:\n                        del self._cache[key]\n```",
+      "latency_sec": 3.718,
+      "prompt_tokens": 135,
+      "completion_tokens": 1075,
+      "cost_usd": 0.000333,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 3,
+        "failed_count": 0,
+        "total_count": 3,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpj2spvmmw\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 3 items\n\ntests/test_oracle.py::test_cache_set_get PASSED                          [ 33%]\ntests/test_oracle.py::test_invalidation_version PASSED                   [ 66%]\ntests/test_oracle.py::test_stale_invalidation_ignored PASSED             [100%]\n\n============================== 3 passed in 0.05s ==============================\n",
+        "stderr": "",
+        "duration_sec": 1.334,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "import time\nimport threading\nfrom typing import Any, Dict, Optional, Set, Tuple\n\n\nclass DistributedCacheInvalidator:\n    \"\"\"A distributed cache invalidation manager supporting version vectors,\n\n    TTL expiry, and thread-safe multi-node synchronization.\n    \"\"\"\n\n    def __init__(self, node_id: str) -> None:\n        self.node_id = node_id\n        # Stores: key -> (value, expiry_timestamp, version)\n        self._cache: Dict[str, Tuple[Any, float, int]] = {}\n        # Stores: key -> highest_seen_version\n        self._versions: Dict[str, int] = {}\n        # Set of connected remote peer instances/nodes\n        self._peers: Set[\"DistributedCacheInvalidator\"] = set()\n        # Thread lock for thread-safe cache operations\n        self._lock = threading.Lock()\n\n    def set(self, key: str, value: Any, version: int, ttl_sec: float) -> bool:\n        \"\"\"Sets a key in the cache with a specific version and TTL.\n\n        If the provided version is lower than or equal to the currently known\n        version for this key, the update is rejected to prevent stale data.\n        \"\"\"\n        with self._lock:\n            current_version = self._versions.get(key, -1)\n            if version <= current_version:\n                return False\n\n            expiry = time.time() + ttl_sec if ttl_sec > 0 else float(\"inf\")\n            self._cache[key] = (value, expiry, version)\n            self._versions[key] = version\n            return True\n\n    def get(self, key: str) -> Optional[Any]:\n        \"\"\"Retrieves a value for a key if it exists and has not expired.\n\n        If expired, it cleans up the entry and returns None.\n        \"\"\"\n        with self._lock:\n            if key not in self._cache:\n                return None\n\n            value, expiry, version = self._cache[key]\n            if time.time() > expiry:\n                # Expired\n                del self._cache[key]\n                return None\n\n            return value\n\n    def invalidate(self, key: str, version: int) -> bool:\n        \"\"\"Invalidates (removes) a key from the cache if the incoming version\n\n        is greater than or equal to the current version. Propagates the\n        invalidation event to connected peers (pub-sub notification).\n        \"\"\"\n        with self._lock:\n            current_version = self._versions.get(key, -1)\n            if version < current_version:\n                return False\n\n            self._versions[key] = version\n            existed = key in self._cache\n            if existed:\n                del self._cache[key]\n\n            # Broadcast invalidation event to all known peers\n            for peer in self._peers:\n                if peer is not self:\n                    # Avoid recursive loops by checking version first\n                    peer._receive_invalidation(key, version, self.node_id)\n\n            return True or existed\n\n    def _receive_invalidation(self, key: str, version: int, source_node: str) -> None:\n        \"\"\"Internal helper to handle incoming invalidation events from peers.\"\"\"\n        with self._lock:\n            current_version = self._versions.get(key, -1)\n            if version >= current_version:\n                self._versions[key] = version\n                if key in self._cache:\n                    del self._cache[key]\n\n    def sync_nodes(self, remote_node: \"DistributedCacheInvalidator\") -> None:\n        \"\"\"Registers a remote node as a peer for bidirectional event pub-sub\n\n        notifications and synchronizes state (reconciling versions).\n        \"\"\"\n        with self._lock:\n            self._peers.add(remote_node)\n            # Ensure bidirectional syncing\n            if self not in remote_node._peers:\n                remote_node.sync_nodes(self)\n\n            # Reconcile state: pull newer or equal versions/keys from remote node\n            for key, (r_val, r_expiry, r_ver) in list(remote_node._cache.items()):\n                local_ver = self._versions.get(key, -1)\n                if r_ver > local_ver:\n                    # Remote has a newer version, adopt it\n                    self._cache[key] = (r_val, r_expiry, r_ver)\n                    self._versions[key] = r_ver\n                elif r_ver == local_ver and key not in self._cache and key in remote_node._cache:\n                    # If versions match but local doesn't have it (invalidated)\n                    if key in self._cache:\n                        del self._cache[key]\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 3,
+    "failed_count": 0,
+    "total_count": 3,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpj2spvmmw\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 3 items\n\ntests/test_oracle.py::test_cache_set_get PASSED                          [ 33%]\ntests/test_oracle.py::test_invalidation_version PASSED                   [ 66%]\ntests/test_oracle.py::test_stale_invalidation_ignored PASSED             [100%]\n\n============================== 3 passed in 0.05s ==============================\n",
+    "stderr": "",
+    "duration_sec": 1.334,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "task_id": "HOLDOUT-12-MULTI-TENANT-ROW-ISOLATION",
+  "domain": "Database & Security / Tenant RLS Invariants",
+  "raw_prompt": "Implement MultiTenantRowGuard in target_module.py that enforces tenant isolation invariants across SQL queries and row mutations, preventing cross-tenant data leaks. Must support set_context(tenant_id), sanitize_query(sql_str), and validate_row(row_dict)."
+}

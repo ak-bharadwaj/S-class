@@ -1,0 +1,5 @@
+{
+  "task_id": "HOLDOUT-01-DISTRIBUTED-CACHE-INVALIDATOR",
+  "domain": "Distributed Systems / Cache Invalidation",
+  "raw_prompt": "Implement a DistributedCacheInvalidator class in target_module.py that manages multi-node cache invalidation with version vectors, ttl expiry, and event pub-sub notifications. Must support invalidate(key, version), get(key), set(key, value, version, ttl_sec), and sync_nodes(remote_node)."
+}

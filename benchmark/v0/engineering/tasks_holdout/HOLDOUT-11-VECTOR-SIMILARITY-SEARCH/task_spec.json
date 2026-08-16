@@ -1,0 +1,5 @@
+{
+  "task_id": "HOLDOUT-11-VECTOR-SIMILARITY-SEARCH",
+  "domain": "AI Infrastructure / HNSW Vector Index",
+  "raw_prompt": "Implement VectorSimilaritySearchIndex in target_module.py supporting cosine and L2 distance similarity search over high-dimensional vectors. Must support insert(vector_id, vector_list), search(query_vector, top_k), and remove(vector_id)."
+}

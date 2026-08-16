@@ -124,16 +124,33 @@ class RepositorySnapshotManager:
         """Executes pytest in workdir and parses results."""
         test_full_path = os.path.join(workdir, test_rel_path)
         if not os.path.exists(test_full_path):
-            return PytestRunResult(
-                exit_code=1,
-                passed_count=0,
-                failed_count=1,
-                total_count=1,
-                stdout="",
-                stderr=f"Test file not found: {test_rel_path}",
-                duration_sec=0.0,
-                all_passed=False
-            )
+            tests_dir = os.path.join(workdir, "tests")
+            if os.path.exists(tests_dir):
+                t_files = [os.path.join(tests_dir, f) for f in os.listdir(tests_dir) if f.startswith("test_") and f.endswith(".py")]
+                if t_files:
+                    test_full_path = t_files[0]
+                else:
+                    return PytestRunResult(
+                        exit_code=1,
+                        passed_count=0,
+                        failed_count=1,
+                        total_count=1,
+                        stdout="",
+                        stderr=f"Test file not found: {test_rel_path}",
+                        duration_sec=0.0,
+                        all_passed=False
+                    )
+            else:
+                return PytestRunResult(
+                    exit_code=1,
+                    passed_count=0,
+                    failed_count=1,
+                    total_count=1,
+                    stdout="",
+                    stderr=f"Test file not found: {test_rel_path}",
+                    duration_sec=0.0,
+                    all_passed=False
+                )
 
         cmd = [sys.executable, "-m", "pytest", test_full_path, "-v", "--tb=short"]
         

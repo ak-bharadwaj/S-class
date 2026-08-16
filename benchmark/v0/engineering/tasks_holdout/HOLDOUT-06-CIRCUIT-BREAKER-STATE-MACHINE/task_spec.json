@@ -1,0 +1,5 @@
+{
+  "task_id": "HOLDOUT-06-CIRCUIT-BREAKER-STATE-MACHINE",
+  "domain": "Resiliency Architecture / FSM State Machine",
+  "raw_prompt": "Implement CircuitBreakerStateMachine in target_module.py supporting CLOSED, OPEN, and HALF_OPEN states with failure thresholds, recovery timeout, and consecutive success counts. Must support call(fn, *args), get_state(), and reset()."
+}

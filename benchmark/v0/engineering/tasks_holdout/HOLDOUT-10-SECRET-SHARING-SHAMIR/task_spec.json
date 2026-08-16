@@ -1,0 +1,5 @@
+{
+  "task_id": "HOLDOUT-10-SECRET-SHARING-SHAMIR",
+  "domain": "Cryptography / Shamirs Secret Sharing",
+  "raw_prompt": "Implement ShamirSecretSharing in target_module.py supporting polynomial secret splitting into N shares with threshold K, and secret reconstruction from any K shares. Must support split(secret_int, n, k) and combine(shares_list)."
+}

@@ -1,0 +1,5 @@
+{
+  "task_id": "HOLDOUT-02-JWT-JWKS-ROTATOR",
+  "domain": "Auth & Security / Cryptographic Key Rotation",
+  "raw_prompt": "Implement JWKSRotator class in target_module.py that manages asymmetric signing key pairs, JSON Web Key Sets (JWKS), and key rotation schedules with graceful key deprecation. Must support rotate_keys(), sign_token(payload), verify_token(token), and get_jwks()."
+}

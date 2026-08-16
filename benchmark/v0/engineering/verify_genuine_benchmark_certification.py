@@ -27,17 +27,22 @@ class CertificationCheck:
     details: str
 
 class GenuineBenchmarkCertifier:
-    def __init__(self, engineering_dir: str):
+    def __init__(self, engineering_dir: str, is_holdout: bool = False):
         self.engineering_dir = engineering_dir
-        self.tasks_dir = os.path.join(engineering_dir, "tasks")
-        self.runs_dir = os.path.join(engineering_dir, "runs")
+        self.is_holdout = is_holdout
+        self.tasks_dir_name = "tasks_holdout" if is_holdout else "tasks"
+        self.runs_dir_name = "runs_holdout" if is_holdout else "runs"
+        self.tasks_dir = os.path.join(engineering_dir, self.tasks_dir_name)
+        self.runs_dir = os.path.join(engineering_dir, self.runs_dir_name)
 
     def verify_certification(self) -> Tuple[bool, Dict[str, Any]]:
         checks = []
         task_ids = sorted([d for d in os.listdir(self.tasks_dir) if os.path.isdir(os.path.join(self.tasks_dir, d))]) if os.path.exists(self.tasks_dir) else []
-        
-        # Check 1: 16 Task Repositories Exist
-        c1 = CertificationCheck("16_tasks_exist", len(task_ids) == 16, f"Found {len(task_ids)} / 16 task directories.")
+        expected_tasks = 12 if self.is_holdout else 16
+        expected_runs = expected_tasks * 4
+
+        # Check 1: Task Repositories Exist
+        c1 = CertificationCheck(f"{expected_tasks}_tasks_exist", len(task_ids) == expected_tasks, f"Found {len(task_ids)} / {expected_tasks} task directories.")
         checks.append(c1)
 
         total_runs = 0
@@ -95,12 +100,12 @@ class GenuineBenchmarkCertifier:
                     mock_runs += 1
                     incomplete_provenance += 1
 
-        # Check 2: 64 / 64 Runs Exist
-        c2 = CertificationCheck("64_runs_exist", total_runs == 64, f"Found {total_runs} / 64 expected run artifacts.")
+        # Check 2: Expected Runs Exist
+        c2 = CertificationCheck(f"{expected_runs}_runs_exist", total_runs == expected_runs, f"Found {total_runs} / {expected_runs} expected run artifacts.")
         checks.append(c2)
 
         # Check 3: 0 Mock Runs
-        c3 = CertificationCheck("zero_mock_runs", mock_runs == 0 and real_runs == 64, f"Real runs: {real_runs}/64, Mock runs detected: {mock_runs}.")
+        c3 = CertificationCheck("zero_mock_runs", mock_runs == 0 and real_runs == expected_runs, f"Real runs: {real_runs}/{expected_runs}, Mock runs detected: {mock_runs}.")
         checks.append(c3)
 
         # Check 4: Valid Live Provider
@@ -122,9 +127,11 @@ class GenuineBenchmarkCertifier:
 
         is_certified = all(c.passed for c in checks)
 
+        cert_title = "Gate 1.6D Holdout Task Replication Certification Audit" if self.is_holdout else "Gate 1.6C Fair Treatment Benchmark Certification Audit"
         cert_report = {
-            "title": "Gate 1.6C Fair Treatment Benchmark Certification Audit",
+            "title": cert_title,
             "certified": is_certified,
+            "is_holdout_replication": self.is_holdout,
             "status": "CERTIFIED_GENUINE_LIVE_BENCHMARK" if is_certified else "UNCERTIFIED_CONTAMINATED_OR_INCOMPLETE",
             "total_runs": total_runs,
             "real_runs": real_runs,

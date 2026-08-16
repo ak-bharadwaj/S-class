@@ -1,0 +1,65 @@
+{
+  "task_id": "HOLDOUT-04-TIMESERIES-METRIC-ROLLUP",
+  "baseline": "B2",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Database & Analytics / Sliding Window Aggregation",
+  "raw_prompt": "Implement TimeseriesRollupEngine in target_module.py supporting ingestion of timestamped metrics and sliding-window rollups (avg, max, min, p95). Must support record(metric, val, ts), and query_rollup(metric, window_sec, agg_func).",
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 1
+  },
+  "repository": {
+    "starting_tree_hash": "44b19444048d29dbb154a0ebe8353cdf2620bf1607d8f3e496a848c79d6ebf75",
+    "final_tree_hash": "554e8c7acdffdbccc319404f853270e2d4f2df707c6d27bb631f871bf059c404"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "Task Instruction:\nImplement TimeseriesRollupEngine in target_module.py supporting ingestion of timestamped metrics and sliding-window rollups (avg, max, min, p95). Must support record(metric, val, ts), and query_rollup(metric, window_sec, agg_func).\n\nExisting Code in target_module.py:\n```python\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nimport time\nfrom collections import defaultdict, deque\nimport math\n\nclass TimeseriesRollupEngine:\n    def __init__(self):\n        # Stores a deque of tuples: (timestamp, value) for each metric name\n        self.metrics = defaultdict(deque)\n\n    def record(self, metric: str, val: float, ts: float) -> None:\n        \"\"\"\n        Record a metric value at a specific timestamp.\n        \"\"\"\n        self.metrics[metric].append((ts, val))\n\n    def query_rollup(self, metric: str, window_sec: float, agg_func: str) -> float:\n        \"\"\"\n        Query the rollup for a given metric over a sliding window (in seconds) \n        ending at the maximum timestamp present in the metric's records.\n        \n        Supported agg_func: 'avg', 'max', 'min', 'p95'\n        \"\"\"\n        if metric not in self.metrics or not self.metrics[metric]:\n            return 0.0\n\n        records = self.metrics[metric]\n        \n        # The window ends at the latest timestamp recorded for this metric\n        latest_ts = records[-1][0]\n        cutoff_ts = latest_ts - window_sec\n\n        # Filter values within the sliding window [cutoff_ts, latest_ts]\n        # Since records are appended chronologically, we can filter efficiently.\n        values = [val for ts, val in records if ts >= cutoff_ts]\n\n        if not values:\n            return 0.0\n\n        if agg_func == 'avg':\n            return sum(values) / len(values)\n        elif agg_func == 'max':\n            return max(values)\n        elif agg_func == 'min':\n            return min(values)\n        elif agg_func == 'p95':\n            sorted_vals = sorted(values)\n            # Using nearest-rank method for p95\n            index = int(math.ceil(0.95 * len(sorted_vals))) - 1\n            index = max(0, min(index, len(sorted_vals) - 1))\n            return sorted_vals[index]\n        else:\n            raise ValueError(f\"Unsupported aggregation function: {agg_func}\")\n```",
+      "latency_sec": 2.3763,
+      "prompt_tokens": 130,
+      "completion_tokens": 509,
+      "cost_usd": 0.000162,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpmkmltkn3\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_rollup_avg PASSED                             [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.577,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "import time\nfrom collections import defaultdict, deque\nimport math\n\nclass TimeseriesRollupEngine:\n    def __init__(self):\n        # Stores a deque of tuples: (timestamp, value) for each metric name\n        self.metrics = defaultdict(deque)\n\n    def record(self, metric: str, val: float, ts: float) -> None:\n        \"\"\"\n        Record a metric value at a specific timestamp.\n        \"\"\"\n        self.metrics[metric].append((ts, val))\n\n    def query_rollup(self, metric: str, window_sec: float, agg_func: str) -> float:\n        \"\"\"\n        Query the rollup for a given metric over a sliding window (in seconds) \n        ending at the maximum timestamp present in the metric's records.\n        \n        Supported agg_func: 'avg', 'max', 'min', 'p95'\n        \"\"\"\n        if metric not in self.metrics or not self.metrics[metric]:\n            return 0.0\n\n        records = self.metrics[metric]\n        \n        # The window ends at the latest timestamp recorded for this metric\n        latest_ts = records[-1][0]\n        cutoff_ts = latest_ts - window_sec\n\n        # Filter values within the sliding window [cutoff_ts, latest_ts]\n        # Since records are appended chronologically, we can filter efficiently.\n        values = [val for ts, val in records if ts >= cutoff_ts]\n\n        if not values:\n            return 0.0\n\n        if agg_func == 'avg':\n            return sum(values) / len(values)\n        elif agg_func == 'max':\n            return max(values)\n        elif agg_func == 'min':\n            return min(values)\n        elif agg_func == 'p95':\n            sorted_vals = sorted(values)\n            # Using nearest-rank method for p95\n            index = int(math.ceil(0.95 * len(sorted_vals))) - 1\n            index = max(0, min(index, len(sorted_vals) - 1))\n            return sorted_vals[index]\n        else:\n            raise ValueError(f\"Unsupported aggregation function: {agg_func}\")\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpmkmltkn3\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_rollup_avg PASSED                             [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.577,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  }
+}

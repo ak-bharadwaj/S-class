@@ -1,0 +1,5 @@
+{
+  "task_id": "HOLDOUT-03-RATE-LIMITED-WEBHOOK-DISPATCHER",
+  "domain": "Networking & Queues / Exponential Backoff",
+  "raw_prompt": "Implement RateLimitedWebhookDispatcher in target_module.py that queues webhooks, respects per-domain rate limits, and retries failed delivery with exponential backoff and jitter. Must support dispatch(url, payload), process_queue(), and get_status(webhook_id)."
+}

@@ -1,0 +1,279 @@
+{
+  "title": "Gate 1.6D Holdout Task Replication & Statistical Rigor Report",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "is_holdout_replication": true,
+  "total_tasks": 12,
+  "baselines": {
+    "B1_Prompt_Only": {
+      "passed": 5,
+      "total": 12,
+      "pass_rate": 41.67,
+      "avg_latency_sec": 4.224,
+      "total_cost_usd": 0.004556,
+      "cost_per_success_usd": 0.000911,
+      "calls_per_success": 2.4
+    },
+    "B2_Agent_Test_Loop": {
+      "passed": 8,
+      "total": 12,
+      "pass_rate": 66.67,
+      "avg_latency_sec": 4.159,
+      "total_cost_usd": 0.010746,
+      "cost_per_success_usd": 0.001343,
+      "calls_per_success": 3.0
+    },
+    "B3_Agent_SClass_Governance": {
+      "passed": 4,
+      "total": 12,
+      "pass_rate": 33.33,
+      "avg_latency_sec": 4.772,
+      "total_cost_usd": 0.014725,
+      "cost_per_success_usd": 0.003681,
+      "calls_per_success": 7.25
+    },
+    "B4_Agent_SClass_Test_Loop": {
+      "passed": 9,
+      "total": 12,
+      "pass_rate": 75.0,
+      "avg_latency_sec": 4.982,
+      "total_cost_usd": 0.013653,
+      "cost_per_success_usd": 0.001517,
+      "calls_per_success": 2.78
+    }
+  },
+  "failure_taxonomy_breakdown": {
+    "B1_Prompt_Only": {
+      "wrong_requirement": 3,
+      "missing_requirement": 2,
+      "implementation_bug": 0,
+      "test_api_mismatch": 2,
+      "environment_failure": 0
+    },
+    "B2_Agent_Test_Loop": {
+      "wrong_requirement": 1,
+      "missing_requirement": 1,
+      "implementation_bug": 2,
+      "test_api_mismatch": 0,
+      "environment_failure": 0
+    },
+    "B3_Agent_SClass_Governance": {
+      "wrong_requirement": 3,
+      "missing_requirement": 1,
+      "implementation_bug": 1,
+      "test_api_mismatch": 3,
+      "environment_failure": 0
+    },
+    "B4_Agent_SClass_Test_Loop": {
+      "wrong_requirement": 1,
+      "missing_requirement": 1,
+      "implementation_bug": 1,
+      "test_api_mismatch": 0,
+      "environment_failure": 0
+    }
+  },
+  "mcnemar_paired_statistical_analysis": {
+    "comparison": "B4 (Model + S-Class + Test Repair) vs B2 (Model + Test Repair)",
+    "contingency_table": {
+      "a_both_pass": 7,
+      "b_b2_pass_b4_fail": 1,
+      "c_b4_pass_b2_fail": 2,
+      "d_both_fail": 2,
+      "discordant_pairs": 3
+    },
+    "statistical_test": {
+      "test_name": "McNemar's Test (Paired Discordance)",
+      "chi2_statistic": 0.0,
+      "p_value": 1.0,
+      "statistically_significant_p05": false
+    },
+    "efficiency_metrics": {
+      "B2_Model_Pytest_Loop": {
+        "passed_tasks": 8,
+        "total_tasks": 12,
+        "pass_rate": 66.67,
+        "total_cost_usd": 0.010746,
+        "cost_per_success_usd": 0.001343,
+        "total_model_calls": 24,
+        "calls_per_success": 3.0,
+        "avg_latency_sec": 4.159
+      },
+      "B4_Model_SClass_Pytest_Loop": {
+        "passed_tasks": 9,
+        "total_tasks": 12,
+        "pass_rate": 75.0,
+        "total_cost_usd": 0.013653,
+        "cost_per_success_usd": 0.001517,
+        "total_model_calls": 25,
+        "calls_per_success": 2.78,
+        "avg_latency_sec": 4.982
+      },
+      "delta_pass_rate_percentage": 8.33
+    },
+    "task_level_outcomes": [
+      {
+        "task_id": "HOLDOUT-01-DISTRIBUTED-CACHE-INVALIDATOR",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "HOLDOUT-02-JWT-JWKS-ROTATOR",
+        "b2_passed": true,
+        "b4_passed": false,
+        "contingency_cell": "b"
+      },
+      {
+        "task_id": "HOLDOUT-03-RATE-LIMITED-WEBHOOK-DISPATCHER",
+        "b2_passed": false,
+        "b4_passed": true,
+        "contingency_cell": "c"
+      },
+      {
+        "task_id": "HOLDOUT-04-TIMESERIES-METRIC-ROLLUP",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "HOLDOUT-05-ZERO-KNOWLEDGE-PROOF-VERIFIER",
+        "b2_passed": false,
+        "b4_passed": false,
+        "contingency_cell": "d"
+      },
+      {
+        "task_id": "HOLDOUT-06-CIRCUIT-BREAKER-STATE-MACHINE",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "HOLDOUT-07-GRPC-MUTUAL-TLS-PROXY",
+        "b2_passed": false,
+        "b4_passed": false,
+        "contingency_cell": "d"
+      },
+      {
+        "task_id": "HOLDOUT-08-EVENT-DRIVEN-SAGA-ORCHESTRATOR",
+        "b2_passed": false,
+        "b4_passed": true,
+        "contingency_cell": "c"
+      },
+      {
+        "task_id": "HOLDOUT-09-GEOSPATIAL-RTREE-INDEX",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "HOLDOUT-10-SECRET-SHARING-SHAMIR",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "HOLDOUT-11-VECTOR-SIMILARITY-SEARCH",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "HOLDOUT-12-MULTI-TENANT-ROW-ISOLATION",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      }
+    ]
+  },
+  "human_adjudication_samples": [
+    {
+      "task_id": "HOLDOUT-01-DISTRIBUTED-CACHE-INVALIDATOR",
+      "baseline": "B3",
+      "automated_category": "wrong_requirement",
+      "automated_reason": "Failed oracle assertions without explicit exception traceback.",
+      "human_adjudicated_category": null,
+      "human_adjudicator_notes": null,
+      "adjudicated": false
+    },
+    {
+      "task_id": "HOLDOUT-02-JWT-JWKS-ROTATOR",
+      "baseline": "B1",
+      "automated_category": "wrong_requirement",
+      "automated_reason": "Failed oracle assertions without explicit exception traceback.",
+      "human_adjudicated_category": null,
+      "human_adjudicator_notes": null,
+      "adjudicated": false
+    },
+    {
+      "task_id": "HOLDOUT-02-JWT-JWKS-ROTATOR",
+      "baseline": "B3",
+      "automated_category": "wrong_requirement",
+      "automated_reason": "Failed oracle assertions without explicit exception traceback.",
+      "human_adjudicated_category": null,
+      "human_adjudicator_notes": null,
+      "adjudicated": false
+    },
+    {
+      "task_id": "HOLDOUT-02-JWT-JWKS-ROTATOR",
+      "baseline": "B4",
+      "automated_category": "wrong_requirement",
+      "automated_reason": "Failed oracle assertions without explicit exception traceback.",
+      "human_adjudicated_category": null,
+      "human_adjudicator_notes": null,
+      "adjudicated": false
+    },
+    {
+      "task_id": "HOLDOUT-03-RATE-LIMITED-WEBHOOK-DISPATCHER",
+      "baseline": "B1",
+      "automated_category": "test_api_mismatch",
+      "automated_reason": "API / signature mismatch detected: TypeError: RateLimitedWebhookDispatcher.__init__() got an unexpected keyword argument",
+      "human_adjudicated_category": null,
+      "human_adjudicator_notes": null,
+      "adjudicated": false
+    },
+    {
+      "task_id": "HOLDOUT-03-RATE-LIMITED-WEBHOOK-DISPATCHER",
+      "baseline": "B2",
+      "automated_category": "wrong_requirement",
+      "automated_reason": "Failed oracle assertions without explicit exception traceback.",
+      "human_adjudicated_category": null,
+      "human_adjudicator_notes": null,
+      "adjudicated": false
+    },
+    {
+      "task_id": "HOLDOUT-03-RATE-LIMITED-WEBHOOK-DISPATCHER",
+      "baseline": "B3",
+      "automated_category": "test_api_mismatch",
+      "automated_reason": "API / signature mismatch detected: TypeError: RateLimitedWebhookDispatcher.__init__() got an unexpected keyword argument",
+      "human_adjudicated_category": null,
+      "human_adjudicator_notes": null,
+      "adjudicated": false
+    },
+    {
+      "task_id": "HOLDOUT-05-ZERO-KNOWLEDGE-PROOF-VERIFIER",
+      "baseline": "B1",
+      "automated_category": "missing_requirement",
+      "automated_reason": "Required class or method missing: AttributeError: 'str' object has no attribute",
+      "human_adjudicated_category": null,
+      "human_adjudicator_notes": null,
+      "adjudicated": false
+    },
+    {
+      "task_id": "HOLDOUT-05-ZERO-KNOWLEDGE-PROOF-VERIFIER",
+      "baseline": "B2",
+      "automated_category": "implementation_bug",
+      "automated_reason": "Runtime logic error or assertion failure: AssertionError: assert False is True",
+      "human_adjudicated_category": null,
+      "human_adjudicator_notes": null,
+      "adjudicated": false
+    },
+    {
+      "task_id": "HOLDOUT-05-ZERO-KNOWLEDGE-PROOF-VERIFIER",
+      "baseline": "B3",
+      "automated_category": "implementation_bug",
+      "automated_reason": "Runtime logic error or assertion failure: ValueError: invalid literal for int() with base 10: 'my_secret_key'",
+      "human_adjudicated_category": null,
+      "human_adjudicator_notes": null,
+      "adjudicated": false
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "task_id": "HOLDOUT-10-SECRET-SHARING-SHAMIR",
+  "baseline": "B1",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Cryptography / Shamirs Secret Sharing",
+  "raw_prompt": "Implement ShamirSecretSharing in target_module.py supporting polynomial secret splitting into N shares with threshold K, and secret reconstruction from any K shares. Must support split(secret_int, n, k) and combine(shares_list).",
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 1,
+    "total_iterations": 1
+  },
+  "repository": {
+    "starting_tree_hash": "5cbc55208a6be8a84db5547313c1bd840a7e7659d321b7ba7f2d7db0d8a0d6f2",
+    "final_tree_hash": "055a18918517b3dcabeddf6281596a68d964e87e629727bcf37801040abd1a0b"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "Task Instruction:\nImplement ShamirSecretSharing in target_module.py supporting polynomial secret splitting into N shares with threshold K, and secret reconstruction from any K shares. Must support split(secret_int, n, k) and combine(shares_list).\n\nExisting Code in target_module.py:\n```python\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nimport random\n\n# A large prime number used for finite field arithmetic.\n# We use the 256-bit prime commonly used in secp256k1 / Bitcoin.\nPRIME = 2**256 - 2**32 - 977\n\n\nclass ShamirSecretSharing:\n    \"\"\"Implementation of Shamir's Secret Sharing scheme over a finite field.\"\"\"\n\n    @staticmethod\n    def _eval_poly(coefficients: list[int], x: int, prime: int) -> int:\n        \"\"\"Evaluates a polynomial with given coefficients at point x modulo prime using Horner's method.\"\"\"\n        accumulated = 0\n        for coefficient in reversed(coefficients):\n            accumulated = (accumulated * x + coefficient) % prime\n        return accumulated\n\n    @staticmethod\n    def _extended_gcd(a: int, b: int) -> tuple[int, int, int]:\n        \"\"\"Extended Euclidean Algorithm to find modular inverse.\"\"\"\n        if a == 0:\n            return b, 0, 1\n        gcd, x1, y1 = ShamirSecretSharing._extended_gcd(b % a, a)\n        x = y1 - (b // a) * x1\n        y = x1\n        return gcd, x, y\n\n    @staticmethod\n    def _mod_inverse(n: int, prime: int) -> int:\n        \"\"\"Computes the modular multiplicative inverse of n modulo prime.\"\"\"\n        gcd, x, _ = ShamirSecretSharing._extended_gcd(n, prime)\n        if gcd != 1:\n            raise ValueError(\n                \"Modular inverse does not exist (n and prime are not coprime).\"\n            )\n        return (x % prime + prime) % prime\n\n    @classmethod\n    def split(\n        cls, secret_int: int, n: int, k: int, prime: int = PRIME\n    ) -> list[tuple[int, int]]:\n        \"\"\"Splits a secret integer into N shares with a threshold K.\n\n        Args:\n            secret_int: The secret integer to split.\n            n: Total number of shares to generate.\n            k: Threshold number of shares needed for reconstruction.\n            prime: The prime modulus (defaults to a 256-bit prime).\n\n        Returns:\n            A list of N shares, where each share is represented as a (x, y) tuple.\n        \"\"\"\n        if k > n:\n            raise ValueError(\"Threshold (k) cannot be greater than total shares (n).\")\n        if k < 1:\n            raise ValueError(\"Threshold (k) must be at least 1.\")\n        if secret_int >= prime:\n            raise ValueError(\"Secret must be strictly less than the prime modulus.\")\n\n        # Generate k-1 random coefficients for the polynomial of degree k-1\n        coefficients = [secret_int]\n        for _ in range(k - 1):\n            coefficients.append(random.randrange(0, prime))\n\n        # Evaluate the polynomial at x = 1, 2, ..., n\n        shares = []\n        for x in range(1, n + 1):\n            y = cls._eval_poly(coefficients, x, prime)\n            shares.append((x, y))\n\n        return shares\n\n    @classmethod\n    def combine(cls, shares_list: list[tuple[int, int]], prime: int = PRIME) -> int:\n        \"\"\"Reconstructs the secret from any K (or more) shares using Lagrange interpolation.\n\n        Args:\n            shares_list: A list of (x, y) share tuples.\n            prime: The prime modulus (defaults to a 256-bit prime).\n\n        Returns:\n            The reconstructed secret integer.\n        \"\"\"\n        if not shares_list:\n            raise ValueError(\"At least one share is required for reconstruction.\")\n\n        # Extract x and y coordinates\n        x_coords = [share[0] for share in shares_list]\n        y_coords = [share[1] for share in shares_list]\n\n        if len(set(x_coords)) != len(x_coords):\n            raise ValueError(\"Duplicate shares (same x-coordinate) provided.\")\n\n        k = len(shares_list)\n        secret = 0\n\n        # Lagrange polynomial interpolation at x = 0\n        for i in range(k):\n            numerator = 1\n            denominator = 1\n\n            for j in range(k):\n                if i != j:\n                    numerator = (numerator * (-x_coords[j])) % prime\n                    denominator = (denominator * (x_coords[i] - x_coords[j])) % prime\n\n            # Compute Lagrange basis polynomial evaluation at x = 0\n            inv_denominator = cls._mod_inverse(denominator, prime)\n            lagrange_basis = (numerator * inv_denominator) % prime\n\n            term = (y_coords[i] * lagrange_basis) % prime\n            secret = (secret + term) % prime\n\n        return (secret + prime) % prime\n```",
+      "latency_sec": 3.7599,
+      "prompt_tokens": 116,
+      "completion_tokens": 1120,
+      "cost_usd": 0.000345,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp5pb4nv_s\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_shamir_split_combine PASSED                   [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.571,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "import random\n\n# A large prime number used for finite field arithmetic.\n# We use the 256-bit prime commonly used in secp256k1 / Bitcoin.\nPRIME = 2**256 - 2**32 - 977\n\n\nclass ShamirSecretSharing:\n    \"\"\"Implementation of Shamir's Secret Sharing scheme over a finite field.\"\"\"\n\n    @staticmethod\n    def _eval_poly(coefficients: list[int], x: int, prime: int) -> int:\n        \"\"\"Evaluates a polynomial with given coefficients at point x modulo prime using Horner's method.\"\"\"\n        accumulated = 0\n        for coefficient in reversed(coefficients):\n            accumulated = (accumulated * x + coefficient) % prime\n        return accumulated\n\n    @staticmethod\n    def _extended_gcd(a: int, b: int) -> tuple[int, int, int]:\n        \"\"\"Extended Euclidean Algorithm to find modular inverse.\"\"\"\n        if a == 0:\n            return b, 0, 1\n        gcd, x1, y1 = ShamirSecretSharing._extended_gcd(b % a, a)\n        x = y1 - (b // a) * x1\n        y = x1\n        return gcd, x, y\n\n    @staticmethod\n    def _mod_inverse(n: int, prime: int) -> int:\n        \"\"\"Computes the modular multiplicative inverse of n modulo prime.\"\"\"\n        gcd, x, _ = ShamirSecretSharing._extended_gcd(n, prime)\n        if gcd != 1:\n            raise ValueError(\n                \"Modular inverse does not exist (n and prime are not coprime).\"\n            )\n        return (x % prime + prime) % prime\n\n    @classmethod\n    def split(\n        cls, secret_int: int, n: int, k: int, prime: int = PRIME\n    ) -> list[tuple[int, int]]:\n        \"\"\"Splits a secret integer into N shares with a threshold K.\n\n        Args:\n            secret_int: The secret integer to split.\n            n: Total number of shares to generate.\n            k: Threshold number of shares needed for reconstruction.\n            prime: The prime modulus (defaults to a 256-bit prime).\n\n        Returns:\n            A list of N shares, where each share is represented as a (x, y) tuple.\n        \"\"\"\n        if k > n:\n            raise ValueError(\"Threshold (k) cannot be greater than total shares (n).\")\n        if k < 1:\n            raise ValueError(\"Threshold (k) must be at least 1.\")\n        if secret_int >= prime:\n            raise ValueError(\"Secret must be strictly less than the prime modulus.\")\n\n        # Generate k-1 random coefficients for the polynomial of degree k-1\n        coefficients = [secret_int]\n        for _ in range(k - 1):\n            coefficients.append(random.randrange(0, prime))\n\n        # Evaluate the polynomial at x = 1, 2, ..., n\n        shares = []\n        for x in range(1, n + 1):\n            y = cls._eval_poly(coefficients, x, prime)\n            shares.append((x, y))\n\n        return shares\n\n    @classmethod\n    def combine(cls, shares_list: list[tuple[int, int]], prime: int = PRIME) -> int:\n        \"\"\"Reconstructs the secret from any K (or more) shares using Lagrange interpolation.\n\n        Args:\n            shares_list: A list of (x, y) share tuples.\n            prime: The prime modulus (defaults to a 256-bit prime).\n\n        Returns:\n            The reconstructed secret integer.\n        \"\"\"\n        if not shares_list:\n            raise ValueError(\"At least one share is required for reconstruction.\")\n\n        # Extract x and y coordinates\n        x_coords = [share[0] for share in shares_list]\n        y_coords = [share[1] for share in shares_list]\n\n        if len(set(x_coords)) != len(x_coords):\n            raise ValueError(\"Duplicate shares (same x-coordinate) provided.\")\n\n        k = len(shares_list)\n        secret = 0\n\n        # Lagrange polynomial interpolation at x = 0\n        for i in range(k):\n            numerator = 1\n            denominator = 1\n\n            for j in range(k):\n                if i != j:\n                    numerator = (numerator * (-x_coords[j])) % prime\n                    denominator = (denominator * (x_coords[i] - x_coords[j])) % prime\n\n            # Compute Lagrange basis polynomial evaluation at x = 0\n            inv_denominator = cls._mod_inverse(denominator, prime)\n            lagrange_basis = (numerator * inv_denominator) % prime\n\n            term = (y_coords[i] * lagrange_basis) % prime\n            secret = (secret + term) % prime\n\n        return (secret + prime) % prime\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp5pb4nv_s\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_shamir_split_combine PASSED                   [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.571,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  }
+}

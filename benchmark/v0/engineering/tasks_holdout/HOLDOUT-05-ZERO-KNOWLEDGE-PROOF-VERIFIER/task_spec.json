@@ -1,0 +1,5 @@
+{
+  "task_id": "HOLDOUT-05-ZERO-KNOWLEDGE-PROOF-VERIFIER",
+  "domain": "Cryptography / ZK Proof Verification",
+  "raw_prompt": "Implement ZKProofVerifier in target_module.py that validates zero-knowledge membership proofs using Schnorr nonces and hash commitments. Must support generate_proof(secret, commitment_key) and verify_proof(proof, public_key)."
+}

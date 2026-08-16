@@ -1,0 +1,5 @@
+{
+  "task_id": "HOLDOUT-07-GRPC-MUTUAL-TLS-PROXY",
+  "domain": "Networking & Infrastructure / mTLS Handshake",
+  "raw_prompt": "Implement MutualTLSProxy in target_module.py that validates client TLS certificates against trusted CA certs, verifies SAN IP/domain constraints, and forwards authenticated payloads. Must support authenticate_peer(cert_pem) and proxy_request(payload, cert_pem)."
+}

@@ -31,9 +31,11 @@ if plugin_root not in sys.path:
 from benchmark.v0.engineering.llm_provider import LLMProvider, LLMProviderConfig, LLMResponse, ProviderAPIKeyMissingError
 from benchmark.v0.engineering.snapshot_manager import RepositorySnapshotManager, PytestRunResult
 from benchmark.v0.engineering.failure_taxonomy import FailureTaxonomyClassifier
+from benchmark.v0.engineering.statistical_analysis import StatisticalAnalysisEngine
+from benchmark.v0.engineering.human_adjudication_protocol import HumanAdjudicationProtocol
 from shadow_semantic_synthesis import ShadowSynthesizer
 
-RUNNER_VERSION = "gate-1.6c-fair-treatment-benchmark-v1"
+RUNNER_VERSION = "gate-1.6d-holdout-replication-v1"
 
 def run_baseline_b1(task_dir: str, spec: Dict[str, Any], provider: LLMProvider) -> Dict[str, Any]:
     """B1: Zero-Shot Prompt-Only Agent."""
@@ -435,16 +437,20 @@ def run_baseline_b4(task_dir: str, spec: Dict[str, Any], provider: LLMProvider, 
         }
         return run_artifact
 
-def run_genuine_benchmark(provider_type: str = "auto", model_name: str = "gemini-3.5-flash-lite", allow_mock: bool = False, api_key: Optional[str] = None):
+def run_genuine_benchmark(provider_type: str = "auto", model_name: str = "gemini-3.5-flash-lite", allow_mock: bool = False, api_key: Optional[str] = None, use_holdout: bool = False):
     engineering_dir = os.path.dirname(os.path.abspath(__file__))
-    tasks_dir = os.path.join(engineering_dir, "tasks")
-    runs_dir = os.path.join(engineering_dir, "runs")
+    tasks_dir_name = "tasks_holdout" if use_holdout else "tasks"
+    runs_dir_name = "runs_holdout" if use_holdout else "runs"
+    
+    tasks_dir = os.path.join(engineering_dir, tasks_dir_name)
+    runs_dir = os.path.join(engineering_dir, runs_dir_name)
     os.makedirs(runs_dir, exist_ok=True)
 
     config = LLMProviderConfig(provider_type=provider_type, model_name=model_name, api_key=api_key)
     provider = LLMProvider(config=config, allow_mock_fallback=allow_mock)
     
-    print(f"=== Starting Gate 1.6C Fair Treatment Benchmark ===")
+    banner = "=== Starting Gate 1.6D Holdout Task Replication ===" if use_holdout else "=== Starting Gate 1.6C Fair Treatment Benchmark ==="
+    print(banner)
     print(f"Provider: {provider.config.provider_type} | Model: {provider.config.model_name}")
     print(f"Tasks Directory: {tasks_dir}\n")
 
@@ -504,9 +510,9 @@ def run_genuine_benchmark(provider_type: str = "auto", model_name: str = "gemini
 
         all_runs.extend([b1_art, b2_art, b3_art, b4_art])
 
-    generate_summary_report(all_runs, engineering_dir)
+    generate_summary_report(all_runs, engineering_dir, is_holdout=use_holdout)
 
-def generate_summary_report(runs: List[Dict[str, Any]], engineering_dir: str):
+def generate_summary_report(runs: List[Dict[str, Any]], engineering_dir: str, is_holdout: bool = False):
     total_tasks = len(set(r["task_id"] for r in runs))
     
     b1_runs = [r for r in runs if r["baseline"] == "B1"]
@@ -520,7 +526,18 @@ def generate_summary_report(runs: List[Dict[str, Any]], engineering_dir: str):
         pass_rate = round((passed / tot * 100.0) if tot > 0 else 0.0, 2)
         avg_latency = round(sum(r["execution_trace"][0]["latency_sec"] for r in b_list) / tot, 3) if tot > 0 else 0.0
         tot_cost = round(sum(sum(t["cost_usd"] for t in r["execution_trace"]) for r in b_list), 6)
-        return {"passed": passed, "total": tot, "pass_rate": pass_rate, "avg_latency_sec": avg_latency, "total_cost_usd": tot_cost}
+        tot_calls = sum(len(r["execution_trace"]) for r in b_list)
+        cost_per_success = round((tot_cost / max(1, passed)), 6)
+        calls_per_success = round((tot_calls / max(1, passed)), 2)
+        return {
+            "passed": passed,
+            "total": tot,
+            "pass_rate": pass_rate,
+            "avg_latency_sec": avg_latency,
+            "total_cost_usd": tot_cost,
+            "cost_per_success_usd": cost_per_success,
+            "calls_per_success": calls_per_success
+        }
 
     def calc_taxonomy_breakdown(b_list):
         failed_runs = [r for r in b_list if not r["oracle_result"]["all_passed"]]
@@ -539,9 +556,16 @@ def generate_summary_report(runs: List[Dict[str, Any]], engineering_dir: str):
                 counts["wrong_requirement"] += 1
         return counts
 
+    # Statistical McNemar Paired Analysis (B4 vs B2)
+    paired_stat_analysis = StatisticalAnalysisEngine.analyze_paired_baselines(b2_runs, b4_runs)
+
+    # Human Failure Adjudication Sampling
+    adjudication_samples = HumanAdjudicationProtocol.sample_failures_for_adjudication(runs, sample_size=10)
+
     summary = {
-        "title": "Gate 1.6C Fair Treatment Benchmark Summary Report",
+        "title": "Gate 1.6D Holdout Task Replication & Statistical Rigor Report" if is_holdout else "Gate 1.6C Fair Treatment Benchmark Summary Report",
         "runner_version": RUNNER_VERSION,
+        "is_holdout_replication": is_holdout,
         "total_tasks": total_tasks,
         "baselines": {
             "B1_Prompt_Only": calc_stats(b1_runs),
@@ -554,30 +578,44 @@ def generate_summary_report(runs: List[Dict[str, Any]], engineering_dir: str):
             "B2_Agent_Test_Loop": calc_taxonomy_breakdown(b2_runs),
             "B3_Agent_SClass_Governance": calc_taxonomy_breakdown(b3_runs),
             "B4_Agent_SClass_Test_Loop": calc_taxonomy_breakdown(b4_runs)
-        }
+        },
+        "mcnemar_paired_statistical_analysis": paired_stat_analysis,
+        "human_adjudication_samples": adjudication_samples
     }
 
-    json_path = os.path.join(engineering_dir, "gate_1_6c_fair_comparison_report.json")
-    md_path = os.path.join(engineering_dir, "gate_1_6c_fair_comparison_report.md")
+    report_prefix = "gate_1_6d_holdout_replication_report" if is_holdout else "gate_1_6c_fair_comparison_report"
+    json_path = os.path.join(engineering_dir, f"{report_prefix}.json")
+    md_path = os.path.join(engineering_dir, f"{report_prefix}.md")
 
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
 
+    title_str = "# Gate 1.6D Holdout Task Replication & Statistical Rigor Report" if is_holdout else "# Gate 1.6C Fair Treatment Benchmark Summary Report"
     md_lines = [
-        "# Gate 1.6C Fair Treatment Benchmark Summary Report",
+        title_str,
         "",
         f"- **Runner Version**: `{RUNNER_VERSION}`",
+        f"- **Holdout Task Set**: `{'YES - Fresh Holdout' if is_holdout else 'NO - Development Set'}`",
         f"- **Total Real Tasks**: {total_tasks}",
-        f"- **Total Benchmark Executions**: {len(runs)} / 64",
+        f"- **Total Executions**: {len(runs)} / {total_tasks * 4}",
         "",
-        "## Empirical Oracle Pass Rates",
+        "## Empirical Oracle Pass Rates & Efficiency",
         "",
-        "| Baseline | Treatment Description | Max Budget | Tasks Passed | Pass Rate (%) | Avg Latency (s) | Total Cost (USD) |",
-        "| :--- | :--- | :---: | :---: | :---: | :---: | :---: |",
-        f"| **B1** | Model-Only (Single-Shot) | 1 call | {summary['baselines']['B1_Prompt_Only']['passed']} / {total_tasks} | {summary['baselines']['B1_Prompt_Only']['pass_rate']}% | {summary['baselines']['B1_Prompt_Only']['avg_latency_sec']}s | ${summary['baselines']['B1_Prompt_Only']['total_cost_usd']} |",
-        f"| **B2** | Model + Pytest Repair Loop | 3 calls | {summary['baselines']['B2_Agent_Test_Loop']['passed']} / {total_tasks} | {summary['baselines']['B2_Agent_Test_Loop']['pass_rate']}% | {summary['baselines']['B2_Agent_Test_Loop']['avg_latency_sec']}s | ${summary['baselines']['B2_Agent_Test_Loop']['total_cost_usd']} |",
-        f"| **B3** | Model + S-Class Candidate Authority | 3 calls | {summary['baselines']['B3_Agent_SClass_Governance']['passed']} / {total_tasks} | {summary['baselines']['B3_Agent_SClass_Governance']['pass_rate']}% | {summary['baselines']['B3_Agent_SClass_Governance']['avg_latency_sec']}s | ${summary['baselines']['B3_Agent_SClass_Governance']['total_cost_usd']} |",
-        f"| **B4** | Model + S-Class + Pytest Repair Loop | 3 calls | {summary['baselines']['B4_Agent_SClass_Test_Loop']['passed']} / {total_tasks} | {summary['baselines']['B4_Agent_SClass_Test_Loop']['pass_rate']}% | {summary['baselines']['B4_Agent_SClass_Test_Loop']['avg_latency_sec']}s | ${summary['baselines']['B4_Agent_SClass_Test_Loop']['total_cost_usd']} |",
+        "| Baseline | Treatment Description | Max Budget | Tasks Passed | Pass Rate (%) | Cost / Success ($) | Calls / Success | Avg Latency (s) | Total Cost ($) |",
+        "| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |",
+        f"| **B1** | Model-Only (Single-Shot) | 1 call | {summary['baselines']['B1_Prompt_Only']['passed']} / {total_tasks} | {summary['baselines']['B1_Prompt_Only']['pass_rate']}% | ${summary['baselines']['B1_Prompt_Only']['cost_per_success_usd']} | {summary['baselines']['B1_Prompt_Only']['calls_per_success']} | {summary['baselines']['B1_Prompt_Only']['avg_latency_sec']}s | ${summary['baselines']['B1_Prompt_Only']['total_cost_usd']} |",
+        f"| **B2** | Model + Pytest Repair Loop | 3 calls | {summary['baselines']['B2_Agent_Test_Loop']['passed']} / {total_tasks} | {summary['baselines']['B2_Agent_Test_Loop']['pass_rate']}% | ${summary['baselines']['B2_Agent_Test_Loop']['cost_per_success_usd']} | {summary['baselines']['B2_Agent_Test_Loop']['calls_per_success']} | {summary['baselines']['B2_Agent_Test_Loop']['avg_latency_sec']}s | ${summary['baselines']['B2_Agent_Test_Loop']['total_cost_usd']} |",
+        f"| **B3** | Model + S-Class Candidate Authority | 3 calls | {summary['baselines']['B3_Agent_SClass_Governance']['passed']} / {total_tasks} | {summary['baselines']['B3_Agent_SClass_Governance']['pass_rate']}% | ${summary['baselines']['B3_Agent_SClass_Governance']['cost_per_success_usd']} | {summary['baselines']['B3_Agent_SClass_Governance']['calls_per_success']} | {summary['baselines']['B3_Agent_SClass_Governance']['avg_latency_sec']}s | ${summary['baselines']['B3_Agent_SClass_Governance']['total_cost_usd']} |",
+        f"| **B4** | Model + S-Class + Pytest Repair Loop | 3 calls | {summary['baselines']['B4_Agent_SClass_Test_Loop']['passed']} / {total_tasks} | {summary['baselines']['B4_Agent_SClass_Test_Loop']['pass_rate']}% | ${summary['baselines']['B4_Agent_SClass_Test_Loop']['cost_per_success_usd']} | {summary['baselines']['B4_Agent_SClass_Test_Loop']['calls_per_success']} | {summary['baselines']['B4_Agent_SClass_Test_Loop']['avg_latency_sec']}s | ${summary['baselines']['B4_Agent_SClass_Test_Loop']['total_cost_usd']} |",
+        "",
+        "## McNemar Paired Statistical Hypothesis Test (B4 vs B2)",
+        "",
+        f"- **Primary Comparison**: `{paired_stat_analysis['comparison']}`",
+        f"- **Contingency Matrix**: $a={paired_stat_analysis['contingency_table']['a_both_pass']}$ (both pass), $b={paired_stat_analysis['contingency_table']['b_b2_pass_b4_fail']}$ (B2 pass / B4 fail), $c={paired_stat_analysis['contingency_table']['c_b4_pass_b2_fail']}$ (B4 pass / B2 fail), $d={paired_stat_analysis['contingency_table']['d_both_fail']}$ (both fail)",
+        f"- **McNemar $\\chi^2$ Statistic**: `{paired_stat_analysis['statistical_test']['chi2_statistic']}`",
+        f"- **$p$-value**: `{paired_stat_analysis['statistical_test']['p_value']}`",
+        f"- **Statistically Significant ($p < 0.05$)**: `{'YES' if paired_stat_analysis['statistical_test']['statistically_significant_p05'] else 'NO'}`",
+        f"- **Survives Replication Effect ($B4 \\ge B2$)**: `{'YES' if summary['baselines']['B4_Agent_SClass_Test_Loop']['pass_rate'] >= summary['baselines']['B2_Agent_Test_Loop']['pass_rate'] else 'NO'}`",
         "",
         "## Failure Taxonomy Classification Breakdown",
         "",
@@ -587,6 +625,9 @@ def generate_summary_report(runs: List[Dict[str, Any]], engineering_dir: str):
         f"| **B2** | {summary['failure_taxonomy_breakdown']['B2_Agent_Test_Loop']['wrong_requirement']} | {summary['failure_taxonomy_breakdown']['B2_Agent_Test_Loop']['missing_requirement']} | {summary['failure_taxonomy_breakdown']['B2_Agent_Test_Loop']['implementation_bug']} | {summary['failure_taxonomy_breakdown']['B2_Agent_Test_Loop']['test_api_mismatch']} | {summary['failure_taxonomy_breakdown']['B2_Agent_Test_Loop']['environment_failure']} |",
         f"| **B3** | {summary['failure_taxonomy_breakdown']['B3_Agent_SClass_Governance']['wrong_requirement']} | {summary['failure_taxonomy_breakdown']['B3_Agent_SClass_Governance']['missing_requirement']} | {summary['failure_taxonomy_breakdown']['B3_Agent_SClass_Governance']['implementation_bug']} | {summary['failure_taxonomy_breakdown']['B3_Agent_SClass_Governance']['test_api_mismatch']} | {summary['failure_taxonomy_breakdown']['B3_Agent_SClass_Governance']['environment_failure']} |",
         f"| **B4** | {summary['failure_taxonomy_breakdown']['B4_Agent_SClass_Test_Loop']['wrong_requirement']} | {summary['failure_taxonomy_breakdown']['B4_Agent_SClass_Test_Loop']['missing_requirement']} | {summary['failure_taxonomy_breakdown']['B4_Agent_SClass_Test_Loop']['implementation_bug']} | {summary['failure_taxonomy_breakdown']['B4_Agent_SClass_Test_Loop']['test_api_mismatch']} | {summary['failure_taxonomy_breakdown']['B4_Agent_SClass_Test_Loop']['environment_failure']} |",
+        "",
+        "## Independent Human Adjudication Sample",
+        f"- Sampled **{len(adjudication_samples)} failing runs** for human review in `human_adjudication_samples` key."
     ]
 
     with open(md_path, "w", encoding="utf-8") as f:
@@ -595,20 +636,21 @@ def generate_summary_report(runs: List[Dict[str, Any]], engineering_dir: str):
     print(f"\nSummary Report saved to {json_path} and {md_path}")
 
 def main():
-    parser = argparse.ArgumentParser(description="Gate 1.6C Fair Treatment Benchmark Runner")
+    parser = argparse.ArgumentParser(description="Gate 1.6D Holdout Replication & Statistical Rigor Runner")
     parser.add_argument("--provider", type=str, default="auto", help="Provider type (auto, gemini, openai, anthropic, custom_http, mock_test)")
     parser.add_argument("--model", type=str, default="gemini-3.5-flash-lite", help="Model name")
     parser.add_argument("--api-key", type=str, default=None, help="LLM Provider API Key")
     parser.add_argument("--allow-mock", action="store_true", help="Allow mock test provider fallback ONLY for local harness testing")
+    parser.add_argument("--holdout", action="store_true", help="Execute benchmark against 12 fresh holdout tasks (tasks_holdout/)")
     args = parser.parse_args()
 
     try:
-        run_genuine_benchmark(provider_type=args.provider, model_name=args.model, allow_mock=args.allow_mock, api_key=args.api_key)
+        run_genuine_benchmark(provider_type=args.provider, model_name=args.model, allow_mock=args.allow_mock, api_key=args.api_key, use_holdout=args.holdout)
         
         # Run certification verifier
         from benchmark.v0.engineering.verify_genuine_benchmark_certification import GenuineBenchmarkCertifier
         engineering_dir = os.path.dirname(os.path.abspath(__file__))
-        certifier = GenuineBenchmarkCertifier(engineering_dir)
+        certifier = GenuineBenchmarkCertifier(engineering_dir, is_holdout=args.holdout)
         is_certified, cert_report = certifier.verify_certification()
         
         json_path = os.path.join(engineering_dir, "benchmark_certification_audit.json")
@@ -616,10 +658,10 @@ def main():
         certifier.write_reports(cert_report, json_path, md_path)
 
         if not is_certified:
-            print(f"\n[REJECTED] Gate 1.6C Certification Failed. Status: {cert_report['status']}")
+            print(f"\n[REJECTED] Gate 1.6D Certification Failed. Status: {cert_report['status']}")
             sys.exit(1)
         else:
-            print(f"\n[CERTIFIED] Gate 1.6C Certified 100% Genuine Live Benchmark!")
+            print(f"\n[CERTIFIED] Gate 1.6D Certified 100% Genuine Live Benchmark!")
             sys.exit(0)
 
     except ProviderAPIKeyMissingError as e:
