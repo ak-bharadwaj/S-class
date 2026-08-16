@@ -9,6 +9,7 @@ import re
 import math
 import pytest
 import hypothesis
+from typing import List, Dict, Any, Tuple, Optional
 from hypothesis import given, settings, strategies as st
 from benchmark.hypothesis_parity.observation import StrategySpec, ObservationRecord, ReplayOutcome, compute_size
 from benchmark.hypothesis_parity.reference_adapter import ReferenceHypothesisAdapter
