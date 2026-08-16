@@ -416,22 +416,31 @@ def test_differential_portalocker_interoperability():
 # 8. Failure Injection & Crash Consistency Suite
 # ============================================================================
 def test_failure_injection_partial_pwrite_loop():
-    """Simulates write returning 1 byte per call to verify write_metadata_atomic_exact loop correctness."""
+    """Simulates pwrite/write returning 1 byte per call to verify write_metadata_atomic_exact loop correctness."""
     written_chunks = []
-    original_write = os.write
+    target_fn = "os.pwrite" if hasattr(os, "pwrite") else "os.write"
 
-    def mock_write_1byte(fd, buf):
-        chunk = buf[:1]
-        written = original_write(fd, chunk)
-        written_chunks.append(written)
-        return written
+    if hasattr(os, "pwrite"):
+        orig_pwrite = os.pwrite
+        def mock_write_1byte(fd, buf, offset):
+            chunk = buf[:1]
+            written = orig_pwrite(fd, chunk, offset)
+            written_chunks.append(written)
+            return written
+    else:
+        orig_write = os.write
+        def mock_write_1byte(fd, buf):
+            chunk = buf[:1]
+            written = orig_write(fd, chunk)
+            written_chunks.append(written)
+            return written
 
     with tempfile.TemporaryDirectory() as tmpdir:
         path = os.path.join(tmpdir, "partial.lock")
         fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
         try:
             payload = b'{"status": "active", "pid": 1234}'
-            with patch("os.write", side_effect=mock_write_1byte):
+            with patch(target_fn, side_effect=mock_write_1byte):
                 _write_metadata_atomic_exact(fd, payload)
 
             with open(path, "rb") as f:
@@ -472,7 +481,11 @@ def test_crash_window_between_pwrite_and_ftruncate():
 
         # 1. Write an oversized garbage lock file payload (simulating crash before ftruncate)
         fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
-        os.write(fd, b'{"status": "active", "pid": 99999} trailing_untruncated_garbage_bytes_1234567890')
+        if hasattr(os, "pwrite"):
+            os.pwrite(fd, b'{"status": "active", "pid": 99999} trailing_untruncated_garbage_bytes_1234567890', 0)
+        else:
+            os.lseek(fd, 0, os.SEEK_SET)
+            os.write(fd, b'{"status": "active", "pid": 99999} trailing_untruncated_garbage_bytes_1234567890')
         os.close(fd)
 
         # 2. Both FileLock and ExperimentalFileLock MUST successfully acquire lock and overwrite with clean metadata
