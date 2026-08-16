@@ -6,111 +6,126 @@
     "cpu_count_logical": 12,
     "portalocker_version": "4.1.0",
     "hostname": "AK",
-    "timestamp_utc": 1786888018.5527906
+    "timestamp_utc": 1786888576.1916814
   },
   "layer_a_primitive_parity": {
     "gate_passed": true,
-    "threshold_applied": "Upper 95% CI of Ratio <= 1.005 for Median and P95",
+    "latency_gate_passed": true,
+    "throughput_gate_passed": true,
+    "memory_gate_passed": true,
+    "threshold_applied": "Paired Median/P95 Upper CI <= 1.005 AND Throughput Lower CI >= 0.995 AND RSS Drift <= 1.05",
     "iterations_per_rep": 500,
     "total_repetitions": 5,
     "total_trials": 2500,
     "reference_portalocker": {
-      "median_us": 185.8,
-      "p95_us": 415.04,
-      "throughput_per_sec": 4424.8
+      "median_us": 179.2,
+      "p95_us": 376.47,
+      "throughput_per_sec": 4669.6
     },
     "sclass_native_primitive": {
-      "median_us": 152.0,
-      "p95_us": 320.82,
-      "throughput_per_sec": 5518.2
+      "median_us": 145.6,
+      "p95_us": 288.54,
+      "throughput_per_sec": 5874.2
     },
     "statistical_metrics": {
-      "median_latency_diff_pct": -18.192,
-      "median_ratio": 0.8181,
+      "median_ratio": 0.8125,
       "median_ratio_95_ci": [
-        0.8033,
-        0.831
+        0.8057,
+        0.8222
       ],
-      "p95_ratio": 0.773,
+      "p95_ratio": 0.7664,
       "p95_ratio_95_ci": [
-        0.7249,
-        0.8207
+        0.7424,
+        0.797
+      ],
+      "throughput_ratio": 1.258,
+      "throughput_ratio_95_ci": [
+        1.2401,
+        1.275
       ]
     },
     "memory_footprint": {
-      "initial_rss_bytes": 28303360,
-      "peak_working_set_bytes": 29204480,
-      "final_rss_bytes": 29204480
+      "initial_rss_bytes": 28770304,
+      "peak_working_set_bytes": 29888512,
+      "final_rss_bytes": 29888512,
+      "rss_growth_ratio": 1.0389
     }
   },
   "layer_b_full_sclass_lifecycle": {
     "n_trials": 500,
     "full_sclass_filelock": {
-      "median_us": 459.0,
-      "p95_us": 883.12,
-      "throughput_per_sec": 1898.4
+      "median_us": 324.05,
+      "p95_us": 581.01,
+      "throughput_per_sec": 2692.2
     },
     "microsegment_latency_breakdown_us": {
       "open_ns": {
-        "median_us": 170.9,
-        "p95_us": 340.05
+        "median_us": 123.25,
+        "p95_us": 237.21
       },
       "lock_ns": {
-        "median_us": 7.6,
-        "p95_us": 15.3
+        "median_us": 5.5,
+        "p95_us": 11.0
       },
       "json_serialize_enter_ns": {
-        "median_us": 3.1,
-        "p95_us": 6.6
+        "median_us": 2.2,
+        "p95_us": 4.8
       },
       "write_flush_enter_ns": {
-        "median_us": 107.3,
-        "p95_us": 215.61
+        "median_us": 79.35,
+        "p95_us": 139.01
       },
       "json_serialize_exit_ns": {
-        "median_us": 1.6,
-        "p95_us": 3.4
+        "median_us": 1.1,
+        "p95_us": 2.4
       },
       "write_flush_exit_ns": {
-        "median_us": 62.55,
-        "p95_us": 124.97
+        "median_us": 40.6,
+        "p95_us": 71.47
       },
       "unlock_ns": {
-        "median_us": 6.1,
-        "p95_us": 12.6
+        "median_us": 3.9,
+        "p95_us": 7.6
       },
       "close_ns": {
-        "median_us": 67.65,
-        "p95_us": 138.01
+        "median_us": 45.8,
+        "p95_us": 90.01
       }
     }
   },
   "layer_c_equivalent_lifecycle": {
     "gate_passed": true,
-    "threshold_applied": "Upper 95% CI of Ratio <= 1.005 for Median and P95 on 1:1 Lifecycle",
+    "latency_gate_passed": true,
+    "throughput_gate_passed": true,
+    "threshold_applied": "Paired Median/P95 Upper CI <= 1.005 AND Throughput Lower CI >= 0.995 on 1:1 Lifecycle",
     "iterations_per_rep": 500,
     "total_repetitions": 5,
     "total_trials": 2500,
     "reference_equivalent_lifecycle": {
-      "median_us": 493.0,
-      "p95_us": 930.26,
-      "throughput_per_sec": 1791.6
+      "median_us": 360.5,
+      "p95_us": 735.5,
+      "throughput_per_sec": 2362.1
     },
     "sclass_filelock_lifecycle": {
-      "median_us": 462.7,
-      "p95_us": 856.91,
-      "throughput_per_sec": 1922.9
+      "median_us": 339.8,
+      "p95_us": 679.11,
+      "throughput_per_sec": 2480.3
     },
     "statistical_metrics": {
-      "median_ratio": 0.9385,
+      "median_ratio": 0.9426,
       "median_ratio_95_ci": [
-        0.9177,
-        0.9574
+        0.9349,
+        0.9517
       ],
-      "p95_ratio": 0.9211,
+      "p95_ratio": 0.9233,
       "p95_ratio_95_ci": [
-        0.885,
-        0.9551
+        0.8747,
+        0.9696
+      ],
+      "throughput_ratio": 1.05,
+      "throughput_ratio_95_ci": [
+        1.0293,
+        1.0674
       ]
     }
   },
@@ -129,24 +144,24 @@
   "differential_multithreaded_contention": {
     "expected_count": 400,
     "reference_actual_count": 400,
-    "reference_elapsed_sec": 1.803,
+    "reference_elapsed_sec": 1.8,
     "sclass_actual_count": 400,
-    "sclass_elapsed_sec": 0.781,
+    "sclass_elapsed_sec": 0.771,
     "thread_differential_passed": true
   },
   "differential_multiprocess_exclusion": {
     "expected_count": 100,
     "reference_final_count": 100,
-    "reference_elapsed_sec": 0.84,
+    "reference_elapsed_sec": 0.582,
     "sclass_final_count": 100,
-    "sclass_elapsed_sec": 0.557,
+    "sclass_elapsed_sec": 0.523,
     "multiprocess_differential_passed": true
   },
   "differential_crash_recovery": {
     "reference_reclaimed": true,
     "reference_reclaim_sec": 0.00054,
     "sclass_reclaimed": true,
-    "sclass_reclaim_sec": 0.000748,
+    "sclass_reclaim_sec": 0.000707,
     "crash_differential_passed": true
   },
   "stale_metadata": {

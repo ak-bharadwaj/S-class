@@ -1,37 +1,30 @@
 #!/usr/bin/env python3
 """
-OSS Parity Gate 1: Differential Benchmark & Capability Verification Harness (Phase 3 Final)
+OSS Parity Gate 1: Differential Benchmark & Capability Verification Harness (Final Certified)
 Comparing S-Class Independent OS-Native Locking Engine vs Reference Portalocker 4.1.0
 
-Architecture & Methodology:
-1. Layer A — Independent Primitive Parity (0.5% Strict Upper 95% CI Threshold):
-   - Measures bare OS kernel advisory lock acquisition/release (open, msvcrt/fcntl lock, unlock, close).
-   - Independent OS-native S-Class NativeLock vs Reference portalocker.Lock.
-   - Strict Gate Criterion: Median Ratio Upper 95% CI <= 1.005 AND P95 Ratio Upper 95% CI <= 1.005.
+Strict Certification Protocol:
+1. Paired Statistical Bootstrap:
+   - Preserves trial pairs (S-Class_i, Reference_i).
+   - Bootstraps paired observations over 1,000 resamples.
+   - Evaluates Paired Median Ratio 95% CI, Paired P95 Ratio 95% CI, and Paired Throughput Ratio 95% CI.
 
-2. Layer B — Full S-Class Lifecycle Profiling:
-   - Measures complete FileLock abstraction (primitive + diagnostic metadata + process ownership + GC).
-   - Microsegment latency breakdown across open, lock, JSON serialize, write/flush, unlock, close.
+2. Strict 0.5% Gate Certification Rules:
+   - Layer A & Layer C Latency: Median Ratio Upper 95% CI <= 1.005 AND P95 Ratio Upper 95% CI <= 1.005
+   - Layer A & Layer C Throughput: Throughput Ratio Lower 95% CI >= 0.995
 
-3. Layer C — Equivalent Full Lifecycle Workload Comparison (0.5% Strict Upper 95% CI Threshold):
-   - Reference equivalent lifecycle (portalocker.Lock + 2-stage enter & exit metadata payload write/flush)
-     vs S-Class FileLock.
-   - Strict Gate Criterion: Median Ratio Upper 95% CI <= 1.005 AND P95 Ratio Upper 95% CI <= 1.005.
+3. Explicit Memory Policy:
+   - Final RSS / Initial RSS <= 1.05 (<= 5% drift over 2,500 continuous cycles, zero leak).
 
 4. Cross-Implementation Interoperability:
-   - S-Class Holder (Process A) -> Portalocker Contender (Process B) MUST BLOCK / RAISE LockException.
-   - Portalocker Holder (Process A) -> S-Class Contender (Process B) MUST BLOCK / RAISE TimeoutError.
-   - Validates kernel-level advisory lock compatibility on the exact same lock file.
+   - S-Class Holder -> Portalocker Contender = BLOCKED_SUCCESS
+   - Portalocker Holder -> S-Class Contender = BLOCKED_SUCCESS
 
-5. 1:1 Differential Comparative Correctness Suite:
-   - Inter-process blocking timeout with dedicated child holder processes (Reference vs S-Class).
-   - Multithreaded contention (8 threads x 50 increments on Reference vs S-Class).
-   - Multiprocess mutual exclusion (4 processes x 25 increments on Reference vs S-Class).
-   - Crash & abrupt termination recovery with child process os._exit(1) (Reference vs S-Class).
-   - Stale metadata takeover and Config GC non-destructive interaction.
+5. 1:1 Differential Semantic Correctness:
+   - Inter-process timeout, 8-thread serialization (400/400), 4-process mutual exclusion (100/100),
+     abrupt crash recovery (os._exit), stale metadata recovery, and config GC safety.
 
-6. Holistic Gate Certification:
-   - Overall PASS requires: Layer A PASS AND Layer C PASS AND Interoperability PASS AND All Differential Dimensions PASS.
+6. Exports standardized machine-readable Parity Certificate (gate_1_parity_certificate.json).
 """
 
 import os
@@ -118,6 +111,12 @@ def get_current_working_set_bytes() -> int:
                 return int(counters.WorkingSetSize)
         except Exception:
             pass
+    else:
+        try:
+            import resource
+            return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024
+        except Exception:
+            pass
     return 0
 
 
@@ -157,44 +156,91 @@ def calculate_linear_percentile(data: List[float], percentile: float) -> float:
     return sorted_data[low_idx] * (1.0 - weight) + sorted_data[high_idx] * weight
 
 
-def compute_ratio_95_ci(sample_a: List[float], sample_b: List[float], percentile: float = 0.5, n_bootstraps: int = 1000) -> Tuple[float, float, float]:
-    """Computes percentile ratio (A / B) and bootstrap 95% confidence interval [low, high]."""
-    if not sample_a or not sample_b:
-        return 1.0, 1.0, 1.0
-    p_a = calculate_linear_percentile(sample_a, percentile)
-    p_b = calculate_linear_percentile(sample_b, percentile)
-    point_ratio = p_a / p_b if p_b > 0 else 1.0
+def compute_paired_bootstrap_metrics(pairs: List[Tuple[float, float]], n_bootstraps: int = 1000) -> Dict[str, Any]:
+    """
+    Performs rigorous paired bootstrap resampling over preserved (sclass_i, ref_i) trials.
+    Calculates paired median ratio CI, paired P95 ratio CI, and paired throughput ratio CI.
+    """
+    n = len(pairs)
+    if n == 0:
+        return {
+            "median_ratio": 1.0, "median_ratio_95_ci": [1.0, 1.0],
+            "p95_ratio": 1.0, "p95_ratio_95_ci": [1.0, 1.0],
+            "throughput_ratio": 1.0, "throughput_ratio_95_ci": [1.0, 1.0]
+        }
 
-    boot_ratios = []
-    na = len(sample_a)
-    nb = len(sample_b)
+    s_all = [p[0] for p in pairs]
+    r_all = [p[1] for p in pairs]
+
+    point_s_med = calculate_linear_percentile(s_all, 0.50)
+    point_r_med = calculate_linear_percentile(r_all, 0.50)
+    point_s_p95 = calculate_linear_percentile(s_all, 0.95)
+    point_r_p95 = calculate_linear_percentile(r_all, 0.95)
+
+    point_med_ratio = point_s_med / point_r_med if point_r_med > 0 else 1.0
+    point_p95_ratio = point_s_p95 / point_r_p95 if point_r_p95 > 0 else 1.0
+
+    sum_s = sum(s_all)
+    sum_r = sum(r_all)
+    point_tp_ratio = (sum_r / sum_s) if sum_s > 0 else 1.0
+
+    boot_med_ratios: List[float] = []
+    boot_p95_ratios: List[float] = []
+    boot_tp_ratios: List[float] = []
+
     rng = random.Random(42)
     for _ in range(n_bootstraps):
-        resample_a = [sample_a[rng.randint(0, na - 1)] for _ in range(na)]
-        resample_b = [sample_b[rng.randint(0, nb - 1)] for _ in range(nb)]
-        m_a = calculate_linear_percentile(resample_a, percentile)
-        m_b = calculate_linear_percentile(resample_b, percentile)
-        if m_b > 0:
-            boot_ratios.append(m_a / m_b)
+        resampled_pairs = [pairs[rng.randint(0, n - 1)] for _ in range(n)]
+        res_s = [p[0] for p in resampled_pairs]
+        res_r = [p[1] for p in resampled_pairs]
 
-    if boot_ratios:
-        ci_low = calculate_linear_percentile(boot_ratios, 0.025)
-        ci_high = calculate_linear_percentile(boot_ratios, 0.975)
-    else:
-        ci_low, ci_high = point_ratio, point_ratio
-    return point_ratio, ci_low, ci_high
+        m_s = calculate_linear_percentile(res_s, 0.50)
+        m_r = calculate_linear_percentile(res_r, 0.50)
+        if m_r > 0:
+            boot_med_ratios.append(m_s / m_r)
+
+        p_s = calculate_linear_percentile(res_s, 0.95)
+        p_r = calculate_linear_percentile(res_r, 0.95)
+        if p_r > 0:
+            boot_p95_ratios.append(p_s / p_r)
+
+        tot_s = sum(res_s)
+        tot_r = sum(res_r)
+        if tot_s > 0:
+            boot_tp_ratios.append(tot_r / tot_s)
+
+    med_ci = [
+        calculate_linear_percentile(boot_med_ratios, 0.025) if boot_med_ratios else point_med_ratio,
+        calculate_linear_percentile(boot_med_ratios, 0.975) if boot_med_ratios else point_med_ratio
+    ]
+    p95_ci = [
+        calculate_linear_percentile(boot_p95_ratios, 0.025) if boot_p95_ratios else point_p95_ratio,
+        calculate_linear_percentile(boot_p95_ratios, 0.975) if boot_p95_ratios else point_p95_ratio
+    ]
+    tp_ci = [
+        calculate_linear_percentile(boot_tp_ratios, 0.025) if boot_tp_ratios else point_tp_ratio,
+        calculate_linear_percentile(boot_tp_ratios, 0.975) if boot_tp_ratios else point_tp_ratio
+    ]
+
+    return {
+        "median_ratio": round(point_med_ratio, 4),
+        "median_ratio_95_ci": [round(med_ci[0], 4), round(med_ci[1], 4)],
+        "p95_ratio": round(point_p95_ratio, 4),
+        "p95_ratio_95_ci": [round(p95_ci[0], 4), round(p95_ci[1], 4)],
+        "throughput_ratio": round(point_tp_ratio, 4),
+        "throughput_ratio_95_ci": [round(tp_ci[0], 4), round(tp_ci[1], 4)]
+    }
 
 
 # ============================================================================
-# Layer A: Independent Primitive Parity (0.5% Strict Upper 95% CI Threshold)
+# Layer A: Independent Primitive Parity (Strict Upper/Lower 95% CI Thresholds)
 # ============================================================================
 def test_layer_a_primitive_parity(n_trials: int = 500, n_repetitions: int = 5) -> Dict[str, Any]:
     with tempfile.TemporaryDirectory() as tmpdir:
         ref_lock_file = os.path.join(tmpdir, "portalocker.lock")
         sclass_lock_file = os.path.join(tmpdir, "sclass_native.lock")
 
-        ref_latencies_us: List[float] = []
-        sclass_latencies_us: List[float] = []
+        paired_latencies_us: List[Tuple[float, float]] = []
 
         initial_rss = get_current_working_set_bytes()
         peak_rss_during_test = get_peak_working_set_bytes()
@@ -203,57 +249,73 @@ def test_layer_a_primitive_parity(n_trials: int = 500, n_repetitions: int = 5) -
         for rep in range(n_repetitions):
             for i in range(n_trials):
                 run_ref_first = rng.choice([True, False])
+                t_ref_us = 0.0
+                t_sclass_us = 0.0
 
-                def run_ref():
+                def run_ref() -> float:
                     t0 = time.perf_counter_ns()
                     with portalocker.Lock(ref_lock_file, timeout=5.0):
                         pass
                     t1 = time.perf_counter_ns()
-                    ref_latencies_us.append((t1 - t0) / 1000.0)
+                    return (t1 - t0) / 1000.0
 
-                def run_sclass():
+                def run_sclass() -> float:
                     t0 = time.perf_counter_ns()
                     with NativeLock(sclass_lock_file, timeout=5.0):
                         pass
                     t1 = time.perf_counter_ns()
-                    sclass_latencies_us.append((t1 - t0) / 1000.0)
+                    return (t1 - t0) / 1000.0
 
                 if run_ref_first:
-                    run_ref()
-                    run_sclass()
+                    t_ref_us = run_ref()
+                    t_sclass_us = run_sclass()
                 else:
-                    run_sclass()
-                    run_ref()
+                    t_sclass_us = run_sclass()
+                    t_ref_us = run_ref()
+
+                paired_latencies_us.append((t_sclass_us, t_ref_us))
 
                 curr_peak = get_peak_working_set_bytes()
                 if curr_peak > peak_rss_during_test:
                     peak_rss_during_test = curr_peak
 
         final_rss = get_current_working_set_bytes()
+        rss_growth_ratio = (final_rss / initial_rss) if initial_rss > 0 else 1.0
 
-        ref_med = calculate_linear_percentile(ref_latencies_us, 0.50)
-        ref_p95 = calculate_linear_percentile(ref_latencies_us, 0.95)
-        sclass_med = calculate_linear_percentile(sclass_latencies_us, 0.50)
-        sclass_p95 = calculate_linear_percentile(sclass_latencies_us, 0.95)
+        s_lats = [p[0] for p in paired_latencies_us]
+        r_lats = [p[1] for p in paired_latencies_us]
 
-        total_ref_sec = sum(ref_latencies_us) / 1e6
-        total_sclass_sec = sum(sclass_latencies_us) / 1e6
-        ref_throughput = (n_trials * n_repetitions) / total_ref_sec if total_ref_sec > 0 else 0
-        sclass_throughput = (n_trials * n_repetitions) / total_sclass_sec if total_sclass_sec > 0 else 0
+        ref_med = calculate_linear_percentile(r_lats, 0.50)
+        ref_p95 = calculate_linear_percentile(r_lats, 0.95)
+        sclass_med = calculate_linear_percentile(s_lats, 0.50)
+        sclass_p95 = calculate_linear_percentile(s_lats, 0.95)
 
-        ratio_med, med_ci_low, med_ci_high = compute_ratio_95_ci(sclass_latencies_us, ref_latencies_us, percentile=0.50)
-        ratio_p95, p95_ci_low, p95_ci_high = compute_ratio_95_ci(sclass_latencies_us, ref_latencies_us, percentile=0.95)
-        pct_diff_median = ((sclass_med - ref_med) / ref_med * 100.0) if ref_med > 0 else 0.0
+        total_ref_sec = sum(r_lats) / 1e6
+        total_sclass_sec = sum(s_lats) / 1e6
+        ref_throughput = len(r_lats) / total_ref_sec if total_ref_sec > 0 else 0
+        sclass_throughput = len(s_lats) / total_sclass_sec if total_sclass_sec > 0 else 0
 
-        # Strict Gate Threshold: Upper 95% CI of ratio <= 1.005 (+0.5% max) for both Median and P95
-        gate_passed = (med_ci_high <= 1.005 and p95_ci_high <= 1.005)
+        paired_metrics = compute_paired_bootstrap_metrics(paired_latencies_us)
+
+        # Strict Gate Certification Criteria:
+        # 1. Median Ratio Upper 95% CI <= 1.005
+        # 2. P95 Ratio Upper 95% CI <= 1.005
+        # 3. Throughput Ratio Lower 95% CI >= 0.995
+        # 4. Memory Growth Ratio <= 1.05 (zero leak)
+        lat_pass = (paired_metrics["median_ratio_95_ci"][1] <= 1.005 and paired_metrics["p95_ratio_95_ci"][1] <= 1.005)
+        tp_pass = (paired_metrics["throughput_ratio_95_ci"][0] >= 0.995)
+        mem_pass = (rss_growth_ratio <= 1.05)
+        gate_passed = (lat_pass and tp_pass and mem_pass)
 
         return {
             "gate_passed": gate_passed,
-            "threshold_applied": "Upper 95% CI of Ratio <= 1.005 for Median and P95",
+            "latency_gate_passed": lat_pass,
+            "throughput_gate_passed": tp_pass,
+            "memory_gate_passed": mem_pass,
+            "threshold_applied": "Paired Median/P95 Upper CI <= 1.005 AND Throughput Lower CI >= 0.995 AND RSS Drift <= 1.05",
             "iterations_per_rep": n_trials,
             "total_repetitions": n_repetitions,
-            "total_trials": n_trials * n_repetitions,
+            "total_trials": len(paired_latencies_us),
             "reference_portalocker": {
                 "median_us": round(ref_med, 2),
                 "p95_us": round(ref_p95, 2),
@@ -264,17 +326,12 @@ def test_layer_a_primitive_parity(n_trials: int = 500, n_repetitions: int = 5) -
                 "p95_us": round(sclass_p95, 2),
                 "throughput_per_sec": round(sclass_throughput, 1)
             },
-            "statistical_metrics": {
-                "median_latency_diff_pct": round(pct_diff_median, 3),
-                "median_ratio": round(ratio_med, 4),
-                "median_ratio_95_ci": [round(med_ci_low, 4), round(med_ci_high, 4)],
-                "p95_ratio": round(ratio_p95, 4),
-                "p95_ratio_95_ci": [round(p95_ci_low, 4), round(p95_ci_high, 4)]
-            },
+            "statistical_metrics": paired_metrics,
             "memory_footprint": {
                 "initial_rss_bytes": initial_rss,
                 "peak_working_set_bytes": peak_rss_during_test,
-                "final_rss_bytes": final_rss
+                "final_rss_bytes": final_rss,
+                "rss_growth_ratio": round(rss_growth_ratio, 4)
             }
         }
 
@@ -333,15 +390,14 @@ def test_layer_b_full_lifecycle(n_trials: int = 500) -> Dict[str, Any]:
 
 
 # ============================================================================
-# Layer C: True 1:1 Equivalent Full Lifecycle Workload Comparison
+# Layer C: True 1:1 Equivalent Full Lifecycle Workload (Strict Gating)
 # ============================================================================
 def test_layer_c_equivalent_lifecycle(n_trials: int = 500, n_repetitions: int = 5) -> Dict[str, Any]:
     with tempfile.TemporaryDirectory() as tmpdir:
         ref_file = os.path.join(tmpdir, "ref_lifecycle.lock")
         sclass_file = os.path.join(tmpdir, "sclass_lifecycle.lock")
 
-        ref_latencies_us: List[float] = []
-        sclass_latencies_us: List[float] = []
+        paired_latencies_us: List[Tuple[float, float]] = []
 
         ref_pid = _CACHED_PID
         ref_host = _CACHED_HOSTNAME
@@ -353,8 +409,10 @@ def test_layer_c_equivalent_lifecycle(n_trials: int = 500, n_repetitions: int = 
         for rep in range(n_repetitions):
             for i in range(n_trials):
                 run_ref_first = rng.choice([True, False])
+                t_ref_us = 0.0
+                t_sclass_us = 0.0
 
-                def run_ref():
+                def run_ref() -> float:
                     t0 = time.perf_counter_ns()
                     with portalocker.Lock(ref_file, mode="a+b", timeout=5.0) as fh:
                         # 1. Enter metadata payload formatting, seek, truncate, write, flush
@@ -371,44 +429,55 @@ def test_layer_c_equivalent_lifecycle(n_trials: int = 500, n_repetitions: int = 
                         fh.write(meta_exit_template)
                         fh.flush()
                     t1 = time.perf_counter_ns()
-                    ref_latencies_us.append((t1 - t0) / 1000.0)
+                    return (t1 - t0) / 1000.0
 
-                def run_sclass():
+                def run_sclass() -> float:
                     t0 = time.perf_counter_ns()
                     with FileLock(sclass_file, timeout=5.0):
                         pass
                     t1 = time.perf_counter_ns()
-                    sclass_latencies_us.append((t1 - t0) / 1000.0)
+                    return (t1 - t0) / 1000.0
 
                 if run_ref_first:
-                    run_ref()
-                    run_sclass()
+                    t_ref_us = run_ref()
+                    t_sclass_us = run_sclass()
                 else:
-                    run_sclass()
-                    run_ref()
+                    t_sclass_us = run_sclass()
+                    t_ref_us = run_ref()
 
-        ref_med = calculate_linear_percentile(ref_latencies_us, 0.50)
-        ref_p95 = calculate_linear_percentile(ref_latencies_us, 0.95)
-        sclass_med = calculate_linear_percentile(sclass_latencies_us, 0.50)
-        sclass_p95 = calculate_linear_percentile(sclass_latencies_us, 0.95)
+                paired_latencies_us.append((t_sclass_us, t_ref_us))
 
-        total_ref_sec = sum(ref_latencies_us) / 1e6
-        total_sclass_sec = sum(sclass_latencies_us) / 1e6
-        ref_throughput = (n_trials * n_repetitions) / total_ref_sec if total_ref_sec > 0 else 0
-        sclass_throughput = (n_trials * n_repetitions) / total_sclass_sec if total_sclass_sec > 0 else 0
+        s_lats = [p[0] for p in paired_latencies_us]
+        r_lats = [p[1] for p in paired_latencies_us]
 
-        ratio_med, med_ci_low, med_ci_high = compute_ratio_95_ci(sclass_latencies_us, ref_latencies_us, percentile=0.50)
-        ratio_p95, p95_ci_low, p95_ci_high = compute_ratio_95_ci(sclass_latencies_us, ref_latencies_us, percentile=0.95)
+        ref_med = calculate_linear_percentile(r_lats, 0.50)
+        ref_p95 = calculate_linear_percentile(r_lats, 0.95)
+        sclass_med = calculate_linear_percentile(s_lats, 0.50)
+        sclass_p95 = calculate_linear_percentile(s_lats, 0.95)
 
-        # Strict Gate Threshold: Upper 95% CI <= 1.005
-        gate_passed = (med_ci_high <= 1.005 and p95_ci_high <= 1.005)
+        total_ref_sec = sum(r_lats) / 1e6
+        total_sclass_sec = sum(s_lats) / 1e6
+        ref_throughput = len(r_lats) / total_ref_sec if total_ref_sec > 0 else 0
+        sclass_throughput = len(s_lats) / total_sclass_sec if total_sclass_sec > 0 else 0
+
+        paired_metrics = compute_paired_bootstrap_metrics(paired_latencies_us)
+
+        # Strict Gate Certification Criteria:
+        # 1. Median Ratio Upper 95% CI <= 1.005
+        # 2. P95 Ratio Upper 95% CI <= 1.005
+        # 3. Throughput Ratio Lower 95% CI >= 0.995
+        lat_pass = (paired_metrics["median_ratio_95_ci"][1] <= 1.005 and paired_metrics["p95_ratio_95_ci"][1] <= 1.005)
+        tp_pass = (paired_metrics["throughput_ratio_95_ci"][0] >= 0.995)
+        gate_passed = (lat_pass and tp_pass)
 
         return {
             "gate_passed": gate_passed,
-            "threshold_applied": "Upper 95% CI of Ratio <= 1.005 for Median and P95 on 1:1 Lifecycle",
+            "latency_gate_passed": lat_pass,
+            "throughput_gate_passed": tp_pass,
+            "threshold_applied": "Paired Median/P95 Upper CI <= 1.005 AND Throughput Lower CI >= 0.995 on 1:1 Lifecycle",
             "iterations_per_rep": n_trials,
             "total_repetitions": n_repetitions,
-            "total_trials": n_trials * n_repetitions,
+            "total_trials": len(paired_latencies_us),
             "reference_equivalent_lifecycle": {
                 "median_us": round(ref_med, 2),
                 "p95_us": round(ref_p95, 2),
@@ -419,12 +488,7 @@ def test_layer_c_equivalent_lifecycle(n_trials: int = 500, n_repetitions: int = 
                 "p95_us": round(sclass_p95, 2),
                 "throughput_per_sec": round(sclass_throughput, 1)
             },
-            "statistical_metrics": {
-                "median_ratio": round(ratio_med, 4),
-                "median_ratio_95_ci": [round(med_ci_low, 4), round(med_ci_high, 4)],
-                "p95_ratio": round(ratio_p95, 4),
-                "p95_ratio_95_ci": [round(p95_ci_low, 4), round(p95_ci_high, 4)]
-            }
+            "statistical_metrics": paired_metrics
         }
 
 
@@ -556,7 +620,6 @@ def _holder_process_worker(lock_type: str, lock_path: str, hold_sec: float, read
 
 def test_differential_timeout() -> Dict[str, Any]:
     with tempfile.TemporaryDirectory() as tmpdir:
-        # 1. Test Reference Timeout with separate holder process
         ref_lock = os.path.join(tmpdir, "ref_timeout.lock")
         ref_ready = os.path.join(tmpdir, "ref_ready.txt")
         cmd_ref = [
@@ -577,7 +640,6 @@ def test_differential_timeout() -> Dict[str, Any]:
         ref_elapsed = time.time() - t0
         p_ref.wait()
 
-        # 2. Test S-Class Timeout with separate holder process
         sclass_lock = os.path.join(tmpdir, "sclass_timeout.lock")
         sclass_ready = os.path.join(tmpdir, "sclass_ready.txt")
         cmd_sclass = [
@@ -613,7 +675,6 @@ def test_differential_multithreading(threads: int = 8, increments: int = 50) -> 
         sclass_lock = os.path.join(tmpdir, "sclass_mt.lock")
         expected = threads * increments
 
-        # Reference
         ref_counter = {"val": 0}
         def ref_worker():
             for _ in range(increments):
@@ -630,7 +691,6 @@ def test_differential_multithreading(threads: int = 8, increments: int = 50) -> 
             t.join()
         ref_sec = time.time() - t0
 
-        # S-Class
         sclass_counter = {"val": 0}
         def sclass_worker():
             for _ in range(increments):
@@ -689,7 +749,6 @@ def test_differential_multiprocessing(procs: int = 4, increments: int = 25) -> D
     with tempfile.TemporaryDirectory() as tmpdir:
         expected = procs * increments
 
-        # Reference
         ref_lock = os.path.join(tmpdir, "ref_mp.lock")
         ref_count_file = os.path.join(tmpdir, "ref_mp_count.txt")
         with open(ref_count_file, "w") as f:
@@ -709,7 +768,6 @@ def test_differential_multiprocessing(procs: int = 4, increments: int = 25) -> D
         with open(ref_count_file, "r") as f:
             ref_final = int(f.read().strip())
 
-        # S-Class
         sclass_lock = os.path.join(tmpdir, "sclass_mp.lock")
         sclass_count_file = os.path.join(tmpdir, "sclass_mp_count.txt")
         with open(sclass_count_file, "w") as f:
@@ -741,7 +799,6 @@ def test_differential_multiprocessing(procs: int = 4, increments: int = 25) -> D
 
 def test_differential_crash_recovery() -> Dict[str, Any]:
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Reference Crash
         ref_lock = os.path.join(tmpdir, "ref_crash.lock")
         cmd_ref = [
             sys.executable, "-c",
@@ -759,7 +816,6 @@ def test_differential_crash_recovery() -> Dict[str, Any]:
             ref_reclaimed = False
         ref_elapsed = time.time() - t0
 
-        # S-Class Crash
         sclass_lock = os.path.join(tmpdir, "sclass_crash.lock")
         cmd_sclass = [
             sys.executable, "-c",
@@ -846,13 +902,13 @@ def run_full_parity_gate() -> Dict[str, Any]:
     print("=" * 80)
     print(f"Frozen Environment:\n{json.dumps(env_info, indent=2)}\n")
 
-    print("[1/10] Layer A — Independent Primitive Parity (5 Reps x 500 Interleaved Trials)...")
+    print("[1/10] Layer A — Independent Primitive Parity (Paired 5 Reps x 500 Interleaved Trials)...")
     layer_a = test_layer_a_primitive_parity(n_trials=500, n_repetitions=5)
 
     print("[2/10] Layer B — Full S-Class Lifecycle & Microsegment Profiling...")
     layer_b = test_layer_b_full_lifecycle(n_trials=500)
 
-    print("[3/10] Layer C — True 1:1 Equivalent Full Lifecycle Workload Comparison (5 Reps x 500 Trials)...")
+    print("[3/10] Layer C — True 1:1 Equivalent Full Lifecycle Workload (Paired 5 Reps x 500 Trials)...")
     layer_c = test_layer_c_equivalent_lifecycle(n_trials=500, n_repetitions=5)
 
     print("[4/10] Cross-Implementation Interoperability Verification (Shared Lock File)...")
@@ -906,28 +962,96 @@ def run_full_parity_gate() -> Dict[str, Any]:
         "final_gate_verdict": final_verdict
     }
 
-    out_file = os.path.join(os.path.dirname(__file__), "parity_gate_1_raw_results.json")
-    with open(out_file, "w", encoding="utf-8") as f:
+    out_raw = os.path.join(os.path.dirname(__file__), "parity_gate_1_raw_results.json")
+    with open(out_raw, "w", encoding="utf-8") as f:
         json.dump(master_results, f, indent=2)
 
-    print("\n" + "=" * 80)
-    print("FINAL OSS PARITY GATE 1 SUMMARY TABLE")
-    print("=" * 80)
-    print(f"{'Capability Dimension':<35} | {'Reference':<15} | {'S-Class':<15} | {'Ratio / CI':<20} | {'Verdict'}")
-    print("-" * 100)
-    print(f"{'Layer A: Primitive Median':<35} | {layer_a['reference_portalocker']['median_us']:>10.2f} us | {layer_a['sclass_native_primitive']['median_us']:>10.2f} us | {layer_a['statistical_metrics']['median_ratio']:>6.4f} {str(layer_a['statistical_metrics']['median_ratio_95_ci']):<12} | {'PASS' if layer_a['gate_passed'] else 'FAIL'}")
-    print(f"{'Layer A: Primitive P95':<35} | {layer_a['reference_portalocker']['p95_us']:>10.2f} us | {layer_a['sclass_native_primitive']['p95_us']:>10.2f} us | {layer_a['statistical_metrics']['p95_ratio']:>6.4f} {str(layer_a['statistical_metrics']['p95_ratio_95_ci']):<12} | {'PASS' if layer_a['gate_passed'] else 'FAIL'}")
-    print(f"{'Layer A: Primitive Throughput':<35} | {layer_a['reference_portalocker']['throughput_per_sec']:>10.1f} /s | {layer_a['sclass_native_primitive']['throughput_per_sec']:>10.1f} /s | {'+'+str(round((layer_a['sclass_native_primitive']['throughput_per_sec']-layer_a['reference_portalocker']['throughput_per_sec'])/layer_a['reference_portalocker']['throughput_per_sec']*100, 1))+'%':<20} | PASS")
-    print(f"{'Layer C: 1:1 Lifecycle Median':<35} | {layer_c['reference_equivalent_lifecycle']['median_us']:>10.2f} us | {layer_c['sclass_filelock_lifecycle']['median_us']:>10.2f} us | {layer_c['statistical_metrics']['median_ratio']:>6.4f} {str(layer_c['statistical_metrics']['median_ratio_95_ci']):<12} | {'PASS' if layer_c['gate_passed'] else 'FAIL'}")
-    print(f"{'Layer C: 1:1 Lifecycle P95':<35} | {layer_c['reference_equivalent_lifecycle']['p95_us']:>10.2f} us | {layer_c['sclass_filelock_lifecycle']['p95_us']:>10.2f} us | {layer_c['statistical_metrics']['p95_ratio']:>6.4f} {str(layer_c['statistical_metrics']['p95_ratio_95_ci']):<12} | {'PASS' if layer_c['gate_passed'] else 'FAIL'}")
-    print(f"{'Interoperability (S->P & P->S)':<35} | {'BLOCKED_SUCCESS':<15} | {'BLOCKED_SUCCESS':<15} | {'Mutual Exclusion':<20} | {'PASS' if interop_res['interoperability_passed'] else 'FAIL'}")
-    print(f"{'Timeout (Inter-process)':<35} | {str(timeout_res['reference_timed_out']):<15} | {str(timeout_res['sclass_timed_out']):<15} | {'Matched':<20} | {'PASS' if timeout_res['timeout_differential_passed'] else 'FAIL'}")
-    print(f"{'Multithreading (8T x 50)':<35} | {str(mt_res['reference_actual_count'])+'/400':<15} | {str(mt_res['sclass_actual_count'])+'/400':<15} | {'Serial Correct':<20} | {'PASS' if mt_res['thread_differential_passed'] else 'FAIL'}")
-    print(f"{'Multiprocessing (4P x 25)':<35} | {str(mp_res['reference_final_count'])+'/100':<15} | {str(mp_res['sclass_final_count'])+'/100':<15} | {'Atomic Correct':<20} | {'PASS' if mp_res['multiprocess_differential_passed'] else 'FAIL'}")
-    print(f"{'Crash Recovery (os._exit)':<35} | {'Reclaimed':<15} | {'Reclaimed':<15} | {'Instant Release':<20} | {'PASS' if crash_res['crash_differential_passed'] else 'FAIL'}")
-    print("=" * 100)
-    print(f"OVERALL COMPOSITE GATE 1 VERDICT: {final_verdict}")
-    print("=" * 100)
+    # Export standardized machine-readable Parity Certificate
+    certificate = {
+        "certificate_id": "OSS-PARITY-GATE-1-FILELOCK",
+        "timestamp_utc": env_info["timestamp_utc"],
+        "final_verdict": final_verdict,
+        "provenance": env_info,
+        "acceptance_criteria": {
+            "primitive_latency_median_upper_ci_max": 1.005,
+            "primitive_latency_p95_upper_ci_max": 1.005,
+            "primitive_throughput_lower_ci_min": 0.995,
+            "lifecycle_latency_median_upper_ci_max": 1.005,
+            "lifecycle_latency_p95_upper_ci_max": 1.005,
+            "lifecycle_throughput_lower_ci_min": 0.995,
+            "memory_rss_growth_ratio_max": 1.05,
+            "cross_implementation_interoperability": "REQUIRED_BLOCKED_SUCCESS",
+            "differential_semantic_correctness": "100_PERCENT_MATCHED"
+        },
+        "layer_a_primitive": {
+            "reference_median_us": layer_a["reference_portalocker"]["median_us"],
+            "sclass_median_us": layer_a["sclass_native_primitive"]["median_us"],
+            "median_ratio": layer_a["statistical_metrics"]["median_ratio"],
+            "median_ratio_95_ci": layer_a["statistical_metrics"]["median_ratio_95_ci"],
+            "p95_ratio": layer_a["statistical_metrics"]["p95_ratio"],
+            "p95_ratio_95_ci": layer_a["statistical_metrics"]["p95_ratio_95_ci"],
+            "throughput_ratio": layer_a["statistical_metrics"]["throughput_ratio"],
+            "throughput_ratio_95_ci": layer_a["statistical_metrics"]["throughput_ratio_95_ci"],
+            "verdict": "PASS" if layer_a["gate_passed"] else "FAIL"
+        },
+        "layer_c_1to1_lifecycle": {
+            "reference_median_us": layer_c["reference_equivalent_lifecycle"]["median_us"],
+            "sclass_median_us": layer_c["sclass_filelock_lifecycle"]["median_us"],
+            "median_ratio": layer_c["statistical_metrics"]["median_ratio"],
+            "median_ratio_95_ci": layer_c["statistical_metrics"]["median_ratio_95_ci"],
+            "p95_ratio": layer_c["statistical_metrics"]["p95_ratio"],
+            "p95_ratio_95_ci": layer_c["statistical_metrics"]["p95_ratio_95_ci"],
+            "throughput_ratio": layer_c["statistical_metrics"]["throughput_ratio"],
+            "throughput_ratio_95_ci": layer_c["statistical_metrics"]["throughput_ratio_95_ci"],
+            "verdict": "PASS" if layer_c["gate_passed"] else "FAIL"
+        },
+        "interoperability": {
+            "sclass_holds_portalocker_blocks": interop_res["sclass_holder_portalocker_contender_result"],
+            "portalocker_holds_sclass_blocks": interop_res["portalocker_holder_sclass_contender_result"],
+            "verdict": "PASS" if interop_res["interoperability_passed"] else "FAIL"
+        },
+        "memory_policy": {
+            "initial_rss_bytes": layer_a["memory_footprint"]["initial_rss_bytes"],
+            "final_rss_bytes": layer_a["memory_footprint"]["final_rss_bytes"],
+            "rss_growth_ratio": layer_a["memory_footprint"]["rss_growth_ratio"],
+            "verdict": "PASS" if layer_a["memory_gate_passed"] else "FAIL"
+        },
+        "differential_semantics": {
+            "timeout": "PASS" if timeout_res["timeout_differential_passed"] else "FAIL",
+            "multithreading_400_count": "PASS" if mt_res["thread_differential_passed"] else "FAIL",
+            "multiprocessing_100_count": "PASS" if mp_res["multiprocess_differential_passed"] else "FAIL",
+            "crash_recovery_os_exit": "PASS" if crash_res["crash_differential_passed"] else "FAIL",
+            "stale_metadata_takeover": "PASS" if stale_res["acquired_over_stale_metadata"] else "FAIL",
+            "gc_safety": "PASS" if gc_res["active_lock_preserved_by_gc"] else "FAIL"
+        }
+    }
+
+    out_cert = os.path.join(os.path.dirname(__file__), "gate_1_parity_certificate.json")
+    with open(out_cert, "w", encoding="utf-8") as f:
+        json.dump(certificate, f, indent=2)
+
+    print("\n" + "=" * 105)
+    print("FINAL OSS PARITY GATE 1 CERTIFICATION MATRIX (PAIRED BOOTSTRAP)")
+    print("=" * 105)
+    print(f"{'Capability Dimension':<32} | {'Reference':<14} | {'S-Class':<14} | {'Paired Ratio (95% CI)':<26} | {'Threshold':<11} | {'Verdict'}")
+    print("-" * 120)
+    print(f"{'Layer A: Primitive Median':<32} | {layer_a['reference_portalocker']['median_us']:>9.2f} us | {layer_a['sclass_native_primitive']['median_us']:>9.2f} us | {layer_a['statistical_metrics']['median_ratio']:>6.4f} {str(layer_a['statistical_metrics']['median_ratio_95_ci']):<18} | {'<= 1.005':<11} | {'PASS' if layer_a['latency_gate_passed'] else 'FAIL'}")
+    print(f"{'Layer A: Primitive P95':<32} | {layer_a['reference_portalocker']['p95_us']:>9.2f} us | {layer_a['sclass_native_primitive']['p95_us']:>9.2f} us | {layer_a['statistical_metrics']['p95_ratio']:>6.4f} {str(layer_a['statistical_metrics']['p95_ratio_95_ci']):<18} | {'<= 1.005':<11} | {'PASS' if layer_a['latency_gate_passed'] else 'FAIL'}")
+    print(f"{'Layer A: Primitive Throughput':<32} | {layer_a['reference_portalocker']['throughput_per_sec']:>9.1f} /s | {layer_a['sclass_native_primitive']['throughput_per_sec']:>9.1f} /s | {layer_a['statistical_metrics']['throughput_ratio']:>6.4f} {str(layer_a['statistical_metrics']['throughput_ratio_95_ci']):<18} | {'>= 0.995':<11} | {'PASS' if layer_a['throughput_gate_passed'] else 'FAIL'}")
+    med_pass = (layer_c['statistical_metrics']['median_ratio_95_ci'][1] <= 1.005)
+    p95_pass = (layer_c['statistical_metrics']['p95_ratio_95_ci'][1] <= 1.005)
+    print(f"{'Layer C: 1:1 Lifecycle Median':<32} | {layer_c['reference_equivalent_lifecycle']['median_us']:>9.2f} us | {layer_c['sclass_filelock_lifecycle']['median_us']:>9.2f} us | {layer_c['statistical_metrics']['median_ratio']:>6.4f} {str(layer_c['statistical_metrics']['median_ratio_95_ci']):<18} | {'<= 1.005':<11} | {'PASS' if med_pass else 'FAIL'}")
+    print(f"{'Layer C: 1:1 Lifecycle P95':<32} | {layer_c['reference_equivalent_lifecycle']['p95_us']:>9.2f} us | {layer_c['sclass_filelock_lifecycle']['p95_us']:>9.2f} us | {layer_c['statistical_metrics']['p95_ratio']:>6.4f} {str(layer_c['statistical_metrics']['p95_ratio_95_ci']):<18} | {'<= 1.005':<11} | {'PASS' if p95_pass else 'FAIL'}")
+    print(f"{'Layer C: 1:1 Lifecycle Throughput':<32} | {layer_c['reference_equivalent_lifecycle']['throughput_per_sec']:>9.1f} /s | {layer_c['sclass_filelock_lifecycle']['throughput_per_sec']:>9.1f} /s | {layer_c['statistical_metrics']['throughput_ratio']:>6.4f} {str(layer_c['statistical_metrics']['throughput_ratio_95_ci']):<18} | {'>= 0.995':<11} | {'PASS' if layer_c['throughput_gate_passed'] else 'FAIL'}")
+    print(f"{'Memory Drift (2,500 Cycles)':<32} | {layer_a['memory_footprint']['initial_rss_bytes']/(1024*1024):>9.2f} MB | {layer_a['memory_footprint']['final_rss_bytes']/(1024*1024):>9.2f} MB | {'Ratio: '+str(layer_a['memory_footprint']['rss_growth_ratio']):<26} | {'<= 1.050':<11} | {'PASS' if layer_a['memory_gate_passed'] else 'FAIL'}")
+    print(f"{'Interoperability (S->P & P->S)':<32} | {'BLOCKED_SUCCESS':<14} | {'BLOCKED_SUCCESS':<14} | {'Mutual Kernel Exclusion':<26} | {'Equiv':<11} | {'PASS' if interop_res['interoperability_passed'] else 'FAIL'}")
+    print(f"{'Timeout (Inter-process)':<32} | {str(timeout_res['reference_timed_out']):<14} | {str(timeout_res['sclass_timed_out']):<14} | {'Matched Semantics':<26} | {'Equiv':<11} | {'PASS' if timeout_res['timeout_differential_passed'] else 'FAIL'}")
+    print(f"{'Multithreading (8T x 50)':<32} | {str(mt_res['reference_actual_count'])+'/400':<14} | {str(mt_res['sclass_actual_count'])+'/400':<14} | {'Serial Correct':<26} | {'400/400':<11} | {'PASS' if mt_res['thread_differential_passed'] else 'FAIL'}")
+    print(f"{'Multiprocessing (4P x 25)':<32} | {str(mp_res['reference_final_count'])+'/100':<14} | {str(mp_res['sclass_final_count'])+'/100':<14} | {'Atomic Correct':<26} | {'100/100':<11} | {'PASS' if mp_res['multiprocess_differential_passed'] else 'FAIL'}")
+    print(f"{'Crash Recovery (os._exit)':<32} | {'Reclaimed':<14} | {'Reclaimed':<14} | {'Instant Release':<26} | {'Equiv':<11} | {'PASS' if crash_res['crash_differential_passed'] else 'FAIL'}")
+    print("=" * 120)
+    print(f"FINAL CERTIFIED OSS PARITY GATE 1 VERDICT: {final_verdict}")
+    print("=" * 120)
     return master_results
 
 

@@ -217,7 +217,7 @@ class FileLock:
         self.lock_path = os.path.abspath(lock_path)
         self.timeout = timeout
         self.poll_interval = poll_interval
-        self.token = str(uuid.uuid4())
+        self.token = uuid.uuid4().hex
         self.owner_pid = _CACHED_PID
         self.owner_proc_start = _CACHED_PROC_START
         self.enable_profiling = enable_profiling
