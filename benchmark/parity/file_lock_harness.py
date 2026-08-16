@@ -48,7 +48,7 @@ import socket
 import tempfile
 import threading
 import subprocess
-import ctypes
+import math
 from enum import Enum
 from dataclasses import dataclass
 from typing import Dict, List, Any, Tuple, Optional
@@ -85,11 +85,11 @@ class ParityMetricGate:
             raise ValueError("ParityMetricGate 'name' must be a non-empty string")
         if not isinstance(self.direction, GateDirection):
             raise ValueError(f"ParityMetricGate 'direction' must be an instance of GateDirection, got {self.direction}")
-        if not isinstance(self.threshold, (int, float)) or not (self.threshold > 0.0) or (self.threshold != self.threshold) or (self.threshold == float('inf')):
+        if isinstance(self.threshold, bool) or not isinstance(self.threshold, (int, float)) or not math.isfinite(float(self.threshold)) or not (self.threshold > 0.0):
             raise ValueError(f"ParityMetricGate 'threshold' must be a positive finite float, got {self.threshold}")
-        if not isinstance(self.escalation_margin, (int, float)) or not (self.escalation_margin >= 0.0) or (self.escalation_margin != self.escalation_margin) or (self.escalation_margin == float('inf')):
+        if isinstance(self.escalation_margin, bool) or not isinstance(self.escalation_margin, (int, float)) or not math.isfinite(float(self.escalation_margin)) or not (self.escalation_margin >= 0.0):
             raise ValueError(f"ParityMetricGate 'escalation_margin' must be a non-negative finite float, got {self.escalation_margin}")
-        if not isinstance(self.escalated_bootstrap_min, int) or self.escalated_bootstrap_min < 1:
+        if isinstance(self.escalated_bootstrap_min, bool) or not isinstance(self.escalated_bootstrap_min, int) or self.escalated_bootstrap_min < 1:
             raise ValueError(f"ParityMetricGate 'escalated_bootstrap_min' must be a positive integer >= 1, got {self.escalated_bootstrap_min}")
 
     def is_near_boundary(self, observed_ratio: float) -> bool:

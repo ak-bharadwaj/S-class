@@ -59,14 +59,16 @@ def test_parity_metric_gate_escalation_boundary():
     )
     # Far below boundary (0.850 < 0.985) -> No escalation
     assert upper_gate.is_near_boundary(0.850) is False
+    # Just outside escalation margin (0.985 - 0.0001 = 0.9849) -> No escalation
+    assert upper_gate.is_near_boundary(0.9849) is False
     # Exactly at escalation margin (1.005 - 0.020 = 0.985) -> Escalation triggered
-    assert upper_gate.is_near_boundary(0.985) is True
+    assert upper_gate.is_near_boundary(0.9850) is True
     # Inside escalation margin (0.995 > 0.985) -> Escalation triggered
-    assert upper_gate.is_near_boundary(0.995) is True
+    assert upper_gate.is_near_boundary(0.9950) is True
     # Exactly at threshold (1.005) -> Escalation triggered
-    assert upper_gate.is_near_boundary(1.005) is True
+    assert upper_gate.is_near_boundary(1.0050) is True
     # Beyond threshold (1.010 > 0.985) -> Escalation triggered
-    assert upper_gate.is_near_boundary(1.010) is True
+    assert upper_gate.is_near_boundary(1.0100) is True
 
     lower_gate = ParityMetricGate(
         name="throughput_test",
@@ -76,14 +78,16 @@ def test_parity_metric_gate_escalation_boundary():
     )
     # Far above boundary (1.200 > 1.015) -> No escalation
     assert lower_gate.is_near_boundary(1.200) is False
+    # Just outside escalation margin (1.015 + 0.0001 = 1.0151) -> No escalation
+    assert lower_gate.is_near_boundary(1.0151) is False
     # Exactly at escalation margin (0.995 + 0.020 = 1.015) -> Escalation triggered
-    assert lower_gate.is_near_boundary(1.015) is True
+    assert lower_gate.is_near_boundary(1.0150) is True
     # Inside escalation margin (1.000 < 1.015) -> Escalation triggered
-    assert lower_gate.is_near_boundary(1.000) is True
+    assert lower_gate.is_near_boundary(1.0000) is True
     # Exactly at threshold (0.995) -> Escalation triggered
-    assert lower_gate.is_near_boundary(0.995) is True
+    assert lower_gate.is_near_boundary(0.9950) is True
     # Below threshold (0.980 < 1.015) -> Escalation triggered
-    assert lower_gate.is_near_boundary(0.980) is True
+    assert lower_gate.is_near_boundary(0.9800) is True
 
 
 def test_standard_required_gates_immutability():
@@ -127,10 +131,22 @@ def test_parity_metric_gate_post_init_validation():
     # Invalid empty name
     with pytest.raises(ValueError, match="non-empty string"):
         ParityMetricGate(name="", direction=GateDirection.UPPER_BOUND, threshold=1.005)
+    with pytest.raises(ValueError, match="non-empty string"):
+        ParityMetricGate(name="   ", direction=GateDirection.UPPER_BOUND, threshold=1.005)
 
     # Invalid direction
     with pytest.raises(ValueError, match="instance of GateDirection"):
         ParityMetricGate(name="test", direction="UPPER", threshold=1.005)  # type: ignore
+
+    # Explicit rejection of booleans in numeric fields
+    with pytest.raises(ValueError, match="positive finite float"):
+        ParityMetricGate(name="test", direction=GateDirection.UPPER_BOUND, threshold=True)  # type: ignore
+    with pytest.raises(ValueError, match="positive finite float"):
+        ParityMetricGate(name="test", direction=GateDirection.UPPER_BOUND, threshold=False)  # type: ignore
+    with pytest.raises(ValueError, match="non-negative finite float"):
+        ParityMetricGate(name="test", direction=GateDirection.UPPER_BOUND, threshold=1.005, escalation_margin=True)  # type: ignore
+    with pytest.raises(ValueError, match="positive integer >= 1"):
+        ParityMetricGate(name="test", direction=GateDirection.UPPER_BOUND, threshold=1.005, escalated_bootstrap_min=True)  # type: ignore
 
     # Non-positive or non-finite threshold
     with pytest.raises(ValueError, match="positive finite float"):
