@@ -15,7 +15,7 @@ Dimensions Differentially Verified:
 5. Stale Metadata Takeover (dead PID lock overwrite).
 6. Config GC Safety Integration.
 7. Portalocker Bidirectional Interoperability.
-8. Error & Failure Injection (partial pwrite, pwrite exception, ftruncate failure, pwrite-to-crash window).
+8. Error & Failure Injection (partial pwrite, pwrite exception, ftruncate failure, pwrite-to-crash window barrier).
 """
 
 import os
@@ -418,15 +418,29 @@ def test_differential_portalocker_interoperability():
 def test_failure_injection_partial_pwrite_loop():
     """Simulates pwrite/write returning 1 byte per call to verify write_metadata_atomic_exact loop correctness."""
     written_chunks = []
-    target_fn = "os.pwrite" if hasattr(os, "pwrite") else "os.write"
 
     if hasattr(os, "pwrite"):
         orig_pwrite = os.pwrite
-        def mock_write_1byte(fd, buf, offset):
+        def mock_pwrite_1byte(fd, buf, offset):
             chunk = buf[:1]
             written = orig_pwrite(fd, chunk, offset)
             written_chunks.append(written)
             return written
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "partial.lock")
+            fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
+            try:
+                payload = b'{"status": "active", "pid": 1234, "token": "test-partial-write-token-12345"}'
+                with patch("os.pwrite", side_effect=mock_pwrite_1byte):
+                    _write_metadata_atomic_exact(fd, payload)
+
+                with open(path, "rb") as f:
+                    content = f.read()
+                assert content == payload, f"File content mismatch! Expected {payload}, got {content}"
+                assert len(written_chunks) == len(payload), f"Expected {len(payload)} 1-byte writes, got {len(written_chunks)}"
+            finally:
+                os.close(fd)
     else:
         orig_write = os.write
         def mock_write_1byte(fd, buf):
@@ -435,20 +449,20 @@ def test_failure_injection_partial_pwrite_loop():
             written_chunks.append(written)
             return written
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        path = os.path.join(tmpdir, "partial.lock")
-        fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
-        try:
-            payload = b'{"status": "active", "pid": 1234}'
-            with patch(target_fn, side_effect=mock_write_1byte):
-                _write_metadata_atomic_exact(fd, payload)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "partial.lock")
+            fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
+            try:
+                payload = b'{"status": "active", "pid": 1234, "token": "test-partial-write-token-12345"}'
+                with patch("os.write", side_effect=mock_write_1byte):
+                    _write_metadata_atomic_exact(fd, payload)
 
-            with open(path, "rb") as f:
-                content = f.read()
-            assert content == payload
-            assert len(written_chunks) == len(payload)
-        finally:
-            os.close(fd)
+                with open(path, "rb") as f:
+                    content = f.read()
+                assert content == payload
+                assert len(written_chunks) == len(payload)
+            finally:
+                os.close(fd)
 
 
 def test_failure_injection_pwrite_and_ftruncate_errors():
@@ -471,29 +485,56 @@ def test_failure_injection_pwrite_and_ftruncate_errors():
             os.close(fd)
 
 
+def _crash_window_worker(lock_path, ready_file):
+    """Worker process that acquires lock, writes untruncated long payload, signals barrier, and abruptly dies before ftruncate."""
+    fl = ExperimentalFileLock(lock_path, timeout=5.0)
+    fl.__enter__()
+    # Explicitly write long payload into fd without calling ftruncate
+    long_payload = b'{"status": "active", "pid": 99999999, "token": "crash-window-long-untruncated-payload-999999999999999999999999999999"}'
+    if hasattr(os, "pwrite"):
+        os.pwrite(fl._fd, long_payload, 0)
+    else:
+        os.lseek(fl._fd, 0, os.SEEK_SET)
+        os.write(fl._fd, long_payload)
+
+    # Signal barrier to parent
+    with open(ready_file, "w", encoding="utf-8") as f:
+        f.write("PWRITE_DONE")
+
+    # Abrupt exit - ftruncate and release never run in this process!
+    os._exit(0)
+
+
 def test_crash_window_between_pwrite_and_ftruncate():
     """
-    Simulates process crash after write completes but BEFORE ftruncate executes.
-    Verifies that a subsequent lock contender cleanly overwrites and takes over the file.
+    Simulates actual process crash AFTER pwrite completes but BEFORE ftruncate executes.
+    Child process writes long untruncated payload, signals barrier, and calls os._exit(0).
+    Parent process verifies OS lock release and clean metadata overwrite/truncation by contender.
     """
     with tempfile.TemporaryDirectory() as tmpdir:
-        path = os.path.join(tmpdir, "crash_window.lock")
+        lock_path = os.path.join(tmpdir, "crash_window.lock")
+        ready_file = os.path.join(tmpdir, "pwrite_done.marker")
 
-        # 1. Write an oversized garbage lock file payload (simulating crash before ftruncate)
-        fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
-        if hasattr(os, "pwrite"):
-            os.pwrite(fd, b'{"status": "active", "pid": 99999} trailing_untruncated_garbage_bytes_1234567890', 0)
-        else:
-            os.lseek(fd, 0, os.SEEK_SET)
-            os.write(fd, b'{"status": "active", "pid": 99999} trailing_untruncated_garbage_bytes_1234567890')
-        os.close(fd)
+        cmd = [
+            sys.executable, "-c",
+            f"from tests.test_experimental_metadata_writer import _crash_window_worker; "
+            f"_crash_window_worker(r'{lock_path}', r'{ready_file}')"
+        ]
+        proc = subprocess.Popen(cmd)
 
-        # 2. Both FileLock and ExperimentalFileLock MUST successfully acquire lock and overwrite with clean metadata
-        with FileLock(path, timeout=2.0) as fl_c:
-            meta_cur = _read_metadata_safe(fl_c, path)
+        start = time.time()
+        while not os.path.exists(ready_file) and time.time() - start < 5.0:
+            time.sleep(0.01)
+        assert os.path.exists(ready_file), "Child process failed to signal pwrite_done barrier"
 
-        with ExperimentalFileLock(path, timeout=2.0) as fl_e:
-            meta_exp = _read_metadata_safe(fl_e, path)
+        proc.wait(timeout=5.0)
 
-        assert meta_cur["pid"] == os.getpid()
+        # Parent process contender acquires lock over the untruncated crash file
+        with ExperimentalFileLock(lock_path, timeout=2.0) as fl_e:
+            meta_exp = _read_metadata_safe(fl_e, lock_path)
+
         assert meta_exp["pid"] == os.getpid()
+        with open(lock_path, "rb") as f:
+            raw_bytes = f.read()
+        parsed = json.loads(raw_bytes.decode("utf-8"))
+        assert parsed["pid"] == os.getpid()

@@ -6,45 +6,45 @@
     "os_version": "#22-Ubuntu SMP Mon Jul 27 17:24:03 UTC 2026",
     "python_version": "3.12.13 (main, Jun 16 2026, 22:05:08) [GCC 13.3.0]",
     "cpu_count_logical": 4,
-    "total_ram_bytes": 16766406656,
+    "total_ram_bytes": 16766414848,
     "portalocker_version": "4.1.0",
     "hostname": "runnervmzvulz",
-    "git_commit_sha": "d81b29eb86041e96beed8397c79e27c31dba9b14",
-    "timestamp_utc": 1786895245.0234778
+    "git_commit_sha": "8d2ac77ff8706d09a9655ea3f5ffa0b3116f5977",
+    "timestamp_utc": 1786895973.9731648
   },
   "results": {
     "total_trials": 2500,
     "current_filelock_distribution": {
-      "p50": 114.24,
-      "p90": 182.82,
-      "p95": 202.31,
-      "p99": 257.25,
-      "max": 968.41,
-      "min": 89.68
+      "p50": 146.47,
+      "p90": 224.37,
+      "p95": 247.31,
+      "p99": 348.14,
+      "max": 4401.6,
+      "min": 106.8
     },
     "experimental_filelock_distribution": {
-      "p50": 50.97,
-      "p90": 64.98,
-      "p95": 69.66,
-      "p99": 82.28,
-      "max": 106.16,
-      "min": 37.71
+      "p50": 59.05,
+      "p90": 82.47,
+      "p95": 99.12,
+      "p99": 110.72,
+      "max": 126.93,
+      "min": 43.82
     },
     "bootstrap_candidate_vs_current": {
-      "median_ratio": 0.4462,
+      "median_ratio": 0.4031,
       "median_ratio_95_ci": [
-        0.4427,
-        0.4498
+        0.3982,
+        0.4118
       ],
-      "p95_ratio": 0.3443,
+      "p95_ratio": 0.4008,
       "p95_ratio_95_ci": [
-        0.3344,
-        0.3572
+        0.3749,
+        0.4163
       ],
-      "throughput_ratio": 2.5455,
+      "throughput_ratio": 2.652,
       "throughput_ratio_95_ci": [
-        2.5081,
-        2.5852
+        2.5599,
+        2.7706
       ],
       "median_gate_passed": true,
       "p95_gate_passed": true,

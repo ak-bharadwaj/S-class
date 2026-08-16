@@ -91,6 +91,14 @@ def main():
     print("=" * 80)
 
     env = get_system_environment_info()
+    provenance = {
+        "tested_source_sha": "7f50a062b837d7cee696d2b8a0cf533b4a07dbf5",
+        "benchmark_harness_sha": env.get("git_commit_sha", "UNKNOWN"),
+        "workflow_run_id": os.environ.get("GITHUB_RUN_ID", "LOCAL_RUN"),
+        "result_generated_at_utc": env.get("timestamp_utc")
+    }
+
+    print("Provenance:", json.dumps(provenance, indent=2))
     print("Environment:", json.dumps(env, indent=2))
 
     print("\nExecuting 2,500 paired trials (Candidate vs Current FileLock)...")
@@ -109,7 +117,7 @@ def main():
 
     out_file = "benchmark/parity/candidate_vs_current_results.json"
     with open(out_file, "w", encoding="utf-8") as f:
-        json.dump({"environment": env, "results": res}, f, indent=2)
+        json.dump({"provenance": provenance, "environment": env, "results": res}, f, indent=2)
     print(f"\nSaved direct comparison results to {out_file}")
 
 
