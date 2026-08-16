@@ -485,48 +485,63 @@ def test_failure_injection_pwrite_and_ftruncate_errors():
             os.close(fd)
 
 
-def _crash_window_worker(lock_path, ready_file):
-    """Worker process that acquires lock, writes untruncated long payload, signals barrier, and abruptly dies before ftruncate."""
-    fl = ExperimentalFileLock(lock_path, timeout=5.0)
-    fl.__enter__()
+def _crash_window_worker(lock_cls_name, lock_path, ready_file):
+    """
+    Worker process that acquires lock using specified implementation (FileLock or ExperimentalFileLock),
+    writes an untruncated long metadata payload without releasing or truncating, signals barrier, and abruptly dies (os._exit).
+    """
     long_payload = b'{"status": "active", "pid": 99999999, "token": "crash-window-long-untruncated-payload-999999999999999999999999999999"}'
-    if hasattr(os, "pwrite"):
-        os.pwrite(fl._fd, long_payload, 0)
+
+    if lock_cls_name == "FileLock":
+        fl = FileLock(lock_path, timeout=5.0)
+        fl.__enter__()
+        if hasattr(fl, "_file") and fl._file is not None:
+            fl._file.seek(0)
+            fl._file.write(long_payload)
+            fl._file.flush()
     else:
-        os.lseek(fl._fd, 0, os.SEEK_SET)
-        os.write(fl._fd, long_payload)
+        fl = ExperimentalFileLock(lock_path, timeout=5.0)
+        fl.__enter__()
+        if hasattr(os, "pwrite"):
+            os.pwrite(fl._fd, long_payload, 0)
+        else:
+            os.lseek(fl._fd, 0, os.SEEK_SET)
+            os.write(fl._fd, long_payload)
 
     with open(ready_file, "w", encoding="utf-8") as f:
-        f.write("PWRITE_DONE")
+        f.write("WRITE_DONE")
 
     os._exit(0)
 
 
 def test_crash_window_between_pwrite_and_ftruncate():
     """
-    Comparative Current-vs-Candidate Crash Window Recovery & Exact Length Integrity Test.
-    Simulates actual process crash AFTER write completes but BEFORE ftruncate executes.
-    Directly compares recovery observations between Current FileLock and Experimental Candidate:
-    - Valid JSON parsing
-    - PID and token ownership
-    - Zero trailing bytes (file size == exact JSON payload length)
-    - Normalized schema equality between Current and Candidate recovery observations
+    Comparative Current-vs-Candidate Crash Window Recovery & Exact Byte Content Integrity Test.
+    Simulates process crash AFTER write completes but BEFORE truncate/release executes for BOTH FileLock and ExperimentalFileLock:
+    1. Current FileLock writer interrupted -> Current FileLock contender recovers.
+    2. Candidate ExperimentalFileLock writer interrupted -> Candidate ExperimentalFileLock contender recovers.
+    3. Strict Content & Length Assertions:
+       - Valid JSON parsing
+       - Expected status ('released')
+       - Expected PID (os.getpid()) and token presence
+       - Exact disk payload match (raw_bytes == json.dumps(parsed).encode('utf-8')) with zero trailing bytes
+    4. Normalized Schema Equality between Current and Candidate crash recovery observations.
     """
-    def run_recovery(lock_cls, tmpdir, prefix):
-        lock_path = os.path.join(tmpdir, f"{prefix}_crash_window.lock")
-        ready_file = os.path.join(tmpdir, f"{prefix}_pwrite_done.marker")
+    def run_recovery(lock_cls_name, lock_cls, tmpdir):
+        lock_path = os.path.join(tmpdir, f"{lock_cls_name}_crash_window.lock")
+        ready_file = os.path.join(tmpdir, f"{lock_cls_name}_write_done.marker")
 
         cmd = [
             sys.executable, "-c",
             f"from tests.test_experimental_metadata_writer import _crash_window_worker; "
-            f"_crash_window_worker(r'{lock_path}', r'{ready_file}')"
+            f"_crash_window_worker('{lock_cls_name}', r'{lock_path}', r'{ready_file}')"
         ]
         proc = subprocess.Popen(cmd)
 
         start = time.time()
         while not os.path.exists(ready_file) and time.time() - start < 5.0:
             time.sleep(0.01)
-        assert os.path.exists(ready_file), f"Child process failed to signal barrier for {prefix}"
+        assert os.path.exists(ready_file), f"Child process failed to signal barrier for {lock_cls_name}"
 
         proc.wait(timeout=5.0)
 
@@ -538,19 +553,19 @@ def test_crash_window_between_pwrite_and_ftruncate():
         with open(lock_path, "rb") as f:
             raw_bytes = f.read()
 
-        # Strict JSON byte length equality check (zero trailing bytes)
+        # Strict JSON parse & exact content byte match (verifying zero trailing bytes)
         parsed = json.loads(raw_bytes.decode("utf-8"))
         expected_bytes = json.dumps(parsed).encode("utf-8")
-        assert len(raw_bytes) == len(expected_bytes), f"Trailing bytes detected! Raw len: {len(raw_bytes)}, Expected len: {len(expected_bytes)}"
+        assert raw_bytes == expected_bytes, f"Raw disk bytes do not match expected JSON payload!\nRaw: {raw_bytes!r}\nExpected: {expected_bytes!r}"
         assert parsed["pid"] == os.getpid()
         assert parsed["status"] == "released"
 
         return _normalize_metadata(meta), _normalize_metadata(parsed)
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        cur_enter_norm, cur_rel_norm = run_recovery(FileLock, tmpdir, "cur")
-        exp_enter_norm, exp_rel_norm = run_recovery(ExperimentalFileLock, tmpdir, "exp")
+        cur_enter_norm, cur_rel_norm = run_recovery("FileLock", FileLock, tmpdir)
+        exp_enter_norm, exp_rel_norm = run_recovery("ExperimentalFileLock", ExperimentalFileLock, tmpdir)
 
-        # Direct Normalized Contract Comparison
+        # Direct Comparative Contract Normalization Assertions
         assert cur_enter_norm == exp_enter_norm, f"Crash recovery enter schema mismatch!\nCurrent: {cur_enter_norm}\nCandidate: {exp_enter_norm}"
         assert cur_rel_norm == exp_rel_norm, f"Crash recovery released schema mismatch!\nCurrent: {cur_rel_norm}\nCandidate: {exp_rel_norm}"
