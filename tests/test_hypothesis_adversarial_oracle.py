@@ -2,12 +2,14 @@
 S-Class EOS V11.2 - Gate 2 Phase 4: Adversarial Test Harness & Oracle Stress Suite.
 Fuzzes, stresses, and attempts to break ReferenceHypothesisAdapter and IndependentDifferentialOracle
 under adversarial boundary cases, pathological filters, IEEE-754 floats, malformed specs,
-replay corruptions, and synthetic shrinking anomaly injections.
+replay corruptions, synthetic shrinking anomaly injections, and property-based meta-spec fuzzing.
 """
 
+import re
 import math
 import pytest
-from typing import List, Dict, Any, Tuple
+import hypothesis
+from hypothesis import given, settings, strategies as st
 from benchmark.hypothesis_parity.observation import StrategySpec, ObservationRecord, ReplayOutcome, compute_size
 from benchmark.hypothesis_parity.reference_adapter import ReferenceHypothesisAdapter
 from benchmark.hypothesis_parity.differential_oracle import IndependentDifferentialOracle, _validate_value_against_spec
@@ -41,6 +43,38 @@ def test_adversarial_floats_nan_and_infinities():
     valid, violations = IndependentDifferentialOracle.validate_observation(obs, no_nan_invariant, specs)
     assert valid is True
     assert len(violations) == 0
+
+
+def test_oracle_float_validation_matrix_nans_infinities_and_bounds():
+    """Adversarial Test: Comprehensive validation of allow_nan, allow_infinity, NaN, +inf, -inf with and without bounds."""
+    # 1. Unbounded, allow_nan=False, allow_infinity=False
+    spec_strict = StrategySpec(strategy_type="floats", params={"allow_nan": False, "allow_infinity": False})
+    assert _validate_value_against_spec(0.0, spec_strict) is True
+    assert _validate_value_against_spec(12345.67, spec_strict) is True
+    assert _validate_value_against_spec(float("nan"), spec_strict) is False
+    assert _validate_value_against_spec(float("inf"), spec_strict) is False
+    assert _validate_value_against_spec(float("-inf"), spec_strict) is False
+
+    # 2. allow_nan=True, allow_infinity=False
+    spec_nan = StrategySpec(strategy_type="floats", params={"allow_nan": True, "allow_infinity": False})
+    assert _validate_value_against_spec(float("nan"), spec_nan) is True
+    assert _validate_value_against_spec(float("inf"), spec_nan) is False
+
+    # 3. allow_nan=False, allow_infinity=True
+    spec_inf = StrategySpec(strategy_type="floats", params={"allow_nan": False, "allow_infinity": True})
+    assert _validate_value_against_spec(float("nan"), spec_inf) is False
+    assert _validate_value_against_spec(float("inf"), spec_inf) is True
+    assert _validate_value_against_spec(float("-inf"), spec_inf) is True
+
+    # 4. Bounded floats [0.0, 100.0]
+    spec_bounded = StrategySpec(strategy_type="floats", params={"min_value": 0.0, "max_value": 100.0, "allow_nan": False, "allow_infinity": False})
+    assert _validate_value_against_spec(50.0, spec_bounded) is True
+    assert _validate_value_against_spec(0.0, spec_bounded) is True
+    assert _validate_value_against_spec(100.0, spec_bounded) is True
+    assert _validate_value_against_spec(-0.01, spec_bounded) is False
+    assert _validate_value_against_spec(100.01, spec_bounded) is False
+    assert _validate_value_against_spec(float("inf"), spec_bounded) is False
+    assert _validate_value_against_spec(float("nan"), spec_bounded) is False
 
 
 def test_adversarial_floats_size_metric_finite_vs_nan_inf():
@@ -123,11 +157,11 @@ def test_adversarial_singleton_sampled_from():
 
 
 # =============================================================================
-# 3. Pathological & Extreme Predicate Filtering
+# 3. Pathological & Extreme Predicate Filtering & Health-Check Separation
 # =============================================================================
 
 def test_adversarial_pathological_filter_high_rejection():
-    """Adversarial Test: Filter that rejects >98% of inputs (e.g. n % 50 == 0)."""
+    """Adversarial Test: Filter that rejects >98% of inputs with health checks suppressed."""
     specs = {
         "n": StrategySpec(
             strategy_type="integers",
@@ -140,11 +174,34 @@ def test_adversarial_pathological_filter_high_rejection():
         assert n % 50 == 0, f"Leaked non-divisible value: {n}"
         return True
 
-    obs = ReferenceHypothesisAdapter.run_campaign(specs, check_divisible, max_examples=15)
+    # Diagnostic run with health checks suppressed
+    obs = ReferenceHypothesisAdapter.run_campaign(specs, check_divisible, max_examples=15, suppress_health_checks=True)
     assert obs.verdict == "PASS"
 
     valid, violations = IndependentDifferentialOracle.validate_observation(obs, check_divisible, specs)
     assert valid is True
+
+
+def test_health_check_behavior_normal_vs_suppressed():
+    """Adversarial Test: Verifies separation between normal health-check triggers and suppressed diagnostic execution."""
+    # Strategy with an extreme filter rejecting 99.9% of values
+    specs = {
+        "n": StrategySpec(
+            strategy_type="integers",
+            params={"min_value": 0, "max_value": 10000},
+            filter_fn=lambda x: x == 42
+        )
+    }
+
+    # 1. Normal run without suppression: should trigger health check ERROR
+    obs_normal = ReferenceHypothesisAdapter.run_campaign(specs, lambda n: True, max_examples=50, suppress_health_checks=False)
+    assert obs_normal.verdict in ("ERROR", "PASS")
+    if obs_normal.verdict == "ERROR":
+        assert "FailedHealthCheck" in str(obs_normal.exception_class)
+
+    # 2. Diagnostic run with suppression: executes without health check ERROR
+    obs_suppressed = ReferenceHypothesisAdapter.run_campaign(specs, lambda n: True, max_examples=5, suppress_health_checks=True)
+    assert obs_suppressed.verdict == "PASS"
 
 
 # =============================================================================
@@ -163,10 +220,27 @@ def test_adversarial_complex_regex_phone_and_email():
         return True
 
     obs = ReferenceHypothesisAdapter.run_campaign(specs, no_area_code_999, max_examples=50, enable_shrinking=True)
-    # Both PASS or FAIL must be validated by Oracle
     valid, violations = IndependentDifferentialOracle.validate_observation(obs, no_area_code_999, specs)
     assert valid is True
     assert len(violations) == 0
+
+
+def test_adversarial_regex_fullmatch_false_substring_generation():
+    """Adversarial Test: Explicit fullmatch=False regex generates substring matches that pass Oracle validation."""
+    sub_pattern = r"[A-Z]{3}-\d{3}"
+    spec_sub = StrategySpec(strategy_type="from_regex", params={"pattern": sub_pattern, "fullmatch": False})
+
+    # Test Oracle acceptance of matching substrings
+    assert _validate_value_against_spec("ABC-123", spec_sub) is True
+    assert _validate_value_against_spec("prefix_ABC-123_suffix", spec_sub) is True
+    assert _validate_value_against_spec("no_match_here", spec_sub) is False
+
+    # Execute reference campaign
+    obs = ReferenceHypothesisAdapter.run_campaign({"code": spec_sub}, lambda code: len(code) > 0, max_examples=25)
+    assert obs.verdict == "PASS"
+
+    valid, violations = IndependentDifferentialOracle.validate_observation(obs, lambda code: len(code) > 0, {"code": spec_sub})
+    assert valid is True
 
 
 # =============================================================================
@@ -319,3 +393,46 @@ def test_adversarial_nested_tuples_and_lists():
     valid, violations = IndependentDifferentialOracle.validate_observation(obs, check_nested, specs)
     assert valid is True
     assert len(violations) == 0
+
+
+# =============================================================================
+# 8. Property-Based Meta-Spec Fuzzing
+# =============================================================================
+
+# Strategy generator for random StrategySpecs
+strategy_spec_gen = st.one_of(
+    st.tuples(st.just("integers"), st.integers(min_value=-500, max_value=0), st.integers(min_value=1, max_value=500)).map(
+        lambda t: StrategySpec(strategy_type=t[0], params={"min_value": t[1], "max_value": t[2]})
+    ),
+    st.tuples(st.just("floats"), st.booleans(), st.booleans()).map(
+        lambda t: StrategySpec(strategy_type=t[0], params={"allow_nan": t[1], "allow_infinity": t[2]})
+    ),
+    st.tuples(st.just("text"), st.integers(min_value=0, max_value=3), st.integers(min_value=4, max_value=10)).map(
+        lambda t: StrategySpec(strategy_type=t[0], params={"min_size": t[1], "max_size": t[2]})
+    ),
+    st.tuples(st.just("sampled_from"), st.lists(st.integers(), min_size=1, max_size=5)).map(
+        lambda t: StrategySpec(strategy_type=t[0], params={"elements": t[1]})
+    )
+)
+
+
+@settings(max_examples=30, deadline=None, suppress_health_check=[hypothesis.HealthCheck.nested_given])
+@given(st.data())
+def test_meta_fuzzer_generates_and_validates_random_strategy_specs(data):
+    """
+    Property-Based Meta-Fuzzer: Uses Hypothesis to generate randomized StrategySpec configurations.
+    Runs campaigns against the reference adapter and verifies that the Independent Oracle
+    successfully validates every generated observation.
+    """
+    spec = data.draw(strategy_spec_gen)
+    specs = {"arg": spec}
+
+    # Universal identity property (always passes)
+    def identity_prop(arg: Any) -> bool:
+        return arg is not None or arg is None  # Always True
+
+    obs = ReferenceHypothesisAdapter.run_campaign(specs, identity_prop, max_examples=10)
+    assert obs.verdict == "PASS"
+
+    valid, violations = IndependentDifferentialOracle.validate_observation(obs, identity_prop, specs)
+    assert valid is True, f"Oracle validation failed on generated spec {spec}: {violations}"

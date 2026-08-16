@@ -27,6 +27,13 @@ def _validate_value_against_spec(val: Any, spec: StrategySpec) -> bool:
     elif st_type == "floats":
         if not isinstance(val, (int, float)) or isinstance(val, bool):
             return False
+        import math
+        allow_nan = p.get("allow_nan", False)
+        allow_infinity = p.get("allow_infinity", False)
+        if math.isnan(val):
+            return bool(allow_nan)
+        if math.isinf(val):
+            return bool(allow_infinity)
         min_v = p.get("min_value", None)
         max_v = p.get("max_value", None)
         if min_v is not None and val < min_v:

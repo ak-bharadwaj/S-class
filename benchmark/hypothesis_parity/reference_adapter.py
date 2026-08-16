@@ -91,7 +91,8 @@ class ReferenceHypothesisAdapter:
         property_fn: Callable[..., Any],
         max_examples: int = 100,
         seed: Optional[int] = None,
-        enable_shrinking: bool = True
+        enable_shrinking: bool = True,
+        suppress_health_checks: bool = False
     ) -> ObservationRecord:
         """
         Executes a property testing campaign using Hypothesis and returns a normalized ObservationRecord.
@@ -128,12 +129,13 @@ class ReferenceHypothesisAdapter:
             "max_examples": max_examples,
             "phases": phases,
             "deadline": None,
-            "database": None,
-            "suppress_health_check": [
+            "database": None
+        }
+        if suppress_health_checks:
+            settings_kwargs["suppress_health_check"] = [
                 hypothesis.HealthCheck.filter_too_much,
                 hypothesis.HealthCheck.too_slow
             ]
-        }
         if seed is not None:
             settings_kwargs["derandomize"] = True
 
