@@ -1,0 +1,56 @@
+{
+  "environment": {
+    "os_platform": "linux",
+    "os_system": "Linux",
+    "os_release": "6.17.0-1022-azure",
+    "os_version": "#22-Ubuntu SMP Mon Jul 27 17:24:03 UTC 2026",
+    "python_version": "3.12.13 (main, Jun 16 2026, 22:05:08) [GCC 13.3.0]",
+    "cpu_count_logical": 4,
+    "total_ram_bytes": 16766406656,
+    "portalocker_version": "4.1.0",
+    "hostname": "runnervmzvulz",
+    "git_commit_sha": "d81b29eb86041e96beed8397c79e27c31dba9b14",
+    "timestamp_utc": 1786895245.0234778
+  },
+  "results": {
+    "total_trials": 2500,
+    "current_filelock_distribution": {
+      "p50": 114.24,
+      "p90": 182.82,
+      "p95": 202.31,
+      "p99": 257.25,
+      "max": 968.41,
+      "min": 89.68
+    },
+    "experimental_filelock_distribution": {
+      "p50": 50.97,
+      "p90": 64.98,
+      "p95": 69.66,
+      "p99": 82.28,
+      "max": 106.16,
+      "min": 37.71
+    },
+    "bootstrap_candidate_vs_current": {
+      "median_ratio": 0.4462,
+      "median_ratio_95_ci": [
+        0.4427,
+        0.4498
+      ],
+      "p95_ratio": 0.3443,
+      "p95_ratio_95_ci": [
+        0.3344,
+        0.3572
+      ],
+      "throughput_ratio": 2.5455,
+      "throughput_ratio_95_ci": [
+        2.5081,
+        2.5852
+      ],
+      "median_gate_passed": true,
+      "p95_gate_passed": true,
+      "throughput_gate_passed": true,
+      "all_gates_passed": true,
+      "bootstraps_evaluated": 1000
+    }
+  }
+}

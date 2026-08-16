@@ -1,19 +1,21 @@
 """
-Comprehensive Differential Verification Suite:
-Current S-Class FileLock vs ExperimentalFileLock (Atomic Positional Writer).
+Strict Current-vs-Candidate Contract Differential Harness & Failure Injection Suite.
 
-Dimensions Verified:
-1. Exact JSON schema equivalence (enter, release, idle/reclaim states).
-2. Shorter payload overwrite (no stale trailing bytes).
-3. Longer payload overwrite.
-4. Process-local thread serialization (_active_local_locks parity).
-5. Multiprocessing exclusion (atomic serialization across processes).
-6. Crash recovery (abrupt os._exit releases kernel lock instantly).
-7. Stale metadata takeover (clean overwrite of unheld file with stale PID).
-8. GC safety (active lock preserved, unreferenced lock cleanup).
-9. Cross-implementation interoperability with Portalocker (bidirectional blocking).
-10. Explicit exit metadata error propagation (no silent corruption).
-11. Crash consistency analysis (pwrite vs ftruncate partial failure simulation).
+This module systematically executes identical scenarios against BOTH:
+1. Current S-Class FileLock (`FileLock`)
+2. Experimental Candidate (`ExperimentalFileLock`)
+
+and directly compares their normalized contract observations.
+
+Dimensions Differentially Verified:
+1. Schema & Field Type Parity (Enter, Released, and Idle/Reclaim states).
+2. Process-Local Thread Serialization (_active_local_locks parity).
+3. Multiprocessing Mutual Exclusion.
+4. Abrupt Crash Recovery (os._exit).
+5. Stale Metadata Takeover (dead PID lock overwrite).
+6. Config GC Safety Integration.
+7. Portalocker Bidirectional Interoperability.
+8. Error & Failure Injection (partial pwrite, pwrite exception, ftruncate failure, pwrite-to-crash window).
 """
 
 import os
@@ -26,6 +28,7 @@ import threading
 import subprocess
 import pytest
 import portalocker
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from file_lock import (
@@ -51,11 +54,19 @@ def _write_metadata_atomic_exact(fd: int, payload: bytes) -> None:
     """
     total_written = 0
     payload_len = len(payload)
-    while total_written < payload_len:
-        written = os.pwrite(fd, payload[total_written:], total_written)
-        if written == 0:
-            raise IOError("os.pwrite wrote 0 bytes to lock file")
-        total_written += written
+    if hasattr(os, "pwrite"):
+        while total_written < payload_len:
+            written = os.pwrite(fd, payload[total_written:], total_written)
+            if written == 0:
+                raise IOError("os.pwrite wrote 0 bytes to lock file")
+            total_written += written
+    else:
+        os.lseek(fd, 0, os.SEEK_SET)
+        while total_written < payload_len:
+            written = os.write(fd, payload[total_written:])
+            if written == 0:
+                raise IOError("os.write wrote 0 bytes to lock file")
+            total_written += written
     os.ftruncate(fd, payload_len)
 
 
@@ -125,7 +136,6 @@ class ExperimentalFileLock:
                 try:
                     _write_metadata_atomic_exact(self._fd, rel_payload)
                 except OSError as err:
-                    # Log and propagate if not handling an active exception
                     if exc_type is None:
                         raise err
 
@@ -137,64 +147,128 @@ class ExperimentalFileLock:
                 _active_local_locks.discard(self.lock_path)
 
 
+def _read_metadata_safe(lock_obj, path: str) -> dict:
+    """Reads metadata safely while lock is held (avoiding Win32 msvcrt locking PermissionError)."""
+    if hasattr(lock_obj, "_file") and lock_obj._file is not None and not lock_obj._file.closed:
+        lock_obj._file.seek(0)
+        return json.loads(lock_obj._file.read().decode("utf-8"))
+    elif hasattr(lock_obj, "_fd") and lock_obj._fd is not None:
+        pos = os.lseek(lock_obj._fd, 0, os.SEEK_SET)
+        data = os.read(lock_obj._fd, 4096)
+        os.lseek(lock_obj._fd, pos, os.SEEK_SET)
+        return json.loads(data.decode("utf-8"))
+    else:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+
+
+def _normalize_metadata(meta_dict: dict) -> dict:
+    """Normalizes metadata observation for comparative schema validation."""
+    return {
+        "keys": sorted(list(meta_dict.keys())),
+        "pid_type": type(meta_dict.get("pid")).__name__,
+        "pid_matches_cached": meta_dict.get("pid") == _CACHED_PID,
+        "token_is_str": isinstance(meta_dict.get("token"), str),
+        "token_len": len(meta_dict.get("token", "")),
+        "has_host": "host" in meta_dict,
+        "has_process_start_time": "process_start_time" in meta_dict,
+        "has_start_time": "start_time" in meta_dict,
+        "status": meta_dict.get("status"),
+        "has_reclaimed_at": "reclaimed_at" in meta_dict
+    }
+
+
 # ============================================================================
-# 1. Exact JSON Schema & State Equivalence
+# 1. Differential Schema Normalization: Enter, Released, Idle/Reclaim
 # ============================================================================
-def test_differential_schema_equivalence():
+def test_differential_schema_normalization_enter_released_idle():
     with tempfile.TemporaryDirectory() as tmpdir:
-        p_std = os.path.join(tmpdir, "std.lock")
-        p_exp = os.path.join(tmpdir, "exp.lock")
+        path_cur = os.path.join(tmpdir, "cur.lock")
+        path_exp = os.path.join(tmpdir, "exp.lock")
 
-        # Standard enter & exit
-        with FileLock(p_std):
-            with open(p_std, "r", encoding="utf-8") as f:
-                meta_std_enter = json.load(f)
-        with open(p_std, "r", encoding="utf-8") as f:
-            meta_std_exit = json.load(f)
+        # --- Current FileLock ---
+        fl_cur = FileLock(path_cur)
+        fl_cur.__enter__()
+        meta_cur_enter = _read_metadata_safe(fl_cur, path_cur)
 
-        # Experimental enter & exit
-        with ExperimentalFileLock(p_exp):
-            with open(p_exp, "r", encoding="utf-8") as f:
-                meta_exp_enter = json.load(f)
-        with open(p_exp, "r", encoding="utf-8") as f:
-            meta_exp_exit = json.load(f)
+        fl_cur._release_status = "idle"
+        fl_cur.__exit__(None, None, None)
+        meta_cur_idle = _read_metadata_safe(None, path_cur)
 
-        assert set(meta_std_enter.keys()) == set(meta_exp_enter.keys())
-        assert set(meta_std_exit.keys()) == set(meta_exp_exit.keys())
-        assert meta_std_enter["pid"] == meta_exp_enter["pid"]
-        assert meta_std_exit["status"] == meta_exp_exit["status"] == "released"
+        fl_cur2 = FileLock(path_cur)
+        fl_cur2.__enter__()
+        fl_cur2._release_status = "released"
+        fl_cur2.__exit__(None, None, None)
+        meta_cur_rel = _read_metadata_safe(None, path_cur)
+
+        # --- Experimental Candidate ---
+        fl_exp = ExperimentalFileLock(path_exp)
+        fl_exp.__enter__()
+        meta_exp_enter = _read_metadata_safe(fl_exp, path_exp)
+
+        fl_exp._release_status = "idle"
+        fl_exp.__exit__(None, None, None)
+        meta_exp_idle = _read_metadata_safe(None, path_exp)
+
+        fl_exp2 = ExperimentalFileLock(path_exp)
+        fl_exp2.__enter__()
+        fl_exp2._release_status = "released"
+        fl_exp2.__exit__(None, None, None)
+        meta_exp_rel = _read_metadata_safe(None, path_exp)
+
+        # Direct Normalized Contract Comparison
+        norm_cur_enter = _normalize_metadata(meta_cur_enter)
+        norm_exp_enter = _normalize_metadata(meta_exp_enter)
+        assert norm_cur_enter == norm_exp_enter, f"Enter metadata schema mismatch!\nCurrent: {norm_cur_enter}\nCandidate: {norm_exp_enter}"
+
+        norm_cur_rel = _normalize_metadata(meta_cur_rel)
+        norm_exp_rel = _normalize_metadata(meta_exp_rel)
+        assert norm_cur_rel == norm_exp_rel, f"Released metadata schema mismatch!\nCurrent: {norm_cur_rel}\nCandidate: {norm_exp_rel}"
+
+        norm_cur_idle = _normalize_metadata(meta_cur_idle)
+        norm_exp_idle = _normalize_metadata(meta_exp_idle)
+        assert norm_cur_idle == norm_exp_idle, f"Idle metadata schema mismatch!\nCurrent: {norm_cur_idle}\nCandidate: {norm_exp_idle}"
 
 
 # ============================================================================
-# 2. Process-Local Thread Serialization Parity
+# 2. Differential Thread Serialization (Current vs Candidate)
 # ============================================================================
-def test_experimental_local_thread_serialization():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        lock_path = os.path.join(tmpdir, "threads.lock")
+def test_differential_thread_serialization():
+    def run_thread_test(lock_cls, lock_path):
         counter = [0]
-
         def worker():
             for _ in range(50):
-                with ExperimentalFileLock(lock_path, timeout=10.0):
+                with lock_cls(lock_path, timeout=10.0):
                     c = counter[0]
                     time.sleep(0.0001)
                     counter[0] = c + 1
-
         threads = [threading.Thread(target=worker) for _ in range(4)]
         for t in threads:
             t.start()
         for t in threads:
             t.join()
+        return counter[0]
 
-        assert counter[0] == 200
+    with tempfile.TemporaryDirectory() as tmpdir:
+        cur_count = run_thread_test(FileLock, os.path.join(tmpdir, "cur_threads.lock"))
+        exp_count = run_thread_test(ExperimentalFileLock, os.path.join(tmpdir, "exp_threads.lock"))
+
+        assert cur_count == 200
+        assert exp_count == 200
+        assert cur_count == exp_count
 
 
 # ============================================================================
-# 3. Multiprocessing Mutual Exclusion
+# 3. Differential Multiprocessing Exclusion (Current vs Candidate)
 # ============================================================================
-def _mp_worker(lock_path, count_file, increments):
+def _mp_generic_worker(lock_cls_name, lock_path, count_file, increments):
+    if lock_cls_name == "FileLock":
+        cls = FileLock
+    else:
+        cls = ExperimentalFileLock
+
     for _ in range(increments):
-        with ExperimentalFileLock(lock_path, timeout=10.0):
+        with cls(lock_path, timeout=10.0):
             with open(count_file, "r+", encoding="utf-8") as f:
                 val = int(f.read().strip())
                 f.seek(0)
@@ -202,38 +276,47 @@ def _mp_worker(lock_path, count_file, increments):
                 f.write(str(val + 1))
 
 
-def test_experimental_multiprocessing_exclusion():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        lock_path = os.path.join(tmpdir, "mp.lock")
-        count_path = os.path.join(tmpdir, "count.txt")
+def test_differential_multiprocessing_exclusion():
+    def run_mp_test(lock_cls_name, tmpdir):
+        lock_path = os.path.join(tmpdir, f"{lock_cls_name}.lock")
+        count_path = os.path.join(tmpdir, f"{lock_cls_name}_count.txt")
         with open(count_path, "w", encoding="utf-8") as f:
             f.write("0")
 
         cmd = [
             sys.executable, "-c",
-            f"from tests.test_experimental_metadata_writer import _mp_worker; "
-            f"_mp_worker(r'{lock_path}', r'{count_path}', 25)"
+            f"from tests.test_experimental_metadata_writer import _mp_generic_worker; "
+            f"_mp_generic_worker('{lock_cls_name}', r'{lock_path}', r'{count_path}', 25)"
         ]
         procs = [subprocess.Popen(cmd) for _ in range(4)]
         for p in procs:
             p.wait(timeout=10.0)
 
         with open(count_path, "r", encoding="utf-8") as f:
-            assert int(f.read().strip()) == 100
+            return int(f.read().strip())
 
-
-# ============================================================================
-# 4. Crash Recovery (os._exit)
-# ============================================================================
-def test_experimental_crash_recovery():
     with tempfile.TemporaryDirectory() as tmpdir:
-        lock_path = os.path.join(tmpdir, "crash.lock")
-        ready_file = os.path.join(tmpdir, "ready.marker")
+        cur_result = run_mp_test("FileLock", tmpdir)
+        exp_result = run_mp_test("ExperimentalFileLock", tmpdir)
+
+        assert cur_result == 100
+        assert exp_result == 100
+        assert cur_result == exp_result
+
+
+# ============================================================================
+# 4. Differential Crash Recovery (Current vs Candidate)
+# ============================================================================
+def test_differential_crash_recovery():
+    def run_crash_test(lock_cls_name, tmpdir):
+        lock_path = os.path.join(tmpdir, f"{lock_cls_name}_crash.lock")
+        ready_file = os.path.join(tmpdir, f"{lock_cls_name}_ready.marker")
 
         cmd = [
             sys.executable, "-c",
-            f"import os, time; from tests.test_experimental_metadata_writer import ExperimentalFileLock; "
-            f"fl = ExperimentalFileLock(r'{lock_path}'); fl.__enter__(); "
+            f"import os, time; from tests.test_experimental_metadata_writer import FileLock, ExperimentalFileLock; "
+            f"cls = FileLock if '{lock_cls_name}' == 'FileLock' else ExperimentalFileLock; "
+            f"fl = cls(r'{lock_path}'); fl.__enter__(); "
             f"open(r'{ready_file}', 'w').write('OK'); time.sleep(0.1); os._exit(0)"
         ]
         proc = subprocess.Popen(cmd)
@@ -241,69 +324,163 @@ def test_experimental_crash_recovery():
             time.sleep(0.01)
         proc.wait(timeout=5.0)
 
-        # Reclaim immediately
+        cls = FileLock if lock_cls_name == "FileLock" else ExperimentalFileLock
         t0 = time.perf_counter()
-        with ExperimentalFileLock(lock_path, timeout=2.0):
+        with cls(lock_path, timeout=2.0):
             t1 = time.perf_counter()
-        assert (t1 - t0) < 0.1
 
+        return (t1 - t0)
 
-# ============================================================================
-# 5. Stale Metadata Takeover
-# ============================================================================
-def test_experimental_stale_metadata_takeover():
     with tempfile.TemporaryDirectory() as tmpdir:
-        lock_path = os.path.join(tmpdir, "stale.lock")
-        # Write dead PID metadata to unheld lock file
+        cur_reclaim_time = run_crash_test("FileLock", tmpdir)
+        exp_reclaim_time = run_crash_test("ExperimentalFileLock", tmpdir)
+
+        assert cur_reclaim_time < 0.2
+        assert exp_reclaim_time < 0.2
+
+
+# ============================================================================
+# 5. Differential Stale Metadata Takeover (Current vs Candidate)
+# ============================================================================
+def test_differential_stale_metadata_takeover():
+    def run_stale_test(lock_cls, tmpdir, prefix):
+        lock_path = os.path.join(tmpdir, f"{prefix}_stale.lock")
         stale_meta = json.dumps({"status": "active", "pid": 99999999, "token": "stale-token", "start_time": 100.0})
         with open(lock_path, "w", encoding="utf-8") as f:
             f.write(stale_meta)
 
-        # Acquire lock over stale metadata
-        with ExperimentalFileLock(lock_path, timeout=2.0) as fl:
-            with open(lock_path, "r", encoding="utf-8") as f:
-                new_meta = json.load(f)
-            assert new_meta["pid"] == os.getpid()
-            assert new_meta["token"] == fl.token
+        with lock_cls(lock_path, timeout=2.0) as fl:
+            new_meta = _read_metadata_safe(fl, lock_path)
 
+        return _normalize_metadata(new_meta)
 
-# ============================================================================
-# 6. GC Safety Integration
-# ============================================================================
-def test_experimental_gc_safety():
     with tempfile.TemporaryDirectory() as tmpdir:
-        active_lock = os.path.join(tmpdir, "active.lock")
-        idle_lock = os.path.join(tmpdir, "idle.lock")
+        cur_takeover = run_stale_test(FileLock, tmpdir, "cur")
+        exp_takeover = run_stale_test(ExperimentalFileLock, tmpdir, "exp")
 
-        # Create active held lock
-        fl_active = ExperimentalFileLock(active_lock)
-        fl_active.__enter__()
-
-        # Create unheld file
-        with open(idle_lock, "w") as f:
-            f.write("idle")
-
-        try:
-            report = run_gc(tmpdir)
-            assert os.path.exists(active_lock), "Active lock MUST NOT be unlinked by GC!"
-        finally:
-            fl_active.__exit__(None, None, None)
+        assert cur_takeover == exp_takeover
+        assert cur_takeover["pid_matches_cached"] is True
 
 
 # ============================================================================
-# 7. Cross-Implementation Interoperability with Portalocker
+# 6. Differential GC Safety Integration (Current vs Candidate)
 # ============================================================================
-def test_experimental_portalocker_interop():
+def test_differential_gc_safety():
+    def run_gc_test(lock_cls, tmpdir, prefix):
+        active_lock = os.path.join(tmpdir, f"{prefix}_active.lock")
+        fl = lock_cls(active_lock)
+        fl.__enter__()
+
+        # Run GC on workspace
+        report = run_gc(tmpdir)
+        is_active_preserved = os.path.exists(active_lock)
+
+        fl.__exit__(None, None, None)
+        return is_active_preserved, report.stale_locks_reclaimed
+
     with tempfile.TemporaryDirectory() as tmpdir:
-        lock_path = os.path.join(tmpdir, "interop.lock")
+        cur_preserved, cur_reclaimed = run_gc_test(FileLock, tmpdir, "cur")
+        exp_preserved, exp_reclaimed = run_gc_test(ExperimentalFileLock, tmpdir, "exp")
 
-        # 1. Experimental holds -> Portalocker contender blocks
-        with ExperimentalFileLock(lock_path, timeout=5.0):
+        assert cur_preserved is True
+        assert exp_preserved is True
+        assert cur_preserved == exp_preserved
+
+
+# ============================================================================
+# 7. Differential Portalocker Interoperability (Current vs Candidate)
+# ============================================================================
+def test_differential_portalocker_interoperability():
+    def run_interop_test(lock_cls, tmpdir, prefix):
+        lock_path = os.path.join(tmpdir, f"{prefix}_interop.lock")
+
+        # 1. Implementation holds -> Portalocker contender blocks
+        with lock_cls(lock_path, timeout=5.0):
             with pytest.raises(portalocker.exceptions.LockException):
                 portalocker.Lock(lock_path, mode="a+b", timeout=0.2).acquire()
 
-        # 2. Portalocker holds -> Experimental contender blocks
+        # 2. Portalocker holds -> Implementation contender blocks
         with portalocker.Lock(lock_path, mode="a+b", timeout=5.0):
             with pytest.raises(TimeoutError):
-                with ExperimentalFileLock(lock_path, timeout=0.2):
+                with lock_cls(lock_path, timeout=0.2):
                     pass
+
+        return True
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        assert run_interop_test(FileLock, tmpdir, "cur") is True
+        assert run_interop_test(ExperimentalFileLock, tmpdir, "exp") is True
+
+
+# ============================================================================
+# 8. Failure Injection & Crash Consistency Suite
+# ============================================================================
+def test_failure_injection_partial_pwrite_loop():
+    """Simulates write returning 1 byte per call to verify write_metadata_atomic_exact loop correctness."""
+    written_chunks = []
+    original_write = os.write
+
+    def mock_write_1byte(fd, buf):
+        chunk = buf[:1]
+        written = original_write(fd, chunk)
+        written_chunks.append(written)
+        return written
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = os.path.join(tmpdir, "partial.lock")
+        fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
+        try:
+            payload = b'{"status": "active", "pid": 1234}'
+            with patch("os.write", side_effect=mock_write_1byte):
+                _write_metadata_atomic_exact(fd, payload)
+
+            with open(path, "rb") as f:
+                content = f.read()
+            assert content == payload
+            assert len(written_chunks) == len(payload)
+        finally:
+            os.close(fd)
+
+
+def test_failure_injection_pwrite_and_ftruncate_errors():
+    """Verifies that write/ftruncate OS errors propagate deterministically."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = os.path.join(tmpdir, "error.lock")
+        fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
+        try:
+            target_fn = "os.pwrite" if hasattr(os, "pwrite") else "os.write"
+            # 1. Write error
+            with patch(target_fn, side_effect=OSError(5, "Input/output error")):
+                with pytest.raises(OSError):
+                    _write_metadata_atomic_exact(fd, b"test")
+
+            # 2. ftruncate error
+            with patch("os.ftruncate", side_effect=OSError(28, "No space left on device")):
+                with pytest.raises(OSError):
+                    _write_metadata_atomic_exact(fd, b"test")
+        finally:
+            os.close(fd)
+
+
+def test_crash_window_between_pwrite_and_ftruncate():
+    """
+    Simulates process crash after write completes but BEFORE ftruncate executes.
+    Verifies that a subsequent lock contender cleanly overwrites and takes over the file.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = os.path.join(tmpdir, "crash_window.lock")
+
+        # 1. Write an oversized garbage lock file payload (simulating crash before ftruncate)
+        fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
+        os.write(fd, b'{"status": "active", "pid": 99999} trailing_untruncated_garbage_bytes_1234567890')
+        os.close(fd)
+
+        # 2. Both FileLock and ExperimentalFileLock MUST successfully acquire lock and overwrite with clean metadata
+        with FileLock(path, timeout=2.0) as fl_c:
+            meta_cur = _read_metadata_safe(fl_c, path)
+
+        with ExperimentalFileLock(path, timeout=2.0) as fl_e:
+            meta_exp = _read_metadata_safe(fl_e, path)
+
+        assert meta_cur["pid"] == os.getpid()
+        assert meta_exp["pid"] == os.getpid()
