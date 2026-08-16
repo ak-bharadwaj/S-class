@@ -284,7 +284,7 @@ def test_experimental_gc_safety():
             f.write("idle")
 
         try:
-            report = run_gc(tmpdir, stale_threshold_seconds=0.0)
+            report = run_gc(tmpdir)
             assert os.path.exists(active_lock), "Active lock MUST NOT be unlinked by GC!"
         finally:
             fl_active.__exit__(None, None, None)
