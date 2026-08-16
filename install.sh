@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# S-Class V12.1 SDK Installer for Linux/macOS
+# S-Class EOS V11.2 SDK Installer for Linux/macOS
 # Run: curl -fsSL https://raw.githubusercontent.com/ak-bharadwaj/S-class/master/install.sh | bash
 
 set -e
@@ -16,10 +16,10 @@ fi
 
 # Clone or pull updates
 if [ -d "$PLUGIN_DIR" ]; then
-    echo "Updating S-Class V12.1 SDK..."
+    echo "Updating S-Class EOS V11.2 SDK..."
     git -C "$PLUGIN_DIR" pull
 else
-    echo "Cloning S-Class V12.1 SDK..."
+    echo "Cloning S-Class EOS V11.2 SDK..."
     git clone https://github.com/ak-bharadwaj/S-class.git "$PLUGIN_DIR"
 fi
 
@@ -30,9 +30,9 @@ if command -v python3 &>/dev/null; then
 fi
 
 echo "=========================================================="
-echo "⚡ S-Class V12.1 Installation Complete!"
+echo "⚡ S-Class EOS V11.2 Installation Complete!"
 echo "Active Plugin Path: $PLUGIN_DIR"
-echo "Cataloged Skills: 118 (Impeccable, Taste, Emil Kowalski, Specification Synthesis, Heavy Backend)"
-echo "Subagent Matrix: 8 Concurrent Subagents (find-skill Enabled) | PracticalSkeptic: 9 Empirical Rules (159 Tests Passing)"
+echo "Cataloged Skills: 118 (Domain Primitives, Behavior Graph, Spec Synthesis, ADR Architecture Debate, ChangeSet Governance)"
+echo "Subagent Matrix: 8 Concurrent Subagents | Verification Engine: 397 Product Regression Tests Passing across 49 Test Suites"
 echo "Commands: /goal, /grill, /doubt, /inquire"
 echo "=========================================================="

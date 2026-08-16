@@ -7,7 +7,7 @@
 
 [![Version](https://img.shields.io/badge/version-11.2.0--frozen-blue.svg)](https://github.com/ak-bharadwaj/S-class)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-green.svg)](https://github.com/ak-bharadwaj/S-class)
-[![Build](https://img.shields.io/badge/tests-390%2F390%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class)
+[![Build](https://img.shields.io/badge/tests-397%2F397%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class)
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 
 [Quick Start](#-quick-start) • [Architecture](#-system-architecture) • [Features](#-core-architectural-innovations) • [Python SDK](#-30-second-python-sdk-quickstart) • [Benchmark Comparison](#-framework-architectural-comparison) • [License](#-license)
@@ -26,9 +26,9 @@ When autonomous AI coding agents execute software engineering tasks, they suffer
 **S-Class EOS V11.2 fixes this completely.** Operating as a **Central Deterministic Orchestration Kernel**, S-Class intercepts all agent actions, routes engineering goals through a strict Finite State Machine (FSM), enforces evidence-driven Specification Synthesis before design/coding, red-teams plans before writing code, and verifies execution authenticity through sovereign test runners and cryptographic evidence receipts before release is allowed.
 
 > [!NOTE]
-> **V11.2 LTS Release Attestation**: Formally verified across 390 tests (50 test suites) covering:
-> 1. Single-authority Layer-0 `FileLock` with kernel advisory locks and empirical subprocess crash resilience.
-> 2. Strict Kernel API contract (`event_name` mandatory, `from_state` optional assertion, `from_state`-only strictly blocks).
+> **V11.2 LTS Release Attestation**: Formally verified across 397 product regression tests (49 test suites) covering:
+> 1. Single-authority Layer-0 `FileLock` with kernel advisory locks, persistent inode identity validation, and empirical subprocess crash resilience.
+> 2. Fail-closed `ArtifactGovernor` security configuration handling and non-destructive GC stale lock reclamation.
 > 3. Multi-step semantic event log replay and natural runtime checkpoint equivalence.
 > 4. Static AST dependency Directed Acyclic Graph (DAG) with zero circular imports across all core modules.
 > 5. Sovereign `SClassTestRunner` subprocess authorization, path-traversal prevention, and shell injection blocking.
@@ -184,10 +184,11 @@ print(f"Kernel Approved Mutation: '{res['previousPhase']}' ➔ '{res['currentPha
 
 ## 🧪 Comprehensive Automated Test Suite
 
-S-Class EOS V11.2 contains **396 product regression test cases across 49 test suites** passing with 100% success across Python 3.10–3.14 (historical and research benchmarks isolated in `benchmark/v0/`):
+S-Class EOS V11.2 contains **397 product regression test cases across 49 test suites** passing with 100% success across Python 3.10–3.14 (historical and research benchmarks isolated in `benchmark/v0/`):
 
 | Test Module Category | Test Count | Functionality Tested |
 | :--- | :--- | :--- |
+| **Audit Hardening & Concurrency** | 10 tests | Live planner/MCP dispatch execution, fail-closed governor security, multi-process GC lock reclamation race safety (`tests/test_audit_hardening_verification.py`). |
 | **V11.2 Stabilization Pass** | 12 tests | Canonical event replay, kernel API contract strictness, subprocess crash resilience, SClassTestRunner boundaries, supply-chain freeze, constraint/preference split, AST dependency DAG (`tests/test_v11_stabilization.py`). |
 | **Master Production Closure** | 6 tests | Whole-system V9.6 $\to$ V11.2 master closure: task compiler, execution planner, repository snapshot, ChangeSet reconciliation, implementation/verification evidence (`tests/test_v11_master_closure.py`). |
 | **World Model & Adapters** | 33 tests | Sovereign PromotionEngine, LanguageAdapters (Python, JS/TS, Fallback), GroundedSpecWeaver, Evidence Verification (`tests/test_v11_world_model.py`). |
