@@ -10,3 +10,5 @@ __pycache__/
 *.pem
 *.secret
 capability_plugins/emil-skills/
+capability_plugins/impeccable/
+capability_plugins/taste-skill/
