@@ -12,3 +12,4 @@ __pycache__/
 capability_plugins/emil-skills/
 capability_plugins/impeccable/
 capability_plugins/taste-skill/
+benchmark/parity/*_downloaded/

@@ -48,31 +48,8 @@ jobs:
         python benchmark/parity/file_lock_harness.py
 
     - name: Strict Certificate Verification & Parity Assertions
-      env:
-        EXPECTED_SHA: ${{ github.sha }}
       run: |
-        python - << 'EOF'
-        import os
-        import sys
-        import json
-        from benchmark.parity.file_lock_harness import verify_parity_certificate
-
-        cert_path = "benchmark/parity/gate_1_parity_certificate_win32.json"
-        raw_path = "benchmark/parity/parity_gate_1_raw_results.json"
-        expected_sha = os.environ.get("EXPECTED_SHA", "").strip()
-
-        if not os.path.isfile(cert_path):
-            sys.exit(f"FATAL: Missing certificate at {cert_path}")
-        if not os.path.isfile(raw_path):
-            sys.exit(f"FATAL: Missing raw results at {raw_path}")
-
-        with open(cert_path, "r", encoding="utf-8") as f:
-            cert = json.load(f)
-
-        print("Validating Windows Certificate Provenance & Gate Assertions via Single-Source Verifier...")
-        verify_parity_certificate(cert, expected_sha=expected_sha)
-        print("ALL WINDOWS PARITY GATE 1 ASSERTIONS PASSED PERFECTLY!")
-        EOF
+        python -m benchmark.parity.verify_certificate --certificate benchmark/parity/gate_1_parity_certificate_win32.json --expected-sha ${{ github.sha }}
 
     - name: Upload Immutable Parity Certificate and Raw Results
       uses: actions/upload-artifact@v4
