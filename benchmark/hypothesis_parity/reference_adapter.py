@@ -11,7 +11,7 @@ import hypothesis
 from hypothesis import given, settings, strategies as st, Phase, seed as h_seed
 from hypothesis.errors import UnsatisfiedAssumption
 
-from benchmark.hypothesis_parity.observation import ObservationRecord, StrategySpec, compute_size
+from benchmark.hypothesis_parity.observation import ObservationRecord, StrategySpec, ReplayOutcome, compute_size
 
 
 def _build_hypothesis_strategy(spec: StrategySpec):
@@ -34,6 +34,19 @@ def _build_hypothesis_strategy(spec: StrategySpec):
         min_size = p.get("min_size", 0)
         max_size = p.get("max_size", None)
         s = st.text(alphabet=alphabet, min_size=min_size, max_size=max_size)
+    elif st_type == "characters":
+        whitelist_categories = p.get("whitelist_categories", None)
+        blacklist_categories = p.get("blacklist_categories", None)
+        min_codepoint = p.get("min_codepoint", None)
+        max_codepoint = p.get("max_codepoint", None)
+        s = st.characters(
+            whitelist_categories=whitelist_categories,
+            blacklist_categories=blacklist_categories,
+            min_codepoint=min_codepoint,
+            max_codepoint=max_codepoint
+        )
+    elif st_type == "emails":
+        s = st.emails()
     elif st_type == "from_regex":
         pattern = p["pattern"]
         fullmatch = p.get("fullmatch", True)
@@ -89,8 +102,7 @@ class ReferenceHypothesisAdapter:
             for arg_name, spec in strategy_specs.items()
         }
 
-        cases_run = 0
-        shrink_evals = 0
+        total_invocations = 0
         first_failing_case = None
         last_failing_case = None
         exception_class = None
@@ -99,23 +111,16 @@ class ReferenceHypothesisAdapter:
         if enable_shrinking:
             phases.append(Phase.shrink)
 
-        # Instrument the property wrapper to observe calls and transitions
-        is_shrinking = False
-
         def instrumented_property(**kwargs):
-            nonlocal cases_run, shrink_evals, first_failing_case, last_failing_case, is_shrinking
-            if not is_shrinking:
-                cases_run += 1
-            else:
-                shrink_evals += 1
+            nonlocal total_invocations, first_failing_case, last_failing_case
+            total_invocations += 1
 
             try:
                 res = property_fn(**kwargs)
                 if res is False:
                     raise AssertionError("Property returned False")
             except (AssertionError, Exception) as err:
-                if not is_shrinking:
-                    is_shrinking = True
+                if first_failing_case is None:
                     first_failing_case = dict(kwargs)
                 last_failing_case = dict(kwargs)
                 raise err
@@ -156,17 +161,18 @@ class ReferenceHypothesisAdapter:
         return ObservationRecord(
             engine_name=f"Hypothesis/{hypothesis.__version__}",
             verdict=verdict,
-            cases_executed=cases_run,
+            cases_executed=min(total_invocations, max_examples),
             initial_counterexample=init_case,
             shrunk_counterexample=shrunk_case,
             exception_class=exception_class,
             exception_message=exception_msg,
-            shrink_evaluations=shrink_evals,
+            shrink_evaluations=None,  # Not inferred via heuristics on reference
             execution_time_ns=t_elapsed,
             metadata={
                 "max_examples": max_examples,
                 "seed": seed,
-                "phases": [p.name for p in phases]
+                "phases": [p.name for p in phases],
+                "total_property_calls": total_invocations
             }
         )
 
@@ -174,14 +180,42 @@ class ReferenceHypothesisAdapter:
     def replay_case(
         cls,
         property_fn: Callable[..., Any],
-        counterexample: Dict[str, Any]
-    ) -> bool:
+        counterexample: Dict[str, Any],
+        expected_exception_class: Optional[str] = None
+    ) -> ReplayOutcome:
         """
-        Executes a property directly against a counterexample to verify reproducibility.
-        Returns True if the property fails (counterexample reproduced), False if it passes.
+        Executes a property directly against a counterexample to verify structured reproducibility.
+        Distinguishes expected invariant failures from unexpected errors (e.g., signature mismatch).
         """
         try:
             res = property_fn(**counterexample)
-            return res is False
-        except (AssertionError, Exception):
-            return True
+            if res is False:
+                reproduced = (expected_exception_class in (None, "AssertionError"))
+                return ReplayOutcome(
+                    reproduced_failure=reproduced,
+                    exception_class="AssertionError",
+                    exception_message="Property returned False",
+                    unexpected_error=not reproduced,
+                    return_value=res
+                )
+            return ReplayOutcome(
+                reproduced_failure=False,
+                return_value=res
+            )
+        except AssertionError as err:
+            reproduced = (expected_exception_class is None or expected_exception_class == "AssertionError")
+            return ReplayOutcome(
+                reproduced_failure=reproduced,
+                exception_class="AssertionError",
+                exception_message=str(err),
+                unexpected_error=not reproduced
+            )
+        except Exception as err:
+            actual_class = err.__class__.__name__
+            reproduced = (expected_exception_class is not None and expected_exception_class == actual_class)
+            return ReplayOutcome(
+                reproduced_failure=reproduced,
+                exception_class=actual_class,
+                exception_message=str(err),
+                unexpected_error=not reproduced
+            )

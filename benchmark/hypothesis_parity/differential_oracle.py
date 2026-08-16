@@ -3,9 +3,11 @@ S-Class EOS V11.2 - Independent Differential Property Oracle.
 Evaluates observations and target functions independently of framework self-reporting.
 """
 
+import re
+import unicodedata
 from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, Callable, List, Tuple
-from benchmark.hypothesis_parity.observation import ObservationRecord, StrategySpec, compute_size
+from benchmark.hypothesis_parity.observation import ObservationRecord, StrategySpec, ReplayOutcome, compute_size
 
 
 def _validate_value_against_spec(val: Any, spec: StrategySpec) -> bool:
@@ -43,13 +45,40 @@ def _validate_value_against_spec(val: Any, spec: StrategySpec) -> bool:
             return False
         if max_s is not None and len(val) > max_s:
             return False
+    elif st_type == "characters":
+        if not isinstance(val, str) or len(val) != 1:
+            return False
+        cp = ord(val)
+        min_cp = p.get("min_codepoint", None)
+        max_cp = p.get("max_codepoint", None)
+        if min_cp is not None and cp < min_cp:
+            return False
+        if max_cp is not None and cp > max_cp:
+            return False
+        cat = unicodedata.category(val)
+        whitelist = p.get("whitelist_categories", None)
+        blacklist = p.get("blacklist_categories", None)
+        if whitelist is not None and cat not in whitelist:
+            return False
+        if blacklist is not None and cat in blacklist:
+            return False
+    elif st_type == "emails":
+        if not isinstance(val, str):
+            return False
+        email_pattern = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
+        if not re.match(email_pattern, val):
+            return False
     elif st_type == "from_regex":
-        import re
         if not isinstance(val, str):
             return False
         pattern = p["pattern"]
-        if not re.fullmatch(pattern, val):
-            return False
+        fullmatch = p.get("fullmatch", True)
+        if fullmatch:
+            if not re.fullmatch(pattern, val):
+                return False
+        else:
+            if not re.search(pattern, val):
+                return False
     elif st_type == "sampled_from":
         elements = p["elements"]
         if val not in elements:
@@ -76,6 +105,8 @@ def _validate_value_against_spec(val: Any, spec: StrategySpec) -> bool:
         for elem_val, es in zip(val, elem_specs):
             if isinstance(es, StrategySpec) and not _validate_value_against_spec(elem_val, es):
                 return False
+    else:
+        return False
 
     if spec.filter_fn is not None:
         try:
@@ -97,7 +128,7 @@ class DifferentialVerdict:
     exception_class_agreement: bool
     reference_shrunk_size: Any
     candidate_shrunk_size: Any
-    candidate_shrink_evaluations: int
+    candidate_shrink_evaluations: Optional[int]
     violations: List[str] = field(default_factory=list)
     diagnostics: Dict[str, Any] = field(default_factory=dict)
 
@@ -168,7 +199,6 @@ class IndependentDifferentialOracle:
             if observation.initial_counterexample is not None and observation.shrunk_counterexample is not None:
                 init_sz = compute_size(observation.initial_counterexample)
                 shrunk_sz = compute_size(observation.shrunk_counterexample)
-                # Ensure shrunk size is <= initial size
                 if shrunk_sz > init_sz:
                     violations.append(f"Shrunk size ({shrunk_sz}) is greater than initial size ({init_sz})! Shrinking was not monotonic.")
 
@@ -224,7 +254,7 @@ class IndependentDifferentialOracle:
             diagnostics={
                 "ref_cases": ref_obs.cases_executed,
                 "cand_cases": cand_obs.cases_executed,
-                "ref_shrink_evals": ref_obs.shrink_evaluations,
-                "cand_shrink_evals": cand_obs.shrink_evaluations
+                "ref_total_calls": ref_obs.metadata.get("total_property_calls"),
+                "cand_total_calls": cand_obs.metadata.get("total_property_calls")
             }
         )

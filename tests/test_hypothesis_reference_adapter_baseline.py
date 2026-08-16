@@ -4,10 +4,11 @@ Certifies the ReferenceHypothesisAdapter and IndependentDifferentialOracle again
 """
 
 import pytest
+import re
 from typing import List
-from benchmark.hypothesis_parity.observation import StrategySpec, ObservationRecord, compute_size
+from benchmark.hypothesis_parity.observation import StrategySpec, ObservationRecord, ReplayOutcome, compute_size
 from benchmark.hypothesis_parity.reference_adapter import ReferenceHypothesisAdapter
-from benchmark.hypothesis_parity.differential_oracle import IndependentDifferentialOracle
+from benchmark.hypothesis_parity.differential_oracle import IndependentDifferentialOracle, _validate_value_against_spec
 
 
 def test_reference_adapter_clean_passing_property():
@@ -131,7 +132,7 @@ def test_reference_adapter_filtered_strategy():
 
 
 def test_reference_adapter_replay_and_determinism():
-    """Validates deterministic execution with fixed seed and direct counterexample replay."""
+    """Validates deterministic execution with fixed seed and structured counterexample replay."""
     specs = {
         "x": StrategySpec(strategy_type="integers", params={"min_value": 0, "max_value": 500})
     }
@@ -147,9 +148,108 @@ def test_reference_adapter_replay_and_determinism():
     assert obs2.verdict == "FAIL"
     assert obs1.shrunk_counterexample == obs2.shrunk_counterexample
 
-    # Verify direct replay
-    reproduced = ReferenceHypothesisAdapter.replay_case(failing_prop, obs1.shrunk_counterexample)
-    assert reproduced is True
+    # Verify direct structured replay
+    outcome = ReferenceHypothesisAdapter.replay_case(failing_prop, obs1.shrunk_counterexample, expected_exception_class="AssertionError")
+    assert isinstance(outcome, ReplayOutcome)
+    assert outcome.reproduced_failure is True
+    assert outcome.unexpected_error is False
+    assert outcome.exception_class == "AssertionError"
+
+
+def test_regex_fullmatch_true_vs_false():
+    """Fail-Closed Test: Validates exact regex fullmatch=True vs fullmatch=False in adapter and oracle."""
+    spec_full = StrategySpec(
+        strategy_type="from_regex",
+        params={"pattern": r"\d{3}-\d{2}-\d{4}", "fullmatch": True}
+    )
+    spec_partial = StrategySpec(
+        strategy_type="from_regex",
+        params={"pattern": r"\d{3}-\d{2}-\d{4}", "fullmatch": False}
+    )
+
+    valid_full = "123-45-6789"
+    invalid_surrounded = "prefix 123-45-6789 suffix"
+
+    # fullmatch=True checks
+    assert _validate_value_against_spec(valid_full, spec_full) is True
+    assert _validate_value_against_spec(invalid_surrounded, spec_full) is False
+
+    # fullmatch=False checks
+    assert _validate_value_against_spec(valid_full, spec_partial) is True
+    assert _validate_value_against_spec(invalid_surrounded, spec_partial) is True
+
+
+def test_replay_error_classification_type_error_vs_assertion_error():
+    """Fail-Closed Test: Replay outcome distinguishes expected AssertionError from unexpected TypeError."""
+    def assertion_failing_prop(x: int) -> bool:
+        assert x < 0, "x >= 0"
+        return True
+
+    def type_error_failing_prop(x: int) -> bool:
+        # Invalid operation simulating unexpected runtime error
+        return "prefix" + x  # TypeError: can only concatenate str (not "int") to str
+
+    # 1. Expected AssertionError reproduced cleanly
+    outcome1 = ReferenceHypothesisAdapter.replay_case(assertion_failing_prop, {"x": 10}, expected_exception_class="AssertionError")
+    assert outcome1.reproduced_failure is True
+    assert outcome1.unexpected_error is False
+    assert outcome1.exception_class == "AssertionError"
+
+    # 2. Unexpected TypeError when expecting AssertionError
+    outcome2 = ReferenceHypothesisAdapter.replay_case(type_error_failing_prop, {"x": 10}, expected_exception_class="AssertionError")
+    assert outcome2.reproduced_failure is False
+    assert outcome2.unexpected_error is True
+    assert outcome2.exception_class == "TypeError"
+
+
+def test_characters_and_emails_strategies():
+    """Validates characters() and emails() strategy specs in reference adapter and oracle."""
+    specs = {
+        "c": StrategySpec(strategy_type="characters", params={"blacklist_categories": ["Cs"], "min_codepoint": 32, "max_codepoint": 126}),
+        "em": StrategySpec(strategy_type="emails")
+    }
+
+    def verify_types(c: str, em: str) -> bool:
+        assert len(c) == 1
+        assert "@" in em and "." in em
+        return True
+
+    obs = ReferenceHypothesisAdapter.run_campaign(specs, verify_types, max_examples=30)
+    assert obs.verdict == "PASS"
+    assert obs.cases_executed >= 30
+
+    valid, violations = IndependentDifferentialOracle.validate_observation(obs, verify_types, specs)
+    assert valid is True
+    assert len(violations) == 0
+
+
+def test_unsupported_strategy_fails_closed():
+    """Fail-Closed Test: Unsupported strategy types raise ValueError and fail oracle validation."""
+    bogus_spec = StrategySpec(strategy_type="bogus_ast_strategy", params={})
+
+    with pytest.raises(ValueError, match="Unsupported strategy type"):
+        ReferenceHypothesisAdapter.run_campaign({"x": bogus_spec}, lambda x: True, max_examples=10)
+
+    # Oracle must return False for unsupported strategy type
+    assert _validate_value_against_spec("some_value", bogus_spec) is False
+
+
+def test_shrink_evaluation_accounting_unconfounded():
+    """Validates that shrink_evaluations is None on reference without speculative heuristic counts."""
+    specs = {
+        "x": StrategySpec(strategy_type="integers", params={"min_value": 0, "max_value": 100})
+    }
+
+    def failing_prop(x: int) -> bool:
+        assert x < 5, "x >= 5"
+        return True
+
+    obs = ReferenceHypothesisAdapter.run_campaign(specs, failing_prop, max_examples=30, enable_shrinking=True)
+    assert obs.verdict == "FAIL"
+    # shrink_evaluations must be None on reference (not an unverified heuristic)
+    assert obs.shrink_evaluations is None
+    # total property calls tracked in metadata
+    assert obs.metadata.get("total_property_calls", 0) > 0
 
 
 def test_differential_oracle_catches_bogus_observations():

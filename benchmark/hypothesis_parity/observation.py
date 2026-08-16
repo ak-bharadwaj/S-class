@@ -32,7 +32,6 @@ def compute_size(val: Any) -> Any:
         return [len(val), sum(ords)]
     if isinstance(val, (list, tuple)):
         items_size = [compute_size(x) for x in val]
-        # Sum scalar sizes or aggregate
         scalar_sum = sum(s if isinstance(s, (int, float)) else s[0] if isinstance(s, list) else 0 for s in items_size)
         return [len(val), scalar_sum]
     if isinstance(val, dict):
@@ -45,6 +44,19 @@ def compute_size(val: Any) -> Any:
 
 
 @dataclass
+class ReplayOutcome:
+    """Structured outcome from replaying a counterexample against a property."""
+    reproduced_failure: bool
+    exception_class: Optional[str] = None
+    exception_message: Optional[str] = None
+    unexpected_error: bool = False
+    return_value: Optional[Any] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
 class ObservationRecord:
     """Immutable normalized observation record emitted by a property verification engine."""
     engine_name: str
@@ -54,7 +66,7 @@ class ObservationRecord:
     shrunk_counterexample: Optional[Dict[str, Any]] = None
     exception_class: Optional[str] = None
     exception_message: Optional[str] = None
-    shrink_evaluations: int = 0
+    shrink_evaluations: Optional[int] = None  # None when reference does not expose an un-confounded shrink counter
     initial_size: Optional[Any] = None
     shrunk_size: Optional[Any] = None
     execution_time_ns: int = 0
@@ -73,7 +85,7 @@ class ObservationRecord:
 @dataclass
 class StrategySpec:
     """Canonical descriptor for search strategies across reference and candidate engines."""
-    strategy_type: str  # "integers" | "floats" | "text" | "from_regex" | "sampled_from" | "tuples" | "lists" | "dict"
+    strategy_type: str  # "integers" | "floats" | "text" | "characters" | "emails" | "from_regex" | "sampled_from" | "tuples" | "lists"
     params: Dict[str, Any] = field(default_factory=dict)
     filter_fn: Optional[Callable[[Any], bool]] = None
     map_fn: Optional[Callable[[Any], Any]] = None

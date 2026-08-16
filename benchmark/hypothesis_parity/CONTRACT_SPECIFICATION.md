@@ -11,7 +11,16 @@
 To ensure rigorous differential verification without over-specifying or confounding external tool nuances with internal engineering standards, specifications are divided into two distinct tiers:
 
 ### Tier 1: Reference-Conformance Guarantees (Hypothesis Semantics)
-1. **Domain Invariant Adherence**: For every strategy $S(C)$ bounded by constraints $C$, every generated input $x$ MUST strictly satisfy $C$ ($x \in \text{Domain}(S)$).
+1. **Domain Invariant Adherence**: For every strategy $S(C)$ bounded by constraints $C$, every generated input $x$ MUST strictly satisfy $C$ ($x \in \text{Domain}(S)$). Supported strategy primitives include:
+   - `integers(min_value, max_value)`
+   - `floats(min_value, max_value, allow_nan, allow_infinity)`
+   - `text(alphabet, min_size, max_size)`
+   - `characters(whitelist_categories, blacklist_categories, min_codepoint, max_codepoint)`
+   - `emails()`
+   - `from_regex(pattern, fullmatch)` (respecting `fullmatch=True` vs `fullmatch=False`)
+   - `sampled_from(elements)`
+   - `lists(elements, min_size, max_size, unique)`
+   - `tuples(*elements)`
 2. **Falsification Detection**: If a target property $P$ fails on a domain element ($P(x) = \text{False}$), the testing campaign MUST identify a failing input with high probability.
 3. **Shrink Failure Preservation**: The shrunk counterexample $x_{\text{shrunk}}$ MUST satisfy $P(x_{\text{shrunk}}) = \text{False}$.
 4. **Shrink Reduction Monotonicity**: The shrunk counterexample MUST be no larger than the initial counterexample from which shrinking began:
@@ -20,9 +29,9 @@ To ensure rigorous differential verification without over-specifying or confound
 6. **Exception Categorization**: Failures are classified by standard exception categories (`AssertionError`, `TypeError`, `ValueError`, `TimeoutError`, etc.) rather than implementation-specific message strings.
 
 ### Tier 2: S-Class Quality & Performance Requirements (Engineering Constraints)
-1. **Deterministic Replay**: Under a fixed PRNG seed $s$, an implementation MUST deterministically regenerate its own exact sequence of inputs $[e_1, e_2, \dots, e_N]$. Replaying on the captured counterexample MUST reproduce the failure with zero variance.
+1. **Deterministic Replay**: Under a fixed PRNG seed $s$, an implementation MUST deterministically regenerate its own exact sequence of inputs $[e_1, e_2, \dots, e_N]$. Replaying on the captured counterexample via `replay_case()` MUST return a structured `ReplayOutcome(reproduced_failure=True, unexpected_error=False)`.
 2. **Boundary-Biased Exploration**: In campaigns with $N \ge 20$ iterations, the initial segment (first 10% of examples or first 5 iterations) MUST explore domain extrema (e.g., $0, \pm 1, \text{MIN\_INT}, \text{MAX\_INT}, \text{""}, \text{NaN}, \pm\infty$). *(Note: This is an S-Class requirement, not a reference guarantee).*
-3. **Shrinking Search Bound**: Shrinking MUST terminate within $\le 500$ property evaluations per failure to prevent unbounded search latencies. *(S-Class acceptance criterion).*
+3. **Shrinking Search Bound**: Candidate shrinking MUST terminate within $\le 500$ property evaluations per failure to prevent unbounded search latencies. *(S-Class acceptance criterion).*
 4. **Self-Contained Ephemeral Receipts**: Serialized counterexamples and reproduction metadata MUST be standalone and executable in-memory without requiring on-disk `.hypothesis` cache directories.
 
 ---
@@ -43,8 +52,6 @@ Comparisons are evaluated lexicographically.
 
 ## 3. Observation Data Model
 
-The reference adapter and any candidate implementation MUST emit normalized observations conforming to the following immutable schema:
-
 ```json
 {
   "engine_name": "string",
@@ -54,10 +61,11 @@ The reference adapter and any candidate implementation MUST emit normalized obse
   "shrunk_counterexample": "Optional[dict]",
   "exception_class": "Optional[str]",
   "exception_message": "Optional[str]",
-  "shrink_evaluations": "int",
+  "shrink_evaluations": "Optional[int]",
   "initial_size": "Optional[float | list]",
   "shrunk_size": "Optional[float | list]",
-  "execution_time_ns": "int"
+  "execution_time_ns": "int",
+  "metadata": "dict"
 }
 ```
 
@@ -75,4 +83,4 @@ For every evaluation:
    - Verdict Agreement: $\text{Verdict}_{\text{ref}} == \text{Verdict}_{\text{cand}}$
    - Semantic Preservation: Both independently falsified $P$
    - Shrink Quality: Relative reduction ratio $\frac{\text{Size}(x_{\text{shrunk}})}{\text{Size}(x_{\text{initial}})}$
-   - Shrink Evaluation Count: $\text{Count}_{\text{cand}} \le 500$
+   - Shrink Evaluation Count: Candidate evaluations $\le 500$
