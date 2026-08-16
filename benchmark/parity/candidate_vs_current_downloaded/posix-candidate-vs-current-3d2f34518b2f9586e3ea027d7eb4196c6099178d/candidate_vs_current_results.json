@@ -1,9 +1,9 @@
 {
   "provenance": {
     "tested_source_sha": "7f50a062b837d7cee696d2b8a0cf533b4a07dbf5",
-    "benchmark_harness_sha": "7be14ca3a592f28c830d94d2129f53786b9d1036",
-    "workflow_run_id": "31957546195",
-    "result_generated_at_utc": 1786896291.448828
+    "benchmark_harness_sha": "3d2f34518b2f9586e3ea027d7eb4196c6099178d",
+    "workflow_run_id": "31957659834",
+    "result_generated_at_utc": 1786896431.0529191
   },
   "environment": {
     "os_platform": "linux",
@@ -12,45 +12,45 @@
     "os_version": "#22-Ubuntu SMP Mon Jul 27 17:24:03 UTC 2026",
     "python_version": "3.12.13 (main, Jun 16 2026, 22:05:08) [GCC 13.3.0]",
     "cpu_count_logical": 4,
-    "total_ram_bytes": 16766414848,
+    "total_ram_bytes": 16766406656,
     "portalocker_version": "4.1.0",
     "hostname": "runnervmzvulz",
-    "git_commit_sha": "7be14ca3a592f28c830d94d2129f53786b9d1036",
-    "timestamp_utc": 1786896291.448828
+    "git_commit_sha": "3d2f34518b2f9586e3ea027d7eb4196c6099178d",
+    "timestamp_utc": 1786896431.0529191
   },
   "results": {
     "total_trials": 2500,
     "current_filelock_distribution": {
-      "p50": 114.3,
-      "p90": 173.82,
-      "p95": 196.04,
-      "p99": 251.17,
-      "max": 1403.42,
-      "min": 90.6
+      "p50": 153.46,
+      "p90": 227.22,
+      "p95": 254.0,
+      "p99": 333.59,
+      "max": 1486.94,
+      "min": 109.4
     },
     "experimental_filelock_distribution": {
-      "p50": 50.94,
-      "p90": 60.69,
-      "p95": 65.99,
-      "p99": 79.15,
-      "max": 98.48,
-      "min": 37.95
+      "p50": 59.64,
+      "p90": 94.44,
+      "p95": 104.18,
+      "p99": 119.63,
+      "max": 146.17,
+      "min": 44.55
     },
     "bootstrap_candidate_vs_current": {
-      "median_ratio": 0.4457,
+      "median_ratio": 0.3887,
       "median_ratio_95_ci": [
-        0.4425,
-        0.4487
+        0.3839,
+        0.3945
       ],
-      "p95_ratio": 0.3366,
+      "p95_ratio": 0.4101,
       "p95_ratio_95_ci": [
-        0.3263,
-        0.3538
+        0.3913,
+        0.4214
       ],
-      "throughput_ratio": 2.5338,
+      "throughput_ratio": 2.5357,
       "throughput_ratio_95_ci": [
-        2.4917,
-        2.5806
+        2.491,
+        2.5871
       ],
       "median_gate_passed": true,
       "p95_gate_passed": true,

@@ -35,11 +35,11 @@ jobs:
         rm -f benchmark/parity/gate_1_parity_certificate_posix.json
         rm -f benchmark/parity/parity_gate_1_raw_results.json
 
-    - name: Run Pytest Regression Suite
+    - name: Run Pytest Regression & Contract Differential Suite
       env:
         PYTHONPATH: .
       run: |
-        python -m pytest tests/test_parity_metric_gate.py tests/test_file_lock_concurrency.py -v
+        python -m pytest tests/test_parity_metric_gate.py tests/test_file_lock_concurrency.py tests/test_experimental_metadata_writer.py -v
 
     - name: Run Full POSIX Parity Benchmark Harness
       run: |

@@ -1,62 +1,70 @@
-#!/usr/bin/env python3
 """
-S-Class EOS V11.2 - Canonical Hardware & OS Mutual Exclusion FileLock Engine (Layer 0)
-
-Architecture & Contract:
-1. Authoritative Mutual Exclusion:
-   - The OS kernel advisory lock (msvcrt.locking on Windows, fcntl.flock on POSIX) is the
-     SOLE authoritative gate for mutual exclusion across processes.
-   - When a process exits, terminates, or crashes, the OS automatically closes file descriptors
-     and releases the kernel lock, guaranteeing crash resilience without unsafe secondary authorities.
-
-2. Diagnostic & Audit Metadata:
-   - On lock acquisition, owner metadata (PID, UUID token, hostname, timestamp) is written atomically
-     to the lock file while holding the kernel lock.
-   - This metadata is strictly for diagnostics, audit trails, and tooling (e.g. doctor, monitoring),
-     never as a secondary ownership authority.
-
-3. Process-Local Thread Safety:
-   - Process-local thread tracking (_active_local_locks) ensures concurrent threads within the same
-     Python runtime serialize access deterministically.
+OS-Native Kernel Advisory Mutual Exclusion FileLock and NativeLock Primitives.
+Zero-dependency, zero-portalocker-runtime cross-platform locking infrastructure.
 """
 
 import os
 import sys
+import time
 import json
 import uuid
-import time
 import socket
-import logging
 import threading
 from typing import Optional, Set
 
-logger = logging.getLogger("file_lock")
+# Process-level static caching for metadata building
+_CACHED_PID = os.getpid()
+_CACHED_HOSTNAME = socket.gethostname()
 
-_active_local_locks: Set[str] = set()
-_active_locks_guard = threading.Lock()
+def _get_process_start_time() -> float:
+    """Best-effort process creation timestamp for stale lock validation."""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            from ctypes import wintypes
+            kernel32 = ctypes.windll.kernel32
+            h_proc = kernel32.GetCurrentProcess()
+            ft_create = wintypes.FILETIME()
+            ft_exit = wintypes.FILETIME()
+            ft_kernel = wintypes.FILETIME()
+            ft_user = wintypes.FILETIME()
+            if kernel32.GetProcessTimes(h_proc, ctypes.byref(ft_create), ctypes.byref(ft_exit), ctypes.byref(ft_kernel), ctypes.byref(ft_user)):
+                intervals = (ft_create.dwHighDateTime << 32) + ft_create.dwLowDateTime
+                return (intervals - 116444736000000000) / 10000000.0
+        except Exception:
+            pass
+    elif sys.platform.startswith("linux"):
+        try:
+            with open(f"/proc/{_CACHED_PID}/stat", "r") as f:
+                fields = f.read().split()
+                starttime_jiffies = float(fields[21])
+                clk_tck = os.sysconf("SC_CLK_TCK")
+                with open("/proc/stat", "r") as pf:
+                    for line in pf:
+                        if line.startswith("btime "):
+                            btime = float(line.split()[1])
+                            return btime + (starttime_jiffies / clk_tck)
+        except Exception:
+            pass
+    return time.time()
 
+_CACHED_PROC_START = _get_process_start_time()
 
 def _process_exists(pid: int) -> bool:
-    """Verifies whether an OS process with the given PID is actively running (diagnostic utility)."""
+    """Checks if a process with the given PID is currently running."""
     if pid <= 0:
         return False
     if sys.platform == "win32":
         try:
             import ctypes
-            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
             kernel32 = ctypes.windll.kernel32
-            handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
-            if handle:
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            h_proc = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+            if h_proc:
                 exit_code = ctypes.c_ulong()
-                if kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
-                    is_active = (exit_code.value == 259)  # 259 = STILL_ACTIVE
-                    kernel32.CloseHandle(handle)
-                    return is_active
-                kernel32.CloseHandle(handle)
-                return True
-            err = kernel32.GetLastError()
-            if err == 5:  # Access Denied -> system/privileged process exists
-                return True
+                kernel32.GetExitCodeProcess(h_proc, ctypes.byref(exit_code))
+                kernel32.CloseHandle(h_proc)
+                return exit_code.value == 259  # STILL_ACTIVE = 259
             return False
         except Exception:
             return False
@@ -64,58 +72,15 @@ def _process_exists(pid: int) -> bool:
         try:
             os.kill(pid, 0)
             return True
-        except OSError:
+        except (OSError, ProcessLookupError):
             return False
 
+# Thread-safe process-local active lock registry
+_active_local_locks: Set[str] = set()
+_active_locks_guard = threading.Lock()
 
-def _get_process_start_time(pid: int) -> Optional[float]:
-    """Retrieves process creation timestamp (epoch seconds) for diagnostic audit trails."""
-    if pid <= 0:
-        return None
-    if sys.platform == "win32":
-        try:
-            import ctypes
-            from ctypes import wintypes
-            class FILETIME(ctypes.Structure):
-                _fields_ = [("dwLowDateTime", wintypes.DWORD), ("dwHighDateTime", wintypes.DWORD)]
-
-            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-            kernel32 = ctypes.windll.kernel32
-            handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
-            if handle:
-                create_time = FILETIME()
-                exit_time = FILETIME()
-                kernel_time = FILETIME()
-                user_time = FILETIME()
-                res = kernel32.GetProcessTimes(
-                    handle,
-                    ctypes.byref(create_time),
-                    ctypes.byref(exit_time),
-                    ctypes.byref(kernel_time),
-                    ctypes.byref(user_time)
-                )
-                kernel32.CloseHandle(handle)
-                if res:
-                    ft64 = (create_time.dwHighDateTime << 32) + create_time.dwLowDateTime
-                    return (ft64 - 116444736000000000) / 10000000.0
-        except Exception:
-            return None
-    else:
-        try:
-            proc_path = f"/proc/{pid}"
-            if os.path.exists(proc_path):
-                return os.path.getmtime(proc_path)
-        except Exception:
-            return None
-    return None
-
-
-# Process-cached static metadata to avoid Win32 Ctypes & socket calls per lock instance
-_CACHED_PID = os.getpid()
-_CACHED_HOSTNAME = socket.gethostname()
-_CACHED_PROC_START = _get_process_start_time(_CACHED_PID)
-_META_PREFIX = f'{{"pid": {_CACHED_PID}, "host": "{_CACHED_HOSTNAME}", "process_start_time": {_CACHED_PROC_START}, "token": "'
-
+# Pre-formatted JSON metadata prefix for zero-overhead string formatting
+_META_PREFIX = f'{{"status": "active", "pid": {_CACHED_PID}, "host": "{_CACHED_HOSTNAME}", "process_start_time": {_CACHED_PROC_START}, "token": "'
 
 try:
     import portalocker
@@ -153,6 +118,31 @@ def _unlock_fd(fd: int) -> None:
         pass
 
 
+def _write_metadata_atomic_exact(fd: int, payload: bytes) -> None:
+    """
+    Robust POSIX/OS positional metadata writer.
+    - Writes exact byte sequence starting at byte offset 0, handling partial writes.
+    - Truncates file to exact payload length to prevent stale trailing byte corruption.
+    - Propagates all OS write/truncate errors deterministically.
+    """
+    total_written = 0
+    payload_len = len(payload)
+    if hasattr(os, "pwrite"):
+        while total_written < payload_len:
+            written = os.pwrite(fd, payload[total_written:], total_written)
+            if written == 0:
+                raise IOError("os.pwrite wrote 0 bytes to lock file")
+            total_written += written
+    else:
+        os.lseek(fd, 0, os.SEEK_SET)
+        while total_written < payload_len:
+            written = os.write(fd, payload[total_written:])
+            if written == 0:
+                raise IOError("os.write wrote 0 bytes to lock file")
+            total_written += written
+    os.ftruncate(fd, payload_len)
+
+
 class NativeLock:
     """
     Bare OS-native kernel advisory lock primitive matching reference portalocker interface.
@@ -170,12 +160,8 @@ class NativeLock:
         start_time = time.time()
         while True:
             try:
-                file_obj = open(self.lock_path, "a+b")
-                fd = file_obj.fileno()
-            except FileNotFoundError:
-                os.makedirs(os.path.dirname(self.lock_path), mode=0o700, exist_ok=True)
-                file_obj = open(self.lock_path, "a+b")
-                fd = file_obj.fileno()
+                fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+                file_obj = os.fdopen(fd, "r+b")
             except OSError:
                 if time.time() - start_time >= self.timeout:
                     raise TimeoutError(f"NativeLock timeout opening file: {self.lock_path}")
@@ -258,12 +244,13 @@ class FileLock:
 
             t_open0 = time.perf_counter_ns() if self.enable_profiling else 0
             try:
-                file_obj = open(self.lock_path, "a+b")
-                fd = file_obj.fileno()
-            except FileNotFoundError:
                 os.makedirs(os.path.dirname(self.lock_path), mode=0o700, exist_ok=True)
-                file_obj = open(self.lock_path, "a+b")
-                fd = file_obj.fileno()
+            except OSError:
+                pass
+
+            try:
+                fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+                file_obj = os.fdopen(fd, "r+b")
             except OSError:
                 if time.time() - start_time >= self.timeout:
                     raise TimeoutError(f"FileLock timeout opening persistent lock file: {self.lock_path}")
@@ -288,10 +275,7 @@ class FileLock:
             # KERNEL ADVISORY LOCK GRANTED!
             t_write0 = time.perf_counter_ns() if self.enable_profiling else 0
             try:
-                file_obj.seek(0)
-                file_obj.truncate(0)
-                file_obj.write(owner_payload)
-                file_obj.flush()
+                _write_metadata_atomic_exact(fd, owner_payload)
             except OSError as err:
                 self._unlock_handle(file_obj)
                 try:
@@ -325,10 +309,8 @@ class FileLock:
                         self.profile_timings["json_serialize_exit_ns"] = time.perf_counter_ns() - t_meta0
 
                     t_write0 = time.perf_counter_ns() if self.enable_profiling else 0
-                    self._file.seek(0)
-                    self._file.truncate(0)
-                    self._file.write(rel_payload)
-                    self._file.flush()
+                    if self._fd is not None:
+                        _write_metadata_atomic_exact(self._fd, rel_payload)
                     if self.enable_profiling:
                         self.profile_timings["write_flush_exit_ns"] = time.perf_counter_ns() - t_write0
                 except OSError:
