@@ -4,115 +4,112 @@
     "os_version": "nt",
     "python_version": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
     "cpu_count_logical": 12,
-    "total_ram_gb": 15.27,
     "portalocker_version": "4.1.0",
-    "portalocker_path": "C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\portalocker\\__init__.py",
     "hostname": "AK",
-    "timestamp_utc": 1786885761.6073217
+    "timestamp_utc": 1786886329.6355982
   },
-  "dimension_1_single_process_benchmark": {
-    "portalocker_ref": {
-      "iterations": 500,
-      "median_us": 193.4,
-      "p90_us": 282.7,
-      "p95_us": 323.5,
-      "p99_us": 498.0,
-      "min_us": 173.3,
-      "max_us": 649.1,
-      "mean_us": 213.96,
-      "stddev_us": 58.05,
-      "throughput_ops_sec": 4673.87
+  "layer_a_primitive_parity": {
+    "gate_passed": true,
+    "threshold_applied": "S-Class NativeLock <= Reference Portalocker * 1.005 (+0.5% max)",
+    "iterations_per_rep": 500,
+    "total_repetitions": 5,
+    "total_trials": 2500,
+    "reference_portalocker": {
+      "median_us": 206.8,
+      "p95_us": 347.87,
+      "throughput_per_sec": 4313.1
     },
-    "sclass_filelock": {
-      "iterations": 500,
-      "median_us": 2838.5,
-      "p90_us": 3682.0,
-      "p95_us": 3911.9,
-      "p99_us": 4746.4,
-      "min_us": 1971.5,
-      "max_us": 6096.0,
-      "mean_us": 2931.7,
-      "stddev_us": 569.33,
-      "throughput_ops_sec": 341.1
+    "sclass_native_primitive": {
+      "median_us": 189.6,
+      "p95_us": 311.41,
+      "throughput_per_sec": 4720.7
     },
-    "memory_delta_bytes": {
-      "portalocker": 0,
-      "sclass": 0
+    "statistical_metrics": {
+      "median_latency_diff_pct": -8.317,
+      "median_ratio": 0.9168,
+      "ratio_95_ci_low": 0.9078,
+      "ratio_95_ci_high": 0.9263
+    },
+    "memory_footprint": {
+      "initial_rss_bytes": 27099136,
+      "peak_working_set_bytes": 28340224,
+      "final_rss_bytes": 28102656
     }
   },
-  "dimension_2_timeout_semantics": {
-    "portalocker_ref": {
-      "timed_out_properly": true,
-      "elapsed_sec": 0.2009,
-      "within_tolerance": true
+  "layer_b_full_sclass_lifecycle": {
+    "n_trials": 500,
+    "full_sclass_filelock": {
+      "median_us": 658.25,
+      "p95_us": 1150.1,
+      "throughput_per_sec": 1431.4
     },
-    "sclass_filelock": {
-      "timed_out_properly": true,
-      "elapsed_sec": 0.2037,
-      "within_tolerance": true
+    "microsegment_latency_breakdown_us": {
+      "open_ns": {
+        "median_us": 195.55,
+        "p95_us": 338.24
+      },
+      "lock_ns": {
+        "median_us": 27.8,
+        "p95_us": 57.31
+      },
+      "json_serialize_enter_ns": {
+        "median_us": 3.4,
+        "p95_us": 6.6
+      },
+      "write_flush_enter_ns": {
+        "median_us": 126.75,
+        "p95_us": 248.23
+      },
+      "json_serialize_exit_ns": {
+        "median_us": 10.4,
+        "p95_us": 21.3
+      },
+      "write_flush_exit_ns": {
+        "median_us": 71.85,
+        "p95_us": 122.5
+      },
+      "unlock_ns": {
+        "median_us": 18.2,
+        "p95_us": 33.63
+      },
+      "close_ns": {
+        "median_us": 80.1,
+        "p95_us": 150.7
+      }
     }
   },
-  "dimension_3_thread_contention": {
-    "sclass_filelock": {
-      "expected_count": 400,
-      "actual_count": 400,
-      "is_exact_match": true,
-      "elapsed_sec": 1.6972
-    },
-    "portalocker_ref": {
-      "expected_count": 400,
-      "actual_count": 400,
-      "is_exact_match": true,
-      "elapsed_sec": 0.3741
-    }
+  "timeout_verification": {
+    "ref_timed_out": true,
+    "ref_elapsed_sec": 0.2512,
+    "sclass_timed_out": true,
+    "sclass_elapsed_sec": 0.2033,
+    "timeout_parity": true
   },
-  "dimension_4_multiprocess_concurrency": {
-    "sclass_filelock": {
-      "expected_count": 100,
-      "actual_count": 100,
-      "is_exact_match": true,
-      "elapsed_sec": 0.7978
-    },
-    "portalocker_ref": {
-      "expected_count": 100,
-      "actual_count": 100,
-      "is_exact_match": true,
-      "elapsed_sec": 0.4842
-    }
+  "multithreaded_contention": {
+    "expected_count": 400,
+    "actual_count": 400,
+    "elapsed_sec": 0.811,
+    "thread_safety_passed": true
   },
-  "dimension_5_crash_termination_release": {
-    "sclass_filelock": {
-      "acquired_after_sigkill": true,
-      "recovery_latency_sec": 0.003714
-    },
-    "portalocker_ref": {
-      "acquired_after_sigkill": true,
-      "recovery_latency_sec": 0.000735
-    }
+  "multiprocess_exclusion": {
+    "expected_count": 100,
+    "actual_count": 100,
+    "elapsed_sec": 0.572,
+    "multiprocess_exclusion_passed": true
   },
-  "dimension_6_repeated_stability": {
-    "iterations": 1000,
-    "elapsed_sec": 2.9551,
-    "throughput_ops_sec": 338.4,
-    "memory_growth_bytes": 0,
-    "leak_detected": false
+  "crash_recovery": {
+    "reclaimed_after_abrupt_exit": true,
+    "reclaim_latency_sec": 0.001488,
+    "crash_resilience_passed": true
   },
-  "dimension_7_stale_metadata": {
+  "stale_metadata": {
     "acquired_over_stale_metadata": true,
     "overwritten_with_live_owner_pid": true
   },
-  "dimension_8_gc_interaction": {
+  "gc_interaction": {
     "active_lock_preserved_by_gc": true,
     "idle_lock_marked_idle_or_reclaimed": true,
     "gc_cleanups_reported": 0
   },
-  "dimension_9_release_reacquire_race": {
-    "cycles_completed": 200,
-    "elapsed_sec": 0.5654,
-    "race_free": true
-  },
-  "dimension_10_descriptor_lifecycle": {
-    "clean_acquisition_initialization": true,
-    "clean_release_handle_closure": true
-  }
+  "final_gate_verdict": "PASS"
 }

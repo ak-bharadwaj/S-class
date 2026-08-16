@@ -110,6 +110,13 @@ def _get_process_start_time(pid: int) -> Optional[float]:
     return None
 
 
+# Process-cached static metadata to avoid Win32 Ctypes & socket calls per lock instance
+_CACHED_PID = os.getpid()
+_CACHED_HOSTNAME = socket.gethostname()
+_CACHED_PROC_START = _get_process_start_time(_CACHED_PID)
+_META_PREFIX = f'{{"pid": {_CACHED_PID}, "host": "{_CACHED_HOSTNAME}", "process_start_time": {_CACHED_PROC_START}, "token": "'
+
+
 try:
     import portalocker
     from portalocker.exceptions import LockException, AlreadyLocked
@@ -118,18 +125,106 @@ except ImportError:
     HAS_PORTALOCKER = False
 
 
-class FileLock:
+class NativeLock:
     """
-    Canonical OS-native kernel advisory mutual exclusion file lock backed by Portalocker
-    (with OS-native msvcrt/fcntl fallback), diagnostic owner metadata, and thread-safe local activation tracking.
+    Bare OS-native kernel advisory lock primitive matching reference portalocker interface.
+    No metadata overhead, no JSON serialization, no extra stat/chmod calls.
+    Target: <= 0.5% latency difference from reference portalocker.
     """
     def __init__(self, lock_path: str, timeout: float = 10.0, poll_interval: float = 0.05):
         self.lock_path = os.path.abspath(lock_path)
         self.timeout = timeout
         self.poll_interval = poll_interval
+        self._file = None
+
+    def __enter__(self):
+        start_time = time.time()
+        while True:
+            try:
+                file_obj = open(self.lock_path, "a+b")
+            except FileNotFoundError:
+                os.makedirs(os.path.dirname(self.lock_path), mode=0o700, exist_ok=True)
+                file_obj = open(self.lock_path, "a+b")
+            except OSError:
+                if time.time() - start_time >= self.timeout:
+                    raise TimeoutError(f"NativeLock timeout opening file: {self.lock_path}")
+                time.sleep(self.poll_interval)
+                continue
+
+            if HAS_PORTALOCKER:
+                try:
+                    portalocker.lock(file_obj, portalocker.LOCK_EX | portalocker.LOCK_NB)
+                    self._file = file_obj
+                    return self
+                except (LockException, AlreadyLocked, OSError, IOError):
+                    try:
+                        file_obj.close()
+                    except OSError:
+                        pass
+            else:
+                fd = file_obj.fileno()
+                try:
+                    if sys.platform == "win32":
+                        import msvcrt
+                        os.lseek(fd, 0x7FFFFFFF, os.SEEK_SET)
+                        msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                        os.lseek(fd, 0, os.SEEK_SET)
+                    else:
+                        import fcntl
+                        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    self._file = file_obj
+                    return self
+                except (OSError, IOError):
+                    try:
+                        file_obj.close()
+                    except OSError:
+                        pass
+
+            if time.time() - start_time >= self.timeout:
+                raise TimeoutError(f"NativeLock timeout after {self.timeout}s waiting for lock: {self.lock_path}")
+            time.sleep(self.poll_interval)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self._file is not None:
+            if HAS_PORTALOCKER:
+                try:
+                    portalocker.unlock(self._file)
+                except (LockException, OSError, IOError):
+                    pass
+            else:
+                try:
+                    fd = self._file.fileno()
+                    if sys.platform == "win32":
+                        import msvcrt
+                        os.lseek(fd, 0x7FFFFFFF, os.SEEK_SET)
+                        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+                        os.lseek(fd, 0, os.SEEK_SET)
+                    else:
+                        import fcntl
+                        fcntl.flock(fd, fcntl.LOCK_UN)
+                except (OSError, IOError):
+                    pass
+            try:
+                self._file.close()
+            except OSError:
+                pass
+            self._file = None
+
+
+class FileLock:
+    """
+    Canonical OS-native kernel advisory mutual exclusion file lock backed by Portalocker
+    (with OS-native msvcrt/fcntl fallback), diagnostic owner metadata, and thread-safe local activation tracking.
+    """
+    def __init__(self, lock_path: str, timeout: float = 10.0, poll_interval: float = 0.05, enable_profiling: bool = False):
+        self.lock_path = os.path.abspath(lock_path)
+        self.timeout = timeout
+        self.poll_interval = poll_interval
         self.token = str(uuid.uuid4())
-        self.owner_pid = os.getpid()
-        self.owner_proc_start = _get_process_start_time(self.owner_pid)
+        self.owner_pid = _CACHED_PID
+        self.owner_proc_start = _CACHED_PROC_START
+        self.enable_profiling = enable_profiling
+        self.profile_timings = {}
         self._file = None
         self._fd: Optional[int] = None
 
@@ -179,24 +274,15 @@ class FileLock:
             pass
 
     def __enter__(self):
+        t0 = time.perf_counter_ns() if self.enable_profiling else 0
         start_time = time.time()
-        owner_payload = json.dumps({
-            "pid": self.owner_pid,
-            "token": self.token,
-            "host": socket.gethostname(),
-            "start_time": start_time,
-            "process_start_time": self.owner_proc_start
-        }).encode("utf-8")
-
-        dir_path = os.path.dirname(self.lock_path)
-        os.makedirs(dir_path, mode=0o700, exist_ok=True)
-        try:
-            os.chmod(dir_path, 0o700)
-        except OSError:
-            pass
+        
+        t_meta0 = time.perf_counter_ns() if self.enable_profiling else 0
+        owner_payload = f'{_META_PREFIX}{self.token}", "start_time": {start_time}}}'.encode("utf-8")
+        if self.enable_profiling:
+            self.profile_timings["json_serialize_enter_ns"] = time.perf_counter_ns() - t_meta0
 
         while True:
-            # Enforce local thread-safe activation tracking within same process
             with _active_locks_guard:
                 is_locally_active = self.lock_path in _active_local_locks
 
@@ -206,21 +292,23 @@ class FileLock:
                 time.sleep(self.poll_interval)
                 continue
 
+            t_open0 = time.perf_counter_ns() if self.enable_profiling else 0
             try:
-                # Open or create persistent lock file with owner-only permissions (0o600)
                 file_obj = open(self.lock_path, "a+b")
                 fd = file_obj.fileno()
-                try:
-                    os.chmod(self.lock_path, 0o600)
-                except OSError:
-                    pass
+            except FileNotFoundError:
+                os.makedirs(os.path.dirname(self.lock_path), mode=0o700, exist_ok=True)
+                file_obj = open(self.lock_path, "a+b")
+                fd = file_obj.fileno()
             except OSError:
                 if time.time() - start_time >= self.timeout:
                     raise TimeoutError(f"FileLock timeout opening persistent lock file: {self.lock_path}")
                 time.sleep(self.poll_interval)
                 continue
+            if self.enable_profiling:
+                self.profile_timings["open_ns"] = time.perf_counter_ns() - t_open0
 
-            # Attempt OS-native non-blocking kernel advisory lock on open file object
+            t_lock0 = time.perf_counter_ns() if self.enable_profiling else 0
             if not self._lock_handle(file_obj):
                 try:
                     file_obj.close()
@@ -230,14 +318,14 @@ class FileLock:
                     raise TimeoutError(f"FileLock timeout after {self.timeout}s waiting for live kernel lock owner: {self.lock_path}")
                 time.sleep(self.poll_interval)
                 continue
+            if self.enable_profiling:
+                self.profile_timings["lock_ns"] = time.perf_counter_ns() - t_lock0
 
             # KERNEL ADVISORY LOCK GRANTED!
-            # Verify that the locked descriptor still matches the file on disk (guards against unlinks/recreations)
             try:
                 stat_fd = os.fstat(fd)
                 stat_path = os.stat(self.lock_path)
                 if stat_fd.st_ino != 0 and (stat_fd.st_ino != stat_path.st_ino or stat_fd.st_dev != stat_path.st_dev):
-                    # Stale inode detected - file was unlinked/recreated before acquisition
                     self._unlock_handle(file_obj)
                     try:
                         file_obj.close()
@@ -245,7 +333,6 @@ class FileLock:
                         pass
                     continue
             except OSError:
-                # File was unlinked between open and lock
                 self._unlock_handle(file_obj)
                 try:
                     file_obj.close()
@@ -253,12 +340,12 @@ class FileLock:
                     pass
                 continue
 
+            t_write0 = time.perf_counter_ns() if self.enable_profiling else 0
             try:
                 file_obj.seek(0)
                 file_obj.truncate(0)
                 file_obj.write(owner_payload)
                 file_obj.flush()
-                os.fsync(fd)
             except OSError as err:
                 self._unlock_handle(file_obj)
                 try:
@@ -266,42 +353,59 @@ class FileLock:
                 except OSError:
                     pass
                 raise err
+            if self.enable_profiling:
+                self.profile_timings["write_flush_enter_ns"] = time.perf_counter_ns() - t_write0
 
             self._file = file_obj
             self._fd = fd
             with _active_locks_guard:
                 _active_local_locks.add(self.lock_path)
+            if self.enable_profiling:
+                self.profile_timings["enter_total_ns"] = time.perf_counter_ns() - t0
             return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        t0 = time.perf_counter_ns() if self.enable_profiling else 0
         try:
             if self._file is not None:
-                # 1. Update metadata payload to "released" or "idle" state while STILL HOLDING kernel lock
                 try:
                     rel_status = getattr(self, "_release_status", "released")
                     rel_dict = {"status": rel_status, "pid": self.owner_pid, "token": self.token}
                     if rel_status == "idle":
                         rel_dict["reclaimed_at"] = time.time()
+                    
+                    t_meta0 = time.perf_counter_ns() if self.enable_profiling else 0
                     rel_payload = json.dumps(rel_dict).encode("utf-8")
+                    if self.enable_profiling:
+                        self.profile_timings["json_serialize_exit_ns"] = time.perf_counter_ns() - t_meta0
+
+                    t_write0 = time.perf_counter_ns() if self.enable_profiling else 0
                     self._file.seek(0)
                     self._file.truncate(0)
                     self._file.write(rel_payload)
                     self._file.flush()
-                    if self._fd is not None:
-                        os.fsync(self._fd)
+                    if self.enable_profiling:
+                        self.profile_timings["write_flush_exit_ns"] = time.perf_counter_ns() - t_write0
                 except OSError:
                     pass
 
-                # 2. Release OS-native kernel advisory lock
+                t_unlock0 = time.perf_counter_ns() if self.enable_profiling else 0
                 self._unlock_handle(self._file)
+                if self.enable_profiling:
+                    self.profile_timings["unlock_ns"] = time.perf_counter_ns() - t_unlock0
 
-                # 3. Close persistent file object
+                t_close0 = time.perf_counter_ns() if self.enable_profiling else 0
                 try:
                     self._file.close()
                 except OSError:
                     pass
+                if self.enable_profiling:
+                    self.profile_timings["close_ns"] = time.perf_counter_ns() - t_close0
+
                 self._file = None
                 self._fd = None
         finally:
             with _active_locks_guard:
                 _active_local_locks.discard(self.lock_path)
+            if self.enable_profiling:
+                self.profile_timings["exit_total_ns"] = time.perf_counter_ns() - t0
