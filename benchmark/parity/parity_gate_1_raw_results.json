@@ -1,0 +1,118 @@
+{
+  "environment": {
+    "os_platform": "win32",
+    "os_version": "nt",
+    "python_version": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+    "cpu_count_logical": 12,
+    "total_ram_gb": 15.27,
+    "portalocker_version": "4.1.0",
+    "portalocker_path": "C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\portalocker\\__init__.py",
+    "hostname": "AK",
+    "timestamp_utc": 1786885761.6073217
+  },
+  "dimension_1_single_process_benchmark": {
+    "portalocker_ref": {
+      "iterations": 500,
+      "median_us": 193.4,
+      "p90_us": 282.7,
+      "p95_us": 323.5,
+      "p99_us": 498.0,
+      "min_us": 173.3,
+      "max_us": 649.1,
+      "mean_us": 213.96,
+      "stddev_us": 58.05,
+      "throughput_ops_sec": 4673.87
+    },
+    "sclass_filelock": {
+      "iterations": 500,
+      "median_us": 2838.5,
+      "p90_us": 3682.0,
+      "p95_us": 3911.9,
+      "p99_us": 4746.4,
+      "min_us": 1971.5,
+      "max_us": 6096.0,
+      "mean_us": 2931.7,
+      "stddev_us": 569.33,
+      "throughput_ops_sec": 341.1
+    },
+    "memory_delta_bytes": {
+      "portalocker": 0,
+      "sclass": 0
+    }
+  },
+  "dimension_2_timeout_semantics": {
+    "portalocker_ref": {
+      "timed_out_properly": true,
+      "elapsed_sec": 0.2009,
+      "within_tolerance": true
+    },
+    "sclass_filelock": {
+      "timed_out_properly": true,
+      "elapsed_sec": 0.2037,
+      "within_tolerance": true
+    }
+  },
+  "dimension_3_thread_contention": {
+    "sclass_filelock": {
+      "expected_count": 400,
+      "actual_count": 400,
+      "is_exact_match": true,
+      "elapsed_sec": 1.6972
+    },
+    "portalocker_ref": {
+      "expected_count": 400,
+      "actual_count": 400,
+      "is_exact_match": true,
+      "elapsed_sec": 0.3741
+    }
+  },
+  "dimension_4_multiprocess_concurrency": {
+    "sclass_filelock": {
+      "expected_count": 100,
+      "actual_count": 100,
+      "is_exact_match": true,
+      "elapsed_sec": 0.7978
+    },
+    "portalocker_ref": {
+      "expected_count": 100,
+      "actual_count": 100,
+      "is_exact_match": true,
+      "elapsed_sec": 0.4842
+    }
+  },
+  "dimension_5_crash_termination_release": {
+    "sclass_filelock": {
+      "acquired_after_sigkill": true,
+      "recovery_latency_sec": 0.003714
+    },
+    "portalocker_ref": {
+      "acquired_after_sigkill": true,
+      "recovery_latency_sec": 0.000735
+    }
+  },
+  "dimension_6_repeated_stability": {
+    "iterations": 1000,
+    "elapsed_sec": 2.9551,
+    "throughput_ops_sec": 338.4,
+    "memory_growth_bytes": 0,
+    "leak_detected": false
+  },
+  "dimension_7_stale_metadata": {
+    "acquired_over_stale_metadata": true,
+    "overwritten_with_live_owner_pid": true
+  },
+  "dimension_8_gc_interaction": {
+    "active_lock_preserved_by_gc": true,
+    "idle_lock_marked_idle_or_reclaimed": true,
+    "gc_cleanups_reported": 0
+  },
+  "dimension_9_release_reacquire_race": {
+    "cycles_completed": 200,
+    "elapsed_sec": 0.5654,
+    "race_free": true
+  },
+  "dimension_10_descriptor_lifecycle": {
+    "clean_acquisition_initialization": true,
+    "clean_release_handle_closure": true
+  }
+}
