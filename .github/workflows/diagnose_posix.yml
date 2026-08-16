@@ -1,0 +1,42 @@
+name: OSS Parity Gate 1 - POSIX Layer C Diagnostics
+
+on:
+  push:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose-posix-layer-c:
+    name: POSIX Layer C Diagnostic Multi-Run (Ubuntu 24.04 / Python 3.12)
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Checkout S-Class Plugin Repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install Pinned Parity Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-parity-linux.txt
+
+    - name: Run 5-Pass POSIX Layer C Diagnostics
+      run: |
+        python benchmark/parity/diagnose_posix_layer_c.py
+
+    - name: Upload Diagnostic Artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: posix-layer-c-diagnostics-${{ github.sha }}
+        path: benchmark/parity/posix_diagnostic_5_runs_results.json
+        retention-days: 90
