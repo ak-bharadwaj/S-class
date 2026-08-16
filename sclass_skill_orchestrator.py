@@ -11,7 +11,7 @@ Exhaustively catalogs, initializes, and orchestrates ALL 70 specialized skills a
 import os
 import json
 import logging
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, field, asdict
 from typing import List, Dict, Any, Set, Optional
 
 logger = logging.getLogger("sclass_skill_orchestrator")
@@ -28,10 +28,10 @@ class SkillDefinition:
     source_repo: str = "builtin"
     reference_playbook: str = ""
     default_active: bool = False
-    conditional_keywords: List[str] = None
+    conditional_keywords: List[str] = field(default_factory=list)
     recommended_agent_id: str = "dss_frontend_dev"
-    applicable_phases: List[str] = None
-    execution_combos: List[str] = None
+    applicable_phases: List[str] = field(default_factory=list)
+    execution_combos: List[str] = field(default_factory=list)
 
 
 class SkillTaxonomy:

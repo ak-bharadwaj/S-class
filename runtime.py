@@ -346,10 +346,12 @@ class MemoryManager:
         NOTE: This is a validation check only — it does NOT execute the fix.
         The caller is responsible for applying the fix before calling this."""
         import subprocess
+        import shlex
         cwd = workspace_dir if workspace_dir else os.getcwd()
         try:
+            cmd_args = shlex.split(test_command, posix=(sys.platform != "win32"))
             result = subprocess.run(
-                test_command.split(),
+                cmd_args,
                 cwd=cwd,
                 capture_output=True,
                 text=True,

@@ -95,7 +95,7 @@ class AuthorizedChangeSet:
     source_task_hashes: Dict[str, str]  # Mapping task_id -> task_spec_hash (immutable semantic task digest)
     authorized_changes: Dict[str, AuthorizedFileChange] = field(default_factory=dict)
     source_snapshot_id: Optional[str] = None
-    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat() + "Z")
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"))
     changeset_hash: str = ""
 
     def __post_init__(self):

@@ -1,0 +1,6 @@
+{
+  "task_id": "INTERNAL_PILOT_CONFIG_GC",
+  "category": "Repository Infrastructure",
+  "domain": "Artifact Lifecycle & Integrity",
+  "raw_prompt": "Implement WorkspaceGarbageCollector in config_gc.py. Must support purge_expired_runs(max_age_days) while strictly preserving locked baseline reports (master_ledger.md, *.json), verify_artifact_integrity() raising ArtifactTamperError on modified report SHA-256 hashes, and get_storage_breakdown()."
+}

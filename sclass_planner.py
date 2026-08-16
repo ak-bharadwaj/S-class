@@ -123,11 +123,11 @@ class ExecutionPlanner:
         plan = WorkflowSelector.select_profile(intent, risk)
         # Step 4: Assemble Execution Strategy chained with Pipeline outputs
         strategy = StrategyEngine.infer_strategy(goal, codebase_meta=codebase_meta)
-        strategy.target_domains = list(dict.fromkeys(strategy.target_domains + intent.target_domains))
+        strategy.detected_domains = list(dict.fromkeys(strategy.detected_domains + intent.target_domains))
         strategy.risk_level = risk.risk_level
         strategy.review_depth = risk.review_depth
 
-        logger.info(f"[ExecutionPlanner] Assembled Execution Plan (Domains={strategy.target_domains}, Risk={risk.risk_level.value}, Profile={plan.profile.value})")
+        logger.info(f"[ExecutionPlanner] Assembled Execution Plan (Domains={strategy.detected_domains}, Risk={risk.risk_level.value}, Profile={plan.profile.value})")
         return strategy
 
     @staticmethod

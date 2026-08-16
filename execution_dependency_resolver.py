@@ -213,18 +213,18 @@ class ExecutionDependencyResolver:
             for p in parents:
                 reverse_dag[p].append(child)
 
-        # Priority queue / sorted list for deterministic tie breaking
-        ready = sorted([k for k, deg in in_degree.items() if deg == 0])
+        import heapq
+        ready = [k for k, deg in in_degree.items() if deg == 0]
+        heapq.heapify(ready)
         ordered: List[str] = []
 
         while ready:
-            curr = ready.pop(0)
+            curr = heapq.heappop(ready)
             ordered.append(curr)
             for child in sorted(reverse_dag[curr]):
                 in_degree[child] -= 1
                 if in_degree[child] == 0:
-                    ready.append(child)
-                    ready.sort()
+                    heapq.heappush(ready, child)
 
         if len(ordered) != len(dependency_dag):
             raise CyclicDependencyError("Topological sort failed due to unresolvable cycle in dependency DAG.")

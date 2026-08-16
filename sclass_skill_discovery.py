@@ -10,7 +10,6 @@ import os
 import re
 import json
 import logging
-import subprocess
 from typing import List, Dict, Any, Set, Optional
 from sclass_skill_orchestrator import SkillTaxonomy, SkillDefinition, SClassSkillOrchestrator
 

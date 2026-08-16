@@ -762,12 +762,18 @@ class SpecificationCompiler:
             if not task_gov.is_blocked and tasks and repo_snapshot:
                 source_task_hashes = {}
                 for t in tasks:
-                    th = getattr(t, "task_spec_hash", None)
+                    if isinstance(t, dict):
+                        th = t.get("task_spec_hash")
+                        t_id = t.get("id", "UNKNOWN")
+                    else:
+                        th = getattr(t, "task_spec_hash", None)
+                        t_id = getattr(t, "id", "UNKNOWN")
+
                     if not th or not isinstance(th, str) or not th.strip():
                         raise ValueError(
-                            f"Cannot compile AuthorizedChangeSet: Task '{getattr(t, 'id', 'UNKNOWN')}' is missing mandatory authoritative 'task_spec_hash'. Synthetic derivation is strictly prohibited."
+                            f"Cannot compile AuthorizedChangeSet: Task '{t_id}' is missing mandatory authoritative 'task_spec_hash'. Synthetic derivation is strictly prohibited."
                         )
-                    source_task_hashes[t.id] = th.strip()
+                    source_task_hashes[t_id] = th.strip()
 
                 if not execution_plan or not getattr(execution_plan, "plan_hash", None) or not str(execution_plan.plan_hash).strip():
                     raise ValueError("Cannot compile AuthorizedChangeSet: ExecutionPlan is missing or lacks mandatory authoritative 'plan_hash'.")

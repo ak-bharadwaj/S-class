@@ -526,8 +526,8 @@ class LLDCompiler:
                         if b_node.id not in mod_behaviors:
                             mod_behaviors.append(b_node.id)
 
-                        tokens = b_node.name.split()
-                        verb = tokens[1].lower() if len(tokens) > 1 else "action"
+                        tokens = (b_node.name or "").split()
+                        verb = tokens[1].lower() if len(tokens) > 1 else (tokens[0].lower() if tokens else "action")
                         ent_stem = clean_b_ent or "entity"
 
                         VERB_TO_NOUN = {

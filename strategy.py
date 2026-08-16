@@ -799,6 +799,7 @@ class StrategyEngine:
         # Fallback to governor & CSO if squad too small
         if len(squad) < 2:
             squad.add("dss_governor")
+            squad.add("dss_cso_v2")
 
         return sorted(list(squad))
 

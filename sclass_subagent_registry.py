@@ -117,7 +117,9 @@ class SubagentRegistry:
             # Resolve dynamic skill stack for subagent
             subagent_skills = SClassSkillOrchestrator.resolve_active_skills(fsm_phase, goal_text, cwd)
             skill_ids = [s.id for s in subagent_skills]
-            discovered_skills = discovery_res.get("bound_skill_ids", []) if isinstance(discovery_res, dict) else []
+            discovered_skills = []
+            if isinstance(discovery_res, dict):
+                discovered_skills = discovery_res.get("discovered_skills", discovery_res.get("bound_skill_ids", []))
             combined_skills = list(dict.fromkeys(sa.assigned_skills + skill_ids + discovered_skills))
             
             dispatched_subagents.append({

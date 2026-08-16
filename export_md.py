@@ -25,18 +25,22 @@ def export_blueprints_to_md(workspace_dir: str):
                 data = json.load(f)
 
             # Generate SYSTEM_ARCHITECTURE.md
-            b = data.get("backend_spec", {})
+            b = data.get("backend_spec") or {}
             arch_lines = ["# 🏛️ Enterprise System Architecture Blueprint\n"]
             arch_lines.append(f"- **Framework:** `{b.get('framework', 'N/A')}`")
             arch_lines.append(f"- **Base Path:** `{b.get('basePath', '/api')}`")
-            auth = b.get("auth", {})
-            arch_lines.append(f"- **Auth Guard:** `{auth.get('type', 'JWT')}` (Expiry: `{auth.get('accessTokenExpiry', '15m')}`)\n")
+            auth = b.get("auth") or {}
+            auth_type = auth.get("type", "JWT") if isinstance(auth, dict) else "JWT"
+            auth_expiry = auth.get("accessTokenExpiry", "15m") if isinstance(auth, dict) else "15m"
+            arch_lines.append(f"- **Auth Guard:** `{auth_type}` (Expiry: `{auth_expiry}`)\n")
             arch_lines.append("### API Endpoints & Controller Matrix")
             arch_lines.append("| HTTP Verb | API Endpoint | Public | Description |")
             arch_lines.append("| --- | --- | --- | --- |")
             for ep in b.get("endpoints", []):
-                is_pub = "Yes" if ep.get("public") else "No"
-                arch_lines.append(f"| `{ep.get('method')}` | `{ep.get('path')}` | {is_pub} | {ep.get('description')} |")
+                if isinstance(ep, dict):
+                    is_pub = "Yes" if ep.get("public") else "No"
+                    desc = str(ep.get("description", "")).replace("|", "\\|")
+                    arch_lines.append(f"| `{ep.get('method')}` | `{ep.get('path')}` | {is_pub} | {desc} |")
 
             arch_md_path = os.path.join(workspace_dir, "SYSTEM_ARCHITECTURE.md")
             with open(arch_md_path, "w", encoding="utf-8") as f:

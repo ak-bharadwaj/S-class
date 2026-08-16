@@ -39,12 +39,13 @@ class WorkflowPlan:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "WorkflowPlan":
+        state_seq = data.get("state_sequence", [])
         return cls(
             profile=WorkflowProfile(data["profile"]),
-            state_sequence=data["state_sequence"],
+            state_sequence=state_seq,
             allowed_transitions=data.get("allowed_transitions", {}),
             rationale=data.get("rationale", ""),
-            estimated_steps=data.get("estimated_steps", len(data.get("state_sequence", []))),
+            estimated_steps=data.get("estimated_steps", len(state_seq)),
         )
 
 

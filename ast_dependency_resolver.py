@@ -184,10 +184,26 @@ class ASTDependencyResolver:
                         with open(fp, "r", encoding="utf-8", errors="ignore") as file_obj:
                             content = file_obj.read()
                         
-                        for match in from_py_pattern.findall(content):
-                            imported_py.add(match)
-                        for match in import_py_pattern.findall(content):
-                            imported_py.add(match)
+                        # Try robust AST parsing first to avoid comments/docstrings
+                        try:
+                            tree = ast.parse(content, filename=fp)
+                            for node in ast.walk(tree):
+                                if isinstance(node, ast.Import):
+                                    for alias in node.names:
+                                        root_mod = alias.name.split(".")[0]
+                                        if root_mod:
+                                            imported_py.add(root_mod)
+                                elif isinstance(node, ast.ImportFrom):
+                                    if node.module:
+                                        root_mod = node.module.split(".")[0]
+                                        if root_mod:
+                                            imported_py.add(root_mod)
+                        except Exception:
+                            # Fallback to regex if syntax error in incomplete file
+                            for match in from_py_pattern.findall(content):
+                                imported_py.add(match)
+                            for match in import_py_pattern.findall(content):
+                                imported_py.add(match)
                     except Exception:
                         pass
 

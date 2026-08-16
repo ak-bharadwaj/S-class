@@ -80,10 +80,15 @@ class DomainNode:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'DomainNode':
+        prim_type_str = data.get("primitive_type", "entity")
+        try:
+            prim_type = DomainPrimitiveType(prim_type_str)
+        except ValueError:
+            prim_type = DomainPrimitiveType.ENTITY
         return cls(
-            id=data["id"],
-            name=data["name"],
-            primitive_type=DomainPrimitiveType(data["primitive_type"]),
+            id=data.get("id", ""),
+            name=data.get("name", ""),
+            primitive_type=prim_type,
             attributes=data.get("attributes", {}),
             provenance=ProvenanceType(data.get("provenance", "strongly_derived")),
             confidence=data.get("confidence", 1.0),
@@ -120,15 +125,15 @@ class DomainEdge:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'DomainEdge':
-        prov_val = data.get("provenance", "derived")
+        prov_val = data.get("provenance", "strongly_derived")
         try:
-            prov = EdgeProvenanceType(prov_val)
+            prov = ProvenanceKind(prov_val)
         except ValueError:
-            prov = EdgeProvenanceType.BEHAVIORAL_DERIVATION
+            prov = ProvenanceKind.STRONGLY_DERIVED
         return cls(
-            source_id=data["source_id"],
-            relation=RelationType(data["relation"]),
-            target_id=data["target_id"],
+            source_id=data.get("source_id", ""),
+            relation=RelationType(data.get("relation", "relates_to")),
+            target_id=data.get("target_id", ""),
             provenance=prov,
             confidence=data.get("confidence", 1.0),
             evidence_ref=data.get("evidence_ref"),

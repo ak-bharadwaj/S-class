@@ -361,7 +361,8 @@ class BehaviorGraphEngine:
         """
         triples = []
         # Split into atomic clause spans (conjunctions and subordinators)
-        clauses = re.split(r'[\.\n;]|\b(?:before|after|while|when|if|and\s+then|then|,)\b', raw_request, flags=re.IGNORECASE)
+        raw_clauses = re.split(r'[\.\n;]|\b(?:before|after|while|when|if|and\s+then|then|,)\b', raw_request, flags=re.IGNORECASE)
+        clauses = [c.strip() for c in raw_clauses if c and c.strip()]
 
         actor_map = {a.name.lower(): a for a in actors}
         for a in actors:

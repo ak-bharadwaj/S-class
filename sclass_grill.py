@@ -105,9 +105,14 @@ class SpecGrillerEngine:
         )
 
         # Save Grill Receipt
-        receipt_file = os.path.join(cwd, ".agents", "grill_report.json")
-        with open(receipt_file, "w", encoding="utf-8") as f:
-            json.dump(asdict(report), f, indent=2)
+        agents_dir = os.path.join(cwd, ".agents")
+        os.makedirs(agents_dir, exist_ok=True)
+        receipt_file = os.path.join(agents_dir, "grill_report.json")
+        try:
+            with open(receipt_file, "w", encoding="utf-8") as f:
+                json.dump(asdict(report), f, indent=2)
+        except Exception as e:
+            logger.warning(f"[SpecGriller] Failed to write grill_report.json: {e}")
 
         return report
 

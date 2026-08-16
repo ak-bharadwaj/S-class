@@ -10,7 +10,7 @@ import sys
 import os
 import json
 import logging
-from dataclasses import asdict
+from dataclasses import asdict, is_dataclass
 from typing import Dict, Any, List, Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -84,7 +84,7 @@ def handle_tool_call(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any
     elif tool_name == "sclass_strategy_planner":
         goal = arguments.get("goal", "")
         exec_plan = ExecutionPlanner.create_plan(goal, workspace_dir=workspace_dir)
-        plan = MetaPlanner.select_profile(goal)
+        plan = MetaPlanner.classify_goal(goal)
         return {
             "profile": plan.profile.value,
             "rationale": plan.rationale,
@@ -95,7 +95,15 @@ def handle_tool_call(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any
         from spec_synthesis import SpecSynthesisEngine
         raw_intent = arguments.get("raw_intent", "Fullstack App Build")
         spec = SpecSynthesisEngine.run_synthesis(raw_intent=raw_intent, workspace_dir=workspace_dir)
-        return {"synthesized_spec": spec.__dict__}
+        if hasattr(spec, "to_dict"):
+            spec_data = spec.to_dict()
+        elif is_dataclass(spec):
+            spec_data = asdict(spec)
+        elif hasattr(spec, "__dict__"):
+            spec_data = spec.__dict__
+        else:
+            spec_data = str(spec)
+        return {"synthesized_spec": spec_data}
 
     elif tool_name == "sclass_preflight_scan":
         from workspace_preflight_scanner import WorkspacePreflightScanner
