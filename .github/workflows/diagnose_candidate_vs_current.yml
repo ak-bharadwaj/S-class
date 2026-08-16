@@ -1,0 +1,48 @@
+name: OSS Parity Gate 1 - POSIX Candidate vs Current Verification
+
+on:
+  push:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-candidate-vs-current:
+    name: POSIX Candidate vs Current Verification (Ubuntu 24.04 / Python 3.12)
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Checkout S-Class Plugin Repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install Pinned Parity Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-parity-linux.txt
+
+    - name: Run Complete Differential Verification Suite
+      env:
+        PYTHONPATH: .
+      run: |
+        python -m pytest tests/test_experimental_metadata_writer.py -v
+
+    - name: Run Direct Head-to-Head Benchmark (Candidate vs Current)
+      run: |
+        python benchmark/parity/benchmark_candidate_vs_current.py
+
+    - name: Upload Comparison Artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: posix-candidate-vs-current-${{ github.sha }}
+        path: benchmark/parity/candidate_vs_current_results.json
+        retention-days: 90
