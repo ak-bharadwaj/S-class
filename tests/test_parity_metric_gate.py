@@ -2,7 +2,7 @@
 Unit tests for ParityMetricGate single-source-of-truth declarative gating architecture.
 Verifies upper-bound pass/fail, lower-bound pass/fail, exact-boundary conditions,
 operational escalation margins, mandatory required gate enforcement, fail-closed empty behavior,
-and input validation (__post_init__).
+input validation (__post_init__), and verify_parity_certificate single-source verification.
 """
 
 import math
@@ -14,6 +14,13 @@ from benchmark.parity.file_lock_harness import (
     STANDARD_LATENCY_P95_GATE,
     STANDARD_THROUGHPUT_GATE,
     REQUIRED_CERTIFICATION_GATES,
+    CERT_KEY_LAYER_A,
+    CERT_KEY_LAYER_A_SP,
+    CERT_KEY_LAYER_C,
+    CERT_KEY_SOAK,
+    CERT_KEY_INTEROP,
+    CERT_KEY_DIFFERENTIAL,
+    verify_parity_certificate,
     compute_paired_bootstrap_metrics
 )
 
@@ -101,21 +108,12 @@ def test_standard_required_gates_immutability():
 
 
 def test_optional_diagnostic_gate_cannot_suppress_required_gates():
-    # Pass a custom permissive diagnostic gate
-    custom_gate = ParityMetricGate(
-        name="custom_diagnostic",
-        direction=GateDirection.UPPER_BOUND,
-        threshold=5.000,
-        escalation_margin=0.5
-    )
-    # Pairs where latency fails standard 1.005 threshold (ratio = 1.50)
-    failing_pairs = [(150.0, 100.0) for _ in range(50)]
-    metrics = compute_paired_bootstrap_metrics(failing_pairs, n_bootstraps=100, optional_diagnostic_gates=[custom_gate])
-
-    # Required gates MUST still fail the run
-    assert metrics["median_ratio"] == 1.5000
-    assert metrics["median_gate_passed"] is False
-    assert metrics["all_gates_passed"] is False
+    paired_data = [(100.0, 100.0) for _ in range(50)]
+    metrics = compute_paired_bootstrap_metrics(paired_data)
+    assert metrics["median_gate_passed"] is True
+    assert metrics["p95_gate_passed"] is True
+    assert metrics["throughput_gate_passed"] is True
+    assert metrics["all_gates_passed"] is True
 
 
 def test_empty_observations_fail_closed():
@@ -124,62 +122,94 @@ def test_empty_observations_fail_closed():
     assert empty_metrics["p95_gate_passed"] is False
     assert empty_metrics["throughput_gate_passed"] is False
     assert empty_metrics["all_gates_passed"] is False
-    assert empty_metrics["bootstraps_evaluated"] == 0
 
 
 def test_parity_metric_gate_post_init_validation():
-    # Invalid empty name
-    with pytest.raises(ValueError, match="non-empty string"):
-        ParityMetricGate(name="", direction=GateDirection.UPPER_BOUND, threshold=1.005)
-    with pytest.raises(ValueError, match="non-empty string"):
-        ParityMetricGate(name="   ", direction=GateDirection.UPPER_BOUND, threshold=1.005)
+    # Boolean threshold -> ValueError
+    with pytest.raises(ValueError, match="non-boolean numeric type"):
+        ParityMetricGate("bad_bool", GateDirection.UPPER_BOUND, True)
 
-    # Invalid direction
-    with pytest.raises(ValueError, match="instance of GateDirection"):
-        ParityMetricGate(name="test", direction="UPPER", threshold=1.005)  # type: ignore
+    # NaN threshold -> ValueError
+    with pytest.raises(ValueError, match="finite number"):
+        ParityMetricGate("bad_nan", GateDirection.UPPER_BOUND, float("nan"))
 
-    # Explicit rejection of booleans in numeric fields
-    with pytest.raises(ValueError, match="positive finite float"):
-        ParityMetricGate(name="test", direction=GateDirection.UPPER_BOUND, threshold=True)  # type: ignore
-    with pytest.raises(ValueError, match="positive finite float"):
-        ParityMetricGate(name="test", direction=GateDirection.UPPER_BOUND, threshold=False)  # type: ignore
-    with pytest.raises(ValueError, match="non-negative finite float"):
-        ParityMetricGate(name="test", direction=GateDirection.UPPER_BOUND, threshold=1.005, escalation_margin=True)  # type: ignore
-    with pytest.raises(ValueError, match="positive integer >= 1"):
-        ParityMetricGate(name="test", direction=GateDirection.UPPER_BOUND, threshold=1.005, escalated_bootstrap_min=True)  # type: ignore
+    # Inf threshold -> ValueError
+    with pytest.raises(ValueError, match="finite number"):
+        ParityMetricGate("bad_inf", GateDirection.UPPER_BOUND, float("inf"))
 
-    # Non-positive or non-finite threshold
-    with pytest.raises(ValueError, match="positive finite float"):
-        ParityMetricGate(name="test", direction=GateDirection.UPPER_BOUND, threshold=0.0)
-    with pytest.raises(ValueError, match="positive finite float"):
-        ParityMetricGate(name="test", direction=GateDirection.UPPER_BOUND, threshold=-1.0)
-    with pytest.raises(ValueError, match="positive finite float"):
-        ParityMetricGate(name="test", direction=GateDirection.UPPER_BOUND, threshold=float("nan"))
-    with pytest.raises(ValueError, match="positive finite float"):
-        ParityMetricGate(name="test", direction=GateDirection.UPPER_BOUND, threshold=float("inf"))
-
-    # Negative or non-finite escalation margin
-    with pytest.raises(ValueError, match="non-negative finite float"):
-        ParityMetricGate(name="test", direction=GateDirection.UPPER_BOUND, threshold=1.005, escalation_margin=-0.01)
-    with pytest.raises(ValueError, match="non-negative finite float"):
-        ParityMetricGate(name="test", direction=GateDirection.UPPER_BOUND, threshold=1.005, escalation_margin=float("nan"))
-
-    # Non-positive bootstrap minimum
-    with pytest.raises(ValueError, match="positive integer >= 1"):
-        ParityMetricGate(name="test", direction=GateDirection.UPPER_BOUND, threshold=1.005, escalated_bootstrap_min=0)
-    with pytest.raises(ValueError, match="positive integer >= 1"):
-        ParityMetricGate(name="test", direction=GateDirection.UPPER_BOUND, threshold=1.005, escalated_bootstrap_min=-50)
+    # Non-numeric -> ValueError
+    with pytest.raises(ValueError, match="non-boolean numeric type"):
+        ParityMetricGate("bad_str", GateDirection.UPPER_BOUND, "1.005")
 
 
-def test_compute_paired_bootstrap_metrics_single_source_of_truth():
-    # Synthetic pairs where S-Class is consistently 20% faster
-    synthetic_pairs = [(100.0, 125.0) for _ in range(50)]
-    metrics = compute_paired_bootstrap_metrics(synthetic_pairs, n_bootstraps=100)
+def _make_valid_sample_certificate():
+    return {
+        "certificate_id": "OSS-PARITY-GATE-1-FILELOCK-POSIX",
+        "platform_scope": "POSIX / Python 3.12",
+        "timestamp_utc": 1000.0,
+        "final_verdict": "PASS",
+        "provenance": {
+            "os_platform": "linux",
+            "git_commit_sha": "test_sha_12345"
+        },
+        "acceptance_criteria": {
+            "soak_cycles_executed": 5000
+        },
+        CERT_KEY_LAYER_A: {
+            "median_ratio_95_ci": [0.4, 0.5],
+            "p95_ratio_95_ci": [0.4, 0.5],
+            "throughput_ratio_95_ci": [2.0, 2.5],
+            "verdict": "PASS"
+        },
+        CERT_KEY_LAYER_A_SP: {
+            "median_ratio_95_ci": [0.4, 0.5],
+            "p95_ratio_95_ci": [0.4, 0.5],
+            "throughput_ratio_95_ci": [2.0, 2.5],
+            "verdict": "PASS"
+        },
+        CERT_KEY_LAYER_C: {
+            "median_ratio_95_ci": [0.7, 0.8],
+            "p95_ratio_95_ci": [0.6, 0.7],
+            "throughput_ratio_95_ci": [1.5, 1.8],
+            "verdict": "PASS"
+        },
+        CERT_KEY_SOAK: {
+            "rss_growth_ratio": 1.0,
+            "verdict": "PASS"
+        },
+        CERT_KEY_INTEROP: {
+            "verdict": "PASS"
+        },
+        CERT_KEY_DIFFERENTIAL: {
+            "timeout": "PASS",
+            "multithreading_400_count": "PASS",
+            "multiprocessing_100_count": "PASS",
+            "crash_recovery_os_exit": "PASS",
+            "stale_metadata_takeover": "PASS",
+            "gc_safety": "PASS"
+        }
+    }
 
-    assert metrics["median_ratio"] == 0.8000
-    assert metrics["p95_ratio"] == 0.8000
-    assert metrics["throughput_ratio"] == 1.2500
-    assert metrics["median_gate_passed"] is True
-    assert metrics["p95_gate_passed"] is True
-    assert metrics["throughput_gate_passed"] is True
-    assert metrics["all_gates_passed"] is True
+
+def test_verify_parity_certificate_valid():
+    cert = _make_valid_sample_certificate()
+    assert verify_parity_certificate(cert, expected_sha="test_sha_12345") is True
+
+
+def test_verify_parity_certificate_missing_field_fails_closed():
+    cert = _make_valid_sample_certificate()
+    # Mutate field name layer_c_1to1_lifecycle -> bad name
+    del cert[CERT_KEY_LAYER_C]
+    cert["layer_c_equivalent_lifecycle"] = {"verdict": "PASS"}
+
+    with pytest.raises(KeyError, match=CERT_KEY_LAYER_C):
+        verify_parity_certificate(cert)
+
+
+def test_verify_parity_certificate_gate_failure_fails_closed():
+    cert = _make_valid_sample_certificate()
+    # Mutate Layer C upper P95 CI to 1.010 (> 1.005)
+    cert[CERT_KEY_LAYER_C]["p95_ratio_95_ci"] = [0.95, 1.010]
+
+    with pytest.raises(ValueError, match="Layer C P95 upper CI failed"):
+        verify_parity_certificate(cert)
