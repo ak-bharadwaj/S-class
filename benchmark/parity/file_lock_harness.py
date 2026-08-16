@@ -80,6 +80,18 @@ class ParityMetricGate:
     escalation_margin: float = 0.020
     escalated_bootstrap_min: int = 10000
 
+    def __post_init__(self):
+        if not self.name or not isinstance(self.name, str) or not self.name.strip():
+            raise ValueError("ParityMetricGate 'name' must be a non-empty string")
+        if not isinstance(self.direction, GateDirection):
+            raise ValueError(f"ParityMetricGate 'direction' must be an instance of GateDirection, got {self.direction}")
+        if not isinstance(self.threshold, (int, float)) or not (self.threshold > 0.0) or (self.threshold != self.threshold) or (self.threshold == float('inf')):
+            raise ValueError(f"ParityMetricGate 'threshold' must be a positive finite float, got {self.threshold}")
+        if not isinstance(self.escalation_margin, (int, float)) or not (self.escalation_margin >= 0.0) or (self.escalation_margin != self.escalation_margin) or (self.escalation_margin == float('inf')):
+            raise ValueError(f"ParityMetricGate 'escalation_margin' must be a non-negative finite float, got {self.escalation_margin}")
+        if not isinstance(self.escalated_bootstrap_min, int) or self.escalated_bootstrap_min < 1:
+            raise ValueError(f"ParityMetricGate 'escalated_bootstrap_min' must be a positive integer >= 1, got {self.escalated_bootstrap_min}")
+
     def is_near_boundary(self, observed_ratio: float) -> bool:
         """Determines if observed point ratio is within operational escalation_margin of failure boundary."""
         if self.direction == GateDirection.UPPER_BOUND:
