@@ -184,12 +184,15 @@ print(f"Kernel Approved Mutation: '{res['previousPhase']}' ➔ '{res['currentPha
 
 ## 🧪 Comprehensive Automated Test Suite
 
-S-Class EOS V11.2 contains **397 product regression test cases across 49 test suites** passing with 100% success across Python 3.10–3.14 (historical and research benchmarks isolated in `benchmark/v0/`):
+S-Class EOS V11.2 contains **407 product regression test cases across 52 test suites** passing with 100% success across Python 3.10–3.14 (historical and research benchmarks isolated in `benchmark/v0/`):
 
 | Test Module Category | Test Count | Functionality Tested |
 | :--- | :--- | :--- |
-| **Audit Hardening & Concurrency** | 10 tests | Live planner/MCP dispatch execution, fail-closed governor security, multi-process GC lock reclamation race safety (`tests/test_audit_hardening_verification.py`). |
-| **V11.2 Stabilization Pass** | 12 tests | Canonical event replay, kernel API contract strictness, subprocess crash resilience, SClassTestRunner boundaries, supply-chain freeze, constraint/preference split, AST dependency DAG (`tests/test_v11_stabilization.py`). |
+| **Property & Invariant Testing** | 4 tests | Hypothesis property testing adapter verifying SPIFFE URI authority, PHI/PII redaction, and double-entry ledger zero-sum conservation (`tests/test_property_verifier.py`). |
+| **API Contract Verification** | 3 tests | Schemathesis OpenAPI contract verification and behavioral fuzzing campaigns (`tests/test_api_contract_verifier.py`). |
+| **Static & Type Verification** | 3 tests | Ruff static analysis quality receipts & Python type checking evidence generation (`tests/test_static_and_type_providers.py`). |
+| **Audit Hardening & Concurrency** | 10 tests | Portalocker cross-platform locking, live planner/MCP dispatch, fail-closed governor security, multi-process GC lock reclamation race safety (`tests/test_audit_hardening_verification.py`). |
+| **V11.2 Stabilization Pass** | 12 tests | Canonical event replay, LibCST AST dependency DAG, kernel API contract strictness, subprocess crash resilience, SClassTestRunner boundaries, supply-chain freeze (`tests/test_v11_stabilization.py`). |
 | **Master Production Closure** | 6 tests | Whole-system V9.6 $\to$ V11.2 master closure: task compiler, execution planner, repository snapshot, ChangeSet reconciliation, implementation/verification evidence (`tests/test_v11_master_closure.py`). |
 | **World Model & Adapters** | 33 tests | Sovereign PromotionEngine, LanguageAdapters (Python, JS/TS, Fallback), GroundedSpecWeaver, Evidence Verification (`tests/test_v11_world_model.py`). |
 | **ChangeSet Governance** | 28 tests | Sovereign ChangeSet issuance, boundary enforcement, atomic diff reconciliation (`tests/test_v11_changeset_governance.py`). |

@@ -110,10 +110,18 @@ def _get_process_start_time(pid: int) -> Optional[float]:
     return None
 
 
+try:
+    import portalocker
+    from portalocker.exceptions import LockException, AlreadyLocked
+    HAS_PORTALOCKER = True
+except ImportError:
+    HAS_PORTALOCKER = False
+
+
 class FileLock:
     """
-    Canonical OS-native kernel advisory mutual exclusion file lock (msvcrt.locking / fcntl.flock)
-    with diagnostic owner metadata and thread-safe local activation tracking.
+    Canonical OS-native kernel advisory mutual exclusion file lock backed by Portalocker
+    (with OS-native msvcrt/fcntl fallback), diagnostic owner metadata, and thread-safe local activation tracking.
     """
     def __init__(self, lock_path: str, timeout: float = 10.0):
         self.lock_path = os.path.abspath(lock_path)
@@ -124,11 +132,16 @@ class FileLock:
         self._fd: Optional[int] = None
 
     def _lock_handle(self, fd: int) -> bool:
-        """Acquires OS-native non-blocking kernel advisory lock."""
+        """Acquires non-blocking kernel advisory lock via portalocker or native OS."""
+        if HAS_PORTALOCKER:
+            try:
+                portalocker.lock(fd, portalocker.LOCK_EX | portalocker.LOCK_NB)
+                return True
+            except (LockException, AlreadyLocked, OSError, IOError):
+                return False
         try:
             if sys.platform == "win32":
                 import msvcrt
-                # Lock byte offset 0x7FFFFFFF (2GB) so byte range 0-1MB remains completely free for unhindered ftruncate and metadata writing
                 os.lseek(fd, 0x7FFFFFFF, os.SEEK_SET)
                 msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
                 os.lseek(fd, 0, os.SEEK_SET)
@@ -140,7 +153,13 @@ class FileLock:
             return False
 
     def _unlock_handle(self, fd: int) -> None:
-        """Releases OS-native kernel advisory lock."""
+        """Releases kernel advisory lock via portalocker or native OS."""
+        if HAS_PORTALOCKER:
+            try:
+                portalocker.unlock(fd)
+                return
+            except (LockException, OSError, IOError):
+                pass
         try:
             if sys.platform == "win32":
                 import msvcrt

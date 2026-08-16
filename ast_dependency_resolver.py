@@ -45,6 +45,31 @@ STDLIB_PYTHON_MODULES: Set[str] = set(getattr(sys, "stdlib_module_names", {
     "urllib", "uuid", "warnings", "weakref", "xml", "zipfile", "zlib"
 }))
 
+try:
+    import libcst as cst
+
+    class LibCSTImportVisitor(cst.CSTVisitor):
+        def __init__(self):
+            self.imports: Set[str] = set()
+
+        def visit_Import(self, node: cst.Import) -> None:
+            for alias in node.names:
+                if hasattr(alias.name, "value"):
+                    val = alias.name.value
+                    if isinstance(val, str):
+                        self.imports.add(val.split(".")[0])
+
+        def visit_ImportFrom(self, node: cst.ImportFrom) -> None:
+            if node.module is not None:
+                if hasattr(node.module, "value"):
+                    val = node.module.value
+                    if isinstance(val, str):
+                        self.imports.add(val.split(".")[0])
+
+    HAS_LIBCST = True
+except ImportError:
+    HAS_LIBCST = False
+
 
 class ASTDependencyResolver:
     """
@@ -184,26 +209,41 @@ class ASTDependencyResolver:
                         with open(fp, "r", encoding="utf-8", errors="ignore") as file_obj:
                             content = file_obj.read()
                         
-                        # Try robust AST parsing first to avoid comments/docstrings
-                        try:
-                            tree = ast.parse(content, filename=fp)
-                            for node in ast.walk(tree):
-                                if isinstance(node, ast.Import):
-                                    for alias in node.names:
-                                        root_mod = alias.name.split(".")[0]
-                                        if root_mod:
-                                            imported_py.add(root_mod)
-                                elif isinstance(node, ast.ImportFrom):
-                                    if node.module:
-                                        root_mod = node.module.split(".")[0]
-                                        if root_mod:
-                                            imported_py.add(root_mod)
-                        except Exception:
-                            # Fallback to regex if syntax error in incomplete file
-                            for match in from_py_pattern.findall(content):
-                                imported_py.add(match)
-                            for match in import_py_pattern.findall(content):
-                                imported_py.add(match)
+                        # Try robust LibCST parsing first, then AST, then regex fallback
+                        extracted_file_imports = set()
+                        cst_success = False
+                        if HAS_LIBCST:
+                            try:
+                                cst_tree = cst.parse_module(content)
+                                visitor = LibCSTImportVisitor()
+                                cst_tree.visit(visitor)
+                                extracted_file_imports = visitor.imports
+                                cst_success = True
+                            except Exception:
+                                cst_success = False
+
+                        if not cst_success:
+                            try:
+                                tree = ast.parse(content, filename=fp)
+                                for node in ast.walk(tree):
+                                    if isinstance(node, ast.Import):
+                                        for alias in node.names:
+                                            root_mod = alias.name.split(".")[0]
+                                            if root_mod:
+                                                extracted_file_imports.add(root_mod)
+                                    elif isinstance(node, ast.ImportFrom):
+                                        if node.module:
+                                            root_mod = node.module.split(".")[0]
+                                            if root_mod:
+                                                extracted_file_imports.add(root_mod)
+                            except Exception:
+                                # Fallback to regex if syntax error in incomplete file
+                                for match in from_py_pattern.findall(content):
+                                    extracted_file_imports.add(match)
+                                for match in import_py_pattern.findall(content):
+                                    extracted_file_imports.add(match)
+
+                        imported_py.update(extracted_file_imports)
                     except Exception:
                         pass
 

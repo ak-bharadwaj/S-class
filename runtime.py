@@ -177,7 +177,15 @@ def _validate_schema_value(value: Any, schema: Dict[str, Any], path: str = ""):
 
 def validate_state_types(state_dict: Dict[str, Any]):
     schema = load_json(SCHEMA_FILE)
-    _validate_schema_value(state_dict, schema)
+    try:
+        import jsonschema
+        try:
+            jsonschema.validate(instance=state_dict, schema=schema)
+            return
+        except jsonschema.ValidationError as err:
+            raise TypeError(f"Type validation failed at '{err.json_path}': {err.message}") from err
+    except ImportError:
+        _validate_schema_value(state_dict, schema)
 
 def _execute_side_effects(state: State, side_effects: List[str]):
     for effect in side_effects:
@@ -1232,7 +1240,7 @@ class FSMGoalSequenceRunner:
                     dependsOn=[],
                     acceptanceCriteria="Task implementation verified",
                     priority="HIGH",
-                    status="completed"
+                    status="COMPLETED"
                 ))
                 save_state(state, workspace_dir)
 

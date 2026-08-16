@@ -284,16 +284,12 @@ class ArtifactGovernor:
         if os.path.exists(cfg_file):
             try:
                 with open(cfg_file, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
-                mode_str = str(cfg.get("executionMode", "")).strip().upper()
-                if mode_str in ["TEST", "SIMULATION", "PRODUCTION"]:
-                    return mode_str
-                if mode_str in ["CLOSED LOOP", "CONVERGENCE"]:
-                    return "SIMULATION"
-                logger.error(f"[ArtifactGovernor] Invalid executionMode '{mode_str}' in {cfg_file}. Failing closed to CONFIGURATION_ERROR.")
-                return "CONFIGURATION_ERROR"
+                    raw_cfg = json.load(f)
+                from sclass_schemas import SClassConfigModel
+                validated_cfg = SClassConfigModel.model_validate(raw_cfg)
+                return validated_cfg.executionMode
             except Exception as e:
-                logger.error(f"[ArtifactGovernor] Malformed configuration file {cfg_file}: {e}. Failing closed to CONFIGURATION_ERROR.")
+                logger.error(f"[ArtifactGovernor] Malformed or invalid configuration file {cfg_file}: {e}. Failing closed to CONFIGURATION_ERROR.")
                 return "CONFIGURATION_ERROR"
 
         if workspace_dir:

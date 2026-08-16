@@ -738,12 +738,11 @@ class EvidenceVerifier:
                 errors.append("DESIGN_REVISION verification failed: Missing '.agents/design_blueprint.json'. Revised design blueprint must be saved.")
 
         elif current_phase == "TASK_VERIFICATION":
-            if os.path.exists(state_file):
                 try:
                     with open(state_file, "r", encoding="utf-8") as f:
                         sdict = json.load(f)
                     tasks = sdict.get("tasks", [])
-                    completed = [t for t in tasks if isinstance(t, dict) and t.get("status") in ["completed", "verified", "DONE"]]
+                    completed = [t for t in tasks if isinstance(t, dict) and str(t.get("status", "")).upper() in ["COMPLETED", "VERIFIED", "DONE"]]
                     has_completed = len(completed) > 0 or allow_soft
                     artifacts.append(EvidenceArtifact(current_phase, "task_execution_receipts", state_file, has_completed, {"completed_count": len(completed)}))
                     if not has_completed and not allow_soft:
