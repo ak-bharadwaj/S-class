@@ -29,37 +29,44 @@ def run_gc(workspace_dir: str, state_max_age_days: int = 7, memory_max_age_days:
         try:
             from file_lock import FileLock, _process_exists
             is_stale = False
-            lock = FileLock(lock_file, timeout=0.1)
             try:
-                with lock:
-                    # We hold the OS kernel lock on state.lock
-                    try:
-                        with open(lock_file, "r", encoding="utf-8") as f:
-                            data = json.load(f)
-                        pid = data.get("pid")
-                        status = data.get("status")
-                        if (pid and not _process_exists(pid)) or status in ["released", "idle"]:
-                            is_stale = True
-                    except (json.JSONDecodeError, OSError, ValueError):
-                        # Malformed or empty lock payload is considered stale
-                        is_stale = True
+                with open(lock_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                pid = data.get("pid")
+                status = data.get("status")
+                if (pid and not _process_exists(pid)) or status in ["released", "idle"]:
+                    is_stale = True
+            except (json.JSONDecodeError, OSError, ValueError):
+                # Malformed or empty lock payload is considered stale
+                is_stale = True
 
-                    if is_stale:
+            if is_stale:
+                # Attempt to acquire kernel lock to reclaim safely
+                lock = FileLock(lock_file, timeout=0.1)
+                try:
+                    with lock:
                         try:
                             size = os.path.getsize(lock_file)
                         except OSError:
                             size = 0
                         report.stale_locks_removed += 1
                         report.total_bytes_freed += size
-            except TimeoutError:
-                # An active live process holds the kernel lock on state.lock - do not touch it
-                is_stale = False
-
-            if is_stale and os.path.exists(lock_file):
-                try:
-                    os.remove(lock_file)
-                except OSError as rm_err:
-                    logging.getLogger("sclass_gc").debug(f"Could not unlink stale lock {lock_file}: {rm_err}")
+                        # Reset lock payload to idle/reclaimed state while holding kernel lock.
+                        # Persistent lock files are NEVER unlinked, permanently eliminating detached-inode split-brain races.
+                        try:
+                            idle_payload = json.dumps({
+                                "status": "idle",
+                                "reclaimed_at": now.isoformat()
+                            }).encode("utf-8")
+                            os.ftruncate(lock._fd, 0)
+                            os.lseek(lock._fd, 0, os.SEEK_SET)
+                            os.write(lock._fd, idle_payload)
+                            os.fsync(lock._fd)
+                        except OSError as write_err:
+                            logging.getLogger("sclass_gc").debug(f"Could not reset stale lock {lock_file}: {write_err}")
+                except TimeoutError:
+                    # An active live process holds the kernel lock on state.lock - do not touch it
+                    pass
         except Exception as e:
             report.errors.append(f"Error checking lock file: {e}")
 

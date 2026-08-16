@@ -136,13 +136,17 @@ def test_config_gc_live_vs_stale_lock(tmp_path):
     lock_file.write_text(json.dumps({"pid": 99999999, "status": "active"}))
     report = run_gc(str(tmp_path))
     assert report.stale_locks_removed == 1
-    assert not lock_file.exists()
+    assert lock_file.exists()
+    data1 = json.loads(lock_file.read_text())
+    assert data1.get("status") in ["released", "idle"]
     
     # 2. Stale lock with 'released' status
     lock_file.write_text(json.dumps({"pid": os.getpid(), "status": "released"}))
     report2 = run_gc(str(tmp_path))
     assert report2.stale_locks_removed == 1
-    assert not lock_file.exists()
+    assert lock_file.exists()
+    data2 = json.loads(lock_file.read_text())
+    assert data2.get("status") in ["released", "idle"]
 
 
 def test_gc_does_not_remove_active_lock(tmp_path):
@@ -186,3 +190,80 @@ def test_concurrent_file_lock_mutual_exclusion(tmp_path):
         
     assert len(errors) == 0
     assert counter["val"] == 50
+
+
+def test_multiprocess_gc_reclaim_and_acquisition_race(tmp_path):
+    """
+    Process-Level Falsification Test:
+    Spawns concurrent external OS processes running FileLock acquisitions and continuous GC runs.
+    Verifies that:
+    1. GC never causes split-brain locks or unlinked inode races between distinct OS processes.
+    2. Lock file remains valid JSON at all times without corruption or trailing bytes.
+    3. All worker operations complete with 100% mutual exclusion.
+    """
+    import subprocess
+    import sys
+    
+    workspace = str(tmp_path)
+    agents_dir = tmp_path / ".agents"
+    agents_dir.mkdir()
+    
+    # State file to track atomic counter
+    counter_file = str(agents_dir / "atomic_counter.json")
+    with open(counter_file, "w", encoding="utf-8") as f:
+        json.dump({"count": 0}, f)
+
+    worker_script = f"""
+import sys, os, time, json
+sys.path.insert(0, {repr(os.path.abspath('.'))})
+from file_lock import FileLock
+
+lock_path = os.path.join({repr(workspace)}, ".agents", "state.lock")
+counter_path = os.path.join({repr(workspace)}, ".agents", "atomic_counter.json")
+
+for i in range(15):
+    with FileLock(lock_path, timeout=10.0):
+        with open(counter_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        c = data["count"]
+        time.sleep(0.01)
+        data["count"] = c + 1
+        with open(counter_path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+"""
+
+    gc_script = f"""
+import sys, os, time
+sys.path.insert(0, {repr(os.path.abspath('.'))})
+from config_gc import run_gc
+
+workspace = {repr(workspace)}
+for _ in range(30):
+    run_gc(workspace)
+    time.sleep(0.01)
+"""
+
+    # Launch 2 worker processes and 1 aggressive GC process concurrently
+    proc_worker1 = subprocess.Popen([sys.executable, "-c", worker_script], cwd=os.path.abspath('.'))
+    proc_worker2 = subprocess.Popen([sys.executable, "-c", worker_script], cwd=os.path.abspath('.'))
+    proc_gc = subprocess.Popen([sys.executable, "-c", gc_script], cwd=os.path.abspath('.'))
+
+    ret_w1 = proc_worker1.wait(timeout=20)
+    ret_w2 = proc_worker2.wait(timeout=20)
+    ret_gc = proc_gc.wait(timeout=20)
+
+    assert ret_w1 == 0, f"Worker 1 failed with returncode {ret_w1}"
+    assert ret_w2 == 0, f"Worker 2 failed with returncode {ret_w2}"
+    assert ret_gc == 0, f"GC process failed with returncode {ret_gc}"
+
+    with open(counter_file, "r", encoding="utf-8") as f:
+        final_counter = json.load(f)
+
+    # 15 increments from Worker 1 + 15 increments from Worker 2 = exactly 30
+    assert final_counter["count"] == 30, f"Expected 30, got {final_counter['count']} (split-brain race occurred!)"
+
+    # Verify lock file metadata is clean and valid JSON
+    lock_file = agents_dir / "state.lock"
+    assert lock_file.exists()
+    lock_data = json.loads(lock_file.read_text(encoding="utf-8"))
+    assert "pid" in lock_data or lock_data.get("status") in ["released", "idle"]

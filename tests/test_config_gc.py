@@ -13,7 +13,9 @@ def test_run_gc_stale_lock(tmp_path):
     
     report = run_gc(str(tmp_path))
     assert report.stale_locks_removed == 1
-    assert not lock_file.exists()
+    assert lock_file.exists()
+    data = json.loads(lock_file.read_text())
+    assert data.get("status") in ["released", "idle"]
 
 def test_run_gc_expired_state(tmp_path):
     agents_dir = tmp_path / ".agents"

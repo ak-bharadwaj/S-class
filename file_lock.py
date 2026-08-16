@@ -128,7 +128,10 @@ class FileLock:
         try:
             if sys.platform == "win32":
                 import msvcrt
+                # Lock byte offset 0x7FFFFFFF (2GB) so byte range 0-1MB remains completely free for unhindered ftruncate and metadata writing
+                os.lseek(fd, 0x7FFFFFFF, os.SEEK_SET)
                 msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                os.lseek(fd, 0, os.SEEK_SET)
             else:
                 import fcntl
                 fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -141,7 +144,9 @@ class FileLock:
         try:
             if sys.platform == "win32":
                 import msvcrt
+                os.lseek(fd, 0x7FFFFFFF, os.SEEK_SET)
                 msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+                os.lseek(fd, 0, os.SEEK_SET)
             else:
                 import fcntl
                 fcntl.flock(fd, fcntl.LOCK_UN)
@@ -223,12 +228,9 @@ class FileLock:
                 continue
 
             try:
+                os.ftruncate(fd, 0)
                 os.lseek(fd, 0, os.SEEK_SET)
                 os.write(fd, owner_payload)
-                try:
-                    os.ftruncate(fd, len(owner_payload))
-                except OSError:
-                    pass
                 os.fsync(fd)
             except OSError as err:
                 self._unlock_handle(fd)
@@ -249,12 +251,9 @@ class FileLock:
                 # 1. Update metadata payload to "released" state while STILL HOLDING kernel lock
                 try:
                     rel_payload = json.dumps({"status": "released", "pid": self.owner_pid, "token": self.token}).encode("utf-8")
+                    os.ftruncate(self._fd, 0)
                     os.lseek(self._fd, 0, os.SEEK_SET)
                     os.write(self._fd, rel_payload)
-                    try:
-                        os.ftruncate(self._fd, len(rel_payload))
-                    except OSError:
-                        pass
                     os.fsync(self._fd)
                 except OSError:
                     pass
