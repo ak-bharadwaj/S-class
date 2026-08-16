@@ -123,23 +123,26 @@ class FileLock:
     Canonical OS-native kernel advisory mutual exclusion file lock backed by Portalocker
     (with OS-native msvcrt/fcntl fallback), diagnostic owner metadata, and thread-safe local activation tracking.
     """
-    def __init__(self, lock_path: str, timeout: float = 10.0):
+    def __init__(self, lock_path: str, timeout: float = 10.0, poll_interval: float = 0.05):
         self.lock_path = os.path.abspath(lock_path)
         self.timeout = timeout
+        self.poll_interval = poll_interval
         self.token = str(uuid.uuid4())
         self.owner_pid = os.getpid()
         self.owner_proc_start = _get_process_start_time(self.owner_pid)
+        self._file = None
         self._fd: Optional[int] = None
 
-    def _lock_handle(self, fd: int) -> bool:
+    def _lock_handle(self, file_obj) -> bool:
         """Acquires non-blocking kernel advisory lock via portalocker or native OS."""
         if HAS_PORTALOCKER:
             try:
-                portalocker.lock(fd, portalocker.LOCK_EX | portalocker.LOCK_NB)
+                portalocker.lock(file_obj, portalocker.LOCK_EX | portalocker.LOCK_NB)
                 return True
             except (LockException, AlreadyLocked, OSError, IOError):
                 return False
         try:
+            fd = file_obj.fileno() if hasattr(file_obj, "fileno") else file_obj
             if sys.platform == "win32":
                 import msvcrt
                 os.lseek(fd, 0x7FFFFFFF, os.SEEK_SET)
@@ -152,15 +155,18 @@ class FileLock:
         except (OSError, IOError):
             return False
 
-    def _unlock_handle(self, fd: int) -> None:
+    def _unlock_handle(self, file_obj) -> None:
         """Releases kernel advisory lock via portalocker or native OS."""
+        if file_obj is None:
+            return
         if HAS_PORTALOCKER:
             try:
-                portalocker.unlock(fd)
+                portalocker.unlock(file_obj)
                 return
             except (LockException, OSError, IOError):
                 pass
         try:
+            fd = file_obj.fileno() if hasattr(file_obj, "fileno") else file_obj
             if sys.platform == "win32":
                 import msvcrt
                 os.lseek(fd, 0x7FFFFFFF, os.SEEK_SET)
@@ -197,12 +203,13 @@ class FileLock:
             if is_locally_active:
                 if time.time() - start_time >= self.timeout:
                     raise TimeoutError(f"Local thread lock timeout after {self.timeout}s waiting for {self.lock_path}")
-                time.sleep(0.05)
+                time.sleep(self.poll_interval)
                 continue
 
             try:
                 # Open or create persistent lock file with owner-only permissions (0o600)
-                fd = os.open(self.lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+                file_obj = open(self.lock_path, "a+b")
+                fd = file_obj.fileno()
                 try:
                     os.chmod(self.lock_path, 0o600)
                 except OSError:
@@ -210,18 +217,18 @@ class FileLock:
             except OSError:
                 if time.time() - start_time >= self.timeout:
                     raise TimeoutError(f"FileLock timeout opening persistent lock file: {self.lock_path}")
-                time.sleep(0.05)
+                time.sleep(self.poll_interval)
                 continue
 
-            # Attempt OS-native non-blocking kernel advisory lock on persistent file descriptor
-            if not self._lock_handle(fd):
+            # Attempt OS-native non-blocking kernel advisory lock on open file object
+            if not self._lock_handle(file_obj):
                 try:
-                    os.close(fd)
+                    file_obj.close()
                 except OSError:
                     pass
                 if time.time() - start_time >= self.timeout:
                     raise TimeoutError(f"FileLock timeout after {self.timeout}s waiting for live kernel lock owner: {self.lock_path}")
-                time.sleep(0.05)
+                time.sleep(self.poll_interval)
                 continue
 
             # KERNEL ADVISORY LOCK GRANTED!
@@ -231,34 +238,36 @@ class FileLock:
                 stat_path = os.stat(self.lock_path)
                 if stat_fd.st_ino != 0 and (stat_fd.st_ino != stat_path.st_ino or stat_fd.st_dev != stat_path.st_dev):
                     # Stale inode detected - file was unlinked/recreated before acquisition
-                    self._unlock_handle(fd)
+                    self._unlock_handle(file_obj)
                     try:
-                        os.close(fd)
+                        file_obj.close()
                     except OSError:
                         pass
                     continue
             except OSError:
                 # File was unlinked between open and lock
-                self._unlock_handle(fd)
+                self._unlock_handle(file_obj)
                 try:
-                    os.close(fd)
+                    file_obj.close()
                 except OSError:
                     pass
                 continue
 
             try:
-                os.ftruncate(fd, 0)
-                os.lseek(fd, 0, os.SEEK_SET)
-                os.write(fd, owner_payload)
+                file_obj.seek(0)
+                file_obj.truncate(0)
+                file_obj.write(owner_payload)
+                file_obj.flush()
                 os.fsync(fd)
             except OSError as err:
-                self._unlock_handle(fd)
+                self._unlock_handle(file_obj)
                 try:
-                    os.close(fd)
+                    file_obj.close()
                 except OSError:
                     pass
                 raise err
 
+            self._file = file_obj
             self._fd = fd
             with _active_locks_guard:
                 _active_local_locks.add(self.lock_path)
@@ -266,25 +275,33 @@ class FileLock:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         try:
-            if self._fd is not None:
-                # 1. Update metadata payload to "released" state while STILL HOLDING kernel lock
+            if self._file is not None:
+                # 1. Update metadata payload to "released" or "idle" state while STILL HOLDING kernel lock
                 try:
-                    rel_payload = json.dumps({"status": "released", "pid": self.owner_pid, "token": self.token}).encode("utf-8")
-                    os.ftruncate(self._fd, 0)
-                    os.lseek(self._fd, 0, os.SEEK_SET)
-                    os.write(self._fd, rel_payload)
-                    os.fsync(self._fd)
+                    rel_status = getattr(self, "_release_status", "released")
+                    rel_dict = {"status": rel_status, "pid": self.owner_pid, "token": self.token}
+                    if rel_status == "idle":
+                        rel_dict["reclaimed_at"] = time.time()
+                    rel_payload = json.dumps(rel_dict).encode("utf-8")
+                    self._file.seek(0)
+                    self._file.truncate(0)
+                    self._file.write(rel_payload)
+                    self._file.flush()
+                    if self._fd is not None:
+                        os.fsync(self._fd)
                 except OSError:
                     pass
 
                 # 2. Release OS-native kernel advisory lock
-                self._unlock_handle(self._fd)
+                self._unlock_handle(self._file)
 
-                # 3. Close persistent file descriptor
+                # 3. Close persistent file object
                 try:
-                    os.close(self._fd)
+                    self._file.close()
                 except OSError:
                     pass
+                self._file = None
+                self._fd = None
         finally:
             with _active_locks_guard:
                 _active_local_locks.discard(self.lock_path)

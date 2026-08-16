@@ -44,6 +44,7 @@ def run_gc(workspace_dir: str, state_max_age_days: int = 7, memory_max_age_days:
                 # Attempt to acquire kernel lock to reclaim safely
                 lock = FileLock(lock_file, timeout=0.1)
                 try:
+                    lock._release_status = "idle"
                     with lock:
                         try:
                             size = os.path.getsize(lock_file)
@@ -51,19 +52,6 @@ def run_gc(workspace_dir: str, state_max_age_days: int = 7, memory_max_age_days:
                             size = 0
                         report.stale_locks_removed += 1
                         report.total_bytes_freed += size
-                        # Reset lock payload to idle/reclaimed state while holding kernel lock.
-                        # Persistent lock files are NEVER unlinked, permanently eliminating detached-inode split-brain races.
-                        try:
-                            idle_payload = json.dumps({
-                                "status": "idle",
-                                "reclaimed_at": now.isoformat()
-                            }).encode("utf-8")
-                            os.ftruncate(lock._fd, 0)
-                            os.lseek(lock._fd, 0, os.SEEK_SET)
-                            os.write(lock._fd, idle_payload)
-                            os.fsync(lock._fd)
-                        except OSError as write_err:
-                            logging.getLogger("sclass_gc").debug(f"Could not reset stale lock {lock_file}: {write_err}")
                 except TimeoutError:
                     # An active live process holds the kernel lock on state.lock - do not touch it
                     pass

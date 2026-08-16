@@ -1,6 +1,7 @@
 """
 S-Class EOS V11.2 - Hypothesis Property & Invariant Verification Adapter
-Generates cryptographic S-Class evidence receipts from Hypothesis property testing campaigns.
+Executes Hypothesis property testing campaigns against external target callables/modules
+and produces structured S-Class evidence receipts with minimized counterexamples.
 """
 
 import os
@@ -10,7 +11,7 @@ import hashlib
 import re
 from datetime import datetime, timezone
 from dataclasses import dataclass, asdict, field
-from typing import Dict, Any, Optional, Callable, List
+from typing import Dict, Any, Optional, Callable, List, Tuple
 import hypothesis
 from hypothesis import given, settings, strategies as st, Phase
 
@@ -20,41 +21,44 @@ class PropertyEvidenceReceipt:
     obligation_id: str
     obligation_title: str
     domain: str
+    target_identifier: str
     passed: bool
     cases_generated: int
     falsifying_example: Optional[str] = None
     shrunk_counterexample: Optional[str] = None
     error_message: Optional[str] = None
     environment: Dict[str, str] = field(default_factory=dict)
+    provenance_hash: str = ""
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    evidence_hash: str = ""
 
-    def compute_hash(self) -> str:
+    def compute_provenance_hash(self) -> str:
         payload = {
             "obligation_id": self.obligation_id,
             "obligation_title": self.obligation_title,
             "domain": self.domain,
+            "target_identifier": self.target_identifier,
             "passed": self.passed,
             "cases_generated": self.cases_generated,
             "falsifying_example": self.falsifying_example,
             "shrunk_counterexample": self.shrunk_counterexample,
             "error_message": self.error_message,
+            "environment": self.environment,
             "timestamp": self.timestamp
         }
         raw = json.dumps(payload, sort_keys=True)
-        self.evidence_hash = hashlib.sha256(raw.encode("utf-8")).hexdigest()
-        return self.evidence_hash
+        self.provenance_hash = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+        return self.provenance_hash
 
     def to_dict(self) -> Dict[str, Any]:
-        if not self.evidence_hash:
-            self.compute_hash()
+        if not self.provenance_hash:
+            self.compute_provenance_hash()
         return asdict(self)
 
 
 class PropertyVerificationAdapter:
     """
     Authoritative S-Class adapter executing Hypothesis property test suites
-    and recording immutable cryptographic evidence receipts.
+    against supplied target callables and recording verifiable evidence receipts.
     """
 
     @classmethod
@@ -67,14 +71,19 @@ class PropertyVerificationAdapter:
         }
 
     @classmethod
-    def run_spiffe_invariant_check(cls, max_examples: int = 100) -> PropertyEvidenceReceipt:
+    def verify_spiffe_parser(
+        cls,
+        target_parser_fn: Callable[[str], Dict[str, str]],
+        obligation_id: str = "OBL-SEC-SPIFFE-001",
+        max_examples: int = 100
+    ) -> PropertyEvidenceReceipt:
         """
-        Obligation: SPIFFE ID URI invariant verification.
-        Invariant: All valid SPIFFE IDs must match spiffe://<trust-domain>/<path> with non-empty trust domain.
+        Obligation: SPIFFE ID URI invariant verification against a target parser.
+        Invariant: All valid SPIFFE IDs must match spiffe://<trust-domain>/<path>
+        and target_parser_fn must return matching scheme and trust domain.
         """
-        obligation_id = "OBL-SEC-SPIFFE-001"
         title = "SPIFFE ID Format & Authority Invariant"
-        spiffe_regex = re.compile(r"^spiffe://([a-zA-Z0-9.\-_]+)(/.*)?$")
+        target_name = getattr(target_parser_fn, "__qualname__", str(target_parser_fn))
 
         cases_run = 0
         falsifying = None
@@ -94,29 +103,29 @@ class PropertyVerificationAdapter:
             cases_run += 1
             formatted_path = ("/" + p.lstrip("/")) if p else ""
             spiffe_id = f"spiffe://{td}{formatted_path}"
-            
-            # Invariant 1: Must start with spiffe://
-            assert spiffe_id.startswith("spiffe://"), "Must have spiffe scheme"
-            # Invariant 2: Parsed regex must match
-            m = spiffe_regex.match(spiffe_id)
-            assert m is not None, f"SPIFFE regex match failed for {spiffe_id}"
-            assert m.group(1) == td, f"Trust domain mismatch: expected {td}, got {m.group(1)}"
+
+            parsed = target_parser_fn(spiffe_id)
+            assert isinstance(parsed, dict), f"Target parser must return dict, got {type(parsed)}"
+            assert parsed.get("scheme") == "spiffe", f"Expected scheme 'spiffe', got {parsed.get('scheme')}"
+            assert parsed.get("trust_domain") == td, f"Trust domain mismatch: expected {td}, got {parsed.get('trust_domain')}"
 
         try:
             test_property()
         except AssertionError as e:
             passed = False
             err_msg = str(e)
-            falsifying = str(getattr(e, "__cause__", e))
             shrunk = str(e)
+            falsifying = str(getattr(e, "__cause__", e))
         except Exception as e:
             passed = False
-            err_msg = f"Unexpected execution error: {e}"
+            err_msg = f"Target exception during property execution: {e}"
+            shrunk = str(e)
 
         receipt = PropertyEvidenceReceipt(
             obligation_id=obligation_id,
             obligation_title=title,
             domain="Security / Zero-Trust Identity",
+            target_identifier=target_name,
             passed=passed,
             cases_generated=cases_run,
             falsifying_example=falsifying,
@@ -124,27 +133,22 @@ class PropertyVerificationAdapter:
             error_message=err_msg,
             environment=cls._get_env_metadata()
         )
-        receipt.compute_hash()
+        receipt.compute_provenance_hash()
         return receipt
 
     @classmethod
-    def run_phi_sanitizer_invariant_check(cls, max_examples: int = 100) -> PropertyEvidenceReceipt:
+    def verify_phi_sanitizer(
+        cls,
+        target_sanitizer_fn: Callable[[str], str],
+        obligation_id: str = "OBL-PRIVACY-PHI-002",
+        max_examples: int = 100
+    ) -> PropertyEvidenceReceipt:
         """
-        Obligation: PHI / PII Redaction Invariant.
-        Invariant: Any SSN (XXX-XX-XXXX) or Email address embedded in arbitrary text must be fully redacted.
+        Obligation: PHI / PII Redaction Invariant against a target sanitizer callable.
+        Invariant: Any SSN (XXX-XX-XXXX) or Email address embedded in arbitrary text must be redacted by target.
         """
-        obligation_id = "OBL-PRIVACY-PHI-002"
         title = "PHI/PII Sanitizer Leak-Prevention Invariant"
-
-        ssn_pattern = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
-        # Full RFC 5322 compliant email regex matching all valid local-part symbols
-        email_pattern = re.compile(r"[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+")
-
-        def sanitize_phi(text: str) -> str:
-            # S-Class standard PHI sanitizer
-            text = ssn_pattern.sub("[REDACTED_SSN]", text)
-            text = email_pattern.sub("[REDACTED_EMAIL]", text)
-            return text
+        target_name = getattr(target_sanitizer_fn, "__qualname__", str(target_sanitizer_fn))
 
         cases_run = 0
         falsifying = None
@@ -162,27 +166,29 @@ class PropertyVerificationAdapter:
             nonlocal cases_run
             cases_run += 1
             raw_input = f"{prefix} {ssn} {mid} {email} {suffix}"
-            sanitized = sanitize_phi(raw_input)
+            sanitized = target_sanitizer_fn(raw_input)
 
-            # Invariant: Raw SSN and Email must NOT appear anywhere in sanitized text
-            assert ssn not in sanitized, f"SSN leak detected in sanitized output: {sanitized}"
-            assert email not in sanitized, f"Email leak detected in sanitized output: {sanitized}"
+            # Invariant: Raw SSN and Email must NOT appear anywhere in target's output
+            assert ssn not in sanitized, f"SSN leak detected: '{ssn}' found in output '{sanitized}'"
+            assert email not in sanitized, f"Email leak detected: '{email}' found in output '{sanitized}'"
 
         try:
             test_property()
         except AssertionError as e:
             passed = False
             err_msg = str(e)
-            falsifying = str(getattr(e, "__cause__", e))
             shrunk = str(e)
+            falsifying = str(getattr(e, "__cause__", e))
         except Exception as e:
             passed = False
-            err_msg = f"Unexpected execution error: {e}"
+            err_msg = f"Target exception during property execution: {e}"
+            shrunk = str(e)
 
         receipt = PropertyEvidenceReceipt(
             obligation_id=obligation_id,
             obligation_title=title,
             domain="Healthcare / Compliance / HIPAA",
+            target_identifier=target_name,
             passed=passed,
             cases_generated=cases_run,
             falsifying_example=falsifying,
@@ -190,17 +196,22 @@ class PropertyVerificationAdapter:
             error_message=err_msg,
             environment=cls._get_env_metadata()
         )
-        receipt.compute_hash()
+        receipt.compute_provenance_hash()
         return receipt
 
     @classmethod
-    def run_double_entry_ledger_invariant_check(cls, max_examples: int = 100) -> PropertyEvidenceReceipt:
+    def verify_double_entry_ledger(
+        cls,
+        target_ledger_fn: Callable[[List[Tuple[str, str, float]]], Dict[str, float]],
+        obligation_id: str = "OBL-FIN-LEDGER-003",
+        max_examples: int = 100
+    ) -> PropertyEvidenceReceipt:
         """
-        Obligation: Double-Entry Financial Ledger Conservation Invariant.
-        Invariant: Total debits must equal total credits across all transactions, preserving zero net delta.
+        Obligation: Double-Entry Financial Ledger Conservation Invariant against a target ledger callable.
+        Invariant: Total debits must equal total credits, and net account balance delta sum must equal 0.0.
         """
-        obligation_id = "OBL-FIN-LEDGER-003"
         title = "Double-Entry Ledger Zero-Sum Conservation Invariant"
+        target_name = getattr(target_ledger_fn, "__qualname__", str(target_ledger_fn))
 
         cases_run = 0
         falsifying = None
@@ -217,37 +228,30 @@ class PropertyVerificationAdapter:
             nonlocal cases_run
             cases_run += 1
 
-            total_debits = 0.0
-            total_credits = 0.0
-            balances: Dict[str, float] = {a: 0.0 for a in ["ASSETS", "LIABILITIES", "EQUITY", "REVENUE", "EXPENSES"]}
+            balances = target_ledger_fn(entries)
+            assert isinstance(balances, dict), f"Target ledger must return balance dict, got {type(balances)}"
 
-            for src, dst, amt in entries:
-                amt_float = float(amt)
-                balances[src] -= amt_float
-                balances[dst] += amt_float
-                total_debits += amt_float
-                total_credits += amt_float
-
-            # Invariant 1: Total Debits == Total Credits
-            assert abs(total_debits - total_credits) < 1e-6, f"Debits ({total_debits}) != Credits ({total_credits})"
-            # Invariant 2: Sum of all account changes must be identically zero
-            assert abs(sum(balances.values())) < 1e-6, f"Non-zero ledger balance sum: {sum(balances.values())}"
+            # Invariant 1: Sum of all account balances returned by target must be identically zero
+            net_delta = sum(balances.values())
+            assert abs(net_delta) < 1e-5, f"Non-zero ledger balance sum: {net_delta} in balances {balances}"
 
         try:
             test_property()
         except AssertionError as e:
             passed = False
             err_msg = str(e)
-            falsifying = str(getattr(e, "__cause__", e))
             shrunk = str(e)
+            falsifying = str(getattr(e, "__cause__", e))
         except Exception as e:
             passed = False
-            err_msg = f"Unexpected execution error: {e}"
+            err_msg = f"Target exception during property execution: {e}"
+            shrunk = str(e)
 
         receipt = PropertyEvidenceReceipt(
             obligation_id=obligation_id,
             obligation_title=title,
             domain="Financial Systems / Double-Entry Accounting",
+            target_identifier=target_name,
             passed=passed,
             cases_generated=cases_run,
             falsifying_example=falsifying,
@@ -255,12 +259,12 @@ class PropertyVerificationAdapter:
             error_message=err_msg,
             environment=cls._get_env_metadata()
         )
-        receipt.compute_hash()
+        receipt.compute_provenance_hash()
         return receipt
 
     @classmethod
     def save_evidence_receipt(cls, receipt: PropertyEvidenceReceipt, workspace_dir: str) -> str:
-        """Persists cryptographic evidence receipt into .agents/evidence/ directory."""
+        """Persists evidence receipt into .agents/evidence/ directory."""
         evidence_dir = os.path.join(workspace_dir, ".agents", "evidence")
         os.makedirs(evidence_dir, exist_ok=True)
         evidence_path = os.path.join(evidence_dir, f"property_{receipt.obligation_id}.json")

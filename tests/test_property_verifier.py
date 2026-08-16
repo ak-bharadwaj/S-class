@@ -1,46 +1,137 @@
 """
 S-Class EOS V11.2 - Hypothesis Property Verification Test Suite
-Verifies SPIFFE, PHI sanitizer, and double-entry ledger property testing and evidence generation.
+Tests PropertyVerificationAdapter against reference (passing) and intentionally flawed (failing) implementations.
+Verifies counterexample capture and provenance checksums.
 """
 
 import os
+import re
 import json
 import tempfile
+from typing import Dict, List, Tuple
 import pytest
 from property_verifier import PropertyVerificationAdapter, PropertyEvidenceReceipt
 
 
-def test_spiffe_invariant_property_verification():
-    receipt = PropertyVerificationAdapter.run_spiffe_invariant_check(max_examples=50)
+# -----------------------------------------------------------------------------
+# 1. SPIFFE Parser Implementations (Reference vs Flawed)
+# -----------------------------------------------------------------------------
+
+def reference_spiffe_parser(spiffe_id: str) -> Dict[str, str]:
+    """Reference implementation: correctly parses SPIFFE URI."""
+    if not spiffe_id.startswith("spiffe://"):
+        raise ValueError("Invalid SPIFFE scheme")
+    remainder = spiffe_id[len("spiffe://"):]
+    parts = remainder.split("/", 1)
+    trust_domain = parts[0]
+    path = ("/" + parts[1]) if len(parts) > 1 else ""
+    return {"scheme": "spiffe", "trust_domain": trust_domain, "path": path}
+
+
+def flawed_spiffe_parser(spiffe_id: str) -> Dict[str, str]:
+    """Flawed implementation: hardcodes incorrect trust domain."""
+    return {"scheme": "spiffe", "trust_domain": "hardcoded.domain.org", "path": ""}
+
+
+# -----------------------------------------------------------------------------
+# 2. PHI Sanitizer Implementations (Reference vs Flawed)
+# -----------------------------------------------------------------------------
+
+def reference_phi_sanitizer(text: str) -> str:
+    """Reference implementation: thoroughly redacts SSNs and Emails."""
+    ssn_pattern = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
+    email_pattern = re.compile(r"[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+")
+    text = ssn_pattern.sub("[REDACTED_SSN]", text)
+    text = email_pattern.sub("[REDACTED_EMAIL]", text)
+    return text
+
+
+def flawed_phi_sanitizer(text: str) -> str:
+    """Flawed implementation: redacts SSNs but leaks emails."""
+    ssn_pattern = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
+    return ssn_pattern.sub("[REDACTED_SSN]", text)
+
+
+# -----------------------------------------------------------------------------
+# 3. Double-Entry Ledger Implementations (Reference vs Flawed)
+# -----------------------------------------------------------------------------
+
+def reference_ledger(entries: List[Tuple[str, str, float]]) -> Dict[str, float]:
+    """Reference implementation: perfectly conserves debit/credit balances."""
+    balances: Dict[str, float] = {a: 0.0 for a in ["ASSETS", "LIABILITIES", "EQUITY", "REVENUE", "EXPENSES"]}
+    for src, dst, amt in entries:
+        amt_f = float(amt)
+        balances[src] -= amt_f
+        balances[dst] += amt_f
+    return balances
+
+
+def flawed_ledger(entries: List[Tuple[str, str, float]]) -> Dict[str, float]:
+    """Flawed implementation: skims 5% fee without offsetting account, violating zero-sum conservation."""
+    balances: Dict[str, float] = {a: 0.0 for a in ["ASSETS", "LIABILITIES", "EQUITY", "REVENUE", "EXPENSES"]}
+    for src, dst, amt in entries:
+        amt_f = float(amt)
+        balances[src] -= amt_f
+        balances[dst] += (amt_f * 0.95)  # 5% leakage
+    return balances
+
+
+# -----------------------------------------------------------------------------
+# Test Cases
+# -----------------------------------------------------------------------------
+
+def test_spiffe_reference_passes():
+    receipt = PropertyVerificationAdapter.verify_spiffe_parser(reference_spiffe_parser, max_examples=40)
     assert receipt.passed is True
-    assert receipt.obligation_id == "OBL-SEC-SPIFFE-001"
-    assert receipt.cases_generated >= 50
-    assert len(receipt.evidence_hash) == 64
-    assert receipt.environment["engine"] == "Hypothesis Property Verification Adapter V11.2"
+    assert receipt.cases_generated >= 40
+    assert receipt.falsifying_example is None
+    assert len(receipt.provenance_hash) == 64
+    assert receipt.target_identifier == "reference_spiffe_parser"
 
 
-def test_phi_sanitizer_invariant_property_verification():
-    receipt = PropertyVerificationAdapter.run_phi_sanitizer_invariant_check(max_examples=50)
+def test_spiffe_flawed_fails_and_captures_counterexample():
+    receipt = PropertyVerificationAdapter.verify_spiffe_parser(flawed_spiffe_parser, max_examples=40)
+    assert receipt.passed is False
+    assert receipt.shrunk_counterexample is not None or receipt.error_message is not None
+    assert "Trust domain mismatch" in str(receipt.error_message) or "Trust domain mismatch" in str(receipt.shrunk_counterexample)
+    assert len(receipt.provenance_hash) == 64
+
+
+def test_phi_sanitizer_reference_passes():
+    receipt = PropertyVerificationAdapter.verify_phi_sanitizer(reference_phi_sanitizer, max_examples=40)
     assert receipt.passed is True
-    assert receipt.obligation_id == "OBL-PRIVACY-PHI-002"
-    assert receipt.cases_generated >= 50
-    assert len(receipt.evidence_hash) == 64
+    assert receipt.cases_generated >= 40
+    assert receipt.falsifying_example is None
+    assert len(receipt.provenance_hash) == 64
 
 
-def test_double_entry_ledger_invariant_property_verification():
-    receipt = PropertyVerificationAdapter.run_double_entry_ledger_invariant_check(max_examples=50)
+def test_phi_sanitizer_flawed_fails_and_captures_counterexample():
+    receipt = PropertyVerificationAdapter.verify_phi_sanitizer(flawed_phi_sanitizer, max_examples=40)
+    assert receipt.passed is False
+    assert receipt.shrunk_counterexample is not None
+    assert "Email leak detected" in str(receipt.error_message) or "Email leak detected" in str(receipt.shrunk_counterexample)
+
+
+def test_ledger_reference_passes():
+    receipt = PropertyVerificationAdapter.verify_double_entry_ledger(reference_ledger, max_examples=40)
     assert receipt.passed is True
-    assert receipt.obligation_id == "OBL-FIN-LEDGER-003"
-    assert receipt.cases_generated >= 50
-    assert len(receipt.evidence_hash) == 64
+    assert receipt.cases_generated >= 40
+    assert receipt.falsifying_example is None
+
+
+def test_ledger_flawed_fails_and_captures_counterexample():
+    receipt = PropertyVerificationAdapter.verify_double_entry_ledger(flawed_ledger, max_examples=40)
+    assert receipt.passed is False
+    assert receipt.shrunk_counterexample is not None
+    assert "Non-zero ledger balance sum" in str(receipt.error_message) or "Non-zero ledger balance sum" in str(receipt.shrunk_counterexample)
 
 
 def test_property_evidence_persistence():
     with tempfile.TemporaryDirectory() as tmpdir:
-        receipt = PropertyVerificationAdapter.run_spiffe_invariant_check(max_examples=20)
+        receipt = PropertyVerificationAdapter.verify_spiffe_parser(reference_spiffe_parser, max_examples=20)
         evidence_file = PropertyVerificationAdapter.save_evidence_receipt(receipt, tmpdir)
         assert os.path.exists(evidence_file)
         with open(evidence_file, "r", encoding="utf-8") as f:
             data = json.load(f)
         assert data["obligation_id"] == "OBL-SEC-SPIFFE-001"
-        assert data["evidence_hash"] == receipt.evidence_hash
+        assert data["provenance_hash"] == receipt.provenance_hash

@@ -184,14 +184,15 @@ print(f"Kernel Approved Mutation: '{res['previousPhase']}' ➔ '{res['currentPha
 
 ## 🧪 Comprehensive Automated Test Suite
 
-S-Class EOS V11.2 contains **407 product regression test cases across 52 test suites** passing with 100% success across Python 3.10–3.14 (historical and research benchmarks isolated in `benchmark/v0/`):
+S-Class EOS V11.2 contains **419 product regression test cases across 53 test suites** passing with 100% success across Python 3.10–3.14 (historical and research benchmarks isolated in `benchmark/v0/`):
 
 | Test Module Category | Test Count | Functionality Tested |
 | :--- | :--- | :--- |
-| **Property & Invariant Testing** | 4 tests | Hypothesis property testing adapter verifying SPIFFE URI authority, PHI/PII redaction, and double-entry ledger zero-sum conservation (`tests/test_property_verifier.py`). |
-| **API Contract Verification** | 3 tests | Schemathesis OpenAPI contract verification and behavioral fuzzing campaigns (`tests/test_api_contract_verifier.py`). |
-| **Static & Type Verification** | 3 tests | Ruff static analysis quality receipts & Python type checking evidence generation (`tests/test_static_and_type_providers.py`). |
-| **Audit Hardening & Concurrency** | 10 tests | Portalocker cross-platform locking, live planner/MCP dispatch, fail-closed governor security, multi-process GC lock reclamation race safety (`tests/test_audit_hardening_verification.py`). |
+| **Cross-Process Concurrency & Locks** | 5 tests | Portalocker/native advisory cross-process mutual exclusion, termination release, multi-process contention, and GC race safety (`tests/test_file_lock_concurrency.py`). |
+| **Property & Invariant Verification** | 7 tests | Hypothesis property campaigns verifying external target callables against SPIFFE authority, PHI/PII sanitizer, and ledger conservation with counterexample capture (`tests/test_property_verifier.py`). |
+| **API Contract Verification** | 5 tests | Schemathesis live HTTP behavioral campaigns against reference and flawed APIs, schema validation, and server error detection (`tests/test_api_contract_verifier.py`). |
+| **Static & Type Verification** | 5 tests | Ruff static analysis & Python type checking evidence generation with provenance hashes on reference and flawed targets (`tests/test_static_and_type_providers.py`). |
+| **Audit Hardening & Concurrency** | 10 tests | Live planner/MCP dispatch, fail-closed governor security, multi-process GC lock reclamation race safety (`tests/test_audit_hardening_verification.py`). |
 | **V11.2 Stabilization Pass** | 12 tests | Canonical event replay, LibCST AST dependency DAG, kernel API contract strictness, subprocess crash resilience, SClassTestRunner boundaries, supply-chain freeze (`tests/test_v11_stabilization.py`). |
 | **Master Production Closure** | 6 tests | Whole-system V9.6 $\to$ V11.2 master closure: task compiler, execution planner, repository snapshot, ChangeSet reconciliation, implementation/verification evidence (`tests/test_v11_master_closure.py`). |
 | **World Model & Adapters** | 33 tests | Sovereign PromotionEngine, LanguageAdapters (Python, JS/TS, Fallback), GroundedSpecWeaver, Evidence Verification (`tests/test_v11_world_model.py`). |
