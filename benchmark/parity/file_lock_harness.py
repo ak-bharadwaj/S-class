@@ -17,9 +17,11 @@ Strict Certification Protocol:
    - Layer A-SP (Same Path): Evaluates S-Class vs Portalocker sequentially acquiring/releasing the exact same file path
      with randomized ordering per pair, which reduces filesystem/path and ordering bias through randomized same-path interleaving.
 
-3. Strict 0.5% Gate Certification Rules:
-   - Layer A, Layer A-SP & Layer C Latency: Median Ratio Upper 95% CI <= 1.005 AND P95 Ratio Upper 95% CI <= 1.005
-   - Layer A, Layer A-SP & Layer C Throughput: Throughput Ratio Lower 95% CI >= 0.995
+3. Single Source of Truth ParityMetricGate Rules:
+   - Evaluates STANDARD_REQUIRED_GATES:
+     * STANDARD_LATENCY_MEDIAN_GATE: Upper CI <= 1.005
+     * STANDARD_LATENCY_P95_GATE: Upper CI <= 1.005
+     * STANDARD_THROUGHPUT_GATE: Lower CI >= 0.995
 
 4. Genuine 5,000-Cycle Long-Soak Memory Stability Evaluation:
    - Dedicated 5,000 continuous lock acquisition & release cycles.
@@ -47,13 +49,82 @@ import tempfile
 import threading
 import subprocess
 import ctypes
-from typing import Dict, List, Any, Tuple
+from enum import Enum
+from dataclasses import dataclass
+from typing import Dict, List, Any, Tuple, Optional
 import portalocker
 
 # Add plugin root to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from file_lock import FileLock, NativeLock, _CACHED_PID, _CACHED_HOSTNAME, _CACHED_PROC_START
 from config_gc import run_gc
+
+
+class GateDirection(Enum):
+    UPPER_BOUND = "UPPER"  # ratio <= threshold (e.g. latency)
+    LOWER_BOUND = "LOWER"  # ratio >= threshold (e.g. throughput)
+
+
+@dataclass(frozen=True)
+class ParityMetricGate:
+    """
+    Single Source of Truth for OSS Parity metric acceptance and precision policies.
+    - threshold: The authoritative scientific acceptance boundary (e.g. 1.005 for latency, 0.995 for throughput).
+    - escalation_margin: Conservative operational policy margin (default 0.020 / 2%) to elevate bootstrap sample
+      count to reduce Monte Carlo resampling estimation error when close to the boundary.
+    - escalated_bootstrap_min: Minimum bootstrap resamples (>= 10,000) when near the escalation margin.
+    """
+    name: str
+    direction: GateDirection
+    threshold: float
+    escalation_margin: float = 0.020
+    escalated_bootstrap_min: int = 10000
+
+    def is_near_boundary(self, observed_ratio: float) -> bool:
+        """Determines if observed point ratio is within operational escalation_margin of failure boundary."""
+        if self.direction == GateDirection.UPPER_BOUND:
+            return observed_ratio >= (self.threshold - self.escalation_margin)
+        else:
+            return observed_ratio <= (self.threshold + self.escalation_margin)
+
+    def is_passing(self, confidence_bound: float) -> bool:
+        """Evaluates whether the empirical 95% confidence bound satisfies the authoritative acceptance gate."""
+        if self.direction == GateDirection.UPPER_BOUND:
+            return confidence_bound <= self.threshold
+        else:
+            return confidence_bound >= self.threshold
+
+
+# Immutable authoritative required certification gates (0.5% tolerance contract)
+STANDARD_LATENCY_MEDIAN_GATE = ParityMetricGate(
+    name="median_latency_ratio",
+    direction=GateDirection.UPPER_BOUND,
+    threshold=1.005,
+    escalation_margin=0.020,
+    escalated_bootstrap_min=10000
+)
+
+STANDARD_LATENCY_P95_GATE = ParityMetricGate(
+    name="p95_latency_ratio",
+    direction=GateDirection.UPPER_BOUND,
+    threshold=1.005,
+    escalation_margin=0.020,
+    escalated_bootstrap_min=10000
+)
+
+STANDARD_THROUGHPUT_GATE = ParityMetricGate(
+    name="throughput_ratio",
+    direction=GateDirection.LOWER_BOUND,
+    threshold=0.995,
+    escalation_margin=0.020,
+    escalated_bootstrap_min=10000
+)
+
+REQUIRED_CERTIFICATION_GATES: Tuple[ParityMetricGate, ...] = (
+    STANDARD_LATENCY_MEDIAN_GATE,
+    STANDARD_LATENCY_P95_GATE,
+    STANDARD_THROUGHPUT_GATE
+)
 
 
 def get_peak_working_set_bytes() -> int:
@@ -151,64 +222,6 @@ def get_system_environment_info() -> Dict[str, Any]:
     }
 
 
-from dataclasses import dataclass
-from enum import Enum
-
-
-class GateDirection(Enum):
-    UPPER_BOUND = "UPPER"  # ratio <= threshold (e.g. latency)
-    LOWER_BOUND = "LOWER"  # ratio >= threshold (e.g. throughput)
-
-
-@dataclass(frozen=True)
-class ParityMetricGate:
-    name: str
-    direction: GateDirection
-    threshold: float
-    escalation_margin: float = 0.020
-    escalated_bootstrap_min: int = 10000
-
-    def is_near_boundary(self, observed_ratio: float) -> bool:
-        """Determines if the observed metric ratio is within escalation_margin of the failure boundary."""
-        if self.direction == GateDirection.UPPER_BOUND:
-            return observed_ratio >= (self.threshold - self.escalation_margin)
-        else:
-            return observed_ratio <= (self.threshold + self.escalation_margin)
-
-    def is_passing(self, confidence_bound: float) -> bool:
-        """Evaluates whether the 95% confidence bound satisfies the acceptance gate."""
-        if self.direction == GateDirection.UPPER_BOUND:
-            return confidence_bound <= self.threshold
-        else:
-            return confidence_bound >= self.threshold
-
-
-# Standard reusable OSS Parity Gates (0.5% tolerance contract)
-STANDARD_LATENCY_MEDIAN_GATE = ParityMetricGate(
-    name="median_latency_ratio",
-    direction=GateDirection.UPPER_BOUND,
-    threshold=1.005,
-    escalation_margin=0.020,
-    escalated_bootstrap_min=10000
-)
-
-STANDARD_LATENCY_P95_GATE = ParityMetricGate(
-    name="p95_latency_ratio",
-    direction=GateDirection.UPPER_BOUND,
-    threshold=1.005,
-    escalation_margin=0.020,
-    escalated_bootstrap_min=10000
-)
-
-STANDARD_THROUGHPUT_GATE = ParityMetricGate(
-    name="throughput_ratio",
-    direction=GateDirection.LOWER_BOUND,
-    threshold=0.995,
-    escalation_margin=0.020,
-    escalated_bootstrap_min=10000
-)
-
-
 def calculate_linear_percentile(data: List[float], percentile: float) -> float:
     """Standard linear interpolation percentile estimator (p * (n - 1))."""
     if not data:
@@ -227,22 +240,29 @@ def calculate_linear_percentile(data: List[float], percentile: float) -> float:
 def compute_paired_bootstrap_metrics(
     pairs: List[Tuple[float, float]],
     n_bootstraps: int = 1000,
-    gates: Optional[List[ParityMetricGate]] = None
+    optional_diagnostic_gates: Optional[List[ParityMetricGate]] = None
 ) -> Dict[str, Any]:
     """
     Performs rigorous paired bootstrap resampling over preserved (sclass_i, ref_i) trials.
     Calculates paired median ratio CI, paired P95 ratio CI, and paired throughput ratio CI.
-    Evaluates configurable ParityMetricGate objects for adaptive sample escalation.
+    Mandatorily evaluates REQUIRED_CERTIFICATION_GATES and any optional diagnostic gates.
     """
-    if gates is None:
-        gates = [STANDARD_LATENCY_MEDIAN_GATE, STANDARD_LATENCY_P95_GATE, STANDARD_THROUGHPUT_GATE]
+    # Enforce mandatory required gates unconditionally; optional gates only appended for diagnostics
+    active_gates = list(REQUIRED_CERTIFICATION_GATES)
+    if optional_diagnostic_gates:
+        active_gates.extend(optional_diagnostic_gates)
 
     n = len(pairs)
     if n == 0:
         return {
             "median_ratio": 1.0, "median_ratio_95_ci": [1.0, 1.0],
             "p95_ratio": 1.0, "p95_ratio_95_ci": [1.0, 1.0],
-            "throughput_ratio": 1.0, "throughput_ratio_95_ci": [1.0, 1.0]
+            "throughput_ratio": 1.0, "throughput_ratio_95_ci": [1.0, 1.0],
+            "median_gate_passed": False,
+            "p95_gate_passed": False,
+            "throughput_gate_passed": False,
+            "all_gates_passed": False,
+            "bootstraps_evaluated": 0
         }
 
     s_all = [p[0] for p in pairs]
@@ -260,19 +280,16 @@ def compute_paired_bootstrap_metrics(
     sum_r = sum(r_all)
     point_tp_ratio = (sum_r / sum_s) if sum_s > 0 else 1.0
 
-    # Metric ratio mapping for declarative gate evaluation
-    metric_values = {
+    metric_point_values = {
         "median_latency_ratio": point_med_ratio,
         "p95_latency_ratio": point_p95_ratio,
         "throughput_ratio": point_tp_ratio
     }
 
     # Declarative boundary-distance escalation:
-    # If any gate is within its configured escalation margin, elevate bootstrap resamples
-    # to reduce bootstrap resampling Monte Carlo error.
     actual_bootstraps = n_bootstraps
-    for gate in gates:
-        val = metric_values.get(gate.name)
+    for gate in active_gates:
+        val = metric_point_values.get(gate.name)
         if val is not None and gate.is_near_boundary(val):
             actual_bootstraps = max(actual_bootstraps, gate.escalated_bootstrap_min)
 
@@ -314,6 +331,11 @@ def compute_paired_bootstrap_metrics(
         calculate_linear_percentile(boot_tp_ratios, 0.975) if boot_tp_ratios else point_tp_ratio
     ]
 
+    # Authoritative Single Source of Truth Gate Evaluation via is_passing()
+    med_passed = STANDARD_LATENCY_MEDIAN_GATE.is_passing(med_ci[1])  # Upper bound <= 1.005
+    p95_passed = STANDARD_LATENCY_P95_GATE.is_passing(p95_ci[1])    # Upper bound <= 1.005
+    tp_passed = STANDARD_THROUGHPUT_GATE.is_passing(tp_ci[0])       # Lower bound >= 0.995
+
     return {
         "median_ratio": round(point_med_ratio, 4),
         "median_ratio_95_ci": [round(med_ci[0], 4), round(med_ci[1], 4)],
@@ -321,6 +343,10 @@ def compute_paired_bootstrap_metrics(
         "p95_ratio_95_ci": [round(p95_ci[0], 4), round(p95_ci[1], 4)],
         "throughput_ratio": round(point_tp_ratio, 4),
         "throughput_ratio_95_ci": [round(tp_ci[0], 4), round(tp_ci[1], 4)],
+        "median_gate_passed": med_passed,
+        "p95_gate_passed": p95_passed,
+        "throughput_gate_passed": tp_passed,
+        "all_gates_passed": (med_passed and p95_passed and tp_passed),
         "bootstraps_evaluated": actual_bootstraps
     }
 
@@ -380,9 +406,10 @@ def test_layer_a_primitive_parity(n_trials: int = 500, n_repetitions: int = 5) -
 
         paired_metrics = compute_paired_bootstrap_metrics(paired_latencies_us)
 
-        lat_pass = (paired_metrics["median_ratio_95_ci"][1] <= 1.005 and paired_metrics["p95_ratio_95_ci"][1] <= 1.005)
-        tp_pass = (paired_metrics["throughput_ratio_95_ci"][0] >= 0.995)
-        gate_passed = (lat_pass and tp_pass)
+        # Single source of truth gate authority
+        gate_passed = paired_metrics["all_gates_passed"]
+        lat_pass = (paired_metrics["median_gate_passed"] and paired_metrics["p95_gate_passed"])
+        tp_pass = paired_metrics["throughput_gate_passed"]
 
         return {
             "gate_passed": gate_passed,
@@ -459,9 +486,10 @@ def test_layer_a_same_path_primitive(n_trials: int = 500, n_repetitions: int = 5
 
         paired_metrics = compute_paired_bootstrap_metrics(paired_latencies_us)
 
-        lat_pass = (paired_metrics["median_ratio_95_ci"][1] <= 1.005 and paired_metrics["p95_ratio_95_ci"][1] <= 1.005)
-        tp_pass = (paired_metrics["throughput_ratio_95_ci"][0] >= 0.995)
-        gate_passed = (lat_pass and tp_pass)
+        # Single source of truth gate authority
+        gate_passed = paired_metrics["all_gates_passed"]
+        lat_pass = (paired_metrics["median_gate_passed"] and paired_metrics["p95_gate_passed"])
+        tp_pass = paired_metrics["throughput_gate_passed"]
 
         return {
             "gate_passed": gate_passed,
@@ -610,9 +638,10 @@ def test_layer_c_equivalent_lifecycle(n_trials: int = 500, n_repetitions: int = 
 
         paired_metrics = compute_paired_bootstrap_metrics(paired_latencies_us)
 
-        lat_pass = (paired_metrics["median_ratio_95_ci"][1] <= 1.005 and paired_metrics["p95_ratio_95_ci"][1] <= 1.005)
-        tp_pass = (paired_metrics["throughput_ratio_95_ci"][0] >= 0.995)
-        gate_passed = (lat_pass and tp_pass)
+        # Single source of truth gate authority
+        gate_passed = paired_metrics["all_gates_passed"]
+        lat_pass = (paired_metrics["median_gate_passed"] and paired_metrics["p95_gate_passed"])
+        tp_pass = paired_metrics["throughput_gate_passed"]
 
         return {
             "gate_passed": gate_passed,
@@ -1118,7 +1147,7 @@ def run_full_parity_gate() -> Dict[str, Any]:
     print("[12/12] Config GC Non-Destructive Interaction Verification...")
     gc_res = test_gc_interaction()
 
-    # Holistic Gate Certification: All conditions must strictly be True
+    # Holistic Gate Certification: All conditions must strictly be True via ParityMetricGate authorities
     gate_all_passed = (
         layer_a["gate_passed"] and
         layer_a_sp["gate_passed"] and
@@ -1166,15 +1195,15 @@ def run_full_parity_gate() -> Dict[str, Any]:
         "final_verdict": final_verdict,
         "provenance": env_info,
         "acceptance_criteria": {
-            "primitive_latency_median_upper_ci_max": 1.005,
-            "primitive_latency_p95_upper_ci_max": 1.005,
-            "primitive_throughput_lower_ci_min": 0.995,
-            "same_path_latency_median_upper_ci_max": 1.005,
-            "same_path_latency_p95_upper_ci_max": 1.005,
-            "same_path_throughput_lower_ci_min": 0.995,
-            "lifecycle_latency_median_upper_ci_max": 1.005,
-            "lifecycle_latency_p95_upper_ci_max": 1.005,
-            "lifecycle_throughput_lower_ci_min": 0.995,
+            "primitive_latency_median_upper_ci_max": STANDARD_LATENCY_MEDIAN_GATE.threshold,
+            "primitive_latency_p95_upper_ci_max": STANDARD_LATENCY_P95_GATE.threshold,
+            "primitive_throughput_lower_ci_min": STANDARD_THROUGHPUT_GATE.threshold,
+            "same_path_latency_median_upper_ci_max": STANDARD_LATENCY_MEDIAN_GATE.threshold,
+            "same_path_latency_p95_upper_ci_max": STANDARD_LATENCY_P95_GATE.threshold,
+            "same_path_throughput_lower_ci_min": STANDARD_THROUGHPUT_GATE.threshold,
+            "lifecycle_latency_median_upper_ci_max": STANDARD_LATENCY_MEDIAN_GATE.threshold,
+            "lifecycle_latency_p95_upper_ci_max": STANDARD_LATENCY_P95_GATE.threshold,
+            "lifecycle_throughput_lower_ci_min": STANDARD_THROUGHPUT_GATE.threshold,
             "soak_memory_bounded_drift_ratio_max": 1.050,
             "soak_cycles_executed": soak_res["soak_cycles"],
             "memory_evaluation_classification": "BOUNDED_RSS_DRIFT_LE_5PCT_5000_CYCLES",
@@ -1247,17 +1276,15 @@ def run_full_parity_gate() -> Dict[str, Any]:
     print("=" * 110)
     print(f"{'Capability Dimension':<32} | {'Reference':<14} | {'S-Class':<14} | {'Paired Ratio (95% CI)':<26} | {'Threshold':<11} | {'Verdict'}")
     print("-" * 125)
-    print(f"{'Layer A: Primitive Median':<32} | {layer_a['reference_portalocker']['median_us']:>9.2f} us | {layer_a['sclass_native_primitive']['median_us']:>9.2f} us | {layer_a['statistical_metrics']['median_ratio']:>6.4f} {str(layer_a['statistical_metrics']['median_ratio_95_ci']):<18} | {'<= 1.005':<11} | {'PASS' if layer_a['latency_gate_passed'] else 'FAIL'}")
-    print(f"{'Layer A: Primitive P95':<32} | {layer_a['reference_portalocker']['p95_us']:>9.2f} us | {layer_a['sclass_native_primitive']['p95_us']:>9.2f} us | {layer_a['statistical_metrics']['p95_ratio']:>6.4f} {str(layer_a['statistical_metrics']['p95_ratio_95_ci']):<18} | {'<= 1.005':<11} | {'PASS' if layer_a['latency_gate_passed'] else 'FAIL'}")
-    print(f"{'Layer A: Primitive Throughput':<32} | {layer_a['reference_portalocker']['throughput_per_sec']:>9.1f} /s | {layer_a['sclass_native_primitive']['throughput_per_sec']:>9.1f} /s | {layer_a['statistical_metrics']['throughput_ratio']:>6.4f} {str(layer_a['statistical_metrics']['throughput_ratio_95_ci']):<18} | {'>= 0.995':<11} | {'PASS' if layer_a['throughput_gate_passed'] else 'FAIL'}")
-    print(f"{'Layer A-SP: Same-Path Median':<32} | {layer_a_sp['reference_portalocker']['median_us']:>9.2f} us | {layer_a_sp['sclass_native_primitive']['median_us']:>9.2f} us | {layer_a_sp['statistical_metrics']['median_ratio']:>6.4f} {str(layer_a_sp['statistical_metrics']['median_ratio_95_ci']):<18} | {'<= 1.005':<11} | {'PASS' if layer_a_sp['latency_gate_passed'] else 'FAIL'}")
-    print(f"{'Layer A-SP: Same-Path P95':<32} | {layer_a_sp['reference_portalocker']['p95_us']:>9.2f} us | {layer_a_sp['sclass_native_primitive']['p95_us']:>9.2f} us | {layer_a_sp['statistical_metrics']['p95_ratio']:>6.4f} {str(layer_a_sp['statistical_metrics']['p95_ratio_95_ci']):<18} | {'<= 1.005':<11} | {'PASS' if layer_a_sp['latency_gate_passed'] else 'FAIL'}")
-    print(f"{'Layer A-SP: Same-Path Throughput':<32} | {layer_a_sp['reference_portalocker']['throughput_per_sec']:>9.1f} /s | {layer_a_sp['sclass_native_primitive']['throughput_per_sec']:>9.1f} /s | {layer_a_sp['statistical_metrics']['throughput_ratio']:>6.4f} {str(layer_a_sp['statistical_metrics']['throughput_ratio_95_ci']):<18} | {'>= 0.995':<11} | {'PASS' if layer_a_sp['throughput_gate_passed'] else 'FAIL'}")
-    med_pass = (layer_c['statistical_metrics']['median_ratio_95_ci'][1] <= 1.005)
-    p95_pass = (layer_c['statistical_metrics']['p95_ratio_95_ci'][1] <= 1.005)
-    print(f"{'Layer C: 1:1 Lifecycle Median':<32} | {layer_c['reference_equivalent_lifecycle']['median_us']:>9.2f} us | {layer_c['sclass_filelock_lifecycle']['median_us']:>9.2f} us | {layer_c['statistical_metrics']['median_ratio']:>6.4f} {str(layer_c['statistical_metrics']['median_ratio_95_ci']):<18} | {'<= 1.005':<11} | {'PASS' if med_pass else 'FAIL'}")
-    print(f"{'Layer C: 1:1 Lifecycle P95':<32} | {layer_c['reference_equivalent_lifecycle']['p95_us']:>9.2f} us | {layer_c['sclass_filelock_lifecycle']['p95_us']:>9.2f} us | {layer_c['statistical_metrics']['p95_ratio']:>6.4f} {str(layer_c['statistical_metrics']['p95_ratio_95_ci']):<18} | {'<= 1.005':<11} | {'PASS' if p95_pass else 'FAIL'}")
-    print(f"{'Layer C: 1:1 Lifecycle Throughput':<32} | {layer_c['reference_equivalent_lifecycle']['throughput_per_sec']:>9.1f} /s | {layer_c['sclass_filelock_lifecycle']['throughput_per_sec']:>9.1f} /s | {layer_c['statistical_metrics']['throughput_ratio']:>6.4f} {str(layer_c['statistical_metrics']['throughput_ratio_95_ci']):<18} | {'>= 0.995':<11} | {'PASS' if layer_c['throughput_gate_passed'] else 'FAIL'}")
+    print(f"{'Layer A: Primitive Median':<32} | {layer_a['reference_portalocker']['median_us']:>9.2f} us | {layer_a['sclass_native_primitive']['median_us']:>9.2f} us | {layer_a['statistical_metrics']['median_ratio']:>6.4f} {str(layer_a['statistical_metrics']['median_ratio_95_ci']):<18} | {'<= '+str(STANDARD_LATENCY_MEDIAN_GATE.threshold):<11} | {'PASS' if layer_a['statistical_metrics']['median_gate_passed'] else 'FAIL'}")
+    print(f"{'Layer A: Primitive P95':<32} | {layer_a['reference_portalocker']['p95_us']:>9.2f} us | {layer_a['sclass_native_primitive']['p95_us']:>9.2f} us | {layer_a['statistical_metrics']['p95_ratio']:>6.4f} {str(layer_a['statistical_metrics']['p95_ratio_95_ci']):<18} | {'<= '+str(STANDARD_LATENCY_P95_GATE.threshold):<11} | {'PASS' if layer_a['statistical_metrics']['p95_gate_passed'] else 'FAIL'}")
+    print(f"{'Layer A: Primitive Throughput':<32} | {layer_a['reference_portalocker']['throughput_per_sec']:>9.1f} /s | {layer_a['sclass_native_primitive']['throughput_per_sec']:>9.1f} /s | {layer_a['statistical_metrics']['throughput_ratio']:>6.4f} {str(layer_a['statistical_metrics']['throughput_ratio_95_ci']):<18} | {'>= '+str(STANDARD_THROUGHPUT_GATE.threshold):<11} | {'PASS' if layer_a['statistical_metrics']['throughput_gate_passed'] else 'FAIL'}")
+    print(f"{'Layer A-SP: Same-Path Median':<32} | {layer_a_sp['reference_portalocker']['median_us']:>9.2f} us | {layer_a_sp['sclass_native_primitive']['median_us']:>9.2f} us | {layer_a_sp['statistical_metrics']['median_ratio']:>6.4f} {str(layer_a_sp['statistical_metrics']['median_ratio_95_ci']):<18} | {'<= '+str(STANDARD_LATENCY_MEDIAN_GATE.threshold):<11} | {'PASS' if layer_a_sp['statistical_metrics']['median_gate_passed'] else 'FAIL'}")
+    print(f"{'Layer A-SP: Same-Path P95':<32} | {layer_a_sp['reference_portalocker']['p95_us']:>9.2f} us | {layer_a_sp['sclass_native_primitive']['p95_us']:>9.2f} us | {layer_a_sp['statistical_metrics']['p95_ratio']:>6.4f} {str(layer_a_sp['statistical_metrics']['p95_ratio_95_ci']):<18} | {'<= '+str(STANDARD_LATENCY_P95_GATE.threshold):<11} | {'PASS' if layer_a_sp['statistical_metrics']['p95_gate_passed'] else 'FAIL'}")
+    print(f"{'Layer A-SP: Same-Path Throughput':<32} | {layer_a_sp['reference_portalocker']['throughput_per_sec']:>9.1f} /s | {layer_a_sp['sclass_native_primitive']['throughput_per_sec']:>9.1f} /s | {layer_a_sp['statistical_metrics']['throughput_ratio']:>6.4f} {str(layer_a_sp['statistical_metrics']['throughput_ratio_95_ci']):<18} | {'>= '+str(STANDARD_THROUGHPUT_GATE.threshold):<11} | {'PASS' if layer_a_sp['statistical_metrics']['throughput_gate_passed'] else 'FAIL'}")
+    print(f"{'Layer C: 1:1 Lifecycle Median':<32} | {layer_c['reference_equivalent_lifecycle']['median_us']:>9.2f} us | {layer_c['sclass_filelock_lifecycle']['median_us']:>9.2f} us | {layer_c['statistical_metrics']['median_ratio']:>6.4f} {str(layer_c['statistical_metrics']['median_ratio_95_ci']):<18} | {'<= '+str(STANDARD_LATENCY_MEDIAN_GATE.threshold):<11} | {'PASS' if layer_c['statistical_metrics']['median_gate_passed'] else 'FAIL'}")
+    print(f"{'Layer C: 1:1 Lifecycle P95':<32} | {layer_c['reference_equivalent_lifecycle']['p95_us']:>9.2f} us | {layer_c['sclass_filelock_lifecycle']['p95_us']:>9.2f} us | {layer_c['statistical_metrics']['p95_ratio']:>6.4f} {str(layer_c['statistical_metrics']['p95_ratio_95_ci']):<18} | {'<= '+str(STANDARD_LATENCY_P95_GATE.threshold):<11} | {'PASS' if layer_c['statistical_metrics']['p95_gate_passed'] else 'FAIL'}")
+    print(f"{'Layer C: 1:1 Lifecycle Throughput':<32} | {layer_c['reference_equivalent_lifecycle']['throughput_per_sec']:>9.1f} /s | {layer_c['sclass_filelock_lifecycle']['throughput_per_sec']:>9.1f} /s | {layer_c['statistical_metrics']['throughput_ratio']:>6.4f} {str(layer_c['statistical_metrics']['throughput_ratio_95_ci']):<18} | {'>= '+str(STANDARD_THROUGHPUT_GATE.threshold):<11} | {'PASS' if layer_c['statistical_metrics']['throughput_gate_passed'] else 'FAIL'}")
     print(f"{'Long Soak (5,000 Cycles)':<32} | {soak_res['initial_rss_bytes']/(1024*1024):>9.2f} MB | {soak_res['final_rss_bytes']/(1024*1024):>9.2f} MB | {'Ratio: '+str(soak_res['rss_growth_ratio']):<26} | {'<= 1.050':<11} | {'PASS' if soak_res['gate_passed'] else 'FAIL'}")
     print(f"{'Interoperability (S->P & P->S)':<32} | {'BLOCKED_SUCCESS':<14} | {'BLOCKED_SUCCESS':<14} | {'Mutual Kernel Exclusion':<26} | {'Equiv':<11} | {'PASS' if interop_res['interoperability_passed'] else 'FAIL'}")
     print(f"{'Timeout (Inter-process)':<32} | {str(timeout_res['reference_timed_out']):<14} | {str(timeout_res['sclass_timed_out']):<14} | {'Matched Semantics':<26} | {'Equiv':<11} | {'PASS' if timeout_res['timeout_differential_passed'] else 'FAIL'}")
