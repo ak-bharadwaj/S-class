@@ -151,6 +151,64 @@ def get_system_environment_info() -> Dict[str, Any]:
     }
 
 
+from dataclasses import dataclass
+from enum import Enum
+
+
+class GateDirection(Enum):
+    UPPER_BOUND = "UPPER"  # ratio <= threshold (e.g. latency)
+    LOWER_BOUND = "LOWER"  # ratio >= threshold (e.g. throughput)
+
+
+@dataclass(frozen=True)
+class ParityMetricGate:
+    name: str
+    direction: GateDirection
+    threshold: float
+    escalation_margin: float = 0.020
+    escalated_bootstrap_min: int = 10000
+
+    def is_near_boundary(self, observed_ratio: float) -> bool:
+        """Determines if the observed metric ratio is within escalation_margin of the failure boundary."""
+        if self.direction == GateDirection.UPPER_BOUND:
+            return observed_ratio >= (self.threshold - self.escalation_margin)
+        else:
+            return observed_ratio <= (self.threshold + self.escalation_margin)
+
+    def is_passing(self, confidence_bound: float) -> bool:
+        """Evaluates whether the 95% confidence bound satisfies the acceptance gate."""
+        if self.direction == GateDirection.UPPER_BOUND:
+            return confidence_bound <= self.threshold
+        else:
+            return confidence_bound >= self.threshold
+
+
+# Standard reusable OSS Parity Gates (0.5% tolerance contract)
+STANDARD_LATENCY_MEDIAN_GATE = ParityMetricGate(
+    name="median_latency_ratio",
+    direction=GateDirection.UPPER_BOUND,
+    threshold=1.005,
+    escalation_margin=0.020,
+    escalated_bootstrap_min=10000
+)
+
+STANDARD_LATENCY_P95_GATE = ParityMetricGate(
+    name="p95_latency_ratio",
+    direction=GateDirection.UPPER_BOUND,
+    threshold=1.005,
+    escalation_margin=0.020,
+    escalated_bootstrap_min=10000
+)
+
+STANDARD_THROUGHPUT_GATE = ParityMetricGate(
+    name="throughput_ratio",
+    direction=GateDirection.LOWER_BOUND,
+    threshold=0.995,
+    escalation_margin=0.020,
+    escalated_bootstrap_min=10000
+)
+
+
 def calculate_linear_percentile(data: List[float], percentile: float) -> float:
     """Standard linear interpolation percentile estimator (p * (n - 1))."""
     if not data:
@@ -166,11 +224,19 @@ def calculate_linear_percentile(data: List[float], percentile: float) -> float:
     return sorted_data[low_idx] * (1.0 - weight) + sorted_data[high_idx] * weight
 
 
-def compute_paired_bootstrap_metrics(pairs: List[Tuple[float, float]], n_bootstraps: int = 1000) -> Dict[str, Any]:
+def compute_paired_bootstrap_metrics(
+    pairs: List[Tuple[float, float]],
+    n_bootstraps: int = 1000,
+    gates: Optional[List[ParityMetricGate]] = None
+) -> Dict[str, Any]:
     """
     Performs rigorous paired bootstrap resampling over preserved (sclass_i, ref_i) trials.
     Calculates paired median ratio CI, paired P95 ratio CI, and paired throughput ratio CI.
+    Evaluates configurable ParityMetricGate objects for adaptive sample escalation.
     """
+    if gates is None:
+        gates = [STANDARD_LATENCY_MEDIAN_GATE, STANDARD_LATENCY_P95_GATE, STANDARD_THROUGHPUT_GATE]
+
     n = len(pairs)
     if n == 0:
         return {
@@ -192,26 +258,23 @@ def compute_paired_bootstrap_metrics(pairs: List[Tuple[float, float]], n_bootstr
 
     sum_s = sum(s_all)
     sum_r = sum(r_all)
-    def _is_near_upper_boundary(ratio: float, gate: float = 1.005, margin: float = 0.020) -> bool:
-        """True if upper-bounded metric ratio (latency) is within margin of failing gate."""
-        return ratio >= (gate - margin)
+    point_tp_ratio = (sum_r / sum_s) if sum_s > 0 else 1.0
 
-    def _is_near_lower_boundary(ratio: float, gate: float = 0.995, margin: float = 0.020) -> bool:
-        """True if lower-bounded metric ratio (throughput) is within margin of failing gate."""
-        return ratio <= (gate + margin)
+    # Metric ratio mapping for declarative gate evaluation
+    metric_values = {
+        "median_latency_ratio": point_med_ratio,
+        "p95_latency_ratio": point_p95_ratio,
+        "throughput_ratio": point_tp_ratio
+    }
 
-    # Generic boundary-distance escalation abstraction:
-    # If any upper-bound metric (latency median/P95) or lower-bound metric (throughput)
-    # is within margin of its acceptance gate, automatically elevate bootstrap resamples
-    # to >= 10,000 to reduce bootstrap resampling Monte Carlo error.
+    # Declarative boundary-distance escalation:
+    # If any gate is within its configured escalation margin, elevate bootstrap resamples
+    # to reduce bootstrap resampling Monte Carlo error.
     actual_bootstraps = n_bootstraps
-    should_escalate = (
-        _is_near_upper_boundary(point_med_ratio, gate=1.005, margin=0.020) or
-        _is_near_upper_boundary(point_p95_ratio, gate=1.005, margin=0.020) or
-        _is_near_lower_boundary(point_tp_ratio, gate=0.995, margin=0.020)
-    )
-    if should_escalate:
-        actual_bootstraps = max(n_bootstraps, 10000)
+    for gate in gates:
+        val = metric_values.get(gate.name)
+        if val is not None and gate.is_near_boundary(val):
+            actual_bootstraps = max(actual_bootstraps, gate.escalated_bootstrap_min)
 
     boot_med_ratios: List[float] = []
     boot_p95_ratios: List[float] = []
