@@ -223,7 +223,7 @@ class SpecGrillerEngine:
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except Exception:
+        except (OSError, json.JSONDecodeError):
             return {}
 
     @classmethod

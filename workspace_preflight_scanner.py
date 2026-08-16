@@ -53,7 +53,7 @@ class WorkspacePreflightScanner:
                 try:
                     size = os.path.getsize(fp)
                     total_bytes += size
-                except Exception:
+                except OSError:
                     pass
 
                 # Scan symbols in code files
@@ -63,7 +63,7 @@ class WorkspacePreflightScanner:
                             content = fo.read()
                         for match in sym_pattern.findall(content):
                             exported_symbols.append({"symbol": match, "file": rel_path})
-                    except Exception:
+                    except (OSError, UnicodeDecodeError):
                         pass
 
                 # Scan environment variables
@@ -74,7 +74,7 @@ class WorkspacePreflightScanner:
                                 line_str = line.strip()
                                 if line_str and not line_str.startswith("#") and env_pattern.match(line_str):
                                     env_vars_declared.add(line_str.split("=")[0].strip())
-                    except Exception:
+                    except (OSError, UnicodeDecodeError):
                         pass
 
                 # Scan dependencies
@@ -86,7 +86,7 @@ class WorkspacePreflightScanner:
                         dev_deps = pkg_data.get("devDependencies", {})
                         pkg_dependencies.update(deps.keys())
                         pkg_dependencies.update(dev_deps.keys())
-                    except Exception:
+                    except (OSError, json.JSONDecodeError):
                         pass
 
         # Also extract python dependencies if present
@@ -125,7 +125,7 @@ class WorkspacePreflightScanner:
                             pkg_name = re.split(r'(?:==|>=|<=|>|<|~=|!=)', line_str)[0].strip()
                             if pkg_name:
                                 deps.add(pkg_name)
-            except Exception:
+            except (OSError, UnicodeDecodeError):
                 pass
 
         toml_path = os.path.join(cwd, "pyproject.toml")
@@ -142,7 +142,7 @@ class WorkspacePreflightScanner:
                             pkg_name = re.split(r'[=><~^!]', line)[0].strip().strip('"\'')
                             if pkg_name and pkg_name.lower() not in ["python", "project", "build-system"]:
                                 deps.add(pkg_name)
-            except Exception:
+            except (OSError, UnicodeDecodeError):
                 pass
         return list(deps)
 
@@ -183,7 +183,7 @@ class WorkspacePreflightScanner:
                                     if col_match:
                                         fields.append(f"{col_match.group(1)} {col_match.group(2)}")
                             schema.append({"name": t_name, "fields": fields, "source": rel_path})
-                except Exception:
+                except (OSError, UnicodeDecodeError):
                     pass
         return schema
 
@@ -213,7 +213,7 @@ class WorkspacePreflightScanner:
 
                     for method, path in nest_pattern.findall(content):
                         routes.append({"method": method.upper(), "path": path, "source": rel_path})
-                except Exception:
+                except (OSError, UnicodeDecodeError):
                     pass
         return routes
 
@@ -231,7 +231,7 @@ class WorkspacePreflightScanner:
                 try:
                     with open(path, 'r', encoding='utf-8') as f:
                         docs[key] = json.load(f)
-                except Exception:
+                except (OSError, json.JSONDecodeError):
                     pass
 
         for root, dirs, files in os.walk(cwd):
@@ -242,7 +242,7 @@ class WorkspacePreflightScanner:
                     try:
                         with open(fp, 'r', encoding='utf-8', errors='ignore') as fo:
                             docs[os.path.relpath(fp, cwd)] = fo.read()
-                    except Exception:
+                    except (OSError, UnicodeDecodeError):
                         pass
         return docs
 
@@ -263,7 +263,7 @@ class WorkspacePreflightScanner:
                                 content = fo.read()
                             for comp in export_pattern.findall(content):
                                 components.append(comp)
-                    except Exception:
+                    except (OSError, UnicodeDecodeError):
                         pass
         return list(set(components))
 
@@ -286,7 +286,7 @@ class WorkspacePreflightScanner:
                         services_block = services_match.group(1)
                         matches = re.findall(r'^\s{2}([a-zA-Z0-9_\-]+):', services_block, re.MULTILINE)
                         services.extend(matches)
-                except Exception:
+                except (OSError, UnicodeDecodeError):
                     pass
         return list(set(services))
 
@@ -303,7 +303,7 @@ class WorkspacePreflightScanner:
                             content = fo.read()
                         matches = re.findall(r'(?:role|permission|guard)\s*[:=]\s*["\']([a-zA-Z0-9_:]+)["\']', content, re.IGNORECASE)
                         perms.update(matches)
-                    except Exception:
+                    except (OSError, UnicodeDecodeError):
                         pass
         return list(perms)
 

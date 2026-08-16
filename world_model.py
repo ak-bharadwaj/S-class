@@ -1034,7 +1034,7 @@ class VerificationRelation:
         if d.get("evidence") and isinstance(d["evidence"], dict):
             try:
                 ev_obj = VerificationEvidence.from_dict(d["evidence"])
-            except Exception:
+            except (KeyError, ValueError, TypeError):
                 ev_obj = d["evidence"]
 
         return cls(

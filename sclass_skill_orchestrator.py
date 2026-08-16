@@ -1404,8 +1404,8 @@ class SClassSkillOrchestrator:
         try:
             with open(stack_file, "w", encoding="utf-8") as f:
                 json.dump(receipt, f, indent=2)
-        except Exception:
-            pass
+        except OSError as e:
+            logger.warning(f"[SkillOrchestrator] Failed to persist active skill stack to {stack_file}: {e}")
 
         return phase_filtered
 

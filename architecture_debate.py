@@ -11,10 +11,13 @@ Enforces:
 import os
 import json
 import hashlib
+import logging
 from datetime import datetime, timezone
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 from typing import Dict, List, Set, Any, Optional, Tuple
+
+logger = logging.getLogger("sclass_architecture_debate")
 
 from behavior_graph import BehaviorGraph, BehaviorNodeType, BehaviorRelationType, EpistemicStatus
 from requirement_ir import RequirementGraph, RequirementNode, RequirementKind, NFRCategory
@@ -381,7 +384,7 @@ class ClaimDecomposer:
                     ev_qual_val = ev_entry.get("quality", 0.0)
                     try:
                         ev_quality = float(ev_qual_val)
-                    except Exception:
+                    except (ValueError, TypeError):
                         ev_quality = 0.0
                     ref_text = ev_entry.get("content") or ev_entry.get("source_ref") or ev_id or str(ev_entry)
                     if "invalid" in ev_prov or ev_quality <= 0.0:
@@ -389,7 +392,10 @@ class ClaimDecomposer:
                 elif hasattr(ev_entry, "provenance") and hasattr(ev_entry, "quality"):
                     ev_id = getattr(ev_entry, "id", None)
                     ev_prov = str(getattr(ev_entry, "provenance", "")).lower()
-                    ev_quality = float(getattr(ev_entry, "quality", 0.0))
+                    try:
+                        ev_quality = float(getattr(ev_entry, "quality", 0.0))
+                    except (ValueError, TypeError):
+                        ev_quality = 0.0
                     ref_text = getattr(ev_entry, "content", "") or getattr(ev_entry, "source_ref", "") or ev_id or str(ev_entry)
                     if "invalid" in ev_prov or ev_quality <= 0.0:
                         is_invalid = True
@@ -400,7 +406,7 @@ class ClaimDecomposer:
                     ev_qual_val = getattr(up_e, "quality", up_e.get("quality", 0.0) if isinstance(up_e, dict) else 0.0)
                     try:
                         ev_quality = float(ev_qual_val)
-                    except Exception:
+                    except (ValueError, TypeError):
                         ev_quality = 0.0
                     if "invalid" in ev_prov or ev_quality <= 0.0:
                         is_invalid = True
@@ -1130,8 +1136,8 @@ class ArchitectureDebateEngine:
                 try:
                     with open(dec_file, "w", encoding="utf-8") as f:
                         json.dump(d_rec.to_dict(), f, indent=2)
-                except Exception:
-                    pass
+                except OSError as e:
+                    logger.warning(f"[ArchitectureDebate] Failed to write decision record {dec_file}: {e}")
 
         agents_dir = os.path.join(cwd, ".agents")
         os.makedirs(agents_dir, exist_ok=True)
@@ -1144,8 +1150,8 @@ class ArchitectureDebateEngine:
                     for r_dict in old_data.get("approval_records", []):
                         if r_dict.get("decision_id"):
                             existing_records_dict[r_dict.get("decision_id")] = r_dict
-            except Exception:
-                pass
+            except (OSError, json.JSONDecodeError) as e:
+                logger.warning(f"[ArchitectureDebate] Failed to read approvals.json {app_file}: {e}")
 
         for r in new_approval_records:
             existing_records_dict[r.decision_id] = r.to_dict()
@@ -1153,8 +1159,8 @@ class ArchitectureDebateEngine:
         try:
             with open(app_file, "w", encoding="utf-8") as f:
                 json.dump({"approval_records": list(existing_records_dict.values()), "timestamp": ts_now}, f, indent=2)
-        except Exception:
-            pass
+        except OSError as e:
+            logger.warning(f"[ArchitectureDebate] Failed to write approvals.json {app_file}: {e}")
 
         return DebateResult(
             accepted_adrs=accepted_adrs,

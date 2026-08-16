@@ -200,13 +200,37 @@ class FileLock:
                 time.sleep(0.05)
                 continue
 
-            # KERNEL ADVISORY LOCK GRANTED! We now hold the kernel lock on this persistent inode.
+            # KERNEL ADVISORY LOCK GRANTED!
+            # Verify that the locked descriptor still matches the file on disk (guards against unlinks/recreations)
             try:
-                os.ftruncate(fd, 0)
+                stat_fd = os.fstat(fd)
+                stat_path = os.stat(self.lock_path)
+                if stat_fd.st_ino != 0 and (stat_fd.st_ino != stat_path.st_ino or stat_fd.st_dev != stat_path.st_dev):
+                    # Stale inode detected - file was unlinked/recreated before acquisition
+                    self._unlock_handle(fd)
+                    try:
+                        os.close(fd)
+                    except OSError:
+                        pass
+                    continue
+            except OSError:
+                # File was unlinked between open and lock
+                self._unlock_handle(fd)
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+                continue
+
+            try:
                 os.lseek(fd, 0, os.SEEK_SET)
                 os.write(fd, owner_payload)
+                try:
+                    os.ftruncate(fd, len(owner_payload))
+                except OSError:
+                    pass
                 os.fsync(fd)
-            except Exception as err:
+            except OSError as err:
                 self._unlock_handle(fd)
                 try:
                     os.close(fd)
@@ -225,11 +249,14 @@ class FileLock:
                 # 1. Update metadata payload to "released" state while STILL HOLDING kernel lock
                 try:
                     rel_payload = json.dumps({"status": "released", "pid": self.owner_pid, "token": self.token}).encode("utf-8")
-                    os.ftruncate(self._fd, 0)
                     os.lseek(self._fd, 0, os.SEEK_SET)
                     os.write(self._fd, rel_payload)
+                    try:
+                        os.ftruncate(self._fd, len(rel_payload))
+                    except OSError:
+                        pass
                     os.fsync(self._fd)
-                except Exception:
+                except OSError:
                     pass
 
                 # 2. Release OS-native kernel advisory lock

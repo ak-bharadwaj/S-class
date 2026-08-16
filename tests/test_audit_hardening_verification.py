@@ -143,3 +143,46 @@ def test_config_gc_live_vs_stale_lock(tmp_path):
     report2 = run_gc(str(tmp_path))
     assert report2.stale_locks_removed == 1
     assert not lock_file.exists()
+
+
+def test_gc_does_not_remove_active_lock(tmp_path):
+    """Invariant: GC never unlinks state.lock while an active process holds the kernel lock."""
+    agents_dir = tmp_path / ".agents"
+    agents_dir.mkdir()
+    lock_file = str(agents_dir / "state.lock")
+    
+    # Process holds live active lock
+    with FileLock(lock_file):
+        report = run_gc(str(tmp_path))
+        # Active lock must NOT be removed
+        assert report.stale_locks_removed == 0
+        assert os.path.exists(lock_file)
+
+
+def test_concurrent_file_lock_mutual_exclusion(tmp_path):
+    """Verifies mutual exclusion across concurrent threads without split-brain inode divergence."""
+    import threading
+    import time
+    
+    lock_file = str(tmp_path / "concurrent.lock")
+    counter = {"val": 0}
+    errors = []
+    
+    def worker():
+        try:
+            for _ in range(10):
+                with FileLock(lock_file, timeout=5.0):
+                    curr = counter["val"]
+                    time.sleep(0.005)
+                    counter["val"] = curr + 1
+        except Exception as e:
+            errors.append(e)
+            
+    threads = [threading.Thread(target=worker) for _ in range(5)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+        
+    assert len(errors) == 0
+    assert counter["val"] == 50

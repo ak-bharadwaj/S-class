@@ -956,7 +956,7 @@ class WorldModelEngine:
                 try:
                     with open(pipeline_file, "r", encoding="utf-8") as pf:
                         pipeline_data = json.load(pf)
-                except Exception:
+                except (OSError, json.JSONDecodeError):
                     pass
 
         GroundedSpecWeaver.weave_specifications(world_model, pipeline_data or {})

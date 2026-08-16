@@ -599,7 +599,7 @@ class RepositoryClassifier:
                                 False,
                                 False
                             )
-            except Exception:
+            except (OSError, UnicodeDecodeError):
                 pass
 
         # 6. Binary Media Check
@@ -733,7 +733,7 @@ class RepositorySnapshotEngine:
             )
             if res.returncode == 0 and res.stdout.strip():
                 return res.stdout.strip()
-        except Exception:
+        except (subprocess.SubprocessError, OSError, FileNotFoundError):
             pass
         return "NO_GIT"
 
@@ -773,13 +773,13 @@ class RepositorySnapshotEngine:
                         symlink_target = os.readlink(full_path)
                         resolved = os.path.abspath(os.path.join(root, symlink_target))
                         is_external = not resolved.startswith(abs_root)
-                    except Exception:
+                    except OSError:
                         is_external = True
 
                 try:
                     with open(full_path, "rb") as fp:
                         content_bytes = fp.read()
-                except Exception:
+                except OSError:
                     content_bytes = b""
 
                 size_bytes = len(content_bytes)

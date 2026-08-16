@@ -190,7 +190,7 @@ class SkillDiscoveryEngine:
                     "total_connected": len(connected_skills),
                     "connected_skills": connected_skills
                 }, f, indent=2)
-        except Exception:
-            pass
+        except OSError as e:
+            logger.warning(f"[SkillDiscovery] Failed saving auto connection receipt to {connection_file}: {e}")
 
         return {"connected_count": len(connected_skills), "connected_skills": connected_skills}
