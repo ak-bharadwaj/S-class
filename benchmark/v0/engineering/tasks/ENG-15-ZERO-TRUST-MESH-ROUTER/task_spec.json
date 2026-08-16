@@ -1,0 +1,11 @@
+{
+  "task_id": "ENG-15-ZERO-TRUST-MESH-ROUTER",
+  "domain": "Networking & Mesh Security",
+  "raw_prompt": "Implement a zero-trust service mesh ingress router in `target_module.py` enforcing mTLS SAN header verification and path-based RBAC permission checks.",
+  "must_invariants": [
+    "mTLS SAN identity header verification",
+    "RBAC path access matrix evaluation",
+    "Fail-closed deny on unauthenticated ingress"
+  ],
+  "total_gt_requirements": 5
+}

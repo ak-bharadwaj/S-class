@@ -1,26 +1,57 @@
 {
   "task_id": "ENG-01-FINTECH-LEDGER",
-  "baseline": "B1_RAW_AGENT",
-  "timestamp": "2026-08-15T19:16:48.480705+00:00",
-  "raw_prompt": "Build an atomic double-entry financial ledger transaction engine with balance invariance and idempotency check.",
-  "synthesized_requirements": [
-    "Execute Transfer",
-    "Get Balance",
-    "Export CSV Ledger",
-    "Send Email Notification"
+  "baseline": "B1",
+  "runner_version": "gate-1.6b-genuine-agent-benchmark-v1",
+  "domain": "Fintech / Double-Entry Ledger",
+  "raw_prompt": "Implement an atomic double-entry financial ledger in `target_module.py` with balance zero-sum invariance, non-zero positive amount validation, overdraft protection, and idempotency token replay protection.",
+  "model_metadata": {
+    "provider_type": "mock_test",
+    "model_name": "mock-test-harness",
+    "temperature": 0.2,
+    "is_mock": true
+  },
+  "repository": {
+    "starting_tree_hash": "3b1521bb39309dafb0da6c72098cac713a8224ac7b21df6e7580e7d781bfed40",
+    "final_tree_hash": "d2659b46088e0dca325b36665959edc5c971db12e000bcb0530f9998663a3ad5"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "Task Instruction:\nImplement an atomic double-entry financial ledger in `target_module.py` with balance zero-sum invariance, non-zero positive amount validation, overdraft protection, and idempotency token replay protection.\n\nExisting Code in target_module.py:\n```python\n# target_module.py\nbalances = {'A': 1000, 'B': 500}\njournal = []\nseen_keys = {}\n\ndef execute_transaction(from_acc: str, to_acc: str, amount: float, idem_key: str) -> dict:\n    # Implement double-entry transaction\n    pass\n\ndef get_balance(acc: str) -> float:\n    return balances.get(acc, 0.0)\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "# Mock Test Provider Response\ndef target_function(): pass\n",
+      "latency_sec": 0.0,
+      "prompt_tokens": 84,
+      "completion_tokens": 8,
+      "cost_usd": 0.0,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 4,
+        "total_count": 4,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpjyra8flj\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 4 items\n\ntests/test_oracle.py::test_negative_amount_rejected FAILED               [ 25%]\ntests/test_oracle.py::test_idempotency_replay FAILED                     [ 50%]\ntests/test_oracle.py::test_overdraft_prevention FAILED                   [ 75%]\ntests/test_oracle.py::test_zero_sum_invariance FAILED                    [100%]\n\n================================== FAILURES ===================================\n________________________ test_negative_amount_rejected ________________________\ntests\\test_oracle.py:6: in test_negative_amount_rejected\n    target_module.execute_transaction('A', 'B', -100, 'k_neg')\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: module 'target_module' has no attribute 'execute_transaction'\n___________________________ test_idempotency_replay ___________________________\ntests\\test_oracle.py:10: in test_idempotency_replay\n    target_module.seen_keys.clear()\n    ^^^^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: module 'target_module' has no attribute 'seen_keys'\n__________________________ test_overdraft_prevention __________________________\ntests\\test_oracle.py:20: in test_overdraft_prevention\n    target_module.execute_transaction('A', 'B', 200, 'k_over')\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: module 'target_module' has no attribute 'execute_transaction'\n__________________________ test_zero_sum_invariance ___________________________\ntests\\test_oracle.py:25: in test_zero_sum_invariance\n    target_module.execute_transaction('A', 'B', 300, 'k_sum')\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: module 'target_module' has no attribute 'execute_transaction'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_negative_amount_rejected - AttributeError: ...\nFAILED tests/test_oracle.py::test_idempotency_replay - AttributeError: module...\nFAILED tests/test_oracle.py::test_overdraft_prevention - AttributeError: modu...\nFAILED tests/test_oracle.py::test_zero_sum_invariance - AttributeError: modul...\n============================== 4 failed in 0.11s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.656,
+        "all_passed": false
+      }
+    }
   ],
-  "synthesized_code": "\nbalances = {'A': 0, 'B': 0}\nseen_keys = set()\ndef execute_transaction(from_acc, to_acc, amount, idem_key):\n    # Bug: missing negative amount check\n    if idem_key in seen_keys: return {'status': 'OK', 'id': idem_key}\n    seen_keys.add(idem_key)\n    balances[from_acc] -= amount\n    balances[to_acc] += amount\n    return {'status': 'OK', 'id': idem_key}\ndef get_balance(acc): return balances.get(acc, 0)\n",
-  "test_harness_output": "Test failed with exit code 1:\nTraceback (most recent call last):\n  File \"<string>\", line 19, in test_ledger_invariants\n    from target_module import execute_transaction\nModuleNotFoundError: No module named 'target_module'\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"<string>\", line 40, in <module>\n    test_ledger_invariants()\n    ~~~~~~~~~~~~~~~~~~~~~~^^\n  File \"<string>\", line 25, in test_ledger_invariants\n    if 'negative' not in str(e).lower(): assert False, f'Unexpected error: {e}'\n                                                ^^^^^\nAssertionError: Unexpected error: No module named 'target_module'",
-  "test_passed": false,
-  "must_invariants_recovered": 4,
-  "must_invariants_total": 6,
-  "must_recall": 66.67,
-  "gt_recall": 50.0,
-  "unsupported_rate": 0.0,
-  "requirement_count": 4,
-  "defects": 2,
-  "interventions": 0,
-  "rework_score": 7.5,
-  "latency_ms": 93.02,
-  "trust_score": 4.0
+  "final_code": "# Mock Test Provider Response\ndef target_function(): pass\n",
+  "oracle_result": {
+    "exit_code": 1,
+    "passed_count": 0,
+    "failed_count": 4,
+    "total_count": 4,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpjyra8flj\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 4 items\n\ntests/test_oracle.py::test_negative_amount_rejected FAILED               [ 25%]\ntests/test_oracle.py::test_idempotency_replay FAILED                     [ 50%]\ntests/test_oracle.py::test_overdraft_prevention FAILED                   [ 75%]\ntests/test_oracle.py::test_zero_sum_invariance FAILED                    [100%]\n\n================================== FAILURES ===================================\n________________________ test_negative_amount_rejected ________________________\ntests\\test_oracle.py:6: in test_negative_amount_rejected\n    target_module.execute_transaction('A', 'B', -100, 'k_neg')\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: module 'target_module' has no attribute 'execute_transaction'\n___________________________ test_idempotency_replay ___________________________\ntests\\test_oracle.py:10: in test_idempotency_replay\n    target_module.seen_keys.clear()\n    ^^^^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: module 'target_module' has no attribute 'seen_keys'\n__________________________ test_overdraft_prevention __________________________\ntests\\test_oracle.py:20: in test_overdraft_prevention\n    target_module.execute_transaction('A', 'B', 200, 'k_over')\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: module 'target_module' has no attribute 'execute_transaction'\n__________________________ test_zero_sum_invariance ___________________________\ntests\\test_oracle.py:25: in test_zero_sum_invariance\n    target_module.execute_transaction('A', 'B', 300, 'k_sum')\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: module 'target_module' has no attribute 'execute_transaction'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_negative_amount_rejected - AttributeError: ...\nFAILED tests/test_oracle.py::test_idempotency_replay - AttributeError: module...\nFAILED tests/test_oracle.py::test_overdraft_prevention - AttributeError: modu...\nFAILED tests/test_oracle.py::test_zero_sum_invariance - AttributeError: modul...\n============================== 4 failed in 0.11s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.656,
+    "all_passed": false
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  }
 }

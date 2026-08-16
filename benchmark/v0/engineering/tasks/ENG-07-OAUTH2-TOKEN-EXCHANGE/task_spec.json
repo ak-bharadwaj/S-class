@@ -1,0 +1,11 @@
+{
+  "task_id": "ENG-07-OAUTH2-TOKEN-EXCHANGE",
+  "domain": "Auth & IAM / Security Protocol",
+  "raw_prompt": "Implement an RFC 8693 OAuth2 token exchange handler in `target_module.py` enforcing subject token validation, audience verification, and token type scope restriction.",
+  "must_invariants": [
+    "RFC 8693 token exchange scope boundary",
+    "Audience verification gate",
+    "Fail-closed subject token validation"
+  ],
+  "total_gt_requirements": 5
+}

@@ -1,0 +1,457 @@
+{
+  "title": "Gate 1.6B Task Oracle Pre-Validation Report",
+  "timestamp": "",
+  "total_tasks": 16,
+  "valid_tasks": 16,
+  "validation_pass_rate": 100.0,
+  "tasks": [
+    {
+      "task_id": "ENG-01-FINTECH-LEDGER",
+      "domain": "Fintech / Double-Entry Ledger",
+      "must_invariants_count": 4,
+      "reference_passed": true,
+      "reference_pytest_result": {
+        "exit_code": 0,
+        "passed_count": 4,
+        "failed_count": 0,
+        "total_count": 4,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpd1eeoqwm\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 4 items\n\ntests/test_oracle.py::test_negative_amount_rejected PASSED               [ 25%]\ntests/test_oracle.py::test_idempotency_replay PASSED                     [ 50%]\ntests/test_oracle.py::test_overdraft_prevention PASSED                   [ 75%]\ntests/test_oracle.py::test_zero_sum_invariance PASSED                    [100%]\n\n============================== 4 passed in 0.04s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.588,
+        "all_passed": true
+      },
+      "flawed_rejected": true,
+      "flawed_pytest_result": {
+        "exit_code": 1,
+        "passed_count": 1,
+        "failed_count": 3,
+        "total_count": 4,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp01gab3be\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 4 items\n\ntests/test_oracle.py::test_negative_amount_rejected FAILED               [ 25%]\ntests/test_oracle.py::test_idempotency_replay FAILED                     [ 50%]\ntests/test_oracle.py::test_overdraft_prevention FAILED                   [ 75%]\ntests/test_oracle.py::test_zero_sum_invariance PASSED                    [100%]\n\n================================== FAILURES ===================================\n________________________ test_negative_amount_rejected ________________________\ntests\\test_oracle.py:5: in test_negative_amount_rejected\n    with pytest.raises(ValueError):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^\nE   Failed: DID NOT RAISE <class 'ValueError'>\n___________________________ test_idempotency_replay ___________________________\ntests\\test_oracle.py:14: in test_idempotency_replay\n    assert target_module.get_balance('A') == 900\nE   AssertionError: assert 800 == 900\nE    +  where 800 = <function get_balance at 0x00000270F78E7E20>('A')\nE    +    where <function get_balance at 0x00000270F78E7E20> = target_module.get_balance\n__________________________ test_overdraft_prevention __________________________\ntests\\test_oracle.py:19: in test_overdraft_prevention\n    with pytest.raises(ValueError):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^\nE   Failed: DID NOT RAISE <class 'ValueError'>\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_negative_amount_rejected - Failed: DID NOT ...\nFAILED tests/test_oracle.py::test_idempotency_replay - AssertionError: assert...\nFAILED tests/test_oracle.py::test_overdraft_prevention - Failed: DID NOT RAIS...\n========================= 3 failed, 1 passed in 0.10s =========================\n",
+        "stderr": "",
+        "duration_sec": 0.631,
+        "all_passed": false
+      },
+      "oracle_valid": true
+    },
+    {
+      "task_id": "ENG-02-AUTH-SESSION-REVOKE",
+      "domain": "Auth & IAM / Distributed State",
+      "must_invariants_count": 3,
+      "reference_passed": true,
+      "reference_pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp2xwj8yp_\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_session_revocation PASSED                     [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.554,
+        "all_passed": true
+      },
+      "flawed_rejected": true,
+      "flawed_pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpxhraygo5\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_session_revocation FAILED                     [100%]\n\n================================== FAILURES ===================================\n___________________________ test_session_revocation ___________________________\ntests\\test_oracle.py:10: in test_session_revocation\n    assert target_module.validate_token(t1) is False\nE   AssertionError: assert True is False\nE    +  where True = <function validate_token at 0x000001C00F7D7E20>('tok_user_1_0')\nE    +    where <function validate_token at 0x000001C00F7D7E20> = target_module.validate_token\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_session_revocation - AssertionError: assert...\n============================== 1 failed in 0.09s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.626,
+        "all_passed": false
+      },
+      "oracle_valid": true
+    },
+    {
+      "task_id": "ENG-03-HEALTHCARE-PHI-ANONYMIZER",
+      "domain": "Healthcare PHI / Security",
+      "must_invariants_count": 3,
+      "reference_passed": true,
+      "reference_pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp0s1il0pa\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_phi_anonymization PASSED                      [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.554,
+        "all_passed": true
+      },
+      "flawed_rejected": true,
+      "flawed_pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpxznqt3x2\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_phi_anonymization FAILED                      [100%]\n\n================================== FAILURES ===================================\n___________________________ test_phi_anonymization ____________________________\ntests\\test_oracle.py:7: in test_phi_anonymization\n    assert res['ssn'] == '[REDACTED_SSN]'\nE   AssertionError: assert '000-12-3456' == '[REDACTED_SSN]'\nE     \nE     - [REDACTED_SSN]\nE     + 000-12-3456\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_phi_anonymization - AssertionError: assert ...\n============================== 1 failed in 0.09s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.616,
+        "all_passed": false
+      },
+      "oracle_valid": true
+    },
+    {
+      "task_id": "ENG-04-AVIONICS-ARINC429-RECORDER",
+      "domain": "Avionics / Embedded Ring Buffer",
+      "must_invariants_count": 3,
+      "reference_passed": true,
+      "reference_pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp60xrpx1j\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_parity_and_ring_capacity PASSED               [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.546,
+        "all_passed": true
+      },
+      "flawed_rejected": true,
+      "flawed_pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp5598wqmj\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_parity_and_ring_capacity FAILED               [100%]\n\n================================== FAILURES ===================================\n________________________ test_parity_and_ring_capacity ________________________\ntests\\test_oracle.py:13: in test_parity_and_ring_capacity\n    assert len(records) == 2\nE   assert 3 == 2\nE    +  where 3 = len([1, 7, 11])\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_parity_and_ring_capacity - assert 3 == 2\n============================== 1 failed in 0.10s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.681,
+        "all_passed": false
+      },
+      "oracle_valid": true
+    },
+    {
+      "task_id": "ENG-05-KIOSK-LOCKDOWN-SANDBOX",
+      "domain": "OS & Containment / Kiosk Security",
+      "must_invariants_count": 3,
+      "reference_passed": true,
+      "reference_pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmptkwn67oz\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_sandbox_containment PASSED                    [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.549,
+        "all_passed": true
+      },
+      "flawed_rejected": true,
+      "flawed_pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpt_mme7f0\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_sandbox_containment FAILED                    [100%]\n\n================================== FAILURES ===================================\n__________________________ test_sandbox_containment ___________________________\ntests\\test_oracle.py:6: in test_sandbox_containment\n    assert target_module.is_syscall_allowed('execve', '/tmp/sandbox/file.txt') is False\nE   AssertionError: assert True is False\nE    +  where True = <function is_syscall_allowed at 0x0000021AE2707B60>('execve', '/tmp/sandbox/file.txt')\nE    +    where <function is_syscall_allowed at 0x0000021AE2707B60> = target_module.is_syscall_allowed\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_sandbox_containment - AssertionError: asser...\n============================== 1 failed in 0.10s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.624,
+        "all_passed": false
+      },
+      "oracle_valid": true
+    },
+    {
+      "task_id": "ENG-06-PAYMENT-GATEWAY-TOKENIZER",
+      "domain": "Fintech / PCI-DSS Security",
+      "must_invariants_count": 3,
+      "reference_passed": true,
+      "reference_pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpawal_fwa\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_luhn_and_tokenization PASSED                  [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.553,
+        "all_passed": true
+      },
+      "flawed_rejected": true,
+      "flawed_pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpwh38g0gz\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_luhn_and_tokenization FAILED                  [100%]\n\n================================== FAILURES ===================================\n_________________________ test_luhn_and_tokenization __________________________\ntests\\test_oracle.py:10: in test_luhn_and_tokenization\n    assert tokenizer.validate_luhn(invalid_pan) is False\nE   AssertionError: assert True is False\nE    +  where True = validate_luhn('4532015112830367')\nE    +    where validate_luhn = <target_module.CardTokenizer object at 0x000001F5B82A9160>.validate_luhn\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_luhn_and_tokenization - AssertionError: ass...\n============================== 1 failed in 0.09s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.606,
+        "all_passed": false
+      },
+      "oracle_valid": true
+    },
+    {
+      "task_id": "ENG-07-OAUTH2-TOKEN-EXCHANGE",
+      "domain": "Auth & IAM / Security Protocol",
+      "must_invariants_count": 3,
+      "reference_passed": true,
+      "reference_pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpkg03xa51\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_oauth2_token_exchange PASSED                  [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.555,
+        "all_passed": true
+      },
+      "flawed_rejected": true,
+      "flawed_pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpha_2dqj7\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_oauth2_token_exchange FAILED                  [100%]\n\n================================== FAILURES ===================================\n_________________________ test_oauth2_token_exchange __________________________\ntests\\test_oracle.py:6: in test_oauth2_token_exchange\n    assert res[\"access_token\"].startswith(\"exchanged_tok_\")\nE   AssertionError: assert False\nE    +  where False = <built-in method startswith of str object at 0x000001E84CECF730>('exchanged_tok_')\nE    +    where <built-in method startswith of str object at 0x000001E84CECF730> = 'exchanged_tok'.startswith\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_oauth2_token_exchange - AssertionError: ass...\n============================== 1 failed in 0.09s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.62,
+        "all_passed": false
+      },
+      "oracle_valid": true
+    },
+    {
+      "task_id": "ENG-08-DISTRIBUTED-RATE-LIMITER",
+      "domain": "Distributed Systems / Traffic Control",
+      "must_invariants_count": 3,
+      "reference_passed": true,
+      "reference_pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp1crpz87w\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_sliding_window_rate_limiter PASSED            [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.545,
+        "all_passed": true
+      },
+      "flawed_rejected": true,
+      "flawed_pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmprjx8xxeu\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_sliding_window_rate_limiter FAILED            [100%]\n\n================================== FAILURES ===================================\n______________________ test_sliding_window_rate_limiter _______________________\ntests\\test_oracle.py:8: in test_sliding_window_rate_limiter\n    assert limiter.allow_request('client_1', 3.0) is False # Cap exceeded\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   AssertionError: assert True is False\nE    +  where True = allow_request('client_1', 3.0)\nE    +    where allow_request = <target_module.SlidingWindowRateLimiter object at 0x0000029139EE9160>.allow_request\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_sliding_window_rate_limiter - AssertionErro...\n============================== 1 failed in 0.11s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.716,
+        "all_passed": false
+      },
+      "oracle_valid": true
+    },
+    {
+      "task_id": "ENG-09-EVENT-SOURCING-CQRS",
+      "domain": "Architecture / CQRS & Event Sourcing",
+      "must_invariants_count": 3,
+      "reference_passed": true,
+      "reference_pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpmbwxvwfm\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_cqrs_event_sourcing PASSED                    [100%]\n\n============================== 1 passed in 0.04s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.629,
+        "all_passed": true
+      },
+      "flawed_rejected": true,
+      "flawed_pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpw96e262n\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_cqrs_event_sourcing FAILED                    [100%]\n\n================================== FAILURES ===================================\n__________________________ test_cqrs_event_sourcing ___________________________\ntests\\test_oracle.py:10: in test_cqrs_event_sourcing\n    assert proj['status'] == 'ACTIVE'\n           ^^^^^^^^^^^^^^\nE   KeyError: 'status'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_cqrs_event_sourcing - KeyError: 'status'\n============================== 1 failed in 0.10s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.632,
+        "all_passed": false
+      },
+      "oracle_valid": true
+    },
+    {
+      "task_id": "ENG-10-DEAD-LETTER-JOB-SCHEDULER",
+      "domain": "Distributed Queues / Resiliency",
+      "must_invariants_count": 3,
+      "reference_passed": true,
+      "reference_pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpd59v38dp\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_dlq_escalation PASSED                         [100%]\n\n============================== 1 passed in 0.05s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.738,
+        "all_passed": true
+      },
+      "flawed_rejected": true,
+      "flawed_pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp6d8fom4f\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_dlq_escalation FAILED                         [100%]\n\n================================== FAILURES ===================================\n_____________________________ test_dlq_escalation _____________________________\ntests\\test_oracle.py:11: in test_dlq_escalation\n    assert status == \"MOVED_TO_DLQ\"\nE   AssertionError: assert 'COMPLETED' == 'MOVED_TO_DLQ'\nE     \nE     - MOVED_TO_DLQ\nE     + COMPLETED\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_dlq_escalation - AssertionError: assert 'CO...\n============================== 1 failed in 0.10s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.686,
+        "all_passed": false
+      },
+      "oracle_valid": true
+    },
+    {
+      "task_id": "ENG-11-WEBSOCKET-COLLAB-ROOM",
+      "domain": "Real-Time / State Synchronization",
+      "must_invariants_count": 3,
+      "reference_passed": true,
+      "reference_pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpbokco69l\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_vector_clock_causality PASSED                 [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.558,
+        "all_passed": true
+      },
+      "flawed_rejected": true,
+      "flawed_pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp368ki2o4\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_vector_clock_causality FAILED                 [100%]\n\n================================== FAILURES ===================================\n_________________________ test_vector_clock_causality _________________________\ntests\\test_oracle.py:10: in test_vector_clock_causality\n    assert doc.apply_update('client_A', {'client_A': 1}, \"Stale Version\") is False\nE   AssertionError: assert True is False\nE    +  where True = apply_update('client_A', {'client_A': 1}, 'Stale Version')\nE    +    where apply_update = <target_module.CollabDocument object at 0x000002D95E139160>.apply_update\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_vector_clock_causality - AssertionError: as...\n============================== 1 failed in 0.10s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.635,
+        "all_passed": false
+      },
+      "oracle_valid": true
+    },
+    {
+      "task_id": "ENG-12-DB-SCHEMA-INVARIANT-VERIFIER",
+      "domain": "Database Engineering / Schema Verification",
+      "must_invariants_count": 3,
+      "reference_passed": true,
+      "reference_pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpckk8elzt\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_schema_invariant_verifier PASSED              [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.554,
+        "all_passed": true
+      },
+      "flawed_rejected": true,
+      "flawed_pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmprfzfvpmv\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_schema_invariant_verifier FAILED              [100%]\n\n================================== FAILURES ===================================\n_______________________ test_schema_invariant_verifier ________________________\ntests\\test_oracle.py:16: in test_schema_invariant_verifier\n    assert \"MISSING_PK:orders\" in violations\nE   AssertionError: assert 'MISSING_PK:orders' in []\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_schema_invariant_verifier - AssertionError:...\n============================== 1 failed in 0.13s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.815,
+        "all_passed": false
+      },
+      "oracle_valid": true
+    },
+    {
+      "task_id": "ENG-13-MULTI-REGION-KMS-SECRETS",
+      "domain": "Cloud Security / KMS Cryptography",
+      "must_invariants_count": 3,
+      "reference_passed": true,
+      "reference_pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpgr38i5zx\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_kms_envelope_encryption PASSED                [100%]\n\n============================== 1 passed in 0.04s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.668,
+        "all_passed": true
+      },
+      "flawed_rejected": true,
+      "flawed_pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp29oe8_9g\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_kms_envelope_encryption FAILED                [100%]\n\n================================== FAILURES ===================================\n________________________ test_kms_envelope_encryption _________________________\ntests\\test_oracle.py:8: in test_kms_envelope_encryption\n    assert enc[\"ciphertext\"] != \"sensitive_api_token_99\"\nE   AssertionError: assert 'sensitive_api_token_99' != 'sensitive_api_token_99'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_kms_envelope_encryption - AssertionError: a...\n============================== 1 failed in 0.11s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.686,
+        "all_passed": false
+      },
+      "oracle_valid": true
+    },
+    {
+      "task_id": "ENG-14-S3-MULTIPART-RESUMABLE-UPLOAD",
+      "domain": "Cloud Storage / Reliable Protocols",
+      "must_invariants_count": 3,
+      "reference_passed": true,
+      "reference_pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmper8h36xd\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_multipart_resumable_upload PASSED             [100%]\n\n============================== 1 passed in 0.04s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.595,
+        "all_passed": true
+      },
+      "flawed_rejected": true,
+      "flawed_pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp8y31k423\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_multipart_resumable_upload FAILED             [100%]\n\n================================== FAILURES ===================================\n_______________________ test_multipart_resumable_upload _______________________\ntests\\test_oracle.py:15: in test_multipart_resumable_upload\n    with pytest.raises(ValueError):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^\nE   Failed: DID NOT RAISE <class 'ValueError'>\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_multipart_resumable_upload - Failed: DID NO...\n============================== 1 failed in 0.11s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.818,
+        "all_passed": false
+      },
+      "oracle_valid": true
+    },
+    {
+      "task_id": "ENG-15-ZERO-TRUST-MESH-ROUTER",
+      "domain": "Networking & Mesh Security",
+      "must_invariants_count": 3,
+      "reference_passed": true,
+      "reference_pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpvcet1zqw\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_zero_trust_ingress PASSED                     [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.573,
+        "all_passed": true
+      },
+      "flawed_rejected": true,
+      "flawed_pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp6xtra5e8\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_zero_trust_ingress FAILED                     [100%]\n\n================================== FAILURES ===================================\n___________________________ test_zero_trust_ingress ___________________________\ntests\\test_oracle.py:10: in test_zero_trust_ingress\n    with pytest.raises(PermissionError):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   Failed: DID NOT RAISE <class 'PermissionError'>\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_zero_trust_ingress - Failed: DID NOT RAISE ...\n============================== 1 failed in 0.10s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.622,
+        "all_passed": false
+      },
+      "oracle_valid": true
+    },
+    {
+      "task_id": "ENG-16-MULTI-TENANT-SCHEMA-GUARD",
+      "domain": "Database & Multi-Tenancy / Isolation",
+      "must_invariants_count": 3,
+      "reference_passed": true,
+      "reference_pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpd9y6v7mz\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_multi_tenant_isolation_guard PASSED           [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.569,
+        "all_passed": true
+      },
+      "flawed_rejected": true,
+      "flawed_pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpisbstl8k\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_multi_tenant_isolation_guard FAILED           [100%]\n\n================================== FAILURES ===================================\n______________________ test_multi_tenant_isolation_guard ______________________\ntests\\test_oracle.py:8: in test_multi_tenant_isolation_guard\n    with pytest.raises(PermissionError):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   Failed: DID NOT RAISE <class 'PermissionError'>\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_multi_tenant_isolation_guard - Failed: DID ...\n============================== 1 failed in 0.10s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.633,
+        "all_passed": false
+      },
+      "oracle_valid": true
+    }
+  ]
+}

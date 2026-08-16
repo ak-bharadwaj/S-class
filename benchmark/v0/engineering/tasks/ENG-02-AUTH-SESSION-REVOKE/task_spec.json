@@ -1,0 +1,11 @@
+{
+  "task_id": "ENG-02-AUTH-SESSION-REVOKE",
+  "domain": "Auth & IAM / Distributed State",
+  "raw_prompt": "Implement user password reset with active session token revocation and fail-closed token validation in `target_module.py`.",
+  "must_invariants": [
+    "Active session token invalidation upon password reset",
+    "Fail-closed token validation access gate",
+    "Token blacklist tracking"
+  ],
+  "total_gt_requirements": 5
+}

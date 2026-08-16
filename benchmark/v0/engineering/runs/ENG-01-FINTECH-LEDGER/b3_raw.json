@@ -1,30 +1,237 @@
 {
   "task_id": "ENG-01-FINTECH-LEDGER",
-  "baseline": "B3_SCLASS_CANDIDATE_AUTHORITY",
-  "timestamp": "2026-08-15T19:16:48.678821+00:00",
-  "raw_prompt": "Build an atomic double-entry financial ledger transaction engine with balance invariance and idempotency check.",
-  "synthesized_requirements": [
-    "Atomic Ledger Transaction Boundary",
-    "Double-Entry Balance Invariance",
-    "Idempotency Key Verification",
-    "Disallow Negative Amount / Non-Zero Transfer Guard",
-    "Row-Level Account Locking and Concurrency Control",
-    "Append-Only Immutable Audit Log",
-    "Underlying Storage Technology Specification",
-    "API Transport Protocol Specification"
+  "baseline": "B3",
+  "runner_version": "gate-1.6b-genuine-agent-benchmark-v1",
+  "domain": "Fintech / Double-Entry Ledger",
+  "raw_prompt": "Implement an atomic double-entry financial ledger in `target_module.py` with balance zero-sum invariance, non-zero positive amount validation, overdraft protection, and idempotency token replay protection.",
+  "sclass_governance": {
+    "semantic_requirements": [
+      {
+        "id": "REQ-SHADOW-001",
+        "title": "Atomic Ledger Transaction Boundary",
+        "description": "Execute financial entries inside an atomic all-or-nothing transaction boundary.",
+        "type": "FUNCTIONAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt mandates atomic financial transaction"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-002",
+        "title": "Double-Entry Balance Invariance",
+        "description": "Ensure sum of all debits strictly equals sum of all credits for every transaction.",
+        "type": "INVARIANT",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt mandates debit/credit balance invariance"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-003",
+        "title": "Idempotency Key Verification",
+        "description": "Verify idempotency keys to prevent duplicate execution of ledger transactions.",
+        "type": "BEHAVIORAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt mandates idempotency check"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-004",
+        "title": "Disallow Negative Amount / Non-Zero Transfer Guard",
+        "description": "Validate that transaction debit and credit amounts are strictly positive non-zero numbers before execution.",
+        "type": "INVARIANT",
+        "epistemic_status": "DERIVED_JUSTIFIED",
+        "confidence": 0.95,
+        "provenance": "PRECONDITION_GUARD",
+        "introduced_in_pass": 2,
+        "why_chain": [
+          "Negative transfer amounts invert accounting polarity",
+          "Pre-condition input validation protects balance integrity",
+          "Mandatory ledger entry invariant"
+        ],
+        "pass_history": [
+          2
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-005",
+        "title": "Row-Level Account Locking and Concurrency Control",
+        "description": "Acquire serializable row-level locks on affected account balances to prevent race conditions.",
+        "type": "INVARIANT",
+        "epistemic_status": "DERIVED_JUSTIFIED",
+        "confidence": 0.95,
+        "provenance": "CONCURRENCY_CONTROL",
+        "introduced_in_pass": 2,
+        "why_chain": [
+          "Concurrent transactions risk double spending",
+          "Row-level locking guarantees serializability",
+          "Mandatory balance consistency invariant"
+        ],
+        "pass_history": [
+          2
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-006",
+        "title": "Append-Only Immutable Audit Log",
+        "description": "Record all ledger entries to an append-only journal with zero in-place updates.",
+        "type": "INVARIANT",
+        "epistemic_status": "DERIVED_JUSTIFIED",
+        "confidence": 0.95,
+        "provenance": "AUDIT_COMPLIANCE",
+        "introduced_in_pass": 2,
+        "why_chain": [
+          "Financial compliance prohibits destructive edits",
+          "Append-only logs preserve forensic lineage",
+          "Mandatory immutable accounting invariant"
+        ],
+        "pass_history": [
+          2
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-007",
+        "title": "Underlying Storage Technology Specification",
+        "description": "The specific persistence engine and database backend are unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify database technology"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-008",
+        "title": "API Transport Protocol Specification",
+        "description": "The specific network transport protocol (gRPC vs REST) is unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify API protocol"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      }
+    ],
+    "epistemic_status": "CONFIRMED",
+    "gate_result": "PASS"
+  },
+  "model_metadata": {
+    "provider_type": "mock_test",
+    "model_name": "mock-test-harness",
+    "temperature": 0.2,
+    "is_mock": true
+  },
+  "repository": {
+    "starting_tree_hash": "26f520a6d5a877117933dfd4e5927aa9fdbda132a972ef4cba37c8571bbd1914",
+    "final_tree_hash": "a381c0fbd98313452a0a8d94a99683b3387efaed0be6ec0b41b0f3e03c553d4e"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "User Task Instruction:\nImplement an atomic double-entry financial ledger in `target_module.py` with balance zero-sum invariance, non-zero positive amount validation, overdraft protection, and idempotency token replay protection.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Atomic Ledger Transaction Boundary: Execute financial entries inside an atomic all-or-nothing transaction boundary.\n- [] Double-Entry Balance Invariance: Ensure sum of all debits strictly equals sum of all credits for every transaction.\n- [] Idempotency Key Verification: Verify idempotency keys to prevent duplicate execution of ledger transactions.\n- [] Disallow Negative Amount / Non-Zero Transfer Guard: Validate that transaction debit and credit amounts are strictly positive non-zero numbers before execution.\n- [] Row-Level Account Locking and Concurrency Control: Acquire serializable row-level locks on affected account balances to prevent race conditions.\n- [] Append-Only Immutable Audit Log: Record all ledger entries to an append-only journal with zero in-place updates.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nExisting Code in target_module.py:\n```python\n# target_module.py\nbalances = {'A': 1000, 'B': 500}\njournal = []\nseen_keys = {}\n\ndef execute_transaction(from_acc: str, to_acc: str, amount: float, idem_key: str) -> dict:\n    # Implement double-entry transaction\n    pass\n\ndef get_balance(acc: str) -> float:\n    return balances.get(acc, 0.0)\n\n```\n\nImplement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block.",
+      "response_text": "# Mock Test Provider Response\ndef target_function(): pass\n",
+      "latency_sec": 0.0,
+      "prompt_tokens": 241,
+      "completion_tokens": 8,
+      "cost_usd": 0.0,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 4,
+        "total_count": 4,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpovyeckx0\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 4 items\n\ntests/test_oracle.py::test_negative_amount_rejected FAILED               [ 25%]\ntests/test_oracle.py::test_idempotency_replay FAILED                     [ 50%]\ntests/test_oracle.py::test_overdraft_prevention FAILED                   [ 75%]\ntests/test_oracle.py::test_zero_sum_invariance FAILED                    [100%]\n\n================================== FAILURES ===================================\n________________________ test_negative_amount_rejected ________________________\ntests\\test_oracle.py:6: in test_negative_amount_rejected\n    target_module.execute_transaction('A', 'B', -100, 'k_neg')\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: module 'target_module' has no attribute 'execute_transaction'\n___________________________ test_idempotency_replay ___________________________\ntests\\test_oracle.py:10: in test_idempotency_replay\n    target_module.seen_keys.clear()\n    ^^^^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: module 'target_module' has no attribute 'seen_keys'\n__________________________ test_overdraft_prevention __________________________\ntests\\test_oracle.py:20: in test_overdraft_prevention\n    target_module.execute_transaction('A', 'B', 200, 'k_over')\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: module 'target_module' has no attribute 'execute_transaction'\n__________________________ test_zero_sum_invariance ___________________________\ntests\\test_oracle.py:25: in test_zero_sum_invariance\n    target_module.execute_transaction('A', 'B', 300, 'k_sum')\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: module 'target_module' has no attribute 'execute_transaction'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_negative_amount_rejected - AttributeError: ...\nFAILED tests/test_oracle.py::test_idempotency_replay - AttributeError: module...\nFAILED tests/test_oracle.py::test_overdraft_prevention - AttributeError: modu...\nFAILED tests/test_oracle.py::test_zero_sum_invariance - AttributeError: modul...\n============================== 4 failed in 0.12s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.747,
+        "all_passed": false
+      }
+    }
   ],
-  "synthesized_code": "\nbalances = {'A': 0, 'B': 0}\njournal = []\nseen_keys = {}\ndef execute_transaction(from_acc, to_acc, amount, idem_key):\n    if amount <= 0: raise ValueError('Amount must be positive non-zero')\n    if idem_key in seen_keys: return seen_keys[idem_key]\n    balances[from_acc] -= amount\n    balances[to_acc] += amount\n    journal.append({'from': from_acc, 'to': to_acc, 'amount': amount, 'key': idem_key})\n    res = {'status': 'OK', 'id': idem_key}\n    seen_keys[idem_key] = res\n    return res\ndef get_balance(acc): return balances.get(acc, 0)\n",
-  "test_harness_output": "Test failed with exit code 1:\nTraceback (most recent call last):\n  File \"<string>\", line 22, in test_ledger_invariants\n    from target_module import execute_transaction\nModuleNotFoundError: No module named 'target_module'\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"<string>\", line 43, in <module>\n    test_ledger_invariants()\n    ~~~~~~~~~~~~~~~~~~~~~~^^\n  File \"<string>\", line 28, in test_ledger_invariants\n    if 'negative' not in str(e).lower(): assert False, f'Unexpected error: {e}'\n                                                ^^^^^\nAssertionError: Unexpected error: No module named 'target_module'",
-  "test_passed": false,
-  "must_invariants_recovered": 6,
-  "must_invariants_total": 6,
-  "must_recall": 100.0,
-  "gt_recall": 87.5,
-  "unsupported_rate": 0.0,
-  "requirement_count": 8,
-  "defects": 0,
-  "interventions": 0,
-  "rework_score": 1.5,
-  "latency_ms": 102.47,
-  "trust_score": 9.5
+  "final_code": "# Mock Test Provider Response\ndef target_function(): pass\n",
+  "oracle_result": {
+    "exit_code": 1,
+    "passed_count": 0,
+    "failed_count": 4,
+    "total_count": 4,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpovyeckx0\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 4 items\n\ntests/test_oracle.py::test_negative_amount_rejected FAILED               [ 25%]\ntests/test_oracle.py::test_idempotency_replay FAILED                     [ 50%]\ntests/test_oracle.py::test_overdraft_prevention FAILED                   [ 75%]\ntests/test_oracle.py::test_zero_sum_invariance FAILED                    [100%]\n\n================================== FAILURES ===================================\n________________________ test_negative_amount_rejected ________________________\ntests\\test_oracle.py:6: in test_negative_amount_rejected\n    target_module.execute_transaction('A', 'B', -100, 'k_neg')\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: module 'target_module' has no attribute 'execute_transaction'\n___________________________ test_idempotency_replay ___________________________\ntests\\test_oracle.py:10: in test_idempotency_replay\n    target_module.seen_keys.clear()\n    ^^^^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: module 'target_module' has no attribute 'seen_keys'\n__________________________ test_overdraft_prevention __________________________\ntests\\test_oracle.py:20: in test_overdraft_prevention\n    target_module.execute_transaction('A', 'B', 200, 'k_over')\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: module 'target_module' has no attribute 'execute_transaction'\n__________________________ test_zero_sum_invariance ___________________________\ntests\\test_oracle.py:25: in test_zero_sum_invariance\n    target_module.execute_transaction('A', 'B', 300, 'k_sum')\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: module 'target_module' has no attribute 'execute_transaction'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_negative_amount_rejected - AttributeError: ...\nFAILED tests/test_oracle.py::test_idempotency_replay - AttributeError: module...\nFAILED tests/test_oracle.py::test_overdraft_prevention - AttributeError: modu...\nFAILED tests/test_oracle.py::test_zero_sum_invariance - AttributeError: modul...\n============================== 4 failed in 0.12s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.747,
+    "all_passed": false
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  }
 }

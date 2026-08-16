@@ -1,0 +1,28 @@
+{
+  "title": "Gate 1.6B Genuine Agent Benchmark Summary Report",
+  "runner_version": "gate-1.6b-genuine-agent-benchmark-v1",
+  "total_tasks": 16,
+  "baselines": {
+    "B1_Prompt_Only": {
+      "passed": 0,
+      "total": 16,
+      "pass_rate": 0.0,
+      "avg_latency_sec": 0.0,
+      "total_cost_usd": 0.0
+    },
+    "B2_Agent_Test_Loop": {
+      "passed": 0,
+      "total": 16,
+      "pass_rate": 0.0,
+      "avg_latency_sec": 0.0,
+      "total_cost_usd": 0.0
+    },
+    "B3_Agent_SClass_Governance": {
+      "passed": 0,
+      "total": 16,
+      "pass_rate": 0.0,
+      "avg_latency_sec": 0.0,
+      "total_cost_usd": 0.0
+    }
+  }
+}

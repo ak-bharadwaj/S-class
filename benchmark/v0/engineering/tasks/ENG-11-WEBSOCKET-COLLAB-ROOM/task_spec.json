@@ -1,0 +1,11 @@
+{
+  "task_id": "ENG-11-WEBSOCKET-COLLAB-ROOM",
+  "domain": "Real-Time / State Synchronization",
+  "raw_prompt": "Implement a real-time collaborative document state synchronization engine in `target_module.py` using Vector Clocks to resolve concurrent update conflicts.",
+  "must_invariants": [
+    "Vector clock causal ordering validation",
+    "LWW / deterministic tie-breaking on concurrent vector clock updates",
+    "Broadcast state payload update"
+  ],
+  "total_gt_requirements": 5
+}

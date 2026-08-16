@@ -1,0 +1,95 @@
+{
+  "task_id": "ENG-10-DEAD-LETTER-JOB-SCHEDULER",
+  "baseline": "B2",
+  "runner_version": "gate-1.6b-genuine-agent-benchmark-v1",
+  "domain": "Distributed Queues / Resiliency",
+  "raw_prompt": "Implement a background job scheduler with exponential backoff retries and Dead Letter Queue (DLQ) isolation in `target_module.py`.",
+  "model_metadata": {
+    "provider_type": "mock_test",
+    "model_name": "gemini-2.5-flash",
+    "temperature": 0.2,
+    "total_iterations": 3
+  },
+  "repository": {
+    "starting_tree_hash": "14b58f01ac3a79f765d50b878d92c21312358e8189e7d9aed283a5a46fe8f66d",
+    "final_tree_hash": "4bd81a0637f1a835a9f59a7c5a983cd8a2ba29fb7a547f5214d9a88f5fe12d48"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "Task Instruction:\nImplement a background job scheduler with exponential backoff retries and Dead Letter Queue (DLQ) isolation in `target_module.py`.\n\nExisting Code in target_module.py:\n```python\n# target_module.py\nclass JobScheduler:\n    def __init__(self, max_retries: int = 3, base_delay_sec: float = 1.0):\n        pass\n    def execute_job(self, job_id: str, job_fn) -> str:\n        pass\n    def get_dlq(self) -> list:\n        pass\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "# Mock Test Provider Response\ndef target_function(): pass\n",
+      "latency_sec": 0.0,
+      "prompt_tokens": 68,
+      "completion_tokens": 8,
+      "cost_usd": 0.0,
+      "pytest_result": {
+        "exit_code": 2,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpwv44u4d6\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 0 items / 1 error\n\n=================================== ERRORS ====================================\n____________________ ERROR collecting tests/test_oracle.py ____________________\nImportError while importing test module 'C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpwv44u4d6\\tests\\test_oracle.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n..\\..\\Python\\pythoncore-3.14-64\\Lib\\importlib\\__init__.py:88: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests\\test_oracle.py:2: in <module>\n    from target_module import JobScheduler\nE   ImportError: cannot import name 'JobScheduler' from 'target_module' (C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpwv44u4d6\\target_module.py)\n=========================== short test summary info ===========================\nERROR tests/test_oracle.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n============================== 1 error in 0.18s ===============================\n",
+        "stderr": "",
+        "duration_sec": 0.728,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "Task Instruction:\nImplement a background job scheduler with exponential backoff retries and Dead Letter Queue (DLQ) isolation in `target_module.py`.\n\nYour previous implementation for `target_module.py` produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpwv44u4d6\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 0 items / 1 error\n\n=================================== ERRORS ====================================\n____________________ ERROR collecting tests/test_oracle.py ____________________\nImportError while importing test module 'C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpwv44u4d6\\tests\\test_oracle.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n..\\..\\Python\\pythoncore-3.14-64\\Lib\\importlib\\__init__.py:88: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests\\test_oracle.py:2: in <module>\n    from target_module import JobScheduler\nE   ImportError: cannot import name 'JobScheduler' from 'target_module' (C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpwv44u4d6\\target_module.py)\n=========================== short test summary info ===========================\nERROR tests/test_oracle.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n============================== 1 error in 0.18s ===============================\n\n\n\nPrevious Code:\n```python\n# Mock Test Provider Response\ndef target_function(): pass\n\n```\n\nPlease analyze the test failures and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "# Mock Test Provider Response\ndef target_function(): pass\n",
+      "latency_sec": 0.0,
+      "prompt_tokens": 158,
+      "completion_tokens": 8,
+      "cost_usd": 0.0,
+      "pytest_result": {
+        "exit_code": 2,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpwv44u4d6\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 0 items / 1 error\n\n=================================== ERRORS ====================================\n____________________ ERROR collecting tests/test_oracle.py ____________________\nImportError while importing test module 'C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpwv44u4d6\\tests\\test_oracle.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n..\\..\\Python\\pythoncore-3.14-64\\Lib\\importlib\\__init__.py:88: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests\\test_oracle.py:2: in <module>\n    from target_module import JobScheduler\nE   ImportError: cannot import name 'JobScheduler' from 'target_module' (C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpwv44u4d6\\target_module.py)\n=========================== short test summary info ===========================\nERROR tests/test_oracle.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n============================== 1 error in 0.17s ===============================\n",
+        "stderr": "",
+        "duration_sec": 0.724,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 3,
+      "prompt": "Task Instruction:\nImplement a background job scheduler with exponential backoff retries and Dead Letter Queue (DLQ) isolation in `target_module.py`.\n\nYour previous implementation for `target_module.py` produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpwv44u4d6\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 0 items / 1 error\n\n=================================== ERRORS ====================================\n____________________ ERROR collecting tests/test_oracle.py ____________________\nImportError while importing test module 'C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpwv44u4d6\\tests\\test_oracle.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n..\\..\\Python\\pythoncore-3.14-64\\Lib\\importlib\\__init__.py:88: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests\\test_oracle.py:2: in <module>\n    from target_module import JobScheduler\nE   ImportError: cannot import name 'JobScheduler' from 'target_module' (C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpwv44u4d6\\target_module.py)\n=========================== short test summary info ===========================\nERROR tests/test_oracle.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n============================== 1 error in 0.17s ===============================\n\n\n\nPrevious Code:\n```python\n# Mock Test Provider Response\ndef target_function(): pass\n\n```\n\nPlease analyze the test failures and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "# Mock Test Provider Response\ndef target_function(): pass\n",
+      "latency_sec": 0.0,
+      "prompt_tokens": 158,
+      "completion_tokens": 8,
+      "cost_usd": 0.0,
+      "pytest_result": {
+        "exit_code": 2,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpwv44u4d6\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 0 items / 1 error\n\n=================================== ERRORS ====================================\n____________________ ERROR collecting tests/test_oracle.py ____________________\nImportError while importing test module 'C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpwv44u4d6\\tests\\test_oracle.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n..\\..\\Python\\pythoncore-3.14-64\\Lib\\importlib\\__init__.py:88: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests\\test_oracle.py:2: in <module>\n    from target_module import JobScheduler\nE   ImportError: cannot import name 'JobScheduler' from 'target_module' (C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpwv44u4d6\\target_module.py)\n=========================== short test summary info ===========================\nERROR tests/test_oracle.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n============================== 1 error in 0.17s ===============================\n",
+        "stderr": "",
+        "duration_sec": 0.692,
+        "all_passed": false
+      }
+    }
+  ],
+  "final_code": "# Mock Test Provider Response\ndef target_function(): pass\n",
+  "oracle_result": {
+    "exit_code": 2,
+    "passed_count": 0,
+    "failed_count": 1,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpwv44u4d6\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 0 items / 1 error\n\n=================================== ERRORS ====================================\n____________________ ERROR collecting tests/test_oracle.py ____________________\nImportError while importing test module 'C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpwv44u4d6\\tests\\test_oracle.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n..\\..\\Python\\pythoncore-3.14-64\\Lib\\importlib\\__init__.py:88: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests\\test_oracle.py:2: in <module>\n    from target_module import JobScheduler\nE   ImportError: cannot import name 'JobScheduler' from 'target_module' (C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpwv44u4d6\\target_module.py)\n=========================== short test summary info ===========================\nERROR tests/test_oracle.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n============================== 1 error in 0.17s ===============================\n",
+    "stderr": "",
+    "duration_sec": 0.692,
+    "all_passed": false
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  }
+}

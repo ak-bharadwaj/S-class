@@ -1,0 +1,11 @@
+{
+  "task_id": "ENG-16-MULTI-TENANT-SCHEMA-GUARD",
+  "domain": "Database & Multi-Tenancy / Isolation",
+  "raw_prompt": "Implement a multi-tenant SQL context filter guard in `target_module.py` enforcing mandatory `tenant_id` WHERE clause injection and SQL injection sanitization.",
+  "must_invariants": [
+    "Mandatory active tenant context validation",
+    "Automatic tenant_id SQL filter injection",
+    "Sanitization against SQL injection bypass attempts"
+  ],
+  "total_gt_requirements": 5
+}

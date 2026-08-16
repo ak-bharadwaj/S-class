@@ -1,0 +1,11 @@
+{
+  "task_id": "ENG-13-MULTI-REGION-KMS-SECRETS",
+  "domain": "Cloud Security / KMS Cryptography",
+  "raw_prompt": "Implement an envelope encryption manager in `target_module.py` with AES-256 data key generation, Key Encryption Key (KEK) wrapping, and automated key rotation.",
+  "must_invariants": [
+    "AES-256 envelope data key generation",
+    "KEK wrapping protection",
+    "Rotated key decryption backwards-compatibility"
+  ],
+  "total_gt_requirements": 5
+}

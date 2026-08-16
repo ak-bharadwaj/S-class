@@ -1,0 +1,11 @@
+{
+  "task_id": "ENG-12-DB-SCHEMA-INVARIANT-VERIFIER",
+  "domain": "Database Engineering / Schema Verification",
+  "raw_prompt": "Implement a relational database schema invariant verifier in `target_module.py` detecting missing primary keys, unindexed foreign key columns, and non-null constraint drift.",
+  "must_invariants": [
+    "Missing Primary Key detection",
+    "Unindexed Foreign Key detection",
+    "Non-null column constraint drift verification"
+  ],
+  "total_gt_requirements": 5
+}

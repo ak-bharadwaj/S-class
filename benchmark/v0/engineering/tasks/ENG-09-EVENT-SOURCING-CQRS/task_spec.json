@@ -1,0 +1,11 @@
+{
+  "task_id": "ENG-09-EVENT-SOURCING-CQRS",
+  "domain": "Architecture / CQRS & Event Sourcing",
+  "raw_prompt": "Implement an event store & read-model projector in `target_module.py` with append-only immutable event persistence and deterministic projection state generation.",
+  "must_invariants": [
+    "Append-only immutable event store journal",
+    "Sequential version numbering per aggregate",
+    "Deterministic read-model state projection"
+  ],
+  "total_gt_requirements": 5
+}

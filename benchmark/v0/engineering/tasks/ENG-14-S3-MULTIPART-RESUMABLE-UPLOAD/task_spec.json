@@ -1,0 +1,11 @@
+{
+  "task_id": "ENG-14-S3-MULTIPART-RESUMABLE-UPLOAD",
+  "domain": "Cloud Storage / Reliable Protocols",
+  "raw_prompt": "Implement a resumable multipart upload state machine in `target_module.py` enforcing per-part MD5/SHA256 checksum verification and contiguous part assembly.",
+  "must_invariants": [
+    "Per-part checksum integrity verification",
+    "Contiguous part sequence verification before completion",
+    "Aborted session upload cleanup"
+  ],
+  "total_gt_requirements": 5
+}

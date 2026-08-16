@@ -1,0 +1,11 @@
+{
+  "task_id": "ENG-05-KIOSK-LOCKDOWN-SANDBOX",
+  "domain": "OS & Containment / Kiosk Security",
+  "raw_prompt": "Implement a process containment syscall sanitizer guard in `target_module.py` that enforces an explicit syscall whitelist and denies unauthorized filesystem access outside `/tmp/sandbox`.",
+  "must_invariants": [
+    "Allowed syscall whitelist validation",
+    "Path containment boundary strictly within /tmp/sandbox",
+    "Deny-by-default execution fallback"
+  ],
+  "total_gt_requirements": 5
+}

@@ -1,0 +1,11 @@
+{
+  "task_id": "ENG-06-PAYMENT-GATEWAY-TOKENIZER",
+  "domain": "Fintech / PCI-DSS Security",
+  "raw_prompt": "Implement a PCI-DSS PAN card tokenizer in `target_module.py` with Luhn algorithm validation, format-preserving token generation, and secure vault storage.",
+  "must_invariants": [
+    "Luhn algorithm validation on raw PAN",
+    "Format-preserving tokenization preserving BIN (first 6) and last 4 digits",
+    "Zero plaintext PAN retention in token store"
+  ],
+  "total_gt_requirements": 5
+}

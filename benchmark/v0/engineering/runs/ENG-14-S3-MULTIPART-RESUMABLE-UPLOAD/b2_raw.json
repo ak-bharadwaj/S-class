@@ -1,0 +1,95 @@
+{
+  "task_id": "ENG-14-S3-MULTIPART-RESUMABLE-UPLOAD",
+  "baseline": "B2",
+  "runner_version": "gate-1.6b-genuine-agent-benchmark-v1",
+  "domain": "Cloud Storage / Reliable Protocols",
+  "raw_prompt": "Implement a resumable multipart upload state machine in `target_module.py` enforcing per-part MD5/SHA256 checksum verification and contiguous part assembly.",
+  "model_metadata": {
+    "provider_type": "mock_test",
+    "model_name": "gemini-2.5-flash",
+    "temperature": 0.2,
+    "total_iterations": 3
+  },
+  "repository": {
+    "starting_tree_hash": "c1891d4b1527c58ae3632ab657b9ea9d81aa4f1446a8bacd1b421cf5f75b613f",
+    "final_tree_hash": "165b0319823cde5169c825634ff1b425fde91b25c016ab8b48797911ed0f8dc0"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "Task Instruction:\nImplement a resumable multipart upload state machine in `target_module.py` enforcing per-part MD5/SHA256 checksum verification and contiguous part assembly.\n\nExisting Code in target_module.py:\n```python\n# target_module.py\nclass MultipartUploader:\n    def __init__(self, total_parts: int):\n        pass\n    def upload_part(self, part_num: int, data: bytes, checksum: str) -> bool:\n        pass\n    def complete_upload(self) -> bytes:\n        pass\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "# Mock Test Provider Response\ndef target_function(): pass\n",
+      "latency_sec": 0.0,
+      "prompt_tokens": 66,
+      "completion_tokens": 8,
+      "cost_usd": 0.0,
+      "pytest_result": {
+        "exit_code": 2,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpdz8i8ubb\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 0 items / 1 error\n\n=================================== ERRORS ====================================\n____________________ ERROR collecting tests/test_oracle.py ____________________\nImportError while importing test module 'C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpdz8i8ubb\\tests\\test_oracle.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n..\\..\\Python\\pythoncore-3.14-64\\Lib\\importlib\\__init__.py:88: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests\\test_oracle.py:3: in <module>\n    from target_module import MultipartUploader\nE   ImportError: cannot import name 'MultipartUploader' from 'target_module' (C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpdz8i8ubb\\target_module.py)\n=========================== short test summary info ===========================\nERROR tests/test_oracle.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n============================== 1 error in 0.18s ===============================\n",
+        "stderr": "",
+        "duration_sec": 0.742,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "Task Instruction:\nImplement a resumable multipart upload state machine in `target_module.py` enforcing per-part MD5/SHA256 checksum verification and contiguous part assembly.\n\nYour previous implementation for `target_module.py` produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpdz8i8ubb\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 0 items / 1 error\n\n=================================== ERRORS ====================================\n____________________ ERROR collecting tests/test_oracle.py ____________________\nImportError while importing test module 'C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpdz8i8ubb\\tests\\test_oracle.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n..\\..\\Python\\pythoncore-3.14-64\\Lib\\importlib\\__init__.py:88: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests\\test_oracle.py:3: in <module>\n    from target_module import MultipartUploader\nE   ImportError: cannot import name 'MultipartUploader' from 'target_module' (C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpdz8i8ubb\\target_module.py)\n=========================== short test summary info ===========================\nERROR tests/test_oracle.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n============================== 1 error in 0.18s ===============================\n\n\n\nPrevious Code:\n```python\n# Mock Test Provider Response\ndef target_function(): pass\n\n```\n\nPlease analyze the test failures and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "# Mock Test Provider Response\ndef target_function(): pass\n",
+      "latency_sec": 0.0001,
+      "prompt_tokens": 159,
+      "completion_tokens": 8,
+      "cost_usd": 0.0,
+      "pytest_result": {
+        "exit_code": 2,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpdz8i8ubb\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 0 items / 1 error\n\n=================================== ERRORS ====================================\n____________________ ERROR collecting tests/test_oracle.py ____________________\nImportError while importing test module 'C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpdz8i8ubb\\tests\\test_oracle.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n..\\..\\Python\\pythoncore-3.14-64\\Lib\\importlib\\__init__.py:88: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests\\test_oracle.py:3: in <module>\n    from target_module import MultipartUploader\nE   ImportError: cannot import name 'MultipartUploader' from 'target_module' (C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpdz8i8ubb\\target_module.py)\n=========================== short test summary info ===========================\nERROR tests/test_oracle.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n============================== 1 error in 0.18s ===============================\n",
+        "stderr": "",
+        "duration_sec": 0.733,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 3,
+      "prompt": "Task Instruction:\nImplement a resumable multipart upload state machine in `target_module.py` enforcing per-part MD5/SHA256 checksum verification and contiguous part assembly.\n\nYour previous implementation for `target_module.py` produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpdz8i8ubb\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 0 items / 1 error\n\n=================================== ERRORS ====================================\n____________________ ERROR collecting tests/test_oracle.py ____________________\nImportError while importing test module 'C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpdz8i8ubb\\tests\\test_oracle.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n..\\..\\Python\\pythoncore-3.14-64\\Lib\\importlib\\__init__.py:88: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests\\test_oracle.py:3: in <module>\n    from target_module import MultipartUploader\nE   ImportError: cannot import name 'MultipartUploader' from 'target_module' (C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpdz8i8ubb\\target_module.py)\n=========================== short test summary info ===========================\nERROR tests/test_oracle.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n============================== 1 error in 0.18s ===============================\n\n\n\nPrevious Code:\n```python\n# Mock Test Provider Response\ndef target_function(): pass\n\n```\n\nPlease analyze the test failures and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "# Mock Test Provider Response\ndef target_function(): pass\n",
+      "latency_sec": 0.0,
+      "prompt_tokens": 159,
+      "completion_tokens": 8,
+      "cost_usd": 0.0,
+      "pytest_result": {
+        "exit_code": 2,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpdz8i8ubb\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 0 items / 1 error\n\n=================================== ERRORS ====================================\n____________________ ERROR collecting tests/test_oracle.py ____________________\nImportError while importing test module 'C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpdz8i8ubb\\tests\\test_oracle.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n..\\..\\Python\\pythoncore-3.14-64\\Lib\\importlib\\__init__.py:88: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests\\test_oracle.py:3: in <module>\n    from target_module import MultipartUploader\nE   ImportError: cannot import name 'MultipartUploader' from 'target_module' (C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpdz8i8ubb\\target_module.py)\n=========================== short test summary info ===========================\nERROR tests/test_oracle.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n============================== 1 error in 0.17s ===============================\n",
+        "stderr": "",
+        "duration_sec": 0.695,
+        "all_passed": false
+      }
+    }
+  ],
+  "final_code": "# Mock Test Provider Response\ndef target_function(): pass\n",
+  "oracle_result": {
+    "exit_code": 2,
+    "passed_count": 0,
+    "failed_count": 1,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpdz8i8ubb\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 0 items / 1 error\n\n=================================== ERRORS ====================================\n____________________ ERROR collecting tests/test_oracle.py ____________________\nImportError while importing test module 'C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpdz8i8ubb\\tests\\test_oracle.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n..\\..\\Python\\pythoncore-3.14-64\\Lib\\importlib\\__init__.py:88: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests\\test_oracle.py:3: in <module>\n    from target_module import MultipartUploader\nE   ImportError: cannot import name 'MultipartUploader' from 'target_module' (C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpdz8i8ubb\\target_module.py)\n=========================== short test summary info ===========================\nERROR tests/test_oracle.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n============================== 1 error in 0.17s ===============================\n",
+    "stderr": "",
+    "duration_sec": 0.695,
+    "all_passed": false
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "task_id": "ENG-01-FINTECH-LEDGER",
+  "domain": "Fintech / Double-Entry Ledger",
+  "raw_prompt": "Implement an atomic double-entry financial ledger in `target_module.py` with balance zero-sum invariance, non-zero positive amount validation, overdraft protection, and idempotency token replay protection.",
+  "must_invariants": [
+    "Atomic transaction boundary / zero-sum balance invariance sum(debits) == sum(credits)",
+    "Disallow negative or zero transfer amount validation",
+    "Account overdraft floor protection",
+    "Idempotency token replay protection"
+  ],
+  "total_gt_requirements": 6
+}

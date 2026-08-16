@@ -1,0 +1,11 @@
+{
+  "task_id": "ENG-03-HEALTHCARE-PHI-ANONYMIZER",
+  "domain": "Healthcare PHI / Security",
+  "raw_prompt": "Implement a HIPAA-compliant PHI anonymizer in `target_module.py` that redacts SSN, replaces Patient Names with salted HMAC-SHA256 hashes, and preserves diagnostic code fields.",
+  "must_invariants": [
+    "SSN redaction (replaced with [REDACTED_SSN])",
+    "Salted HMAC-SHA256 pseudonymization for patient names",
+    "Preservation of medical diagnostic code fields"
+  ],
+  "total_gt_requirements": 5
+}

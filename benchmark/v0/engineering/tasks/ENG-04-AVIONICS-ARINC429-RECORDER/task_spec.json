@@ -1,0 +1,11 @@
+{
+  "task_id": "ENG-04-AVIONICS-ARINC429-RECORDER",
+  "domain": "Avionics / Embedded Ring Buffer",
+  "raw_prompt": "Implement an ARINC-429 flight data ring-buffer blackbox recorder in `target_module.py` with fixed capacity, parity bit validation, and FIFO overwrite.",
+  "must_invariants": [
+    "Fixed ring buffer capacity bound",
+    "Odd-parity bit integrity check on 32-bit words",
+    "FIFO oldest-first overwrite when full"
+  ],
+  "total_gt_requirements": 5
+}

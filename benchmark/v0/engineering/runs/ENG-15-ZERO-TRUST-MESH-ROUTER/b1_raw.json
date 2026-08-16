@@ -1,0 +1,57 @@
+{
+  "task_id": "ENG-15-ZERO-TRUST-MESH-ROUTER",
+  "baseline": "B1",
+  "runner_version": "gate-1.6b-genuine-agent-benchmark-v1",
+  "domain": "Networking & Mesh Security",
+  "raw_prompt": "Implement a zero-trust service mesh ingress router in `target_module.py` enforcing mTLS SAN header verification and path-based RBAC permission checks.",
+  "model_metadata": {
+    "provider_type": "mock_test",
+    "model_name": "mock-test-harness",
+    "temperature": 0.2,
+    "is_mock": true
+  },
+  "repository": {
+    "starting_tree_hash": "92e62320f3520e14ef21fd12d4d91dc86c76a5555da2bbebd664fd65cc1ae24a",
+    "final_tree_hash": "faadc6817464f12e47dfb1ca031d1be742b6e1d20914d71467708ea69c6bf486"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "Task Instruction:\nImplement a zero-trust service mesh ingress router in `target_module.py` enforcing mTLS SAN header verification and path-based RBAC permission checks.\n\nExisting Code in target_module.py:\n```python\n# target_module.py\ndef route_request(headers: dict, path: str) -> dict:\n    pass\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "# Mock Test Provider Response\ndef target_function(): pass\n",
+      "latency_sec": 0.0,
+      "prompt_tokens": 52,
+      "completion_tokens": 8,
+      "cost_usd": 0.0,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp_bpuw0kw\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_zero_trust_ingress FAILED                     [100%]\n\n================================== FAILURES ===================================\n___________________________ test_zero_trust_ingress ___________________________\ntests\\test_oracle.py:6: in test_zero_trust_ingress\n    res = target_module.route_request(headers, \"/api/v1/charge\")\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: module 'target_module' has no attribute 'route_request'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_zero_trust_ingress - AttributeError: module...\n============================== 1 failed in 0.10s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.678,
+        "all_passed": false
+      }
+    }
+  ],
+  "final_code": "# Mock Test Provider Response\ndef target_function(): pass\n",
+  "oracle_result": {
+    "exit_code": 1,
+    "passed_count": 0,
+    "failed_count": 1,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp_bpuw0kw\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_zero_trust_ingress FAILED                     [100%]\n\n================================== FAILURES ===================================\n___________________________ test_zero_trust_ingress ___________________________\ntests\\test_oracle.py:6: in test_zero_trust_ingress\n    res = target_module.route_request(headers, \"/api/v1/charge\")\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: module 'target_module' has no attribute 'route_request'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_zero_trust_ingress - AttributeError: module...\n============================== 1 failed in 0.10s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.678,
+    "all_passed": false
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "task_id": "ENG-08-DISTRIBUTED-RATE-LIMITER",
+  "domain": "Distributed Systems / Traffic Control",
+  "raw_prompt": "Implement a sliding window log rate limiter in `target_module.py` enforcing request threshold caps per client window and automatic window sliding cleanup.",
+  "must_invariants": [
+    "Strict max request rate cap per window",
+    "Sliding window log timestamp eviction",
+    "Thread-safe request check atomic boundary"
+  ],
+  "total_gt_requirements": 5
+}

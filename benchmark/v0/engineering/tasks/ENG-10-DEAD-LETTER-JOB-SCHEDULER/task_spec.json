@@ -1,0 +1,11 @@
+{
+  "task_id": "ENG-10-DEAD-LETTER-JOB-SCHEDULER",
+  "domain": "Distributed Queues / Resiliency",
+  "raw_prompt": "Implement a background job scheduler with exponential backoff retries and Dead Letter Queue (DLQ) isolation in `target_module.py`.",
+  "must_invariants": [
+    "Max retry attempt cap before DLQ escalation",
+    "Exponential backoff calculation (delay = base * 2^attempt)",
+    "DLQ dead-letter queue routing upon final failure"
+  ],
+  "total_gt_requirements": 5
+}
