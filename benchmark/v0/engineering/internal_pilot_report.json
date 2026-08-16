@@ -1,0 +1,30 @@
+{
+  "title": "Internal Real-Workflow Pilot Decision Report",
+  "task_id": "INTERNAL_PILOT_CONFIG_GC",
+  "condition_a_b2": {
+    "passed": false,
+    "calls": 3,
+    "latency_sec": 12.57,
+    "status": "FAIL (0/2 tests passed, exhausted 3 iterations)"
+  },
+  "condition_b_b4": {
+    "passed": true,
+    "calls": 2,
+    "latency_sec": 11.09,
+    "status": "PASS (2/2 tests passed on Iteration 2)"
+  },
+  "qualitative_audit": {
+    "b2_invariant_misses": [
+      "B2 failed to establish persistent SHA-256 manifest tracking across 3 repair iterations",
+      "B2 improperly auto-generated checksums during verification, masking tampering errors"
+    ],
+    "b4_sclass_catches": [
+      "B4 established explicit register_baseline_artifacts() manifest store (.artifact_hashes.json)",
+      "B4 enforced SHA-256 digest hashing and raised ArtifactTamperError on file mutation",
+      "B4 guarded master_ledger.md and *.json files from purge"
+    ],
+    "catch_correctness": "100% Correct",
+    "false_alarms": "None",
+    "developer_judgment": "KEEP S-CLASS"
+  }
+}
