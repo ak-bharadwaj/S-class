@@ -4,25 +4,25 @@
   "total_tasks": 16,
   "baselines": {
     "B1_Prompt_Only": {
-      "passed": 0,
+      "passed": 4,
       "total": 16,
-      "pass_rate": 0.0,
-      "avg_latency_sec": 0.0,
-      "total_cost_usd": 0.0
+      "pass_rate": 25.0,
+      "avg_latency_sec": 3.813,
+      "total_cost_usd": 0.004313
     },
     "B2_Agent_Test_Loop": {
-      "passed": 0,
+      "passed": 10,
       "total": 16,
-      "pass_rate": 0.0,
-      "avg_latency_sec": 0.0,
-      "total_cost_usd": 0.0
+      "pass_rate": 62.5,
+      "avg_latency_sec": 3.709,
+      "total_cost_usd": 0.011704
     },
     "B3_Agent_SClass_Governance": {
-      "passed": 0,
+      "passed": 6,
       "total": 16,
-      "pass_rate": 0.0,
-      "avg_latency_sec": 0.0,
-      "total_cost_usd": 0.0
+      "pass_rate": 37.5,
+      "avg_latency_sec": 4.216,
+      "total_cost_usd": 0.005327
     }
   }
 }

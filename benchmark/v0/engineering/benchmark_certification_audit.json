@@ -1,0 +1,46 @@
+{
+  "title": "Gate 1.6B Genuine Agent Benchmark Certification Audit",
+  "certified": true,
+  "status": "CERTIFIED_GENUINE_LIVE_BENCHMARK",
+  "total_runs": 48,
+  "real_runs": 48,
+  "mock_runs": 0,
+  "provider_types": [
+    "gemini"
+  ],
+  "model_names": [
+    "gemini-3.5-flash-lite"
+  ],
+  "checks": [
+    {
+      "check_name": "16_tasks_exist",
+      "passed": true,
+      "details": "Found 16 / 16 task directories."
+    },
+    {
+      "check_name": "48_runs_exist",
+      "passed": true,
+      "details": "Found 48 / 48 expected run artifacts."
+    },
+    {
+      "check_name": "zero_mock_runs",
+      "passed": true,
+      "details": "Real runs: 48/48, Mock runs detected: 0."
+    },
+    {
+      "check_name": "valid_live_provider",
+      "passed": true,
+      "details": "Observed providers: ['gemini'] (Allowed: ['anthropic', 'custom_http', 'gemini', 'openai'])."
+    },
+    {
+      "check_name": "uniform_model_configuration",
+      "passed": true,
+      "details": "Observed model names: ['gemini-3.5-flash-lite']."
+    },
+    {
+      "check_name": "complete_provenance",
+      "passed": true,
+      "details": "Incomplete provenance runs: 0."
+    }
+  ]
+}

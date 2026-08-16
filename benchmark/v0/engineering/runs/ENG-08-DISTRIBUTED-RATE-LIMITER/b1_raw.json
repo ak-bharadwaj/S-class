@@ -5,46 +5,46 @@
   "domain": "Distributed Systems / Traffic Control",
   "raw_prompt": "Implement a sliding window log rate limiter in `target_module.py` enforcing request threshold caps per client window and automatic window sliding cleanup.",
   "model_metadata": {
-    "provider_type": "mock_test",
-    "model_name": "mock-test-harness",
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
     "temperature": 0.2,
-    "is_mock": true
+    "is_mock": false
   },
   "repository": {
     "starting_tree_hash": "bf03f3f18cffc118ac6ea0a7d182eab468eeb64a011013b03359cdada419db0e",
-    "final_tree_hash": "4958e0ebc341a59e48aca13e0b411c8c63a3288890174f46a3f918b20c3a545e"
+    "final_tree_hash": "4e58a290e979ce69f49b28b4555e9ab401e7039bf33f021900fbf0fca98590e7"
   },
   "execution_trace": [
     {
       "iteration": 1,
       "prompt": "Task Instruction:\nImplement a sliding window log rate limiter in `target_module.py` enforcing request threshold caps per client window and automatic window sliding cleanup.\n\nExisting Code in target_module.py:\n```python\n# target_module.py\nclass SlidingWindowRateLimiter:\n    def __init__(self, max_requests: int, window_sec: float):\n        pass\n    def allow_request(self, client_id: str, timestamp: float) -> bool:\n        pass\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
-      "response_text": "# Mock Test Provider Response\ndef target_function(): pass\n",
-      "latency_sec": 0.0,
-      "prompt_tokens": 64,
-      "completion_tokens": 8,
-      "cost_usd": 0.0,
+      "response_text": "```python\n# target_module.py\nfrom collections import deque\nfrom typing import Dict\n\nclass SlidingWindowRateLimiter:\n    def __init__(self, max_requests: int, window_sec: float):\n        \"\"\"\n        Initializes the SlidingWindowRateLimiter.\n\n        :param max_requests: Maximum number of requests allowed within the window.\n        :param window_sec: The size of the sliding window in seconds.\n        \"\"\"\n        self.max_requests = max_requests\n        self.window_sec = window_sec\n        # Maps each client_id to a deque of timestamps representing their request log\n        self._client_logs: Dict[str, deque] = {}\n\n    def allow_request(self, client_id: str, timestamp: float) -> bool:\n        \"\"\"\n        Determines whether a request from a client should be allowed at the given timestamp.\n\n        :param client_id: Unique identifier for the client.\n        :param timestamp: The current timestamp of the incoming request.\n        :return: True if the request is allowed, False if the rate limit is exceeded.\n        \"\"\"\n        # Initialize deque for new clients\n        if client_id not in self._client_logs:\n            self._client_logs[client_id] = deque()\n\n        client_log = self._client_logs[client_id]\n        window_start = timestamp - self.window_sec\n\n        # Remove timestamps that fall outside the current sliding window\n        while client_log and client_log[0] <= window_start:\n            client_log.popleft()\n\n        # Check if the client has reached the request threshold cap\n        if len(client_log) < self.max_requests:\n            client_log.append(timestamp)\n            return True\n\n        return False\n```",
+      "latency_sec": 2.7908,
+      "prompt_tokens": 158,
+      "completion_tokens": 401,
+      "cost_usd": 0.000132,
       "pytest_result": {
-        "exit_code": 2,
-        "passed_count": 0,
-        "failed_count": 1,
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
         "total_count": 1,
-        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpl1wu34ff\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 0 items / 1 error\n\n=================================== ERRORS ====================================\n____________________ ERROR collecting tests/test_oracle.py ____________________\nImportError while importing test module 'C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpl1wu34ff\\tests\\test_oracle.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n..\\..\\Python\\pythoncore-3.14-64\\Lib\\importlib\\__init__.py:88: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests\\test_oracle.py:2: in <module>\n    from target_module import SlidingWindowRateLimiter\nE   ImportError: cannot import name 'SlidingWindowRateLimiter' from 'target_module' (C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpl1wu34ff\\target_module.py)\n=========================== short test summary info ===========================\nERROR tests/test_oracle.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n============================== 1 error in 0.19s ===============================\n",
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp6zqpdr79\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_sliding_window_rate_limiter PASSED            [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
         "stderr": "",
-        "duration_sec": 0.787,
-        "all_passed": false
+        "duration_sec": 0.648,
+        "all_passed": true
       }
     }
   ],
-  "final_code": "# Mock Test Provider Response\ndef target_function(): pass\n",
+  "final_code": "# target_module.py\nfrom collections import deque\nfrom typing import Dict\n\nclass SlidingWindowRateLimiter:\n    def __init__(self, max_requests: int, window_sec: float):\n        \"\"\"\n        Initializes the SlidingWindowRateLimiter.\n\n        :param max_requests: Maximum number of requests allowed within the window.\n        :param window_sec: The size of the sliding window in seconds.\n        \"\"\"\n        self.max_requests = max_requests\n        self.window_sec = window_sec\n        # Maps each client_id to a deque of timestamps representing their request log\n        self._client_logs: Dict[str, deque] = {}\n\n    def allow_request(self, client_id: str, timestamp: float) -> bool:\n        \"\"\"\n        Determines whether a request from a client should be allowed at the given timestamp.\n\n        :param client_id: Unique identifier for the client.\n        :param timestamp: The current timestamp of the incoming request.\n        :return: True if the request is allowed, False if the rate limit is exceeded.\n        \"\"\"\n        # Initialize deque for new clients\n        if client_id not in self._client_logs:\n            self._client_logs[client_id] = deque()\n\n        client_log = self._client_logs[client_id]\n        window_start = timestamp - self.window_sec\n\n        # Remove timestamps that fall outside the current sliding window\n        while client_log and client_log[0] <= window_start:\n            client_log.popleft()\n\n        # Check if the client has reached the request threshold cap\n        if len(client_log) < self.max_requests:\n            client_log.append(timestamp)\n            return True\n\n        return False\n",
   "oracle_result": {
-    "exit_code": 2,
-    "passed_count": 0,
-    "failed_count": 1,
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
     "total_count": 1,
-    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpl1wu34ff\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 0 items / 1 error\n\n=================================== ERRORS ====================================\n____________________ ERROR collecting tests/test_oracle.py ____________________\nImportError while importing test module 'C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpl1wu34ff\\tests\\test_oracle.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n..\\..\\Python\\pythoncore-3.14-64\\Lib\\importlib\\__init__.py:88: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests\\test_oracle.py:2: in <module>\n    from target_module import SlidingWindowRateLimiter\nE   ImportError: cannot import name 'SlidingWindowRateLimiter' from 'target_module' (C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpl1wu34ff\\target_module.py)\n=========================== short test summary info ===========================\nERROR tests/test_oracle.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n============================== 1 error in 0.19s ===============================\n",
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp6zqpdr79\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_sliding_window_rate_limiter PASSED            [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
     "stderr": "",
-    "duration_sec": 0.787,
-    "all_passed": false
+    "duration_sec": 0.648,
+    "all_passed": true
   },
   "human_evaluation": {
     "defects": null,

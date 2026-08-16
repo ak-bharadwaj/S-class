@@ -5,45 +5,45 @@
   "domain": "Healthcare PHI / Security",
   "raw_prompt": "Implement a HIPAA-compliant PHI anonymizer in `target_module.py` that redacts SSN, replaces Patient Names with salted HMAC-SHA256 hashes, and preserves diagnostic code fields.",
   "model_metadata": {
-    "provider_type": "mock_test",
-    "model_name": "mock-test-harness",
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
     "temperature": 0.2,
-    "is_mock": true
+    "is_mock": false
   },
   "repository": {
     "starting_tree_hash": "f9ad53129d3a8d45e32dd8c9eaacb48520e4ac6b8bb1fc3edfae7fbe9dae4778",
-    "final_tree_hash": "32958c7f975d7fe63493a90effd5a7b959975ee8ae6a8978bd2ddf2f1bfe2c40"
+    "final_tree_hash": "b7476f124ec558d4c9338e18ed370f84bbd863031929d0c341bbee84d29b595c"
   },
   "execution_trace": [
     {
       "iteration": 1,
       "prompt": "Task Instruction:\nImplement a HIPAA-compliant PHI anonymizer in `target_module.py` that redacts SSN, replaces Patient Names with salted HMAC-SHA256 hashes, and preserves diagnostic code fields.\n\nExisting Code in target_module.py:\n```python\n# target_module.py\nimport hmac, hashlib\n\ndef anonymize_record(record: dict, salt: str) -> dict:\n    pass\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
-      "response_text": "# Mock Test Provider Response\ndef target_function(): pass\n",
-      "latency_sec": 0.0,
-      "prompt_tokens": 58,
-      "completion_tokens": 8,
-      "cost_usd": 0.0,
+      "response_text": "```python\n# target_module.py\nimport hmac\nimport hashlib\nimport re\n\ndef anonymize_record(record: dict, salt: str) -> dict:\n    \"\"\"\n    Anonymizes a HIPAA-compliant medical record dictionary by:\n    1. Redacting Social Security Numbers (SSN).\n    2. Replacing Patient Names with salted HMAC-SHA256 hashes.\n    3. Preserving diagnostic code fields (and any other un-targeted fields).\n\n    Args:\n        record (dict): A dictionary representing a medical record.\n        salt (str): A secret salt string used for HMAC hashing.\n\n    Returns:\n        dict: A new dictionary with PHI redacted or pseudonymized.\n    \"\"\"\n    # Regex for standard US Social Security Numbers (e.g., 123-45-6789 or 123456789)\n    ssn_regex = re.compile(r'\\b\\d{3}-?\\d{2}-?\\d{4}\\b')\n\n    anonymized = {}\n    salt_bytes = salt.encode('utf-8')\n\n    for key, value in record.items():\n        lower_key = key.lower()\n\n        # 1. Redact SSN fields or values matching SSN patterns\n        if 'ssn' in lower_key or (isinstance(value, str) and ssn_regex.search(value)):\n            if isinstance(value, str):\n                anonymized[key] = ssn_regex.sub('[REDACTED]', value)\n            else:\n                anonymized[key] = '[REDACTED]'\n\n        # 2. Replace Patient Names with salted HMAC-SHA256 hashes\n        elif 'name' in lower_key and isinstance(value, str):\n            hmac_hash = hmac.new(salt_bytes, value.encode('utf-8'), hashlib.sha256).hexdigest()\n            anonymized[key] = hmac_hash\n\n        # 3. Preserve diagnostic codes and other unaffected fields\n        else:\n            anonymized[key] = value\n\n    return anonymized\n```",
+      "latency_sec": 2.2946,
+      "prompt_tokens": 143,
+      "completion_tokens": 481,
+      "cost_usd": 0.000155,
       "pytest_result": {
         "exit_code": 1,
         "passed_count": 0,
         "failed_count": 1,
         "total_count": 1,
-        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmphntfbis2\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_phi_anonymization FAILED                      [100%]\n\n================================== FAILURES ===================================\n___________________________ test_phi_anonymization ____________________________\ntests\\test_oracle.py:6: in test_phi_anonymization\n    res = target_module.anonymize_record(rec, salt='secret_salt')\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: module 'target_module' has no attribute 'anonymize_record'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_phi_anonymization - AttributeError: module ...\n============================== 1 failed in 0.10s ==============================\n",
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpsyggtuqu\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_phi_anonymization FAILED                      [100%]\n\n================================== FAILURES ===================================\n___________________________ test_phi_anonymization ____________________________\ntests\\test_oracle.py:7: in test_phi_anonymization\n    assert res['ssn'] == '[REDACTED_SSN]'\nE   AssertionError: assert '[REDACTED]' == '[REDACTED_SSN]'\nE     \nE     - [REDACTED_SSN]\nE     ?          ----\nE     + [REDACTED]\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_phi_anonymization - AssertionError: assert ...\n============================== 1 failed in 0.10s ==============================\n",
         "stderr": "",
-        "duration_sec": 0.645,
+        "duration_sec": 0.662,
         "all_passed": false
       }
     }
   ],
-  "final_code": "# Mock Test Provider Response\ndef target_function(): pass\n",
+  "final_code": "# target_module.py\nimport hmac\nimport hashlib\nimport re\n\ndef anonymize_record(record: dict, salt: str) -> dict:\n    \"\"\"\n    Anonymizes a HIPAA-compliant medical record dictionary by:\n    1. Redacting Social Security Numbers (SSN).\n    2. Replacing Patient Names with salted HMAC-SHA256 hashes.\n    3. Preserving diagnostic code fields (and any other un-targeted fields).\n\n    Args:\n        record (dict): A dictionary representing a medical record.\n        salt (str): A secret salt string used for HMAC hashing.\n\n    Returns:\n        dict: A new dictionary with PHI redacted or pseudonymized.\n    \"\"\"\n    # Regex for standard US Social Security Numbers (e.g., 123-45-6789 or 123456789)\n    ssn_regex = re.compile(r'\\b\\d{3}-?\\d{2}-?\\d{4}\\b')\n\n    anonymized = {}\n    salt_bytes = salt.encode('utf-8')\n\n    for key, value in record.items():\n        lower_key = key.lower()\n\n        # 1. Redact SSN fields or values matching SSN patterns\n        if 'ssn' in lower_key or (isinstance(value, str) and ssn_regex.search(value)):\n            if isinstance(value, str):\n                anonymized[key] = ssn_regex.sub('[REDACTED]', value)\n            else:\n                anonymized[key] = '[REDACTED]'\n\n        # 2. Replace Patient Names with salted HMAC-SHA256 hashes\n        elif 'name' in lower_key and isinstance(value, str):\n            hmac_hash = hmac.new(salt_bytes, value.encode('utf-8'), hashlib.sha256).hexdigest()\n            anonymized[key] = hmac_hash\n\n        # 3. Preserve diagnostic codes and other unaffected fields\n        else:\n            anonymized[key] = value\n\n    return anonymized\n",
   "oracle_result": {
     "exit_code": 1,
     "passed_count": 0,
     "failed_count": 1,
     "total_count": 1,
-    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmphntfbis2\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_phi_anonymization FAILED                      [100%]\n\n================================== FAILURES ===================================\n___________________________ test_phi_anonymization ____________________________\ntests\\test_oracle.py:6: in test_phi_anonymization\n    res = target_module.anonymize_record(rec, salt='secret_salt')\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: module 'target_module' has no attribute 'anonymize_record'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_phi_anonymization - AttributeError: module ...\n============================== 1 failed in 0.10s ==============================\n",
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpsyggtuqu\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_phi_anonymization FAILED                      [100%]\n\n================================== FAILURES ===================================\n___________________________ test_phi_anonymization ____________________________\ntests\\test_oracle.py:7: in test_phi_anonymization\n    assert res['ssn'] == '[REDACTED_SSN]'\nE   AssertionError: assert '[REDACTED]' == '[REDACTED_SSN]'\nE     \nE     - [REDACTED_SSN]\nE     ?          ----\nE     + [REDACTED]\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_phi_anonymization - AssertionError: assert ...\n============================== 1 failed in 0.10s ==============================\n",
     "stderr": "",
-    "duration_sec": 0.645,
+    "duration_sec": 0.662,
     "all_passed": false
   },
   "human_evaluation": {

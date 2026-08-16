@@ -164,46 +164,46 @@
     "gate_result": "PASS"
   },
   "model_metadata": {
-    "provider_type": "mock_test",
-    "model_name": "mock-test-harness",
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
     "temperature": 0.2,
-    "is_mock": true
+    "is_mock": false
   },
   "repository": {
     "starting_tree_hash": "063891f0e86627344c4f922b78a4c2e39dcef6013d26e8fddc75e8b1fd6be8af",
-    "final_tree_hash": "4174b7d42e83538ac8e1157d6f6f49fc3dd7c725468a451e4344d6dd37413182"
+    "final_tree_hash": "da68f9cad355729ebf11cb9978694156de40949a61a5949d486b06a75a5eb428"
   },
   "execution_trace": [
     {
       "iteration": 1,
       "prompt": "User Task Instruction:\nImplement a process containment syscall sanitizer guard in `target_module.py` that enforces an explicit syscall whitelist and denies unauthorized filesystem access outside `/tmp/sandbox`.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Password Reset Session Revocation: Invalidate all active sessions and refresh tokens upon password reset.\n- [] Cross-Cluster Token Blacklist Propagation: Propagate revoked token identifiers across all active cluster nodes.\n- [] Cryptographic Credential Hashing (Argon2id / bcrypt): IF local credential storage is configured: Hash and salt user passwords using Argon2id or bcrypt.\n- [] Bounded Blacklist Retention and TTL Expiry: Retain revoked token entries in the blacklist for the maximum token TTL window.\n- [] Immediate Fail-Closed Access Gate: Reject requests with blacklisted tokens immediately with HTTP 401 Unauthorized.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nExisting Code in target_module.py:\n```python\n# target_module.py\nALLOWED_SYSCALLS = {'read', 'write', 'stat', 'exit'}\n\ndef is_syscall_allowed(syscall_name: str, path_arg: str) -> bool:\n    pass\n\n```\n\nImplement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block.",
-      "response_text": "# Mock Test Provider Response\ndef target_function(): pass\n",
-      "latency_sec": 0.0,
-      "prompt_tokens": 199,
-      "completion_tokens": 8,
-      "cost_usd": 0.0,
+      "response_text": "```python\n# target_module.py\nimport os\nfrom typing import Set\n\nALLOWED_SYSCALLS: Set[str] = {'read', 'write', 'stat', 'exit'}\nSANDBOX_DIR: str = os.path.abspath('/tmp/sandbox')\n\ndef is_syscall_allowed(syscall_name: str, path_arg: str = \"\") -> bool:\n    \"\"\"\n    Enforces an explicit syscall whitelist and denies unauthorized \n    filesystem access outside /tmp/sandbox.\n    \"\"\"\n    # 1. Enforce explicit syscall whitelist\n    if syscall_name not in ALLOWED_SYSCALLS:\n        return False\n\n    # 2. Enforce strict filesystem access containment if a path argument is provided\n    if path_arg:\n        try:\n            # Resolve absolute path to prevent traversal attacks (e.g., ../)\n            absolute_path = os.path.abspath(path_arg)\n            \n            # Ensure the resolved path resides strictly within the sandbox directory\n            # Common prefix check ensuring it doesn't just match substring names\n            if not absolute_path.startswith(SANDBOX_DIR + os.sep) and absolute_path != SANDBOX_DIR:\n                return False\n        except (ValueError, TypeError):\n            # Fail closed on any path parsing anomalies\n            return False\n\n    return True\n```",
+      "latency_sec": 1.7413,
+      "prompt_tokens": 359,
+      "completion_tokens": 296,
+      "cost_usd": 0.000116,
       "pytest_result": {
-        "exit_code": 1,
-        "passed_count": 0,
-        "failed_count": 1,
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
         "total_count": 1,
-        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmps8qctej2\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_sandbox_containment FAILED                    [100%]\n\n================================== FAILURES ===================================\n__________________________ test_sandbox_containment ___________________________\ntests\\test_oracle.py:5: in test_sandbox_containment\n    assert target_module.is_syscall_allowed('read', '/tmp/sandbox/file.txt') is True\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: module 'target_module' has no attribute 'is_syscall_allowed'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_sandbox_containment - AttributeError: modul...\n============================== 1 failed in 0.10s ==============================\n",
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpv13x6cp6\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_sandbox_containment PASSED                    [100%]\n\n============================== 1 passed in 0.05s ==============================\n",
         "stderr": "",
-        "duration_sec": 0.729,
-        "all_passed": false
+        "duration_sec": 0.793,
+        "all_passed": true
       }
     }
   ],
-  "final_code": "# Mock Test Provider Response\ndef target_function(): pass\n",
+  "final_code": "# target_module.py\nimport os\nfrom typing import Set\n\nALLOWED_SYSCALLS: Set[str] = {'read', 'write', 'stat', 'exit'}\nSANDBOX_DIR: str = os.path.abspath('/tmp/sandbox')\n\ndef is_syscall_allowed(syscall_name: str, path_arg: str = \"\") -> bool:\n    \"\"\"\n    Enforces an explicit syscall whitelist and denies unauthorized \n    filesystem access outside /tmp/sandbox.\n    \"\"\"\n    # 1. Enforce explicit syscall whitelist\n    if syscall_name not in ALLOWED_SYSCALLS:\n        return False\n\n    # 2. Enforce strict filesystem access containment if a path argument is provided\n    if path_arg:\n        try:\n            # Resolve absolute path to prevent traversal attacks (e.g., ../)\n            absolute_path = os.path.abspath(path_arg)\n            \n            # Ensure the resolved path resides strictly within the sandbox directory\n            # Common prefix check ensuring it doesn't just match substring names\n            if not absolute_path.startswith(SANDBOX_DIR + os.sep) and absolute_path != SANDBOX_DIR:\n                return False\n        except (ValueError, TypeError):\n            # Fail closed on any path parsing anomalies\n            return False\n\n    return True\n",
   "oracle_result": {
-    "exit_code": 1,
-    "passed_count": 0,
-    "failed_count": 1,
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
     "total_count": 1,
-    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmps8qctej2\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_sandbox_containment FAILED                    [100%]\n\n================================== FAILURES ===================================\n__________________________ test_sandbox_containment ___________________________\ntests\\test_oracle.py:5: in test_sandbox_containment\n    assert target_module.is_syscall_allowed('read', '/tmp/sandbox/file.txt') is True\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: module 'target_module' has no attribute 'is_syscall_allowed'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_sandbox_containment - AttributeError: modul...\n============================== 1 failed in 0.10s ==============================\n",
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpv13x6cp6\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_sandbox_containment PASSED                    [100%]\n\n============================== 1 passed in 0.05s ==============================\n",
     "stderr": "",
-    "duration_sec": 0.729,
-    "all_passed": false
+    "duration_sec": 0.793,
+    "all_passed": true
   },
   "human_evaluation": {
     "defects": null,

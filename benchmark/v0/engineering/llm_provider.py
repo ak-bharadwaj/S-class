@@ -33,7 +33,7 @@ class ProviderAPIKeyMissingError(Exception):
 @dataclass
 class LLMProviderConfig:
     provider_type: str = "auto"  # auto, gemini, openai, anthropic, custom_http, mock_test
-    model_name: str = "gemini-2.5-flash"
+    model_name: str = "gemini-3.5-flash-lite"
     temperature: float = 0.2
     max_tokens: int = 4096
     api_key: Optional[str] = None
@@ -127,7 +127,8 @@ class LLMProvider:
 
     def _call_gemini_api(self, prompt: str, system_prompt: Optional[str], start_time: float, timestamp_str: str) -> LLMResponse:
         api_key = self.config.api_key
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.config.model_name}:generateContent?key={api_key}"
+        m_path = self.config.model_name if self.config.model_name.startswith("models/") else f"models/{self.config.model_name}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/{m_path}:generateContent?key={api_key}"
         
         contents = []
         if system_prompt:
@@ -143,17 +144,72 @@ class LLMProvider:
             }
         }
         
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"}
-        )
-        
-        with urllib.request.urlopen(req, timeout=self.config.timeout_sec) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
+        keys = []
+        if isinstance(self.config.api_key, list):
+            keys = self.config.api_key
+        elif isinstance(self.config.api_key, str):
+            keys = [k.strip() for k in self.config.api_key.split(",") if k.strip()]
             
-        text = data["candidates"][0]["content"]["parts"][0]["text"]
-        usage = data.get("usageMetadata", {})
+        if not hasattr(self, "_active_key_idx"):
+            self._active_key_idx = 0
+
+        max_attempts = 40
+        data = None
+        for attempt in range(1, max_attempts + 1):
+            current_key = keys[self._active_key_idx % len(keys)] if keys else self.config.api_key
+            url_current = f"https://generativelanguage.googleapis.com/v1beta/{m_path}:generateContent?key={current_key}"
+            
+            try:
+                req = urllib.request.Request(
+                    url_current,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json"}
+                )
+                with urllib.request.urlopen(req, timeout=self.config.timeout_sec) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                break
+            except urllib.error.HTTPError as e:
+                err_body = ""
+                try:
+                    err_body = e.read().decode("utf-8")
+                except Exception:
+                    pass
+                if e.code == 429 and attempt < max_attempts:
+                    if len(keys) > 1:
+                        old_idx = self._active_key_idx % len(keys)
+                        self._active_key_idx += 1
+                        new_idx = self._active_key_idx % len(keys)
+                        if attempt % len(keys) == 0:
+                            print(f"  [429 Quota Exceeded across key pool] Waiting 35s for quota window reset...")
+                            time.sleep(35)
+                        else:
+                            print(f"  [429 Quota Exceeded] Swapping key #{old_idx+1} -> key #{new_idx+1}...")
+                            time.sleep(2)
+                    else:
+                        print(f"  [Rate Limit 429] Waiting 35s before retry (attempt {attempt}/{max_attempts})...")
+                        time.sleep(35)
+                elif e.code in (503, 500, 502) and attempt < max_attempts:
+                    time.sleep(5)
+                else:
+                    raise RuntimeError(f"Gemini API HTTP Error {e.code}: {e.reason} - Details: {err_body}")
+            except Exception as e:
+                if attempt < max_attempts:
+                    time.sleep(5)
+                else:
+                    raise e
+            
+        text = ""
+        candidates = data.get("candidates", []) if data else []
+        if candidates and "content" in candidates[0]:
+            parts = candidates[0]["content"].get("parts", [])
+            for p in parts:
+                if isinstance(p, dict) and "text" in p:
+                    text += p["text"]
+        if not text and candidates:
+            finish_reason = candidates[0].get("finishReason", "UNKNOWN")
+            text = f"# API Finish Reason: {finish_reason}\ndef target_function(): pass\n"
+            
+        usage = data.get("usageMetadata", {}) if data else {}
         prompt_tokens = usage.get("promptTokenCount", len(prompt.split()))
         completion_tokens = usage.get("candidatesTokenCount", len(text.split()))
         latency = round(time.time() - start_time, 4)
