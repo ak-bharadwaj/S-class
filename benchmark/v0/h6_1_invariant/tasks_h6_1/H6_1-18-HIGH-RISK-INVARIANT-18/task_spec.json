@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_1-18-HIGH-RISK-INVARIANT-18",
+  "category": "Cryptography",
+  "domain": "Cryptography Invariant Module 18",
+  "raw_prompt": "Implement HighRiskModule18 in target_module.py under Cryptography domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True."
+}

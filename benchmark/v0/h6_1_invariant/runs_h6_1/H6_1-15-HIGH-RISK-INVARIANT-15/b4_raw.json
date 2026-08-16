@@ -1,0 +1,140 @@
+{
+  "task_id": "H6_1-15-HIGH-RISK-INVARIANT-15",
+  "baseline": "B4",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Financial Invariants Invariant Module 15",
+  "raw_prompt": "Implement HighRiskModule15 in target_module.py under Financial Invariants domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True.",
+  "sclass_governance": {
+    "semantic_requirements": [
+      {
+        "id": "REQ-SHADOW-001",
+        "title": "Core Service Functionality",
+        "description": "Implement core processing logic for: Implement HighRiskModule15 in target_module.py under Financial Invariants domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True.",
+        "type": "FUNCTIONAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt execution mandate"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-002",
+        "title": "Underlying Storage Technology Specification",
+        "description": "The specific persistence engine and database backend are unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify database technology"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-003",
+        "title": "API Transport Protocol Specification",
+        "description": "The specific network transport protocol (gRPC vs REST) is unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify API protocol"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      }
+    ],
+    "epistemic_status": "CONFIRMED",
+    "gate_result": "PASS"
+  },
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 1
+  },
+  "repository": {
+    "starting_tree_hash": "d1f014037880eceabaa9264ff812c6f596769305123b1b28d101bdb54ccc9a56",
+    "final_tree_hash": "d2be9a716bce35fb5929efb7210bcc1651eda1ec865a316298539bb544846feb"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "User Task Instruction:\nImplement HighRiskModule15 in target_module.py under Financial Invariants domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement HighRiskModule15 in target_module.py under Financial Invariants domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nExisting Code in target_module.py:\n```python\n\n```\n\nImplement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block.",
+      "response_text": "```python\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when a financial invariant validation fails.\"\"\"\n    pass\n\n\nclass HighRiskModule15:\n    \"\"\"\n    Financial Invariants domain module that enforces strict validation\n    on operational payloads.\n    \"\"\"\n\n    @staticmethod\n    def validate_invariant(payload: dict) -> bool:\n        \"\"\"\n        Validates that the payload satisfies the required financial invariant.\n        \n        Args:\n            payload (dict): The data payload to validate.\n            \n        Returns:\n            bool: True if valid.\n            \n        Raises:\n            InvariantViolationError: If payload.get('valid') is not True.\n        \"\"\"\n        if not isinstance(payload, dict) or payload.get(\"valid\") is not True:\n            raise InvariantViolationError(\n                \"Invariant violation: payload['valid'] must be True.\"\n            )\n        return True\n\n    def process(self, payload: dict) -> dict:\n        \"\"\"\n        Enforces validation before processing the payload.\n        \n        Args:\n            payload (dict): The data payload to process.\n            \n        Returns:\n            dict: The processed payload if invariants are satisfied.\n        \"\"\"\n        self.validate_invariant(payload)\n        # Core processing logic for HighRiskModule15 goes here\n        return {\"status\": \"success\", \"processed_payload\": payload}\n```",
+      "latency_sec": 2.7803,
+      "prompt_tokens": 245,
+      "completion_tokens": 306,
+      "cost_usd": 0.00011,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpx6gp7d3a\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_1_basic_15 PASSED                          [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.545,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "class InvariantViolationError(Exception):\n    \"\"\"Raised when a financial invariant validation fails.\"\"\"\n    pass\n\n\nclass HighRiskModule15:\n    \"\"\"\n    Financial Invariants domain module that enforces strict validation\n    on operational payloads.\n    \"\"\"\n\n    @staticmethod\n    def validate_invariant(payload: dict) -> bool:\n        \"\"\"\n        Validates that the payload satisfies the required financial invariant.\n        \n        Args:\n            payload (dict): The data payload to validate.\n            \n        Returns:\n            bool: True if valid.\n            \n        Raises:\n            InvariantViolationError: If payload.get('valid') is not True.\n        \"\"\"\n        if not isinstance(payload, dict) or payload.get(\"valid\") is not True:\n            raise InvariantViolationError(\n                \"Invariant violation: payload['valid'] must be True.\"\n            )\n        return True\n\n    def process(self, payload: dict) -> dict:\n        \"\"\"\n        Enforces validation before processing the payload.\n        \n        Args:\n            payload (dict): The data payload to process.\n            \n        Returns:\n            dict: The processed payload if invariants are satisfied.\n        \"\"\"\n        self.validate_invariant(payload)\n        # Core processing logic for HighRiskModule15 goes here\n        return {\"status\": \"success\", \"processed_payload\": payload}\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpx6gp7d3a\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_1_basic_15 PASSED                          [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.545,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  },
+  "layer2_behavioral_adjudication": {
+    "layer2_passed": true,
+    "false_confidence_detected": false,
+    "l2_stdout_snippet": "========= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp9eenbpys\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_adversarial_invariants.py::test_h6_1_adversarial_probes_15 PASSED [100%]\n\n============================== 1 passed in 0.03s ==============================\n\n",
+    "audit_trace_completeness_pct": 100.0
+  }
+}

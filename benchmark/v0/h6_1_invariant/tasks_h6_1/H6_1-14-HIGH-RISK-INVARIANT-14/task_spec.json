@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_1-14-HIGH-RISK-INVARIANT-14",
+  "category": "Safety-Critical Controls",
+  "domain": "Safety-Critical Controls Invariant Module 14",
+  "raw_prompt": "Implement HighRiskModule14 in target_module.py under Safety-Critical Controls domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True."
+}

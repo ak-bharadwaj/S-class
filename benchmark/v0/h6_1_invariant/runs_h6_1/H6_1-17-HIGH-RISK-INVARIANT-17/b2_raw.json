@@ -1,0 +1,90 @@
+{
+  "task_id": "H6_1-17-HIGH-RISK-INVARIANT-17",
+  "baseline": "B2",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Security Invariant Module 17",
+  "raw_prompt": "Implement HighRiskModule17 in target_module.py under Security domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True.",
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 2
+  },
+  "repository": {
+    "starting_tree_hash": "e32eb41a2e25998010bb8b9a30a415fa056c8b6d28492b3f70a9d25356a374a8",
+    "final_tree_hash": "dca4c2a6ddcac65230bb1508f80ae5c9aa26737be1ecea288d69ddc098272962"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "Task Instruction:\nImplement HighRiskModule17 in target_module.py under Security domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True.\n\nExisting Code in target_module.py:\n```python\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nclass InvariantViolationError(Exception):\n    \"\"\"Exception raised when payload invariant validation fails.\"\"\"\n    pass\n\n\ndef validate_invariant(payload: dict) -> None:\n    \"\"\"\n    Enforces that the payload contains a 'valid' key set to True.\n    Raises InvariantViolationError otherwise.\n    \"\"\"\n    if not isinstance(payload, dict) or payload.get('valid') is not True:\n        raise InvariantViolationError(\"Payload invariant validation failed: 'valid' must be True.\")\n\n\nclass HighRiskModule17:\n    \"\"\"\n    High-risk security module that processes payloads and enforces strict invariant validation.\n    \"\"\"\n    \n    def process(self, payload: dict) -> bool:\n        validate_invariant(payload)\n        return True\n```",
+      "latency_sec": 1.4053,
+      "prompt_tokens": 111,
+      "completion_tokens": 171,
+      "cost_usd": 6e-05,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpvid4rvhy\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_1_basic_17 FAILED                          [100%]\n\n================================== FAILURES ===================================\n_____________________________ test_h6_1_basic_17 ______________________________\ntests\\test_oracle.py:6: in test_h6_1_basic_17\n    assert m.validate_invariant({'valid': True}) is True\n           ^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: 'HighRiskModule17' object has no attribute 'validate_invariant'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_1_basic_17 - AttributeError: 'HighRiskMo...\n============================== 1 failed in 0.09s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.598,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "Task Instruction:\nImplement HighRiskModule17 in target_module.py under Security domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True.\n\nYour previous implementation for `target_module.py` produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpvid4rvhy\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_1_basic_17 FAILED                          [100%]\n\n================================== FAILURES ===================================\n_____________________________ test_h6_1_basic_17 ______________________________\ntests\\test_oracle.py:6: in test_h6_1_basic_17\n    assert m.validate_invariant({'valid': True}) is True\n           ^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: 'HighRiskModule17' object has no attribute 'validate_invariant'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_1_basic_17 - AttributeError: 'HighRiskMo...\n============================== 1 failed in 0.09s ==============================\n\n\n\nPrevious Code:\n```python\nclass InvariantViolationError(Exception):\n    \"\"\"Exception raised when payload invariant validation fails.\"\"\"\n    pass\n\n\ndef validate_invariant(payload: dict) -> None:\n    \"\"\"\n    Enforces that the payload contains a 'valid' key set to True.\n    Raises InvariantViolationError otherwise.\n    \"\"\"\n    if not isinstance(payload, dict) or payload.get('valid') is not True:\n        raise InvariantViolationError(\"Payload invariant validation failed: 'valid' must be True.\")\n\n\nclass HighRiskModule17:\n    \"\"\"\n    High-risk security module that processes payloads and enforces strict invariant validation.\n    \"\"\"\n    \n    def process(self, payload: dict) -> bool:\n        validate_invariant(payload)\n        return True\n\n```\n\nPlease analyze the test failures and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nclass InvariantViolationError(Exception):\n    \"\"\"Exception raised when payload invariant validation fails.\"\"\"\n    pass\n\n\nclass HighRiskModule17:\n    \"\"\"\n    High-risk security module that processes payloads and enforces strict invariant validation.\n    \"\"\"\n    \n    def validate_invariant(self, payload: dict) -> bool:\n        \"\"\"\n        Enforces that the payload contains a 'valid' key set to True.\n        Raises InvariantViolationError otherwise. Returns True if valid.\n        \"\"\"\n        if not isinstance(payload, dict) or payload.get('valid') is not True:\n            raise InvariantViolationError(\"Payload invariant validation failed: 'valid' must be True.\")\n        return True\n\n    def process(self, payload: dict) -> bool:\n        self.validate_invariant(payload)\n        return True\n```",
+      "latency_sec": 1.5989,
+      "prompt_tokens": 599,
+      "completion_tokens": 185,
+      "cost_usd": 0.0001,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpvid4rvhy\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_1_basic_17 PASSED                          [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.521,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "class InvariantViolationError(Exception):\n    \"\"\"Exception raised when payload invariant validation fails.\"\"\"\n    pass\n\n\nclass HighRiskModule17:\n    \"\"\"\n    High-risk security module that processes payloads and enforces strict invariant validation.\n    \"\"\"\n    \n    def validate_invariant(self, payload: dict) -> bool:\n        \"\"\"\n        Enforces that the payload contains a 'valid' key set to True.\n        Raises InvariantViolationError otherwise. Returns True if valid.\n        \"\"\"\n        if not isinstance(payload, dict) or payload.get('valid') is not True:\n            raise InvariantViolationError(\"Payload invariant validation failed: 'valid' must be True.\")\n        return True\n\n    def process(self, payload: dict) -> bool:\n        self.validate_invariant(payload)\n        return True\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpvid4rvhy\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_1_basic_17 PASSED                          [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.521,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  },
+  "layer2_behavioral_adjudication": {
+    "layer2_passed": true,
+    "false_confidence_detected": false,
+    "l2_stdout_snippet": "========= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpw0q7a6kx\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_adversarial_invariants.py::test_h6_1_adversarial_probes_17 PASSED [100%]\n\n============================== 1 passed in 0.03s ==============================\n\n",
+    "audit_trace_completeness_pct": 100.0
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_1-13-HIGH-RISK-INVARIANT-13",
+  "category": "Data Isolation",
+  "domain": "Data Isolation Invariant Module 13",
+  "raw_prompt": "Implement HighRiskModule13 in target_module.py under Data Isolation domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True."
+}

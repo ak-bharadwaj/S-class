@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_1-06-AVIONICS-RING-BUFFER-OVERRUN-PREVENTER",
+  "category": "Safety-Critical Controls",
+  "domain": "Avionics Telemetry",
+  "raw_prompt": "Implement AvionicsRingBufferGuard in target_module.py. Fixed capacity ring buffer. Must overwrite oldest frame on overrun while incrementing overrun_count."
+}

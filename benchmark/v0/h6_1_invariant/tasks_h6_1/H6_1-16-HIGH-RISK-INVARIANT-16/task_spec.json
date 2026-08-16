@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_1-16-HIGH-RISK-INVARIANT-16",
+  "category": "Authorization",
+  "domain": "Authorization Invariant Module 16",
+  "raw_prompt": "Implement HighRiskModule16 in target_module.py under Authorization domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True."
+}

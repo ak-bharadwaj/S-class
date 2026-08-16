@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_1-23-HIGH-RISK-INVARIANT-23",
+  "category": "Financial Invariants",
+  "domain": "Financial Invariants Invariant Module 23",
+  "raw_prompt": "Implement HighRiskModule23 in target_module.py under Financial Invariants domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True."
+}

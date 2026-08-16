@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_1-08-OAUTH2-AUDIENCE-RESTRICTION-GUARD",
+  "category": "Authorization",
+  "domain": "OAuth2 / IAM",
+  "raw_prompt": "Implement OAuth2AudienceGuard in target_module.py. Verify claims['aud'] matches self.expected_aud. Raise InvalidAudienceError on mismatch or missing aud."
+}

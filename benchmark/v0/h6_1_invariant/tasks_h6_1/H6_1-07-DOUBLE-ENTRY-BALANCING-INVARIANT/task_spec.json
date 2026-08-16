@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_1-07-DOUBLE-ENTRY-BALANCING-INVARIANT",
+  "category": "Financial Invariants",
+  "domain": "Fintech Accounting",
+  "raw_prompt": "Implement DoubleEntryBalanceGuard in target_module.py. Enforce sum(debits) == sum(credits) for every transaction. Raise UnbalancedLedgerError if debits != credits."
+}

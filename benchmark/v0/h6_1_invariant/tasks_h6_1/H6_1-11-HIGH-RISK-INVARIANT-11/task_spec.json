@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_1-11-HIGH-RISK-INVARIANT-11",
+  "category": "Privacy & Compliance",
+  "domain": "Privacy & Compliance Invariant Module 11",
+  "raw_prompt": "Implement HighRiskModule11 in target_module.py under Privacy & Compliance domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True."
+}

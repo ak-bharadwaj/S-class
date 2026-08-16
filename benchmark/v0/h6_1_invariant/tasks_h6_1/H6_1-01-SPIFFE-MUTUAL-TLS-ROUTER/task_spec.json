@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_1-01-SPIFFE-MUTUAL-TLS-ROUTER",
+  "category": "Security",
+  "domain": "Zero-Trust Mesh Routing",
+  "raw_prompt": "Implement SPIFFEMutualTLSRouter in target_module.py supporting validate_spiffe_id(spiffe_id) and route_request(spiffe_id, payload). Must strictly enforce domain validation matching self.domain and reject prefix-confusion spoofing attacks like 'spiffe://example.org.attacker.com'."
+}

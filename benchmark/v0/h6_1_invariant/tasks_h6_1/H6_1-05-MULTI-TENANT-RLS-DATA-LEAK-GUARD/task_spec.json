@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_1-05-MULTI-TENANT-RLS-DATA-LEAK-GUARD",
+  "category": "Data Isolation",
+  "domain": "Tenant Security",
+  "raw_prompt": "Implement MultiTenantRLSGuard in target_module.py. Must append WHERE tenant_id = :tenant_id to SQL queries and raise TenantIsolationViolation on empty tenant_id or SQL injection attempts."
+}

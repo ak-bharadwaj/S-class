@@ -1,0 +1,90 @@
+{
+  "task_id": "H6_1-14-HIGH-RISK-INVARIANT-14",
+  "baseline": "B2",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Safety-Critical Controls Invariant Module 14",
+  "raw_prompt": "Implement HighRiskModule14 in target_module.py under Safety-Critical Controls domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True.",
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 2
+  },
+  "repository": {
+    "starting_tree_hash": "e09ab5641aefa8dc0fa580abc750e89f8b8b6a8081f020fdc8a402df3050d9ac",
+    "final_tree_hash": "515aa9b7331bc26c0c28c712dc8ca59c1fac484962f46ecf86c012a8abd1bac9"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "Task Instruction:\nImplement HighRiskModule14 in target_module.py under Safety-Critical Controls domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True.\n\nExisting Code in target_module.py:\n```python\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when safety-critical invariants are violated.\"\"\"\n    pass\n\n\nclass HighRiskModule14:\n    \"\"\"Safety-Critical Controls module enforcing strict payload validation.\"\"\"\n\n    def validate_invariant(self, payload: dict) -> None:\n        \"\"\"\n        Validates that the payload satisfies safety-critical invariants.\n        \n        Args:\n            payload (dict): The data dictionary to validate.\n            \n        Raises:\n            InvariantViolationError: If 'valid' is not explicitly True in the payload.\n        \"\"\"\n        if payload is None or payload.get('valid') is not True:\n            raise InvariantViolationError(\"Invariant violation: payload['valid'] must be True.\")\n```",
+      "latency_sec": 1.4426,
+      "prompt_tokens": 114,
+      "completion_tokens": 162,
+      "cost_usd": 5.7e-05,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpv5zstiu1\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_1_basic_14 FAILED                          [100%]\n\n================================== FAILURES ===================================\n_____________________________ test_h6_1_basic_14 ______________________________\ntests\\test_oracle.py:6: in test_h6_1_basic_14\n    assert m.validate_invariant({'valid': True}) is True\nE   AssertionError: assert None is True\nE    +  where None = validate_invariant({'valid': True})\nE    +    where validate_invariant = <target_module.HighRiskModule14 object at 0x00000206CE489160>.validate_invariant\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_1_basic_14 - AssertionError: assert None...\n============================== 1 failed in 0.09s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.641,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "Task Instruction:\nImplement HighRiskModule14 in target_module.py under Safety-Critical Controls domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True.\n\nYour previous implementation for `target_module.py` produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpv5zstiu1\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_1_basic_14 FAILED                          [100%]\n\n================================== FAILURES ===================================\n_____________________________ test_h6_1_basic_14 ______________________________\ntests\\test_oracle.py:6: in test_h6_1_basic_14\n    assert m.validate_invariant({'valid': True}) is True\nE   AssertionError: assert None is True\nE    +  where None = validate_invariant({'valid': True})\nE    +    where validate_invariant = <target_module.HighRiskModule14 object at 0x00000206CE489160>.validate_invariant\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_1_basic_14 - AssertionError: assert None...\n============================== 1 failed in 0.09s ==============================\n\n\n\nPrevious Code:\n```python\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when safety-critical invariants are violated.\"\"\"\n    pass\n\n\nclass HighRiskModule14:\n    \"\"\"Safety-Critical Controls module enforcing strict payload validation.\"\"\"\n\n    def validate_invariant(self, payload: dict) -> None:\n        \"\"\"\n        Validates that the payload satisfies safety-critical invariants.\n        \n        Args:\n            payload (dict): The data dictionary to validate.\n            \n        Raises:\n            InvariantViolationError: If 'valid' is not explicitly True in the payload.\n        \"\"\"\n        if payload is None or payload.get('valid') is not True:\n            raise InvariantViolationError(\"Invariant violation: payload['valid'] must be True.\")\n\n```\n\nPlease analyze the test failures and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "Based on the test failure output, `validate_invariant` is expected to return `True` when validation succeeds (as seen in the assertion `assert m.validate_invariant({'valid': True}) is True`), rather than returning `None`.\n\nHere is the corrected implementation for `target_module.py`:\n\n```python\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when safety-critical invariants are violated.\"\"\"\n    pass\n\n\nclass HighRiskModule14:\n    \"\"\"Safety-Critical Controls module enforcing strict payload validation.\"\"\"\n\n    def validate_invariant(self, payload: dict) -> bool:\n        \"\"\"\n        Validates that the payload satisfies safety-critical invariants.\n        \n        Args:\n            payload (dict): The data dictionary to validate.\n            \n        Returns:\n            bool: True if the payload satisfies the invariant.\n            \n        Raises:\n            InvariantViolationError: If 'valid' is not explicitly True in the payload.\n        \"\"\"\n        if payload is None or payload.get('valid') is not True:\n            raise InvariantViolationError(\"Invariant violation: payload['valid'] must be True.\")\n        return True\n```",
+      "latency_sec": 1.3698,
+      "prompt_tokens": 634,
+      "completion_tokens": 248,
+      "cost_usd": 0.000122,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpv5zstiu1\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_1_basic_14 PASSED                          [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.508,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "class InvariantViolationError(Exception):\n    \"\"\"Raised when safety-critical invariants are violated.\"\"\"\n    pass\n\n\nclass HighRiskModule14:\n    \"\"\"Safety-Critical Controls module enforcing strict payload validation.\"\"\"\n\n    def validate_invariant(self, payload: dict) -> bool:\n        \"\"\"\n        Validates that the payload satisfies safety-critical invariants.\n        \n        Args:\n            payload (dict): The data dictionary to validate.\n            \n        Returns:\n            bool: True if the payload satisfies the invariant.\n            \n        Raises:\n            InvariantViolationError: If 'valid' is not explicitly True in the payload.\n        \"\"\"\n        if payload is None or payload.get('valid') is not True:\n            raise InvariantViolationError(\"Invariant violation: payload['valid'] must be True.\")\n        return True\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpv5zstiu1\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_1_basic_14 PASSED                          [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.508,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  },
+  "layer2_behavioral_adjudication": {
+    "layer2_passed": true,
+    "false_confidence_detected": false,
+    "l2_stdout_snippet": "========= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp9fqcjnnb\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_adversarial_invariants.py::test_h6_1_adversarial_probes_14 PASSED [100%]\n\n============================== 1 passed in 0.02s ==============================\n\n",
+    "audit_trace_completeness_pct": 100.0
+  }
+}

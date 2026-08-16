@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_1-03-HIPAA-PHI-MASKING-GUARD",
+  "category": "Privacy & Compliance",
+  "domain": "Healthcare Compliance",
+  "raw_prompt": "Implement PHIMaskingGuard in target_module.py. Must mask SSNs (XXX-XX-XXXX), MRNs (MRN-XXXXXX), and emails across clinical notes, including obfuscated spaces or dots."
+}

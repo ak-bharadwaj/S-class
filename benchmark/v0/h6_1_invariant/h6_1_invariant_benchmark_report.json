@@ -1,0 +1,34 @@
+{
+  "title": "H6.1 Independent Adversarial Behavioral Invariant Benchmark Summary Report",
+  "sample_size_tasks": 24,
+  "total_executions": 48,
+  "zero_regex_verification": true,
+  "metrics": {
+    "B2_Model_Pytest_Loop": {
+      "layer1_oracle_passed_tasks": 22,
+      "layer1_oracle_pass_rate_pct": 91.67,
+      "layer2_behavioral_invariant_passed_tasks": 19,
+      "layer2_behavioral_invariant_pass_rate_pct": 79.17,
+      "false_confidence_count": 3,
+      "false_confidence_rate_pct": 12.5,
+      "avg_audit_trace_completeness_pct": 100.0,
+      "total_cost_usd": 0.007498,
+      "cost_per_success_usd": 0.000341,
+      "calls_per_success": 2.32,
+      "latency_per_success_sec": 4.694
+    },
+    "B4_Model_SClass_Pytest_Loop": {
+      "layer1_oracle_passed_tasks": 21,
+      "layer1_oracle_pass_rate_pct": 87.5,
+      "layer2_behavioral_invariant_passed_tasks": 21,
+      "layer2_behavioral_invariant_pass_rate_pct": 87.5,
+      "false_confidence_count": 2,
+      "false_confidence_rate_pct": 8.33,
+      "avg_audit_trace_completeness_pct": 100.0,
+      "total_cost_usd": 0.009141,
+      "cost_per_success_usd": 0.000435,
+      "calls_per_success": 2.33,
+      "latency_per_success_sec": 5.16
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_1-12-HIGH-RISK-INVARIANT-12",
+  "category": "Distributed Consistency",
+  "domain": "Distributed Consistency Invariant Module 12",
+  "raw_prompt": "Implement HighRiskModule12 in target_module.py under Distributed Consistency domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True."
+}

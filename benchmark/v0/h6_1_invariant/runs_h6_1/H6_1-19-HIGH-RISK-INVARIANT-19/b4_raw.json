@@ -1,0 +1,159 @@
+{
+  "task_id": "H6_1-19-HIGH-RISK-INVARIANT-19",
+  "baseline": "B4",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Privacy & Compliance Invariant Module 19",
+  "raw_prompt": "Implement HighRiskModule19 in target_module.py under Privacy & Compliance domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True.",
+  "sclass_governance": {
+    "semantic_requirements": [
+      {
+        "id": "REQ-SHADOW-001",
+        "title": "Core Service Functionality",
+        "description": "Implement core processing logic for: Implement HighRiskModule19 in target_module.py under Privacy & Compliance domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True.",
+        "type": "FUNCTIONAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt execution mandate"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-002",
+        "title": "Underlying Storage Technology Specification",
+        "description": "The specific persistence engine and database backend are unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify database technology"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-003",
+        "title": "API Transport Protocol Specification",
+        "description": "The specific network transport protocol (gRPC vs REST) is unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify API protocol"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      }
+    ],
+    "epistemic_status": "CONFIRMED",
+    "gate_result": "PASS"
+  },
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 2
+  },
+  "repository": {
+    "starting_tree_hash": "03e38f29f256147a6d429f35f923d30237edbf40993adc0aa099a6bfb0199497",
+    "final_tree_hash": "a059f0eefbf804f1c85067f4e60fef80f3bac814957307dbf8d41e4855592b92"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "User Task Instruction:\nImplement HighRiskModule19 in target_module.py under Privacy & Compliance domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement HighRiskModule19 in target_module.py under Privacy & Compliance domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nExisting Code in target_module.py:\n```python\n\n```\n\nImplement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block.",
+      "response_text": "```python\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when payload invariant validation fails under Privacy & Compliance domain.\"\"\"\n    pass\n\n\ndef validate_invariant(payload: dict) -> None:\n    \"\"\"\n    Enforces the core invariant for HighRiskModule19:\n    Raises InvariantViolationError if payload.get('valid') is not True.\n    \"\"\"\n    if not isinstance(payload, dict) or payload.get(\"valid\") is not True:\n        raise InvariantViolationError(\"Payload invariant validation failed: 'valid' must be True.\")\n\n\nclass HighRiskModule19:\n    \"\"\"\n    Privacy & Compliance domain module implementing HighRiskModule19.\n    Enforces invariant validation on payloads.\n    \"\"\"\n\n    def __init__(self):\n        pass\n\n    def process(self, payload: dict) -> dict:\n        \"\"\"\n        Processes the given payload after validating its invariant.\n        \n        Args:\n            payload (dict): The data payload to process.\n            \n        Returns:\n            dict: The processed payload result.\n            \n        Raises:\n            InvariantViolationError: If the payload is invalid.\n        \"\"\"\n        validate_invariant(payload)\n        \n        # Core processing logic for HighRiskModule19\n        return {\n            \"status\": \"success\",\n            \"module\": \"HighRiskModule19\",\n            \"domain\": \"Privacy & Compliance\",\n            \"processed_payload\": payload\n        }\n```",
+      "latency_sec": 1.6372,
+      "prompt_tokens": 245,
+      "completion_tokens": 320,
+      "cost_usd": 0.000114,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpvfqeiflt\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_1_basic_19 FAILED                          [100%]\n\n================================== FAILURES ===================================\n_____________________________ test_h6_1_basic_19 ______________________________\ntests\\test_oracle.py:6: in test_h6_1_basic_19\n    assert m.validate_invariant({'valid': True}) is True\n           ^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: 'HighRiskModule19' object has no attribute 'validate_invariant'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_1_basic_19 - AttributeError: 'HighRiskMo...\n============================== 1 failed in 0.08s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.567,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "User Task Instruction:\nImplement HighRiskModule19 in target_module.py under Privacy & Compliance domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement HighRiskModule19 in target_module.py under Privacy & Compliance domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nYour previous implementation produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpvfqeiflt\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_1_basic_19 FAILED                          [100%]\n\n================================== FAILURES ===================================\n_____________________________ test_h6_1_basic_19 ______________________________\ntests\\test_oracle.py:6: in test_h6_1_basic_19\n    assert m.validate_invariant({'valid': True}) is True\n           ^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: 'HighRiskModule19' object has no attribute 'validate_invariant'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_1_basic_19 - AttributeError: 'HighRiskMo...\n============================== 1 failed in 0.08s ==============================\n\n\n\nPrevious Code in target_module.py:\n```python\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when payload invariant validation fails under Privacy & Compliance domain.\"\"\"\n    pass\n\n\ndef validate_invariant(payload: dict) -> None:\n    \"\"\"\n    Enforces the core invariant for HighRiskModule19:\n    Raises InvariantViolationError if payload.get('valid') is not True.\n    \"\"\"\n    if not isinstance(payload, dict) or payload.get(\"valid\") is not True:\n        raise InvariantViolationError(\"Payload invariant validation failed: 'valid' must be True.\")\n\n\nclass HighRiskModule19:\n    \"\"\"\n    Privacy & Compliance domain module implementing HighRiskModule19.\n    Enforces invariant validation on payloads.\n    \"\"\"\n\n    def __init__(self):\n        pass\n\n    def process(self, payload: dict) -> dict:\n        \"\"\"\n        Processes the given payload after validating its invariant.\n        \n        Args:\n            payload (dict): The data payload to process.\n            \n        Returns:\n            dict: The processed payload result.\n            \n        Raises:\n            InvariantViolationError: If the payload is invalid.\n        \"\"\"\n        validate_invariant(payload)\n        \n        # Core processing logic for HighRiskModule19\n        return {\n            \"status\": \"success\",\n            \"module\": \"HighRiskModule19\",\n            \"domain\": \"Privacy & Compliance\",\n            \"processed_payload\": payload\n        }\n\n```\n\nAnalyze the test failures against the S-Class governance requirements and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when payload invariant validation fails under Privacy & Compliance domain.\"\"\"\n    pass\n\n\ndef validate_invariant(payload: dict) -> bool:\n    \"\"\"\n    Enforces the core invariant for HighRiskModule19:\n    Raises InvariantViolationError if payload.get('valid') is not True.\n    Returns True if valid.\n    \"\"\"\n    if not isinstance(payload, dict) or payload.get(\"valid\") is not True:\n        raise InvariantViolationError(\"Payload invariant validation failed: 'valid' must be True.\")\n    return True\n\n\nclass HighRiskModule19:\n    \"\"\"\n    Privacy & Compliance domain module implementing HighRiskModule19.\n    Enforces invariant validation on payloads.\n    \"\"\"\n\n    def __init__(self):\n        pass\n\n    def validate_invariant(self, payload: dict) -> bool:\n        \"\"\"\n        Instance method enforcing invariant validation on the payload.\n        Delegates to module-level validate_invariant.\n        \"\"\"\n        return validate_invariant(payload)\n\n    def process(self, payload: dict) -> dict:\n        \"\"\"\n        Processes the given payload after validating its invariant.\n        \n        Args:\n            payload (dict): The data payload to process.\n            \n        Returns:\n            dict: The processed payload result.\n            \n        Raises:\n            InvariantViolationError: If the payload is invalid.\n        \"\"\"\n        self.validate_invariant(payload)\n        \n        # Core processing logic for HighRiskModule19\n        return {\n            \"status\": \"success\",\n            \"module\": \"HighRiskModule19\",\n            \"domain\": \"Privacy & Compliance\",\n            \"processed_payload\": payload\n        }\n```",
+      "latency_sec": 1.7783,
+      "prompt_tokens": 885,
+      "completion_tokens": 387,
+      "cost_usd": 0.000182,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpvfqeiflt\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_1_basic_19 PASSED                          [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.531,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "class InvariantViolationError(Exception):\n    \"\"\"Raised when payload invariant validation fails under Privacy & Compliance domain.\"\"\"\n    pass\n\n\ndef validate_invariant(payload: dict) -> bool:\n    \"\"\"\n    Enforces the core invariant for HighRiskModule19:\n    Raises InvariantViolationError if payload.get('valid') is not True.\n    Returns True if valid.\n    \"\"\"\n    if not isinstance(payload, dict) or payload.get(\"valid\") is not True:\n        raise InvariantViolationError(\"Payload invariant validation failed: 'valid' must be True.\")\n    return True\n\n\nclass HighRiskModule19:\n    \"\"\"\n    Privacy & Compliance domain module implementing HighRiskModule19.\n    Enforces invariant validation on payloads.\n    \"\"\"\n\n    def __init__(self):\n        pass\n\n    def validate_invariant(self, payload: dict) -> bool:\n        \"\"\"\n        Instance method enforcing invariant validation on the payload.\n        Delegates to module-level validate_invariant.\n        \"\"\"\n        return validate_invariant(payload)\n\n    def process(self, payload: dict) -> dict:\n        \"\"\"\n        Processes the given payload after validating its invariant.\n        \n        Args:\n            payload (dict): The data payload to process.\n            \n        Returns:\n            dict: The processed payload result.\n            \n        Raises:\n            InvariantViolationError: If the payload is invalid.\n        \"\"\"\n        self.validate_invariant(payload)\n        \n        # Core processing logic for HighRiskModule19\n        return {\n            \"status\": \"success\",\n            \"module\": \"HighRiskModule19\",\n            \"domain\": \"Privacy & Compliance\",\n            \"processed_payload\": payload\n        }\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpvfqeiflt\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_1_basic_19 PASSED                          [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.531,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  },
+  "layer2_behavioral_adjudication": {
+    "layer2_passed": true,
+    "false_confidence_detected": false,
+    "l2_stdout_snippet": "========= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpvtaqdcxn\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_adversarial_invariants.py::test_h6_1_adversarial_probes_19 PASSED [100%]\n\n============================== 1 passed in 0.02s ==============================\n\n",
+    "audit_trace_completeness_pct": 100.0
+  }
+}

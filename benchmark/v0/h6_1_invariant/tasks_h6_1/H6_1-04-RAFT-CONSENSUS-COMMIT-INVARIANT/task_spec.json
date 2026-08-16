@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_1-04-RAFT-CONSENSUS-COMMIT-INVARIANT",
+  "category": "Distributed Consistency",
+  "domain": "Consensus Protocols",
+  "raw_prompt": "Implement RaftCommitGuard in target_module.py. Enforce that entries can ONLY be committed if stored on a strict majority of nodes (ack_count > cluster_size // 2) AND entry_term == current_term."
+}

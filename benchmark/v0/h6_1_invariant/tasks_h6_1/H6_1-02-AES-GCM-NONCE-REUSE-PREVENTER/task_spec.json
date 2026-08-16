@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_1-02-AES-GCM-NONCE-REUSE-PREVENTER",
+  "category": "Cryptography",
+  "domain": "Authenticated Encryption",
+  "raw_prompt": "Implement AESGCMNonceGuard in target_module.py supporting generate_nonce() and register_nonce(nonce). Must raise NonceReuseError on duplicate nonce registration."
+}

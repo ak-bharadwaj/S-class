@@ -1,0 +1,109 @@
+{
+  "task_id": "H6_1-04-RAFT-CONSENSUS-COMMIT-INVARIANT",
+  "baseline": "B2",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Consensus Protocols",
+  "raw_prompt": "Implement RaftCommitGuard in target_module.py. Enforce that entries can ONLY be committed if stored on a strict majority of nodes (ack_count > cluster_size // 2) AND entry_term == current_term.",
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 3
+  },
+  "repository": {
+    "starting_tree_hash": "dff1352ea43631243c65325bf606112940c56568dae812cb23457eceb615e31e",
+    "final_tree_hash": "0b87174068337f74ef2cbb61cbff835dd0ac8e8200cfbd499d8403268b95b46a"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "Task Instruction:\nImplement RaftCommitGuard in target_module.py. Enforce that entries can ONLY be committed if stored on a strict majority of nodes (ack_count > cluster_size // 2) AND entry_term == current_term.\n\nExisting Code in target_module.py:\n```python\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nclass RaftCommitGuard:\n    \"\"\"\n    Enforces Raft consensus safety rules for committing log entries.\n    \n    Rules for committing an entry:\n    1. Must be stored on a strict majority of nodes: ack_count > cluster_size // 2.\n    2. The entry's term must match the leader's current term: entry_term == current_term.\n    (Per Raft safety, leaders cannot commit log entries from previous terms by counting replicas directly;\n    they must commit an entry from their current term, which implicitly commits all preceding entries).\n    \"\"\"\n    \n    @staticmethod\n    def can_commit(ack_count: int, cluster_size: int, entry_term: int, current_term: int) -> bool:\n        \"\"\"\n        Determines whether a log entry is safe to commit.\n\n        :param ack_count: Number of nodes that have acknowledged storing the entry.\n        :param cluster_size: Total number of nodes in the Raft cluster.\n        :param entry_term: The term in which the entry was created.\n        :param current_term: The leader's current term.\n        :return: True if the entry can be committed, False otherwise.\n        \"\"\"\n        has_majority = ack_count > (cluster_size // 2)\n        is_current_term = (entry_term == current_term)\n        \n        return has_majority and is_current_term\n```",
+      "latency_sec": 1.6305,
+      "prompt_tokens": 119,
+      "completion_tokens": 324,
+      "cost_usd": 0.000106,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmppz4w42ua\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_raft_basic FAILED                             [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_raft_basic _______________________________\ntests\\test_oracle.py:4: in test_raft_basic\n    g = RaftCommitGuard(cluster_size=5)\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   TypeError: RaftCommitGuard() takes no arguments\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_raft_basic - TypeError: RaftCommitGuard() t...\n============================== 1 failed in 0.09s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.586,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "Task Instruction:\nImplement RaftCommitGuard in target_module.py. Enforce that entries can ONLY be committed if stored on a strict majority of nodes (ack_count > cluster_size // 2) AND entry_term == current_term.\n\nYour previous implementation for `target_module.py` produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmppz4w42ua\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_raft_basic FAILED                             [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_raft_basic _______________________________\ntests\\test_oracle.py:4: in test_raft_basic\n    g = RaftCommitGuard(cluster_size=5)\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   TypeError: RaftCommitGuard() takes no arguments\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_raft_basic - TypeError: RaftCommitGuard() t...\n============================== 1 failed in 0.09s ==============================\n\n\n\nPrevious Code:\n```python\nclass RaftCommitGuard:\n    \"\"\"\n    Enforces Raft consensus safety rules for committing log entries.\n    \n    Rules for committing an entry:\n    1. Must be stored on a strict majority of nodes: ack_count > cluster_size // 2.\n    2. The entry's term must match the leader's current term: entry_term == current_term.\n    (Per Raft safety, leaders cannot commit log entries from previous terms by counting replicas directly;\n    they must commit an entry from their current term, which implicitly commits all preceding entries).\n    \"\"\"\n    \n    @staticmethod\n    def can_commit(ack_count: int, cluster_size: int, entry_term: int, current_term: int) -> bool:\n        \"\"\"\n        Determines whether a log entry is safe to commit.\n\n        :param ack_count: Number of nodes that have acknowledged storing the entry.\n        :param cluster_size: Total number of nodes in the Raft cluster.\n        :param entry_term: The term in which the entry was created.\n        :param current_term: The leader's current term.\n        :return: True if the entry can be committed, False otherwise.\n        \"\"\"\n        has_majority = ack_count > (cluster_size // 2)\n        is_current_term = (entry_term == current_term)\n        \n        return has_majority and is_current_term\n\n```\n\nPlease analyze the test failures and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "To fix the `TypeError: RaftCommitGuard() takes no arguments`, the class needs an `__init__` method that accepts `cluster_size` as an argument (and potentially stores it, or handles the instantiation correctly). \n\nHere is the corrected implementation for `target_module.py`:\n\n```python\nclass RaftCommitGuard:\n    \"\"\"\n    Enforces Raft consensus safety rules for committing log entries.\n    \n    Rules for committing an entry:\n    1. Must be stored on a strict majority of nodes: ack_count > cluster_size // 2.\n    2. The entry's term must match the leader's current term: entry_term == current_term.\n    (Per Raft safety, leaders cannot commit log entries from previous terms by counting replicas directly;\n    they must commit an entry from their current term, which implicitly commits all preceding entries).\n    \"\"\"\n    \n    def __init__(self, cluster_size: int):\n        \"\"\"\n        Initializes the RaftCommitGuard with the cluster size.\n\n        :param cluster_size: Total number of nodes in the Raft cluster.\n        \"\"\"\n        self.cluster_size = cluster_size\n\n    def can_commit(self, ack_count: int, entry_term: int, current_term: int, cluster_size: int = None) -> bool:\n        \"\"\"\n        Determines whether a log entry is safe to commit.\n\n        :param ack_count: Number of nodes that have acknowledged storing the entry.\n        :param entry_term: The term in which the entry was created.\n        :param current_term: The leader's current term.\n        :param cluster_size: Optional override for total number of nodes in the Raft cluster.\n        :return: True if the entry can be committed, False otherwise.\n        \"\"\"\n        size = cluster_size if cluster_size is not None else self.cluster_size\n        has_majority = ack_count > (size // 2)\n        is_current_term = (entry_term == current_term)\n        \n        return has_majority and is_current_term\n```",
+      "latency_sec": 2.4319,
+      "prompt_tokens": 736,
+      "completion_tokens": 471,
+      "cost_usd": 0.000197,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmppz4w42ua\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_raft_basic FAILED                             [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_raft_basic _______________________________\ntests\\test_oracle.py:5: in test_raft_basic\n    assert g.is_committed(replica_ack_count=3, entry_term=2, current_term=2) is True\n           ^^^^^^^^^^^^^^\nE   AttributeError: 'RaftCommitGuard' object has no attribute 'is_committed'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_raft_basic - AttributeError: 'RaftCommitGua...\n============================== 1 failed in 0.08s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.575,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 3,
+      "prompt": "Task Instruction:\nImplement RaftCommitGuard in target_module.py. Enforce that entries can ONLY be committed if stored on a strict majority of nodes (ack_count > cluster_size // 2) AND entry_term == current_term.\n\nYour previous implementation for `target_module.py` produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmppz4w42ua\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_raft_basic FAILED                             [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_raft_basic _______________________________\ntests\\test_oracle.py:5: in test_raft_basic\n    assert g.is_committed(replica_ack_count=3, entry_term=2, current_term=2) is True\n           ^^^^^^^^^^^^^^\nE   AttributeError: 'RaftCommitGuard' object has no attribute 'is_committed'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_raft_basic - AttributeError: 'RaftCommitGua...\n============================== 1 failed in 0.08s ==============================\n\n\n\nPrevious Code:\n```python\nclass RaftCommitGuard:\n    \"\"\"\n    Enforces Raft consensus safety rules for committing log entries.\n    \n    Rules for committing an entry:\n    1. Must be stored on a strict majority of nodes: ack_count > cluster_size // 2.\n    2. The entry's term must match the leader's current term: entry_term == current_term.\n    (Per Raft safety, leaders cannot commit log entries from previous terms by counting replicas directly;\n    they must commit an entry from their current term, which implicitly commits all preceding entries).\n    \"\"\"\n    \n    def __init__(self, cluster_size: int):\n        \"\"\"\n        Initializes the RaftCommitGuard with the cluster size.\n\n        :param cluster_size: Total number of nodes in the Raft cluster.\n        \"\"\"\n        self.cluster_size = cluster_size\n\n    def can_commit(self, ack_count: int, entry_term: int, current_term: int, cluster_size: int = None) -> bool:\n        \"\"\"\n        Determines whether a log entry is safe to commit.\n\n        :param ack_count: Number of nodes that have acknowledged storing the entry.\n        :param entry_term: The term in which the entry was created.\n        :param current_term: The leader's current term.\n        :param cluster_size: Optional override for total number of nodes in the Raft cluster.\n        :return: True if the entry can be committed, False otherwise.\n        \"\"\"\n        size = cluster_size if cluster_size is not None else self.cluster_size\n        has_majority = ack_count > (size // 2)\n        is_current_term = (entry_term == current_term)\n        \n        return has_majority and is_current_term\n\n```\n\nPlease analyze the test failures and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "To fix the test failure (`AttributeError: 'RaftCommitGuard' object has no attribute 'is_committed'`), we need to add the `is_committed` method (or alias it to `can_commit`) to match what the test suite expects. \n\nHere is the updated implementation for `target_module.py`:\n\n```python\nclass RaftCommitGuard:\n    \"\"\"\n    Enforces Raft consensus safety rules for committing log entries.\n    \n    Rules for committing an entry:\n    1. Must be stored on a strict majority of nodes: ack_count > cluster_size // 2.\n    2. The entry's term must match the leader's current term: entry_term == current_term.\n    (Per Raft safety, leaders cannot commit log entries from previous terms by counting replicas directly;\n    they must commit an entry from their current term, which implicitly commits all preceding entries).\n    \"\"\"\n    \n    def __init__(self, cluster_size: int):\n        \"\"\"\n        Initializes the RaftCommitGuard with the cluster size.\n\n        :param cluster_size: Total number of nodes in the Raft cluster.\n        \"\"\"\n        self.cluster_size = cluster_size\n\n    def can_commit(self, ack_count: int, entry_term: int, current_term: int, cluster_size: int = None) -> bool:\n        \"\"\"\n        Determines whether a log entry is safe to commit.\n\n        :param ack_count: Number of nodes that have acknowledged storing the entry.\n        :param entry_term: The term in which the entry was created.\n        :param current_term: The leader's current term.\n        :param cluster_size: Optional override for total number of nodes in the Raft cluster.\n        :return: True if the entry can be committed, False otherwise.\n        \"\"\"\n        size = cluster_size if cluster_size is not None else self.cluster_size\n        has_majority = ack_count > (size // 2)\n        is_current_term = (entry_term == current_term)\n        \n        return has_majority and is_current_term\n\n    def is_committed(self, replica_ack_count: int, entry_term: int, current_term: int, cluster_size: int = None) -> bool:\n        \"\"\"\n        Alias/wrapper for can_commit using replica_ack_count to match test expectations.\n        \"\"\"\n        return self.can_commit(\n            ack_count=replica_ack_count,\n            entry_term=entry_term,\n            current_term=current_term,\n            cluster_size=cluster_size\n        )\n```",
+      "latency_sec": 2.0989,
+      "prompt_tokens": 839,
+      "completion_tokens": 597,
+      "cost_usd": 0.000242,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmppz4w42ua\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_raft_basic PASSED                             [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.502,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "class RaftCommitGuard:\n    \"\"\"\n    Enforces Raft consensus safety rules for committing log entries.\n    \n    Rules for committing an entry:\n    1. Must be stored on a strict majority of nodes: ack_count > cluster_size // 2.\n    2. The entry's term must match the leader's current term: entry_term == current_term.\n    (Per Raft safety, leaders cannot commit log entries from previous terms by counting replicas directly;\n    they must commit an entry from their current term, which implicitly commits all preceding entries).\n    \"\"\"\n    \n    def __init__(self, cluster_size: int):\n        \"\"\"\n        Initializes the RaftCommitGuard with the cluster size.\n\n        :param cluster_size: Total number of nodes in the Raft cluster.\n        \"\"\"\n        self.cluster_size = cluster_size\n\n    def can_commit(self, ack_count: int, entry_term: int, current_term: int, cluster_size: int = None) -> bool:\n        \"\"\"\n        Determines whether a log entry is safe to commit.\n\n        :param ack_count: Number of nodes that have acknowledged storing the entry.\n        :param entry_term: The term in which the entry was created.\n        :param current_term: The leader's current term.\n        :param cluster_size: Optional override for total number of nodes in the Raft cluster.\n        :return: True if the entry can be committed, False otherwise.\n        \"\"\"\n        size = cluster_size if cluster_size is not None else self.cluster_size\n        has_majority = ack_count > (size // 2)\n        is_current_term = (entry_term == current_term)\n        \n        return has_majority and is_current_term\n\n    def is_committed(self, replica_ack_count: int, entry_term: int, current_term: int, cluster_size: int = None) -> bool:\n        \"\"\"\n        Alias/wrapper for can_commit using replica_ack_count to match test expectations.\n        \"\"\"\n        return self.can_commit(\n            ack_count=replica_ack_count,\n            entry_term=entry_term,\n            current_term=current_term,\n            cluster_size=cluster_size\n        )\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmppz4w42ua\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_raft_basic PASSED                             [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.502,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  },
+  "layer2_behavioral_adjudication": {
+    "layer2_passed": true,
+    "false_confidence_detected": false,
+    "l2_stdout_snippet": "============ test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpepzof4xs\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_adversarial_invariants.py::test_raft_adversarial_probes PASSED [100%]\n\n============================== 1 passed in 0.03s ==============================\n\n",
+    "audit_trace_completeness_pct": 100.0
+  }
+}

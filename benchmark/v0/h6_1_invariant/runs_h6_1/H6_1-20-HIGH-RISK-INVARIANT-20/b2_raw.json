@@ -1,0 +1,90 @@
+{
+  "task_id": "H6_1-20-HIGH-RISK-INVARIANT-20",
+  "baseline": "B2",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Distributed Consistency Invariant Module 20",
+  "raw_prompt": "Implement HighRiskModule20 in target_module.py under Distributed Consistency domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True.",
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 2
+  },
+  "repository": {
+    "starting_tree_hash": "8ff7f26d5b15aeeb4103436317d55c23f5d7150f5425d681a148c77b31401067",
+    "final_tree_hash": "0da71d46f708793537f2a3d1ea065e8613df6253484826192b89f37766835e44"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "Task Instruction:\nImplement HighRiskModule20 in target_module.py under Distributed Consistency domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True.\n\nExisting Code in target_module.py:\n```python\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when data invariants are violated.\"\"\"\n    pass\n\n\nclass HighRiskModule20:\n    \"\"\"Distributed Consistency domain module for high-risk operations.\"\"\"\n\n    def validate_invariant(self, payload: dict) -> None:\n        \"\"\"\n        Enforces that the payload has a 'valid' key set to True.\n        Raises InvariantViolationError otherwise.\n        \"\"\"\n        if not isinstance(payload, dict) or payload.get(\"valid\") is not True:\n            raise InvariantViolationError(\"Payload invariant validation failed: 'valid' must be True.\")\n```",
+      "latency_sec": 1.6844,
+      "prompt_tokens": 112,
+      "completion_tokens": 136,
+      "cost_usd": 4.9e-05,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp_bd82ve2\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_1_basic_20 FAILED                          [100%]\n\n================================== FAILURES ===================================\n_____________________________ test_h6_1_basic_20 ______________________________\ntests\\test_oracle.py:6: in test_h6_1_basic_20\n    assert m.validate_invariant({'valid': True}) is True\nE   AssertionError: assert None is True\nE    +  where None = validate_invariant({'valid': True})\nE    +    where validate_invariant = <target_module.HighRiskModule20 object at 0x000002AA7ED79160>.validate_invariant\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_1_basic_20 - AssertionError: assert None...\n============================== 1 failed in 0.09s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.569,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "Task Instruction:\nImplement HighRiskModule20 in target_module.py under Distributed Consistency domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True.\n\nYour previous implementation for `target_module.py` produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp_bd82ve2\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_1_basic_20 FAILED                          [100%]\n\n================================== FAILURES ===================================\n_____________________________ test_h6_1_basic_20 ______________________________\ntests\\test_oracle.py:6: in test_h6_1_basic_20\n    assert m.validate_invariant({'valid': True}) is True\nE   AssertionError: assert None is True\nE    +  where None = validate_invariant({'valid': True})\nE    +    where validate_invariant = <target_module.HighRiskModule20 object at 0x000002AA7ED79160>.validate_invariant\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_1_basic_20 - AssertionError: assert None...\n============================== 1 failed in 0.09s ==============================\n\n\n\nPrevious Code:\n```python\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when data invariants are violated.\"\"\"\n    pass\n\n\nclass HighRiskModule20:\n    \"\"\"Distributed Consistency domain module for high-risk operations.\"\"\"\n\n    def validate_invariant(self, payload: dict) -> None:\n        \"\"\"\n        Enforces that the payload has a 'valid' key set to True.\n        Raises InvariantViolationError otherwise.\n        \"\"\"\n        if not isinstance(payload, dict) or payload.get(\"valid\") is not True:\n            raise InvariantViolationError(\"Payload invariant validation failed: 'valid' must be True.\")\n\n```\n\nPlease analyze the test failures and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when data invariants are violated.\"\"\"\n    pass\n\n\nclass HighRiskModule20:\n    \"\"\"Distributed Consistency domain module for high-risk operations.\"\"\"\n\n    def validate_invariant(self, payload: dict) -> bool:\n        \"\"\"\n        Enforces that the payload has a 'valid' key set to True.\n        Raises InvariantViolationError otherwise and returns True on success.\n        \"\"\"\n        if not isinstance(payload, dict) or payload.get(\"valid\") is not True:\n            raise InvariantViolationError(\"Payload invariant validation failed: 'valid' must be True.\")\n        return True\n```",
+      "latency_sec": 1.2857,
+      "prompt_tokens": 605,
+      "completion_tokens": 145,
+      "cost_usd": 8.9e-05,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp_bd82ve2\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_1_basic_20 PASSED                          [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.491,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "class InvariantViolationError(Exception):\n    \"\"\"Raised when data invariants are violated.\"\"\"\n    pass\n\n\nclass HighRiskModule20:\n    \"\"\"Distributed Consistency domain module for high-risk operations.\"\"\"\n\n    def validate_invariant(self, payload: dict) -> bool:\n        \"\"\"\n        Enforces that the payload has a 'valid' key set to True.\n        Raises InvariantViolationError otherwise and returns True on success.\n        \"\"\"\n        if not isinstance(payload, dict) or payload.get(\"valid\") is not True:\n            raise InvariantViolationError(\"Payload invariant validation failed: 'valid' must be True.\")\n        return True\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp_bd82ve2\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_1_basic_20 PASSED                          [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.491,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  },
+  "layer2_behavioral_adjudication": {
+    "layer2_passed": true,
+    "false_confidence_detected": false,
+    "l2_stdout_snippet": "========= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpj1goeakj\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_adversarial_invariants.py::test_h6_1_adversarial_probes_20 PASSED [100%]\n\n============================== 1 passed in 0.03s ==============================\n\n",
+    "audit_trace_completeness_pct": 100.0
+  }
+}

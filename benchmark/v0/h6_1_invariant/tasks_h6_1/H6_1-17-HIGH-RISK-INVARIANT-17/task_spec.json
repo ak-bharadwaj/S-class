@@ -1,0 +1,6 @@
+{
+  "task_id": "H6_1-17-HIGH-RISK-INVARIANT-17",
+  "category": "Security",
+  "domain": "Security Invariant Module 17",
+  "raw_prompt": "Implement HighRiskModule17 in target_module.py under Security domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True."
+}

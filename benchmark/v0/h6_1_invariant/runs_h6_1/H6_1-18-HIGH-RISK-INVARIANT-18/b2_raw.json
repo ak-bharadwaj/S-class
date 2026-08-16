@@ -1,0 +1,90 @@
+{
+  "task_id": "H6_1-18-HIGH-RISK-INVARIANT-18",
+  "baseline": "B2",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Cryptography Invariant Module 18",
+  "raw_prompt": "Implement HighRiskModule18 in target_module.py under Cryptography domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True.",
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 2
+  },
+  "repository": {
+    "starting_tree_hash": "64107ee680ae9dc1b6916451e564910c168328d57ebe961f9096a8c28bb7a2bc",
+    "final_tree_hash": "5fdd70000c346b30d015441218800fe404c4934b7d11a2d1e18da9acc98e3cf2"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "Task Instruction:\nImplement HighRiskModule18 in target_module.py under Cryptography domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True.\n\nExisting Code in target_module.py:\n```python\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when a cryptographic payload violates security invariants.\"\"\"\n    pass\n\n\ndef validate_invariant(payload: dict) -> None:\n    \"\"\"\n    Validates that the payload contains a 'valid' key set to True.\n    Raises InvariantViolationError otherwise.\n    \"\"\"\n    if not isinstance(payload, dict) or payload.get(\"valid\") is not True:\n        raise InvariantViolationError(\"Payload invariant validation failed: 'valid' must be True.\")\n\n\nclass HighRiskModule18:\n    \"\"\"\n    High Risk Module 18 under the Cryptography domain.\n    Enforces strict payload invariant validation.\n    \"\"\"\n\n    def __init__(self):\n        pass\n\n    def process(self, payload: dict) -> dict:\n        \"\"\"\n        Processes the given payload after validating its invariants.\n        \"\"\"\n        validate_invariant(payload)\n        # Proceed with processing if invariant holds\n        return {\"status\": \"success\", \"processed_payload\": payload}\n```",
+      "latency_sec": 1.6115,
+      "prompt_tokens": 112,
+      "completion_tokens": 226,
+      "cost_usd": 7.6e-05,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpv__iymbg\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_1_basic_18 FAILED                          [100%]\n\n================================== FAILURES ===================================\n_____________________________ test_h6_1_basic_18 ______________________________\ntests\\test_oracle.py:6: in test_h6_1_basic_18\n    assert m.validate_invariant({'valid': True}) is True\n           ^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: 'HighRiskModule18' object has no attribute 'validate_invariant'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_1_basic_18 - AttributeError: 'HighRiskMo...\n============================== 1 failed in 0.09s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.618,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "Task Instruction:\nImplement HighRiskModule18 in target_module.py under Cryptography domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if payload.get('valid') is not True.\n\nYour previous implementation for `target_module.py` produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpv__iymbg\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_1_basic_18 FAILED                          [100%]\n\n================================== FAILURES ===================================\n_____________________________ test_h6_1_basic_18 ______________________________\ntests\\test_oracle.py:6: in test_h6_1_basic_18\n    assert m.validate_invariant({'valid': True}) is True\n           ^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: 'HighRiskModule18' object has no attribute 'validate_invariant'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_1_basic_18 - AttributeError: 'HighRiskMo...\n============================== 1 failed in 0.09s ==============================\n\n\n\nPrevious Code:\n```python\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when a cryptographic payload violates security invariants.\"\"\"\n    pass\n\n\ndef validate_invariant(payload: dict) -> None:\n    \"\"\"\n    Validates that the payload contains a 'valid' key set to True.\n    Raises InvariantViolationError otherwise.\n    \"\"\"\n    if not isinstance(payload, dict) or payload.get(\"valid\") is not True:\n        raise InvariantViolationError(\"Payload invariant validation failed: 'valid' must be True.\")\n\n\nclass HighRiskModule18:\n    \"\"\"\n    High Risk Module 18 under the Cryptography domain.\n    Enforces strict payload invariant validation.\n    \"\"\"\n\n    def __init__(self):\n        pass\n\n    def process(self, payload: dict) -> dict:\n        \"\"\"\n        Processes the given payload after validating its invariants.\n        \"\"\"\n        validate_invariant(payload)\n        # Proceed with processing if invariant holds\n        return {\"status\": \"success\", \"processed_payload\": payload}\n\n```\n\nPlease analyze the test failures and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "Based on the test failure, `HighRiskModule18` is missing the `validate_invariant` method (the test attempts to call `m.validate_invariant({'valid': True})` directly on an instance of the class). \n\nHere is the corrected implementation of `target_module.py`:\n\n```python\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when a cryptographic payload violates security invariants.\"\"\"\n    pass\n\n\nclass HighRiskModule18:\n    \"\"\"\n    High Risk Module 18 under the Cryptography domain.\n    Enforces strict payload invariant validation.\n    \"\"\"\n\n    def __init__(self):\n        pass\n\n    def validate_invariant(self, payload: dict) -> bool:\n        \"\"\"\n        Validates that the payload contains a 'valid' key set to True.\n        Raises InvariantViolationError otherwise. Returns True on success.\n        \"\"\"\n        if not isinstance(payload, dict) or payload.get(\"valid\") is not True:\n            raise InvariantViolationError(\"Payload invariant validation failed: 'valid' must be True.\")\n        return True\n\n    def process(self, payload: dict) -> dict:\n        \"\"\"\n        Processes the given payload after validating its invariants.\n        \"\"\"\n        self.validate_invariant(payload)\n        # Proceed with processing if invariant holds\n        return {\"status\": \"success\", \"processed_payload\": payload}\n\n\ndef validate_invariant(payload: dict) -> bool:\n    \"\"\"\n    Module-level helper function for backward compatibility.\n    \"\"\"\n    return HighRiskModule18().validate_invariant(payload)\n```",
+      "latency_sec": 1.8639,
+      "prompt_tokens": 656,
+      "completion_tokens": 349,
+      "cost_usd": 0.000154,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpv__iymbg\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_1_basic_18 PASSED                          [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.536,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "class InvariantViolationError(Exception):\n    \"\"\"Raised when a cryptographic payload violates security invariants.\"\"\"\n    pass\n\n\nclass HighRiskModule18:\n    \"\"\"\n    High Risk Module 18 under the Cryptography domain.\n    Enforces strict payload invariant validation.\n    \"\"\"\n\n    def __init__(self):\n        pass\n\n    def validate_invariant(self, payload: dict) -> bool:\n        \"\"\"\n        Validates that the payload contains a 'valid' key set to True.\n        Raises InvariantViolationError otherwise. Returns True on success.\n        \"\"\"\n        if not isinstance(payload, dict) or payload.get(\"valid\") is not True:\n            raise InvariantViolationError(\"Payload invariant validation failed: 'valid' must be True.\")\n        return True\n\n    def process(self, payload: dict) -> dict:\n        \"\"\"\n        Processes the given payload after validating its invariants.\n        \"\"\"\n        self.validate_invariant(payload)\n        # Proceed with processing if invariant holds\n        return {\"status\": \"success\", \"processed_payload\": payload}\n\n\ndef validate_invariant(payload: dict) -> bool:\n    \"\"\"\n    Module-level helper function for backward compatibility.\n    \"\"\"\n    return HighRiskModule18().validate_invariant(payload)\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpv__iymbg\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_1_basic_18 PASSED                          [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.536,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  },
+  "layer2_behavioral_adjudication": {
+    "layer2_passed": true,
+    "false_confidence_detected": false,
+    "l2_stdout_snippet": "========= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmplv4wd0yy\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_adversarial_invariants.py::test_h6_1_adversarial_probes_18 PASSED [100%]\n\n============================== 1 passed in 0.03s ==============================\n\n",
+    "audit_trace_completeness_pct": 100.0
+  }
+}

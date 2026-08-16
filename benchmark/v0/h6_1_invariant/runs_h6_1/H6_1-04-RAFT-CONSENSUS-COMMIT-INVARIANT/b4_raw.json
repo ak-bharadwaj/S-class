@@ -1,0 +1,178 @@
+{
+  "task_id": "H6_1-04-RAFT-CONSENSUS-COMMIT-INVARIANT",
+  "baseline": "B4",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Consensus Protocols",
+  "raw_prompt": "Implement RaftCommitGuard in target_module.py. Enforce that entries can ONLY be committed if stored on a strict majority of nodes (ack_count > cluster_size // 2) AND entry_term == current_term.",
+  "sclass_governance": {
+    "semantic_requirements": [
+      {
+        "id": "REQ-SHADOW-001",
+        "title": "Core Service Functionality",
+        "description": "Implement core processing logic for: Implement RaftCommitGuard in target_module.py. Enforce that entries can ONLY be committed if stored on a strict majority of nodes (ack_count > cluster_size // 2) AND entry_term == current_term.",
+        "type": "FUNCTIONAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt execution mandate"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-002",
+        "title": "Underlying Storage Technology Specification",
+        "description": "The specific persistence engine and database backend are unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify database technology"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-003",
+        "title": "API Transport Protocol Specification",
+        "description": "The specific network transport protocol (gRPC vs REST) is unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify API protocol"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      }
+    ],
+    "epistemic_status": "CONFIRMED",
+    "gate_result": "PASS"
+  },
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 3
+  },
+  "repository": {
+    "starting_tree_hash": "8d2bcf43e5da23d9ae72984359025bf0471f030955a987d676a05603fda4f8f9",
+    "final_tree_hash": "0bc3b80516013d1a67da43277ae8cb6c1cc87982c762e800c195d113c1150474"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "User Task Instruction:\nImplement RaftCommitGuard in target_module.py. Enforce that entries can ONLY be committed if stored on a strict majority of nodes (ack_count > cluster_size // 2) AND entry_term == current_term.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement RaftCommitGuard in target_module.py. Enforce that entries can ONLY be committed if stored on a strict majority of nodes (ack_count > cluster_size // 2) AND entry_term == current_term.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nExisting Code in target_module.py:\n```python\n\n```\n\nImplement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block.",
+      "response_text": "```python\nclass RaftCommitGuard:\n    \"\"\"\n    Guard for Raft log entry commit validation.\n    Enforces that entries can ONLY be committed if:\n      1. They are stored on a strict majority of nodes (ack_count > cluster_size // 2).\n      2. The entry's term matches the current term (entry_term == current_term).\n    \"\"\"\n\n    def __init__(self, cluster_size: int, current_term: int):\n        if cluster_size <= 0:\n            raise ValueError(\"cluster_size must be greater than 0\")\n        if current_term < 0:\n            raise ValueError(\"current_term cannot be negative\")\n            \n        self.cluster_size = cluster_size\n        self.current_term = current_term\n\n    def can_commit(self, ack_count: int, entry_term: int) -> bool:\n        \"\"\"\n        Determines whether a log entry is safe to commit based on Raft safety rules.\n\n        :param ack_count: Number of nodes that have acknowledged storing the entry (including the leader).\n        :param entry_term: The term in which the entry was created.\n        :return: True if the entry meets both commit criteria, False otherwise.\n        \"\"\"\n        majority = self.cluster_size // 2\n        has_majority = ack_count > majority\n        is_current_term = (entry_term == self.current_term)\n\n        return has_majority and is_current_term\n```",
+      "latency_sec": 1.9911,
+      "prompt_tokens": 257,
+      "completion_tokens": 337,
+      "cost_usd": 0.00012,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpswm2u4ro\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_raft_basic FAILED                             [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_raft_basic _______________________________\ntests\\test_oracle.py:4: in test_raft_basic\n    g = RaftCommitGuard(cluster_size=5)\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   TypeError: RaftCommitGuard.__init__() missing 1 required positional argument: 'current_term'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_raft_basic - TypeError: RaftCommitGuard.__i...\n============================== 1 failed in 0.09s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.611,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "User Task Instruction:\nImplement RaftCommitGuard in target_module.py. Enforce that entries can ONLY be committed if stored on a strict majority of nodes (ack_count > cluster_size // 2) AND entry_term == current_term.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement RaftCommitGuard in target_module.py. Enforce that entries can ONLY be committed if stored on a strict majority of nodes (ack_count > cluster_size // 2) AND entry_term == current_term.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nYour previous implementation produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpswm2u4ro\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_raft_basic FAILED                             [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_raft_basic _______________________________\ntests\\test_oracle.py:4: in test_raft_basic\n    g = RaftCommitGuard(cluster_size=5)\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   TypeError: RaftCommitGuard.__init__() missing 1 required positional argument: 'current_term'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_raft_basic - TypeError: RaftCommitGuard.__i...\n============================== 1 failed in 0.09s ==============================\n\n\n\nPrevious Code in target_module.py:\n```python\nclass RaftCommitGuard:\n    \"\"\"\n    Guard for Raft log entry commit validation.\n    Enforces that entries can ONLY be committed if:\n      1. They are stored on a strict majority of nodes (ack_count > cluster_size // 2).\n      2. The entry's term matches the current term (entry_term == current_term).\n    \"\"\"\n\n    def __init__(self, cluster_size: int, current_term: int):\n        if cluster_size <= 0:\n            raise ValueError(\"cluster_size must be greater than 0\")\n        if current_term < 0:\n            raise ValueError(\"current_term cannot be negative\")\n            \n        self.cluster_size = cluster_size\n        self.current_term = current_term\n\n    def can_commit(self, ack_count: int, entry_term: int) -> bool:\n        \"\"\"\n        Determines whether a log entry is safe to commit based on Raft safety rules.\n\n        :param ack_count: Number of nodes that have acknowledged storing the entry (including the leader).\n        :param entry_term: The term in which the entry was created.\n        :return: True if the entry meets both commit criteria, False otherwise.\n        \"\"\"\n        majority = self.cluster_size // 2\n        has_majority = ack_count > majority\n        is_current_term = (entry_term == self.current_term)\n\n        return has_majority and is_current_term\n\n```\n\nAnalyze the test failures against the S-Class governance requirements and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nclass RaftCommitGuard:\n    \"\"\"\n    Guard for Raft log entry commit validation.\n    Enforces that entries can ONLY be committed if:\n      1. They are stored on a strict majority of nodes (ack_count > cluster_size // 2).\n      2. The entry's term matches the current term (entry_term == current_term).\n    \"\"\"\n\n    def __init__(self, cluster_size: int, current_term: int = 0):\n        if cluster_size <= 0:\n            raise ValueError(\"cluster_size must be greater than 0\")\n        if current_term < 0:\n            raise ValueError(\"current_term cannot be negative\")\n            \n        self.cluster_size = cluster_size\n        self.current_term = current_term\n\n    def can_commit(self, ack_count: int, entry_term: int) -> bool:\n        \"\"\"\n        Determines whether a log entry is safe to commit based on Raft safety rules.\n\n        :param ack_count: Number of nodes that have acknowledged storing the entry (including the leader).\n        :param entry_term: The term in which the entry was created.\n        :return: True if the entry meets both commit criteria, False otherwise.\n        \"\"\"\n        majority = self.cluster_size // 2\n        has_majority = ack_count > majority\n        is_current_term = (entry_term == self.current_term)\n\n        return has_majority and is_current_term\n```",
+      "latency_sec": 1.6982,
+      "prompt_tokens": 899,
+      "completion_tokens": 340,
+      "cost_usd": 0.000169,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpswm2u4ro\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_raft_basic FAILED                             [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_raft_basic _______________________________\ntests\\test_oracle.py:5: in test_raft_basic\n    assert g.is_committed(replica_ack_count=3, entry_term=2, current_term=2) is True\n           ^^^^^^^^^^^^^^\nE   AttributeError: 'RaftCommitGuard' object has no attribute 'is_committed'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_raft_basic - AttributeError: 'RaftCommitGua...\n============================== 1 failed in 0.09s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.641,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 3,
+      "prompt": "User Task Instruction:\nImplement RaftCommitGuard in target_module.py. Enforce that entries can ONLY be committed if stored on a strict majority of nodes (ack_count > cluster_size // 2) AND entry_term == current_term.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement RaftCommitGuard in target_module.py. Enforce that entries can ONLY be committed if stored on a strict majority of nodes (ack_count > cluster_size // 2) AND entry_term == current_term.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nYour previous implementation produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpswm2u4ro\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_raft_basic FAILED                             [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_raft_basic _______________________________\ntests\\test_oracle.py:5: in test_raft_basic\n    assert g.is_committed(replica_ack_count=3, entry_term=2, current_term=2) is True\n           ^^^^^^^^^^^^^^\nE   AttributeError: 'RaftCommitGuard' object has no attribute 'is_committed'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_raft_basic - AttributeError: 'RaftCommitGua...\n============================== 1 failed in 0.09s ==============================\n\n\n\nPrevious Code in target_module.py:\n```python\nclass RaftCommitGuard:\n    \"\"\"\n    Guard for Raft log entry commit validation.\n    Enforces that entries can ONLY be committed if:\n      1. They are stored on a strict majority of nodes (ack_count > cluster_size // 2).\n      2. The entry's term matches the current term (entry_term == current_term).\n    \"\"\"\n\n    def __init__(self, cluster_size: int, current_term: int = 0):\n        if cluster_size <= 0:\n            raise ValueError(\"cluster_size must be greater than 0\")\n        if current_term < 0:\n            raise ValueError(\"current_term cannot be negative\")\n            \n        self.cluster_size = cluster_size\n        self.current_term = current_term\n\n    def can_commit(self, ack_count: int, entry_term: int) -> bool:\n        \"\"\"\n        Determines whether a log entry is safe to commit based on Raft safety rules.\n\n        :param ack_count: Number of nodes that have acknowledged storing the entry (including the leader).\n        :param entry_term: The term in which the entry was created.\n        :return: True if the entry meets both commit criteria, False otherwise.\n        \"\"\"\n        majority = self.cluster_size // 2\n        has_majority = ack_count > majority\n        is_current_term = (entry_term == self.current_term)\n\n        return has_majority and is_current_term\n\n```\n\nAnalyze the test failures against the S-Class governance requirements and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nclass RaftCommitGuard:\n    \"\"\"\n    Guard for Raft log entry commit validation.\n    Enforces that entries can ONLY be committed if:\n      1. They are stored on a strict majority of nodes (ack_count > cluster_size // 2).\n      2. The entry's term matches the current term (entry_term == current_term).\n    \"\"\"\n\n    def __init__(self, cluster_size: int, current_term: int = 0):\n        if cluster_size <= 0:\n            raise ValueError(\"cluster_size must be greater than 0\")\n        if current_term < 0:\n            raise ValueError(\"current_term cannot be negative\")\n            \n        self.cluster_size = cluster_size\n        self.current_term = current_term\n\n    def can_commit(self, ack_count: int, entry_term: int) -> bool:\n        \"\"\"\n        Determines whether a log entry is safe to commit based on Raft safety rules.\n\n        :param ack_count: Number of nodes that have acknowledged storing the entry (including the leader).\n        :param entry_term: The term in which the entry was created.\n        :return: True if the entry meets both commit criteria, False otherwise.\n        \"\"\"\n        majority = self.cluster_size // 2\n        has_majority = ack_count > majority\n        is_current_term = (entry_term == self.current_term)\n\n        return has_majority and is_current_term\n\n    def is_committed(self, replica_ack_count: int, entry_term: int, current_term: int | None = None) -> bool:\n        \"\"\"\n        Alias/wrapper for checking commit eligibility as expected by certain test suites.\n        \n        :param replica_ack_count: Number of acknowledgements.\n        :param entry_term: Term of the log entry.\n        :param current_term: Optional override for the current term.\n        :return: True if committed, False otherwise.\n        \"\"\"\n        term_to_use = self.current_term if current_term is None else current_term\n        majority = self.cluster_size // 2\n        has_majority = replica_ack_count > majority\n        is_current_term = (entry_term == term_to_use)\n\n        return has_majority and is_current_term\n```",
+      "latency_sec": 1.9955,
+      "prompt_tokens": 910,
+      "completion_tokens": 536,
+      "cost_usd": 0.000229,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpswm2u4ro\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_raft_basic PASSED                             [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.517,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "class RaftCommitGuard:\n    \"\"\"\n    Guard for Raft log entry commit validation.\n    Enforces that entries can ONLY be committed if:\n      1. They are stored on a strict majority of nodes (ack_count > cluster_size // 2).\n      2. The entry's term matches the current term (entry_term == current_term).\n    \"\"\"\n\n    def __init__(self, cluster_size: int, current_term: int = 0):\n        if cluster_size <= 0:\n            raise ValueError(\"cluster_size must be greater than 0\")\n        if current_term < 0:\n            raise ValueError(\"current_term cannot be negative\")\n            \n        self.cluster_size = cluster_size\n        self.current_term = current_term\n\n    def can_commit(self, ack_count: int, entry_term: int) -> bool:\n        \"\"\"\n        Determines whether a log entry is safe to commit based on Raft safety rules.\n\n        :param ack_count: Number of nodes that have acknowledged storing the entry (including the leader).\n        :param entry_term: The term in which the entry was created.\n        :return: True if the entry meets both commit criteria, False otherwise.\n        \"\"\"\n        majority = self.cluster_size // 2\n        has_majority = ack_count > majority\n        is_current_term = (entry_term == self.current_term)\n\n        return has_majority and is_current_term\n\n    def is_committed(self, replica_ack_count: int, entry_term: int, current_term: int | None = None) -> bool:\n        \"\"\"\n        Alias/wrapper for checking commit eligibility as expected by certain test suites.\n        \n        :param replica_ack_count: Number of acknowledgements.\n        :param entry_term: Term of the log entry.\n        :param current_term: Optional override for the current term.\n        :return: True if committed, False otherwise.\n        \"\"\"\n        term_to_use = self.current_term if current_term is None else current_term\n        majority = self.cluster_size // 2\n        has_majority = replica_ack_count > majority\n        is_current_term = (entry_term == term_to_use)\n\n        return has_majority and is_current_term\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpswm2u4ro\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_raft_basic PASSED                             [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.517,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  },
+  "layer2_behavioral_adjudication": {
+    "layer2_passed": true,
+    "false_confidence_detected": false,
+    "l2_stdout_snippet": "============ test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp95j8_k22\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_adversarial_invariants.py::test_raft_adversarial_probes PASSED [100%]\n\n============================== 1 passed in 0.03s ==============================\n\n",
+    "audit_trace_completeness_pct": 100.0
+  }
+}

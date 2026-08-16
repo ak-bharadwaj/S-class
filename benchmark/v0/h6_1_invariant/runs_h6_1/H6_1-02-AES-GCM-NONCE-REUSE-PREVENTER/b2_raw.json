@@ -1,0 +1,90 @@
+{
+  "task_id": "H6_1-02-AES-GCM-NONCE-REUSE-PREVENTER",
+  "baseline": "B2",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Authenticated Encryption",
+  "raw_prompt": "Implement AESGCMNonceGuard in target_module.py supporting generate_nonce() and register_nonce(nonce). Must raise NonceReuseError on duplicate nonce registration.",
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 2
+  },
+  "repository": {
+    "starting_tree_hash": "8cd25c172acc0b91defce70433f33a61fe32215e9497104cac514550353e05fe",
+    "final_tree_hash": "16b263572e2e4755fbdf73aeebaf1ab126f5bbe9b7ab8485563bfca5093c9647"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "Task Instruction:\nImplement AESGCMNonceGuard in target_module.py supporting generate_nonce() and register_nonce(nonce). Must raise NonceReuseError on duplicate nonce registration.\n\nExisting Code in target_module.py:\n```python\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nclass NonceReuseError(Exception):\n    \"\"\"Raised when an AES-GCM nonce is reused.\"\"\"\n    pass\n\n\nclass AESGCMNonceGuard:\n    \"\"\"Guards against nonce reuse in AES-GCM encryption.\"\"\"\n\n    def __init__(self, nonce_length: int = 12):\n        self.nonce_length = nonce_length\n        self._seen_nonces = set()\n\n    def generate_nonce(self) -> bytes:\n        \"\"\"Generates a cryptographically secure random nonce and registers it.\"\"\"\n        import os\n        while True:\n            nonce = os.urandom(self.nonce_length)\n            if nonce not in self._seen_nonces:\n                self._seen_nonces.add(nonce)\n                return nonce\n\n    def register_nonce(self, nonce: bytes) -> None:\n        \"\"\"Registers an externally provided nonce.\n\n        Raises NonceReuseError if the nonce has already been registered or generated.\n        \"\"\"\n        if nonce in self._seen_nonces:\n            raise NonceReuseError(f\"Nonce reuse detected: {nonce!r}\")\n        self._seen_nonces.add(nonce)\n```",
+      "latency_sec": 1.6667,
+      "prompt_tokens": 105,
+      "completion_tokens": 263,
+      "cost_usd": 8.7e-05,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpwcsc6ioe\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_nonce_basic FAILED                            [100%]\n\n================================== FAILURES ===================================\n______________________________ test_nonce_basic _______________________________\ntests\\test_oracle.py:7: in test_nonce_basic\n    g.register_nonce(n1)\ntarget_module.py:28: in register_nonce\n    raise NonceReuseError(f\"Nonce reuse detected: {nonce!r}\")\nE   target_module.NonceReuseError: Nonce reuse detected: b\"%*'r\\xa2%\\xee@\\xd9fd<\"\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_nonce_basic - target_module.NonceReuseError...\n============================== 1 failed in 0.09s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.597,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "Task Instruction:\nImplement AESGCMNonceGuard in target_module.py supporting generate_nonce() and register_nonce(nonce). Must raise NonceReuseError on duplicate nonce registration.\n\nYour previous implementation for `target_module.py` produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpwcsc6ioe\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_nonce_basic FAILED                            [100%]\n\n================================== FAILURES ===================================\n______________________________ test_nonce_basic _______________________________\ntests\\test_oracle.py:7: in test_nonce_basic\n    g.register_nonce(n1)\ntarget_module.py:28: in register_nonce\n    raise NonceReuseError(f\"Nonce reuse detected: {nonce!r}\")\nE   target_module.NonceReuseError: Nonce reuse detected: b\"%*'r\\xa2%\\xee@\\xd9fd<\"\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_nonce_basic - target_module.NonceReuseError...\n============================== 1 failed in 0.09s ==============================\n\n\n\nPrevious Code:\n```python\nclass NonceReuseError(Exception):\n    \"\"\"Raised when an AES-GCM nonce is reused.\"\"\"\n    pass\n\n\nclass AESGCMNonceGuard:\n    \"\"\"Guards against nonce reuse in AES-GCM encryption.\"\"\"\n\n    def __init__(self, nonce_length: int = 12):\n        self.nonce_length = nonce_length\n        self._seen_nonces = set()\n\n    def generate_nonce(self) -> bytes:\n        \"\"\"Generates a cryptographically secure random nonce and registers it.\"\"\"\n        import os\n        while True:\n            nonce = os.urandom(self.nonce_length)\n            if nonce not in self._seen_nonces:\n                self._seen_nonces.add(nonce)\n                return nonce\n\n    def register_nonce(self, nonce: bytes) -> None:\n        \"\"\"Registers an externally provided nonce.\n\n        Raises NonceReuseError if the nonce has already been registered or generated.\n        \"\"\"\n        if nonce in self._seen_nonces:\n            raise NonceReuseError(f\"Nonce reuse detected: {nonce!r}\")\n        self._seen_nonces.add(nonce)\n\n```\n\nPlease analyze the test failures and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "Based on the test failure, the issue in the previous implementation was that `generate_nonce()` automatically registered the nonce it generated by adding it to `self._seen_nonces`. When the test then tried to explicitly call `register_nonce(n1)` with the nonce returned by `generate_nonce()`, it triggered a `NonceReuseError` because the nonce was already considered \"seen.\"\n\nTypically, `generate_nonce()` should generate a unique nonce, but the registration check should only fail if a nonce is *explicitly* registered twice or if it is explicitly registered after being used. Wait, `generate_nonce()` *should* ensure uniqueness, but should it automatically register it so that `register_nonce` immediately throws on it? Usually, `generate_nonce()` returns a fresh nonce, and `register_nonce()` is used for checking externally provided nonces or registering generated ones. If `generate_nonce()` registers it internally, then calling `register_nonce()` on the generated nonce is redundant or expected to fail *if* it's already registered. \n\nHowever, looking at the standard pattern for a nonce guard, `generate_nonce()` creates a nonce and registers it as used so it won't be generated again. If a test calls `generate_nonce()` and then calls `register_nonce()` on that *same* nonce, it might be testing that `register_nonce()` catches nonces that were already generated (preventing collision between generated and external nonces), *or* the test expects `generate_nonce()` *not* to pre-register the nonce, leaving registration entirely up to the caller, OR `register_nonce` should only raise if registered a second time via `register_nonce`.\n\nLet's adjust `generate_nonce()` so it does *not* automatically register the nonce inside `_seen_nonces` upon generation, but rather leaves registration to when `register_nonce()` is called, or we make sure `generate_nonce` generates a secure nonce without locking it out from being registered. Wait, if `generate_nonce` doesn't register it, how does it guarantee uniqueness? It can still use `os.urandom`, and uniqueness is handled when `register_nonce` is called, or `generate_nonce` loops until it finds one not in `_seen_nonces`, and then registers it *only* when the user actually uses/registers it.\n\nLet's rewrite `generate_nonce` to simply return a random nonce of the correct length, and let `register_nonce` handle tracking and raising `NonceReuseError` upon duplicate registration.\n\n```python\nimport os\n\nclass NonceReuseError(Exception):\n    \"\"\"Raised when an AES-GCM nonce is reused.\"\"\"\n    pass\n\n\nclass AESGCMNonceGuard:\n    \"\"\"Guards against nonce reuse in AES-GCM encryption.\"\"\"\n\n    def __init__(self, nonce_length: int = 12):\n        self.nonce_length = nonce_length\n        self._seen_nonces = set()\n\n    def generate_nonce(self) -> bytes:\n        \"\"\"Generates a cryptographically secure random nonce.\"\"\"\n        return os.urandom(self.nonce_length)\n\n    def register_nonce(self, nonce: bytes) -> None:\n        \"\"\"Registers an externally provided or generated nonce.\n\n        Raises NonceReuseError if the nonce has already been registered.\n        \"\"\"\n        if nonce in self._seen_nonces:\n            raise NonceReuseError(f\"Nonce reuse detected: {nonce!r}\")\n        self._seen_nonces.add(nonce)\n```",
+      "latency_sec": 3.45,
+      "prompt_tokens": 696,
+      "completion_tokens": 767,
+      "cost_usd": 0.000282,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpwcsc6ioe\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_nonce_basic PASSED                            [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.511,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "import os\n\nclass NonceReuseError(Exception):\n    \"\"\"Raised when an AES-GCM nonce is reused.\"\"\"\n    pass\n\n\nclass AESGCMNonceGuard:\n    \"\"\"Guards against nonce reuse in AES-GCM encryption.\"\"\"\n\n    def __init__(self, nonce_length: int = 12):\n        self.nonce_length = nonce_length\n        self._seen_nonces = set()\n\n    def generate_nonce(self) -> bytes:\n        \"\"\"Generates a cryptographically secure random nonce.\"\"\"\n        return os.urandom(self.nonce_length)\n\n    def register_nonce(self, nonce: bytes) -> None:\n        \"\"\"Registers an externally provided or generated nonce.\n\n        Raises NonceReuseError if the nonce has already been registered.\n        \"\"\"\n        if nonce in self._seen_nonces:\n            raise NonceReuseError(f\"Nonce reuse detected: {nonce!r}\")\n        self._seen_nonces.add(nonce)\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpwcsc6ioe\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_nonce_basic PASSED                            [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.511,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  },
+  "layer2_behavioral_adjudication": {
+    "layer2_passed": false,
+    "false_confidence_detected": true,
+    "l2_stdout_snippet": "r):\n            g.register_nonce(n)\n        # Probe 2: Invalid short nonce length\n>       with pytest.raises(Exception):\n             ^^^^^^^^^^^^^^^^^^^^^^^^\nE       Failed: DID NOT RAISE <class 'Exception'>\n\ntests\\test_adversarial_invariants.py:14: Failed\n=========================== short test summary info ===========================\nFAILED tests/test_adversarial_invariants.py::test_nonce_adversarial_probes - ...\n============================== 1 failed in 0.08s ==============================\n\n",
+    "audit_trace_completeness_pct": 100.0
+  }
+}
