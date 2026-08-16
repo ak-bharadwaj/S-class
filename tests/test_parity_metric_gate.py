@@ -150,6 +150,7 @@ def _make_valid_sample_certificate():
         "final_verdict": "PASS",
         "provenance": {
             "os_platform": "linux",
+            "tested_source_sha": "test_sha_12345",
             "git_commit_sha": "test_sha_12345"
         },
         "acceptance_criteria": {
@@ -194,6 +195,13 @@ def _make_valid_sample_certificate():
 def test_verify_parity_certificate_valid():
     cert = _make_valid_sample_certificate()
     assert verify_parity_certificate(cert, expected_sha="test_sha_12345") is True
+
+
+def test_verify_parity_certificate_provenance_mismatch_fails_closed():
+    cert = _make_valid_sample_certificate()
+    cert["provenance"]["tested_source_sha"] = "old_commit_sha_9999"
+    with pytest.raises(ValueError, match="Tested source SHA mismatch in certificate"):
+        verify_parity_certificate(cert, expected_sha="current_checked_out_sha_12345")
 
 
 def test_verify_parity_certificate_missing_field_fails_closed():

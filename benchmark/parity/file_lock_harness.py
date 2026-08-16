@@ -134,9 +134,13 @@ def verify_parity_certificate(cert: dict, expected_sha: Optional[str] = None) ->
     if not prov or not isinstance(prov, dict):
         raise ValueError("Missing or invalid provenance object in certificate")
 
+    tested_source_sha = prov.get("tested_source_sha", prov.get("git_commit_sha", "UNKNOWN"))
     cert_sha = prov.get("git_commit_sha", "UNKNOWN")
-    if expected_sha and expected_sha != "UNKNOWN" and cert_sha != "UNKNOWN":
-        if cert_sha != expected_sha:
+
+    if expected_sha and expected_sha != "UNKNOWN":
+        if tested_source_sha != "UNKNOWN" and tested_source_sha != expected_sha:
+            raise ValueError(f"Tested source SHA mismatch in certificate! Expected {expected_sha}, got {tested_source_sha}")
+        if cert_sha != "UNKNOWN" and cert_sha != expected_sha:
             raise ValueError(f"Commit SHA mismatch in certificate! Expected {expected_sha}, got {cert_sha}")
 
     crit = cert.get("acceptance_criteria", {})
@@ -337,6 +341,10 @@ def get_system_environment_info() -> Dict[str, Any]:
         "total_ram_bytes": total_ram_bytes,
         "portalocker_version": p_ver,
         "hostname": socket.gethostname(),
+        "tested_source_sha": commit_sha,
+        "benchmark_harness_sha": commit_sha,
+        "certificate_commit_sha": commit_sha,
+        "workflow_run_id": os.environ.get("GITHUB_RUN_ID", "LOCAL"),
         "git_commit_sha": commit_sha,
         "timestamp_utc": time.time()
     }
@@ -376,7 +384,7 @@ def compute_paired_bootstrap_metrics(
             "p95_gate_passed": False,
             "throughput_gate_passed": False,
             "all_gates_passed": False,
-            "bootstraps_evaluated": 0
+            "bootstraps_evaluated": n_bootstraps
         }
 
     n = len(paired_latencies_us)
