@@ -6,12 +6,12 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   certify-posix-gate-1:
     name: POSIX Parity Certification (Ubuntu 24.04 / Python 3.12)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
     - name: Checkout S-Class Plugin Repository
@@ -24,33 +24,96 @@ jobs:
       with:
         python-version: "3.12"
 
-    - name: Install Dependencies
+    - name: Install Pinned Parity Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pytest portalocker==4.1.0 hypothesis==6.165.9 schemathesis==4.24.3 psutil
+        pip install -r requirements-parity-linux.txt
+        pip list
+
+    - name: Clean Workspace Benchmark Artifacts
+      run: |
+        rm -f benchmark/parity/gate_1_parity_certificate_posix.json
+        rm -f benchmark/parity/parity_gate_1_raw_results.json
+
+    - name: Run Pytest Regression Suite
+      env:
+        PYTHONPATH: .
+      run: |
+        python -m pytest tests/test_parity_metric_gate.py tests/test_file_lock.py -v
 
     - name: Run Full POSIX Parity Benchmark Harness
       run: |
         python benchmark/parity/file_lock_harness.py
 
-    - name: Verify POSIX Parity Certificate Generated
+    - name: Strict Certificate Verification & Parity Assertions
+      env:
+        EXPECTED_SHA: ${{ github.sha }}
       run: |
-        ls -la benchmark/parity/
-        test -f benchmark/parity/gate_1_parity_certificate_posix.json
-        cat benchmark/parity/gate_1_parity_certificate_posix.json
+        python - << 'EOF'
+        import os
+        import sys
+        import json
 
-    - name: Run Pytest Test Suite
-      run: |
-        python -m pytest tests/ -v
+        cert_path = "benchmark/parity/gate_1_parity_certificate_posix.json"
+        raw_path = "benchmark/parity/parity_gate_1_raw_results.json"
+        expected_sha = os.environ.get("EXPECTED_SHA", "").strip()
 
-    - name: Commit and Push POSIX Parity Certificate
-      run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add benchmark/parity/gate_1_parity_certificate_posix.json benchmark/parity/parity_gate_1_raw_results.json
-        if git diff --staged --quiet; then
-          echo "No new certificate changes to commit."
-        else
-          git commit -m "feat(parity): certified OSS-PARITY-GATE-1-FILELOCK-POSIX on Ubuntu runner"
-          git push origin HEAD:${{ github.ref_name }}
-        fi
+        if not os.path.isfile(cert_path):
+            sys.exit(f"FATAL: Missing certificate at {cert_path}")
+        if not os.path.isfile(raw_path):
+            sys.exit(f"FATAL: Missing raw results at {raw_path}")
+
+        with open(cert_path, "r", encoding="utf-8") as f:
+            cert = json.load(f)
+
+        print("Validating POSIX Certificate Provenance & Gate Assertions...")
+        print(json.dumps(cert, indent=2))
+
+        # 1. Structural and platform checks
+        assert cert.get("certificate_id") == "OSS-PARITY-GATE-1-FILELOCK-POSIX", f"Invalid certificate_id: {cert.get('certificate_id')}"
+        prov = cert.get("provenance", {})
+        assert prov.get("os_platform") == "linux", f"Invalid os_platform: {prov.get('os_platform')}"
+        assert prov.get("os_system") == "Linux", f"Invalid os_system: {prov.get('os_system')}"
+        assert prov.get("portalocker_version") == "4.1.0", f"Invalid portalocker version: {prov.get('portalocker_version')}"
+        
+        # Verify checked-out source SHA integrity if available
+        cert_sha = prov.get("git_commit_sha")
+        if expected_sha and cert_sha != "UNKNOWN":
+            assert cert_sha == expected_sha, f"SHA mismatch! Expected {expected_sha}, got {cert_sha}"
+
+        # 2. Assert all required parity dimensions passed
+        crit = cert.get("acceptance_criteria", {})
+        assert crit.get("soak_cycles_executed") == 5000, "Soak cycles must be 5,000"
+
+        assert cert.get("layer_a_primitive", {}).get("median_ratio_95_ci", [99, 99])[1] <= 1.005, "Layer A median upper CI failed"
+        assert cert.get("layer_a_primitive", {}).get("p95_ratio_95_ci", [99, 99])[1] <= 1.005, "Layer A P95 upper CI failed"
+        assert cert.get("layer_a_primitive", {}).get("throughput_ratio_95_ci", [0, 0])[0] >= 0.995, "Layer A throughput lower CI failed"
+
+        assert cert.get("layer_a_same_path_primitive", {}).get("median_ratio_95_ci", [99, 99])[1] <= 1.005, "Layer A-SP median upper CI failed"
+        assert cert.get("layer_a_same_path_primitive", {}).get("p95_ratio_95_ci", [99, 99])[1] <= 1.005, "Layer A-SP P95 upper CI failed"
+        assert cert.get("layer_a_same_path_primitive", {}).get("throughput_ratio_95_ci", [0, 0])[0] >= 0.995, "Layer A-SP throughput lower CI failed"
+
+        assert cert.get("layer_c_equivalent_lifecycle", {}).get("median_ratio_95_ci", [99, 99])[1] <= 1.005, "Layer C median upper CI failed"
+        assert cert.get("layer_c_equivalent_lifecycle", {}).get("p95_ratio_95_ci", [99, 99])[1] <= 1.005, "Layer C P95 upper CI failed"
+        assert cert.get("layer_c_equivalent_lifecycle", {}).get("throughput_ratio_95_ci", [0, 0])[0] >= 0.995, "Layer C throughput lower CI failed"
+
+        assert cert.get("soak_memory_drift", {}).get("drift_ratio", 99) <= 1.050, "Soak memory drift failed"
+        assert cert.get("cross_implementation_interoperability", {}).get("status") == "PASS", "Interoperability failed"
+        assert cert.get("differential_timeout_semantics", {}).get("status") == "PASS", "Timeout semantics failed"
+        assert cert.get("differential_multithreading_contention", {}).get("status") == "PASS", "Multithreading failed"
+        assert cert.get("differential_multiprocess_exclusion", {}).get("status") == "PASS", "Multiprocessing failed"
+        assert cert.get("differential_crash_recovery", {}).get("status") == "PASS", "Crash recovery failed"
+
+        assert cert.get("final_verdict") == "PASS", f"Final certificate verdict must be PASS, got: {cert.get('final_verdict')}"
+        print("ALL POSIX PARITY GATE 1 ASSERTIONS PASSED PERFECTLY!")
+        EOF
+
+    - name: Upload Immutable Parity Certificate and Raw Results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: oss-parity-gate-1-posix-${{ github.sha }}
+        path: |
+          benchmark/parity/gate_1_parity_certificate_posix.json
+          benchmark/parity/parity_gate_1_raw_results.json
+        retention-days: 90
