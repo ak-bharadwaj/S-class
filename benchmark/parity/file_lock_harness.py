@@ -477,7 +477,16 @@ def run_full_parity_gate():
         path_c_ref = os.path.join(tmpdir, "layer_c_ref.lock")
         path_c_sclass = os.path.join(tmpdir, "layer_c_sclass.lock")
 
-        # 1. Layer A Primitive
+        # 1. Layer A Primitive (Warmup + 2,500 Trials)
+        for _ in range(50):
+            with NativeLock(path_a_sclass, timeout=5.0):
+                pass
+            if HAS_PORTALOCKER:
+                f = open(path_a_ref, "a+b")
+                portalocker.lock(f, portalocker.LOCK_EX)
+                portalocker.unlock(f)
+                f.close()
+
         paired_a = []
         l_a_ref_times, l_a_sclass_times = [], []
         rng = random.Random(101)
@@ -596,11 +605,21 @@ def run_full_parity_gate():
             }
         }
 
-        # 4. Layer C 1-to-1 Equivalent Lifecycle
-        paired_c = []
-        l_c_ref_times, l_c_sclass_times = [], []
+        # 4. Layer C 1-to-1 Equivalent Lifecycle (Warmup + 2,500 Trials)
         meta_payload = json.dumps({"status": "active", "pid": os.getpid(), "host": socket.gethostname()}).encode("utf-8")
         rel_payload = json.dumps({"status": "released", "pid": os.getpid()}).encode("utf-8")
+
+        for _ in range(50):
+            with FileLock(path_c_sclass, timeout=5.0):
+                pass
+            if HAS_PORTALOCKER:
+                f = open(path_c_ref, "a+b")
+                portalocker.lock(f, portalocker.LOCK_EX)
+                portalocker.unlock(f)
+                f.close()
+
+        paired_c = []
+        l_c_ref_times, l_c_sclass_times = [], []
 
         for _ in range(5):
             for _ in range(500):
