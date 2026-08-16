@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 """
-OSS Parity Gate 1: Differential Benchmark & Capability Verification Harness (Windows Edition)
+OSS Parity Gate 1: Differential Benchmark & Capability Verification Harness (Cross-Platform / POSIX & Windows)
 Comparing S-Class Independent OS-Native Locking Engine vs Reference Portalocker 4.1.0
 
-Platform Scope: Windows / Python 3.14.5 (msvcrt kernel advisory locking)
-Certificate ID: OSS-PARITY-GATE-1-FILELOCK-WINDOWS
+Platform Scope: Parameterized by OS Runtime (Windows msvcrt / POSIX fcntl.flock)
+Certificate Schema: OSS-PARITY-GATE-1-FILELOCK-<PLATFORM>
 
 Strict Certification Protocol:
 1. Paired Statistical Bootstrap:
    - Preserves trial pairs (S-Class_i, Reference_i).
-   - Bootstraps paired observations over 1,000 resamples.
+   - Bootstraps paired observations (>= 1,000 resamples for deep margins, >= 10,000 resamples for boundary decisions).
    - Evaluates Paired Median Ratio 95% CI, Paired P95 Ratio 95% CI, and Paired Throughput Ratio 95% CI.
 
 2. Dual Path Validation (Independent Paths & Same-Path Interleaving):
    - Layer A (Independent Paths): Evaluates S-Class vs Portalocker on independent temporary lock files.
-   - Layer A-SP (Same Path): Evaluates S-Class vs Portalocker sequentially acquiring/releasing the exact same file path with randomized ordering per pair to eliminate filesystem/cache path bias.
+   - Layer A-SP (Same Path): Evaluates S-Class vs Portalocker sequentially acquiring/releasing the exact same file path
+     with randomized ordering per pair, which reduces filesystem/path and ordering bias through randomized same-path interleaving.
 
 3. Strict 0.5% Gate Certification Rules:
    - Layer A, Layer A-SP & Layer C Latency: Median Ratio Upper 95% CI <= 1.005 AND P95 Ratio Upper 95% CI <= 1.005
@@ -33,7 +34,7 @@ Strict Certification Protocol:
    - Inter-process timeout, 8-thread serialization (400/400), 4-process mutual exclusion (100/100),
      abrupt crash recovery (os._exit), stale metadata recovery, and config GC safety.
 
-7. Exports standardized machine-readable Parity Certificate (gate_1_parity_certificate_windows.json).
+7. Exports standardized machine-readable Parity Certificate per platform.
 """
 
 import os
@@ -193,12 +194,17 @@ def compute_paired_bootstrap_metrics(pairs: List[Tuple[float, float]], n_bootstr
     sum_r = sum(r_all)
     point_tp_ratio = (sum_r / sum_s) if sum_s > 0 else 1.0
 
+    # If within 2% boundary of gate (0.985 - 1.025), automatically elevate bootstrap iterations to 10,000
+    actual_bootstraps = n_bootstraps
+    if 0.985 <= point_med_ratio <= 1.025 or 0.985 <= point_p95_ratio <= 1.025:
+        actual_bootstraps = max(n_bootstraps, 10000)
+
     boot_med_ratios: List[float] = []
     boot_p95_ratios: List[float] = []
     boot_tp_ratios: List[float] = []
 
     rng = random.Random(42)
-    for _ in range(n_bootstraps):
+    for _ in range(actual_bootstraps):
         resampled_pairs = [pairs[rng.randint(0, n - 1)] for _ in range(n)]
         res_s = [p[0] for p in resampled_pairs]
         res_r = [p[1] for p in resampled_pairs]
@@ -237,7 +243,8 @@ def compute_paired_bootstrap_metrics(pairs: List[Tuple[float, float]], n_bootstr
         "p95_ratio": round(point_p95_ratio, 4),
         "p95_ratio_95_ci": [round(p95_ci[0], 4), round(p95_ci[1], 4)],
         "throughput_ratio": round(point_tp_ratio, 4),
-        "throughput_ratio_95_ci": [round(tp_ci[0], 4), round(tp_ci[1], 4)]
+        "throughput_ratio_95_ci": [round(tp_ci[0], 4), round(tp_ci[1], 4)],
+        "bootstraps_evaluated": actual_bootstraps
     }
 
 
@@ -383,6 +390,7 @@ def test_layer_a_same_path_primitive(n_trials: int = 500, n_repetitions: int = 5
             "gate_passed": gate_passed,
             "latency_gate_passed": lat_pass,
             "throughput_gate_passed": tp_pass,
+            "methodology_note": "Reduces filesystem/path and ordering bias through randomized same-path interleaving",
             "threshold_applied": "Same-Path Paired Median/P95 Upper CI <= 1.005 AND Throughput Lower CI >= 0.995",
             "total_trials": len(paired_latencies_us),
             "reference_portalocker": {
@@ -695,7 +703,7 @@ def test_cross_implementation_interoperability() -> Dict[str, Any]:
 
 
 # ============================================================================
-# 1:1 Differential Comparative Correctness Suite (Dimensions 2-10)
+# 1:1 Differential Comparative Correctness Suite
 # ============================================================================
 def _holder_process_worker(lock_type: str, lock_path: str, hold_sec: float, ready_file: str):
     if lock_type == "portalocker":
@@ -989,8 +997,11 @@ def test_gc_interaction() -> Dict[str, Any]:
 
 def run_full_parity_gate() -> Dict[str, Any]:
     env_info = get_system_environment_info()
+    platform_name = "WINDOWS" if sys.platform == "win32" else "POSIX"
+    cert_id = f"OSS-PARITY-GATE-1-FILELOCK-{platform_name}"
+
     print("=" * 80)
-    print("RUNNING OSS PARITY GATE 1 (WINDOWS EDITION): S-CLASS VS PORTALOCKER 4.1.0")
+    print(f"RUNNING OSS PARITY GATE 1 ({platform_name} EDITION): S-CLASS VS PORTALOCKER 4.1.0")
     print("=" * 80)
     print(f"Frozen Environment:\n{json.dumps(env_info, indent=2)}\n")
 
@@ -1049,8 +1060,8 @@ def run_full_parity_gate() -> Dict[str, Any]:
 
     master_results = {
         "environment": env_info,
-        "platform_scope": "WINDOWS_NT_MSVCRT",
-        "certificate_id": "OSS-PARITY-GATE-1-FILELOCK-WINDOWS",
+        "platform_scope": f"{platform_name}_{sys.platform}",
+        "certificate_id": cert_id,
         "layer_a_primitive_parity": layer_a,
         "layer_a_same_path_primitive": layer_a_sp,
         "layer_b_full_sclass_lifecycle": layer_b,
@@ -1070,10 +1081,10 @@ def run_full_parity_gate() -> Dict[str, Any]:
     with open(out_raw, "w", encoding="utf-8") as f:
         json.dump(master_results, f, indent=2)
 
-    # Export standardized machine-readable Windows Parity Certificate
+    # Export standardized machine-readable Parity Certificate
     certificate = {
-        "certificate_id": "OSS-PARITY-GATE-1-FILELOCK-WINDOWS",
-        "platform_scope": "Windows / Python 3.14.5 (AMD64)",
+        "certificate_id": cert_id,
+        "platform_scope": f"{platform_name} / Python {sys.version.split()[0]}",
         "timestamp_utc": env_info["timestamp_utc"],
         "final_verdict": final_verdict,
         "provenance": env_info,
@@ -1149,17 +1160,13 @@ def run_full_parity_gate() -> Dict[str, Any]:
         }
     }
 
-    out_cert_win = os.path.join(os.path.dirname(__file__), "gate_1_parity_certificate_windows.json")
-    with open(out_cert_win, "w", encoding="utf-8") as f:
-        json.dump(certificate, f, indent=2)
-
-    # Maintain gate_1_parity_certificate.json as pointer/current platform snapshot
-    out_cert_generic = os.path.join(os.path.dirname(__file__), "gate_1_parity_certificate.json")
-    with open(out_cert_generic, "w", encoding="utf-8") as f:
+    cert_filename = f"gate_1_parity_certificate_{platform_name.lower()}.json"
+    out_cert_plat = os.path.join(os.path.dirname(__file__), cert_filename)
+    with open(out_cert_plat, "w", encoding="utf-8") as f:
         json.dump(certificate, f, indent=2)
 
     print("\n" + "=" * 110)
-    print("FINAL OSS PARITY GATE 1 (WINDOWS EDITION) CERTIFICATION MATRIX")
+    print(f"FINAL OSS PARITY GATE 1 ({platform_name} EDITION) CERTIFICATION MATRIX")
     print("=" * 110)
     print(f"{'Capability Dimension':<32} | {'Reference':<14} | {'S-Class':<14} | {'Paired Ratio (95% CI)':<26} | {'Threshold':<11} | {'Verdict'}")
     print("-" * 125)
@@ -1181,7 +1188,7 @@ def run_full_parity_gate() -> Dict[str, Any]:
     print(f"{'Multiprocessing (4P x 25)':<32} | {str(mp_res['reference_final_count'])+'/100':<14} | {str(mp_res['sclass_final_count'])+'/100':<14} | {'Atomic Correct':<26} | {'100/100':<11} | {'PASS' if mp_res['multiprocess_differential_passed'] else 'FAIL'}")
     print(f"{'Crash Recovery (os._exit)':<32} | {'Reclaimed':<14} | {'Reclaimed':<14} | {'Instant Release':<26} | {'Equiv':<11} | {'PASS' if crash_res['crash_differential_passed'] else 'FAIL'}")
     print("=" * 125)
-    print(f"FINAL CERTIFIED OSS PARITY GATE 1 (WINDOWS) VERDICT: {final_verdict}")
+    print(f"FINAL CERTIFIED OSS PARITY GATE 1 ({platform_name}) VERDICT: {final_verdict}")
     print("=" * 125)
     return master_results
 

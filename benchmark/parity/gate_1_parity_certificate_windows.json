@@ -1,7 +1,7 @@
 {
   "certificate_id": "OSS-PARITY-GATE-1-FILELOCK-WINDOWS",
-  "platform_scope": "Windows / Python 3.14.5 (AMD64)",
-  "timestamp_utc": 1786889401.4194722,
+  "platform_scope": "WINDOWS / Python 3.14.5",
+  "timestamp_utc": 1786889826.6680393,
   "final_verdict": "PASS",
   "provenance": {
     "os_platform": "win32",
@@ -10,7 +10,7 @@
     "cpu_count_logical": 12,
     "portalocker_version": "4.1.0",
     "hostname": "AK",
-    "timestamp_utc": 1786889401.4194722
+    "timestamp_utc": 1786889826.6680393
   },
   "acceptance_criteria": {
     "primitive_latency_median_upper_ci_max": 1.005,
@@ -29,70 +29,70 @@
     "differential_semantic_correctness": "100_PERCENT_MATCHED"
   },
   "layer_a_primitive": {
-    "reference_median_us": 183.3,
-    "sclass_median_us": 150.85,
-    "median_ratio": 0.823,
+    "reference_median_us": 173.45,
+    "sclass_median_us": 141.5,
+    "median_ratio": 0.8158,
     "median_ratio_95_ci": [
-      0.8095,
-      0.8327
+      0.8066,
+      0.8261
     ],
-    "p95_ratio": 0.836,
+    "p95_ratio": 0.8103,
     "p95_ratio_95_ci": [
-      0.7926,
-      0.8876
+      0.7717,
+      0.8415
     ],
-    "throughput_ratio": 1.2159,
+    "throughput_ratio": 1.2246,
     "throughput_ratio_95_ci": [
-      1.1951,
-      1.2355
+      1.205,
+      1.2451
     ],
     "verdict": "PASS"
   },
   "layer_a_same_path_primitive": {
-    "reference_median_us": 231.55,
-    "sclass_median_us": 191.65,
-    "median_ratio": 0.8277,
+    "reference_median_us": 166.55,
+    "sclass_median_us": 138.25,
+    "median_ratio": 0.8301,
     "median_ratio_95_ci": [
-      0.8196,
-      0.8393
+      0.8211,
+      0.8385
     ],
-    "p95_ratio": 0.8163,
+    "p95_ratio": 0.7753,
     "p95_ratio_95_ci": [
-      0.7745,
-      0.8471
+      0.7389,
+      0.8186
     ],
-    "throughput_ratio": 1.2201,
+    "throughput_ratio": 1.2271,
     "throughput_ratio_95_ci": [
-      1.2027,
-      1.2372
+      1.2083,
+      1.2429
     ],
     "verdict": "PASS"
   },
   "layer_c_1to1_lifecycle": {
-    "reference_median_us": 537.2,
-    "sclass_median_us": 501.2,
-    "median_ratio": 0.933,
+    "reference_median_us": 370.15,
+    "sclass_median_us": 348.05,
+    "median_ratio": 0.9403,
     "median_ratio_95_ci": [
-      0.9165,
-      0.9475
+      0.9307,
+      0.9499
     ],
-    "p95_ratio": 0.922,
+    "p95_ratio": 0.9393,
     "p95_ratio_95_ci": [
-      0.8961,
-      0.957
+      0.903,
+      0.9821
     ],
-    "throughput_ratio": 1.0759,
+    "throughput_ratio": 1.0689,
     "throughput_ratio_95_ci": [
-      1.0567,
-      1.0926
+      1.0512,
+      1.093
     ],
     "verdict": "PASS"
   },
   "long_soak_memory": {
     "soak_cycles": 5000,
-    "initial_rss_bytes": 29941760,
-    "final_rss_bytes": 29970432,
-    "rss_growth_ratio": 1.001,
+    "initial_rss_bytes": 29872128,
+    "final_rss_bytes": 29896704,
+    "rss_growth_ratio": 1.0008,
     "classification": "BOUNDED_RSS_DRIFT_LE_5PCT_5000_CYCLES",
     "verdict": "PASS"
   },
