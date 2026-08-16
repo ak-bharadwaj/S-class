@@ -1,0 +1,124 @@
+name: OSS Parity Gate 1 - POSIX Candidate Differential & Benchmark
+
+on:
+  push:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  differential-and-benchmark:
+    name: POSIX Candidate Differential Tests & Parity Benchmark (Ubuntu 24.04 / Python 3.12)
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Checkout S-Class Plugin Repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install Pinned Parity Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-parity-linux.txt
+
+    - name: Run Differential Unit Test Suite
+      env:
+        PYTHONPATH: .
+      run: |
+        python -m pytest tests/test_experimental_metadata_writer.py tests/test_file_lock_concurrency.py -v
+
+    - name: Run Paired Candidate vs Reference Benchmark
+      run: |
+        python - << 'EOF'
+        import os
+        import sys
+        import time
+        import json
+        import random
+        import tempfile
+        import portalocker
+
+        from file_lock import FileLock, _CACHED_PID, _CACHED_HOSTNAME, _CACHED_PROC_START
+        from tests.test_experimental_metadata_writer import ExperimentalFileLock
+        from benchmark.parity.file_lock_harness import (
+            calculate_linear_percentile,
+            compute_paired_bootstrap_metrics,
+            get_system_environment_info
+        )
+
+        def benchmark_candidate(n_trials=500, n_repetitions=5):
+            with tempfile.TemporaryDirectory() as tmpdir:
+                path_ref = os.path.join(tmpdir, "ref.lock")
+                path_exp = os.path.join(tmpdir, "candidate.lock")
+
+                ref_pid = _CACHED_PID
+                ref_host = _CACHED_HOSTNAME
+                ref_proc_start = _CACHED_PROC_START
+                meta_enter = f'{{"pid": {ref_pid}, "host": "{ref_host}", "process_start_time": {ref_proc_start}, "token": "ref-token", "start_time": '
+                meta_exit = f'{{"status": "released", "pid": {ref_pid}, "token": "ref-token"}}'.encode("utf-8")
+
+                paired_lats = []
+                rng = random.Random(42)
+
+                for rep in range(n_repetitions):
+                    for i in range(n_trials):
+                        run_ref_first = rng.choice([True, False])
+                        t_ref_us, t_exp_us = 0.0, 0.0
+
+                        def run_ref():
+                            t0 = time.perf_counter_ns()
+                            with portalocker.Lock(path_ref, mode="a+b", timeout=5.0) as fh:
+                                t_now = time.time()
+                                fh.seek(0)
+                                fh.truncate(0)
+                                fh.write(f'{meta_enter}{t_now}}}'.encode("utf-8"))
+                                fh.flush()
+
+                                fh.seek(0)
+                                fh.truncate(0)
+                                fh.write(meta_exit)
+                                fh.flush()
+                            t1 = time.perf_counter_ns()
+                            return (t1 - t0) / 1000.0
+
+                        def run_exp():
+                            t0 = time.perf_counter_ns()
+                            with ExperimentalFileLock(path_exp, timeout=5.0):
+                                pass
+                            t1 = time.perf_counter_ns()
+                            return (t1 - t0) / 1000.0
+
+                        if run_ref_first:
+                            t_ref_us = run_ref()
+                            t_exp_us = run_exp()
+                        else:
+                            t_exp_us = run_exp()
+                            t_ref_us = run_ref()
+
+                        paired_lats.append((t_exp_us, t_ref_us))
+
+                s_lats = [p[0] for p in paired_lats]
+                r_lats = [p[1] for p in paired_lats]
+
+                metrics = compute_paired_bootstrap_metrics(paired_lats)
+                return {
+                    "total_trials": len(paired_lats),
+                    "ref_p50": round(calculate_linear_percentile(r_lats, 0.50), 2),
+                    "ref_p95": round(calculate_linear_percentile(r_lats, 0.95), 2),
+                    "candidate_p50": round(calculate_linear_percentile(s_lats, 0.50), 2),
+                    "candidate_p95": round(calculate_linear_percentile(s_lats, 0.95), 2),
+                    "metrics": metrics
+                }
+
+        res = benchmark_candidate()
+        print("Candidate vs Reference Lifecycle Parity Metrics:")
+        print(json.dumps(res, indent=2))
+        EOF

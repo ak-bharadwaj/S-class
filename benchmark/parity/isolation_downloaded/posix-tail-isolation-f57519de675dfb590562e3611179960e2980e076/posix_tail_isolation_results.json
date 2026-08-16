@@ -1,0 +1,120 @@
+{
+  "provenance": {
+    "tested_source_sha": "7f50a062b837d7cee696d2b8a0cf533b4a07dbf5",
+    "diagnostic_harness_sha": "f57519de675dfb590562e3611179960e2980e076",
+    "environment": {
+      "os_platform": "linux",
+      "os_system": "Linux",
+      "os_release": "6.17.0-1022-azure",
+      "os_version": "#22-Ubuntu SMP Mon Jul 27 17:24:03 UTC 2026",
+      "python_version": "3.12.13 (main, Jun 16 2026, 22:05:08) [GCC 13.3.0]",
+      "cpu_count_logical": 4,
+      "total_ram_bytes": 16766414848,
+      "portalocker_version": "4.1.0",
+      "hostname": "runnervmzvulz",
+      "git_commit_sha": "f57519de675dfb590562e3611179960e2980e076",
+      "timestamp_utc": 1786894371.9808202
+    }
+  },
+  "results": {
+    "total_trials": 2500,
+    "variant_a_reference": {
+      "p50": 148.51,
+      "p90": 176.53,
+      "p95": 191.42,
+      "p99": 263.09,
+      "max": 2761.33,
+      "min": 123.95
+    },
+    "variant_b_sclass_standard": {
+      "p50": 135.0,
+      "p90": 162.63,
+      "p95": 170.18,
+      "p99": 193.33,
+      "max": 1866.23,
+      "min": 105.17
+    },
+    "variant_c_sclass_no_meta_write": {
+      "p50": 34.07,
+      "p90": 43.11,
+      "p95": 49.48,
+      "p99": 64.77,
+      "max": 106.9,
+      "min": 28.86
+    },
+    "variant_d_sclass_direct_pwrite": {
+      "p50": 31.98,
+      "p90": 57.31,
+      "p95": 67.42,
+      "p99": 81.89,
+      "max": 506.3,
+      "min": 29.05
+    },
+    "bootstrap_b_vs_a": {
+      "median_ratio": 0.9091,
+      "median_ratio_95_ci": [
+        0.8936,
+        0.934
+      ],
+      "p95_ratio": 0.8891,
+      "p95_ratio_95_ci": [
+        0.8722,
+        0.9018
+      ],
+      "throughput_ratio": 1.1317,
+      "throughput_ratio_95_ci": [
+        1.1049,
+        1.1609
+      ],
+      "median_gate_passed": true,
+      "p95_gate_passed": true,
+      "throughput_gate_passed": true,
+      "all_gates_passed": true,
+      "bootstraps_evaluated": 1000
+    },
+    "bootstrap_c_vs_a": {
+      "median_ratio": 0.2294,
+      "median_ratio_95_ci": [
+        0.2278,
+        0.2309
+      ],
+      "p95_ratio": 0.2585,
+      "p95_ratio_95_ci": [
+        0.2481,
+        0.2692
+      ],
+      "throughput_ratio": 4.5363,
+      "throughput_ratio_95_ci": [
+        4.4389,
+        4.6359
+      ],
+      "median_gate_passed": true,
+      "p95_gate_passed": true,
+      "throughput_gate_passed": true,
+      "all_gates_passed": true,
+      "bootstraps_evaluated": 1000
+    },
+    "bootstrap_d_vs_a": {
+      "median_ratio": 0.2153,
+      "median_ratio_95_ci": [
+        0.2139,
+        0.2168
+      ],
+      "p95_ratio": 0.3522,
+      "p95_ratio_95_ci": [
+        0.3399,
+        0.365
+      ],
+      "throughput_ratio": 4.0531,
+      "throughput_ratio_95_ci": [
+        3.9458,
+        4.1599
+      ],
+      "median_gate_passed": true,
+      "p95_gate_passed": true,
+      "throughput_gate_passed": true,
+      "all_gates_passed": true,
+      "bootstraps_evaluated": 1000
+    }
+  }
+}
