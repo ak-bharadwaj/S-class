@@ -146,8 +146,10 @@ def test_native_fallback_mode(monkeypatch):
         lock_file = os.path.join(tmpdir, "state.lock")
         with FileLock(lock_file, timeout=2.0) as fl:
             assert os.path.exists(lock_file)
-            fl._file.seek(0)
-            payload = json.loads(fl._file.read().decode("utf-8").strip())
+            assert fl._fd is not None
+            os.lseek(fl._fd, 0, os.SEEK_SET)
+            raw = os.read(fl._fd, 1024)
+            payload = json.loads(raw.decode("utf-8").strip())
             assert payload["pid"] == os.getpid()
 
 
