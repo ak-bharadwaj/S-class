@@ -1,0 +1,79 @@
+{
+  "task_id": "H6-06-AVIONICS-RING-BUFFER-OVERRUN-PREVENTER",
+  "baseline": "B2",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Avionics Telemetry",
+  "raw_prompt": "Implement AvionicsRingBufferGuard in target_module.py. Fixed capacity ring buffer. Must overwrite oldest frame on overrun while logging overrun_count invariant.",
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 1
+  },
+  "repository": {
+    "starting_tree_hash": "90eca2493a83993253ebb29e55c591450a3d1219019efb673f541ad25be85f45",
+    "final_tree_hash": "e8e0ed14e43a7cc9b5b57f03b39184b378e297dcc1a3f7b5844938ab45adc797"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "Task Instruction:\nImplement AvionicsRingBufferGuard in target_module.py. Fixed capacity ring buffer. Must overwrite oldest frame on overrun while logging overrun_count invariant.\n\nExisting Code in target_module.py:\n```python\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nimport logging\n\nlogger = logging.getLogger(__name__)\n\nclass AvionicsRingBufferGuard:\n    \"\"\"\n    A fixed-capacity ring buffer designed for avionics applications.\n    Overwrites the oldest frame on overrun and maintains an overrun_count invariant.\n    \"\"\"\n    def __init__(self, capacity: int):\n        if capacity <= 0:\n            raise ValueError(\"Ring buffer capacity must be greater than 0.\")\n        self.capacity = capacity\n        self._buffer = [None] * capacity\n        self._head = 0\n        self._tail = 0\n        self._size = 0\n        self.overrun_count = 0\n\n    def push(self, item) -> None:\n        \"\"\"\n        Pushes an item into the ring buffer. If the buffer is full,\n        overwrites the oldest item and increments overrun_count.\n        \"\"\"\n        if self._size == self.capacity:\n            # Buffer is full, overwrite the oldest item (at head)\n            self._buffer[self._head] = item\n            self._head = (self._head + 1) % self.capacity\n            self._tail = (self._tail + 1) % self.capacity\n            self.overrun_count += 1\n            logger.warning(\n                f\"AvionicsRingBufferGuard overrun detected. \"\n                f\"Oldest frame overwritten. Total overruns: {self.overrun_count}\"\n            )\n        else:\n            self._buffer[self._tail] = item\n            self._tail = (self._tail + 1) % self.capacity\n            self._size += 1\n\n    def pop(self):\n        \"\"\"\n        Removes and returns the oldest item from the ring buffer.\n        Raises IndexError if the buffer is empty.\n        \"\"\"\n        if self._size == 0:\n            raise IndexError(\"pop from empty ring buffer\")\n        \n        item = self._buffer[self._head]\n        self._buffer[self._head] = None  # Clear reference\n        self._head = (self._head + 1) % self.capacity\n        self._size -= 1\n        return item\n\n    def peek(self):\n        \"\"\"\n        Returns the oldest item without removing it.\n        Raises IndexError if the buffer is empty.\n        \"\"\"\n        if self._size == 0:\n            raise IndexError(\"peek from empty ring buffer\")\n        return self._buffer[self._head]\n\n    def __len__(self) -> int:\n        return self._size\n\n    @property\n    def is_empty(self) -> bool:\n        return self._size == 0\n\n    @property\n    def is_full(self) -> bool:\n        return self._size == self.capacity\n```",
+      "latency_sec": 3.2194,
+      "prompt_tokens": 101,
+      "completion_tokens": 619,
+      "cost_usd": 0.000193,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpemrtyvg8\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_avionics_buffer PASSED                        [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.548,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "import logging\n\nlogger = logging.getLogger(__name__)\n\nclass AvionicsRingBufferGuard:\n    \"\"\"\n    A fixed-capacity ring buffer designed for avionics applications.\n    Overwrites the oldest frame on overrun and maintains an overrun_count invariant.\n    \"\"\"\n    def __init__(self, capacity: int):\n        if capacity <= 0:\n            raise ValueError(\"Ring buffer capacity must be greater than 0.\")\n        self.capacity = capacity\n        self._buffer = [None] * capacity\n        self._head = 0\n        self._tail = 0\n        self._size = 0\n        self.overrun_count = 0\n\n    def push(self, item) -> None:\n        \"\"\"\n        Pushes an item into the ring buffer. If the buffer is full,\n        overwrites the oldest item and increments overrun_count.\n        \"\"\"\n        if self._size == self.capacity:\n            # Buffer is full, overwrite the oldest item (at head)\n            self._buffer[self._head] = item\n            self._head = (self._head + 1) % self.capacity\n            self._tail = (self._tail + 1) % self.capacity\n            self.overrun_count += 1\n            logger.warning(\n                f\"AvionicsRingBufferGuard overrun detected. \"\n                f\"Oldest frame overwritten. Total overruns: {self.overrun_count}\"\n            )\n        else:\n            self._buffer[self._tail] = item\n            self._tail = (self._tail + 1) % self.capacity\n            self._size += 1\n\n    def pop(self):\n        \"\"\"\n        Removes and returns the oldest item from the ring buffer.\n        Raises IndexError if the buffer is empty.\n        \"\"\"\n        if self._size == 0:\n            raise IndexError(\"pop from empty ring buffer\")\n        \n        item = self._buffer[self._head]\n        self._buffer[self._head] = None  # Clear reference\n        self._head = (self._head + 1) % self.capacity\n        self._size -= 1\n        return item\n\n    def peek(self):\n        \"\"\"\n        Returns the oldest item without removing it.\n        Raises IndexError if the buffer is empty.\n        \"\"\"\n        if self._size == 0:\n            raise IndexError(\"peek from empty ring buffer\")\n        return self._buffer[self._head]\n\n    def __len__(self) -> int:\n        return self._size\n\n    @property\n    def is_empty(self) -> bool:\n        return self._size == 0\n\n    @property\n    def is_full(self) -> bool:\n        return self._size == self.capacity\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpemrtyvg8\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_avionics_buffer PASSED                        [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.548,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  },
+  "layer2_adjudication": {
+    "layer2_passed": false,
+    "critical_invariant_coverage_pct": 50.0,
+    "unsupported_assumption_rate_pct": 0.0,
+    "requirement_omissions_count": 1,
+    "false_confidence_detected": true,
+    "audit_trace_completeness_pct": 100.0,
+    "satisfied_invariants": [
+      "Increment overrun_count on capacity breach"
+    ],
+    "violated_invariants": [
+      "Maintain capacity ceiling invariant"
+    ]
+  }
+}

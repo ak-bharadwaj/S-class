@@ -1,0 +1,119 @@
+{
+  "task_id": "H6-13-HIGH-RISK-INVARIANT-13",
+  "baseline": "B2",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Data Isolation Invariant Module 13",
+  "raw_prompt": "Implement HighRiskModule13 in target_module.py under Data Isolation domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if invariant check fails.",
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 3
+  },
+  "repository": {
+    "starting_tree_hash": "55aebe9b8b238cca3314d50ff6ecd583181ff344fd0f55937ba42a12b61ca43d",
+    "final_tree_hash": "0668fa4a866ae2bab908b090b363a31fbf79b17297d50388832d18f97e60e9ad"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "Task Instruction:\nImplement HighRiskModule13 in target_module.py under Data Isolation domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if invariant check fails.\n\nExisting Code in target_module.py:\n```python\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when a data isolation invariant is violated.\"\"\"\n    pass\n\n\ndef validate_invariant(payload: dict) -> None:\n    \"\"\"\n    Validates the data isolation invariant for the given payload.\n    Raises InvariantViolationError if the invariant check fails.\n    \"\"\"\n    # Example invariant check: payload must not contain cross-tenant references\n    if not isinstance(payload, dict):\n        raise InvariantViolationError(\"Payload must be a dictionary.\")\n    \n    if payload.get(\"isolated\") is False:\n        raise InvariantViolationError(\"Data isolation invariant violated: payload is not isolated.\")\n\n\nclass HighRiskModule13:\n    \"\"\"\n    Handles high-risk operations within the Data Isolation domain,\n    ensuring all payloads strictly adhere to security invariants.\n    \"\"\"\n\n    def process(self, payload: dict) -> dict:\n        \"\"\"\n        Processes the payload after enforcing invariant validation.\n        \"\"\"\n        validate_invariant(payload)\n        # Proceed with processing if validation passes\n        return {\"status\": \"success\", \"processed_payload\": payload}\n```",
+      "latency_sec": 1.7728,
+      "prompt_tokens": 106,
+      "completion_tokens": 246,
+      "cost_usd": 8.2e-05,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmprg9s4xay\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_module_13 FAILED                           [100%]\n\n================================== FAILURES ===================================\n______________________________ test_h6_module_13 ______________________________\ntests\\test_oracle.py:6: in test_h6_module_13\n    assert m.validate_invariant({'valid': True}) is True\n           ^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: 'HighRiskModule13' object has no attribute 'validate_invariant'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_module_13 - AttributeError: 'HighRiskMod...\n============================== 1 failed in 0.09s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.561,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "Task Instruction:\nImplement HighRiskModule13 in target_module.py under Data Isolation domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if invariant check fails.\n\nYour previous implementation for `target_module.py` produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmprg9s4xay\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_module_13 FAILED                           [100%]\n\n================================== FAILURES ===================================\n______________________________ test_h6_module_13 ______________________________\ntests\\test_oracle.py:6: in test_h6_module_13\n    assert m.validate_invariant({'valid': True}) is True\n           ^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: 'HighRiskModule13' object has no attribute 'validate_invariant'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_module_13 - AttributeError: 'HighRiskMod...\n============================== 1 failed in 0.09s ==============================\n\n\n\nPrevious Code:\n```python\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when a data isolation invariant is violated.\"\"\"\n    pass\n\n\ndef validate_invariant(payload: dict) -> None:\n    \"\"\"\n    Validates the data isolation invariant for the given payload.\n    Raises InvariantViolationError if the invariant check fails.\n    \"\"\"\n    # Example invariant check: payload must not contain cross-tenant references\n    if not isinstance(payload, dict):\n        raise InvariantViolationError(\"Payload must be a dictionary.\")\n    \n    if payload.get(\"isolated\") is False:\n        raise InvariantViolationError(\"Data isolation invariant violated: payload is not isolated.\")\n\n\nclass HighRiskModule13:\n    \"\"\"\n    Handles high-risk operations within the Data Isolation domain,\n    ensuring all payloads strictly adhere to security invariants.\n    \"\"\"\n\n    def process(self, payload: dict) -> dict:\n        \"\"\"\n        Processes the payload after enforcing invariant validation.\n        \"\"\"\n        validate_invariant(payload)\n        # Proceed with processing if validation passes\n        return {\"status\": \"success\", \"processed_payload\": payload}\n\n```\n\nPlease analyze the test failures and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "To fix the `AttributeError: 'HighRiskModule13' object has no attribute 'validate_invariant'`, we need to make `validate_invariant` a method of the `HighRiskModule13` class (or provide it as a method on the class instance, as expected by the test `m.validate_invariant(...)`).\n\nHere is the corrected code for `target_module.py`:\n\n```python\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when a data isolation invariant is violated.\"\"\"\n    pass\n\n\nclass HighRiskModule13:\n    \"\"\"\n    Handles high-risk operations within the Data Isolation domain,\n    ensuring all payloads strictly adhere to security invariants.\n    \"\"\"\n\n    def validate_invariant(self, payload: dict) -> bool:\n        \"\"\"\n        Validates the data isolation invariant for the given payload.\n        Raises InvariantViolationError if the invariant check fails.\n        Returns True if validation passes.\n        \"\"\"\n        if not isinstance(payload, dict):\n            raise InvariantViolationError(\"Payload must be a dictionary.\")\n        \n        if payload.get(\"isolated\") is False:\n            raise InvariantViolationError(\"Data isolation invariant violated: payload is not isolated.\")\n        \n        return True\n\n    def process(self, payload: dict) -> dict:\n        \"\"\"\n        Processes the payload after enforcing invariant validation.\n        \"\"\"\n        self.validate_invariant(payload)\n        # Proceed with processing if validation passes\n        return {\"status\": \"success\", \"processed_payload\": payload}\n\n\ndef validate_invariant(payload: dict) -> None:\n    \"\"\"\n    Module-level helper for backward compatibility.\n    \"\"\"\n    instance = HighRiskModule13()\n    instance.validate_invariant(payload)\n```",
+      "latency_sec": 4.2713,
+      "prompt_tokens": 664,
+      "completion_tokens": 383,
+      "cost_usd": 0.000165,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmprg9s4xay\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_module_13 FAILED                           [100%]\n\n================================== FAILURES ===================================\n______________________________ test_h6_module_13 ______________________________\ntests\\test_oracle.py:7: in test_h6_module_13\n    with pytest.raises(InvariantViolationError):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   Failed: DID NOT RAISE <class 'target_module.InvariantViolationError'>\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_module_13 - Failed: DID NOT RAISE <class...\n============================== 1 failed in 0.08s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.559,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 3,
+      "prompt": "Task Instruction:\nImplement HighRiskModule13 in target_module.py under Data Isolation domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if invariant check fails.\n\nYour previous implementation for `target_module.py` produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmprg9s4xay\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_module_13 FAILED                           [100%]\n\n================================== FAILURES ===================================\n______________________________ test_h6_module_13 ______________________________\ntests\\test_oracle.py:7: in test_h6_module_13\n    with pytest.raises(InvariantViolationError):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   Failed: DID NOT RAISE <class 'target_module.InvariantViolationError'>\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_module_13 - Failed: DID NOT RAISE <class...\n============================== 1 failed in 0.08s ==============================\n\n\n\nPrevious Code:\n```python\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when a data isolation invariant is violated.\"\"\"\n    pass\n\n\nclass HighRiskModule13:\n    \"\"\"\n    Handles high-risk operations within the Data Isolation domain,\n    ensuring all payloads strictly adhere to security invariants.\n    \"\"\"\n\n    def validate_invariant(self, payload: dict) -> bool:\n        \"\"\"\n        Validates the data isolation invariant for the given payload.\n        Raises InvariantViolationError if the invariant check fails.\n        Returns True if validation passes.\n        \"\"\"\n        if not isinstance(payload, dict):\n            raise InvariantViolationError(\"Payload must be a dictionary.\")\n        \n        if payload.get(\"isolated\") is False:\n            raise InvariantViolationError(\"Data isolation invariant violated: payload is not isolated.\")\n        \n        return True\n\n    def process(self, payload: dict) -> dict:\n        \"\"\"\n        Processes the payload after enforcing invariant validation.\n        \"\"\"\n        self.validate_invariant(payload)\n        # Proceed with processing if validation passes\n        return {\"status\": \"success\", \"processed_payload\": payload}\n\n\ndef validate_invariant(payload: dict) -> None:\n    \"\"\"\n    Module-level helper for backward compatibility.\n    \"\"\"\n    instance = HighRiskModule13()\n    instance.validate_invariant(payload)\n\n```\n\nPlease analyze the test failures and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "Based on the test failure, `HighRiskModule13` or the test expects invariant validation to fail under certain conditions (or universally if testing the exception case), but the current implementation passes valid dictionaries or doesn't check specific isolation criteria that the test expects to trigger `InvariantViolationError`. \n\nLet's ensure that `HighRiskModule13` strictly enforces validation and correctly raises `InvariantViolationError` when payloads lack required isolation keys/values (such as requiring an explicit isolation flag or checking for cross-domain leakage keys).\n\nHere is the corrected implementation for `target_module.py`:\n\n```python\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when a data isolation invariant is violated.\"\"\"\n    pass\n\n\nclass HighRiskModule13:\n    \"\"\"\n    Handles high-risk operations within the Data Isolation domain,\n    ensuring all payloads strictly adhere to security invariants.\n    \"\"\"\n\n    def validate_invariant(self, payload: dict) -> bool:\n        \"\"\"\n        Validates the data isolation invariant for the given payload.\n        Raises InvariantViolationError if the invariant check fails.\n        Returns True if validation passes.\n        \"\"\"\n        if not isinstance(payload, dict):\n            raise InvariantViolationError(\"Payload must be a dictionary.\")\n        \n        # Enforce strict data isolation invariants:\n        # 1. Must contain an 'isolated' key set to True, or\n        # 2. Must not contain forbidden cross-domain/shared keys.\n        if \"isolated\" not in payload:\n            raise InvariantViolationError(\"Data isolation invariant violated: 'isolated' key is missing.\")\n            \n        if payload.get(\"isolated\") is not True:\n            raise InvariantViolationError(\"Data isolation invariant violated: payload is not isolated.\")\n            \n        if \"shared\" in payload and payload[\"shared\"] is True:\n            raise InvariantViolationError(\"Data isolation invariant violated: shared data is prohibited.\")\n        \n        return True\n\n    def process(self, payload: dict) -> dict:\n        \"\"\"\n        Processes the payload after enforcing invariant validation.\n        \"\"\"\n        self.validate_invariant(payload)\n        # Proceed with processing if validation passes\n        return {\"status\": \"success\", \"processed_payload\": payload}\n\n\ndef validate_invariant(payload: dict) -> None:\n    \"\"\"\n    Module-level helper for backward compatibility.\n    \"\"\"\n    instance = HighRiskModule13()\n    instance.validate_invariant(payload)\n```",
+      "latency_sec": 2.6345,
+      "prompt_tokens": 718,
+      "completion_tokens": 537,
+      "cost_usd": 0.000215,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmprg9s4xay\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_module_13 FAILED                           [100%]\n\n================================== FAILURES ===================================\n______________________________ test_h6_module_13 ______________________________\ntests\\test_oracle.py:6: in test_h6_module_13\n    assert m.validate_invariant({'valid': True}) is True\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntarget_module.py:25: in validate_invariant\n    raise InvariantViolationError(\"Data isolation invariant violated: 'isolated' key is missing.\")\nE   target_module.InvariantViolationError: Data isolation invariant violated: 'isolated' key is missing.\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_module_13 - target_module.InvariantViola...\n============================== 1 failed in 0.08s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.554,
+        "all_passed": false
+      }
+    }
+  ],
+  "final_code": "class InvariantViolationError(Exception):\n    \"\"\"Raised when a data isolation invariant is violated.\"\"\"\n    pass\n\n\nclass HighRiskModule13:\n    \"\"\"\n    Handles high-risk operations within the Data Isolation domain,\n    ensuring all payloads strictly adhere to security invariants.\n    \"\"\"\n\n    def validate_invariant(self, payload: dict) -> bool:\n        \"\"\"\n        Validates the data isolation invariant for the given payload.\n        Raises InvariantViolationError if the invariant check fails.\n        Returns True if validation passes.\n        \"\"\"\n        if not isinstance(payload, dict):\n            raise InvariantViolationError(\"Payload must be a dictionary.\")\n        \n        # Enforce strict data isolation invariants:\n        # 1. Must contain an 'isolated' key set to True, or\n        # 2. Must not contain forbidden cross-domain/shared keys.\n        if \"isolated\" not in payload:\n            raise InvariantViolationError(\"Data isolation invariant violated: 'isolated' key is missing.\")\n            \n        if payload.get(\"isolated\") is not True:\n            raise InvariantViolationError(\"Data isolation invariant violated: payload is not isolated.\")\n            \n        if \"shared\" in payload and payload[\"shared\"] is True:\n            raise InvariantViolationError(\"Data isolation invariant violated: shared data is prohibited.\")\n        \n        return True\n\n    def process(self, payload: dict) -> dict:\n        \"\"\"\n        Processes the payload after enforcing invariant validation.\n        \"\"\"\n        self.validate_invariant(payload)\n        # Proceed with processing if validation passes\n        return {\"status\": \"success\", \"processed_payload\": payload}\n\n\ndef validate_invariant(payload: dict) -> None:\n    \"\"\"\n    Module-level helper for backward compatibility.\n    \"\"\"\n    instance = HighRiskModule13()\n    instance.validate_invariant(payload)\n",
+  "oracle_result": {
+    "exit_code": 1,
+    "passed_count": 0,
+    "failed_count": 1,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmprg9s4xay\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_module_13 FAILED                           [100%]\n\n================================== FAILURES ===================================\n______________________________ test_h6_module_13 ______________________________\ntests\\test_oracle.py:6: in test_h6_module_13\n    assert m.validate_invariant({'valid': True}) is True\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntarget_module.py:25: in validate_invariant\n    raise InvariantViolationError(\"Data isolation invariant violated: 'isolated' key is missing.\")\nE   target_module.InvariantViolationError: Data isolation invariant violated: 'isolated' key is missing.\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_module_13 - target_module.InvariantViola...\n============================== 1 failed in 0.08s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.554,
+    "all_passed": false
+  },
+  "failure_taxonomy": {
+    "category": "wrong_requirement",
+    "reason": "Failed oracle assertions without explicit exception traceback.",
+    "details": [
+      "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmprg9s4xay\nplugins: any"
+    ]
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  },
+  "layer2_adjudication": {
+    "layer2_passed": false,
+    "critical_invariant_coverage_pct": 50.0,
+    "unsupported_assumption_rate_pct": 0.0,
+    "requirement_omissions_count": 1,
+    "false_confidence_detected": false,
+    "audit_trace_completeness_pct": 100.0,
+    "satisfied_invariants": [
+      "Raise InvariantViolationError on failure"
+    ],
+    "violated_invariants": [
+      "Validate payload invariant condition"
+    ]
+  }
+}

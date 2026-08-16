@@ -1,0 +1,16 @@
+{
+  "task_id": "H6-04-RAFT-CONSENSUS-COMMIT-INVARIANT",
+  "category": "Distributed Consistency",
+  "domain": "Consensus Protocols",
+  "raw_prompt": "Implement RaftCommitGuard in target_module.py. Enforce that entries can ONLY be committed if stored on a majority of nodes in the current term.",
+  "critical_invariants": [
+    {
+      "description": "Majority quorum check (ack > cluster_size/2)",
+      "check_regex": "replica_ack_count\\s*>=\\s*\\(?self\\.cluster_size\\s*//?\\s*2\\s*\\+\\s*1\\)"
+    },
+    {
+      "description": "Current term matching invariant",
+      "check_regex": "entry_term\\s*==\\s*current_term"
+    }
+  ]
+}

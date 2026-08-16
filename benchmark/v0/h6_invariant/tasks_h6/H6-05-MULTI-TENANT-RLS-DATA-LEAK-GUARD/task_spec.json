@@ -1,0 +1,16 @@
+{
+  "task_id": "H6-05-MULTI-TENANT-RLS-DATA-LEAK-GUARD",
+  "category": "Data Isolation",
+  "domain": "Tenant Security",
+  "raw_prompt": "Implement MultiTenantRLSGuard in target_module.py. Must append WHERE tenant_id = :tenant_id to every SQL query and raise TenantIsolationViolation on missing tenant_id.",
+  "critical_invariants": [
+    {
+      "description": "Tenant ID validation check",
+      "check_regex": "if\\s+not\\s+tenant_id|raise\\s+TenantIsolationViolation"
+    },
+    {
+      "description": "Append tenant_id predicate",
+      "check_regex": "tenant_id|WHERE"
+    }
+  ]
+}

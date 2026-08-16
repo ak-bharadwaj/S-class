@@ -1,0 +1,16 @@
+{
+  "task_id": "H6-08-OAUTH2-AUDIENCE-RESTRICTION-GUARD",
+  "category": "Authorization",
+  "domain": "OAuth2 / IAM",
+  "raw_prompt": "Implement OAuth2AudienceGuard in target_module.py. Verify token audience claim matches expected target audience. Raise InvalidAudienceError on mismatch.",
+  "critical_invariants": [
+    {
+      "description": "Check claims.get('aud') == self.expected_aud",
+      "check_regex": "aud\\s*==\\s*self\\.expected_aud|claims\\.get\\('aud'\\)"
+    },
+    {
+      "description": "Raise InvalidAudienceError",
+      "check_regex": "raise\\s+InvalidAudienceError"
+    }
+  ]
+}

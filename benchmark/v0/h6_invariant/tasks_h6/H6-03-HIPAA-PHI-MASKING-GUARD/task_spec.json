@@ -1,0 +1,16 @@
+{
+  "task_id": "H6-03-HIPAA-PHI-MASKING-GUARD",
+  "category": "Privacy & Compliance",
+  "domain": "Healthcare Compliance",
+  "raw_prompt": "Implement PHIMaskingGuard in target_module.py. Must mask SSNs (XXX-XX-XXXX), MRNs (MRN-XXXXXX), and email addresses from clinical notes.",
+  "critical_invariants": [
+    {
+      "description": "Regex masking for SSN",
+      "check_regex": "re\\.sub|r'\\d{3}-\\d{2}-\\d{4}'"
+    },
+    {
+      "description": "No unmasked SSN leakage",
+      "check_regex": "\\[REDACTED\\]|\\[REDACTED_SSN\\]|XXX-XX-XXXX|\\*\\*\\*"
+    }
+  ]
+}

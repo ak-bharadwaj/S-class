@@ -1,0 +1,188 @@
+{
+  "task_id": "H6-09-HIGH-RISK-INVARIANT-09",
+  "baseline": "B4",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Security Invariant Module 09",
+  "raw_prompt": "Implement HighRiskModule09 in target_module.py under Security domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if invariant check fails.",
+  "sclass_governance": {
+    "semantic_requirements": [
+      {
+        "id": "REQ-SHADOW-001",
+        "title": "Core Service Functionality",
+        "description": "Implement core processing logic for: Implement HighRiskModule09 in target_module.py under Security domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if invariant check fails.",
+        "type": "FUNCTIONAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt execution mandate"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-002",
+        "title": "Underlying Storage Technology Specification",
+        "description": "The specific persistence engine and database backend are unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify database technology"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-003",
+        "title": "API Transport Protocol Specification",
+        "description": "The specific network transport protocol (gRPC vs REST) is unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify API protocol"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      }
+    ],
+    "epistemic_status": "CONFIRMED",
+    "gate_result": "PASS"
+  },
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 3
+  },
+  "repository": {
+    "starting_tree_hash": "b7318a7ce48bba9dbaf03c4f8ef6136269b7c05045927e5eecf472ece982b41b",
+    "final_tree_hash": "ddd868158b7adea15ffcdec3db6fee8281109ed673d4fbb746e442db79b27eff"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "User Task Instruction:\nImplement HighRiskModule09 in target_module.py under Security domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if invariant check fails.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement HighRiskModule09 in target_module.py under Security domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if invariant check fails.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nExisting Code in target_module.py:\n```python\n\n```\n\nImplement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block.",
+      "response_text": "```python\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when a security invariant check fails.\"\"\"\n    pass\n\n\ndef validate_invariant(payload: dict) -> None:\n    \"\"\"\n    Validates the security invariant for the given payload.\n    Raises InvariantViolationError if the payload is invalid or violates security rules.\n    \"\"\"\n    if not isinstance(payload, dict):\n        raise InvariantViolationError(\"Payload must be a dictionary.\")\n    \n    # Enforce core security invariants\n    if \"restricted\" in payload and payload[\"restricted\"] is True:\n        raise InvariantViolationError(\"Payload contains restricted access flags.\")\n    \n    if not payload:\n        raise InvariantViolationError(\"Payload cannot be empty.\")\n\n\nclass HighRiskModule09:\n    \"\"\"\n    S-Class Autonomous Security Module 09.\n    Enforces strict invariant validation on all processed payloads.\n    \"\"\"\n\n    def __init__(self) -> None:\n        pass\n\n    def process(self, payload: dict) -> dict:\n        \"\"\"\n        Processes the given payload after enforcing validate_invariant(payload).\n        Raises InvariantViolationError if the invariant check fails.\n        \"\"\"\n        validate_invariant(payload)\n        \n        # Core processing logic for HighRiskModule09\n        processed_result = {\n            \"status\": \"success\",\n            \"module\": \"HighRiskModule09\",\n            \"domain\": \"Security\",\n            \"data\": payload\n        }\n        \n        return processed_result\n```",
+      "latency_sec": 1.8628,
+      "prompt_tokens": 229,
+      "completion_tokens": 333,
+      "cost_usd": 0.000117,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp7nmnlvb6\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_module_09 FAILED                           [100%]\n\n================================== FAILURES ===================================\n______________________________ test_h6_module_09 ______________________________\ntests\\test_oracle.py:6: in test_h6_module_09\n    assert m.validate_invariant({'valid': True}) is True\n           ^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: 'HighRiskModule09' object has no attribute 'validate_invariant'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_module_09 - AttributeError: 'HighRiskMod...\n============================== 1 failed in 0.08s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.557,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "User Task Instruction:\nImplement HighRiskModule09 in target_module.py under Security domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if invariant check fails.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement HighRiskModule09 in target_module.py under Security domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if invariant check fails.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nYour previous implementation produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp7nmnlvb6\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_module_09 FAILED                           [100%]\n\n================================== FAILURES ===================================\n______________________________ test_h6_module_09 ______________________________\ntests\\test_oracle.py:6: in test_h6_module_09\n    assert m.validate_invariant({'valid': True}) is True\n           ^^^^^^^^^^^^^^^^^^^^\nE   AttributeError: 'HighRiskModule09' object has no attribute 'validate_invariant'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_module_09 - AttributeError: 'HighRiskMod...\n============================== 1 failed in 0.08s ==============================\n\n\n\nPrevious Code in target_module.py:\n```python\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when a security invariant check fails.\"\"\"\n    pass\n\n\ndef validate_invariant(payload: dict) -> None:\n    \"\"\"\n    Validates the security invariant for the given payload.\n    Raises InvariantViolationError if the payload is invalid or violates security rules.\n    \"\"\"\n    if not isinstance(payload, dict):\n        raise InvariantViolationError(\"Payload must be a dictionary.\")\n    \n    # Enforce core security invariants\n    if \"restricted\" in payload and payload[\"restricted\"] is True:\n        raise InvariantViolationError(\"Payload contains restricted access flags.\")\n    \n    if not payload:\n        raise InvariantViolationError(\"Payload cannot be empty.\")\n\n\nclass HighRiskModule09:\n    \"\"\"\n    S-Class Autonomous Security Module 09.\n    Enforces strict invariant validation on all processed payloads.\n    \"\"\"\n\n    def __init__(self) -> None:\n        pass\n\n    def process(self, payload: dict) -> dict:\n        \"\"\"\n        Processes the given payload after enforcing validate_invariant(payload).\n        Raises InvariantViolationError if the invariant check fails.\n        \"\"\"\n        validate_invariant(payload)\n        \n        # Core processing logic for HighRiskModule09\n        processed_result = {\n            \"status\": \"success\",\n            \"module\": \"HighRiskModule09\",\n            \"domain\": \"Security\",\n            \"data\": payload\n        }\n        \n        return processed_result\n\n```\n\nAnalyze the test failures against the S-Class governance requirements and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when a security invariant check fails.\"\"\"\n    pass\n\n\ndef validate_invariant(payload: dict) -> bool:\n    \"\"\"\n    Validates the security invariant for the given payload.\n    Raises InvariantViolationError if the payload is invalid or violates security rules.\n    Returns True if valid.\n    \"\"\"\n    if not isinstance(payload, dict):\n        raise InvariantViolationError(\"Payload must be a dictionary.\")\n    \n    # Enforce core security invariants\n    if \"restricted\" in payload and payload[\"restricted\"] is True:\n        raise InvariantViolationError(\"Payload contains restricted access flags.\")\n    \n    if not payload:\n        raise InvariantViolationError(\"Payload cannot be empty.\")\n        \n    return True\n\n\nclass HighRiskModule09:\n    \"\"\"\n    S-Class Autonomous Security Module 09.\n    Enforces strict invariant validation on all processed payloads.\n    \"\"\"\n\n    def __init__(self) -> None:\n        pass\n\n    def validate_invariant(self, payload: dict) -> bool:\n        \"\"\"\n        Instance method wrapper for validate_invariant to satisfy test expectations.\n        \"\"\"\n        return validate_invariant(payload)\n\n    def process(self, payload: dict) -> dict:\n        \"\"\"\n        Processes the given payload after enforcing validate_invariant(payload).\n        Raises InvariantViolationError if the invariant check fails.\n        \"\"\"\n        self.validate_invariant(payload)\n        \n        # Core processing logic for HighRiskModule09\n        processed_result = {\n            \"status\": \"success\",\n            \"module\": \"HighRiskModule09\",\n            \"domain\": \"Security\",\n            \"data\": payload\n        }\n        \n        return processed_result\n```",
+      "latency_sec": 1.721,
+      "prompt_tokens": 875,
+      "completion_tokens": 393,
+      "cost_usd": 0.000184,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp7nmnlvb6\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_module_09 FAILED                           [100%]\n\n================================== FAILURES ===================================\n______________________________ test_h6_module_09 ______________________________\ntests\\test_oracle.py:7: in test_h6_module_09\n    with pytest.raises(InvariantViolationError):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   Failed: DID NOT RAISE <class 'target_module.InvariantViolationError'>\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_module_09 - Failed: DID NOT RAISE <class...\n============================== 1 failed in 0.08s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.575,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 3,
+      "prompt": "User Task Instruction:\nImplement HighRiskModule09 in target_module.py under Security domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if invariant check fails.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement HighRiskModule09 in target_module.py under Security domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if invariant check fails.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nYour previous implementation produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp7nmnlvb6\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_module_09 FAILED                           [100%]\n\n================================== FAILURES ===================================\n______________________________ test_h6_module_09 ______________________________\ntests\\test_oracle.py:7: in test_h6_module_09\n    with pytest.raises(InvariantViolationError):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   Failed: DID NOT RAISE <class 'target_module.InvariantViolationError'>\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_module_09 - Failed: DID NOT RAISE <class...\n============================== 1 failed in 0.08s ==============================\n\n\n\nPrevious Code in target_module.py:\n```python\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when a security invariant check fails.\"\"\"\n    pass\n\n\ndef validate_invariant(payload: dict) -> bool:\n    \"\"\"\n    Validates the security invariant for the given payload.\n    Raises InvariantViolationError if the payload is invalid or violates security rules.\n    Returns True if valid.\n    \"\"\"\n    if not isinstance(payload, dict):\n        raise InvariantViolationError(\"Payload must be a dictionary.\")\n    \n    # Enforce core security invariants\n    if \"restricted\" in payload and payload[\"restricted\"] is True:\n        raise InvariantViolationError(\"Payload contains restricted access flags.\")\n    \n    if not payload:\n        raise InvariantViolationError(\"Payload cannot be empty.\")\n        \n    return True\n\n\nclass HighRiskModule09:\n    \"\"\"\n    S-Class Autonomous Security Module 09.\n    Enforces strict invariant validation on all processed payloads.\n    \"\"\"\n\n    def __init__(self) -> None:\n        pass\n\n    def validate_invariant(self, payload: dict) -> bool:\n        \"\"\"\n        Instance method wrapper for validate_invariant to satisfy test expectations.\n        \"\"\"\n        return validate_invariant(payload)\n\n    def process(self, payload: dict) -> dict:\n        \"\"\"\n        Processes the given payload after enforcing validate_invariant(payload).\n        Raises InvariantViolationError if the invariant check fails.\n        \"\"\"\n        self.validate_invariant(payload)\n        \n        # Core processing logic for HighRiskModule09\n        processed_result = {\n            \"status\": \"success\",\n            \"module\": \"HighRiskModule09\",\n            \"domain\": \"Security\",\n            \"data\": payload\n        }\n        \n        return processed_result\n\n```\n\nAnalyze the test failures against the S-Class governance requirements and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when a security invariant check fails.\"\"\"\n    pass\n\n\ndef validate_invariant(payload: dict) -> bool:\n    \"\"\"\n    Validates the security invariant for the given payload.\n    Raises InvariantViolationError if the payload is invalid or violates security rules.\n    Returns True if valid.\n    \"\"\"\n    if not isinstance(payload, dict):\n        raise InvariantViolationError(\"Payload must be a dictionary.\")\n    \n    # Enforce core security invariants\n    if \"restricted\" in payload and payload[\"restricted\"] is True:\n        raise InvariantViolationError(\"Payload contains restricted access flags.\")\n    \n    if not payload:\n        raise InvariantViolationError(\"Payload cannot be empty.\")\n        \n    return True\n\n\nclass HighRiskModule09:\n    \"\"\"\n    S-Class Autonomous Security Module 09.\n    Enforces strict invariant validation on all processed payloads.\n    \"\"\"\n\n    def __init__(self) -> None:\n        pass\n\n    def validate_invariant(self, payload: dict) -> bool:\n        \"\"\"\n        Instance method wrapper for validate_invariant.\n        Must enforce validate_invariant(payload) and raise InvariantViolationError if invariant check fails.\n        \"\"\"\n        return validate_invariant(payload)\n\n    def process(self, payload: dict) -> dict:\n        \"\"\"\n        Processes the given payload after enforcing validate_invariant(payload).\n        Raises InvariantViolationError if the invariant check fails.\n        \"\"\"\n        # Always enforce validation explicitly on entry\n        validate_invariant(payload)\n        \n        # Core processing logic for HighRiskModule09\n        processed_result = {\n            \"status\": \"success\",\n            \"module\": \"HighRiskModule09\",\n            \"domain\": \"Security\",\n            \"data\": payload\n        }\n        \n        return processed_result\n```",
+      "latency_sec": 1.8915,
+      "prompt_tokens": 936,
+      "completion_tokens": 417,
+      "cost_usd": 0.000195,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp7nmnlvb6\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_module_09 FAILED                           [100%]\n\n================================== FAILURES ===================================\n______________________________ test_h6_module_09 ______________________________\ntests\\test_oracle.py:7: in test_h6_module_09\n    with pytest.raises(InvariantViolationError):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   Failed: DID NOT RAISE <class 'target_module.InvariantViolationError'>\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_module_09 - Failed: DID NOT RAISE <class...\n============================== 1 failed in 0.09s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.594,
+        "all_passed": false
+      }
+    }
+  ],
+  "final_code": "class InvariantViolationError(Exception):\n    \"\"\"Raised when a security invariant check fails.\"\"\"\n    pass\n\n\ndef validate_invariant(payload: dict) -> bool:\n    \"\"\"\n    Validates the security invariant for the given payload.\n    Raises InvariantViolationError if the payload is invalid or violates security rules.\n    Returns True if valid.\n    \"\"\"\n    if not isinstance(payload, dict):\n        raise InvariantViolationError(\"Payload must be a dictionary.\")\n    \n    # Enforce core security invariants\n    if \"restricted\" in payload and payload[\"restricted\"] is True:\n        raise InvariantViolationError(\"Payload contains restricted access flags.\")\n    \n    if not payload:\n        raise InvariantViolationError(\"Payload cannot be empty.\")\n        \n    return True\n\n\nclass HighRiskModule09:\n    \"\"\"\n    S-Class Autonomous Security Module 09.\n    Enforces strict invariant validation on all processed payloads.\n    \"\"\"\n\n    def __init__(self) -> None:\n        pass\n\n    def validate_invariant(self, payload: dict) -> bool:\n        \"\"\"\n        Instance method wrapper for validate_invariant.\n        Must enforce validate_invariant(payload) and raise InvariantViolationError if invariant check fails.\n        \"\"\"\n        return validate_invariant(payload)\n\n    def process(self, payload: dict) -> dict:\n        \"\"\"\n        Processes the given payload after enforcing validate_invariant(payload).\n        Raises InvariantViolationError if the invariant check fails.\n        \"\"\"\n        # Always enforce validation explicitly on entry\n        validate_invariant(payload)\n        \n        # Core processing logic for HighRiskModule09\n        processed_result = {\n            \"status\": \"success\",\n            \"module\": \"HighRiskModule09\",\n            \"domain\": \"Security\",\n            \"data\": payload\n        }\n        \n        return processed_result\n",
+  "oracle_result": {
+    "exit_code": 1,
+    "passed_count": 0,
+    "failed_count": 1,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp7nmnlvb6\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_module_09 FAILED                           [100%]\n\n================================== FAILURES ===================================\n______________________________ test_h6_module_09 ______________________________\ntests\\test_oracle.py:7: in test_h6_module_09\n    with pytest.raises(InvariantViolationError):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   Failed: DID NOT RAISE <class 'target_module.InvariantViolationError'>\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_module_09 - Failed: DID NOT RAISE <class...\n============================== 1 failed in 0.09s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.594,
+    "all_passed": false
+  },
+  "failure_taxonomy": {
+    "category": "wrong_requirement",
+    "reason": "Failed oracle assertions without explicit exception traceback.",
+    "details": [
+      "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp7nmnlvb6\nplugins: any"
+    ]
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  },
+  "layer2_adjudication": {
+    "layer2_passed": false,
+    "critical_invariant_coverage_pct": 50.0,
+    "unsupported_assumption_rate_pct": 0.0,
+    "requirement_omissions_count": 1,
+    "false_confidence_detected": false,
+    "audit_trace_completeness_pct": 100.0,
+    "satisfied_invariants": [
+      "Raise InvariantViolationError on failure"
+    ],
+    "violated_invariants": [
+      "Validate payload invariant condition"
+    ]
+  }
+}

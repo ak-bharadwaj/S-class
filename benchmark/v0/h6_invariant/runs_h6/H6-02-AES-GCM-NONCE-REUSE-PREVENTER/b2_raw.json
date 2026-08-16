@@ -1,0 +1,119 @@
+{
+  "task_id": "H6-02-AES-GCM-NONCE-REUSE-PREVENTER",
+  "baseline": "B2",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Authenticated Encryption",
+  "raw_prompt": "Implement AESGCMNonceGuard in target_module.py. Must generate unique 96-bit nonces, track used nonces, and raise NonceReuseError if a duplicate nonce is presented.",
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 3
+  },
+  "repository": {
+    "starting_tree_hash": "03af3d5edce8e6af756b139a05ec6011b049042afb2e61356f9b0c4518b58ea4",
+    "final_tree_hash": "64ee94d1fe85102f1875856bddb4a7aa98c065ad3ce69749564c75202bcd8a2a"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "Task Instruction:\nImplement AESGCMNonceGuard in target_module.py. Must generate unique 96-bit nonces, track used nonces, and raise NonceReuseError if a duplicate nonce is presented.\n\nExisting Code in target_module.py:\n```python\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nimport os\n\nclass NonceReuseError(Exception):\n    \"\"\"Raised when an attempt is made to reuse an AES-GCM nonce.\"\"\"\n    pass\n\n\nclass AESGCMNonceGuard:\n    \"\"\"\n    Generates unique 96-bit (12-byte) nonces for AES-GCM, tracks used nonces,\n    and raises NonceReuseError if a duplicate nonce is presented.\n    \"\"\"\n    def __init__(self):\n        self._used_nonces = set()\n\n    def generate(self) -> bytes:\n        \"\"\"\n        Generates a cryptographically secure unique 96-bit (12-byte) nonce,\n        records it as used, and returns it.\n        \"\"\"\n        while True:\n            nonce = os.urandom(12)\n            if nonce not in self._used_nonces:\n                self._used_nonces.add(nonce)\n                return nonce\n\n    def register(self, nonce: bytes) -> None:\n        \"\"\"\n        Registers an externally provided nonce. Raises NonceReuseError if\n        the nonce has already been used or registered.\n        \"\"\"\n        if not isinstance(nonce, bytes) or len(nonce) != 12:\n            raise ValueError(\"Nonce must be a 12-byte (96-bit) bytes object.\")\n        \n        if nonce in self._used_nonces:\n            raise NonceReuseError(\"Nonce reuse detected!\")\n        \n        self._used_nonces.add(nonce)\n```",
+      "latency_sec": 1.6536,
+      "prompt_tokens": 112,
+      "completion_tokens": 339,
+      "cost_usd": 0.00011,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp37ipxhrq\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_nonce_guard FAILED                            [100%]\n\n================================== FAILURES ===================================\n______________________________ test_nonce_guard _______________________________\ntests\\test_oracle.py:6: in test_nonce_guard\n    n1 = g.generate_nonce()\n         ^^^^^^^^^^^^^^^^\nE   AttributeError: 'AESGCMNonceGuard' object has no attribute 'generate_nonce'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_nonce_guard - AttributeError: 'AESGCMNonceG...\n============================== 1 failed in 0.09s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.604,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "Task Instruction:\nImplement AESGCMNonceGuard in target_module.py. Must generate unique 96-bit nonces, track used nonces, and raise NonceReuseError if a duplicate nonce is presented.\n\nYour previous implementation for `target_module.py` produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp37ipxhrq\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_nonce_guard FAILED                            [100%]\n\n================================== FAILURES ===================================\n______________________________ test_nonce_guard _______________________________\ntests\\test_oracle.py:6: in test_nonce_guard\n    n1 = g.generate_nonce()\n         ^^^^^^^^^^^^^^^^\nE   AttributeError: 'AESGCMNonceGuard' object has no attribute 'generate_nonce'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_nonce_guard - AttributeError: 'AESGCMNonceG...\n============================== 1 failed in 0.09s ==============================\n\n\n\nPrevious Code:\n```python\nimport os\n\nclass NonceReuseError(Exception):\n    \"\"\"Raised when an attempt is made to reuse an AES-GCM nonce.\"\"\"\n    pass\n\n\nclass AESGCMNonceGuard:\n    \"\"\"\n    Generates unique 96-bit (12-byte) nonces for AES-GCM, tracks used nonces,\n    and raises NonceReuseError if a duplicate nonce is presented.\n    \"\"\"\n    def __init__(self):\n        self._used_nonces = set()\n\n    def generate(self) -> bytes:\n        \"\"\"\n        Generates a cryptographically secure unique 96-bit (12-byte) nonce,\n        records it as used, and returns it.\n        \"\"\"\n        while True:\n            nonce = os.urandom(12)\n            if nonce not in self._used_nonces:\n                self._used_nonces.add(nonce)\n                return nonce\n\n    def register(self, nonce: bytes) -> None:\n        \"\"\"\n        Registers an externally provided nonce. Raises NonceReuseError if\n        the nonce has already been used or registered.\n        \"\"\"\n        if not isinstance(nonce, bytes) or len(nonce) != 12:\n            raise ValueError(\"Nonce must be a 12-byte (96-bit) bytes object.\")\n        \n        if nonce in self._used_nonces:\n            raise NonceReuseError(\"Nonce reuse detected!\")\n        \n        self._used_nonces.add(nonce)\n\n```\n\nPlease analyze the test failures and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nimport os\n\nclass NonceReuseError(Exception):\n    \"\"\"Raised when an attempt is made to reuse an AES-GCM nonce.\"\"\"\n    pass\n\n\nclass AESGCMNonceGuard:\n    \"\"\"\n    Generates unique 96-bit (12-byte) nonces for AES-GCM, tracks used nonces,\n    and raises NonceReuseError if a duplicate nonce is presented.\n    \"\"\"\n    def __init__(self):\n        self._used_nonces = set()\n\n    def generate_nonce(self) -> bytes:\n        \"\"\"\n        Generates a cryptographically secure unique 96-bit (12-byte) nonce,\n        records it as used, and returns it.\n        \"\"\"\n        while True:\n            nonce = os.urandom(12)\n            if nonce not in self._used_nonces:\n                self._used_nonces.add(nonce)\n                return nonce\n\n    def generate(self) -> bytes:\n        \"\"\"\n        Alias for generate_nonce for compatibility.\n        \"\"\"\n        return self.generate_nonce()\n\n    def register(self, nonce: bytes) -> None:\n        \"\"\"\n        Registers an externally provided nonce. Raises NonceReuseError if\n        the nonce has already been used or registered.\n        \"\"\"\n        if not isinstance(nonce, bytes) or len(nonce) != 12:\n            raise ValueError(\"Nonce must be a 12-byte (96-bit) bytes object.\")\n        \n        if nonce in self._used_nonces:\n            raise NonceReuseError(\"Nonce reuse detected!\")\n        \n        self._used_nonces.add(nonce)\n```",
+      "latency_sec": 1.6851,
+      "prompt_tokens": 742,
+      "completion_tokens": 376,
+      "cost_usd": 0.000168,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp37ipxhrq\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_nonce_guard FAILED                            [100%]\n\n================================== FAILURES ===================================\n______________________________ test_nonce_guard _______________________________\ntests\\test_oracle.py:7: in test_nonce_guard\n    g.register_nonce(n1)\n    ^^^^^^^^^^^^^^^^\nE   AttributeError: 'AESGCMNonceGuard' object has no attribute 'register_nonce'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_nonce_guard - AttributeError: 'AESGCMNonceG...\n============================== 1 failed in 0.08s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.586,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 3,
+      "prompt": "Task Instruction:\nImplement AESGCMNonceGuard in target_module.py. Must generate unique 96-bit nonces, track used nonces, and raise NonceReuseError if a duplicate nonce is presented.\n\nYour previous implementation for `target_module.py` produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp37ipxhrq\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_nonce_guard FAILED                            [100%]\n\n================================== FAILURES ===================================\n______________________________ test_nonce_guard _______________________________\ntests\\test_oracle.py:7: in test_nonce_guard\n    g.register_nonce(n1)\n    ^^^^^^^^^^^^^^^^\nE   AttributeError: 'AESGCMNonceGuard' object has no attribute 'register_nonce'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_nonce_guard - AttributeError: 'AESGCMNonceG...\n============================== 1 failed in 0.08s ==============================\n\n\n\nPrevious Code:\n```python\nimport os\n\nclass NonceReuseError(Exception):\n    \"\"\"Raised when an attempt is made to reuse an AES-GCM nonce.\"\"\"\n    pass\n\n\nclass AESGCMNonceGuard:\n    \"\"\"\n    Generates unique 96-bit (12-byte) nonces for AES-GCM, tracks used nonces,\n    and raises NonceReuseError if a duplicate nonce is presented.\n    \"\"\"\n    def __init__(self):\n        self._used_nonces = set()\n\n    def generate_nonce(self) -> bytes:\n        \"\"\"\n        Generates a cryptographically secure unique 96-bit (12-byte) nonce,\n        records it as used, and returns it.\n        \"\"\"\n        while True:\n            nonce = os.urandom(12)\n            if nonce not in self._used_nonces:\n                self._used_nonces.add(nonce)\n                return nonce\n\n    def generate(self) -> bytes:\n        \"\"\"\n        Alias for generate_nonce for compatibility.\n        \"\"\"\n        return self.generate_nonce()\n\n    def register(self, nonce: bytes) -> None:\n        \"\"\"\n        Registers an externally provided nonce. Raises NonceReuseError if\n        the nonce has already been used or registered.\n        \"\"\"\n        if not isinstance(nonce, bytes) or len(nonce) != 12:\n            raise ValueError(\"Nonce must be a 12-byte (96-bit) bytes object.\")\n        \n        if nonce in self._used_nonces:\n            raise NonceReuseError(\"Nonce reuse detected!\")\n        \n        self._used_nonces.add(nonce)\n\n```\n\nPlease analyze the test failures and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nimport os\n\nclass NonceReuseError(Exception):\n    \"\"\"Raised when an attempt is made to reuse an AES-GCM nonce.\"\"\"\n    pass\n\n\nclass AESGCMNonceGuard:\n    \"\"\"\n    Generates unique 96-bit (12-byte) nonces for AES-GCM, tracks used nonces,\n    and raises NonceReuseError if a duplicate nonce is presented.\n    \"\"\"\n    def __init__(self):\n        self._used_nonces = set()\n\n    def generate_nonce(self) -> bytes:\n        \"\"\"\n        Generates a cryptographically secure unique 96-bit (12-byte) nonce,\n        records it as used, and returns it.\n        \"\"\"\n        while True:\n            nonce = os.urandom(12)\n            if nonce not in self._used_nonces:\n                self._used_nonces.add(nonce)\n                return nonce\n\n    def generate(self) -> bytes:\n        \"\"\"\n        Alias for generate_nonce for compatibility.\n        \"\"\"\n        return self.generate_nonce()\n\n    def register(self, nonce: bytes) -> None:\n        \"\"\"\n        Registers an externally provided nonce. Raises NonceReuseError if\n        the nonce has already been used or registered.\n        \"\"\"\n        if not isinstance(nonce, bytes) or len(nonce) != 12:\n            raise ValueError(\"Nonce must be a 12-byte (96-bit) bytes object.\")\n        \n        if nonce in self._used_nonces:\n            raise NonceReuseError(\"Nonce reuse detected!\")\n        \n        self._used_nonces.add(nonce)\n\n    def register_nonce(self, nonce: bytes) -> None:\n        \"\"\"\n        Alias for register to support register_nonce calls from tests.\n        \"\"\"\n        return self.register(nonce)\n```",
+      "latency_sec": 1.8044,
+      "prompt_tokens": 779,
+      "completion_tokens": 421,
+      "cost_usd": 0.000185,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp37ipxhrq\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_nonce_guard FAILED                            [100%]\n\n================================== FAILURES ===================================\n______________________________ test_nonce_guard _______________________________\ntests\\test_oracle.py:7: in test_nonce_guard\n    g.register_nonce(n1)\ntarget_module.py:50: in register_nonce\n    return self.register(nonce)\n           ^^^^^^^^^^^^^^^^^^^^\ntarget_module.py:42: in register\n    raise NonceReuseError(\"Nonce reuse detected!\")\nE   target_module.NonceReuseError: Nonce reuse detected!\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_nonce_guard - target_module.NonceReuseError...\n============================== 1 failed in 0.08s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.562,
+        "all_passed": false
+      }
+    }
+  ],
+  "final_code": "import os\n\nclass NonceReuseError(Exception):\n    \"\"\"Raised when an attempt is made to reuse an AES-GCM nonce.\"\"\"\n    pass\n\n\nclass AESGCMNonceGuard:\n    \"\"\"\n    Generates unique 96-bit (12-byte) nonces for AES-GCM, tracks used nonces,\n    and raises NonceReuseError if a duplicate nonce is presented.\n    \"\"\"\n    def __init__(self):\n        self._used_nonces = set()\n\n    def generate_nonce(self) -> bytes:\n        \"\"\"\n        Generates a cryptographically secure unique 96-bit (12-byte) nonce,\n        records it as used, and returns it.\n        \"\"\"\n        while True:\n            nonce = os.urandom(12)\n            if nonce not in self._used_nonces:\n                self._used_nonces.add(nonce)\n                return nonce\n\n    def generate(self) -> bytes:\n        \"\"\"\n        Alias for generate_nonce for compatibility.\n        \"\"\"\n        return self.generate_nonce()\n\n    def register(self, nonce: bytes) -> None:\n        \"\"\"\n        Registers an externally provided nonce. Raises NonceReuseError if\n        the nonce has already been used or registered.\n        \"\"\"\n        if not isinstance(nonce, bytes) or len(nonce) != 12:\n            raise ValueError(\"Nonce must be a 12-byte (96-bit) bytes object.\")\n        \n        if nonce in self._used_nonces:\n            raise NonceReuseError(\"Nonce reuse detected!\")\n        \n        self._used_nonces.add(nonce)\n\n    def register_nonce(self, nonce: bytes) -> None:\n        \"\"\"\n        Alias for register to support register_nonce calls from tests.\n        \"\"\"\n        return self.register(nonce)\n",
+  "oracle_result": {
+    "exit_code": 1,
+    "passed_count": 0,
+    "failed_count": 1,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp37ipxhrq\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_nonce_guard FAILED                            [100%]\n\n================================== FAILURES ===================================\n______________________________ test_nonce_guard _______________________________\ntests\\test_oracle.py:7: in test_nonce_guard\n    g.register_nonce(n1)\ntarget_module.py:50: in register_nonce\n    return self.register(nonce)\n           ^^^^^^^^^^^^^^^^^^^^\ntarget_module.py:42: in register\n    raise NonceReuseError(\"Nonce reuse detected!\")\nE   target_module.NonceReuseError: Nonce reuse detected!\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_nonce_guard - target_module.NonceReuseError...\n============================== 1 failed in 0.08s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.562,
+    "all_passed": false
+  },
+  "failure_taxonomy": {
+    "category": "wrong_requirement",
+    "reason": "Failed oracle assertions without explicit exception traceback.",
+    "details": [
+      "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp37ipxhrq\nplugins: any"
+    ]
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  },
+  "layer2_adjudication": {
+    "layer2_passed": false,
+    "critical_invariant_coverage_pct": 50.0,
+    "unsupported_assumption_rate_pct": 0.0,
+    "requirement_omissions_count": 1,
+    "false_confidence_detected": false,
+    "audit_trace_completeness_pct": 100.0,
+    "satisfied_invariants": [
+      "Raise NonceReuseError"
+    ],
+    "violated_invariants": [
+      "Track used nonces set"
+    ]
+  }
+}

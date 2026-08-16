@@ -1,0 +1,39 @@
+{
+  "title": "H6 High-Risk Invariant Benchmark Two-Layer Summary Report",
+  "sample_size_tasks": 24,
+  "total_executions": 48,
+  "metrics": {
+    "B2_Model_Pytest_Loop": {
+      "layer1_oracle_passed_tasks": 9,
+      "layer1_oracle_pass_rate_pct": 37.5,
+      "layer2_invariant_passed_tasks": 3,
+      "layer2_invariant_pass_rate_pct": 12.5,
+      "avg_critical_invariant_coverage_pct": 54.17,
+      "avg_unsupported_assumption_rate_pct": 0.0,
+      "total_requirement_omissions_count": 22,
+      "false_confidence_count": 8,
+      "false_confidence_rate_pct": 33.33,
+      "avg_audit_trace_completeness_pct": 100.0,
+      "total_cost_usd": 0.012533,
+      "cost_per_success_usd": 0.001393,
+      "calls_per_success": 7.22,
+      "latency_per_success_sec": 18.81
+    },
+    "B4_Model_SClass_Pytest_Loop": {
+      "layer1_oracle_passed_tasks": 16,
+      "layer1_oracle_pass_rate_pct": 66.67,
+      "layer2_invariant_passed_tasks": 3,
+      "layer2_invariant_pass_rate_pct": 12.5,
+      "avg_critical_invariant_coverage_pct": 54.17,
+      "avg_unsupported_assumption_rate_pct": 0.0,
+      "total_requirement_omissions_count": 22,
+      "false_confidence_count": 15,
+      "false_confidence_rate_pct": 62.5,
+      "avg_audit_trace_completeness_pct": 100.0,
+      "total_cost_usd": 0.014473,
+      "cost_per_success_usd": 0.000905,
+      "calls_per_success": 3.88,
+      "latency_per_success_sec": 9.909
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "task_id": "H6-09-HIGH-RISK-INVARIANT-09",
+  "category": "Security",
+  "domain": "Security Invariant Module 09",
+  "raw_prompt": "Implement HighRiskModule09 in target_module.py under Security domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if invariant check fails.",
+  "critical_invariants": [
+    {
+      "description": "Validate payload invariant condition",
+      "check_regex": "payload\\.get\\('valid'\\)"
+    },
+    {
+      "description": "Raise InvariantViolationError on failure",
+      "check_regex": "raise\\s+InvariantViolationError"
+    }
+  ]
+}

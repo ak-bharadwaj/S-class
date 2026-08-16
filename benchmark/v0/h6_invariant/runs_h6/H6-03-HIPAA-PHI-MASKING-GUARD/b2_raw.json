@@ -1,0 +1,98 @@
+{
+  "task_id": "H6-03-HIPAA-PHI-MASKING-GUARD",
+  "baseline": "B2",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Healthcare Compliance",
+  "raw_prompt": "Implement PHIMaskingGuard in target_module.py. Must mask SSNs (XXX-XX-XXXX), MRNs (MRN-XXXXXX), and email addresses from clinical notes.",
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 2
+  },
+  "repository": {
+    "starting_tree_hash": "8c5ab69ca0a573da6d4c52fde74fd1cc1e2fca8fa5ca694f1fb2252aad30bfa4",
+    "final_tree_hash": "54f462f2ccd9f69a6273c7a60591f68c46d0a4fea953c4a61743786eb7c293ee"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "Task Instruction:\nImplement PHIMaskingGuard in target_module.py. Must mask SSNs (XXX-XX-XXXX), MRNs (MRN-XXXXXX), and email addresses from clinical notes.\n\nExisting Code in target_module.py:\n```python\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nimport re\n\nclass PHIMaskingGuard:\n    \"\"\"\n    Guard for masking Protected Health Information (PHI) such as Social Security Numbers (SSNs),\n    Medical Record Numbers (MRNs), and email addresses from clinical notes.\n    \"\"\"\n    \n    def __init__(self):\n        # Regex patterns for PHI\n        # SSN: XXX-XX-XXXX\n        self.ssn_pattern = re.compile(r'\\b\\d{3}-\\d{2}-\\d{4}\\b')\n        \n        # MRN: MRN-XXXXXX (assuming standard format like MRN- followed by alphanumeric or digits)\n        self.mrn_pattern = re.compile(r'\\bMRN-[A-Za-z0-9]+\\b', re.IGNORECASE)\n        \n        # Email addresses\n        self.email_pattern = re.compile(r'\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b')\n\n    def mask(self, text: str) -> str:\n        \"\"\"\n        Masks SSNs, MRNs, and email addresses in the provided text.\n        \n        Args:\n            text (str): The clinical note or text to mask.\n            \n        Returns:\n            str: The text with PHI masked out.\n        \"\"\"\n        if not isinstance(text, str):\n            return text\n            \n        # Apply masks in sequence\n        masked_text = self.ssn_pattern.sub('[REDACTED_SSN]', text)\n        masked_text = self.mrn_pattern.sub('[REDACTED_MRN]', masked_text)\n        masked_text = self.email_pattern.sub('[REDACTED_EMAIL]', masked_text)\n        \n        return masked_text\n```",
+      "latency_sec": 1.77,
+      "prompt_tokens": 109,
+      "completion_tokens": 417,
+      "cost_usd": 0.000133,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp3dchcec3\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_phi_masking FAILED                            [100%]\n\n================================== FAILURES ===================================\n______________________________ test_phi_masking _______________________________\ntests\\test_oracle.py:5: in test_phi_masking\n    clean = g.mask_phi('Patient SSN: 123-45-6789 MRN: MRN-998877 email: test@hosp.org')\n            ^^^^^^^^^^\nE   AttributeError: 'PHIMaskingGuard' object has no attribute 'mask_phi'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_phi_masking - AttributeError: 'PHIMaskingGu...\n============================== 1 failed in 0.10s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.585,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "Task Instruction:\nImplement PHIMaskingGuard in target_module.py. Must mask SSNs (XXX-XX-XXXX), MRNs (MRN-XXXXXX), and email addresses from clinical notes.\n\nYour previous implementation for `target_module.py` produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp3dchcec3\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_phi_masking FAILED                            [100%]\n\n================================== FAILURES ===================================\n______________________________ test_phi_masking _______________________________\ntests\\test_oracle.py:5: in test_phi_masking\n    clean = g.mask_phi('Patient SSN: 123-45-6789 MRN: MRN-998877 email: test@hosp.org')\n            ^^^^^^^^^^\nE   AttributeError: 'PHIMaskingGuard' object has no attribute 'mask_phi'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_phi_masking - AttributeError: 'PHIMaskingGu...\n============================== 1 failed in 0.10s ==============================\n\n\n\nPrevious Code:\n```python\nimport re\n\nclass PHIMaskingGuard:\n    \"\"\"\n    Guard for masking Protected Health Information (PHI) such as Social Security Numbers (SSNs),\n    Medical Record Numbers (MRNs), and email addresses from clinical notes.\n    \"\"\"\n    \n    def __init__(self):\n        # Regex patterns for PHI\n        # SSN: XXX-XX-XXXX\n        self.ssn_pattern = re.compile(r'\\b\\d{3}-\\d{2}-\\d{4}\\b')\n        \n        # MRN: MRN-XXXXXX (assuming standard format like MRN- followed by alphanumeric or digits)\n        self.mrn_pattern = re.compile(r'\\bMRN-[A-Za-z0-9]+\\b', re.IGNORECASE)\n        \n        # Email addresses\n        self.email_pattern = re.compile(r'\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b')\n\n    def mask(self, text: str) -> str:\n        \"\"\"\n        Masks SSNs, MRNs, and email addresses in the provided text.\n        \n        Args:\n            text (str): The clinical note or text to mask.\n            \n        Returns:\n            str: The text with PHI masked out.\n        \"\"\"\n        if not isinstance(text, str):\n            return text\n            \n        # Apply masks in sequence\n        masked_text = self.ssn_pattern.sub('[REDACTED_SSN]', text)\n        masked_text = self.mrn_pattern.sub('[REDACTED_MRN]', masked_text)\n        masked_text = self.email_pattern.sub('[REDACTED_EMAIL]', masked_text)\n        \n        return masked_text\n\n```\n\nPlease analyze the test failures and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "To fix the `AttributeError: 'PHIMaskingGuard' object has no attribute 'mask_phi'`, we need to add a `mask_phi` method to the `PHIMaskingGuard` class (or alias it to the existing `mask` method) to match what the test oracle expects.\n\nHere is the corrected implementation for `target_module.py`:\n\n```python\nimport re\n\nclass PHIMaskingGuard:\n    \"\"\"\n    Guard for masking Protected Health Information (PHI) such as Social Security Numbers (SSNs),\n    Medical Record Numbers (MRNs), and email addresses from clinical notes.\n    \"\"\"\n    \n    def __init__(self):\n        # Regex patterns for PHI\n        # SSN: XXX-XX-XXXX\n        self.ssn_pattern = re.compile(r'\\b\\d{3}-\\d{2}-\\d{4}\\b')\n        \n        # MRN: MRN-XXXXXX (assuming standard format like MRN- followed by alphanumeric or digits)\n        self.mrn_pattern = re.compile(r'\\bMRN-[A-Za-z0-9]+\\b', re.IGNORECASE)\n        \n        # Email addresses\n        self.email_pattern = re.compile(r'\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b')\n\n    def mask(self, text: str) -> str:\n        \"\"\"\n        Masks SSNs, MRNs, and email addresses in the provided text.\n        \n        Args:\n            text (str): The clinical note or text to mask.\n            \n        Returns:\n            str: The text with PHI masked out.\n        \"\"\"\n        if not isinstance(text, str):\n            return text\n            \n        # Apply masks in sequence\n        masked_text = self.ssn_pattern.sub('[REDACTED_SSN]', text)\n        masked_text = self.mrn_pattern.sub('[REDACTED_MRN]', masked_text)\n        masked_text = self.email_pattern.sub('[REDACTED_EMAIL]', masked_text)\n        \n        return masked_text\n\n    def mask_phi(self, text: str) -> str:\n        \"\"\"\n        Alias for mask() to satisfy test expectations for mask_phi.\n        \n        Args:\n            text (str): The clinical note or text to mask.\n            \n        Returns:\n            str: The text with PHI masked out.\n        \"\"\"\n        return self.mask(text)\n```",
+      "latency_sec": 2.3521,
+      "prompt_tokens": 854,
+      "completion_tokens": 578,
+      "cost_usd": 0.000237,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp3dchcec3\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_phi_masking PASSED                            [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.507,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "import re\n\nclass PHIMaskingGuard:\n    \"\"\"\n    Guard for masking Protected Health Information (PHI) such as Social Security Numbers (SSNs),\n    Medical Record Numbers (MRNs), and email addresses from clinical notes.\n    \"\"\"\n    \n    def __init__(self):\n        # Regex patterns for PHI\n        # SSN: XXX-XX-XXXX\n        self.ssn_pattern = re.compile(r'\\b\\d{3}-\\d{2}-\\d{4}\\b')\n        \n        # MRN: MRN-XXXXXX (assuming standard format like MRN- followed by alphanumeric or digits)\n        self.mrn_pattern = re.compile(r'\\bMRN-[A-Za-z0-9]+\\b', re.IGNORECASE)\n        \n        # Email addresses\n        self.email_pattern = re.compile(r'\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b')\n\n    def mask(self, text: str) -> str:\n        \"\"\"\n        Masks SSNs, MRNs, and email addresses in the provided text.\n        \n        Args:\n            text (str): The clinical note or text to mask.\n            \n        Returns:\n            str: The text with PHI masked out.\n        \"\"\"\n        if not isinstance(text, str):\n            return text\n            \n        # Apply masks in sequence\n        masked_text = self.ssn_pattern.sub('[REDACTED_SSN]', text)\n        masked_text = self.mrn_pattern.sub('[REDACTED_MRN]', masked_text)\n        masked_text = self.email_pattern.sub('[REDACTED_EMAIL]', masked_text)\n        \n        return masked_text\n\n    def mask_phi(self, text: str) -> str:\n        \"\"\"\n        Alias for mask() to satisfy test expectations for mask_phi.\n        \n        Args:\n            text (str): The clinical note or text to mask.\n            \n        Returns:\n            str: The text with PHI masked out.\n        \"\"\"\n        return self.mask(text)\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp3dchcec3\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_phi_masking PASSED                            [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.507,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  },
+  "layer2_adjudication": {
+    "layer2_passed": false,
+    "critical_invariant_coverage_pct": 50.0,
+    "unsupported_assumption_rate_pct": 0.0,
+    "requirement_omissions_count": 1,
+    "false_confidence_detected": true,
+    "audit_trace_completeness_pct": 100.0,
+    "satisfied_invariants": [
+      "No unmasked SSN leakage"
+    ],
+    "violated_invariants": [
+      "Regex masking for SSN"
+    ]
+  }
+}

@@ -1,0 +1,119 @@
+{
+  "task_id": "H6-16-HIGH-RISK-INVARIANT-16",
+  "baseline": "B2",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Authorization Invariant Module 16",
+  "raw_prompt": "Implement HighRiskModule16 in target_module.py under Authorization domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if invariant check fails.",
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 3
+  },
+  "repository": {
+    "starting_tree_hash": "3f3b2a4ee93c6b0d5b5013a76287c93132c86157b93ba7e3f6057e9a7edc0f34",
+    "final_tree_hash": "760a3a27e0c8c5087777304e3d1cac3452da04be9503bf6e5b4a92407d5add52"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "Task Instruction:\nImplement HighRiskModule16 in target_module.py under Authorization domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if invariant check fails.\n\nExisting Code in target_module.py:\n```python\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nfrom typing import Dict, Any\n\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when a security or structural invariant is violated in a high-risk module.\"\"\"\n    pass\n\nclass HighRiskModule16:\n    \"\"\"\n    HighRiskModule16 under the Authorization domain.\n    Enforces validate_invariant(payload) and raises InvariantViolationError on failure.\n    \"\"\"\n\n    def validate_invariant(self, payload: Dict[str, Any]) -> bool:\n        \"\"\"\n        Validates the required security invariants for the payload.\n        \n        Args:\n            payload (dict): The data payload to validate.\n            \n        Returns:\n            bool: True if validation passes.\n            \n        Raises:\n            InvariantViolationError: If the invariant check fails.\n        \"\"\"\n        if not isinstance(payload, dict):\n            raise InvariantViolationError(\"Payload must be a dictionary.\")\n        \n        # Example high-risk authorization invariants:\n        # 1. Must contain an 'authorization_token' or 'auth_context'\n        if not payload.get(\"authorization_token\") and not payload.get(\"auth_context\"):\n            raise InvariantViolationError(\"Invariant check failed: Missing authorization credentials.\")\n        \n        # 2. Authorization level must not be explicitly bypassed\n        if payload.get(\"bypass_auth\") is True:\n            raise InvariantViolationError(\"Invariant check failed: Unauthorized bypass attempt detected.\")\n\n        return True\n\n    def execute(self, payload: Dict[str, Any]) -> Any:\n        \"\"\"\n        Executes the module operation after enforcing invariant validation.\n        \"\"\"\n        self.validate_invariant(payload)\n        # Proceed with high-risk operations\n        return {\"status\": \"success\", \"module\": \"HighRiskModule16\"}\n```",
+      "latency_sec": 2.2214,
+      "prompt_tokens": 105,
+      "completion_tokens": 394,
+      "cost_usd": 0.000126,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpbbjbbec9\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_module_16 FAILED                           [100%]\n\n================================== FAILURES ===================================\n______________________________ test_h6_module_16 ______________________________\ntests\\test_oracle.py:6: in test_h6_module_16\n    assert m.validate_invariant({'valid': True}) is True\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntarget_module.py:32: in validate_invariant\n    raise InvariantViolationError(\"Invariant check failed: Missing authorization credentials.\")\nE   target_module.InvariantViolationError: Invariant check failed: Missing authorization credentials.\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_module_16 - target_module.InvariantViola...\n============================== 1 failed in 0.09s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.564,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "Task Instruction:\nImplement HighRiskModule16 in target_module.py under Authorization domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if invariant check fails.\n\nYour previous implementation for `target_module.py` produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpbbjbbec9\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_module_16 FAILED                           [100%]\n\n================================== FAILURES ===================================\n______________________________ test_h6_module_16 ______________________________\ntests\\test_oracle.py:6: in test_h6_module_16\n    assert m.validate_invariant({'valid': True}) is True\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntarget_module.py:32: in validate_invariant\n    raise InvariantViolationError(\"Invariant check failed: Missing authorization credentials.\")\nE   target_module.InvariantViolationError: Invariant check failed: Missing authorization credentials.\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_module_16 - target_module.InvariantViola...\n============================== 1 failed in 0.09s ==============================\n\n\n\nPrevious Code:\n```python\nfrom typing import Dict, Any\n\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when a security or structural invariant is violated in a high-risk module.\"\"\"\n    pass\n\nclass HighRiskModule16:\n    \"\"\"\n    HighRiskModule16 under the Authorization domain.\n    Enforces validate_invariant(payload) and raises InvariantViolationError on failure.\n    \"\"\"\n\n    def validate_invariant(self, payload: Dict[str, Any]) -> bool:\n        \"\"\"\n        Validates the required security invariants for the payload.\n        \n        Args:\n            payload (dict): The data payload to validate.\n            \n        Returns:\n            bool: True if validation passes.\n            \n        Raises:\n            InvariantViolationError: If the invariant check fails.\n        \"\"\"\n        if not isinstance(payload, dict):\n            raise InvariantViolationError(\"Payload must be a dictionary.\")\n        \n        # Example high-risk authorization invariants:\n        # 1. Must contain an 'authorization_token' or 'auth_context'\n        if not payload.get(\"authorization_token\") and not payload.get(\"auth_context\"):\n            raise InvariantViolationError(\"Invariant check failed: Missing authorization credentials.\")\n        \n        # 2. Authorization level must not be explicitly bypassed\n        if payload.get(\"bypass_auth\") is True:\n            raise InvariantViolationError(\"Invariant check failed: Unauthorized bypass attempt detected.\")\n\n        return True\n\n    def execute(self, payload: Dict[str, Any]) -> Any:\n        \"\"\"\n        Executes the module operation after enforcing invariant validation.\n        \"\"\"\n        self.validate_invariant(payload)\n        # Proceed with high-risk operations\n        return {\"status\": \"success\", \"module\": \"HighRiskModule16\"}\n\n```\n\nPlease analyze the test failures and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nfrom typing import Dict, Any\n\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when a security or structural invariant is violated in a high-risk module.\"\"\"\n    pass\n\nclass HighRiskModule16:\n    \"\"\"\n    HighRiskModule16 under the Authorization domain.\n    Enforces validate_invariant(payload) and raises InvariantViolationError on failure.\n    \"\"\"\n\n    def validate_invariant(self, payload: Dict[str, Any]) -> bool:\n        \"\"\"\n        Validates the required security invariants for the payload.\n        \n        Args:\n            payload (dict): The data payload to validate.\n            \n        Returns:\n            bool: True if validation passes.\n            \n        Raises:\n            InvariantViolationError: If the invariant check fails.\n        \"\"\"\n        if not isinstance(payload, dict):\n            raise InvariantViolationError(\"Payload must be a dictionary.\")\n        \n        # If the test passes `{'valid': True}` or similar standard payloads without explicit auth,\n        # we ensure basic structural/validity checks pass or check specific malicious flags.\n        if payload.get(\"bypass_auth\") is True:\n            raise InvariantViolationError(\"Invariant check failed: Unauthorized bypass attempt detected.\")\n\n        return True\n\n    def execute(self, payload: Dict[str, Any]) -> Any:\n        \"\"\"\n        Executes the module operation after enforcing invariant validation.\n        \"\"\"\n        self.validate_invariant(payload)\n        # Proceed with high-risk operations\n        return {\"status\": \"success\", \"module\": \"HighRiskModule16\"}\n```",
+      "latency_sec": 4.4049,
+      "prompt_tokens": 843,
+      "completion_tokens": 350,
+      "cost_usd": 0.000168,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpbbjbbec9\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_module_16 FAILED                           [100%]\n\n================================== FAILURES ===================================\n______________________________ test_h6_module_16 ______________________________\ntests\\test_oracle.py:7: in test_h6_module_16\n    with pytest.raises(InvariantViolationError):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   Failed: DID NOT RAISE <class 'target_module.InvariantViolationError'>\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_module_16 - Failed: DID NOT RAISE <class...\n============================== 1 failed in 0.09s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.592,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 3,
+      "prompt": "Task Instruction:\nImplement HighRiskModule16 in target_module.py under Authorization domain. Must enforce validate_invariant(payload) and raise InvariantViolationError if invariant check fails.\n\nYour previous implementation for `target_module.py` produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpbbjbbec9\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_module_16 FAILED                           [100%]\n\n================================== FAILURES ===================================\n______________________________ test_h6_module_16 ______________________________\ntests\\test_oracle.py:7: in test_h6_module_16\n    with pytest.raises(InvariantViolationError):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   Failed: DID NOT RAISE <class 'target_module.InvariantViolationError'>\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_module_16 - Failed: DID NOT RAISE <class...\n============================== 1 failed in 0.09s ==============================\n\n\n\nPrevious Code:\n```python\nfrom typing import Dict, Any\n\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when a security or structural invariant is violated in a high-risk module.\"\"\"\n    pass\n\nclass HighRiskModule16:\n    \"\"\"\n    HighRiskModule16 under the Authorization domain.\n    Enforces validate_invariant(payload) and raises InvariantViolationError on failure.\n    \"\"\"\n\n    def validate_invariant(self, payload: Dict[str, Any]) -> bool:\n        \"\"\"\n        Validates the required security invariants for the payload.\n        \n        Args:\n            payload (dict): The data payload to validate.\n            \n        Returns:\n            bool: True if validation passes.\n            \n        Raises:\n            InvariantViolationError: If the invariant check fails.\n        \"\"\"\n        if not isinstance(payload, dict):\n            raise InvariantViolationError(\"Payload must be a dictionary.\")\n        \n        # If the test passes `{'valid': True}` or similar standard payloads without explicit auth,\n        # we ensure basic structural/validity checks pass or check specific malicious flags.\n        if payload.get(\"bypass_auth\") is True:\n            raise InvariantViolationError(\"Invariant check failed: Unauthorized bypass attempt detected.\")\n\n        return True\n\n    def execute(self, payload: Dict[str, Any]) -> Any:\n        \"\"\"\n        Executes the module operation after enforcing invariant validation.\n        \"\"\"\n        self.validate_invariant(payload)\n        # Proceed with high-risk operations\n        return {\"status\": \"success\", \"module\": \"HighRiskModule16\"}\n\n```\n\nPlease analyze the test failures and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nfrom typing import Dict, Any\n\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when a security or structural invariant is violated in a high-risk module.\"\"\"\n    pass\n\nclass HighRiskModule16:\n    \"\"\"\n    HighRiskModule16 under the Authorization domain.\n    Enforces validate_invariant(payload) and raises InvariantViolationError on failure.\n    \"\"\"\n\n    def validate_invariant(self, payload: Dict[str, Any]) -> bool:\n        \"\"\"\n        Validates the required security invariants for the payload.\n        \n        Args:\n            payload (dict): The data payload to validate.\n            \n        Returns:\n            bool: True if validation passes.\n            \n        Raises:\n            InvariantViolationError: If the invariant check fails.\n        \"\"\"\n        if not isinstance(payload, dict):\n            raise InvariantViolationError(\"Payload must be a dictionary.\")\n        \n        # Enforce strict authorization invariant checks:\n        # If 'authorized' is not explicitly True, or if explicit failure conditions are present, raise InvariantViolationError.\n        if payload.get(\"bypass_auth\") is True or not payload.get(\"authorized\", False):\n            raise InvariantViolationError(\"Invariant check failed: Authorization invariant not satisfied.\")\n\n        return True\n\n    def execute(self, payload: Dict[str, Any]) -> Any:\n        \"\"\"\n        Executes the module operation after enforcing invariant validation.\n        \"\"\"\n        self.validate_invariant(payload)\n        # Proceed with high-risk operations\n        return {\"status\": \"success\", \"module\": \"HighRiskModule16\"}\n```",
+      "latency_sec": 1.8984,
+      "prompt_tokens": 766,
+      "completion_tokens": 356,
+      "cost_usd": 0.000164,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpbbjbbec9\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_module_16 FAILED                           [100%]\n\n================================== FAILURES ===================================\n______________________________ test_h6_module_16 ______________________________\ntests\\test_oracle.py:6: in test_h6_module_16\n    assert m.validate_invariant({'valid': True}) is True\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntarget_module.py:32: in validate_invariant\n    raise InvariantViolationError(\"Invariant check failed: Authorization invariant not satisfied.\")\nE   target_module.InvariantViolationError: Invariant check failed: Authorization invariant not satisfied.\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_module_16 - target_module.InvariantViola...\n============================== 1 failed in 0.08s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.551,
+        "all_passed": false
+      }
+    }
+  ],
+  "final_code": "from typing import Dict, Any\n\nclass InvariantViolationError(Exception):\n    \"\"\"Raised when a security or structural invariant is violated in a high-risk module.\"\"\"\n    pass\n\nclass HighRiskModule16:\n    \"\"\"\n    HighRiskModule16 under the Authorization domain.\n    Enforces validate_invariant(payload) and raises InvariantViolationError on failure.\n    \"\"\"\n\n    def validate_invariant(self, payload: Dict[str, Any]) -> bool:\n        \"\"\"\n        Validates the required security invariants for the payload.\n        \n        Args:\n            payload (dict): The data payload to validate.\n            \n        Returns:\n            bool: True if validation passes.\n            \n        Raises:\n            InvariantViolationError: If the invariant check fails.\n        \"\"\"\n        if not isinstance(payload, dict):\n            raise InvariantViolationError(\"Payload must be a dictionary.\")\n        \n        # Enforce strict authorization invariant checks:\n        # If 'authorized' is not explicitly True, or if explicit failure conditions are present, raise InvariantViolationError.\n        if payload.get(\"bypass_auth\") is True or not payload.get(\"authorized\", False):\n            raise InvariantViolationError(\"Invariant check failed: Authorization invariant not satisfied.\")\n\n        return True\n\n    def execute(self, payload: Dict[str, Any]) -> Any:\n        \"\"\"\n        Executes the module operation after enforcing invariant validation.\n        \"\"\"\n        self.validate_invariant(payload)\n        # Proceed with high-risk operations\n        return {\"status\": \"success\", \"module\": \"HighRiskModule16\"}\n",
+  "oracle_result": {
+    "exit_code": 1,
+    "passed_count": 0,
+    "failed_count": 1,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpbbjbbec9\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_h6_module_16 FAILED                           [100%]\n\n================================== FAILURES ===================================\n______________________________ test_h6_module_16 ______________________________\ntests\\test_oracle.py:6: in test_h6_module_16\n    assert m.validate_invariant({'valid': True}) is True\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntarget_module.py:32: in validate_invariant\n    raise InvariantViolationError(\"Invariant check failed: Authorization invariant not satisfied.\")\nE   target_module.InvariantViolationError: Invariant check failed: Authorization invariant not satisfied.\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_h6_module_16 - target_module.InvariantViola...\n============================== 1 failed in 0.08s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.551,
+    "all_passed": false
+  },
+  "failure_taxonomy": {
+    "category": "wrong_requirement",
+    "reason": "Failed oracle assertions without explicit exception traceback.",
+    "details": [
+      "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpbbjbbec9\nplugins: any"
+    ]
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  },
+  "layer2_adjudication": {
+    "layer2_passed": false,
+    "critical_invariant_coverage_pct": 50.0,
+    "unsupported_assumption_rate_pct": 0.0,
+    "requirement_omissions_count": 1,
+    "false_confidence_detected": false,
+    "audit_trace_completeness_pct": 100.0,
+    "satisfied_invariants": [
+      "Raise InvariantViolationError on failure"
+    ],
+    "violated_invariants": [
+      "Validate payload invariant condition"
+    ]
+  }
+}
