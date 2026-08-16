@@ -192,16 +192,25 @@ def compute_paired_bootstrap_metrics(pairs: List[Tuple[float, float]], n_bootstr
 
     sum_s = sum(s_all)
     sum_r = sum(r_all)
-    point_tp_ratio = (sum_r / sum_s) if sum_s > 0 else 1.0
+    def _is_near_upper_boundary(ratio: float, gate: float = 1.005, margin: float = 0.020) -> bool:
+        """True if upper-bounded metric ratio (latency) is within margin of failing gate."""
+        return ratio >= (gate - margin)
 
-    # Strict boundary-aware bootstrap escalation:
-    # If any latency ratio is near the upper gate (point_ratio >= 0.985 vs 1.005 limit)
-    # OR if throughput ratio is near the lower gate (point_tp_ratio <= 1.015 vs 0.995 limit),
-    # automatically elevate bootstrap resamples to >= 10,000 to eliminate resampling variance.
+    def _is_near_lower_boundary(ratio: float, gate: float = 0.995, margin: float = 0.020) -> bool:
+        """True if lower-bounded metric ratio (throughput) is within margin of failing gate."""
+        return ratio <= (gate + margin)
+
+    # Generic boundary-distance escalation abstraction:
+    # If any upper-bound metric (latency median/P95) or lower-bound metric (throughput)
+    # is within margin of its acceptance gate, automatically elevate bootstrap resamples
+    # to >= 10,000 to reduce bootstrap resampling Monte Carlo error.
     actual_bootstraps = n_bootstraps
-    is_latency_near_boundary = (point_med_ratio >= 0.985 or point_p95_ratio >= 0.985)
-    is_throughput_near_boundary = (point_tp_ratio <= 1.015)
-    if is_latency_near_boundary or is_throughput_near_boundary:
+    should_escalate = (
+        _is_near_upper_boundary(point_med_ratio, gate=1.005, margin=0.020) or
+        _is_near_upper_boundary(point_p95_ratio, gate=1.005, margin=0.020) or
+        _is_near_lower_boundary(point_tp_ratio, gate=0.995, margin=0.020)
+    )
+    if should_escalate:
         actual_bootstraps = max(n_bootstraps, 10000)
 
     boot_med_ratios: List[float] = []
