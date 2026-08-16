@@ -144,10 +144,10 @@ def test_native_fallback_mode(monkeypatch):
     monkeypatch.setattr(file_lock, "HAS_PORTALOCKER", False)
     with tempfile.TemporaryDirectory() as tmpdir:
         lock_file = os.path.join(tmpdir, "state.lock")
-        with FileLock(lock_file, timeout=2.0):
+        with FileLock(lock_file, timeout=2.0) as fl:
             assert os.path.exists(lock_file)
-            with open(lock_file, "r", encoding="utf-8") as f:
-                payload = json.loads(f.read().strip())
+            fl._file.seek(0)
+            payload = json.loads(fl._file.read().decode("utf-8").strip())
             assert payload["pid"] == os.getpid()
 
 

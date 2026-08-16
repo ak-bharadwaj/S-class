@@ -1,23 +1,35 @@
 #!/usr/bin/env python3
 """
-OSS Parity Gate 1: Differential Benchmark & Capability Verification Harness
-Comparing S-Class Locking Engine vs Reference Portalocker 4.1.0
+OSS Parity Gate 1: Differential Benchmark & Capability Verification Harness (Phase 2)
+Comparing S-Class Independent OS-Native Locking Engine vs Reference Portalocker 4.1.0
 
 Architecture & Methodology:
-1. Layer A — Primitive Parity:
-   - Measures bare OS kernel advisory lock acquisition/release (open, lock, unlock, close).
-   - Compares S-Class NativeLock vs Reference portalocker.Lock.
+1. Layer A — Primitive Parity (0.5% Gate Threshold):
+   - Measures bare OS kernel advisory lock acquisition/release (open, msvcrt/fcntl lock, unlock, close).
+   - Completely independent OS-native S-Class NativeLock vs Reference portalocker.Lock.
    - Strict Gate Criterion: NativeLock median latency <= Reference * 1.005 (<= 0.5% slower).
 
-2. Layer B — Full S-Class Lifecycle:
+2. Layer B — Full S-Class Lifecycle Profiling:
    - Measures complete FileLock abstraction (primitive + diagnostic metadata + process ownership + GC).
-   - Microsegment latency profiling across open, lock, metadata JSON serialization, write/flush, unlock, close.
+   - Microsegment latency breakdown across open, lock, JSON serialize, write/flush, unlock, close.
 
-3. Statistical Rigor:
-   - Interleaved / randomized paired trial ordering across multiple independent repetitions to eliminate order/thermal bias.
-   - Standard linear interpolation percentile estimation (median, P95).
-   - 95% Confidence Intervals (CIs) for median and P95 performance ratios.
-   - Peak RSS working set memory measurement.
+3. Layer C — Equivalent Full Lifecycle Workload Comparison:
+   - Reference equivalent lifecycle (portalocker.Lock + identical metadata payload read/write/flush)
+     vs S-Class FileLock.
+
+4. 1:1 Differential Comparative Correctness Suite:
+   - Inter-process blocking timeout with dedicated child holder processes (Reference vs S-Class).
+   - Multithreaded contention (8 threads x 50 increments on Reference vs S-Class).
+   - Multiprocess mutual exclusion (4 processes x 25 increments on Reference vs S-Class).
+   - Crash & abrupt termination recovery with child process os._exit(1) (Reference vs S-Class).
+   - Stale metadata takeover and Config GC non-destructive interaction.
+
+5. Statistical Rigor:
+   - Interleaved / randomized paired trial ordering across 5 reps x 500 trials (2,500 total).
+   - Linear interpolation percentiles (p * (n - 1)).
+   - 95% bootstrap Confidence Intervals for median and P95 performance ratios.
+   - Peak RSS working set memory tracking.
+   - Strict provenance integrity (zero fabricated fallback strings).
 """
 
 import os
@@ -32,11 +44,10 @@ import subprocess
 import ctypes
 from typing import Dict, List, Any, Tuple
 import portalocker
-import portalocker.utils
 
 # Add plugin root to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
-from file_lock import FileLock, NativeLock, HAS_PORTALOCKER
+from file_lock import FileLock, NativeLock, _CACHED_PID, _CACHED_HOSTNAME, _CACHED_PROC_START
 from config_gc import run_gc
 
 
@@ -109,13 +120,21 @@ def get_current_working_set_bytes() -> int:
 
 
 def get_system_environment_info() -> Dict[str, Any]:
-    """Freezes system environment metadata."""
+    """Freezes system environment metadata with strict provenance integrity."""
+    p_ver = getattr(portalocker, "__version__", None)
+    if not p_ver:
+        try:
+            import importlib.metadata
+            p_ver = importlib.metadata.version("portalocker")
+        except Exception:
+            p_ver = "UNKNOWN"
+
     return {
         "os_platform": sys.platform,
         "os_version": os.name,
         "python_version": sys.version,
         "cpu_count_logical": os.cpu_count(),
-        "portalocker_version": getattr(portalocker, "__version__", "4.1.0"),
+        "portalocker_version": p_ver if p_ver else "UNKNOWN",
         "hostname": socket.gethostname(),
         "timestamp_utc": time.time()
     }
@@ -165,7 +184,7 @@ def compute_ratio_95_ci(sample_a: List[float], sample_b: List[float], n_bootstra
 
 
 # ============================================================================
-# Layer A: Primitive Parity (0.5% Gate Threshold)
+# Layer A: Independent Primitive Parity (0.5% Gate Threshold)
 # ============================================================================
 def test_layer_a_primitive_parity(n_trials: int = 500, n_repetitions: int = 5) -> Dict[str, Any]:
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -223,12 +242,12 @@ def test_layer_a_primitive_parity(n_trials: int = 500, n_repetitions: int = 5) -
         ratio_med, ci_low, ci_high = compute_ratio_95_ci(sclass_latencies_us, ref_latencies_us)
         pct_diff_median = ((sclass_med - ref_med) / ref_med * 100.0) if ref_med > 0 else 0.0
 
-        # Strict Gate Threshold: Primitive S-Class <= Reference * 1.005 (<= 0.5% slower)
+        # Strict Gate Threshold: Independent S-Class NativeLock <= Reference * 1.005 (<= 0.5% slower)
         gate_passed = (sclass_med <= ref_med * 1.005)
 
         return {
             "gate_passed": gate_passed,
-            "threshold_applied": "S-Class NativeLock <= Reference Portalocker * 1.005 (+0.5% max)",
+            "threshold_applied": "S-Class NativeLock (pure OS-native) <= Reference Portalocker * 1.005 (+0.5% max)",
             "iterations_per_rep": n_trials,
             "total_repetitions": n_repetitions,
             "total_trials": n_trials * n_repetitions,
@@ -310,89 +329,234 @@ def test_layer_b_full_lifecycle(n_trials: int = 500) -> Dict[str, Any]:
 
 
 # ============================================================================
-# Correctness & Contract Verification Suite (Dimensions 2-10)
+# Layer C: Equivalent Full Lifecycle Workload Comparison
 # ============================================================================
-def test_timeout_semantics() -> Dict[str, Any]:
+def test_layer_c_equivalent_lifecycle(n_trials: int = 500) -> Dict[str, Any]:
     with tempfile.TemporaryDirectory() as tmpdir:
-        lock_path = os.path.join(tmpdir, "timeout.lock")
-        t_ref_start = time.time()
-        with portalocker.Lock(lock_path, timeout=0.1):
-            try:
-                with portalocker.Lock(lock_path, timeout=0.2):
-                    pass
-                ref_timed_out = False
-            except (portalocker.exceptions.AlreadyLocked, portalocker.exceptions.LockException):
-                ref_timed_out = True
-        ref_elapsed = time.time() - t_ref_start
+        ref_file = os.path.join(tmpdir, "ref_lifecycle.lock")
+        sclass_file = os.path.join(tmpdir, "sclass_lifecycle.lock")
 
-        t_sclass_start = time.time()
-        with FileLock(lock_path, timeout=0.1):
-            try:
-                with FileLock(lock_path, timeout=0.2):
+        ref_latencies_us: List[float] = []
+        sclass_latencies_us: List[float] = []
+
+        ref_pid = os.getpid()
+        ref_host = socket.gethostname()
+
+        rng = random.Random(999)
+        for _ in range(n_trials):
+            run_ref_first = rng.choice([True, False])
+
+            def run_ref():
+                t0 = time.perf_counter_ns()
+                with portalocker.Lock(ref_file, mode="a+b", timeout=5.0) as fh:
+                    # Perform equivalent metadata write and flush
+                    t_now = time.time()
+                    payload = json.dumps({
+                        "pid": ref_pid,
+                        "host": ref_host,
+                        "start_time": t_now,
+                        "token": "ref-token"
+                    }).encode("utf-8")
+                    fh.seek(0)
+                    fh.truncate(0)
+                    fh.write(payload)
+                    fh.flush()
+                t1 = time.perf_counter_ns()
+                ref_latencies_us.append((t1 - t0) / 1000.0)
+
+            def run_sclass():
+                t0 = time.perf_counter_ns()
+                with FileLock(sclass_file, timeout=5.0):
                     pass
-                sclass_timed_out = False
-            except TimeoutError:
-                sclass_timed_out = True
-        sclass_elapsed = time.time() - t_sclass_start
+                t1 = time.perf_counter_ns()
+                sclass_latencies_us.append((t1 - t0) / 1000.0)
+
+            if run_ref_first:
+                run_ref()
+                run_sclass()
+            else:
+                run_sclass()
+                run_ref()
+
+        ref_med = calculate_linear_percentile(ref_latencies_us, 0.50)
+        ref_p95 = calculate_linear_percentile(ref_latencies_us, 0.95)
+        sclass_med = calculate_linear_percentile(sclass_latencies_us, 0.50)
+        sclass_p95 = calculate_linear_percentile(sclass_latencies_us, 0.95)
+
+        ratio_med, ci_low, ci_high = compute_ratio_95_ci(sclass_latencies_us, ref_latencies_us)
 
         return {
-            "ref_timed_out": ref_timed_out,
-            "ref_elapsed_sec": round(ref_elapsed, 4),
-            "sclass_timed_out": sclass_timed_out,
-            "sclass_elapsed_sec": round(sclass_elapsed, 4),
-            "timeout_parity": ref_timed_out and sclass_timed_out
+            "n_trials": n_trials,
+            "reference_equivalent_lifecycle": {
+                "median_us": round(ref_med, 2),
+                "p95_us": round(ref_p95, 2),
+                "throughput_per_sec": round(n_trials / (sum(ref_latencies_us) / 1e6), 1)
+            },
+            "sclass_filelock_lifecycle": {
+                "median_us": round(sclass_med, 2),
+                "p95_us": round(sclass_p95, 2),
+                "throughput_per_sec": round(n_trials / (sum(sclass_latencies_us) / 1e6), 1)
+            },
+            "lifecycle_ratio": round(ratio_med, 4),
+            "ratio_95_ci": [round(ci_low, 4), round(ci_high, 4)]
         }
 
 
-def test_multithreaded_contention(threads: int = 8, increments_per_thread: int = 50) -> Dict[str, Any]:
-    with tempfile.TemporaryDirectory() as tmpdir:
-        lock_path = os.path.join(tmpdir, "mt.lock")
-        counter = {"val": 0}
+# ============================================================================
+# 1:1 Differential Comparative Correctness Suite (Dimensions 2-10)
+# ============================================================================
+def _holder_process_worker(lock_type: str, lock_path: str, hold_sec: float, ready_file: str):
+    if lock_type == "portalocker":
+        with portalocker.Lock(lock_path, timeout=5.0):
+            with open(ready_file, "w") as f:
+                f.write("READY")
+            time.sleep(hold_sec)
+    else:
+        with FileLock(lock_path, timeout=5.0):
+            with open(ready_file, "w") as f:
+                f.write("READY")
+            time.sleep(hold_sec)
 
-        def worker():
-            for _ in range(increments_per_thread):
-                with FileLock(lock_path, timeout=10.0):
-                    curr = counter["val"]
-                    time.sleep(0.0001)
-                    counter["val"] = curr + 1
+
+def test_differential_timeout() -> Dict[str, Any]:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # 1. Test Reference Timeout with separate holder process
+        ref_lock = os.path.join(tmpdir, "ref_timeout.lock")
+        ref_ready = os.path.join(tmpdir, "ref_ready.txt")
+        cmd_ref = [
+            sys.executable, "-c",
+            f"from benchmark.parity.file_lock_harness import _holder_process_worker; _holder_process_worker('portalocker', r'{ref_lock}', 0.5, r'{ref_ready}')"
+        ]
+        p_ref = subprocess.Popen(cmd_ref)
+        while not os.path.exists(ref_ready):
+            time.sleep(0.01)
 
         t0 = time.time()
-        t_list = [threading.Thread(target=worker) for _ in range(threads)]
-        for t in t_list:
-            t.start()
-        for t in t_list:
-            t.join()
-        elapsed = time.time() - t0
+        ref_timed_out = False
+        try:
+            with portalocker.Lock(ref_lock, timeout=0.2):
+                pass
+        except (portalocker.exceptions.AlreadyLocked, portalocker.exceptions.LockException):
+            ref_timed_out = True
+        ref_elapsed = time.time() - t0
+        p_ref.wait()
 
-        expected = threads * increments_per_thread
+        # 2. Test S-Class Timeout with separate holder process
+        sclass_lock = os.path.join(tmpdir, "sclass_timeout.lock")
+        sclass_ready = os.path.join(tmpdir, "sclass_ready.txt")
+        cmd_sclass = [
+            sys.executable, "-c",
+            f"from benchmark.parity.file_lock_harness import _holder_process_worker; _holder_process_worker('sclass', r'{sclass_lock}', 0.5, r'{sclass_ready}')"
+        ]
+        p_sclass = subprocess.Popen(cmd_sclass)
+        while not os.path.exists(sclass_ready):
+            time.sleep(0.01)
+
+        t0 = time.time()
+        sclass_timed_out = False
+        try:
+            with FileLock(sclass_lock, timeout=0.2):
+                pass
+        except TimeoutError:
+            sclass_timed_out = True
+        sclass_elapsed = time.time() - t0
+        p_sclass.wait()
+
         return {
-            "expected_count": expected,
-            "actual_count": counter["val"],
-            "elapsed_sec": round(elapsed, 3),
-            "thread_safety_passed": (counter["val"] == expected)
+            "reference_timed_out": ref_timed_out,
+            "reference_elapsed_sec": round(ref_elapsed, 4),
+            "sclass_timed_out": sclass_timed_out,
+            "sclass_elapsed_sec": round(sclass_elapsed, 4),
+            "timeout_differential_passed": (ref_timed_out and sclass_timed_out)
         }
 
 
-def _proc_worker(lock_path: str, count_file: str, increments: int):
-    for _ in range(increments):
-        with FileLock(lock_path, timeout=15.0):
-            val = 0
-            if os.path.exists(count_file):
-                with open(count_file, "r") as f:
-                    try:
-                        val = int(f.read().strip())
-                    except ValueError:
-                        val = 0
-            time.sleep(0.001)
-            with open(count_file, "w") as f:
-                f.write(str(val + 1))
-
-
-def test_multiprocess_exclusion(procs: int = 4, increments_per_proc: int = 25) -> Dict[str, Any]:
+def test_differential_multithreading(threads: int = 8, increments: int = 50) -> Dict[str, Any]:
     with tempfile.TemporaryDirectory() as tmpdir:
-        lock_path = os.path.join(tmpdir, "mp.lock")
-        count_file = os.path.join(tmpdir, "mp_count.txt")
-        with open(count_file, "w") as f:
+        ref_lock = os.path.join(tmpdir, "ref_mt.lock")
+        sclass_lock = os.path.join(tmpdir, "sclass_mt.lock")
+        expected = threads * increments
+
+        # Reference
+        ref_counter = {"val": 0}
+        def ref_worker():
+            for _ in range(increments):
+                with portalocker.Lock(ref_lock, timeout=10.0):
+                    curr = ref_counter["val"]
+                    time.sleep(0.0001)
+                    ref_counter["val"] = curr + 1
+
+        t0 = time.time()
+        t_ref = [threading.Thread(target=ref_worker) for _ in range(threads)]
+        for t in t_ref:
+            t.start()
+        for t in t_ref:
+            t.join()
+        ref_sec = time.time() - t0
+
+        # S-Class
+        sclass_counter = {"val": 0}
+        def sclass_worker():
+            for _ in range(increments):
+                with FileLock(sclass_lock, timeout=10.0):
+                    curr = sclass_counter["val"]
+                    time.sleep(0.0001)
+                    sclass_counter["val"] = curr + 1
+
+        t0 = time.time()
+        t_sclass = [threading.Thread(target=sclass_worker) for _ in range(threads)]
+        for t in t_sclass:
+            t.start()
+        for t in t_sclass:
+            t.join()
+        sclass_sec = time.time() - t0
+
+        return {
+            "expected_count": expected,
+            "reference_actual_count": ref_counter["val"],
+            "reference_elapsed_sec": round(ref_sec, 3),
+            "sclass_actual_count": sclass_counter["val"],
+            "sclass_elapsed_sec": round(sclass_sec, 3),
+            "thread_differential_passed": (ref_counter["val"] == expected and sclass_counter["val"] == expected)
+        }
+
+
+def _mp_worker(lock_type: str, lock_path: str, count_file: str, increments: int):
+    for _ in range(increments):
+        if lock_type == "portalocker":
+            with portalocker.Lock(lock_path, timeout=15.0):
+                val = 0
+                if os.path.exists(count_file):
+                    with open(count_file, "r") as f:
+                        try:
+                            val = int(f.read().strip())
+                        except ValueError:
+                            val = 0
+                time.sleep(0.001)
+                with open(count_file, "w") as f:
+                    f.write(str(val + 1))
+        else:
+            with FileLock(lock_path, timeout=15.0):
+                val = 0
+                if os.path.exists(count_file):
+                    with open(count_file, "r") as f:
+                        try:
+                            val = int(f.read().strip())
+                        except ValueError:
+                            val = 0
+                time.sleep(0.001)
+                with open(count_file, "w") as f:
+                    f.write(str(val + 1))
+
+
+def test_differential_multiprocessing(procs: int = 4, increments: int = 25) -> Dict[str, Any]:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        expected = procs * increments
+
+        # Reference
+        ref_lock = os.path.join(tmpdir, "ref_mp.lock")
+        ref_count_file = os.path.join(tmpdir, "ref_mp_count.txt")
+        with open(ref_count_file, "w") as f:
             f.write("0")
 
         t0 = time.time()
@@ -400,51 +564,89 @@ def test_multiprocess_exclusion(procs: int = 4, increments_per_proc: int = 25) -
         for _ in range(procs):
             cmd = [
                 sys.executable, "-c",
-                f"from benchmark.parity.file_lock_harness import _proc_worker; _proc_worker(r'{lock_path}', r'{count_file}', {increments_per_proc})"
+                f"from benchmark.parity.file_lock_harness import _mp_worker; _mp_worker('portalocker', r'{ref_lock}', r'{ref_count_file}', {increments})"
             ]
-            p = subprocess.Popen(cmd)
-            p_list.append(p)
-
+            p_list.append(subprocess.Popen(cmd))
         for p in p_list:
             p.wait()
-        elapsed = time.time() - t0
+        ref_sec = time.time() - t0
+        with open(ref_count_file, "r") as f:
+            ref_final = int(f.read().strip())
 
-        final_val = 0
-        with open(count_file, "r") as f:
-            final_val = int(f.read().strip())
+        # S-Class
+        sclass_lock = os.path.join(tmpdir, "sclass_mp.lock")
+        sclass_count_file = os.path.join(tmpdir, "sclass_mp_count.txt")
+        with open(sclass_count_file, "w") as f:
+            f.write("0")
 
-        expected = procs * increments_per_proc
+        t0 = time.time()
+        p_list = []
+        for _ in range(procs):
+            cmd = [
+                sys.executable, "-c",
+                f"from benchmark.parity.file_lock_harness import _mp_worker; _mp_worker('sclass', r'{sclass_lock}', r'{sclass_count_file}', {increments})"
+            ]
+            p_list.append(subprocess.Popen(cmd))
+        for p in p_list:
+            p.wait()
+        sclass_sec = time.time() - t0
+        with open(sclass_count_file, "r") as f:
+            sclass_final = int(f.read().strip())
+
         return {
             "expected_count": expected,
-            "actual_count": final_val,
-            "elapsed_sec": round(elapsed, 3),
-            "multiprocess_exclusion_passed": (final_val == expected)
+            "reference_final_count": ref_final,
+            "reference_elapsed_sec": round(ref_sec, 3),
+            "sclass_final_count": sclass_final,
+            "sclass_elapsed_sec": round(sclass_sec, 3),
+            "multiprocess_differential_passed": (ref_final == expected and sclass_final == expected)
         }
 
 
-def test_crash_recovery() -> Dict[str, Any]:
+def test_differential_crash_recovery() -> Dict[str, Any]:
     with tempfile.TemporaryDirectory() as tmpdir:
-        lock_path = os.path.join(tmpdir, "crash.lock")
-        cmd = [
+        # Reference Crash
+        ref_lock = os.path.join(tmpdir, "ref_crash.lock")
+        cmd_ref = [
             sys.executable, "-c",
-            f"from file_lock import FileLock; fl = FileLock(r'{lock_path}', timeout=2.0); fl.__enter__(); import os; os._exit(1)"
+            f"import portalocker, os; f = open(r'{ref_lock}', 'a+'); portalocker.lock(f, portalocker.LOCK_EX); os._exit(1)"
         ]
-        p = subprocess.Popen(cmd)
+        p = subprocess.Popen(cmd_ref)
         p.wait()
 
         t0 = time.time()
-        reclaimed = False
+        ref_reclaimed = False
         try:
-            with FileLock(lock_path, timeout=1.0):
-                reclaimed = True
+            with portalocker.Lock(ref_lock, timeout=1.0):
+                ref_reclaimed = True
         except Exception:
-            reclaimed = False
-        elapsed = time.time() - t0
+            ref_reclaimed = False
+        ref_elapsed = time.time() - t0
+
+        # S-Class Crash
+        sclass_lock = os.path.join(tmpdir, "sclass_crash.lock")
+        cmd_sclass = [
+            sys.executable, "-c",
+            f"from file_lock import FileLock; fl = FileLock(r'{sclass_lock}', timeout=2.0); fl.__enter__(); import os; os._exit(1)"
+        ]
+        p = subprocess.Popen(cmd_sclass)
+        p.wait()
+
+        t0 = time.time()
+        sclass_reclaimed = False
+        try:
+            with FileLock(sclass_lock, timeout=1.0):
+                sclass_reclaimed = True
+        except Exception:
+            sclass_reclaimed = False
+        sclass_elapsed = time.time() - t0
 
         return {
-            "reclaimed_after_abrupt_exit": reclaimed,
-            "reclaim_latency_sec": round(elapsed, 6),
-            "crash_resilience_passed": reclaimed
+            "reference_reclaimed": ref_reclaimed,
+            "reference_reclaim_sec": round(ref_elapsed, 6),
+            "sclass_reclaimed": sclass_reclaimed,
+            "sclass_reclaim_sec": round(sclass_elapsed, 6),
+            "crash_differential_passed": (ref_reclaimed and sclass_reclaimed)
         }
 
 
@@ -504,42 +706,46 @@ def test_gc_interaction() -> Dict[str, Any]:
 def run_full_parity_gate() -> Dict[str, Any]:
     env_info = get_system_environment_info()
     print("=" * 80)
-    print("RUNNING OSS PARITY GATE 1: S-CLASS LOCKING ENGINE VS PORTALOCKER 4.1.0")
+    print("RUNNING OSS PARITY GATE 1: S-CLASS NATIVE ENGINE VS PORTALOCKER 4.1.0")
     print("=" * 80)
     print(f"Frozen Environment:\n{json.dumps(env_info, indent=2)}\n")
 
-    print("[1/8] Layer A — Primitive Parity Verification (5 Reps x 500 Interleaved Trials)...")
+    print("[1/9] Layer A — Independent Primitive Parity (5 Reps x 500 Interleaved Trials)...")
     layer_a = test_layer_a_primitive_parity(n_trials=500, n_repetitions=5)
 
-    print("[2/8] Layer B — Full S-Class Lifecycle & Microsegment Profiling...")
+    print("[2/9] Layer B — Full S-Class Lifecycle & Microsegment Profiling...")
     layer_b = test_layer_b_full_lifecycle(n_trials=500)
 
-    print("[3/8] Timeout Semantics Verification...")
-    timeout_res = test_timeout_semantics()
+    print("[3/9] Layer C — Equivalent Full Lifecycle Workload Comparison...")
+    layer_c = test_layer_c_equivalent_lifecycle(n_trials=500)
 
-    print("[4/8] Multithreaded Contention Verification (8 Threads x 50 Increments)...")
-    mt_res = test_multithreaded_contention()
+    print("[4/9] Differential Timeout Semantics Verification (Inter-Process)...")
+    timeout_res = test_differential_timeout()
 
-    print("[5/8] Multiprocess Cross-Process Mutual Exclusion (4 Procs x 25 Increments)...")
-    mp_res = test_multiprocess_exclusion()
+    print("[5/9] Differential Multithreaded Contention Verification (8 Threads x 50 Inc)...")
+    mt_res = test_differential_multithreading()
 
-    print("[6/8] Crash & Abrupt Termination Release Verification...")
-    crash_res = test_crash_recovery()
+    print("[6/9] Differential Multiprocess Exclusion Verification (4 Procs x 25 Inc)...")
+    mp_res = test_differential_multiprocessing()
 
-    print("[7/8] Stale Metadata Recovery Verification...")
+    print("[7/9] Differential Crash Recovery Verification (Abrupt os._exit)...")
+    crash_res = test_differential_crash_recovery()
+
+    print("[8/9] Stale Metadata Recovery Verification...")
     stale_res = test_stale_metadata()
 
-    print("[8/8] Config GC Non-Destructive Interaction Verification...")
+    print("[9/9] Config GC Non-Destructive Interaction Verification...")
     gc_res = test_gc_interaction()
 
     master_results = {
         "environment": env_info,
         "layer_a_primitive_parity": layer_a,
         "layer_b_full_sclass_lifecycle": layer_b,
-        "timeout_verification": timeout_res,
-        "multithreaded_contention": mt_res,
-        "multiprocess_exclusion": mp_res,
-        "crash_recovery": crash_res,
+        "layer_c_equivalent_lifecycle": layer_c,
+        "differential_timeout_verification": timeout_res,
+        "differential_multithreaded_contention": mt_res,
+        "differential_multiprocess_exclusion": mp_res,
+        "differential_crash_recovery": crash_res,
         "stale_metadata": stale_res,
         "gc_interaction": gc_res,
         "final_gate_verdict": "PASS" if layer_a["gate_passed"] else "FAIL"
@@ -551,8 +757,8 @@ def run_full_parity_gate() -> Dict[str, Any]:
 
     print("\nRaw results successfully saved to:", out_file)
     print("Layer A Gate Passed:", layer_a["gate_passed"])
-    print(f"NativeLock Median: {layer_a['sclass_native_primitive']['median_us']} us vs Portalocker: {layer_a['reference_portalocker']['median_us']} us ({layer_a['statistical_metrics']['median_latency_diff_pct']}% diff)")
-    print(f"Full FileLock Median: {layer_b['full_sclass_filelock']['median_us']} us")
+    print(f"Independent NativeLock Median: {layer_a['sclass_native_primitive']['median_us']} us vs Portalocker: {layer_a['reference_portalocker']['median_us']} us ({layer_a['statistical_metrics']['median_latency_diff_pct']}% diff)")
+    print(f"Layer C Lifecycle Ratio: {layer_c['lifecycle_ratio']} (95% CI: {layer_c['ratio_95_ci']})")
     print(f"Final Gate Verdict: {master_results['final_gate_verdict']}")
     return master_results
 

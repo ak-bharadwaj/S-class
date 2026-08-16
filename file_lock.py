@@ -119,16 +119,44 @@ _META_PREFIX = f'{{"pid": {_CACHED_PID}, "host": "{_CACHED_HOSTNAME}", "process_
 
 try:
     import portalocker
-    from portalocker.exceptions import LockException, AlreadyLocked
     HAS_PORTALOCKER = True
 except ImportError:
     HAS_PORTALOCKER = False
 
 
+def _lock_fd(fd: int) -> bool:
+    """Acquires non-blocking kernel advisory lock via OS-native kernel primitive."""
+    try:
+        if sys.platform == "win32":
+            import msvcrt
+            os.lseek(fd, 0, os.SEEK_SET)
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except (OSError, IOError):
+        return False
+
+
+def _unlock_fd(fd: int) -> None:
+    """Releases kernel advisory lock via OS-native kernel primitive."""
+    try:
+        if sys.platform == "win32":
+            import msvcrt
+            os.lseek(fd, 0, os.SEEK_SET)
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    except (OSError, IOError):
+        pass
+
+
 class NativeLock:
     """
     Bare OS-native kernel advisory lock primitive matching reference portalocker interface.
-    No metadata overhead, no JSON serialization, no extra stat/chmod calls.
+    No metadata overhead, no JSON serialization, no extra stat/chmod calls, zero portalocker runtime calls.
     Target: <= 0.5% latency difference from reference portalocker.
     """
     def __init__(self, lock_path: str, timeout: float = 10.0, poll_interval: float = 0.05):
@@ -136,49 +164,33 @@ class NativeLock:
         self.timeout = timeout
         self.poll_interval = poll_interval
         self._file = None
+        self._fd: Optional[int] = None
 
     def __enter__(self):
         start_time = time.time()
         while True:
             try:
                 file_obj = open(self.lock_path, "a+b")
+                fd = file_obj.fileno()
             except FileNotFoundError:
                 os.makedirs(os.path.dirname(self.lock_path), mode=0o700, exist_ok=True)
                 file_obj = open(self.lock_path, "a+b")
+                fd = file_obj.fileno()
             except OSError:
                 if time.time() - start_time >= self.timeout:
                     raise TimeoutError(f"NativeLock timeout opening file: {self.lock_path}")
                 time.sleep(self.poll_interval)
                 continue
 
-            if HAS_PORTALOCKER:
-                try:
-                    portalocker.lock(file_obj, portalocker.LOCK_EX | portalocker.LOCK_NB)
-                    self._file = file_obj
-                    return self
-                except (LockException, AlreadyLocked, OSError, IOError):
-                    try:
-                        file_obj.close()
-                    except OSError:
-                        pass
-            else:
-                fd = file_obj.fileno()
-                try:
-                    if sys.platform == "win32":
-                        import msvcrt
-                        os.lseek(fd, 0x7FFFFFFF, os.SEEK_SET)
-                        msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
-                        os.lseek(fd, 0, os.SEEK_SET)
-                    else:
-                        import fcntl
-                        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    self._file = file_obj
-                    return self
-                except (OSError, IOError):
-                    try:
-                        file_obj.close()
-                    except OSError:
-                        pass
+            if _lock_fd(fd):
+                self._file = file_obj
+                self._fd = fd
+                return self
+
+            try:
+                file_obj.close()
+            except OSError:
+                pass
 
             if time.time() - start_time >= self.timeout:
                 raise TimeoutError(f"NativeLock timeout after {self.timeout}s waiting for lock: {self.lock_path}")
@@ -186,35 +198,20 @@ class NativeLock:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self._file is not None:
-            if HAS_PORTALOCKER:
-                try:
-                    portalocker.unlock(self._file)
-                except (LockException, OSError, IOError):
-                    pass
-            else:
-                try:
-                    fd = self._file.fileno()
-                    if sys.platform == "win32":
-                        import msvcrt
-                        os.lseek(fd, 0x7FFFFFFF, os.SEEK_SET)
-                        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
-                        os.lseek(fd, 0, os.SEEK_SET)
-                    else:
-                        import fcntl
-                        fcntl.flock(fd, fcntl.LOCK_UN)
-                except (OSError, IOError):
-                    pass
+            if self._fd is not None:
+                _unlock_fd(self._fd)
             try:
                 self._file.close()
             except OSError:
                 pass
             self._file = None
+            self._fd = None
 
 
 class FileLock:
     """
-    Canonical OS-native kernel advisory mutual exclusion file lock backed by Portalocker
-    (with OS-native msvcrt/fcntl fallback), diagnostic owner metadata, and thread-safe local activation tracking.
+    Canonical OS-native kernel advisory mutual exclusion file lock with OS-native msvcrt/fcntl
+    backend, diagnostic owner metadata, and thread-safe local activation tracking.
     """
     def __init__(self, lock_path: str, timeout: float = 10.0, poll_interval: float = 0.05, enable_profiling: bool = False):
         self.lock_path = os.path.abspath(lock_path)
@@ -229,49 +226,16 @@ class FileLock:
         self._fd: Optional[int] = None
 
     def _lock_handle(self, file_obj) -> bool:
-        """Acquires non-blocking kernel advisory lock via portalocker or native OS."""
-        if HAS_PORTALOCKER:
-            try:
-                portalocker.lock(file_obj, portalocker.LOCK_EX | portalocker.LOCK_NB)
-                return True
-            except (LockException, AlreadyLocked, OSError, IOError):
-                return False
-        try:
-            fd = file_obj.fileno() if hasattr(file_obj, "fileno") else file_obj
-            if sys.platform == "win32":
-                import msvcrt
-                os.lseek(fd, 0x7FFFFFFF, os.SEEK_SET)
-                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
-                os.lseek(fd, 0, os.SEEK_SET)
-            else:
-                import fcntl
-                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            return True
-        except (OSError, IOError):
-            return False
+        """Acquires non-blocking kernel advisory lock via native OS."""
+        fd = file_obj.fileno() if hasattr(file_obj, "fileno") else file_obj
+        return _lock_fd(fd)
 
     def _unlock_handle(self, file_obj) -> None:
-        """Releases kernel advisory lock via portalocker or native OS."""
+        """Releases kernel advisory lock via native OS."""
         if file_obj is None:
             return
-        if HAS_PORTALOCKER:
-            try:
-                portalocker.unlock(file_obj)
-                return
-            except (LockException, OSError, IOError):
-                pass
-        try:
-            fd = file_obj.fileno() if hasattr(file_obj, "fileno") else file_obj
-            if sys.platform == "win32":
-                import msvcrt
-                os.lseek(fd, 0x7FFFFFFF, os.SEEK_SET)
-                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
-                os.lseek(fd, 0, os.SEEK_SET)
-            else:
-                import fcntl
-                fcntl.flock(fd, fcntl.LOCK_UN)
-        except (OSError, IOError):
-            pass
+        fd = file_obj.fileno() if hasattr(file_obj, "fileno") else file_obj
+        _unlock_fd(fd)
 
     def __enter__(self):
         t0 = time.perf_counter_ns() if self.enable_profiling else 0
