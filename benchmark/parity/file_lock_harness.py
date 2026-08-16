@@ -194,9 +194,14 @@ def compute_paired_bootstrap_metrics(pairs: List[Tuple[float, float]], n_bootstr
     sum_r = sum(r_all)
     point_tp_ratio = (sum_r / sum_s) if sum_s > 0 else 1.0
 
-    # If within 2% boundary of gate (0.985 - 1.025), automatically elevate bootstrap iterations to 10,000
+    # Strict boundary-aware bootstrap escalation:
+    # If any latency ratio is near the upper gate (point_ratio >= 0.985 vs 1.005 limit)
+    # OR if throughput ratio is near the lower gate (point_tp_ratio <= 1.015 vs 0.995 limit),
+    # automatically elevate bootstrap resamples to >= 10,000 to eliminate resampling variance.
     actual_bootstraps = n_bootstraps
-    if 0.985 <= point_med_ratio <= 1.025 or 0.985 <= point_p95_ratio <= 1.025:
+    is_latency_near_boundary = (point_med_ratio >= 0.985 or point_p95_ratio >= 0.985)
+    is_throughput_near_boundary = (point_tp_ratio <= 1.015)
+    if is_latency_near_boundary or is_throughput_near_boundary:
         actual_bootstraps = max(n_bootstraps, 10000)
 
     boot_med_ratios: List[float] = []
