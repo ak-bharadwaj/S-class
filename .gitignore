@@ -9,3 +9,4 @@ __pycache__/
 *.key
 *.pem
 *.secret
+capability_plugins/emil-skills/
