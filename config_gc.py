@@ -15,8 +15,6 @@ class GCReport:
     total_bytes_freed: int = 0
     errors: List[str] = field(default_factory=list)
 
-from runtime import _process_exists
-
 def run_gc(workspace_dir: str, state_max_age_days: int = 7, memory_max_age_days: int = 30) -> GCReport:
     report = GCReport()
     agents_dir = os.path.join(workspace_dir, ".agents")
@@ -29,14 +27,35 @@ def run_gc(workspace_dir: str, state_max_age_days: int = 7, memory_max_age_days:
     lock_file = os.path.join(agents_dir, "state.lock")
     if os.path.exists(lock_file):
         try:
-            with open(lock_file, "r") as f:
-                data = json.load(f)
-            pid = data.get("pid")
-            if pid and not _process_exists(pid):
-                size = os.path.getsize(lock_file)
-                os.remove(lock_file)
-                report.stale_locks_removed += 1
-                report.total_bytes_freed += size
+            from file_lock import FileLock, _process_exists
+            is_stale = False
+            lock = FileLock(lock_file, timeout=0.1)
+            try:
+                with lock:
+                    # We hold the OS kernel lock! Check if owner PID is dead or status is released.
+                    try:
+                        with open(lock_file, "r") as f:
+                            data = json.load(f)
+                        pid = data.get("pid")
+                        status = data.get("status")
+                        if (pid and not _process_exists(pid)) or status == "released":
+                            is_stale = True
+                    except Exception:
+                        is_stale = True
+
+                    if is_stale:
+                        size = os.path.getsize(lock_file)
+                        report.stale_locks_removed += 1
+                        report.total_bytes_freed += size
+            except TimeoutError:
+                # Active process holds the kernel lock on state.lock - preserve lock intact.
+                pass
+
+            if is_stale and os.path.exists(lock_file):
+                try:
+                    os.remove(lock_file)
+                except OSError:
+                    pass
         except Exception as e:
             report.errors.append(f"Error checking lock file: {e}")
 

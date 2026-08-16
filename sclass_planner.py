@@ -1,11 +1,17 @@
 """
-S-Class EOS Decoupled Planning Pipeline (sclass_planner.py)
+S-Class EOS 2-Tier Decoupled Planning Architecture (sclass_planner.py)
 
-Decoupled single-responsibility planning components:
-1. IntentExtractor    -> Extracts goals, scope boundaries, and explicit constraints.
-2. RiskAnalyzer       -> Assesses risk level, urgency, review depth, and queries Knowledge Base.
-3. WorkflowSelector   -> Selects optimal workflow profile (FULL, BUG_FIX, RESEARCH, REFACTOR, HOTFIX).
-4. ExecutionPlanner   -> Assembles execution plan, task DAG, and capability plugin squad.
+Architecture & Layering Contract:
+- Tier 1: Low-Level FSM Workflow Engine (`planner.py / MetaPlanner`)
+  Authoritatively manages workflow profiles (FULL, BUG_FIX, RESEARCH, REFACTOR, HOTFIX),
+  FSM state transitions (TRIAGE -> PLAN -> SPEC -> BUILD -> QA -> RELEASE), and phase step validation.
+
+- Tier 2: High-Level Strategy & Intent Synthesis (`sclass_planner.py / ExecutionPlanner`)
+  Higher-level orchestration wrapper delegating state transition semantics to MetaPlanner while adding:
+  1. IntentExtractor    -> Extracts goals, scope boundaries, explicit constraints, and target domains.
+  2. RiskAnalyzer       -> Assesses risk level, review depth, and queries Knowledge Base.
+  3. WorkflowSelector   -> Selects optimal workflow profile and delegates FSM creation to MetaPlanner.
+  4. ExecutionPlanner   -> Assembles execution plan, task DAG, strategy, and capability plugin squad.
 """
 
 import os

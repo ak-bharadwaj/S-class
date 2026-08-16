@@ -4,6 +4,7 @@ __pycache__/
 .agents/
 *.tmp
 .env
+!.env.example
 .env.*
 *.key
 *.pem

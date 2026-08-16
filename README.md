@@ -7,7 +7,7 @@
 
 [![Version](https://img.shields.io/badge/version-11.2.0--frozen-blue.svg)](https://github.com/ak-bharadwaj/S-class)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-green.svg)](https://github.com/ak-bharadwaj/S-class)
-[![Build](https://img.shields.io/badge/tests-381%2F381%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class)
+[![Build](https://img.shields.io/badge/tests-390%2F390%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class)
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 
 [Quick Start](#-quick-start) • [Architecture](#-system-architecture) • [Features](#-core-architectural-innovations) • [Python SDK](#-30-second-python-sdk-quickstart) • [Benchmark Comparison](#-framework-architectural-comparison) • [License](#-license)
@@ -26,7 +26,7 @@ When autonomous AI coding agents execute software engineering tasks, they suffer
 **S-Class EOS V11.2 fixes this completely.** Operating as a **Central Deterministic Orchestration Kernel**, S-Class intercepts all agent actions, routes engineering goals through a strict Finite State Machine (FSM), enforces evidence-driven Specification Synthesis before design/coding, red-teams plans before writing code, and verifies execution authenticity through sovereign test runners and cryptographic evidence receipts before release is allowed.
 
 > [!NOTE]
-> **V11.2 Stabilization & Release Freeze Attestation**: Formally verified across 381 tests (49 test suites) covering:
+> **V11.2 LTS Release Attestation**: Formally verified across 390 tests (50 test suites) covering:
 > 1. Single-authority Layer-0 `FileLock` with kernel advisory locks and empirical subprocess crash resilience.
 > 2. Strict Kernel API contract (`event_name` mandatory, `from_state` optional assertion, `from_state`-only strictly blocks).
 > 3. Multi-step semantic event log replay and natural runtime checkpoint equivalence.

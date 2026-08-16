@@ -35,8 +35,6 @@ from context_compressor import ContextCompressor
 logger = logging.getLogger("sclass_kernel")
 
 
-class KernelPermissionError(PermissionError):
-    """Raised when an untrusted component attempts direct state mutation without Kernel API."""
 from event_store import EventStore, EventRecord
 
 
