@@ -1,4 +1,10 @@
 {
+  "provenance": {
+    "tested_source_sha": "7f50a062b837d7cee696d2b8a0cf533b4a07dbf5",
+    "benchmark_harness_sha": "2afa29c415bd4f1a85a95bc94c2c7b7ccad90121",
+    "workflow_run_id": "31957405444",
+    "result_generated_at_utc": 1786896129.2036388
+  },
   "environment": {
     "os_platform": "linux",
     "os_system": "Linux",
@@ -6,45 +12,45 @@
     "os_version": "#22-Ubuntu SMP Mon Jul 27 17:24:03 UTC 2026",
     "python_version": "3.12.13 (main, Jun 16 2026, 22:05:08) [GCC 13.3.0]",
     "cpu_count_logical": 4,
-    "total_ram_bytes": 16766414848,
+    "total_ram_bytes": 16770748416,
     "portalocker_version": "4.1.0",
     "hostname": "runnervmzvulz",
-    "git_commit_sha": "8d2ac77ff8706d09a9655ea3f5ffa0b3116f5977",
-    "timestamp_utc": 1786895973.9731648
+    "git_commit_sha": "2afa29c415bd4f1a85a95bc94c2c7b7ccad90121",
+    "timestamp_utc": 1786896129.2036388
   },
   "results": {
     "total_trials": 2500,
     "current_filelock_distribution": {
-      "p50": 146.47,
-      "p90": 224.37,
-      "p95": 247.31,
-      "p99": 348.14,
-      "max": 4401.6,
-      "min": 106.8
+      "p50": 145.07,
+      "p90": 216.46,
+      "p95": 242.97,
+      "p99": 315.42,
+      "max": 1861.49,
+      "min": 95.9
     },
     "experimental_filelock_distribution": {
-      "p50": 59.05,
-      "p90": 82.47,
-      "p95": 99.12,
-      "p99": 110.72,
-      "max": 126.93,
-      "min": 43.82
+      "p50": 55.96,
+      "p90": 79.68,
+      "p95": 87.94,
+      "p99": 111.19,
+      "max": 118.61,
+      "min": 42.57
     },
     "bootstrap_candidate_vs_current": {
-      "median_ratio": 0.4031,
+      "median_ratio": 0.3858,
       "median_ratio_95_ci": [
-        0.3982,
-        0.4118
+        0.3792,
+        0.393
       ],
-      "p95_ratio": 0.4008,
+      "p95_ratio": 0.3619,
       "p95_ratio_95_ci": [
-        0.3749,
-        0.4163
+        0.3436,
+        0.3874
       ],
-      "throughput_ratio": 2.652,
+      "throughput_ratio": 2.6819,
       "throughput_ratio_95_ci": [
-        2.5599,
-        2.7706
+        2.6287,
+        2.7368
       ],
       "median_gate_passed": true,
       "p95_gate_passed": true,

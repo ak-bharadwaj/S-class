@@ -489,7 +489,6 @@ def _crash_window_worker(lock_path, ready_file):
     """Worker process that acquires lock, writes untruncated long payload, signals barrier, and abruptly dies before ftruncate."""
     fl = ExperimentalFileLock(lock_path, timeout=5.0)
     fl.__enter__()
-    # Explicitly write long payload into fd without calling ftruncate
     long_payload = b'{"status": "active", "pid": 99999999, "token": "crash-window-long-untruncated-payload-999999999999999999999999999999"}'
     if hasattr(os, "pwrite"):
         os.pwrite(fl._fd, long_payload, 0)
@@ -497,23 +496,25 @@ def _crash_window_worker(lock_path, ready_file):
         os.lseek(fl._fd, 0, os.SEEK_SET)
         os.write(fl._fd, long_payload)
 
-    # Signal barrier to parent
     with open(ready_file, "w", encoding="utf-8") as f:
         f.write("PWRITE_DONE")
 
-    # Abrupt exit - ftruncate and release never run in this process!
     os._exit(0)
 
 
 def test_crash_window_between_pwrite_and_ftruncate():
     """
-    Simulates actual process crash AFTER pwrite completes but BEFORE ftruncate executes.
-    Child process writes long untruncated payload, signals barrier, and calls os._exit(0).
-    Parent process verifies OS lock release and clean metadata overwrite/truncation by contender.
+    Comparative Current-vs-Candidate Crash Window Recovery & Exact Length Integrity Test.
+    Simulates actual process crash AFTER write completes but BEFORE ftruncate executes.
+    Directly compares recovery observations between Current FileLock and Experimental Candidate:
+    - Valid JSON parsing
+    - PID and token ownership
+    - Zero trailing bytes (file size == exact JSON payload length)
+    - Normalized schema equality between Current and Candidate recovery observations
     """
-    with tempfile.TemporaryDirectory() as tmpdir:
-        lock_path = os.path.join(tmpdir, "crash_window.lock")
-        ready_file = os.path.join(tmpdir, "pwrite_done.marker")
+    def run_recovery(lock_cls, tmpdir, prefix):
+        lock_path = os.path.join(tmpdir, f"{prefix}_crash_window.lock")
+        ready_file = os.path.join(tmpdir, f"{prefix}_pwrite_done.marker")
 
         cmd = [
             sys.executable, "-c",
@@ -525,16 +526,31 @@ def test_crash_window_between_pwrite_and_ftruncate():
         start = time.time()
         while not os.path.exists(ready_file) and time.time() - start < 5.0:
             time.sleep(0.01)
-        assert os.path.exists(ready_file), "Child process failed to signal pwrite_done barrier"
+        assert os.path.exists(ready_file), f"Child process failed to signal barrier for {prefix}"
 
         proc.wait(timeout=5.0)
 
-        # Parent process contender acquires lock over the untruncated crash file
-        with ExperimentalFileLock(lock_path, timeout=2.0) as fl_e:
-            meta_exp = _read_metadata_safe(fl_e, lock_path)
+        # Contender acquires lock over the untruncated crash file
+        with lock_cls(lock_path, timeout=2.0) as fl:
+            meta = _read_metadata_safe(fl, lock_path)
 
-        assert meta_exp["pid"] == os.getpid()
+        # Read raw disk bytes after release
         with open(lock_path, "rb") as f:
             raw_bytes = f.read()
+
+        # Strict JSON byte length equality check (zero trailing bytes)
         parsed = json.loads(raw_bytes.decode("utf-8"))
+        expected_bytes = json.dumps(parsed).encode("utf-8")
+        assert len(raw_bytes) == len(expected_bytes), f"Trailing bytes detected! Raw len: {len(raw_bytes)}, Expected len: {len(expected_bytes)}"
         assert parsed["pid"] == os.getpid()
+        assert parsed["status"] == "released"
+
+        return _normalize_metadata(meta), _normalize_metadata(parsed)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        cur_enter_norm, cur_rel_norm = run_recovery(FileLock, tmpdir, "cur")
+        exp_enter_norm, exp_rel_norm = run_recovery(ExperimentalFileLock, tmpdir, "exp")
+
+        # Direct Normalized Contract Comparison
+        assert cur_enter_norm == exp_enter_norm, f"Crash recovery enter schema mismatch!\nCurrent: {cur_enter_norm}\nCandidate: {exp_enter_norm}"
+        assert cur_rel_norm == exp_rel_norm, f"Crash recovery released schema mismatch!\nCurrent: {cur_rel_norm}\nCandidate: {exp_rel_norm}"
