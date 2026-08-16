@@ -172,16 +172,16 @@ class ArtifactGovernor:
                     sec = f.read().strip()
                     if len(sec) >= 32:
                         return sec
-            except Exception:
-                pass
+            except (OSError, UnicodeDecodeError) as e:
+                logger.warning(f"[ArtifactGovernor] Failed reading governance key from {key_file}: {e}")
 
         os.makedirs(key_dir, exist_ok=True)
         new_secret = secrets.token_hex(32)
         try:
             with open(key_file, "w", encoding="utf-8") as f:
                 f.write(new_secret)
-        except Exception:
-            pass
+        except OSError as e:
+            logger.warning(f"[ArtifactGovernor] Failed persisting governance key to {key_file}: {e}")
         return new_secret
 
     @classmethod
@@ -1946,13 +1946,13 @@ class ArtifactGovernor:
                             try:
                                 with open(anchor_path, "r", encoding="utf-8") as af:
                                     anchor_data = json.load(af)
-                            except Exception:
+                            except (OSError, json.JSONDecodeError):
                                 pass
                         if os.path.exists(cs_path):
                             try:
                                 with open(cs_path, "r", encoding="utf-8") as cf:
                                     changeset_data = json.load(cf)
-                            except Exception:
+                            except (OSError, json.JSONDecodeError):
                                 pass
 
                     if not anchor_data:
@@ -2001,7 +2001,7 @@ class ArtifactGovernor:
                                 try:
                                     with open(disk_snap_path, "r", encoding="utf-8") as sf:
                                         snap_data = json.load(sf)
-                                except Exception:
+                                except (OSError, json.JSONDecodeError):
                                     pass
                         if not snap_data:
                             snap_data = anchor_data or pipe_data.get("repository_snapshot")

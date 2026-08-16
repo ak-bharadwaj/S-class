@@ -20,7 +20,7 @@ def load_json(path: str) -> Any:
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
-    except Exception:
+    except (OSError, json.JSONDecodeError):
         return None
 
 def write_json_atomic(path: str, data: Any) -> None:
@@ -816,7 +816,7 @@ class SpecificationCompiler:
                 if os.path.exists(cs_path):
                     try:
                         os.remove(cs_path)
-                    except Exception:
+                    except OSError:
                         pass
 
         return res_dict
@@ -883,7 +883,7 @@ class SpecificationCompiler:
                         if new_content_hash == curr_content_hash:
                             # Deduplication hit — skip creating duplicate version file
                             return current_file
-                    except Exception:
+                    except (OSError, json.JSONDecodeError):
                         pass
 
             next_ver = current_ver + 1
@@ -895,7 +895,7 @@ class SpecificationCompiler:
                     try:
                         with open(parent_file, "rb") as pf:
                             parent_hash = hashlib.sha256(pf.read()).hexdigest()
-                    except Exception:
+                    except OSError:
                         pass
 
             payload = dict(content_payload)
@@ -919,7 +919,7 @@ class SpecificationCompiler:
                 setattr(state, "currentSpecVersion", next_ver)
                 setattr(state, "currentDebateVersion", next_ver)
                 save_state(state, workspace_dir)
-            except Exception:
+            except (ImportError, AttributeError, OSError):
                 pass
 
             return versioned_file
