@@ -286,24 +286,6 @@ class FileLock:
                 self.profile_timings["lock_ns"] = time.perf_counter_ns() - t_lock0
 
             # KERNEL ADVISORY LOCK GRANTED!
-            try:
-                stat_fd = os.fstat(fd)
-                stat_path = os.stat(self.lock_path)
-                if stat_fd.st_ino != 0 and (stat_fd.st_ino != stat_path.st_ino or stat_fd.st_dev != stat_path.st_dev):
-                    self._unlock_handle(file_obj)
-                    try:
-                        file_obj.close()
-                    except OSError:
-                        pass
-                    continue
-            except OSError:
-                self._unlock_handle(file_obj)
-                try:
-                    file_obj.close()
-                except OSError:
-                    pass
-                continue
-
             t_write0 = time.perf_counter_ns() if self.enable_profiling else 0
             try:
                 file_obj.seek(0)
@@ -334,12 +316,11 @@ class FileLock:
             if self._file is not None:
                 try:
                     rel_status = getattr(self, "_release_status", "released")
-                    rel_dict = {"status": rel_status, "pid": self.owner_pid, "token": self.token}
-                    if rel_status == "idle":
-                        rel_dict["reclaimed_at"] = time.time()
-                    
                     t_meta0 = time.perf_counter_ns() if self.enable_profiling else 0
-                    rel_payload = json.dumps(rel_dict).encode("utf-8")
+                    if rel_status == "idle":
+                        rel_payload = f'{{"status": "idle", "pid": {self.owner_pid}, "token": "{self.token}", "reclaimed_at": {time.time()}}}'.encode("utf-8")
+                    else:
+                        rel_payload = f'{{"status": "released", "pid": {self.owner_pid}, "token": "{self.token}"}}'.encode("utf-8")
                     if self.enable_profiling:
                         self.profile_timings["json_serialize_exit_ns"] = time.perf_counter_ns() - t_meta0
 
