@@ -1,0 +1,50 @@
+[
+  {
+    "task_id": "H6_2-01-SPIFFE-ROUTER-V2",
+    "baseline": "B2",
+    "l1_result": "PASS",
+    "l2_result": "PASS",
+    "calls": 1,
+    "latency_sec": 1.42
+  },
+  {
+    "task_id": "H6_2-01-SPIFFE-ROUTER-V2",
+    "baseline": "B4",
+    "l1_result": "PASS",
+    "l2_result": "PASS",
+    "calls": 1,
+    "latency_sec": 1.58
+  },
+  {
+    "task_id": "H6_2-03-PHI-SANITIZER-V2",
+    "baseline": "B2",
+    "l1_result": "PASS",
+    "l2_result": "PASS",
+    "calls": 1,
+    "latency_sec": 1.35
+  },
+  {
+    "task_id": "H6_2-03-PHI-SANITIZER-V2",
+    "baseline": "B4",
+    "l1_result": "PASS",
+    "l2_result": "PASS",
+    "calls": 1,
+    "latency_sec": 1.21
+  },
+  {
+    "task_id": "H6_2-06-DOUBLE-ENTRY-LEDGER-V2",
+    "baseline": "B2",
+    "l1_result": "PASS",
+    "l2_result": "PASS",
+    "calls": 1,
+    "latency_sec": 1.1
+  },
+  {
+    "task_id": "H6_2-06-DOUBLE-ENTRY-LEDGER-V2",
+    "baseline": "B4",
+    "l1_result": "PASS",
+    "l2_result": "PASS",
+    "calls": 1,
+    "latency_sec": 1.62
+  }
+]
