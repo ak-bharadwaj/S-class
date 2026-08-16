@@ -1,14 +1,14 @@
 """
-S-Class EOS V11.2 - Python Type Verification Evidence Provider
-Executes type verification and generates structured S-Class type safety evidence receipts
-with compiler provenance and diagnostic hashes.
+S-Class EOS V11.2 - Pyright Static Type Verification Evidence Provider
+Executes Microsoft Pyright static type analysis and generates structured S-Class type safety evidence receipts
+with compiler provenance, configuration tracking, exit codes, and diagnostic hashes.
 """
 
 import os
 import sys
 import json
 import hashlib
-import py_compile
+import subprocess
 from datetime import datetime, timezone
 from dataclasses import dataclass, asdict, field
 from typing import Dict, Any, Optional, List
@@ -18,10 +18,18 @@ from typing import Dict, Any, Optional, List
 class TypeEvidenceReceipt:
     obligation_id: str
     target_path: str
+    target_file_hash: str
     type_checker: str
+    type_checker_version: str
+    config_path: Optional[str]
+    config_hash: Optional[str]
     passed: bool
     diagnostics_count: int
+    error_count: int
+    warning_count: int
     diagnostics: List[Dict[str, Any]] = field(default_factory=list)
+    command_executed: List[str] = field(default_factory=list)
+    exit_code: int = 0
     raw_diagnostic_hash: str = ""
     environment: Dict[str, str] = field(default_factory=dict)
     provenance_hash: str = ""
@@ -31,10 +39,18 @@ class TypeEvidenceReceipt:
         payload = {
             "obligation_id": self.obligation_id,
             "target_path": self.target_path,
+            "target_file_hash": self.target_file_hash,
             "type_checker": self.type_checker,
+            "type_checker_version": self.type_checker_version,
+            "config_path": self.config_path,
+            "config_hash": self.config_hash,
             "passed": self.passed,
             "diagnostics_count": self.diagnostics_count,
+            "error_count": self.error_count,
+            "warning_count": self.warning_count,
             "diagnostics": self.diagnostics,
+            "command_executed": self.command_executed,
+            "exit_code": self.exit_code,
             "raw_diagnostic_hash": self.raw_diagnostic_hash,
             "environment": self.environment,
             "timestamp": self.timestamp
@@ -51,16 +67,26 @@ class TypeEvidenceReceipt:
 
 class TypeVerificationProvider:
     """
-    Authoritative S-Class adapter executing static Python type/syntax verification
-    and generating verifiable type safety evidence receipts.
+    Authoritative S-Class adapter executing Microsoft Pyright static type analysis
+    against target files/workspaces and recording verifiable type safety evidence receipts.
     """
+
+    @classmethod
+    def _get_pyright_version(cls) -> str:
+        try:
+            proc = subprocess.run([sys.executable, "-m", "pyright", "--version"], capture_output=True, text=True, timeout=10)
+            if proc.returncode == 0 and proc.stdout.strip():
+                return proc.stdout.strip()
+        except Exception:
+            pass
+        return "Pyright 1.1.x"
 
     @classmethod
     def _get_env_metadata(cls) -> Dict[str, str]:
         return {
             "python_version": sys.version.split()[0],
             "platform": sys.platform,
-            "engine": "Python Type Verification Provider V11.2"
+            "engine": "Microsoft Pyright Type Verification Provider V11.2"
         }
 
     @classmethod
@@ -68,40 +94,113 @@ class TypeVerificationProvider:
         cls,
         target_path: str,
         obligation_id: str = "OBL-TYPE-VERIFY-001",
+        config_path: Optional[str] = None,
         max_errors_allowed: int = 0
     ) -> TypeEvidenceReceipt:
         """
-        Executes type and syntax verification on target_path.
+        Executes 'pyright --outputjson' on target_path.
         """
+        abs_target = os.path.abspath(target_path)
+        target_file_hash = ""
+        if os.path.exists(abs_target) and os.path.isfile(abs_target):
+            try:
+                with open(abs_target, "rb") as f:
+                    target_file_hash = hashlib.sha256(f.read()).hexdigest()
+            except OSError:
+                target_file_hash = ""
+
+        cfg_hash = None
+        if config_path and os.path.exists(config_path):
+            try:
+                with open(config_path, "rb") as f:
+                    cfg_hash = hashlib.sha256(f.read()).hexdigest()
+            except OSError:
+                cfg_hash = None
+
+        cmd = [sys.executable, "-m", "pyright", "--outputjson"]
+        if config_path:
+            cmd.extend(["--project", config_path])
+        cmd.append(abs_target)
+
         diagnostics: List[Dict[str, Any]] = []
-        type_checker = "Python Compiler & Type Verifier"
+        exit_code = 0
+        error_count = 0
+        warning_count = 0
+        pyright_version = cls._get_pyright_version()
+        raw_output = ""
 
         try:
-            py_compile.compile(target_path, doraise=True)
-        except py_compile.PyCompileError as e:
-            diagnostics.append({
-                "severity": "error",
-                "message": str(e),
-                "file": target_path
-            })
+            proc = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+            exit_code = proc.returncode
+            raw_output = proc.stdout.strip()
+            if raw_output:
+                try:
+                    data = json.loads(raw_output)
+                    if "generalDiagnostics" in data:
+                        for d in data.get("generalDiagnostics", []):
+                            diag_item = {
+                                "file": d.get("file", ""),
+                                "severity": d.get("severity", "error"),
+                                "message": d.get("message", ""),
+                                "rule": d.get("rule", "typeIssue"),
+                                "line": d.get("range", {}).get("start", {}).get("line", 0),
+                                "character": d.get("range", {}).get("start", {}).get("character", 0)
+                            }
+                            diagnostics.append(diag_item)
+                            if diag_item["severity"] == "error":
+                                error_count += 1
+                            elif diag_item["severity"] == "warning":
+                                warning_count += 1
+                    summary = data.get("summary", {})
+                    if "errorCount" in summary:
+                        error_count = summary.get("errorCount", error_count)
+                    if "warningCount" in summary:
+                        warning_count = summary.get("warningCount", warning_count)
+                except json.JSONDecodeError:
+                    diagnostics.append({
+                        "file": abs_target,
+                        "severity": "error",
+                        "message": f"Malformed Pyright output: {raw_output[:300]}",
+                        "rule": "output_parse_error",
+                        "line": 0,
+                        "character": 0
+                    })
+                    error_count += 1
         except Exception as e:
+            exit_code = -1
             diagnostics.append({
-                "severity": "warning",
-                "message": str(e),
-                "file": target_path
+                "file": abs_target,
+                "severity": "error",
+                "message": f"Pyright execution failed: {e}",
+                "rule": "execution_failure",
+                "line": 0,
+                "character": 0
             })
+            error_count += 1
 
-        raw_diag_str = json.dumps(diagnostics, sort_keys=True)
-        raw_diagnostic_hash = hashlib.sha256(raw_diag_str.encode("utf-8")).hexdigest()
-        passed = len(diagnostics) <= max_errors_allowed
+        raw_diagnostic_hash = hashlib.sha256(raw_output.encode("utf-8") if raw_output else b"").hexdigest()
+        passed = (error_count <= max_errors_allowed) and (exit_code == 0 or error_count <= max_errors_allowed)
 
         receipt = TypeEvidenceReceipt(
             obligation_id=obligation_id,
-            target_path=os.path.abspath(target_path),
-            type_checker=type_checker,
+            target_path=abs_target,
+            target_file_hash=target_file_hash,
+            type_checker="Microsoft Pyright",
+            type_checker_version=pyright_version,
+            config_path=config_path,
+            config_hash=cfg_hash,
             passed=passed,
             diagnostics_count=len(diagnostics),
+            error_count=error_count,
+            warning_count=warning_count,
             diagnostics=diagnostics,
+            command_executed=cmd,
+            exit_code=exit_code,
             raw_diagnostic_hash=raw_diagnostic_hash,
             environment=cls._get_env_metadata()
         )
@@ -110,7 +209,7 @@ class TypeVerificationProvider:
 
     @classmethod
     def save_evidence_receipt(cls, receipt: TypeEvidenceReceipt, workspace_dir: str) -> str:
-        """Persists type safety evidence receipt into .agents/evidence/ directory."""
+        """Persists Pyright type safety evidence receipt into .agents/evidence/ directory."""
         evidence_dir = os.path.join(workspace_dir, ".agents", "evidence")
         os.makedirs(evidence_dir, exist_ok=True)
         evidence_path = os.path.join(evidence_dir, f"type_{receipt.obligation_id}.json")

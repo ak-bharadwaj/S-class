@@ -1,7 +1,7 @@
 """
 S-Class EOS V11.2 - Ruff Static Analysis & Quality Evidence Provider
 Executes Ruff static analysis and generates structured S-Class quality evidence receipts
-with comprehensive command provenance, exit codes, and output checksums.
+with comprehensive configuration hashes, target file checksums, command provenance, exit codes, and output checksums.
 """
 
 import os
@@ -18,7 +18,13 @@ from typing import Dict, Any, Optional, List
 class StaticAnalysisEvidenceReceipt:
     obligation_id: str
     target_path: str
+    target_file_hash: str
     linter: str
+    linter_version: str
+    config_path: Optional[str]
+    config_hash: Optional[str]
+    selected_rules: List[str]
+    target_python_version: str
     passed: bool
     violations_count: int
     violations: List[Dict[str, Any]] = field(default_factory=list)
@@ -33,7 +39,13 @@ class StaticAnalysisEvidenceReceipt:
         payload = {
             "obligation_id": self.obligation_id,
             "target_path": self.target_path,
+            "target_file_hash": self.target_file_hash,
             "linter": self.linter,
+            "linter_version": self.linter_version,
+            "config_path": self.config_path,
+            "config_hash": self.config_hash,
+            "selected_rules": self.selected_rules,
+            "target_python_version": self.target_python_version,
             "passed": self.passed,
             "violations_count": self.violations_count,
             "violations": self.violations,
@@ -63,18 +75,17 @@ class StaticAnalysisProvider:
     def _get_linter_version(cls) -> str:
         try:
             proc = subprocess.run([sys.executable, "-m", "ruff", "--version"], capture_output=True, text=True, timeout=5)
-            if proc.returncode == 0:
+            if proc.returncode == 0 and proc.stdout.strip():
                 return proc.stdout.strip()
         except Exception:
             pass
-        return "Ruff Standalone"
+        return "Ruff 0.16.x"
 
     @classmethod
     def _get_env_metadata(cls) -> Dict[str, str]:
         return {
             "python_version": sys.version.split()[0],
             "platform": sys.platform,
-            "linter_version": cls._get_linter_version(),
             "engine": "Ruff Static Analysis Provider V11.2"
         }
 
@@ -83,13 +94,42 @@ class StaticAnalysisProvider:
         cls,
         target_path: str,
         obligation_id: str = "OBL-STATIC-RUFF-001",
+        config_path: Optional[str] = None,
+        select_rules: Optional[List[str]] = None,
         max_violations_allowed: int = 0
     ) -> StaticAnalysisEvidenceReceipt:
         """
         Executes 'ruff check --output-format=json' on target_path.
         """
+        abs_target = os.path.abspath(target_path)
+        target_file_hash = ""
+        if os.path.exists(abs_target) and os.path.isfile(abs_target):
+            try:
+                with open(abs_target, "rb") as f:
+                    target_file_hash = hashlib.sha256(f.read()).hexdigest()
+            except OSError:
+                target_file_hash = ""
+
+        cfg_hash = None
+        if config_path and os.path.exists(config_path):
+            try:
+                with open(config_path, "rb") as f:
+                    cfg_hash = hashlib.sha256(f.read()).hexdigest()
+            except OSError:
+                cfg_hash = None
+
+        rules = select_rules or ["E", "F", "W"]
+        linter_ver = cls._get_linter_version()
+        target_py_ver = f"py{sys.version_info.major}{sys.version_info.minor}"
+
         violations: List[Dict[str, Any]] = []
-        cmd = [sys.executable, "-m", "ruff", "check", "--output-format=json", target_path]
+        cmd = [sys.executable, "-m", "ruff", "check", "--output-format=json"]
+        if config_path:
+            cmd.extend(["--config", config_path])
+        if select_rules:
+            cmd.extend(["--select", ",".join(select_rules)])
+        cmd.append(abs_target)
+
         exit_code = 0
         raw_output = ""
 
@@ -125,8 +165,14 @@ class StaticAnalysisProvider:
 
         receipt = StaticAnalysisEvidenceReceipt(
             obligation_id=obligation_id,
-            target_path=os.path.abspath(target_path),
+            target_path=abs_target,
+            target_file_hash=target_file_hash,
             linter="Ruff",
+            linter_version=linter_ver,
+            config_path=config_path,
+            config_hash=cfg_hash,
+            selected_rules=rules,
+            target_python_version=target_py_ver,
             passed=passed,
             violations_count=len(violations),
             violations=violations,

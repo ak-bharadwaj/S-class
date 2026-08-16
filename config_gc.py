@@ -6,14 +6,25 @@ from dataclasses import dataclass, field
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 
+logger = logging.getLogger("sclass_gc")
+
 @dataclass
 class GCReport:
-    stale_locks_removed: int = 0
+    stale_locks_reclaimed: int = 0
     expired_states_removed: int = 0
     orphaned_screenshots_removed: int = 0
     expired_memory_entries_pruned: int = 0
     total_bytes_freed: int = 0
     errors: List[str] = field(default_factory=list)
+
+    @property
+    def stale_locks_removed(self) -> int:
+        """Deprecated alias for stale_locks_reclaimed to preserve backward compatibility."""
+        return self.stale_locks_reclaimed
+
+    @stale_locks_removed.setter
+    def stale_locks_removed(self, val: int) -> None:
+        self.stale_locks_reclaimed = val
 
 def run_gc(workspace_dir: str, state_max_age_days: int = 7, memory_max_age_days: int = 30) -> GCReport:
     report = GCReport()
@@ -50,11 +61,11 @@ def run_gc(workspace_dir: str, state_max_age_days: int = 7, memory_max_age_days:
                             size = os.path.getsize(lock_file)
                         except OSError:
                             size = 0
-                        report.stale_locks_removed += 1
+                        report.stale_locks_reclaimed += 1
                         report.total_bytes_freed += size
                 except TimeoutError:
                     # An active live process holds the kernel lock on state.lock - do not touch it
-                    pass
+                    logger.debug(f"Lock file {lock_file} is held by active process; skipping reclamation.")
         except Exception as e:
             report.errors.append(f"Error checking lock file: {e}")
 

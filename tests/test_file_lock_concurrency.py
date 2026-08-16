@@ -164,12 +164,14 @@ def test_gc_race_safety_with_active_and_stale_locks():
             res = run_gc(tmpdir)
             # Active lock MUST NOT be removed
             assert os.path.exists(active_lock)
+            assert res.stale_locks_reclaimed == 0
             assert res.stale_locks_removed == 0
 
         # After releasing active lock and marking it stale (status: released)
         assert os.path.exists(active_lock)
         res2 = run_gc(tmpdir)
         # Stale released lock is reclaimed and reset to idle
+        assert res2.stale_locks_reclaimed == 1
         assert res2.stale_locks_removed == 1
         with open(active_lock, "r", encoding="utf-8") as f:
             reclaimed_data = json.load(f)

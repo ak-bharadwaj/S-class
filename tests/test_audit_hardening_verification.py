@@ -135,6 +135,7 @@ def test_config_gc_live_vs_stale_lock(tmp_path):
     # 1. Stale lock with dead PID
     lock_file.write_text(json.dumps({"pid": 99999999, "status": "active"}))
     report = run_gc(str(tmp_path))
+    assert report.stale_locks_reclaimed == 1
     assert report.stale_locks_removed == 1
     assert lock_file.exists()
     data1 = json.loads(lock_file.read_text())
@@ -143,6 +144,7 @@ def test_config_gc_live_vs_stale_lock(tmp_path):
     # 2. Stale lock with 'released' status
     lock_file.write_text(json.dumps({"pid": os.getpid(), "status": "released"}))
     report2 = run_gc(str(tmp_path))
+    assert report2.stale_locks_reclaimed == 1
     assert report2.stale_locks_removed == 1
     assert lock_file.exists()
     data2 = json.loads(lock_file.read_text())
@@ -158,7 +160,8 @@ def test_gc_does_not_remove_active_lock(tmp_path):
     # Process holds live active lock
     with FileLock(lock_file):
         report = run_gc(str(tmp_path))
-        # Active lock must NOT be removed
+        # Active lock must NOT be touched
+        assert report.stale_locks_reclaimed == 0
         assert report.stale_locks_removed == 0
         assert os.path.exists(lock_file)
 

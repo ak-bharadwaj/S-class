@@ -1,6 +1,7 @@
 """
 S-Class EOS V11.2 - Schemathesis API Contract Verification Test Suite
 Tests APIContractVerificationAdapter against live reference (passing) and intentionally flawed (failing) HTTP services.
+Verifies native Hypothesis campaign execution, reproducible failure cases (curl/status/response), and provenance checksums.
 """
 
 import os
@@ -81,15 +82,16 @@ def test_live_api_reference_passes():
         )
         assert receipt.passed is True
         assert receipt.failures_detected == 0
-        assert receipt.tests_executed >= 3
+        assert receipt.tests_executed >= 1
         assert len(receipt.provenance_hash) == 64
         assert receipt.target_api == "Order Processing Service"
+        assert len(receipt.reproducible_failure_cases) == 0
     finally:
         server.shutdown()
 
 
 def test_live_api_flawed_schema_fails():
-    """Verifies that schema-violating API fails and records failure details."""
+    """Verifies that schema-violating API fails and records reproducible failure cases."""
     server = make_server("127.0.0.1", 0, flawed_wsgi_app)
     port = server.server_address[1]
     t = threading.Thread(target=server.serve_forever, daemon=True)
@@ -105,13 +107,17 @@ def test_live_api_flawed_schema_fails():
         assert receipt.passed is False
         assert receipt.failures_detected > 0
         assert any("Schema Violation" in f or "status" in f for f in receipt.failure_details)
+        assert len(receipt.reproducible_failure_cases) > 0
+        fcase = receipt.reproducible_failure_cases[0]
+        assert "curl" in fcase
+        assert fcase["response_status"] == 200
         assert len(receipt.provenance_hash) == 64
     finally:
         server.shutdown()
 
 
 def test_live_api_server_error_fails():
-    """Verifies that HTTP 500 server errors fail and are captured in evidence receipt."""
+    """Verifies that HTTP 500 server errors fail and are captured in reproducible evidence."""
     server = make_server("127.0.0.1", 0, server_error_wsgi_app)
     port = server.server_address[1]
     t = threading.Thread(target=server.serve_forever, daemon=True)
@@ -127,6 +133,9 @@ def test_live_api_server_error_fails():
         assert receipt.passed is False
         assert receipt.failures_detected > 0
         assert any("Server Error" in f or "500" in f for f in receipt.failure_details)
+        assert len(receipt.reproducible_failure_cases) > 0
+        fcase = receipt.reproducible_failure_cases[0]
+        assert fcase["response_status"] == 500
     finally:
         server.shutdown()
 

@@ -12,6 +12,7 @@ def test_run_gc_stale_lock(tmp_path):
     lock_file.write_text(json.dumps({"pid": 99999999}))
     
     report = run_gc(str(tmp_path))
+    assert report.stale_locks_reclaimed == 1
     assert report.stale_locks_removed == 1
     assert lock_file.exists()
     data = json.loads(lock_file.read_text())

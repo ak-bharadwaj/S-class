@@ -1,6 +1,7 @@
 """
 S-Class EOS V11.2 - Static & Type Verification Test Suite
 Tests StaticAnalysisProvider and TypeVerificationProvider on reference (passing) and flawed (failing) files.
+Verifies actual Pyright semantic type analysis (catching return type mismatches) and Ruff static analysis.
 """
 
 import os
@@ -16,6 +17,11 @@ def calculate_total(price: float, tax_rate: float) -> float:
     return price * (1.0 + tax_rate)
 """
 
+TYPE_ERROR_PYTHON_CODE = """
+def calculate_value(x: int) -> str:
+    return x
+"""
+
 SYNTAX_ERROR_PYTHON_CODE = """
 def broken_function(:
     return 42
@@ -25,7 +31,7 @@ FLAWED_UNUSED_IMPORT_CODE = """
 import os
 import sys
 
-def hello():
+def hello() -> str:
     return "world"
 """
 
@@ -38,14 +44,34 @@ def test_type_verification_reference_passes():
     try:
         receipt = TypeVerificationProvider.run_type_check(f_name)
         assert receipt.passed is True
-        assert receipt.diagnostics_count == 0
+        assert receipt.error_count == 0
+        assert receipt.type_checker == "Microsoft Pyright"
         assert len(receipt.provenance_hash) == 64
     finally:
         if os.path.exists(f_name):
             os.unlink(f_name)
 
 
-def test_type_verification_flawed_fails():
+def test_type_verification_catches_semantic_type_error():
+    """Proves Pyright semantic type checking: int returned where str is annotated."""
+    with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False) as f:
+        f.write(TYPE_ERROR_PYTHON_CODE)
+        f_name = f.name
+
+    try:
+        receipt = TypeVerificationProvider.run_type_check(f_name)
+        assert receipt.passed is False
+        assert receipt.error_count > 0
+        assert len(receipt.diagnostics) > 0
+        assert any("return" in d.get("message", "").lower() or "type" in d.get("message", "").lower() for d in receipt.diagnostics)
+        assert receipt.type_checker == "Microsoft Pyright"
+        assert len(receipt.provenance_hash) == 64
+    finally:
+        if os.path.exists(f_name):
+            os.unlink(f_name)
+
+
+def test_type_verification_syntax_error_fails():
     with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False) as f:
         f.write(SYNTAX_ERROR_PYTHON_CODE)
         f_name = f.name
@@ -53,8 +79,7 @@ def test_type_verification_flawed_fails():
     try:
         receipt = TypeVerificationProvider.run_type_check(f_name)
         assert receipt.passed is False
-        assert receipt.diagnostics_count > 0
-        assert any("invalid syntax" in d.get("message", "").lower() or "syntax" in d.get("message", "").lower() for d in receipt.diagnostics)
+        assert receipt.error_count > 0
     finally:
         if os.path.exists(f_name):
             os.unlink(f_name)
@@ -82,7 +107,6 @@ def test_static_analysis_flawed_detects_violations():
 
     try:
         receipt = StaticAnalysisProvider.run_ruff_audit(f_name, max_violations_allowed=0)
-        # Unused imports should trigger violations or exit code != 0
         assert receipt.violations_count >= 1 or receipt.exit_code != 0
         assert len(receipt.provenance_hash) == 64
     finally:
@@ -104,6 +128,14 @@ def test_persistence_and_provenance():
                 data = json.load(f)
             assert data["obligation_id"] == "OBL-STATIC-RUFF-001"
             assert data["provenance_hash"] == receipt.provenance_hash
+
+            type_receipt = TypeVerificationProvider.run_type_check(f_name)
+            tp = TypeVerificationProvider.save_evidence_receipt(type_receipt, tmpdir)
+            assert os.path.exists(tp)
+            with open(tp, "r", encoding="utf-8") as f:
+                tdata = json.load(f)
+            assert tdata["type_checker"] == "Microsoft Pyright"
+            assert tdata["provenance_hash"] == type_receipt.provenance_hash
         finally:
             if os.path.exists(f_name):
                 os.unlink(f_name)

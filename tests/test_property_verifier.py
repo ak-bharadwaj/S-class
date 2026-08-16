@@ -1,7 +1,7 @@
 """
 S-Class EOS V11.2 - Hypothesis Property Verification Test Suite
 Tests PropertyVerificationAdapter against reference (passing) and intentionally flawed (failing) implementations.
-Verifies counterexample capture and provenance checksums.
+Verifies exact minimized input counterexample capture, reproducibility metadata, and provenance checksums.
 """
 
 import os
@@ -92,8 +92,10 @@ def test_spiffe_reference_passes():
 def test_spiffe_flawed_fails_and_captures_counterexample():
     receipt = PropertyVerificationAdapter.verify_spiffe_parser(flawed_spiffe_parser, max_examples=40)
     assert receipt.passed is False
-    assert receipt.shrunk_counterexample is not None or receipt.error_message is not None
-    assert "Trust domain mismatch" in str(receipt.error_message) or "Trust domain mismatch" in str(receipt.shrunk_counterexample)
+    assert receipt.shrunk_counterexample is not None
+    assert isinstance(receipt.shrunk_counterexample, dict)
+    assert "input_spiffe_id" in receipt.shrunk_counterexample
+    assert "Trust domain mismatch" in str(receipt.error_message)
     assert len(receipt.provenance_hash) == 64
 
 
@@ -109,7 +111,9 @@ def test_phi_sanitizer_flawed_fails_and_captures_counterexample():
     receipt = PropertyVerificationAdapter.verify_phi_sanitizer(flawed_phi_sanitizer, max_examples=40)
     assert receipt.passed is False
     assert receipt.shrunk_counterexample is not None
-    assert "Email leak detected" in str(receipt.error_message) or "Email leak detected" in str(receipt.shrunk_counterexample)
+    assert isinstance(receipt.shrunk_counterexample, dict)
+    assert "email" in receipt.shrunk_counterexample
+    assert "Email leak detected" in str(receipt.error_message)
 
 
 def test_ledger_reference_passes():
@@ -123,7 +127,9 @@ def test_ledger_flawed_fails_and_captures_counterexample():
     receipt = PropertyVerificationAdapter.verify_double_entry_ledger(flawed_ledger, max_examples=40)
     assert receipt.passed is False
     assert receipt.shrunk_counterexample is not None
-    assert "Non-zero ledger balance sum" in str(receipt.error_message) or "Non-zero ledger balance sum" in str(receipt.shrunk_counterexample)
+    assert isinstance(receipt.shrunk_counterexample, dict)
+    assert "entries" in receipt.shrunk_counterexample
+    assert "Non-zero ledger balance sum" in str(receipt.error_message)
 
 
 def test_property_evidence_persistence():
