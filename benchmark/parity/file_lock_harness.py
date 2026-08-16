@@ -704,9 +704,9 @@ def run_full_parity_gate():
         gc_res = {"active_lock_preserved_by_gc": True}
 
     gate_all_passed = (
-        layer_a["all_gates_passed"] and
-        layer_a_sp["all_gates_passed"] and
-        layer_c["all_gates_passed"] and
+        layer_a["gate_passed"] and
+        layer_a_sp["gate_passed"] and
+        layer_c["gate_passed"] and
         soak_res["gate_passed"] and
         interop_res["interoperability_passed"] and
         timeout_res["timeout_differential_passed"] and
