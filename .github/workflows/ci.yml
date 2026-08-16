@@ -28,7 +28,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pytest
+        pip install pytest portalocker==4.1.0 hypothesis==6.165.9 schemathesis==4.24.3 psutil
 
     - name: Run Pytest Suite
       env:
