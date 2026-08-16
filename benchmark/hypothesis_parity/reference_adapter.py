@@ -30,21 +30,20 @@ def _build_hypothesis_strategy(spec: StrategySpec):
         allow_infinity = p.get("allow_infinity", False)
         s = st.floats(min_value=min_v, max_value=max_v, allow_nan=allow_nan, allow_infinity=allow_infinity)
     elif st_type == "text":
-        alphabet = p.get("alphabet", None)
-        min_size = p.get("min_size", 0)
-        max_size = p.get("max_size", None)
-        s = st.text(alphabet=alphabet, min_size=min_size, max_size=max_size)
+        kw = {}
+        if "alphabet" in p and p["alphabet"] is not None:
+            kw["alphabet"] = p["alphabet"]
+        if "min_size" in p and p["min_size"] is not None:
+            kw["min_size"] = p["min_size"]
+        if "max_size" in p and p["max_size"] is not None:
+            kw["max_size"] = p["max_size"]
+        s = st.text(**kw)
     elif st_type == "characters":
-        whitelist_categories = p.get("whitelist_categories", None)
-        blacklist_categories = p.get("blacklist_categories", None)
-        min_codepoint = p.get("min_codepoint", None)
-        max_codepoint = p.get("max_codepoint", None)
-        s = st.characters(
-            whitelist_categories=whitelist_categories,
-            blacklist_categories=blacklist_categories,
-            min_codepoint=min_codepoint,
-            max_codepoint=max_codepoint
-        )
+        kw = {}
+        for k in ("whitelist_categories", "blacklist_categories", "min_codepoint", "max_codepoint"):
+            if k in p and p[k] is not None:
+                kw[k] = p[k]
+        s = st.characters(**kw)
     elif st_type == "emails":
         s = st.emails()
     elif st_type == "from_regex":
@@ -129,7 +128,11 @@ class ReferenceHypothesisAdapter:
             "max_examples": max_examples,
             "phases": phases,
             "deadline": None,
-            "database": None
+            "database": None,
+            "suppress_health_check": [
+                hypothesis.HealthCheck.filter_too_much,
+                hypothesis.HealthCheck.too_slow
+            ]
         }
         if seed is not None:
             settings_kwargs["derandomize"] = True
@@ -149,6 +152,10 @@ class ReferenceHypothesisAdapter:
             exception_msg = str(err)
         except UnsatisfiedAssumption:
             verdict = "PASS"
+        except (hypothesis.errors.InvalidArgument, hypothesis.errors.HypothesisException) as err:
+            verdict = "ERROR"
+            exception_class = err.__class__.__name__
+            exception_msg = str(err)
         except Exception as err:
             verdict = "FAIL"
             exception_class = err.__class__.__name__
