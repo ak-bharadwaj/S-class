@@ -1,0 +1,707 @@
+{
+  "environment": {
+    "os_platform": "linux",
+    "os_system": "Linux",
+    "os_release": "6.17.0-1022-azure",
+    "os_version": "#22-Ubuntu SMP Mon Jul 27 17:24:03 UTC 2026",
+    "python_version": "3.12.13 (main, Jun 16 2026, 22:05:08) [GCC 13.3.0]",
+    "cpu_count_logical": 4,
+    "total_ram_bytes": 16765378560,
+    "portalocker_version": "4.1.0",
+    "hostname": "runnervmzvulz",
+    "git_commit_sha": "539e25300226425bdf1f92c211efcfb7d2c9dd2c",
+    "timestamp_utc": 1786893808.9466014
+  },
+  "runs": [
+    {
+      "run_id": 1,
+      "total_pairs": 2500,
+      "ref_distribution": {
+        "p50": 95.9,
+        "p90": 142.61,
+        "p95": 167.1,
+        "p99": 242.05,
+        "max": 2339.72,
+        "min": 69.2
+      },
+      "sclass_distribution": {
+        "p50": 75.5,
+        "p90": 139.29,
+        "p95": 162.58,
+        "p99": 242.22,
+        "max": 14662.86,
+        "min": 55.77
+      },
+      "bootstrap_metrics": {
+        "median_ratio": 0.7873,
+        "median_ratio_95_ci": [
+          0.7728,
+          0.8054
+        ],
+        "p95_ratio": 0.9729,
+        "p95_ratio_95_ci": [
+          0.9067,
+          1.054
+        ],
+        "throughput_ratio": 1.0788,
+        "throughput_ratio_95_ci": [
+          0.9525,
+          1.1757
+        ],
+        "median_gate_passed": true,
+        "p95_gate_passed": false,
+        "throughput_gate_passed": false,
+        "all_gates_passed": false,
+        "bootstraps_evaluated": 1000
+      },
+      "slowest_outliers": [
+        {
+          "index": 2238,
+          "sclass_us": 14662.86,
+          "ref_us": 92.0,
+          "ratio": 159.3789
+        },
+        {
+          "index": 1040,
+          "sclass_us": 64.93,
+          "ref_us": 2339.72,
+          "ratio": 0.0278
+        },
+        {
+          "index": 1288,
+          "sclass_us": 1799.76,
+          "ref_us": 96.48,
+          "ratio": 18.6548
+        },
+        {
+          "index": 484,
+          "sclass_us": 67.07,
+          "ref_us": 827.47,
+          "ratio": 0.0811
+        },
+        {
+          "index": 1,
+          "sclass_us": 92.26,
+          "ref_us": 787.24,
+          "ratio": 0.1172
+        },
+        {
+          "index": 961,
+          "sclass_us": 741.28,
+          "ref_us": 80.55,
+          "ratio": 9.2029
+        },
+        {
+          "index": 789,
+          "sclass_us": 63.7,
+          "ref_us": 664.54,
+          "ratio": 0.0959
+        },
+        {
+          "index": 815,
+          "sclass_us": 598.28,
+          "ref_us": 81.21,
+          "ratio": 7.3672
+        },
+        {
+          "index": 1533,
+          "sclass_us": 58.98,
+          "ref_us": 547.88,
+          "ratio": 0.1076
+        },
+        {
+          "index": 2293,
+          "sclass_us": 63.49,
+          "ref_us": 528.49,
+          "ratio": 0.1201
+        }
+      ],
+      "sclass_profile_samples": {
+        "open_ns": {
+          "median_us": 8.39,
+          "p95_us": 11.52
+        },
+        "lock_ns": {
+          "median_us": 2.16,
+          "p95_us": 3.46
+        },
+        "json_serialize_enter_ns": {
+          "median_us": 2.15,
+          "p95_us": 3.16
+        },
+        "write_flush_enter_ns": {
+          "median_us": 14.17,
+          "p95_us": 113.18
+        },
+        "json_serialize_exit_ns": {
+          "median_us": 0.77,
+          "p95_us": 1.14
+        },
+        "write_flush_exit_ns": {
+          "median_us": 9.68,
+          "p95_us": 15.16
+        },
+        "unlock_ns": {
+          "median_us": 1.72,
+          "p95_us": 2.61
+        },
+        "close_ns": {
+          "median_us": 14.24,
+          "p95_us": 23.17
+        }
+      }
+    },
+    {
+      "run_id": 2,
+      "total_pairs": 2500,
+      "ref_distribution": {
+        "p50": 96.19,
+        "p90": 142.77,
+        "p95": 160.52,
+        "p99": 248.83,
+        "max": 12940.37,
+        "min": 70.13
+      },
+      "sclass_distribution": {
+        "p50": 75.99,
+        "p90": 139.23,
+        "p95": 155.72,
+        "p99": 221.22,
+        "max": 705.7,
+        "min": 58.47
+      },
+      "bootstrap_metrics": {
+        "median_ratio": 0.79,
+        "median_ratio_95_ci": [
+          0.7797,
+          0.8013
+        ],
+        "p95_ratio": 0.9701,
+        "p95_ratio_95_ci": [
+          0.9207,
+          1.0157
+        ],
+        "throughput_ratio": 1.271,
+        "throughput_ratio_95_ci": [
+          1.1504,
+          1.4355
+        ],
+        "median_gate_passed": true,
+        "p95_gate_passed": false,
+        "throughput_gate_passed": true,
+        "all_gates_passed": false,
+        "bootstraps_evaluated": 1000
+      },
+      "slowest_outliers": [
+        {
+          "index": 1880,
+          "sclass_us": 67.72,
+          "ref_us": 12940.37,
+          "ratio": 0.0052
+        },
+        {
+          "index": 486,
+          "sclass_us": 75.39,
+          "ref_us": 12240.5,
+          "ratio": 0.0062
+        },
+        {
+          "index": 1092,
+          "sclass_us": 66.52,
+          "ref_us": 747.48,
+          "ratio": 0.089
+        },
+        {
+          "index": 2098,
+          "sclass_us": 705.7,
+          "ref_us": 78.54,
+          "ratio": 8.9851
+        },
+        {
+          "index": 85,
+          "sclass_us": 71.76,
+          "ref_us": 682.99,
+          "ratio": 0.1051
+        },
+        {
+          "index": 560,
+          "sclass_us": 624.28,
+          "ref_us": 75.02,
+          "ratio": 8.3213
+        },
+        {
+          "index": 1630,
+          "sclass_us": 67.21,
+          "ref_us": 597.35,
+          "ratio": 0.1125
+        },
+        {
+          "index": 1021,
+          "sclass_us": 67.28,
+          "ref_us": 451.78,
+          "ratio": 0.1489
+        },
+        {
+          "index": 2251,
+          "sclass_us": 65.67,
+          "ref_us": 401.26,
+          "ratio": 0.1637
+        },
+        {
+          "index": 2324,
+          "sclass_us": 399.64,
+          "ref_us": 91.44,
+          "ratio": 4.3706
+        }
+      ],
+      "sclass_profile_samples": {
+        "open_ns": {
+          "median_us": 8.47,
+          "p95_us": 11.03
+        },
+        "lock_ns": {
+          "median_us": 2.12,
+          "p95_us": 2.68
+        },
+        "json_serialize_enter_ns": {
+          "median_us": 2.17,
+          "p95_us": 2.54
+        },
+        "write_flush_enter_ns": {
+          "median_us": 14.61,
+          "p95_us": 131.59
+        },
+        "json_serialize_exit_ns": {
+          "median_us": 0.8,
+          "p95_us": 1.12
+        },
+        "write_flush_exit_ns": {
+          "median_us": 9.9,
+          "p95_us": 22.59
+        },
+        "unlock_ns": {
+          "median_us": 1.79,
+          "p95_us": 2.86
+        },
+        "close_ns": {
+          "median_us": 14.43,
+          "p95_us": 23.12
+        }
+      }
+    },
+    {
+      "run_id": 3,
+      "total_pairs": 2500,
+      "ref_distribution": {
+        "p50": 77.22,
+        "p90": 149.5,
+        "p95": 190.66,
+        "p99": 690.84,
+        "max": 94247.21,
+        "min": 67.24
+      },
+      "sclass_distribution": {
+        "p50": 65.3,
+        "p90": 145.79,
+        "p95": 184.92,
+        "p99": 450.82,
+        "max": 201888.0,
+        "min": 56.03
+      },
+      "bootstrap_metrics": {
+        "median_ratio": 0.8457,
+        "median_ratio_95_ci": [
+          0.8275,
+          0.8629
+        ],
+        "p95_ratio": 0.9699,
+        "p95_ratio_95_ci": [
+          0.8765,
+          1.106
+        ],
+        "throughput_ratio": 0.8101,
+        "throughput_ratio_95_ci": [
+          0.4005,
+          1.838
+        ],
+        "median_gate_passed": true,
+        "p95_gate_passed": false,
+        "throughput_gate_passed": false,
+        "all_gates_passed": false,
+        "bootstraps_evaluated": 10000
+      },
+      "slowest_outliers": [
+        {
+          "index": 1731,
+          "sclass_us": 201888.0,
+          "ref_us": 272.8,
+          "ratio": 740.0586
+        },
+        {
+          "index": 1793,
+          "sclass_us": 155057.89,
+          "ref_us": 244.97,
+          "ratio": 632.9643
+        },
+        {
+          "index": 1734,
+          "sclass_us": 141047.23,
+          "ref_us": 309.96,
+          "ratio": 455.0439
+        },
+        {
+          "index": 1794,
+          "sclass_us": 204.41,
+          "ref_us": 94247.21,
+          "ratio": 0.0022
+        },
+        {
+          "index": 1732,
+          "sclass_us": 46868.26,
+          "ref_us": 92986.33,
+          "ratio": 0.504
+        },
+        {
+          "index": 1730,
+          "sclass_us": 87290.05,
+          "ref_us": 904.29,
+          "ratio": 96.5283
+        },
+        {
+          "index": 1733,
+          "sclass_us": 49111.12,
+          "ref_us": 62396.22,
+          "ratio": 0.7871
+        },
+        {
+          "index": 1698,
+          "sclass_us": 577.5,
+          "ref_us": 52172.09,
+          "ratio": 0.0111
+        },
+        {
+          "index": 1792,
+          "sclass_us": 173.43,
+          "ref_us": 49315.68,
+          "ratio": 0.0035
+        },
+        {
+          "index": 1791,
+          "sclass_us": 1535.97,
+          "ref_us": 41751.56,
+          "ratio": 0.0368
+        }
+      ],
+      "sclass_profile_samples": {
+        "open_ns": {
+          "median_us": 7.3,
+          "p95_us": 8.54
+        },
+        "lock_ns": {
+          "median_us": 1.93,
+          "p95_us": 2.28
+        },
+        "json_serialize_enter_ns": {
+          "median_us": 1.88,
+          "p95_us": 2.16
+        },
+        "write_flush_enter_ns": {
+          "median_us": 13.84,
+          "p95_us": 148.69
+        },
+        "json_serialize_exit_ns": {
+          "median_us": 0.75,
+          "p95_us": 0.91
+        },
+        "write_flush_exit_ns": {
+          "median_us": 9.46,
+          "p95_us": 10.3
+        },
+        "unlock_ns": {
+          "median_us": 1.53,
+          "p95_us": 1.82
+        },
+        "close_ns": {
+          "median_us": 11.98,
+          "p95_us": 14.39
+        }
+      }
+    },
+    {
+      "run_id": 4,
+      "total_pairs": 2500,
+      "ref_distribution": {
+        "p50": 92.94,
+        "p90": 113.1,
+        "p95": 122.83,
+        "p99": 159.76,
+        "max": 492.83,
+        "min": 68.98
+      },
+      "sclass_distribution": {
+        "p50": 80.84,
+        "p90": 110.95,
+        "p95": 120.64,
+        "p99": 168.91,
+        "max": 775.46,
+        "min": 57.59
+      },
+      "bootstrap_metrics": {
+        "median_ratio": 0.8697,
+        "median_ratio_95_ci": [
+          0.8651,
+          0.8744
+        ],
+        "p95_ratio": 0.9822,
+        "p95_ratio_95_ci": [
+          0.9459,
+          1.0264
+        ],
+        "throughput_ratio": 1.0937,
+        "throughput_ratio_95_ci": [
+          1.0748,
+          1.1104
+        ],
+        "median_gate_passed": true,
+        "p95_gate_passed": false,
+        "throughput_gate_passed": true,
+        "all_gates_passed": false,
+        "bootstraps_evaluated": 1000
+      },
+      "slowest_outliers": [
+        {
+          "index": 442,
+          "sclass_us": 775.46,
+          "ref_us": 95.55,
+          "ratio": 8.1157
+        },
+        {
+          "index": 2202,
+          "sclass_us": 748.28,
+          "ref_us": 82.36,
+          "ratio": 9.0853
+        },
+        {
+          "index": 1613,
+          "sclass_us": 520.02,
+          "ref_us": 81.47,
+          "ratio": 6.3828
+        },
+        {
+          "index": 1026,
+          "sclass_us": 78.99,
+          "ref_us": 492.83,
+          "ratio": 0.1603
+        },
+        {
+          "index": 1614,
+          "sclass_us": 369.72,
+          "ref_us": 89.37,
+          "ratio": 4.1368
+        },
+        {
+          "index": 1,
+          "sclass_us": 91.61,
+          "ref_us": 355.52,
+          "ratio": 0.2577
+        },
+        {
+          "index": 258,
+          "sclass_us": 68.86,
+          "ref_us": 349.93,
+          "ratio": 0.1968
+        },
+        {
+          "index": 23,
+          "sclass_us": 282.83,
+          "ref_us": 83.89,
+          "ratio": 3.3714
+        },
+        {
+          "index": 170,
+          "sclass_us": 278.43,
+          "ref_us": 82.79,
+          "ratio": 3.3632
+        },
+        {
+          "index": 1264,
+          "sclass_us": 275.17,
+          "ref_us": 94.07,
+          "ratio": 2.9252
+        }
+      ],
+      "sclass_profile_samples": {
+        "open_ns": {
+          "median_us": 8.27,
+          "p95_us": 10.7
+        },
+        "lock_ns": {
+          "median_us": 2.08,
+          "p95_us": 2.62
+        },
+        "json_serialize_enter_ns": {
+          "median_us": 1.98,
+          "p95_us": 2.45
+        },
+        "write_flush_enter_ns": {
+          "median_us": 14.08,
+          "p95_us": 108.94
+        },
+        "json_serialize_exit_ns": {
+          "median_us": 0.79,
+          "p95_us": 1.02
+        },
+        "write_flush_exit_ns": {
+          "median_us": 9.41,
+          "p95_us": 11.18
+        },
+        "unlock_ns": {
+          "median_us": 1.54,
+          "p95_us": 2.65
+        },
+        "close_ns": {
+          "median_us": 12.72,
+          "p95_us": 18.99
+        }
+      }
+    },
+    {
+      "run_id": 5,
+      "total_pairs": 2500,
+      "ref_distribution": {
+        "p50": 98.17,
+        "p90": 139.22,
+        "p95": 156.65,
+        "p99": 215.42,
+        "max": 12064.58,
+        "min": 73.1
+      },
+      "sclass_distribution": {
+        "p50": 76.12,
+        "p90": 134.97,
+        "p95": 150.93,
+        "p99": 215.75,
+        "max": 703.03,
+        "min": 59.15
+      },
+      "bootstrap_metrics": {
+        "median_ratio": 0.7754,
+        "median_ratio_95_ci": [
+          0.764,
+          0.7867
+        ],
+        "p95_ratio": 0.9635,
+        "p95_ratio_95_ci": [
+          0.9181,
+          1.0044
+        ],
+        "throughput_ratio": 1.222,
+        "throughput_ratio_95_ci": [
+          1.1483,
+          1.3377
+        ],
+        "median_gate_passed": true,
+        "p95_gate_passed": true,
+        "throughput_gate_passed": true,
+        "all_gates_passed": true,
+        "bootstraps_evaluated": 1000
+      },
+      "slowest_outliers": [
+        {
+          "index": 1360,
+          "sclass_us": 63.69,
+          "ref_us": 12064.58,
+          "ratio": 0.0053
+        },
+        {
+          "index": 1834,
+          "sclass_us": 703.03,
+          "ref_us": 107.6,
+          "ratio": 6.5338
+        },
+        {
+          "index": 273,
+          "sclass_us": 67.22,
+          "ref_us": 598.74,
+          "ratio": 0.1123
+        },
+        {
+          "index": 2370,
+          "sclass_us": 581.51,
+          "ref_us": 82.03,
+          "ratio": 7.0885
+        },
+        {
+          "index": 2065,
+          "sclass_us": 522.25,
+          "ref_us": 78.31,
+          "ratio": 6.6694
+        },
+        {
+          "index": 501,
+          "sclass_us": 366.52,
+          "ref_us": 81.68,
+          "ratio": 4.4875
+        },
+        {
+          "index": 1339,
+          "sclass_us": 309.97,
+          "ref_us": 341.63,
+          "ratio": 0.9073
+        },
+        {
+          "index": 1910,
+          "sclass_us": 64.63,
+          "ref_us": 336.46,
+          "ratio": 0.1921
+        },
+        {
+          "index": 809,
+          "sclass_us": 325.84,
+          "ref_us": 76.51,
+          "ratio": 4.2587
+        },
+        {
+          "index": 956,
+          "sclass_us": 68.13,
+          "ref_us": 323.39,
+          "ratio": 0.2107
+        }
+      ],
+      "sclass_profile_samples": {
+        "open_ns": {
+          "median_us": 8.48,
+          "p95_us": 9.25
+        },
+        "lock_ns": {
+          "median_us": 2.18,
+          "p95_us": 3.05
+        },
+        "json_serialize_enter_ns": {
+          "median_us": 2.14,
+          "p95_us": 2.35
+        },
+        "write_flush_enter_ns": {
+          "median_us": 20.75,
+          "p95_us": 56.43
+        },
+        "json_serialize_exit_ns": {
+          "median_us": 1.14,
+          "p95_us": 1.43
+        },
+        "write_flush_exit_ns": {
+          "median_us": 14.29,
+          "p95_us": 23.89
+        },
+        "unlock_ns": {
+          "median_us": 1.87,
+          "p95_us": 2.63
+        },
+        "close_ns": {
+          "median_us": 13.36,
+          "p95_us": 21.48
+        }
+      }
+    }
+  ]
+}
