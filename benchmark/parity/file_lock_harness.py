@@ -615,6 +615,14 @@ def run_full_parity_gate():
             if HAS_PORTALOCKER:
                 f = open(path_c_ref, "a+b")
                 portalocker.lock(f, portalocker.LOCK_EX)
+                f.seek(0)
+                f.truncate(0)
+                f.write(meta_payload)
+                f.flush()
+                f.seek(0)
+                f.truncate(0)
+                f.write(rel_payload)
+                f.flush()
                 portalocker.unlock(f)
                 f.close()
 
