@@ -1,0 +1,116 @@
+{
+  "certificate_id": "OSS-PARITY-GATE-1-FILELOCK-WIN32",
+  "platform_scope": "WIN32 / Python 3.14.5",
+  "timestamp_utc": 1786897445.0324044,
+  "final_verdict": "PASS",
+  "provenance": {
+    "os_platform": "win32",
+    "os_system": "Windows",
+    "os_release": "win32",
+    "os_version": "win32",
+    "python_version": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+    "cpu_count_logical": 12,
+    "total_ram_bytes": 16396091392,
+    "portalocker_version": "4.1.0",
+    "hostname": "AK",
+    "git_commit_sha": "45bdbbf91f743e7e15c969cd0cc0f79bfc0873db",
+    "timestamp_utc": 1786897445.0324044
+  },
+  "acceptance_criteria": {
+    "primitive_latency_median_upper_ci_max": 1.005,
+    "primitive_latency_p95_upper_ci_max": 1.005,
+    "primitive_throughput_lower_ci_min": 0.995,
+    "same_path_latency_median_upper_ci_max": 1.005,
+    "same_path_latency_p95_upper_ci_max": 1.005,
+    "same_path_throughput_lower_ci_min": 0.995,
+    "lifecycle_latency_median_upper_ci_max": 1.005,
+    "lifecycle_latency_p95_upper_ci_max": 1.005,
+    "lifecycle_throughput_lower_ci_min": 0.995,
+    "soak_memory_bounded_drift_ratio_max": 1.05,
+    "soak_cycles_executed": 5000,
+    "memory_evaluation_classification": "BOUNDED_RSS_DRIFT_LE_5PCT_5000_CYCLES",
+    "cross_implementation_interoperability": "REQUIRED_BLOCKED_SUCCESS",
+    "differential_semantic_correctness": "100_PERCENT_MATCHED"
+  },
+  "layer_a_primitive": {
+    "reference_median_us": 172.45,
+    "sclass_median_us": 137.8,
+    "median_ratio": 0.7991,
+    "median_ratio_95_ci": [
+      0.7856,
+      0.8154
+    ],
+    "p95_ratio": 0.8341,
+    "p95_ratio_95_ci": [
+      0.7776,
+      0.8823
+    ],
+    "throughput_ratio": 1.2524,
+    "throughput_ratio_95_ci": [
+      1.2333,
+      1.272
+    ],
+    "verdict": "PASS"
+  },
+  "layer_a_same_path_primitive": {
+    "reference_median_us": 211.5,
+    "sclass_median_us": 168.25,
+    "median_ratio": 0.7955,
+    "median_ratio_95_ci": [
+      0.7869,
+      0.805
+    ],
+    "p95_ratio": 0.7685,
+    "p95_ratio_95_ci": [
+      0.729,
+      0.8144
+    ],
+    "throughput_ratio": 1.2728,
+    "throughput_ratio_95_ci": [
+      1.2516,
+      1.292
+    ],
+    "verdict": "PASS"
+  },
+  "layer_c_1to1_lifecycle": {
+    "reference_median_us": 580.7,
+    "sclass_median_us": 492.3,
+    "median_ratio": 0.8478,
+    "median_ratio_95_ci": [
+      0.8298,
+      0.8641
+    ],
+    "p95_ratio": 0.8532,
+    "p95_ratio_95_ci": [
+      0.824,
+      0.887
+    ],
+    "throughput_ratio": 1.1764,
+    "throughput_ratio_95_ci": [
+      1.1595,
+      1.1943
+    ],
+    "verdict": "PASS"
+  },
+  "long_soak_memory": {
+    "soak_cycles": 5000,
+    "initial_rss_bytes": 31584256,
+    "final_rss_bytes": 31588352,
+    "rss_growth_ratio": 1.0001,
+    "classification": "BOUNDED_RSS_DRIFT_LE_5PCT_5000_CYCLES",
+    "verdict": "PASS"
+  },
+  "interoperability": {
+    "sclass_holds_portalocker_blocks": "BLOCKED_SUCCESS",
+    "portalocker_holds_sclass_blocks": "BLOCKED_SUCCESS",
+    "verdict": "PASS"
+  },
+  "differential_semantics": {
+    "timeout": "PASS",
+    "multithreading_400_count": "PASS",
+    "multiprocessing_100_count": "PASS",
+    "crash_recovery_os_exit": "PASS",
+    "stale_metadata_takeover": "PASS",
+    "gc_safety": "PASS"
+  }
+}

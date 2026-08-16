@@ -153,7 +153,6 @@ class NativeLock:
         self.lock_path = os.path.abspath(lock_path)
         self.timeout = timeout
         self.poll_interval = poll_interval
-        self._file = None
         self._fd: Optional[int] = None
 
     def __enter__(self):
@@ -161,36 +160,41 @@ class NativeLock:
         while True:
             try:
                 fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT, 0o600)
-                file_obj = os.fdopen(fd, "r+b")
+            except FileNotFoundError:
+                try:
+                    os.makedirs(os.path.dirname(self.lock_path), mode=0o700, exist_ok=True)
+                    fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+                except OSError:
+                    if time.time() - start_time >= self.timeout:
+                        raise TimeoutError(f"NativeLock timeout opening file: {self.lock_path}")
+                    time.sleep(min(self.poll_interval, 0.0002))
+                    continue
             except OSError:
                 if time.time() - start_time >= self.timeout:
                     raise TimeoutError(f"NativeLock timeout opening file: {self.lock_path}")
-                time.sleep(self.poll_interval)
+                time.sleep(min(self.poll_interval, 0.0002))
                 continue
 
             if _lock_fd(fd):
-                self._file = file_obj
                 self._fd = fd
                 return self
 
             try:
-                file_obj.close()
+                os.close(fd)
             except OSError:
                 pass
 
             if time.time() - start_time >= self.timeout:
                 raise TimeoutError(f"NativeLock timeout after {self.timeout}s waiting for lock: {self.lock_path}")
-            time.sleep(self.poll_interval)
+            time.sleep(min(self.poll_interval, 0.0002))
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if self._file is not None:
-            if self._fd is not None:
-                _unlock_fd(self._fd)
+        if self._fd is not None:
+            _unlock_fd(self._fd)
             try:
-                self._file.close()
+                os.close(self._fd)
             except OSError:
                 pass
-            self._file = None
             self._fd = None
 
 
@@ -239,35 +243,38 @@ class FileLock:
             if is_locally_active:
                 if time.time() - start_time >= self.timeout:
                     raise TimeoutError(f"Local thread lock timeout after {self.timeout}s waiting for {self.lock_path}")
-                time.sleep(self.poll_interval)
+                time.sleep(min(self.poll_interval, 0.0002))
                 continue
 
             t_open0 = time.perf_counter_ns() if self.enable_profiling else 0
             try:
-                os.makedirs(os.path.dirname(self.lock_path), mode=0o700, exist_ok=True)
-            except OSError:
-                pass
-
-            try:
                 fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT, 0o600)
-                file_obj = os.fdopen(fd, "r+b")
+            except FileNotFoundError:
+                try:
+                    os.makedirs(os.path.dirname(self.lock_path), mode=0o700, exist_ok=True)
+                    fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+                except OSError:
+                    if time.time() - start_time >= self.timeout:
+                        raise TimeoutError(f"FileLock timeout opening persistent lock file: {self.lock_path}")
+                    time.sleep(min(self.poll_interval, 0.0002))
+                    continue
             except OSError:
                 if time.time() - start_time >= self.timeout:
                     raise TimeoutError(f"FileLock timeout opening persistent lock file: {self.lock_path}")
-                time.sleep(self.poll_interval)
+                time.sleep(min(self.poll_interval, 0.0002))
                 continue
             if self.enable_profiling:
                 self.profile_timings["open_ns"] = time.perf_counter_ns() - t_open0
 
             t_lock0 = time.perf_counter_ns() if self.enable_profiling else 0
-            if not self._lock_handle(file_obj):
+            if not _lock_fd(fd):
                 try:
-                    file_obj.close()
+                    os.close(fd)
                 except OSError:
                     pass
                 if time.time() - start_time >= self.timeout:
                     raise TimeoutError(f"FileLock timeout after {self.timeout}s waiting for live kernel lock owner: {self.lock_path}")
-                time.sleep(self.poll_interval)
+                time.sleep(min(self.poll_interval, 0.0002))
                 continue
             if self.enable_profiling:
                 self.profile_timings["lock_ns"] = time.perf_counter_ns() - t_lock0
@@ -277,17 +284,17 @@ class FileLock:
             try:
                 _write_metadata_atomic_exact(fd, owner_payload)
             except OSError as err:
-                self._unlock_handle(file_obj)
+                _unlock_fd(fd)
                 try:
-                    file_obj.close()
+                    os.close(fd)
                 except OSError:
                     pass
                 raise err
             if self.enable_profiling:
                 self.profile_timings["write_flush_enter_ns"] = time.perf_counter_ns() - t_write0
 
-            self._file = file_obj
             self._fd = fd
+            self._file = None
             with _active_locks_guard:
                 _active_local_locks.add(self.lock_path)
             if self.enable_profiling:
@@ -297,7 +304,7 @@ class FileLock:
     def __exit__(self, exc_type, exc_val, exc_tb):
         t0 = time.perf_counter_ns() if self.enable_profiling else 0
         try:
-            if self._file is not None:
+            if self._fd is not None:
                 try:
                     rel_status = getattr(self, "_release_status", "released")
                     t_meta0 = time.perf_counter_ns() if self.enable_profiling else 0
@@ -309,27 +316,25 @@ class FileLock:
                         self.profile_timings["json_serialize_exit_ns"] = time.perf_counter_ns() - t_meta0
 
                     t_write0 = time.perf_counter_ns() if self.enable_profiling else 0
-                    if self._fd is not None:
-                        _write_metadata_atomic_exact(self._fd, rel_payload)
+                    _write_metadata_atomic_exact(self._fd, rel_payload)
                     if self.enable_profiling:
                         self.profile_timings["write_flush_exit_ns"] = time.perf_counter_ns() - t_write0
                 except OSError:
                     pass
 
                 t_unlock0 = time.perf_counter_ns() if self.enable_profiling else 0
-                self._unlock_handle(self._file)
+                _unlock_fd(self._fd)
                 if self.enable_profiling:
                     self.profile_timings["unlock_ns"] = time.perf_counter_ns() - t_unlock0
 
                 t_close0 = time.perf_counter_ns() if self.enable_profiling else 0
                 try:
-                    self._file.close()
+                    os.close(self._fd)
                 except OSError:
                     pass
                 if self.enable_profiling:
                     self.profile_timings["close_ns"] = time.perf_counter_ns() - t_close0
 
-                self._file = None
                 self._fd = None
         finally:
             with _active_locks_guard:

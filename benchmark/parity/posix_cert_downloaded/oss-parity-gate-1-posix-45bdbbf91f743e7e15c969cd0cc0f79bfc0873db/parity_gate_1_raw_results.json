@@ -1,45 +1,45 @@
 {
   "environment": {
-    "os_platform": "win32",
-    "os_system": "Windows",
-    "os_release": "win32",
-    "os_version": "win32",
-    "python_version": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
-    "cpu_count_logical": 12,
-    "total_ram_bytes": 16396091392,
+    "os_platform": "linux",
+    "os_system": "POSIX",
+    "os_release": "6.17.0-1022-azure",
+    "os_version": "#22-Ubuntu SMP Mon Jul 27 17:24:03 UTC 2026",
+    "python_version": "3.12.13 (main, Jun 16 2026, 22:05:08) [GCC 13.3.0]",
+    "cpu_count_logical": 4,
+    "total_ram_bytes": 16766414848,
     "portalocker_version": "4.1.0",
-    "hostname": "AK",
+    "hostname": "runnervmzvulz",
     "git_commit_sha": "45bdbbf91f743e7e15c969cd0cc0f79bfc0873db",
-    "timestamp_utc": 1786897445.0324044
+    "timestamp_utc": 1786897261.575967
   },
-  "platform_scope": "WIN32_win32",
-  "certificate_id": "OSS-PARITY-GATE-1-FILELOCK-WIN32",
+  "platform_scope": "POSIX_linux",
+  "certificate_id": "OSS-PARITY-GATE-1-FILELOCK-POSIX",
   "layer_a_primitive_parity": {
     "reference_portalocker": {
-      "median_us": 172.45,
-      "p95_us": 375.06,
-      "throughput_per_sec": 4937.2
+      "median_us": 18.98,
+      "p95_us": 23.15,
+      "throughput_per_sec": 50344.8
     },
     "sclass_native_primitive": {
-      "median_us": 137.8,
-      "p95_us": 312.82,
-      "throughput_per_sec": 6183.5
+      "median_us": 16.2,
+      "p95_us": 20.65,
+      "throughput_per_sec": 59213.9
     },
     "statistical_metrics": {
-      "median_ratio": 0.7991,
+      "median_ratio": 0.8538,
       "median_ratio_95_ci": [
-        0.7856,
-        0.8154
+        0.8526,
+        0.8552
       ],
-      "p95_ratio": 0.8341,
+      "p95_ratio": 0.8919,
       "p95_ratio_95_ci": [
-        0.7776,
-        0.8823
+        0.8503,
+        0.936
       ],
-      "throughput_ratio": 1.2524,
+      "throughput_ratio": 1.1762,
       "throughput_ratio_95_ci": [
-        1.2333,
-        1.272
+        1.1648,
+        1.1876
       ],
       "median_gate_passed": true,
       "p95_gate_passed": true,
@@ -51,30 +51,30 @@
   },
   "layer_a_same_path_primitive": {
     "reference_portalocker": {
-      "median_us": 211.5,
-      "p95_us": 423.61,
-      "throughput_per_sec": 4232.4
+      "median_us": 18.64,
+      "p95_us": 21.6,
+      "throughput_per_sec": 51601.2
     },
     "sclass_native_primitive": {
-      "median_us": 168.25,
-      "p95_us": 325.54,
-      "throughput_per_sec": 5387.0
+      "median_us": 16.02,
+      "p95_us": 19.59,
+      "throughput_per_sec": 60730.5
     },
     "statistical_metrics": {
-      "median_ratio": 0.7955,
+      "median_ratio": 0.8592,
       "median_ratio_95_ci": [
-        0.7869,
-        0.805
+        0.8582,
+        0.8607
       ],
-      "p95_ratio": 0.7685,
+      "p95_ratio": 0.907,
       "p95_ratio_95_ci": [
-        0.729,
-        0.8144
+        0.845,
+        0.9499
       ],
-      "throughput_ratio": 1.2728,
+      "throughput_ratio": 1.1769,
       "throughput_ratio_95_ci": [
-        1.2516,
-        1.292
+        1.1663,
+        1.189
       ],
       "median_gate_passed": true,
       "p95_gate_passed": true,
@@ -86,37 +86,37 @@
   },
   "layer_b_full_sclass_lifecycle": {
     "sclass_filelock_full": {
-      "median_us": 421.8,
-      "p95_us": 773.84,
-      "throughput_per_sec": 2143.5
+      "median_us": 72.71,
+      "p95_us": 95.29,
+      "throughput_per_sec": 13205.6
     }
   },
   "layer_c_equivalent_lifecycle": {
     "reference_equivalent_lifecycle": {
-      "median_us": 580.7,
-      "p95_us": 1153.41,
-      "throughput_per_sec": 1543.8
+      "median_us": 116.39,
+      "p95_us": 260.21,
+      "throughput_per_sec": 6541.3
     },
     "sclass_filelock_lifecycle": {
-      "median_us": 492.3,
-      "p95_us": 984.11,
-      "throughput_per_sec": 1816.1
+      "median_us": 93.26,
+      "p95_us": 132.54,
+      "throughput_per_sec": 10189.5
     },
     "statistical_metrics": {
-      "median_ratio": 0.8478,
+      "median_ratio": 0.8012,
       "median_ratio_95_ci": [
-        0.8298,
-        0.8641
+        0.7673,
+        0.8329
       ],
-      "p95_ratio": 0.8532,
+      "p95_ratio": 0.5094,
       "p95_ratio_95_ci": [
-        0.824,
-        0.887
+        0.4947,
+        0.5374
       ],
-      "throughput_ratio": 1.1764,
+      "throughput_ratio": 1.5577,
       "throughput_ratio_95_ci": [
-        1.1595,
-        1.1943
+        1.5134,
+        1.6085
       ],
       "median_gate_passed": true,
       "p95_gate_passed": true,
@@ -128,9 +128,9 @@
   },
   "long_soak_memory_stability": {
     "soak_cycles": 5000,
-    "initial_rss_bytes": 31584256,
-    "final_rss_bytes": 31588352,
-    "rss_growth_ratio": 1.0001,
+    "initial_rss_bytes": 23527424,
+    "final_rss_bytes": 23527424,
+    "rss_growth_ratio": 1.0,
     "classification": "BOUNDED_RSS_DRIFT_LE_5PCT_5000_CYCLES",
     "gate_passed": true
   },
