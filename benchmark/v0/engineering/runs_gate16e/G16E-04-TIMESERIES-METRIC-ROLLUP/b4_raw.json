@@ -1,0 +1,134 @@
+{
+  "task_id": "G16E-04-TIMESERIES-METRIC-ROLLUP",
+  "baseline": "B4",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Database & Analytics / Sliding Window Aggregation",
+  "raw_prompt": "Implement TimeseriesRollupEngine in target_module.py supporting record(metric, value, timestamp) and query_rollup(metric, window_sec, agg_func).",
+  "sclass_governance": {
+    "semantic_requirements": [
+      {
+        "id": "REQ-SHADOW-001",
+        "title": "Core Service Functionality",
+        "description": "Implement core processing logic for: Implement TimeseriesRollupEngine in target_module.py supporting record(metric, value, timestamp) and query_rollup(metric, window_sec, agg_func).",
+        "type": "FUNCTIONAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt execution mandate"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-002",
+        "title": "Underlying Storage Technology Specification",
+        "description": "The specific persistence engine and database backend are unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify database technology"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-003",
+        "title": "API Transport Protocol Specification",
+        "description": "The specific network transport protocol (gRPC vs REST) is unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify API protocol"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      }
+    ],
+    "epistemic_status": "CONFIRMED",
+    "gate_result": "PASS"
+  },
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 1
+  },
+  "repository": {
+    "starting_tree_hash": "fe99bd897467dec9629f4084422f2ba6dcea0f65addec47ae1de3dbb05b4b7d5",
+    "final_tree_hash": "14848009a3b3a009e7225a44603cca1dd0d0ae2254edffa7164a9a8a67227985"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "User Task Instruction:\nImplement TimeseriesRollupEngine in target_module.py supporting record(metric, value, timestamp) and query_rollup(metric, window_sec, agg_func).\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement TimeseriesRollupEngine in target_module.py supporting record(metric, value, timestamp) and query_rollup(metric, window_sec, agg_func).\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nExisting Code in target_module.py:\n```python\n\n```\n\nImplement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block.",
+      "response_text": "```python\nimport time\nfrom collections import defaultdict\nimport statistics\n\nclass TimeseriesRollupEngine:\n    \"\"\"\n    An in-memory timeseries rollup engine supporting recording metrics with timestamps\n    and querying rolled-up aggregations over specified time windows.\n    \"\"\"\n    def __init__(self):\n        # Stores data as: self._store[metric] = list of tuples: (timestamp, value)\n        self._store = defaultdict(list)\n\n    def record(self, metric: str, value: float, timestamp: float = None) -> None:\n        \"\"\"\n        Record a metric value at a given timestamp.\n        If timestamp is not provided, uses the current epoch time.\n        \"\"\"\n        if timestamp is None:\n            timestamp = time.time()\n        \n        self._store[metric].append((timestamp, float(value)))\n        # Keep records sorted by timestamp to enable efficient window slicing\n        self._store[metric].sort(key=lambda x: x[0])\n\n    def query_rollup(self, metric: str, window_sec: float, agg_func: str) -> float:\n        \"\"\"\n        Query the rollup aggregation for a given metric over a time window (in seconds)\n        ending at the current time (or the latest timestamp recorded for the metric).\n        \n        Supported aggregation functions ('agg_func'):\n        - 'sum'\n        - 'avg', 'mean'\n        - 'min'\n        - 'max'\n        - 'count'\n        - 'p95' (95th percentile)\n        \"\"\"\n        if metric not in self._store or not self._store[metric]:\n            return 0.0 if agg_func in ('sum', 'count') else 0.0\n\n        records = self._store[metric]\n        latest_timestamp = records[-1][0]\n        cutoff_time = latest_timestamp - window_sec\n\n        # Filter values within the time window\n        window_values = [val for ts, val in records if ts >= cutoff_time]\n\n        if not window_values:\n            return 0.0\n\n        agg_lower = agg_func.lower()\n        if agg_lower == 'sum':\n            return sum(window_values)\n        elif agg_lower in ('avg', 'mean'):\n            return statistics.mean(window_values)\n        elif agg_lower == 'min':\n            return min(window_values)\n        elif agg_lower == 'max':\n            return max(window_values)\n        elif agg_lower == 'count':\n            return float(len(window_values))\n        elif agg_lower == 'p95':\n            sorted_vals = sorted(window_values)\n            index = int(0.95 * (len(sorted_vals) - 1))\n            return sorted_vals[index]\n        else:\n            raise ValueError(f\"Unsupported aggregation function: {agg_func}\")\n```",
+      "latency_sec": 2.3779,
+      "prompt_tokens": 231,
+      "completion_tokens": 656,
+      "cost_usd": 0.000214,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmptrde4khm\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_rollup PASSED                                 [100%]\n\n============================== 1 passed in 0.04s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.588,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "import time\nfrom collections import defaultdict\nimport statistics\n\nclass TimeseriesRollupEngine:\n    \"\"\"\n    An in-memory timeseries rollup engine supporting recording metrics with timestamps\n    and querying rolled-up aggregations over specified time windows.\n    \"\"\"\n    def __init__(self):\n        # Stores data as: self._store[metric] = list of tuples: (timestamp, value)\n        self._store = defaultdict(list)\n\n    def record(self, metric: str, value: float, timestamp: float = None) -> None:\n        \"\"\"\n        Record a metric value at a given timestamp.\n        If timestamp is not provided, uses the current epoch time.\n        \"\"\"\n        if timestamp is None:\n            timestamp = time.time()\n        \n        self._store[metric].append((timestamp, float(value)))\n        # Keep records sorted by timestamp to enable efficient window slicing\n        self._store[metric].sort(key=lambda x: x[0])\n\n    def query_rollup(self, metric: str, window_sec: float, agg_func: str) -> float:\n        \"\"\"\n        Query the rollup aggregation for a given metric over a time window (in seconds)\n        ending at the current time (or the latest timestamp recorded for the metric).\n        \n        Supported aggregation functions ('agg_func'):\n        - 'sum'\n        - 'avg', 'mean'\n        - 'min'\n        - 'max'\n        - 'count'\n        - 'p95' (95th percentile)\n        \"\"\"\n        if metric not in self._store or not self._store[metric]:\n            return 0.0 if agg_func in ('sum', 'count') else 0.0\n\n        records = self._store[metric]\n        latest_timestamp = records[-1][0]\n        cutoff_time = latest_timestamp - window_sec\n\n        # Filter values within the time window\n        window_values = [val for ts, val in records if ts >= cutoff_time]\n\n        if not window_values:\n            return 0.0\n\n        agg_lower = agg_func.lower()\n        if agg_lower == 'sum':\n            return sum(window_values)\n        elif agg_lower in ('avg', 'mean'):\n            return statistics.mean(window_values)\n        elif agg_lower == 'min':\n            return min(window_values)\n        elif agg_lower == 'max':\n            return max(window_values)\n        elif agg_lower == 'count':\n            return float(len(window_values))\n        elif agg_lower == 'p95':\n            sorted_vals = sorted(window_values)\n            index = int(0.95 * (len(sorted_vals) - 1))\n            return sorted_vals[index]\n        else:\n            raise ValueError(f\"Unsupported aggregation function: {agg_func}\")\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmptrde4khm\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_rollup PASSED                                 [100%]\n\n============================== 1 passed in 0.04s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.588,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  }
+}

@@ -1,0 +1,243 @@
+{
+  "task_id": "G16E-02-JWT-JWKS-ROTATOR",
+  "baseline": "B4",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Auth & Security / Cryptographic Key Rotation",
+  "raw_prompt": "Implement JWKSRotator class in target_module.py supporting rotate_keys(), sign_token(payload), verify_token(token), and get_jwks().",
+  "sclass_governance": {
+    "semantic_requirements": [
+      {
+        "id": "REQ-SHADOW-001",
+        "title": "Password Reset Session Revocation",
+        "description": "Invalidate all active sessions and refresh tokens upon password reset.",
+        "type": "FUNCTIONAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Directly requested in prompt"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-002",
+        "title": "Cross-Cluster Token Blacklist Propagation",
+        "description": "Propagate revoked token identifiers across all active cluster nodes.",
+        "type": "BEHAVIORAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt mandates blacklisting across all clusters"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-003",
+        "title": "Cryptographic Credential Hashing (Argon2id / bcrypt)",
+        "description": "IF local credential storage is configured: Hash and salt user passwords using Argon2id or bcrypt.",
+        "type": "INVARIANT",
+        "epistemic_status": "DERIVED_JUSTIFIED",
+        "confidence": 0.95,
+        "provenance": "CONDITIONAL_BRANCH_LOCAL_AUTH",
+        "introduced_in_pass": 2,
+        "why_chain": [
+          "Local credential stores risk database exfiltration",
+          "Argon2id memory-hard hashing prevents brute force attacks",
+          "Mandatory authentication security invariant"
+        ],
+        "pass_history": [
+          2
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-004",
+        "title": "Bounded Blacklist Retention and TTL Expiry",
+        "description": "Retain revoked token entries in the blacklist for the maximum token TTL window.",
+        "type": "INVARIANT",
+        "epistemic_status": "DERIVED_JUSTIFIED",
+        "confidence": 0.95,
+        "provenance": "STORAGE_HYGIENE",
+        "introduced_in_pass": 2,
+        "why_chain": [
+          "Expired tokens cannot be accepted anyway",
+          "Automatic TTL prevents memory exhaustion",
+          "Mandatory bounded memory invariant"
+        ],
+        "pass_history": [
+          2
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-005",
+        "title": "Immediate Fail-Closed Access Gate",
+        "description": "Reject requests with blacklisted tokens immediately with HTTP 401 Unauthorized.",
+        "type": "INVARIANT",
+        "epistemic_status": "DERIVED_JUSTIFIED",
+        "confidence": 0.95,
+        "provenance": "SECURITY_GATE",
+        "introduced_in_pass": 2,
+        "why_chain": [
+          "Revoked credentials must not execute privileged operations",
+          "Fail-closed gateway validates blacklist on every call",
+          "Mandatory security boundary invariant"
+        ],
+        "pass_history": [
+          2
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-006",
+        "title": "Underlying Storage Technology Specification",
+        "description": "The specific persistence engine and database backend are unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify database technology"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-007",
+        "title": "API Transport Protocol Specification",
+        "description": "The specific network transport protocol (gRPC vs REST) is unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify API protocol"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      }
+    ],
+    "epistemic_status": "CONFIRMED",
+    "gate_result": "PASS"
+  },
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 2
+  },
+  "repository": {
+    "starting_tree_hash": "d97513e476cfe6713e5bdaea0abf1b4f4770f91880a07df5afc6adfb3c6eff07",
+    "final_tree_hash": "ef7555b2e8e857886b4a4ab5859524c80e91b4607de9082f92231db5cfd04826"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "User Task Instruction:\nImplement JWKSRotator class in target_module.py supporting rotate_keys(), sign_token(payload), verify_token(token), and get_jwks().\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Password Reset Session Revocation: Invalidate all active sessions and refresh tokens upon password reset.\n- [] Cross-Cluster Token Blacklist Propagation: Propagate revoked token identifiers across all active cluster nodes.\n- [] Cryptographic Credential Hashing (Argon2id / bcrypt): IF local credential storage is configured: Hash and salt user passwords using Argon2id or bcrypt.\n- [] Bounded Blacklist Retention and TTL Expiry: Retain revoked token entries in the blacklist for the maximum token TTL window.\n- [] Immediate Fail-Closed Access Gate: Reject requests with blacklisted tokens immediately with HTTP 401 Unauthorized.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nExisting Code in target_module.py:\n```python\n\n```\n\nImplement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block.",
+      "response_text": "```python\nimport time\nimport uuid\nfrom typing import Dict, Any, Optional\nimport jwt\nfrom cryptography.hazmat.primitives.asymmetric import rsa\nfrom cryptography.hazmat.primitives import serialization\n\nclass JWKSRotator:\n    \"\"\"\n    JWKSRotator manages RSA key pairs for signing and verifying JSON Web Tokens (JWTs),\n    supporting key rotation, dynamic JWKS generation, and adherence to strict cryptographic\n    and security governance requirements.\n    \"\"\"\n\n    def __init__(self, token_ttl_seconds: int = 3600):\n        self.token_ttl_seconds = token_ttl_seconds\n        self._keys: Dict[str, Dict[str, Any]] = {}\n        self._current_kid: Optional[str] = None\n        self.blacklisted_tokens: Dict[str, float] = {}  # jti -> expiry timestamp\n        self.user_sessions: Dict[str, float] = {}       # user_id -> password reset/session invalidation timestamp\n        \n        # Initialize the first signing key\n        self.rotate_keys()\n\n    def rotate_keys(self) -> str:\n        \"\"\"\n        Generates a new RSA private/public key pair, assigns a unique key ID (kid),\n        sets it as the active signing key, and returns the new kid.\n        \"\"\"\n        kid = str(uuid.uuid4())\n        private_key = rsa.generate_private_key(\n            public_exponent=65537,\n            key_size=2048\n        )\n        public_key = private_key.public_key()\n\n        pem_private = private_key.private_bytes(\n            encoding=serialization.Encoding.PEM,\n            format=serialization.PrivateFormat.PKCS8,\n            encryption_algorithm=serialization.NoEncryption()\n        )\n\n        pem_public = public_key.public_bytes(\n            encoding=serialization.Encoding.PEM,\n            format=serialization.PublicFormat.SubjectPublicKeyInfo\n        )\n\n        self._keys[kid] = {\n            \"private_key\": pem_private,\n            \"public_key\": pem_public,\n            \"created_at\": time.time()\n        }\n        self._current_kid = kid\n        return kid\n\n    def sign_token(self, payload: Dict[str, Any], user_id: Optional[str] = None) -> str:\n        \"\"\"\n        Signs a JWT payload using the current active private key.\n        Injects a unique token identifier (jti), issued-at (iat), expiration (exp),\n        and associates it with the active key ID (kid) in the header.\n        \"\"\"\n        if not self._current_kid or self._current_kid not in self._keys:\n            self.rotate_keys()\n\n        current_time = time.time()\n        payload = payload.copy()\n        \n        if \"jti\" not in payload:\n            payload[\"jti\"] = str(uuid.uuid4())\n        if \"iat\" not in payload:\n            payload[\"iat\"] = int(current_time)\n        if \"exp\" not in payload:\n            payload[\"exp\"] = int(current_time + self.token_ttl_seconds)\n        if user_id and \"sub\" not in payload:\n            payload[\"sub\"] = user_id\n\n        private_key_pem = self._keys[self._current_kid][\"private_key\"]\n        \n        token = jwt.encode(\n            payload,\n            private_key_pem,\n            algorithm=\"RS256\",\n            headers={\"kid\": self._current_kid}\n        )\n        return token\n\n    def verify_token(self, token: str) -> Dict[str, Any]:\n        \"\"\"\n        Verifies a JWT token signature, expiration, blacklist status, and session validity.\n        Implements fail-closed access gating for revoked tokens or invalid sessions.\n        \"\"\"\n        # Cleanup expired blacklist entries first\n        self._purge_expired_blacklist()\n\n        try:\n            # Unverified header to extract kid\n            unverified_headers = jwt.get_unverified_header(token)\n            kid = unverified_headers.get(\"kid\")\n\n            if not kid or kid not in self._keys:\n                raise ValueError(\"Invalid key ID (kid)\")\n\n            public_key_pem = self._keys[kid][\"public_key\"]\n            payload = jwt.decode(\n                token,\n                public_key_pem,\n                algorithms=[\"RS256\"]\n            )\n        except jwt.PyJWTError as e:\n            raise ValueError(f\"Token verification failed: {str(e)}\") from e\n\n        # Check token blacklist (Cross-Cluster Token Blacklist Propagation & Bounded TTL Expiry)\n        jti = payload.get(\"jti\")\n        if jti and jti in self.blacklisted_tokens:\n            raise ValueError(\"Access Denied: Token has been revoked (HTTP 401 equivalent)\")\n\n        # Check Password Reset Session Revocation\n        sub = payload.get(\"sub\")\n        iat = payload.get(\"iat\", 0)\n        if sub and sub in self.user_sessions:\n            invalidation_timestamp = self.user_sessions[sub]\n            if iat < invalidation_timestamp:\n                raise ValueError(\"Access Denied: Session revoked due to password reset (HTTP 401 equivalent)\")\n\n        return payload\n\n    def get_jwks(self) -> Dict[str, Any]:\n        \"\"\"\n        Returns the JSON Web Key Set (JWKS) containing all active public keys\n        formatted according to RFC 7517.\n        \"\"\"\n        keys = []\n        for kid, key_data in self._keys.items():\n            public_key = serialization.load_pem_public_key(key_data[\"public_key\"])\n            public_numbers = public_key.public_numbers()\n            \n            # Convert public numbers to base64urlUInt\n            import base64\n            \n            def int_to_base64url(val: int) -> str:\n                byte_length = (val.bit_length() + 7) // 8\n                val_bytes = val.to_bytes(byte_length, 'big')\n                return base64.urlsafe_b64encode(val_bytes).rstrip(b'=').decode('utf-8')\n\n            keys.append({\n                \"kty\": \"RSA\",\n                \"use\": \"sig\",\n                \"alg\": \"RS256\",\n                \"kid\": kid,\n                \"n\": int_to_base64url(public_numbers.n),\n                \"e\": int_to_base64url(public_numbers.e)\n            })\n\n        return {\"keys\": keys}\n\n    def revoke_token(self, token: str) -> None:\n        \"\"\"\n        Revokes a specific token by adding its jti to the blacklist with TTL expiry.\n        \"\"\"\n        try:\n            unverified_headers = jwt.get_unverified_header(token)\n            kid = unverified_headers.get(\"kid\")\n            if kid and kid in self._keys:\n                payload = jwt.decode(token, self._keys[kid][\"public_key\"], algorithms=[\"RS256\"], options={\"verify_signature\": True, \"verify_exp\": False})\n            else:\n                payload = jwt.decode(token, options={\"verify_signature\": False})\n            \n            jti = payload.get(\"jti\")\n            exp = payload.get(\"exp\", time.time() + self.token_ttl_seconds)\n            if jti:\n                self.blacklisted_tokens[jti] = exp\n        except Exception:\n            # If decoding fails completely, nothing to blacklist safely\n            pass\n\n    def invalidate_user_sessions(self, user_id: str) -> None:\n        \"\"\"\n        Password Reset Session Revocation: Invalidate all active sessions and refresh tokens \n        for a given user by recording the invalidation timestamp.\n        \"\"\"\n        self.user_sessions[user_id] = time.time()\n\n    def _purge_expired_blacklist(self) -> None:\n        \"\"\"\n        Removes expired tokens from the blacklist to bound memory usage.\n        \"\"\"\n        current_time = time.time()\n        expired_jtis = [jti for jti, exp in self.blacklisted_tokens.items() if exp < current_time]\n        for jti in expired_jtis:\n            del self.blacklisted_tokens[jti]\n```",
+      "latency_sec": 5.7464,
+      "prompt_tokens": 313,
+      "completion_tokens": 1938,
+      "cost_usd": 0.000605,
+      "pytest_result": {
+        "exit_code": 2,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpfbn_iay5\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 0 items / 1 error\n\n=================================== ERRORS ====================================\n____________________ ERROR collecting tests/test_oracle.py ____________________\nImportError while importing test module 'C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpfbn_iay5\\tests\\test_oracle.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n..\\..\\Python\\pythoncore-3.14-64\\Lib\\importlib\\__init__.py:88: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests\\test_oracle.py:1: in <module>\n    from target_module import JWKSRotator\ntarget_module.py:4: in <module>\n    import jwt\nE   ModuleNotFoundError: No module named 'jwt'\n=========================== short test summary info ===========================\nERROR tests/test_oracle.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n============================== 1 error in 0.18s ===============================\n",
+        "stderr": "",
+        "duration_sec": 0.77,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "User Task Instruction:\nImplement JWKSRotator class in target_module.py supporting rotate_keys(), sign_token(payload), verify_token(token), and get_jwks().\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Password Reset Session Revocation: Invalidate all active sessions and refresh tokens upon password reset.\n- [] Cross-Cluster Token Blacklist Propagation: Propagate revoked token identifiers across all active cluster nodes.\n- [] Cryptographic Credential Hashing (Argon2id / bcrypt): IF local credential storage is configured: Hash and salt user passwords using Argon2id or bcrypt.\n- [] Bounded Blacklist Retention and TTL Expiry: Retain revoked token entries in the blacklist for the maximum token TTL window.\n- [] Immediate Fail-Closed Access Gate: Reject requests with blacklisted tokens immediately with HTTP 401 Unauthorized.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nYour previous implementation produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpfbn_iay5\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 0 items / 1 error\n\n=================================== ERRORS ====================================\n____________________ ERROR collecting tests/test_oracle.py ____________________\nImportError while importing test module 'C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpfbn_iay5\\tests\\test_oracle.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n..\\..\\Python\\pythoncore-3.14-64\\Lib\\importlib\\__init__.py:88: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests\\test_oracle.py:1: in <module>\n    from target_module import JWKSRotator\ntarget_module.py:4: in <module>\n    import jwt\nE   ModuleNotFoundError: No module named 'jwt'\n=========================== short test summary info ===========================\nERROR tests/test_oracle.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n============================== 1 error in 0.18s ===============================\n\n\n\nPrevious Code in target_module.py:\n```python\nimport time\nimport uuid\nfrom typing import Dict, Any, Optional\nimport jwt\nfrom cryptography.hazmat.primitives.asymmetric import rsa\nfrom cryptography.hazmat.primitives import serialization\n\nclass JWKSRotator:\n    \"\"\"\n    JWKSRotator manages RSA key pairs for signing and verifying JSON Web Tokens (JWTs),\n    supporting key rotation, dynamic JWKS generation, and adherence to strict cryptographic\n    and security governance requirements.\n    \"\"\"\n\n    def __init__(self, token_ttl_seconds: int = 3600):\n        self.token_ttl_seconds = token_ttl_seconds\n        self._keys: Dict[str, Dict[str, Any]] = {}\n        self._current_kid: Optional[str] = None\n        self.blacklisted_tokens: Dict[str, float] = {}  # jti -> expiry timestamp\n        self.user_sessions: Dict[str, float] = {}       # user_id -> password reset/session invalidation timestamp\n        \n        # Initialize the first signing key\n        self.rotate_keys()\n\n    def rotate_keys(self) -> str:\n        \"\"\"\n        Generates a new RSA private/public key pair, assigns a unique key ID (kid),\n        sets it as the active signing key, and returns the new kid.\n        \"\"\"\n        kid = str(uuid.uuid4())\n        private_key = rsa.generate_private_key(\n            public_exponent=65537,\n            key_size=2048\n        )\n        public_key = private_key.public_key()\n\n        pem_private = private_key.private_bytes(\n            encoding=serialization.Encoding.PEM,\n            format=serialization.PrivateFormat.PKCS8,\n            encryption_algorithm=serialization.NoEncryption()\n        )\n\n        pem_public = public_key.public_bytes(\n            encoding=serialization.Encoding.PEM,\n            format=serialization.PublicFormat.SubjectPublicKeyInfo\n        )\n\n        self._keys[kid] = {\n            \"private_key\": pem_private,\n            \"public_key\": pem_public,\n            \"created_at\": time.time()\n        }\n        self._current_kid = kid\n        return kid\n\n    def sign_token(self, payload: Dict[str, Any], user_id: Optional[str] = None) -> str:\n        \"\"\"\n        Signs a JWT payload using the current active private key.\n        Injects a unique token identifier (jti), issued-at (iat), expiration (exp),\n        and associates it with the active key ID (kid) in the header.\n        \"\"\"\n        if not self._current_kid or self._current_kid not in self._keys:\n            self.rotate_keys()\n\n        current_time = time.time()\n        payload = payload.copy()\n        \n        if \"jti\" not in payload:\n            payload[\"jti\"] = str(uuid.uuid4())\n        if \"iat\" not in payload:\n            payload[\"iat\"] = int(current_time)\n        if \"exp\" not in payload:\n            payload[\"exp\"] = int(current_time + self.token_ttl_seconds)\n        if user_id and \"sub\" not in payload:\n            payload[\"sub\"] = user_id\n\n        private_key_pem = self._keys[self._current_kid][\"private_key\"]\n        \n        token = jwt.encode(\n            payload,\n            private_key_pem,\n            algorithm=\"RS256\",\n            headers={\"kid\": self._current_kid}\n        )\n        return token\n\n    def verify_token(self, token: str) -> Dict[str, Any]:\n        \"\"\"\n        Verifies a JWT token signature, expiration, blacklist status, and session validity.\n        Implements fail-closed access gating for revoked tokens or invalid sessions.\n        \"\"\"\n        # Cleanup expired blacklist entries first\n        self._purge_expired_blacklist()\n\n        try:\n            # Unverified header to extract kid\n            unverified_headers = jwt.get_unverified_header(token)\n            kid = unverified_headers.get(\"kid\")\n\n            if not kid or kid not in self._keys:\n                raise ValueError(\"Invalid key ID (kid)\")\n\n            public_key_pem = self._keys[kid][\"public_key\"]\n            payload = jwt.decode(\n                token,\n                public_key_pem,\n                algorithms=[\"RS256\"]\n            )\n        except jwt.PyJWTError as e:\n            raise ValueError(f\"Token verification failed: {str(e)}\") from e\n\n        # Check token blacklist (Cross-Cluster Token Blacklist Propagation & Bounded TTL Expiry)\n        jti = payload.get(\"jti\")\n        if jti and jti in self.blacklisted_tokens:\n            raise ValueError(\"Access Denied: Token has been revoked (HTTP 401 equivalent)\")\n\n        # Check Password Reset Session Revocation\n        sub = payload.get(\"sub\")\n        iat = payload.get(\"iat\", 0)\n        if sub and sub in self.user_sessions:\n            invalidation_timestamp = self.user_sessions[sub]\n            if iat < invalidation_timestamp:\n                raise ValueError(\"Access Denied: Session revoked due to password reset (HTTP 401 equivalent)\")\n\n        return payload\n\n    def get_jwks(self) -> Dict[str, Any]:\n        \"\"\"\n        Returns the JSON Web Key Set (JWKS) containing all active public keys\n        formatted according to RFC 7517.\n        \"\"\"\n        keys = []\n        for kid, key_data in self._keys.items():\n            public_key = serialization.load_pem_public_key(key_data[\"public_key\"])\n            public_numbers = public_key.public_numbers()\n            \n            # Convert public numbers to base64urlUInt\n            import base64\n            \n            def int_to_base64url(val: int) -> str:\n                byte_length = (val.bit_length() + 7) // 8\n                val_bytes = val.to_bytes(byte_length, 'big')\n                return base64.urlsafe_b64encode(val_bytes).rstrip(b'=').decode('utf-8')\n\n            keys.append({\n                \"kty\": \"RSA\",\n                \"use\": \"sig\",\n                \"alg\": \"RS256\",\n                \"kid\": kid,\n                \"n\": int_to_base64url(public_numbers.n),\n                \"e\": int_to_base64url(public_numbers.e)\n            })\n\n        return {\"keys\": keys}\n\n    def revoke_token(self, token: str) -> None:\n        \"\"\"\n        Revokes a specific token by adding its jti to the blacklist with TTL expiry.\n        \"\"\"\n        try:\n            unverified_headers = jwt.get_unverified_header(token)\n            kid = unverified_headers.get(\"kid\")\n            if kid and kid in self._keys:\n                payload = jwt.decode(token, self._keys[kid][\"public_key\"], algorithms=[\"RS256\"], options={\"verify_signature\": True, \"verify_exp\": False})\n            else:\n                payload = jwt.decode(token, options={\"verify_signature\": False})\n            \n            jti = payload.get(\"jti\")\n            exp = payload.get(\"exp\", time.time() + self.token_ttl_seconds)\n            if jti:\n                self.blacklisted_tokens[jti] = exp\n        except Exception:\n            # If decoding fails completely, nothing to blacklist safely\n            pass\n\n    def invalidate_user_sessions(self, user_id: str) -> None:\n        \"\"\"\n        Password Reset Session Revocation: Invalidate all active sessions and refresh tokens \n        for a given user by recording the invalidation timestamp.\n        \"\"\"\n        self.user_sessions[user_id] = time.time()\n\n    def _purge_expired_blacklist(self) -> None:\n        \"\"\"\n        Removes expired tokens from the blacklist to bound memory usage.\n        \"\"\"\n        current_time = time.time()\n        expired_jtis = [jti for jti, exp in self.blacklisted_tokens.items() if exp < current_time]\n        for jti in expired_jtis:\n            del self.blacklisted_tokens[jti]\n\n```\n\nAnalyze the test failures against the S-Class governance requirements and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nimport time\nimport uuid\nimport base64\nfrom typing import Dict, Any, Optional\nfrom cryptography.hazmat.primitives.asymmetric import rsa\nfrom cryptography.hazmat.primitives import serialization\n\n# Lightweight pure Python JWT & JWS implementation to avoid external dependencies like PyJWT/cryptography-jwt mismatch issues\nimport hmac\nimport hashlib\nimport json\n\ndef _base64url_encode(data: bytes) -> str:\n    return base64.urlsafe_b64encode(data).rstrip(b'=').decode('utf-8')\n\ndef _base64url_decode(data: str) -> bytes:\n    padding = '=' * (4 - (len(data) % 4))\n    return base64.urlsafe_b64decode(data + padding)\n\nclass JWKSRotator:\n    \"\"\"\n    JWKSRotator manages RSA key pairs for signing and verifying JSON Web Tokens (JWTs),\n    supporting key rotation, dynamic JWKS generation, and adherence to strict cryptographic\n    and security governance requirements.\n    \"\"\"\n\n    def __init__(self, token_ttl_seconds: int = 3600):\n        self.token_ttl_seconds = token_ttl_seconds\n        self._keys: Dict[str, Dict[str, Any]] = {}\n        self._current_kid: Optional[str] = None\n        self.blacklisted_tokens: Dict[str, float] = {}  # jti -> expiry timestamp\n        self.user_sessions: Dict[str, float] = {}       # user_id -> password reset/session invalidation timestamp\n        \n        # Initialize the first signing key\n        self.rotate_keys()\n\n    def rotate_keys(self) -> str:\n        \"\"\"\n        Generates a new RSA private/public key pair, assigns a unique key ID (kid),\n        sets it as the active signing key, and returns the new kid.\n        \"\"\"\n        kid = str(uuid.uuid4())\n        private_key = rsa.generate_private_key(\n            public_exponent=65537,\n            key_size=2048\n        )\n        public_key = private_key.public_key()\n\n        pem_private = private_key.private_bytes(\n            encoding=serialization.Encoding.PEM,\n            format=serialization.PrivateFormat.PKCS8,\n            encryption_algorithm=serialization.NoEncryption()\n        )\n\n        pem_public = public_key.public_bytes(\n            encoding=serialization.Encoding.PEM,\n            format=serialization.PublicFormat.SubjectPublicKeyInfo\n        )\n\n        self._keys[kid] = {\n            \"private_key\": pem_private,\n            \"public_key\": pem_public,\n            \"created_at\": time.time()\n        }\n        self._current_kid = kid\n        return kid\n\n    def sign_token(self, payload: Dict[str, Any], user_id: Optional[str] = None) -> str:\n        \"\"\"\n        Signs a JWT payload using the current active private key.\n        Injects a unique token identifier (jti), issued-at (iat), expiration (exp),\n        and associates it with the active key ID (kid) in the header.\n        \"\"\"\n        if not self._current_kid or self._current_kid not in self._keys:\n            self.rotate_keys()\n\n        current_time = time.time()\n        payload = dict(payload)\n        \n        if \"jti\" not in payload:\n            payload[\"jti\"] = str(uuid.uuid4())\n        if \"iat\" not in payload:\n            payload[\"iat\"] = int(current_time)\n        if \"exp\" not in payload:\n            payload[\"exp\"] = int(current_time + self.token_ttl_seconds)\n        if user_id and \"sub\" not in payload:\n            payload[\"sub\"] = user_id\n\n        header = {\"alg\": \"RS256\", \"typ\": \"JWT\", \"kid\": self._current_kid}\n        \n        header_json = json.dumps(header, separators=(',', ':'), sort_keys=True).encode('utf-8')\n        payload_json = json.dumps(payload, separators=(',', ':'), sort_keys=True).encode('utf-8')\n        \n        signing_input = _base64url_encode(header_json) + \".\" + _base64url_encode(payload_json)\n        \n        private_key_pem = self._keys[self._current_kid][\"private_key\"]\n        private_key = serialization.load_pem_private_key(private_key_pem, password=None)\n        \n        from cryptography.hazmat.primitives.asymmetric import padding\n        signature = private_key.sign(\n            signing_input.encode('utf-8'),\n            padding.PKCS1v15(),\n            hashes.SHA256() if 'hashes' in globals() else __import__('cryptography.hazmat.primitives.hashes', fromlist=['SHA256']).SHA256()\n        )\n        \n        token = signing_input + \".\" + _base64url_encode(signature)\n        return token\n\n    def verify_token(self, token: str) -> Dict[str, Any]:\n        \"\"\"\n        Verifies a JWT token signature, expiration, blacklist status, and session validity.\n        Implements fail-closed access gating for revoked tokens or invalid sessions.\n        \"\"\"\n        self._purge_expired_blacklist()\n\n        parts = token.split('.')\n        if len(parts) != 3:\n            raise ValueError(\"Token verification failed: Invalid token format\")\n\n        try:\n            header_json = _base64url_decode(parts[0]).decode('utf-8')\n            payload_json = _base64url_decode(parts[1]).decode('utf-8')\n            \n            header = json.loads(header_json)\n            payload = json.loads(payload_json)\n        except Exception as e:\n            raise ValueError(f\"Token verification failed: {str(e)}\") from e\n\n        kid = header.get(\"kid\")\n        if not kid or kid not in self._keys:\n            raise ValueError(\"Invalid key ID (kid)\")\n\n        # Verify signature\n        public_key_pem = self._keys[kid][\"public_key\"]\n        public_key = serialization.load_pem_public_key(public_key_pem)\n        \n        signing_input = parts[0] + \".\" + parts[1]\n        signature = _base64url_decode(parts[2])\n\n        from cryptography.hazmat.primitives.asymmetric import padding\n        from cryptography.hazmat.primitives import hashes\n        try:\n            public_key.verify(\n                signature,\n                signing_input.encode('utf-8'),\n                padding.PKCS1v15(),\n                hashes.SHA256()\n            )\n        except Exception as e:\n            raise ValueError(f\"Token verification failed: Signature verification failed\") from e\n\n        # Check expiration\n        exp = payload.get(\"exp\")\n        if exp and time.time() > exp:\n            raise ValueError(\"Token verification failed: Token has expired\")\n\n        # Check token blacklist\n        jti = payload.get(\"jti\")\n        if jti and jti in self.blacklisted_tokens:\n            raise ValueError(\"Access Denied: Token has been revoked (HTTP 401 equivalent)\")\n\n        # Check Password Reset Session Revocation\n        sub = payload.get(\"sub\")\n        iat = payload.get(\"iat\", 0)\n        if sub and sub in self.user_sessions:\n            invalidation_timestamp = self.user_sessions[sub]\n            if iat < invalidation_timestamp:\n                raise ValueError(\"Access Denied: Session revoked due to password reset (HTTP 401 equivalent)\")\n\n        return payload\n\n    def get_jwks(self) -> Dict[str, Any]:\n        \"\"\"\n        Returns the JSON Web Key Set (JWKS) containing all active public keys\n        formatted according to RFC 7517.\n        \"\"\"\n        keys = []\n        for kid, key_data in self._keys.items():\n            public_key = serialization.load_pem_public_key(key_data[\"public_key\"])\n            public_numbers = public_key.public_numbers()\n            \n            def int_to_base64url(val: int) -> str:\n                byte_length = (val.bit_length() + 7) // 8\n                val_bytes = val.to_bytes(byte_length, 'big')\n                return base64.urlsafe_b64encode(val_bytes).rstrip(b'=').decode('utf-8')\n\n            keys.append({\n                \"kty\": \"RSA\",\n                \"use\": \"sig\",\n                \"alg\": \"RS256\",\n                \"kid\": kid,\n                \"n\": int_to_base64url(public_numbers.n),\n                \"e\": int_to_base64url(public_numbers.e)\n            })\n\n        return {\"keys\": keys}\n\n    def revoke_token(self, token: str) -> None:\n        \"\"\"\n        Revokes a specific token by adding its jti to the blacklist with TTL expiry.\n        \"\"\"\n        try:\n            parts = token.split('.')\n            if len(parts) >= 2:\n                payload = json.loads(_base64url_decode(parts[1]).decode('utf-8'))\n                jti = payload.get(\"jti\")\n                exp = payload.get(\"exp\", time.time() + self.token_ttl_seconds)\n                if jti:\n                    self.blacklisted_tokens[jti] = exp\n        except Exception:\n            pass\n\n    def invalidate_user_sessions(self, user_id: str) -> None:\n        \"\"\"\n        Password Reset Session Revocation: Invalidate all active sessions and refresh tokens \n        for a given user by recording the invalidation timestamp.\n        \"\"\"\n        self.user_sessions[user_id] = time.time()\n\n    def _purge_expired_blacklist(self) -> None:\n        \"\"\"\n        Removes expired tokens from the blacklist to bound memory usage.\n        \"\"\"\n        current_time = time.time()\n        expired_jtis = [jti for jti, exp in self.blacklisted_tokens.items() if exp < current_time]\n        for jti in expired_jtis:\n            del self.blacklisted_tokens[jti]\n```",
+      "latency_sec": 7.5084,
+      "prompt_tokens": 2651,
+      "completion_tokens": 2426,
+      "cost_usd": 0.000927,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpfbn_iay5\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_jwks_rotation PASSED                          [100%]\n\n============================== 1 passed in 0.21s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.731,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "import time\nimport uuid\nimport base64\nfrom typing import Dict, Any, Optional\nfrom cryptography.hazmat.primitives.asymmetric import rsa\nfrom cryptography.hazmat.primitives import serialization\n\n# Lightweight pure Python JWT & JWS implementation to avoid external dependencies like PyJWT/cryptography-jwt mismatch issues\nimport hmac\nimport hashlib\nimport json\n\ndef _base64url_encode(data: bytes) -> str:\n    return base64.urlsafe_b64encode(data).rstrip(b'=').decode('utf-8')\n\ndef _base64url_decode(data: str) -> bytes:\n    padding = '=' * (4 - (len(data) % 4))\n    return base64.urlsafe_b64decode(data + padding)\n\nclass JWKSRotator:\n    \"\"\"\n    JWKSRotator manages RSA key pairs for signing and verifying JSON Web Tokens (JWTs),\n    supporting key rotation, dynamic JWKS generation, and adherence to strict cryptographic\n    and security governance requirements.\n    \"\"\"\n\n    def __init__(self, token_ttl_seconds: int = 3600):\n        self.token_ttl_seconds = token_ttl_seconds\n        self._keys: Dict[str, Dict[str, Any]] = {}\n        self._current_kid: Optional[str] = None\n        self.blacklisted_tokens: Dict[str, float] = {}  # jti -> expiry timestamp\n        self.user_sessions: Dict[str, float] = {}       # user_id -> password reset/session invalidation timestamp\n        \n        # Initialize the first signing key\n        self.rotate_keys()\n\n    def rotate_keys(self) -> str:\n        \"\"\"\n        Generates a new RSA private/public key pair, assigns a unique key ID (kid),\n        sets it as the active signing key, and returns the new kid.\n        \"\"\"\n        kid = str(uuid.uuid4())\n        private_key = rsa.generate_private_key(\n            public_exponent=65537,\n            key_size=2048\n        )\n        public_key = private_key.public_key()\n\n        pem_private = private_key.private_bytes(\n            encoding=serialization.Encoding.PEM,\n            format=serialization.PrivateFormat.PKCS8,\n            encryption_algorithm=serialization.NoEncryption()\n        )\n\n        pem_public = public_key.public_bytes(\n            encoding=serialization.Encoding.PEM,\n            format=serialization.PublicFormat.SubjectPublicKeyInfo\n        )\n\n        self._keys[kid] = {\n            \"private_key\": pem_private,\n            \"public_key\": pem_public,\n            \"created_at\": time.time()\n        }\n        self._current_kid = kid\n        return kid\n\n    def sign_token(self, payload: Dict[str, Any], user_id: Optional[str] = None) -> str:\n        \"\"\"\n        Signs a JWT payload using the current active private key.\n        Injects a unique token identifier (jti), issued-at (iat), expiration (exp),\n        and associates it with the active key ID (kid) in the header.\n        \"\"\"\n        if not self._current_kid or self._current_kid not in self._keys:\n            self.rotate_keys()\n\n        current_time = time.time()\n        payload = dict(payload)\n        \n        if \"jti\" not in payload:\n            payload[\"jti\"] = str(uuid.uuid4())\n        if \"iat\" not in payload:\n            payload[\"iat\"] = int(current_time)\n        if \"exp\" not in payload:\n            payload[\"exp\"] = int(current_time + self.token_ttl_seconds)\n        if user_id and \"sub\" not in payload:\n            payload[\"sub\"] = user_id\n\n        header = {\"alg\": \"RS256\", \"typ\": \"JWT\", \"kid\": self._current_kid}\n        \n        header_json = json.dumps(header, separators=(',', ':'), sort_keys=True).encode('utf-8')\n        payload_json = json.dumps(payload, separators=(',', ':'), sort_keys=True).encode('utf-8')\n        \n        signing_input = _base64url_encode(header_json) + \".\" + _base64url_encode(payload_json)\n        \n        private_key_pem = self._keys[self._current_kid][\"private_key\"]\n        private_key = serialization.load_pem_private_key(private_key_pem, password=None)\n        \n        from cryptography.hazmat.primitives.asymmetric import padding\n        signature = private_key.sign(\n            signing_input.encode('utf-8'),\n            padding.PKCS1v15(),\n            hashes.SHA256() if 'hashes' in globals() else __import__('cryptography.hazmat.primitives.hashes', fromlist=['SHA256']).SHA256()\n        )\n        \n        token = signing_input + \".\" + _base64url_encode(signature)\n        return token\n\n    def verify_token(self, token: str) -> Dict[str, Any]:\n        \"\"\"\n        Verifies a JWT token signature, expiration, blacklist status, and session validity.\n        Implements fail-closed access gating for revoked tokens or invalid sessions.\n        \"\"\"\n        self._purge_expired_blacklist()\n\n        parts = token.split('.')\n        if len(parts) != 3:\n            raise ValueError(\"Token verification failed: Invalid token format\")\n\n        try:\n            header_json = _base64url_decode(parts[0]).decode('utf-8')\n            payload_json = _base64url_decode(parts[1]).decode('utf-8')\n            \n            header = json.loads(header_json)\n            payload = json.loads(payload_json)\n        except Exception as e:\n            raise ValueError(f\"Token verification failed: {str(e)}\") from e\n\n        kid = header.get(\"kid\")\n        if not kid or kid not in self._keys:\n            raise ValueError(\"Invalid key ID (kid)\")\n\n        # Verify signature\n        public_key_pem = self._keys[kid][\"public_key\"]\n        public_key = serialization.load_pem_public_key(public_key_pem)\n        \n        signing_input = parts[0] + \".\" + parts[1]\n        signature = _base64url_decode(parts[2])\n\n        from cryptography.hazmat.primitives.asymmetric import padding\n        from cryptography.hazmat.primitives import hashes\n        try:\n            public_key.verify(\n                signature,\n                signing_input.encode('utf-8'),\n                padding.PKCS1v15(),\n                hashes.SHA256()\n            )\n        except Exception as e:\n            raise ValueError(f\"Token verification failed: Signature verification failed\") from e\n\n        # Check expiration\n        exp = payload.get(\"exp\")\n        if exp and time.time() > exp:\n            raise ValueError(\"Token verification failed: Token has expired\")\n\n        # Check token blacklist\n        jti = payload.get(\"jti\")\n        if jti and jti in self.blacklisted_tokens:\n            raise ValueError(\"Access Denied: Token has been revoked (HTTP 401 equivalent)\")\n\n        # Check Password Reset Session Revocation\n        sub = payload.get(\"sub\")\n        iat = payload.get(\"iat\", 0)\n        if sub and sub in self.user_sessions:\n            invalidation_timestamp = self.user_sessions[sub]\n            if iat < invalidation_timestamp:\n                raise ValueError(\"Access Denied: Session revoked due to password reset (HTTP 401 equivalent)\")\n\n        return payload\n\n    def get_jwks(self) -> Dict[str, Any]:\n        \"\"\"\n        Returns the JSON Web Key Set (JWKS) containing all active public keys\n        formatted according to RFC 7517.\n        \"\"\"\n        keys = []\n        for kid, key_data in self._keys.items():\n            public_key = serialization.load_pem_public_key(key_data[\"public_key\"])\n            public_numbers = public_key.public_numbers()\n            \n            def int_to_base64url(val: int) -> str:\n                byte_length = (val.bit_length() + 7) // 8\n                val_bytes = val.to_bytes(byte_length, 'big')\n                return base64.urlsafe_b64encode(val_bytes).rstrip(b'=').decode('utf-8')\n\n            keys.append({\n                \"kty\": \"RSA\",\n                \"use\": \"sig\",\n                \"alg\": \"RS256\",\n                \"kid\": kid,\n                \"n\": int_to_base64url(public_numbers.n),\n                \"e\": int_to_base64url(public_numbers.e)\n            })\n\n        return {\"keys\": keys}\n\n    def revoke_token(self, token: str) -> None:\n        \"\"\"\n        Revokes a specific token by adding its jti to the blacklist with TTL expiry.\n        \"\"\"\n        try:\n            parts = token.split('.')\n            if len(parts) >= 2:\n                payload = json.loads(_base64url_decode(parts[1]).decode('utf-8'))\n                jti = payload.get(\"jti\")\n                exp = payload.get(\"exp\", time.time() + self.token_ttl_seconds)\n                if jti:\n                    self.blacklisted_tokens[jti] = exp\n        except Exception:\n            pass\n\n    def invalidate_user_sessions(self, user_id: str) -> None:\n        \"\"\"\n        Password Reset Session Revocation: Invalidate all active sessions and refresh tokens \n        for a given user by recording the invalidation timestamp.\n        \"\"\"\n        self.user_sessions[user_id] = time.time()\n\n    def _purge_expired_blacklist(self) -> None:\n        \"\"\"\n        Removes expired tokens from the blacklist to bound memory usage.\n        \"\"\"\n        current_time = time.time()\n        expired_jtis = [jti for jti, exp in self.blacklisted_tokens.items() if exp < current_time]\n        for jti in expired_jtis:\n            del self.blacklisted_tokens[jti]\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpfbn_iay5\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_jwks_rotation PASSED                          [100%]\n\n============================== 1 passed in 0.21s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.731,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  }
+}

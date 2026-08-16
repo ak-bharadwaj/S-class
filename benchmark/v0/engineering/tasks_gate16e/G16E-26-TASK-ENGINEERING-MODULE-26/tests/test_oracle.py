@@ -1,0 +1,7 @@
+from target_module import EngineModule26
+
+def test_engine_26():
+    e = EngineModule26()
+    assert e.get_status() == 'ready'
+    res = e.process({'input': 123})
+    assert res.get('status') == 'success'

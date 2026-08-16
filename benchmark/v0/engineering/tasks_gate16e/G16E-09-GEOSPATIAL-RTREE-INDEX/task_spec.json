@@ -1,0 +1,5 @@
+{
+  "task_id": "G16E-09-GEOSPATIAL-RTREE-INDEX",
+  "domain": "Algorithms & Spatial / R-Tree Spatial Index",
+  "raw_prompt": "Implement RTreeSpatialIndex in target_module.py supporting insert(item_id, bbox) and search(query_bbox)."
+}

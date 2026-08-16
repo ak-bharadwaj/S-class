@@ -1,0 +1,5 @@
+{
+  "task_id": "G16E-10-SECRET-SHARING-SHAMIR",
+  "domain": "Cryptography / Shamir Secret Sharing",
+  "raw_prompt": "Implement ShamirSecretSharing in target_module.py supporting split(secret, n, k) and combine(shares)."
+}

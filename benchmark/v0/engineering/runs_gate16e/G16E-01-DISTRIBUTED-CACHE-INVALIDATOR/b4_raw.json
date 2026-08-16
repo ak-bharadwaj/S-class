@@ -1,0 +1,134 @@
+{
+  "task_id": "G16E-01-DISTRIBUTED-CACHE-INVALIDATOR",
+  "baseline": "B4",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Distributed Systems / Cache Invalidation",
+  "raw_prompt": "Implement DistributedCacheInvalidator class in target_module.py supporting set(key, value, version, ttl_sec), get(key), and invalidate(key, version). Version must reject stale updates.",
+  "sclass_governance": {
+    "semantic_requirements": [
+      {
+        "id": "REQ-SHADOW-001",
+        "title": "Core Service Functionality",
+        "description": "Implement core processing logic for: Implement DistributedCacheInvalidator class in target_module.py supporting set(key, value, version, ttl_sec), get(key), and invalidate(key, version). Version must reject stale updates.",
+        "type": "FUNCTIONAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt execution mandate"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-002",
+        "title": "Underlying Storage Technology Specification",
+        "description": "The specific persistence engine and database backend are unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify database technology"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-003",
+        "title": "API Transport Protocol Specification",
+        "description": "The specific network transport protocol (gRPC vs REST) is unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify API protocol"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      }
+    ],
+    "epistemic_status": "CONFIRMED",
+    "gate_result": "PASS"
+  },
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 1
+  },
+  "repository": {
+    "starting_tree_hash": "7c1da043135868a3a9cd1a36a4164de3f5292e30e1d86572e80620a6177867fa",
+    "final_tree_hash": "66e091ba1aa3c09b16712f02df1c6300455dfb7afe78c09a13e87a02bdff7b82"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "User Task Instruction:\nImplement DistributedCacheInvalidator class in target_module.py supporting set(key, value, version, ttl_sec), get(key), and invalidate(key, version). Version must reject stale updates.\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement DistributedCacheInvalidator class in target_module.py supporting set(key, value, version, ttl_sec), get(key), and invalidate(key, version). Version must reject stale updates.\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nExisting Code in target_module.py:\n```python\n\n```\n\nImplement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block.",
+      "response_text": "```python\nimport time\nimport threading\n\nclass DistributedCacheInvalidator:\n    \"\"\"\n    A thread-safe distributed cache invalidator supporting version-checked \n    updates (stale version rejection), TTL-based expiration, and explicit invalidation.\n    \"\"\"\n    def __init__(self):\n        self._lock = threading.Lock()\n        # Storage format: key -> {\"value\": value, \"version\": version, \"expires_at\": expires_at}\n        self._store = {}\n\n    def set(self, key: str, value: any, version: int, ttl_sec: float = None) -> bool:\n        \"\"\"\n        Sets a key to a value with a given version and optional TTL in seconds.\n        Rejects updates if an existing record has a strictly higher version.\n        If the existing version is equal, it acts as an idempotent update or overwrite.\n        \n        Returns:\n            bool: True if the set succeeded, False if rejected due to a stale version.\n        \"\"\"\n        with self._lock:\n            now = time.time()\n            \n            # Check if key exists and is not expired\n            if key in self._store:\n                item = self._store[key]\n                if item[\"expires_at\"] is not None and now >= item[\"expires_at\"]:\n                    # Expired, treat as non-existent\n                    pass\n                else:\n                    # Version check: reject if incoming version is strictly less than existing version\n                    if version < item[\"version\"]:\n                        return False\n\n            # Calculate expiration time\n            expires_at = (now + ttl_sec) if ttl_sec is not None else None\n            \n            self._store[key] = {\n                \"value\": value,\n                \"version\": version,\n                \"expires_at\": expires_at\n            }\n            return True\n\n    def get(self, key: str) -> any:\n        \"\"\"\n        Retrieves the value for a key if it exists and has not expired.\n        Automatically cleans up expired keys upon access.\n        \n        Returns:\n            The cached value, or None if the key does not exist or has expired.\n        \"\"\"\n        with self._lock:\n            if key not in self._store:\n                return None\n            \n            item = self._store[key]\n            if item[\"expires_at\"] is not None and time.time() >= item[\"expires_at\"]:\n                del self._store[key]\n                return None\n            \n            return item[\"value\"]\n\n    def invalidate(self, key: str, version: int) -> bool:\n        \"\"\"\n        Invalidates (deletes or marks as stale) a key given a specific version.\n        Rejects invalidation if the existing version is strictly greater than \n        the provided version, preventing out-of-order invalidation messages.\n        \n        Returns:\n            bool: True if invalidation was applied, False if rejected due to stale version.\n        \"\"\"\n        with self._lock:\n            now = time.time()\n            \n            if key in self._store:\n                item = self._store[key]\n                # Check if already expired\n                if item[\"expires_at\"] is not None and now >= item[\"expires_at\"]:\n                    del self._store[key]\n                    return True\n                \n                # Version check for invalidation\n                if version < item[\"version\"]:\n                    return False\n                \n                del self._store[key]\n                return True\n            else:\n                # If the key isn't present, we can either record a tombstone or just return True.\n                # Here, since it's not present, we can successfully consider it invalidated.\n                return True\n```",
+      "latency_sec": 3.6714,
+      "prompt_tokens": 243,
+      "completion_tokens": 821,
+      "cost_usd": 0.000265,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmppoey7oc6\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_cache_operations PASSED                       [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.646,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "import time\nimport threading\n\nclass DistributedCacheInvalidator:\n    \"\"\"\n    A thread-safe distributed cache invalidator supporting version-checked \n    updates (stale version rejection), TTL-based expiration, and explicit invalidation.\n    \"\"\"\n    def __init__(self):\n        self._lock = threading.Lock()\n        # Storage format: key -> {\"value\": value, \"version\": version, \"expires_at\": expires_at}\n        self._store = {}\n\n    def set(self, key: str, value: any, version: int, ttl_sec: float = None) -> bool:\n        \"\"\"\n        Sets a key to a value with a given version and optional TTL in seconds.\n        Rejects updates if an existing record has a strictly higher version.\n        If the existing version is equal, it acts as an idempotent update or overwrite.\n        \n        Returns:\n            bool: True if the set succeeded, False if rejected due to a stale version.\n        \"\"\"\n        with self._lock:\n            now = time.time()\n            \n            # Check if key exists and is not expired\n            if key in self._store:\n                item = self._store[key]\n                if item[\"expires_at\"] is not None and now >= item[\"expires_at\"]:\n                    # Expired, treat as non-existent\n                    pass\n                else:\n                    # Version check: reject if incoming version is strictly less than existing version\n                    if version < item[\"version\"]:\n                        return False\n\n            # Calculate expiration time\n            expires_at = (now + ttl_sec) if ttl_sec is not None else None\n            \n            self._store[key] = {\n                \"value\": value,\n                \"version\": version,\n                \"expires_at\": expires_at\n            }\n            return True\n\n    def get(self, key: str) -> any:\n        \"\"\"\n        Retrieves the value for a key if it exists and has not expired.\n        Automatically cleans up expired keys upon access.\n        \n        Returns:\n            The cached value, or None if the key does not exist or has expired.\n        \"\"\"\n        with self._lock:\n            if key not in self._store:\n                return None\n            \n            item = self._store[key]\n            if item[\"expires_at\"] is not None and time.time() >= item[\"expires_at\"]:\n                del self._store[key]\n                return None\n            \n            return item[\"value\"]\n\n    def invalidate(self, key: str, version: int) -> bool:\n        \"\"\"\n        Invalidates (deletes or marks as stale) a key given a specific version.\n        Rejects invalidation if the existing version is strictly greater than \n        the provided version, preventing out-of-order invalidation messages.\n        \n        Returns:\n            bool: True if invalidation was applied, False if rejected due to stale version.\n        \"\"\"\n        with self._lock:\n            now = time.time()\n            \n            if key in self._store:\n                item = self._store[key]\n                # Check if already expired\n                if item[\"expires_at\"] is not None and now >= item[\"expires_at\"]:\n                    del self._store[key]\n                    return True\n                \n                # Version check for invalidation\n                if version < item[\"version\"]:\n                    return False\n                \n                del self._store[key]\n                return True\n            else:\n                # If the key isn't present, we can either record a tombstone or just return True.\n                # Here, since it's not present, we can successfully consider it invalidated.\n                return True\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmppoey7oc6\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_cache_operations PASSED                       [100%]\n\n============================== 1 passed in 0.03s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.646,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  }
+}

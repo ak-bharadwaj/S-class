@@ -1,0 +1,5 @@
+{
+  "task_id": "G16E-03-RATE-LIMITED-WEBHOOK-DISPATCHER",
+  "domain": "Networking & Queues / Exponential Backoff",
+  "raw_prompt": "Implement RateLimitedWebhookDispatcher in target_module.py supporting dispatch(url, payload), process_queue(), and get_status(webhook_id)."
+}

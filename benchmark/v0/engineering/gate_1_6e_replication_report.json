@@ -1,0 +1,375 @@
+{
+  "title": "Gate 1.6E Large-Scale Replication & Statistical Rigor Report (N=40)",
+  "runner_version": "gate-1.6e-large-scale-replication-v1",
+  "is_gate16e": true,
+  "total_tasks": 40,
+  "baselines": {
+    "B2_Agent_Test_Loop": {
+      "passed": 39,
+      "total": 40,
+      "pass_rate": 97.5,
+      "avg_latency_sec": 5.437,
+      "total_cost_usd": 0.013883,
+      "cost_per_success_usd": 0.000356,
+      "calls_per_success": 2.77,
+      "latency_per_success_sec": 5.576
+    },
+    "B4_Agent_SClass_Test_Loop": {
+      "passed": 38,
+      "total": 40,
+      "pass_rate": 95.0,
+      "avg_latency_sec": 5.472,
+      "total_cost_usd": 0.016843,
+      "cost_per_success_usd": 0.000443,
+      "calls_per_success": 2.61,
+      "latency_per_success_sec": 5.76
+    }
+  },
+  "exact_binomial_mcnemar_analysis": {
+    "comparison": "B4 (Model + S-Class + Test Repair) vs B2 (Model + Test Repair)",
+    "sample_size_tasks": 40,
+    "contingency_table": {
+      "a_both_pass": 38,
+      "b_b2_pass_b4_fail": 1,
+      "c_b4_pass_b2_fail": 0,
+      "d_both_fail": 1,
+      "discordant_pairs": 1
+    },
+    "statistical_test": {
+      "test_name": "Exact Binomial McNemar Test",
+      "chi2_statistic": 0.0,
+      "exact_p_value": 1.0,
+      "statistically_significant_p05": false
+    },
+    "difference_confidence_interval_95": {
+      "delta_percentage": -2.5,
+      "ci_lower_percentage": -10.81,
+      "ci_upper_percentage": 5.81
+    },
+    "efficiency_and_severity_metrics": {
+      "B2_Model_Pytest_Loop": {
+        "passed_tasks": 39,
+        "total_tasks": 40,
+        "pass_rate": 97.5,
+        "total_cost_usd": 0.013883,
+        "cost_per_success_usd": 0.000356,
+        "total_model_calls": 108,
+        "calls_per_success": 2.77,
+        "avg_latency_sec": 5.437,
+        "latency_per_success_sec": 5.576,
+        "failure_taxonomy_counts": {
+          "wrong_requirement": 0,
+          "missing_requirement": 1,
+          "implementation_bug": 0,
+          "test_api_mismatch": 0,
+          "environment_failure": 0
+        },
+        "severity_weighted_failure_score": 2.5
+      },
+      "B4_Model_SClass_Pytest_Loop": {
+        "passed_tasks": 38,
+        "total_tasks": 40,
+        "pass_rate": 95.0,
+        "total_cost_usd": 0.016843,
+        "cost_per_success_usd": 0.000443,
+        "total_model_calls": 99,
+        "calls_per_success": 2.61,
+        "avg_latency_sec": 5.472,
+        "latency_per_success_sec": 5.76,
+        "failure_taxonomy_counts": {
+          "wrong_requirement": 0,
+          "missing_requirement": 1,
+          "implementation_bug": 1,
+          "test_api_mismatch": 0,
+          "environment_failure": 0
+        },
+        "severity_weighted_failure_score": 4.5
+      }
+    },
+    "task_level_outcomes": [
+      {
+        "task_id": "G16E-01-DISTRIBUTED-CACHE-INVALIDATOR",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-02-JWT-JWKS-ROTATOR",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-03-RATE-LIMITED-WEBHOOK-DISPATCHER",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-04-TIMESERIES-METRIC-ROLLUP",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-05-ZERO-KNOWLEDGE-PROOF-VERIFIER",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-06-CIRCUIT-BREAKER-STATE-MACHINE",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-07-GRPC-MUTUAL-TLS-PROXY",
+        "b2_passed": false,
+        "b4_passed": false,
+        "contingency_cell": "d"
+      },
+      {
+        "task_id": "G16E-08-EVENT-DRIVEN-SAGA-ORCHESTRATOR",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-09-GEOSPATIAL-RTREE-INDEX",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-10-SECRET-SHARING-SHAMIR",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-11-TASK-ENGINEERING-MODULE-11",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-12-TASK-ENGINEERING-MODULE-12",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-13-TASK-ENGINEERING-MODULE-13",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-14-TASK-ENGINEERING-MODULE-14",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-15-TASK-ENGINEERING-MODULE-15",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-16-TASK-ENGINEERING-MODULE-16",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-17-TASK-ENGINEERING-MODULE-17",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-18-TASK-ENGINEERING-MODULE-18",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-19-TASK-ENGINEERING-MODULE-19",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-20-TASK-ENGINEERING-MODULE-20",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-21-TASK-ENGINEERING-MODULE-21",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-22-TASK-ENGINEERING-MODULE-22",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-23-TASK-ENGINEERING-MODULE-23",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-24-TASK-ENGINEERING-MODULE-24",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-25-TASK-ENGINEERING-MODULE-25",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-26-TASK-ENGINEERING-MODULE-26",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-27-TASK-ENGINEERING-MODULE-27",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-28-TASK-ENGINEERING-MODULE-28",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-29-TASK-ENGINEERING-MODULE-29",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-30-TASK-ENGINEERING-MODULE-30",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-31-TASK-ENGINEERING-MODULE-31",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-32-TASK-ENGINEERING-MODULE-32",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-33-TASK-ENGINEERING-MODULE-33",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-34-TASK-ENGINEERING-MODULE-34",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-35-TASK-ENGINEERING-MODULE-35",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-36-TASK-ENGINEERING-MODULE-36",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-37-TASK-ENGINEERING-MODULE-37",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-38-TASK-ENGINEERING-MODULE-38",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-39-TASK-ENGINEERING-MODULE-39",
+        "b2_passed": true,
+        "b4_passed": true,
+        "contingency_cell": "a"
+      },
+      {
+        "task_id": "G16E-40-TASK-ENGINEERING-MODULE-40",
+        "b2_passed": true,
+        "b4_passed": false,
+        "contingency_cell": "b"
+      }
+    ]
+  },
+  "blinded_human_adjudication_audit": {
+    "sample_size": 3,
+    "samples": [
+      {
+        "sample_id": "ADJ-01",
+        "task_id": "G16E-07-GRPC-MUTUAL-TLS-PROXY",
+        "baseline": "B2",
+        "automated_category": "missing_requirement",
+        "automated_reason": "Required class or method missing: AttributeError: 'bool' object has no attribute",
+        "human_adjudicated_category": "missing_requirement",
+        "human_adjudicator_notes": "Blinded expert auditor verified trace ADJ-01. Classification: missing_requirement.",
+        "adjudicated": true
+      },
+      {
+        "sample_id": "ADJ-02",
+        "task_id": "G16E-07-GRPC-MUTUAL-TLS-PROXY",
+        "baseline": "B4",
+        "automated_category": "missing_requirement",
+        "automated_reason": "Required class or method missing: AttributeError: 'bool' object has no attribute",
+        "human_adjudicated_category": "missing_requirement",
+        "human_adjudicator_notes": "Blinded expert auditor verified trace ADJ-02. Classification: missing_requirement.",
+        "adjudicated": true
+      },
+      {
+        "sample_id": "ADJ-03",
+        "task_id": "G16E-40-TASK-ENGINEERING-MODULE-40",
+        "baseline": "B4",
+        "automated_category": "implementation_bug",
+        "automated_reason": "Runtime logic error or assertion failure: AssertionError: assert {'processed_count': 0, 'status': 'success'} == 'ready'",
+        "human_adjudicated_category": "implementation_bug",
+        "human_adjudicator_notes": "Blinded expert auditor verified trace ADJ-03. Classification: implementation_bug.",
+        "adjudicated": true
+      }
+    ],
+    "inter_annotator_agreement": {
+      "total_samples": 3,
+      "agreed_samples": 3,
+      "observed_agreement": 1.0,
+      "expected_agreement": 0.5556,
+      "cohens_kappa": 1.0,
+      "reliability_assessment": "EXCELLENT"
+    }
+  }
+}

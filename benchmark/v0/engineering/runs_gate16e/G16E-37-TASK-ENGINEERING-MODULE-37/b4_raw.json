@@ -1,0 +1,172 @@
+{
+  "task_id": "G16E-37-TASK-ENGINEERING-MODULE-37",
+  "baseline": "B4",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Software Engineering / Module 37",
+  "raw_prompt": "Implement EngineModule37 class in target_module.py supporting process(data) and get_status().",
+  "sclass_governance": {
+    "semantic_requirements": [
+      {
+        "id": "REQ-SHADOW-001",
+        "title": "Core Service Functionality",
+        "description": "Implement core processing logic for: Implement EngineModule37 class in target_module.py supporting process(data) and get_status().",
+        "type": "FUNCTIONAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt execution mandate"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-002",
+        "title": "Underlying Storage Technology Specification",
+        "description": "The specific persistence engine and database backend are unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify database technology"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-003",
+        "title": "API Transport Protocol Specification",
+        "description": "The specific network transport protocol (gRPC vs REST) is unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify API protocol"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      }
+    ],
+    "epistemic_status": "CONFIRMED",
+    "gate_result": "PASS"
+  },
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 3
+  },
+  "repository": {
+    "starting_tree_hash": "a02a6cd0fab6ac3675dd8c4e5cfeb7f21a8cdaa48486229e9898448ccbea6ca8",
+    "final_tree_hash": "952aa77c9799ad555622e054a1acb74a68aa712affe47af8ae6e7dd606a02d0d"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "User Task Instruction:\nImplement EngineModule37 class in target_module.py supporting process(data) and get_status().\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement EngineModule37 class in target_module.py supporting process(data) and get_status().\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nExisting Code in target_module.py:\n```python\n\n```\n\nImplement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block.",
+      "response_text": "```python\nclass EngineModule37:\n    \"\"\"\n    EngineModule37 class implementing core processing and status retrieval functionality.\n    \"\"\"\n    def __init__(self):\n        self._status = \"IDLE\"\n        self._last_processed = None\n\n    def process(self, data):\n        \"\"\"\n        Process incoming data and update internal state/status.\n        \n        Args:\n            data: The input data to be processed.\n            \n        Returns:\n            The processed data result.\n        \"\"\"\n        self._status = \"PROCESSING\"\n        # Core processing logic\n        self._last_processed = data\n        self._status = \"IDLE\"\n        return data\n\n    def get_status(self) -> str:\n        \"\"\"\n        Retrieve the current status of the engine module.\n        \n        Returns:\n            str: The current status string.\n        \"\"\"\n        return self._status\n```",
+      "latency_sec": 1.3697,
+      "prompt_tokens": 203,
+      "completion_tokens": 204,
+      "cost_usd": 7.6e-05,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpi0ugyzbb\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_engine_37 FAILED                              [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_engine_37 ________________________________\ntests\\test_oracle.py:5: in test_engine_37\n    assert e.get_status() == 'ready'\nE   AssertionError: assert 'IDLE' == 'ready'\nE     \nE     - ready\nE     + IDLE\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_engine_37 - AssertionError: assert 'IDLE' =...\n============================== 1 failed in 0.08s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.541,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "User Task Instruction:\nImplement EngineModule37 class in target_module.py supporting process(data) and get_status().\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement EngineModule37 class in target_module.py supporting process(data) and get_status().\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nYour previous implementation produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpi0ugyzbb\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_engine_37 FAILED                              [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_engine_37 ________________________________\ntests\\test_oracle.py:5: in test_engine_37\n    assert e.get_status() == 'ready'\nE   AssertionError: assert 'IDLE' == 'ready'\nE     \nE     - ready\nE     + IDLE\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_engine_37 - AssertionError: assert 'IDLE' =...\n============================== 1 failed in 0.08s ==============================\n\n\n\nPrevious Code in target_module.py:\n```python\nclass EngineModule37:\n    \"\"\"\n    EngineModule37 class implementing core processing and status retrieval functionality.\n    \"\"\"\n    def __init__(self):\n        self._status = \"IDLE\"\n        self._last_processed = None\n\n    def process(self, data):\n        \"\"\"\n        Process incoming data and update internal state/status.\n        \n        Args:\n            data: The input data to be processed.\n            \n        Returns:\n            The processed data result.\n        \"\"\"\n        self._status = \"PROCESSING\"\n        # Core processing logic\n        self._last_processed = data\n        self._status = \"IDLE\"\n        return data\n\n    def get_status(self) -> str:\n        \"\"\"\n        Retrieve the current status of the engine module.\n        \n        Returns:\n            str: The current status string.\n        \"\"\"\n        return self._status\n\n```\n\nAnalyze the test failures against the S-Class governance requirements and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nclass EngineModule37:\n    \"\"\"\n    EngineModule37 class implementing core processing and status retrieval functionality.\n    \"\"\"\n    def __init__(self):\n        self._status = \"ready\"\n        self._last_processed = None\n\n    def process(self, data):\n        \"\"\"\n        Process incoming data and update internal state/status.\n        \n        Args:\n            data: The input data to be processed.\n            \n        Returns:\n            The processed data result.\n        \"\"\"\n        self._status = \"processing\"\n        # Core processing logic\n        self._last_processed = data\n        self._status = \"ready\"\n        return data\n\n    def get_status(self) -> str:\n        \"\"\"\n        Retrieve the current status of the engine module.\n        \n        Returns:\n            str: The current status string.\n        \"\"\"\n        return self._status\n```",
+      "latency_sec": 1.5618,
+      "prompt_tokens": 707,
+      "completion_tokens": 202,
+      "cost_usd": 0.000114,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpi0ugyzbb\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_engine_37 FAILED                              [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_engine_37 ________________________________\ntests\\test_oracle.py:7: in test_engine_37\n    assert res.get('status') == 'success'\nE   AssertionError: assert None == 'success'\nE    +  where None = <built-in method get of dict object at 0x0000024EFF3DDD00>('status')\nE    +    where <built-in method get of dict object at 0x0000024EFF3DDD00> = {'input': 123}.get\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_engine_37 - AssertionError: assert None == ...\n============================== 1 failed in 0.08s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.53,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 3,
+      "prompt": "User Task Instruction:\nImplement EngineModule37 class in target_module.py supporting process(data) and get_status().\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement EngineModule37 class in target_module.py supporting process(data) and get_status().\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nYour previous implementation produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpi0ugyzbb\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_engine_37 FAILED                              [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_engine_37 ________________________________\ntests\\test_oracle.py:7: in test_engine_37\n    assert res.get('status') == 'success'\nE   AssertionError: assert None == 'success'\nE    +  where None = <built-in method get of dict object at 0x0000024EFF3DDD00>('status')\nE    +    where <built-in method get of dict object at 0x0000024EFF3DDD00> = {'input': 123}.get\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_engine_37 - AssertionError: assert None == ...\n============================== 1 failed in 0.08s ==============================\n\n\n\nPrevious Code in target_module.py:\n```python\nclass EngineModule37:\n    \"\"\"\n    EngineModule37 class implementing core processing and status retrieval functionality.\n    \"\"\"\n    def __init__(self):\n        self._status = \"ready\"\n        self._last_processed = None\n\n    def process(self, data):\n        \"\"\"\n        Process incoming data and update internal state/status.\n        \n        Args:\n            data: The input data to be processed.\n            \n        Returns:\n            The processed data result.\n        \"\"\"\n        self._status = \"processing\"\n        # Core processing logic\n        self._last_processed = data\n        self._status = \"ready\"\n        return data\n\n    def get_status(self) -> str:\n        \"\"\"\n        Retrieve the current status of the engine module.\n        \n        Returns:\n            str: The current status string.\n        \"\"\"\n        return self._status\n\n```\n\nAnalyze the test failures against the S-Class governance requirements and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nclass EngineModule37:\n    \"\"\"\n    EngineModule37 class implementing core processing and status retrieval functionality.\n    \"\"\"\n    def __init__(self):\n        self._status = \"ready\"\n        self._last_processed = None\n\n    def process(self, data):\n        \"\"\"\n        Process incoming data and update internal state/status.\n        \n        Args:\n            data: The input data to be processed.\n            \n        Returns:\n            A dictionary or result containing the processed data and status.\n        \"\"\"\n        self._status = \"processing\"\n        self._last_processed = data\n        self._status = \"ready\"\n        \n        if isinstance(data, dict):\n            res = dict(data)\n            res['status'] = 'success'\n            return res\n        return {'data': data, 'status': 'success'}\n\n    def get_status(self) -> str:\n        \"\"\"\n        Retrieve the current status of the engine module.\n        \n        Returns:\n            str: The current status string.\n        \"\"\"\n        return self._status\n```",
+      "latency_sec": 1.6228,
+      "prompt_tokens": 764,
+      "completion_tokens": 245,
+      "cost_usd": 0.000131,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpi0ugyzbb\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_engine_37 PASSED                              [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.473,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "class EngineModule37:\n    \"\"\"\n    EngineModule37 class implementing core processing and status retrieval functionality.\n    \"\"\"\n    def __init__(self):\n        self._status = \"ready\"\n        self._last_processed = None\n\n    def process(self, data):\n        \"\"\"\n        Process incoming data and update internal state/status.\n        \n        Args:\n            data: The input data to be processed.\n            \n        Returns:\n            A dictionary or result containing the processed data and status.\n        \"\"\"\n        self._status = \"processing\"\n        self._last_processed = data\n        self._status = \"ready\"\n        \n        if isinstance(data, dict):\n            res = dict(data)\n            res['status'] = 'success'\n            return res\n        return {'data': data, 'status': 'success'}\n\n    def get_status(self) -> str:\n        \"\"\"\n        Retrieve the current status of the engine module.\n        \n        Returns:\n            str: The current status string.\n        \"\"\"\n        return self._status\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpi0ugyzbb\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_engine_37 PASSED                              [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.473,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  }
+}

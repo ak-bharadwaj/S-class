@@ -1,0 +1,103 @@
+{
+  "task_id": "G16E-27-TASK-ENGINEERING-MODULE-27",
+  "baseline": "B2",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Software Engineering / Module 27",
+  "raw_prompt": "Implement EngineModule27 class in target_module.py supporting process(data) and get_status().",
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 3
+  },
+  "repository": {
+    "starting_tree_hash": "43102ba0c10852b2b2abfd0355995c7eda3f2c01aa56dcdd75db78fb092444a4",
+    "final_tree_hash": "1411c1b9d9fa384181650bce1ac1413ab96c5f94015efdd77cd5b5a38e00e754"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "Task Instruction:\nImplement EngineModule27 class in target_module.py supporting process(data) and get_status().\n\nExisting Code in target_module.py:\n```python\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nclass EngineModule27:\n    \"\"\"Implementation of EngineModule27 supporting process(data) and get_status().\"\"\"\n\n    def __init__(self):\n        self._status = \"idle\"\n        self._last_processed = None\n\n    def process(self, data):\n        \"\"\"Processes the given data and updates internal state.\"\"\"\n        self._last_processed = data\n        self._status = \"processed\"\n        return data\n\n    def get_status(self):\n        \"\"\"Returns the current status of the engine module.\"\"\"\n        return self._status\n```",
+      "latency_sec": 1.2966,
+      "prompt_tokens": 92,
+      "completion_tokens": 127,
+      "cost_usd": 4.5e-05,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp924kbpn5\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_engine_27 FAILED                              [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_engine_27 ________________________________\ntests\\test_oracle.py:5: in test_engine_27\n    assert e.get_status() == 'ready'\nE   AssertionError: assert 'idle' == 'ready'\nE     \nE     - ready\nE     + idle\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_engine_27 - AssertionError: assert 'idle' =...\n============================== 1 failed in 0.09s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.614,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "Task Instruction:\nImplement EngineModule27 class in target_module.py supporting process(data) and get_status().\n\nYour previous implementation for `target_module.py` produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp924kbpn5\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_engine_27 FAILED                              [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_engine_27 ________________________________\ntests\\test_oracle.py:5: in test_engine_27\n    assert e.get_status() == 'ready'\nE   AssertionError: assert 'idle' == 'ready'\nE     \nE     - ready\nE     + idle\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_engine_27 - AssertionError: assert 'idle' =...\n============================== 1 failed in 0.09s ==============================\n\n\n\nPrevious Code:\n```python\nclass EngineModule27:\n    \"\"\"Implementation of EngineModule27 supporting process(data) and get_status().\"\"\"\n\n    def __init__(self):\n        self._status = \"idle\"\n        self._last_processed = None\n\n    def process(self, data):\n        \"\"\"Processes the given data and updates internal state.\"\"\"\n        self._last_processed = data\n        self._status = \"processed\"\n        return data\n\n    def get_status(self):\n        \"\"\"Returns the current status of the engine module.\"\"\"\n        return self._status\n\n```\n\nPlease analyze the test failures and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nclass EngineModule27:\n    \"\"\"Implementation of EngineModule27 supporting process(data) and get_status().\"\"\"\n\n    def __init__(self):\n        self._status = \"ready\"\n        self._last_processed = None\n\n    def process(self, data):\n        \"\"\"Processes the given data and updates internal state.\"\"\"\n        self._last_processed = data\n        self._status = \"processed\"\n        return data\n\n    def get_status(self):\n        \"\"\"Returns the current status of the engine module.\"\"\"\n        return self._status\n```",
+      "latency_sec": 1.2282,
+      "prompt_tokens": 516,
+      "completion_tokens": 127,
+      "cost_usd": 7.7e-05,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp924kbpn5\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_engine_27 FAILED                              [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_engine_27 ________________________________\ntests\\test_oracle.py:7: in test_engine_27\n    assert res.get('status') == 'success'\nE   AssertionError: assert None == 'success'\nE    +  where None = <built-in method get of dict object at 0x000002B70ACEEA00>('status')\nE    +    where <built-in method get of dict object at 0x000002B70ACEEA00> = {'input': 123}.get\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_engine_27 - AssertionError: assert None == ...\n============================== 1 failed in 0.09s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.619,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 3,
+      "prompt": "Task Instruction:\nImplement EngineModule27 class in target_module.py supporting process(data) and get_status().\n\nYour previous implementation for `target_module.py` produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp924kbpn5\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_engine_27 FAILED                              [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_engine_27 ________________________________\ntests\\test_oracle.py:7: in test_engine_27\n    assert res.get('status') == 'success'\nE   AssertionError: assert None == 'success'\nE    +  where None = <built-in method get of dict object at 0x000002B70ACEEA00>('status')\nE    +    where <built-in method get of dict object at 0x000002B70ACEEA00> = {'input': 123}.get\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_engine_27 - AssertionError: assert None == ...\n============================== 1 failed in 0.09s ==============================\n\n\n\nPrevious Code:\n```python\nclass EngineModule27:\n    \"\"\"Implementation of EngineModule27 supporting process(data) and get_status().\"\"\"\n\n    def __init__(self):\n        self._status = \"ready\"\n        self._last_processed = None\n\n    def process(self, data):\n        \"\"\"Processes the given data and updates internal state.\"\"\"\n        self._last_processed = data\n        self._status = \"processed\"\n        return data\n\n    def get_status(self):\n        \"\"\"Returns the current status of the engine module.\"\"\"\n        return self._status\n\n```\n\nPlease analyze the test failures and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "Based on the test failure (`assert res.get('status') == 'success'`), the test expects the `process(data)` method to return a dictionary containing a `'status'` key with the value `'success'` (or similar status info), rather than just returning the raw input data.\n\nHere is the corrected implementation for `target_module.py`:\n\n```python\nclass EngineModule27:\n    \"\"\"Implementation of EngineModule27 supporting process(data) and get_status().\"\"\"\n\n    def __init__(self):\n        self._status = \"ready\"\n        self._last_processed = None\n\n    def process(self, data):\n        \"\"\"Processes the given data, updates internal state, and returns a result dict.\"\"\"\n        self._last_processed = data\n        self._status = \"success\"\n        return {\"status\": \"success\", \"data\": data}\n\n    def get_status(self):\n        \"\"\"Returns the current status of the engine module.\"\"\"\n        return self._status\n```",
+      "latency_sec": 1.5486,
+      "prompt_tokens": 582,
+      "completion_tokens": 217,
+      "cost_usd": 0.000109,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp924kbpn5\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_engine_27 PASSED                              [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.535,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "class EngineModule27:\n    \"\"\"Implementation of EngineModule27 supporting process(data) and get_status().\"\"\"\n\n    def __init__(self):\n        self._status = \"ready\"\n        self._last_processed = None\n\n    def process(self, data):\n        \"\"\"Processes the given data, updates internal state, and returns a result dict.\"\"\"\n        self._last_processed = data\n        self._status = \"success\"\n        return {\"status\": \"success\", \"data\": data}\n\n    def get_status(self):\n        \"\"\"Returns the current status of the engine module.\"\"\"\n        return self._status\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp924kbpn5\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_engine_27 PASSED                              [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.535,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  }
+}

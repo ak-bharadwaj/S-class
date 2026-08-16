@@ -1,0 +1,5 @@
+{
+  "task_id": "G16E-20-TASK-ENGINEERING-MODULE-20",
+  "domain": "Software Engineering / Module 20",
+  "raw_prompt": "Implement EngineModule20 class in target_module.py supporting process(data) and get_status()."
+}

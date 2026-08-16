@@ -1,10 +1,11 @@
 {
-  "title": "Gate 1.6D Holdout Task Replication Certification Audit",
+  "title": "Gate 1.6E Large-Scale Replication Certification Audit",
   "certified": true,
-  "is_holdout_replication": true,
+  "is_gate16e": true,
+  "is_holdout_replication": false,
   "status": "CERTIFIED_GENUINE_LIVE_BENCHMARK",
-  "total_runs": 48,
-  "real_runs": 48,
+  "total_runs": 80,
+  "real_runs": 80,
   "mock_runs": 0,
   "provider_types": [
     "gemini"
@@ -14,24 +15,24 @@
   ],
   "checks": [
     {
-      "check_name": "12_tasks_exist",
+      "check_name": "40_tasks_exist",
       "passed": true,
-      "details": "Found 12 / 12 task directories."
+      "details": "Found 40 / 40 task directories."
     },
     {
-      "check_name": "48_runs_exist",
+      "check_name": "80_runs_exist",
       "passed": true,
-      "details": "Found 48 / 48 expected run artifacts."
+      "details": "Found 80 / 80 expected run artifacts."
     },
     {
       "check_name": "zero_mock_runs",
       "passed": true,
-      "details": "Real runs: 48/48, Mock runs detected: 0."
+      "details": "Real runs: 80/80, Mock runs detected: 0."
     },
     {
       "check_name": "valid_live_provider",
       "passed": true,
-      "details": "Observed providers: ['gemini'] (Allowed: ['gemini', 'anthropic', 'openai', 'custom_http'])."
+      "details": "Observed providers: ['gemini'] (Allowed: ['openai', 'custom_http', 'anthropic', 'gemini'])."
     },
     {
       "check_name": "uniform_model_configuration",

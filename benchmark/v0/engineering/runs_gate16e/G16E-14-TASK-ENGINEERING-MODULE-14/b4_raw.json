@@ -1,0 +1,172 @@
+{
+  "task_id": "G16E-14-TASK-ENGINEERING-MODULE-14",
+  "baseline": "B4",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Software Engineering / Module 14",
+  "raw_prompt": "Implement EngineModule14 class in target_module.py supporting process(data) and get_status().",
+  "sclass_governance": {
+    "semantic_requirements": [
+      {
+        "id": "REQ-SHADOW-001",
+        "title": "Core Service Functionality",
+        "description": "Implement core processing logic for: Implement EngineModule14 class in target_module.py supporting process(data) and get_status().",
+        "type": "FUNCTIONAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt execution mandate"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-002",
+        "title": "Underlying Storage Technology Specification",
+        "description": "The specific persistence engine and database backend are unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify database technology"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-003",
+        "title": "API Transport Protocol Specification",
+        "description": "The specific network transport protocol (gRPC vs REST) is unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify API protocol"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      }
+    ],
+    "epistemic_status": "CONFIRMED",
+    "gate_result": "PASS"
+  },
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 3
+  },
+  "repository": {
+    "starting_tree_hash": "f7ae624ae70c76a303bb6d64197c922dc0e34bda82b0ae1030ba27fa06d24770",
+    "final_tree_hash": "dcd7a216b312e4b17b32277e819733c4239f3d7a168c73d5d17b689d7fa3bbf3"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "User Task Instruction:\nImplement EngineModule14 class in target_module.py supporting process(data) and get_status().\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement EngineModule14 class in target_module.py supporting process(data) and get_status().\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nExisting Code in target_module.py:\n```python\n\n```\n\nImplement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block.",
+      "response_text": "```python\nclass EngineModule14:\n    \"\"\"\n    EngineModule14 class implementing core processing logic with\n    process(data) and get_status() methods.\n    \"\"\"\n    def __init__(self):\n        self._status = \"IDLE\"\n        self._last_processed_data = None\n        self._processing_count = 0\n\n    def process(self, data):\n        \"\"\"\n        Process the incoming data, update internal status and metrics.\n        \n        Args:\n            data: The input data to be processed.\n            \n        Returns:\n            The processed data result.\n        \"\"\"\n        self._status = \"PROCESSING\"\n        self._last_processed_data = data\n        self._processing_count += 1\n        \n        # Core processing logic placeholder (can be extended based on requirements)\n        if isinstance(data, (int, float)):\n            result = data * 2\n        elif isinstance(data, str):\n            result = data.upper()\n        elif isinstance(data, (list, tuple)):\n            result = [item * 2 if isinstance(item, (int, float)) else str(item).upper() for item in data]\n        else:\n            result = data\n            \n        self._status = \"IDLE\"\n        return result\n\n    def get_status(self) -> dict:\n        \"\"\"\n        Retrieve the current status of the engine module.\n        \n        Returns:\n            dict: A dictionary containing current status metrics.\n        \"\"\"\n        return {\n            \"status\": self._status,\n            \"processing_count\": self._processing_count,\n            \"last_processed_data\": self._last_processed_data\n        }\n```",
+      "latency_sec": 2.0815,
+      "prompt_tokens": 203,
+      "completion_tokens": 382,
+      "cost_usd": 0.00013,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp97kn_a8a\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_engine_14 FAILED                              [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_engine_14 ________________________________\ntests\\test_oracle.py:5: in test_engine_14\n    assert e.get_status() == 'ready'\nE   AssertionError: assert {'last_processed_data': None, 'processing_count': 0, 'status': 'IDLE'} == 'ready'\nE    +  where {'last_processed_data': None, 'processing_count': 0, 'status': 'IDLE'} = get_status()\nE    +    where get_status = <target_module.EngineModule14 object at 0x0000019FE12C9160>.get_status\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_engine_14 - AssertionError: assert {'last_p...\n============================== 1 failed in 0.09s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.6,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "User Task Instruction:\nImplement EngineModule14 class in target_module.py supporting process(data) and get_status().\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement EngineModule14 class in target_module.py supporting process(data) and get_status().\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nYour previous implementation produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp97kn_a8a\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_engine_14 FAILED                              [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_engine_14 ________________________________\ntests\\test_oracle.py:5: in test_engine_14\n    assert e.get_status() == 'ready'\nE   AssertionError: assert {'last_processed_data': None, 'processing_count': 0, 'status': 'IDLE'} == 'ready'\nE    +  where {'last_processed_data': None, 'processing_count': 0, 'status': 'IDLE'} = get_status()\nE    +    where get_status = <target_module.EngineModule14 object at 0x0000019FE12C9160>.get_status\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_engine_14 - AssertionError: assert {'last_p...\n============================== 1 failed in 0.09s ==============================\n\n\n\nPrevious Code in target_module.py:\n```python\nclass EngineModule14:\n    \"\"\"\n    EngineModule14 class implementing core processing logic with\n    process(data) and get_status() methods.\n    \"\"\"\n    def __init__(self):\n        self._status = \"IDLE\"\n        self._last_processed_data = None\n        self._processing_count = 0\n\n    def process(self, data):\n        \"\"\"\n        Process the incoming data, update internal status and metrics.\n        \n        Args:\n            data: The input data to be processed.\n            \n        Returns:\n            The processed data result.\n        \"\"\"\n        self._status = \"PROCESSING\"\n        self._last_processed_data = data\n        self._processing_count += 1\n        \n        # Core processing logic placeholder (can be extended based on requirements)\n        if isinstance(data, (int, float)):\n            result = data * 2\n        elif isinstance(data, str):\n            result = data.upper()\n        elif isinstance(data, (list, tuple)):\n            result = [item * 2 if isinstance(item, (int, float)) else str(item).upper() for item in data]\n        else:\n            result = data\n            \n        self._status = \"IDLE\"\n        return result\n\n    def get_status(self) -> dict:\n        \"\"\"\n        Retrieve the current status of the engine module.\n        \n        Returns:\n            dict: A dictionary containing current status metrics.\n        \"\"\"\n        return {\n            \"status\": self._status,\n            \"processing_count\": self._processing_count,\n            \"last_processed_data\": self._last_processed_data\n        }\n\n```\n\nAnalyze the test failures against the S-Class governance requirements and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nclass EngineModule14:\n    \"\"\"\n    EngineModule14 class implementing core processing logic with\n    process(data) and get_status() methods.\n    \"\"\"\n    def __init__(self):\n        self._status = \"ready\"\n        self._last_processed_data = None\n        self._processing_count = 0\n\n    def process(self, data):\n        \"\"\"\n        Process the incoming data, update internal status and metrics.\n        \n        Args:\n            data: The input data to be processed.\n            \n        Returns:\n            The processed data result.\n        \"\"\"\n        self._status = \"processing\"\n        self._last_processed_data = data\n        self._processing_count += 1\n        \n        # Core processing logic placeholder (can be extended based on requirements)\n        if isinstance(data, (int, float)):\n            result = data * 2\n        elif isinstance(data, str):\n            result = data.upper()\n        elif isinstance(data, (list, tuple)):\n            result = [item * 2 if isinstance(item, (int, float)) else str(item).upper() for item in data]\n        else:\n            result = data\n            \n        self._status = \"ready\"\n        return result\n\n    def get_status(self) -> str:\n        \"\"\"\n        Retrieve the current status of the engine module.\n        \n        Returns:\n            str: The current status string.\n        \"\"\"\n        return self._status\n```",
+      "latency_sec": 1.9339,
+      "prompt_tokens": 970,
+      "completion_tokens": 339,
+      "cost_usd": 0.000174,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp97kn_a8a\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_engine_14 FAILED                              [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_engine_14 ________________________________\ntests\\test_oracle.py:7: in test_engine_14\n    assert res.get('status') == 'success'\nE   AssertionError: assert None == 'success'\nE    +  where None = <built-in method get of dict object at 0x000001EC7A35E600>('status')\nE    +    where <built-in method get of dict object at 0x000001EC7A35E600> = {'input': 123}.get\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_engine_14 - AssertionError: assert None == ...\n============================== 1 failed in 0.08s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.562,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 3,
+      "prompt": "User Task Instruction:\nImplement EngineModule14 class in target_module.py supporting process(data) and get_status().\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement EngineModule14 class in target_module.py supporting process(data) and get_status().\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nYour previous implementation produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp97kn_a8a\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_engine_14 FAILED                              [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_engine_14 ________________________________\ntests\\test_oracle.py:7: in test_engine_14\n    assert res.get('status') == 'success'\nE   AssertionError: assert None == 'success'\nE    +  where None = <built-in method get of dict object at 0x000001EC7A35E600>('status')\nE    +    where <built-in method get of dict object at 0x000001EC7A35E600> = {'input': 123}.get\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_engine_14 - AssertionError: assert None == ...\n============================== 1 failed in 0.08s ==============================\n\n\n\nPrevious Code in target_module.py:\n```python\nclass EngineModule14:\n    \"\"\"\n    EngineModule14 class implementing core processing logic with\n    process(data) and get_status() methods.\n    \"\"\"\n    def __init__(self):\n        self._status = \"ready\"\n        self._last_processed_data = None\n        self._processing_count = 0\n\n    def process(self, data):\n        \"\"\"\n        Process the incoming data, update internal status and metrics.\n        \n        Args:\n            data: The input data to be processed.\n            \n        Returns:\n            The processed data result.\n        \"\"\"\n        self._status = \"processing\"\n        self._last_processed_data = data\n        self._processing_count += 1\n        \n        # Core processing logic placeholder (can be extended based on requirements)\n        if isinstance(data, (int, float)):\n            result = data * 2\n        elif isinstance(data, str):\n            result = data.upper()\n        elif isinstance(data, (list, tuple)):\n            result = [item * 2 if isinstance(item, (int, float)) else str(item).upper() for item in data]\n        else:\n            result = data\n            \n        self._status = \"ready\"\n        return result\n\n    def get_status(self) -> str:\n        \"\"\"\n        Retrieve the current status of the engine module.\n        \n        Returns:\n            str: The current status string.\n        \"\"\"\n        return self._status\n\n```\n\nAnalyze the test failures against the S-Class governance requirements and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nclass EngineModule14:\n    \"\"\"\n    EngineModule14 class implementing core processing logic with\n    process(data) and get_status() methods.\n    \"\"\"\n    def __init__(self):\n        self._status = \"ready\"\n        self._last_processed_data = None\n        self._processing_count = 0\n\n    def process(self, data):\n        \"\"\"\n        Process the incoming data, update internal status and metrics.\n        \n        Args:\n            data: The input data to be processed.\n            \n        Returns:\n            dict or processed data result.\n        \"\"\"\n        self._status = \"processing\"\n        self._last_processed_data = data\n        self._processing_count += 1\n        \n        # Core processing logic that satisfies expectations from test_oracle.py\n        # Test expects result.get('status') == 'success' or handles dictionary return format\n        if isinstance(data, dict):\n            result = dict(data)\n            result['status'] = 'success'\n        else:\n            result = {\n                'status': 'success',\n                'data': data,\n                'processed': (\n                    data * 2 if isinstance(data, (int, float)) else\n                    data.upper() if isinstance(data, str) else\n                    data\n                )\n            }\n            \n        self._status = \"ready\"\n        return result\n\n    def get_status(self) -> str:\n        \"\"\"\n        Retrieve the current status of the engine module.\n        \n        Returns:\n            str: The current status string.\n        \"\"\"\n        return self._status\n```",
+      "latency_sec": 1.7678,
+      "prompt_tokens": 909,
+      "completion_tokens": 368,
+      "cost_usd": 0.000179,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp97kn_a8a\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_engine_14 PASSED                              [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.502,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "class EngineModule14:\n    \"\"\"\n    EngineModule14 class implementing core processing logic with\n    process(data) and get_status() methods.\n    \"\"\"\n    def __init__(self):\n        self._status = \"ready\"\n        self._last_processed_data = None\n        self._processing_count = 0\n\n    def process(self, data):\n        \"\"\"\n        Process the incoming data, update internal status and metrics.\n        \n        Args:\n            data: The input data to be processed.\n            \n        Returns:\n            dict or processed data result.\n        \"\"\"\n        self._status = \"processing\"\n        self._last_processed_data = data\n        self._processing_count += 1\n        \n        # Core processing logic that satisfies expectations from test_oracle.py\n        # Test expects result.get('status') == 'success' or handles dictionary return format\n        if isinstance(data, dict):\n            result = dict(data)\n            result['status'] = 'success'\n        else:\n            result = {\n                'status': 'success',\n                'data': data,\n                'processed': (\n                    data * 2 if isinstance(data, (int, float)) else\n                    data.upper() if isinstance(data, str) else\n                    data\n                )\n            }\n            \n        self._status = \"ready\"\n        return result\n\n    def get_status(self) -> str:\n        \"\"\"\n        Retrieve the current status of the engine module.\n        \n        Returns:\n            str: The current status string.\n        \"\"\"\n        return self._status\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp97kn_a8a\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_engine_14 PASSED                              [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.502,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "task_id": "G16E-40-TASK-ENGINEERING-MODULE-40",
+  "baseline": "B2",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Software Engineering / Module 40",
+  "raw_prompt": "Implement EngineModule40 class in target_module.py supporting process(data) and get_status().",
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 3
+  },
+  "repository": {
+    "starting_tree_hash": "98917ab049b731f08fa7dd4b09f98b8963b70704720eb29d466df1fd8504d15a",
+    "final_tree_hash": "64da5a4385ad452c877216006dcefbb9ac278e0e705cca077d21942d42571e4c"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "Task Instruction:\nImplement EngineModule40 class in target_module.py supporting process(data) and get_status().\n\nExisting Code in target_module.py:\n```python\n\n```\n\nPlease provide the complete updated Python code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "```python\nclass EngineModule40:\n    \"\"\"A module that processes data and maintains operational status.\"\"\"\n\n    def __init__(self):\n        self._status = \"idle\"\n\n    def process(self, data):\n        \"\"\"Processes the given data and updates status.\"\"\"\n        if data is None:\n            self._status = \"error\"\n            raise ValueError(\"Data cannot be None\")\n        \n        # Perform processing (mock implementation)\n        self._status = \"processing\"\n        \n        # If data is a collection, we can do a simple transformation or check\n        if isinstance(data, (list, tuple, set, dict)):\n            result = [item for item in data]\n        else:\n            result = data\n\n        self._status = \"ready\"\n        return result\n\n    def get_status(self):\n        \"\"\"Returns the current status of the module.\"\"\"\n        return self._status\n```",
+      "latency_sec": 1.6883,
+      "prompt_tokens": 92,
+      "completion_tokens": 201,
+      "cost_usd": 6.7e-05,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpbfpz5y1k\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_engine_40 FAILED                              [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_engine_40 ________________________________\ntests\\test_oracle.py:5: in test_engine_40\n    assert e.get_status() == 'ready'\nE   AssertionError: assert 'idle' == 'ready'\nE     \nE     - ready\nE     + idle\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_engine_40 - AssertionError: assert 'idle' =...\n============================== 1 failed in 0.09s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.557,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 2,
+      "prompt": "Task Instruction:\nImplement EngineModule40 class in target_module.py supporting process(data) and get_status().\n\nYour previous implementation for `target_module.py` produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpbfpz5y1k\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_engine_40 FAILED                              [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_engine_40 ________________________________\ntests\\test_oracle.py:5: in test_engine_40\n    assert e.get_status() == 'ready'\nE   AssertionError: assert 'idle' == 'ready'\nE     \nE     - ready\nE     + idle\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_engine_40 - AssertionError: assert 'idle' =...\n============================== 1 failed in 0.09s ==============================\n\n\n\nPrevious Code:\n```python\nclass EngineModule40:\n    \"\"\"A module that processes data and maintains operational status.\"\"\"\n\n    def __init__(self):\n        self._status = \"idle\"\n\n    def process(self, data):\n        \"\"\"Processes the given data and updates status.\"\"\"\n        if data is None:\n            self._status = \"error\"\n            raise ValueError(\"Data cannot be None\")\n        \n        # Perform processing (mock implementation)\n        self._status = \"processing\"\n        \n        # If data is a collection, we can do a simple transformation or check\n        if isinstance(data, (list, tuple, set, dict)):\n            result = [item for item in data]\n        else:\n            result = data\n\n        self._status = \"ready\"\n        return result\n\n    def get_status(self):\n        \"\"\"Returns the current status of the module.\"\"\"\n        return self._status\n\n```\n\nPlease analyze the test failures and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "Based on the test failure, `EngineModule40.get_status()` returned `'idle'` instead of the expected `'ready'` initially (likely during initialization or before/after processing checks). The test `test_engine_40` asserts that `e.get_status() == 'ready'` right after instantiating the engine (or expects `'ready'` as the initial status).\n\nHere is the corrected `target_module.py` with the initial status set to `'ready'`:\n\n```python\nclass EngineModule40:\n    \"\"\"A module that processes data and maintains operational status.\"\"\"\n\n    def __init__(self):\n        self._status = \"ready\"\n\n    def process(self, data):\n        \"\"\"Processes the given data and updates status.\"\"\"\n        if data is None:\n            self._status = \"error\"\n            raise ValueError(\"Data cannot be None\")\n        \n        # Perform processing (mock implementation)\n        self._status = \"processing\"\n        \n        # If data is a collection, we can do a simple transformation or check\n        if isinstance(data, (list, tuple, set, dict)):\n            result = [item for item in data]\n        else:\n            result = data\n\n        self._status = \"ready\"\n        return result\n\n    def get_status(self):\n        \"\"\"Returns the current status of the module.\"\"\"\n        return self._status\n```",
+      "latency_sec": 2.0425,
+      "prompt_tokens": 589,
+      "completion_tokens": 304,
+      "cost_usd": 0.000135,
+      "pytest_result": {
+        "exit_code": 1,
+        "passed_count": 0,
+        "failed_count": 1,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpbfpz5y1k\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_engine_40 FAILED                              [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_engine_40 ________________________________\ntests\\test_oracle.py:7: in test_engine_40\n    assert res.get('status') == 'success'\n           ^^^^^^^\nE   AttributeError: 'list' object has no attribute 'get'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_engine_40 - AttributeError: 'list' object h...\n============================== 1 failed in 0.08s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.574,
+        "all_passed": false
+      }
+    },
+    {
+      "iteration": 3,
+      "prompt": "Task Instruction:\nImplement EngineModule40 class in target_module.py supporting process(data) and get_status().\n\nYour previous implementation for `target_module.py` produced test failures:\n\nPytest Output:\n============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpbfpz5y1k\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_engine_40 FAILED                              [100%]\n\n================================== FAILURES ===================================\n_______________________________ test_engine_40 ________________________________\ntests\\test_oracle.py:7: in test_engine_40\n    assert res.get('status') == 'success'\n           ^^^^^^^\nE   AttributeError: 'list' object has no attribute 'get'\n=========================== short test summary info ===========================\nFAILED tests/test_oracle.py::test_engine_40 - AttributeError: 'list' object h...\n============================== 1 failed in 0.08s ==============================\n\n\n\nPrevious Code:\n```python\nclass EngineModule40:\n    \"\"\"A module that processes data and maintains operational status.\"\"\"\n\n    def __init__(self):\n        self._status = \"ready\"\n\n    def process(self, data):\n        \"\"\"Processes the given data and updates status.\"\"\"\n        if data is None:\n            self._status = \"error\"\n            raise ValueError(\"Data cannot be None\")\n        \n        # Perform processing (mock implementation)\n        self._status = \"processing\"\n        \n        # If data is a collection, we can do a simple transformation or check\n        if isinstance(data, (list, tuple, set, dict)):\n            result = [item for item in data]\n        else:\n            result = data\n\n        self._status = \"ready\"\n        return result\n\n    def get_status(self):\n        \"\"\"Returns the current status of the module.\"\"\"\n        return self._status\n\n```\n\nPlease analyze the test failures and provide the fixed code for `target_module.py` in a ```python markdown code block.",
+      "response_text": "Based on the test failure (`AttributeError: 'list' object has no attribute 'get'`), the test expects the `process` method to return a dictionary containing a `'status'` key (or similar dictionary structure), rather than a raw list of items.\n\nHere is the corrected implementation for `target_module.py`:\n\n```python\nclass EngineModule40:\n    \"\"\"A module that processes data and maintains operational status.\"\"\"\n\n    def __init__(self):\n        self._status = \"ready\"\n\n    def process(self, data):\n        \"\"\"Processes the given data and updates status.\"\"\"\n        if data is None:\n            self._status = \"error\"\n            raise ValueError(\"Data cannot be None\")\n        \n        # Perform processing (mock implementation)\n        self._status = \"processing\"\n        \n        # If data is a collection, we can do a simple transformation or check\n        if isinstance(data, (list, tuple, set, dict)):\n            processed_data = [item for item in data]\n        else:\n            processed_data = data\n\n        self._status = \"ready\"\n        \n        # Return a dictionary with 'status' and 'data' to satisfy expectations like res.get('status')\n        return {\n            \"status\": \"success\",\n            \"data\": processed_data\n        }\n\n    def get_status(self):\n        \"\"\"Returns the current status of the module.\"\"\"\n        return self._status\n```",
+      "latency_sec": 1.6393,
+      "prompt_tokens": 583,
+      "completion_tokens": 317,
+      "cost_usd": 0.000139,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpbfpz5y1k\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_engine_40 PASSED                              [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.535,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "class EngineModule40:\n    \"\"\"A module that processes data and maintains operational status.\"\"\"\n\n    def __init__(self):\n        self._status = \"ready\"\n\n    def process(self, data):\n        \"\"\"Processes the given data and updates status.\"\"\"\n        if data is None:\n            self._status = \"error\"\n            raise ValueError(\"Data cannot be None\")\n        \n        # Perform processing (mock implementation)\n        self._status = \"processing\"\n        \n        # If data is a collection, we can do a simple transformation or check\n        if isinstance(data, (list, tuple, set, dict)):\n            processed_data = [item for item in data]\n        else:\n            processed_data = data\n\n        self._status = \"ready\"\n        \n        # Return a dictionary with 'status' and 'data' to satisfy expectations like res.get('status')\n        return {\n            \"status\": \"success\",\n            \"data\": processed_data\n        }\n\n    def get_status(self):\n        \"\"\"Returns the current status of the module.\"\"\"\n        return self._status\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmpbfpz5y1k\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_engine_40 PASSED                              [100%]\n\n============================== 1 passed in 0.02s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.535,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  }
+}

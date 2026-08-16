@@ -1,0 +1,5 @@
+{
+  "task_id": "G16E-08-EVENT-DRIVEN-SAGA-ORCHESTRATOR",
+  "domain": "Distributed Transactions / Compensation Logic",
+  "raw_prompt": "Implement SagaOrchestrator in target_module.py supporting add_step(name, action, compensate) and execute(saga_data)."
+}

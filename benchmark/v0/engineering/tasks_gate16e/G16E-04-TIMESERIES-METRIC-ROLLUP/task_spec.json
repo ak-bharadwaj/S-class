@@ -1,0 +1,5 @@
+{
+  "task_id": "G16E-04-TIMESERIES-METRIC-ROLLUP",
+  "domain": "Database & Analytics / Sliding Window Aggregation",
+  "raw_prompt": "Implement TimeseriesRollupEngine in target_module.py supporting record(metric, value, timestamp) and query_rollup(metric, window_sec, agg_func)."
+}

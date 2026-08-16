@@ -1,0 +1,134 @@
+{
+  "task_id": "G16E-10-SECRET-SHARING-SHAMIR",
+  "baseline": "B4",
+  "runner_version": "gate-1.6d-holdout-replication-v1",
+  "domain": "Cryptography / Shamir Secret Sharing",
+  "raw_prompt": "Implement ShamirSecretSharing in target_module.py supporting split(secret, n, k) and combine(shares).",
+  "sclass_governance": {
+    "semantic_requirements": [
+      {
+        "id": "REQ-SHADOW-001",
+        "title": "Core Service Functionality",
+        "description": "Implement core processing logic for: Implement ShamirSecretSharing in target_module.py supporting split(secret, n, k) and combine(shares).",
+        "type": "FUNCTIONAL",
+        "epistemic_status": "EXPLICIT",
+        "confidence": 1.0,
+        "provenance": "USER_PROMPT",
+        "introduced_in_pass": 1,
+        "why_chain": [
+          "Prompt execution mandate"
+        ],
+        "pass_history": [
+          1
+        ],
+        "normative_level": "MUST",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-002",
+        "title": "Underlying Storage Technology Specification",
+        "description": "The specific persistence engine and database backend are unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify database technology"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      },
+      {
+        "id": "REQ-SHADOW-003",
+        "title": "API Transport Protocol Specification",
+        "description": "The specific network transport protocol (gRPC vs REST) is unstated in prompt.",
+        "type": "NON_FUNCTIONAL",
+        "epistemic_status": "UNKNOWN",
+        "confidence": 1.0,
+        "provenance": "EPISTEMIC_BOUNDARY",
+        "introduced_in_pass": 3,
+        "why_chain": [
+          "Prompt does not specify API protocol"
+        ],
+        "pass_history": [
+          3
+        ],
+        "normative_level": "OPTIONAL",
+        "affects": [
+          "backend",
+          "core"
+        ]
+      }
+    ],
+    "epistemic_status": "CONFIRMED",
+    "gate_result": "PASS"
+  },
+  "model_metadata": {
+    "provider_type": "gemini",
+    "model_name": "gemini-3.5-flash-lite",
+    "temperature": 0.2,
+    "is_mock": false,
+    "is_mock_fallback": false,
+    "model_call_budget": 3,
+    "total_iterations": 1
+  },
+  "repository": {
+    "starting_tree_hash": "d8981469c77db22cbd5ba908b626075ce2f52781bd3acad99a99100520b28b1f",
+    "final_tree_hash": "fc32f50330d20af3d50bf08f3811dfa9656eb1d46112681f02fd4e346a7445f0"
+  },
+  "execution_trace": [
+    {
+      "iteration": 1,
+      "prompt": "User Task Instruction:\nImplement ShamirSecretSharing in target_module.py supporting split(secret, n, k) and combine(shares).\n\nS-Class Synthesized Requirement Governance Contract:\n- [] Core Service Functionality: Implement core processing logic for: Implement ShamirSecretSharing in target_module.py supporting split(secret, n, k) and combine(shares).\n- [] Underlying Storage Technology Specification: The specific persistence engine and database backend are unstated in prompt.\n- [] API Transport Protocol Specification: The specific network transport protocol (gRPC vs REST) is unstated in prompt.\nEpistemic Status: CONFIRMED, Gate: PASS\n\nExisting Code in target_module.py:\n```python\n\n```\n\nImplement `target_module.py` strictly enforcing all grounded invariants above. Return code in a ```python markdown code block.",
+      "response_text": "```python\nimport secrets\nimport random\n\nclass ShamirSecretSharing:\n    \"\"\"\n    Implements Shamir's Secret Sharing scheme over a prime field.\n    A secret is split into `n` shares, where any `k` (threshold) shares\n    can be used to reconstruct the secret, but `k-1` shares reveal nothing.\n    \"\"\"\n    \n    # A large 256-bit prime number for finite field arithmetic\n    # 2^256 - 189 = 115792089237316195423570985008687907853269984665640564039457584007913129639747\n    PRIME = 2**256 - 189\n\n    @classmethod\n    def _eval_poly(cls, coeffs: list[int], x: int, prime: int) -> int:\n        \"\"\"Evaluates a polynomial with given coefficients at point x using Horner's method.\"\"\"\n        accum = 0\n        for coeff in reversed(coeffs):\n            accum = (accum * x + coeff) % prime\n        return accum\n\n    @classmethod\n    def _extended_gcd(cls, a: int, b: int) -> tuple[int, int, int]:\n        \"\"\"Extended Euclidean Algorithm to find modular inverse.\"\"\"\n        if a == 0:\n            return b, 0, 1\n        gcd, x1, y1 = cls._extended_gcd(b % a, a)\n        x = y1 - (b // a) * x1\n        y = x1\n        return gcd, x, y\n\n    @classmethod\n    def _mod_inverse(cls, n: int, prime: int) -> int:\n        \"\"\"Finds the modular multiplicative inverse of n modulo prime.\"\"\"\n        gcd, x, _ = cls._extended_gcd(n, prime)\n        if gcd != 1:\n            raise ValueError(f\"Modular inverse does not exist for {n} and {prime}\")\n        return (x % prime + prime) % prime\n\n    @classmethod\n    def split(cls, secret: int | bytes | str, n: int, k: int, prime: int = PRIME) -> list[tuple[int, int]]:\n        \"\"\"\n        Splits a secret into `n` shares, requiring at least `k` shares to reconstruct.\n        \n        Args:\n            secret: The secret to split. Can be an integer, bytes, or string.\n            n: Total number of shares to generate.\n            k: Threshold number of shares required for reconstruction.\n            prime: The prime modulus to use for finite field arithmetic.\n            \n        Returns:\n            A list of `n` shares, where each share is a tuple (x, y).\n        \"\"\"\n        if k > n:\n            raise ValueError(\"Threshold (k) cannot be greater than total shares (n)\")\n        if k < 1:\n            raise ValueError(\"Threshold (k) must be at least 1\")\n        if n < 1:\n            raise ValueError(\"Total shares (n) must be at least 1\")\n\n        # Convert secret to integer if it's not already one\n        if isinstance(secret, str):\n            secret_int = int.from_bytes(secret.encode('utf-8'), 'big')\n        elif isinstance(secret, bytes):\n            secret_int = int.from_bytes(secret, 'big')\n        elif isinstance(secret, int):\n            secret_int = secret\n        else:\n            raise TypeError(\"Secret must be an int, bytes, or str\")\n\n        if secret_int >= prime:\n            raise ValueError(\"Secret is too large for the chosen prime field\")\n\n        # Generate k-1 random coefficients for the polynomial of degree k-1\n        # f(x) = secret + a_1*x + a_2*x^2 + ... + a_{k-1}*x^{k-1}\n        coeffs = [secret_int] + [secrets.randbelow(prime) for _ in range(k - 1)]\n\n        # Generate n distinct shares (x from 1 to n)\n        shares = []\n        for x in range(1, n + 1):\n            y = cls._eval_poly(coeffs, x, prime)\n            shares.append((x, y))\n\n        return shares\n\n    @classmethod\n    def combine(cls, shares: list[tuple[int, int]], prime: int = PRIME, as_bytes: bool = False) -> int | bytes:\n        \"\"\"\n        Reconstructs the secret from a list of `k` or more shares using Lagrange interpolation.\n        \n        Args:\n            shares: A list of shares, where each share is a tuple (x, y).\n            prime: The prime modulus used during splitting.\n            as_bytes: If True, attempts to convert the reconstructed integer back to bytes/string.\n            \n        Returns:\n            The reconstructed secret as an integer (or bytes if as_bytes=True).\n        \"\"\"\n        if not shares:\n            raise ValueError(\"At least one share is required for combination\")\n\n        # Extract x and y coordinates\n        x_s, y_s = zip(*shares)\n        \n        # Check for duplicate x coordinates\n        if len(set(x_s)) != len(x_s):\n            raise ValueError(\"Duplicate x coordinates found in shares\")\n\n        k = len(shares)\n        secret_int = 0\n\n        # Lagrange interpolation at x = 0\n        for i in range(k):\n            xi, yi = x_s[i], y_s[i]\n            \n            # Compute the Lagrange basis polynomial l_i(0)\n            numerator = 1\n            denominator = 1\n            for j in range(k):\n                if i == j:\n                    continue\n                xj = x_s[j]\n                numerator = (numerator * (-xj)) % prime\n                denominator = (denominator * (xi - xj)) % prime\n\n            # Lagrange basis evaluation at 0\n            inv_denominator = cls._mod_inverse(denominator, prime)\n            lagrange_basis = (numerator * inv_denominator) % prime\n            \n            term = (yi * lagrange_basis) % prime\n            secret_int = (secret_int + term) % prime\n\n        if as_bytes:\n            # Convert integer back to bytes, stripping leading zero bytes padding\n            byte_length = (secret_int.bit_length() + 7) // 8\n            if byte_length == 0:\n                return b'\\x00'\n            return secret_int.to_bytes(byte_length, 'big')\n\n        return secret_int\n```",
+      "latency_sec": 4.7459,
+      "prompt_tokens": 209,
+      "completion_tokens": 1537,
+      "cost_usd": 0.000477,
+      "pytest_result": {
+        "exit_code": 0,
+        "passed_count": 1,
+        "failed_count": 0,
+        "total_count": 1,
+        "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp3r9it9az\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_shamir PASSED                                 [100%]\n\n============================== 1 passed in 0.06s ==============================\n",
+        "stderr": "",
+        "duration_sec": 0.541,
+        "all_passed": true
+      }
+    }
+  ],
+  "final_code": "import secrets\nimport random\n\nclass ShamirSecretSharing:\n    \"\"\"\n    Implements Shamir's Secret Sharing scheme over a prime field.\n    A secret is split into `n` shares, where any `k` (threshold) shares\n    can be used to reconstruct the secret, but `k-1` shares reveal nothing.\n    \"\"\"\n    \n    # A large 256-bit prime number for finite field arithmetic\n    # 2^256 - 189 = 115792089237316195423570985008687907853269984665640564039457584007913129639747\n    PRIME = 2**256 - 189\n\n    @classmethod\n    def _eval_poly(cls, coeffs: list[int], x: int, prime: int) -> int:\n        \"\"\"Evaluates a polynomial with given coefficients at point x using Horner's method.\"\"\"\n        accum = 0\n        for coeff in reversed(coeffs):\n            accum = (accum * x + coeff) % prime\n        return accum\n\n    @classmethod\n    def _extended_gcd(cls, a: int, b: int) -> tuple[int, int, int]:\n        \"\"\"Extended Euclidean Algorithm to find modular inverse.\"\"\"\n        if a == 0:\n            return b, 0, 1\n        gcd, x1, y1 = cls._extended_gcd(b % a, a)\n        x = y1 - (b // a) * x1\n        y = x1\n        return gcd, x, y\n\n    @classmethod\n    def _mod_inverse(cls, n: int, prime: int) -> int:\n        \"\"\"Finds the modular multiplicative inverse of n modulo prime.\"\"\"\n        gcd, x, _ = cls._extended_gcd(n, prime)\n        if gcd != 1:\n            raise ValueError(f\"Modular inverse does not exist for {n} and {prime}\")\n        return (x % prime + prime) % prime\n\n    @classmethod\n    def split(cls, secret: int | bytes | str, n: int, k: int, prime: int = PRIME) -> list[tuple[int, int]]:\n        \"\"\"\n        Splits a secret into `n` shares, requiring at least `k` shares to reconstruct.\n        \n        Args:\n            secret: The secret to split. Can be an integer, bytes, or string.\n            n: Total number of shares to generate.\n            k: Threshold number of shares required for reconstruction.\n            prime: The prime modulus to use for finite field arithmetic.\n            \n        Returns:\n            A list of `n` shares, where each share is a tuple (x, y).\n        \"\"\"\n        if k > n:\n            raise ValueError(\"Threshold (k) cannot be greater than total shares (n)\")\n        if k < 1:\n            raise ValueError(\"Threshold (k) must be at least 1\")\n        if n < 1:\n            raise ValueError(\"Total shares (n) must be at least 1\")\n\n        # Convert secret to integer if it's not already one\n        if isinstance(secret, str):\n            secret_int = int.from_bytes(secret.encode('utf-8'), 'big')\n        elif isinstance(secret, bytes):\n            secret_int = int.from_bytes(secret, 'big')\n        elif isinstance(secret, int):\n            secret_int = secret\n        else:\n            raise TypeError(\"Secret must be an int, bytes, or str\")\n\n        if secret_int >= prime:\n            raise ValueError(\"Secret is too large for the chosen prime field\")\n\n        # Generate k-1 random coefficients for the polynomial of degree k-1\n        # f(x) = secret + a_1*x + a_2*x^2 + ... + a_{k-1}*x^{k-1}\n        coeffs = [secret_int] + [secrets.randbelow(prime) for _ in range(k - 1)]\n\n        # Generate n distinct shares (x from 1 to n)\n        shares = []\n        for x in range(1, n + 1):\n            y = cls._eval_poly(coeffs, x, prime)\n            shares.append((x, y))\n\n        return shares\n\n    @classmethod\n    def combine(cls, shares: list[tuple[int, int]], prime: int = PRIME, as_bytes: bool = False) -> int | bytes:\n        \"\"\"\n        Reconstructs the secret from a list of `k` or more shares using Lagrange interpolation.\n        \n        Args:\n            shares: A list of shares, where each share is a tuple (x, y).\n            prime: The prime modulus used during splitting.\n            as_bytes: If True, attempts to convert the reconstructed integer back to bytes/string.\n            \n        Returns:\n            The reconstructed secret as an integer (or bytes if as_bytes=True).\n        \"\"\"\n        if not shares:\n            raise ValueError(\"At least one share is required for combination\")\n\n        # Extract x and y coordinates\n        x_s, y_s = zip(*shares)\n        \n        # Check for duplicate x coordinates\n        if len(set(x_s)) != len(x_s):\n            raise ValueError(\"Duplicate x coordinates found in shares\")\n\n        k = len(shares)\n        secret_int = 0\n\n        # Lagrange interpolation at x = 0\n        for i in range(k):\n            xi, yi = x_s[i], y_s[i]\n            \n            # Compute the Lagrange basis polynomial l_i(0)\n            numerator = 1\n            denominator = 1\n            for j in range(k):\n                if i == j:\n                    continue\n                xj = x_s[j]\n                numerator = (numerator * (-xj)) % prime\n                denominator = (denominator * (xi - xj)) % prime\n\n            # Lagrange basis evaluation at 0\n            inv_denominator = cls._mod_inverse(denominator, prime)\n            lagrange_basis = (numerator * inv_denominator) % prime\n            \n            term = (yi * lagrange_basis) % prime\n            secret_int = (secret_int + term) % prime\n\n        if as_bytes:\n            # Convert integer back to bytes, stripping leading zero bytes padding\n            byte_length = (secret_int.bit_length() + 7) // 8\n            if byte_length == 0:\n                return b'\\x00'\n            return secret_int.to_bytes(byte_length, 'big')\n\n        return secret_int\n",
+  "oracle_result": {
+    "exit_code": 0,
+    "passed_count": 1,
+    "failed_count": 0,
+    "total_count": 1,
+    "stdout": "============================= test session starts =============================\nplatform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\dorni\\AppData\\Local\\Temp\\tmp3r9it9az\nplugins: anyio-4.13.0, cov-7.1.0\ncollecting ... collected 1 item\n\ntests/test_oracle.py::test_shamir PASSED                                 [100%]\n\n============================== 1 passed in 0.06s ==============================\n",
+    "stderr": "",
+    "duration_sec": 0.541,
+    "all_passed": true
+  },
+  "failure_taxonomy": {
+    "category": null,
+    "reason": "Run passed 100% of oracle tests.",
+    "details": []
+  },
+  "human_evaluation": {
+    "defects": null,
+    "unsupported_inventions": null,
+    "review_friction_score": null,
+    "developer_interventions": null,
+    "evaluator_notes": null,
+    "rated": false
+  }
+}

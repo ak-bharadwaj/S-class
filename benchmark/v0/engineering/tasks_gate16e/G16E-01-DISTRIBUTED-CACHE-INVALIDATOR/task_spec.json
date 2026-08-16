@@ -1,0 +1,5 @@
+{
+  "task_id": "G16E-01-DISTRIBUTED-CACHE-INVALIDATOR",
+  "domain": "Distributed Systems / Cache Invalidation",
+  "raw_prompt": "Implement DistributedCacheInvalidator class in target_module.py supporting set(key, value, version, ttl_sec), get(key), and invalidate(key, version). Version must reject stale updates."
+}

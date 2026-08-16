@@ -1,0 +1,5 @@
+{
+  "task_id": "G16E-06-CIRCUIT-BREAKER-STATE-MACHINE",
+  "domain": "Resiliency Architecture / FSM State Machine",
+  "raw_prompt": "Implement CircuitBreakerStateMachine in target_module.py supporting CLOSED, OPEN, HALF_OPEN states and call(fn, *args)."
+}

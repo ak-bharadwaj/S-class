@@ -27,19 +27,39 @@ class CertificationCheck:
     details: str
 
 class GenuineBenchmarkCertifier:
-    def __init__(self, engineering_dir: str, is_holdout: bool = False):
+    def __init__(self, engineering_dir: str, is_holdout: bool = False, is_gate16e: bool = False):
         self.engineering_dir = engineering_dir
         self.is_holdout = is_holdout
-        self.tasks_dir_name = "tasks_holdout" if is_holdout else "tasks"
-        self.runs_dir_name = "runs_holdout" if is_holdout else "runs"
+        self.is_gate16e = is_gate16e
+        
+        if is_gate16e:
+            self.tasks_dir_name = "tasks_gate16e"
+            self.runs_dir_name = "runs_gate16e"
+        elif is_holdout:
+            self.tasks_dir_name = "tasks_holdout"
+            self.runs_dir_name = "runs_holdout"
+        else:
+            self.tasks_dir_name = "tasks"
+            self.runs_dir_name = "runs"
+
         self.tasks_dir = os.path.join(engineering_dir, self.tasks_dir_name)
         self.runs_dir = os.path.join(engineering_dir, self.runs_dir_name)
 
     def verify_certification(self) -> Tuple[bool, Dict[str, Any]]:
         checks = []
         task_ids = sorted([d for d in os.listdir(self.tasks_dir) if os.path.isdir(os.path.join(self.tasks_dir, d))]) if os.path.exists(self.tasks_dir) else []
-        expected_tasks = 12 if self.is_holdout else 16
-        expected_runs = expected_tasks * 4
+        
+        if self.is_gate16e:
+            expected_tasks = 40
+            expected_baselines = ["b2", "b4"]
+        elif self.is_holdout:
+            expected_tasks = 12
+            expected_baselines = ["b1", "b2", "b3", "b4"]
+        else:
+            expected_tasks = 16
+            expected_baselines = ["b1", "b2", "b3", "b4"]
+
+        expected_runs = expected_tasks * len(expected_baselines)
 
         # Check 1: Task Repositories Exist
         c1 = CertificationCheck(f"{expected_tasks}_tasks_exist", len(task_ids) == expected_tasks, f"Found {len(task_ids)} / {expected_tasks} task directories.")
@@ -56,7 +76,7 @@ class GenuineBenchmarkCertifier:
 
         for task_id in task_ids:
             truns_dir = os.path.join(self.runs_dir, task_id)
-            for b in ["b1", "b2", "b3", "b4"]:
+            for b in expected_baselines:
                 rfile = os.path.join(truns_dir, f"{b}_raw.json")
                 if not os.path.exists(rfile):
                     continue
@@ -127,10 +147,11 @@ class GenuineBenchmarkCertifier:
 
         is_certified = all(c.passed for c in checks)
 
-        cert_title = "Gate 1.6D Holdout Task Replication Certification Audit" if self.is_holdout else "Gate 1.6C Fair Treatment Benchmark Certification Audit"
+        cert_title = "Gate 1.6E Large-Scale Replication Certification Audit" if self.is_gate16e else ("Gate 1.6D Holdout Task Replication Certification Audit" if self.is_holdout else "Gate 1.6C Fair Treatment Benchmark Certification Audit")
         cert_report = {
             "title": cert_title,
             "certified": is_certified,
+            "is_gate16e": self.is_gate16e,
             "is_holdout_replication": self.is_holdout,
             "status": "CERTIFIED_GENUINE_LIVE_BENCHMARK" if is_certified else "UNCERTIFIED_CONTAMINATED_OR_INCOMPLETE",
             "total_runs": total_runs,

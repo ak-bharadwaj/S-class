@@ -1,0 +1,5 @@
+{
+  "task_id": "G16E-02-JWT-JWKS-ROTATOR",
+  "domain": "Auth & Security / Cryptographic Key Rotation",
+  "raw_prompt": "Implement JWKSRotator class in target_module.py supporting rotate_keys(), sign_token(payload), verify_token(token), and get_jwks()."
+}
