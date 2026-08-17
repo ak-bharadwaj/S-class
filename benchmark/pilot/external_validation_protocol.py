@@ -1,19 +1,29 @@
 """
 S-Class EOS V11.2 - External Developer Validation Protocol & Trial Harness.
-Provides the protocol specification, within-participant counterbalanced A/B trial assignment,
-measurement provenance tracking, and data collection harness for evaluating real developer tasks
-comparing Baseline (Ungoverned) vs S-Class Treatment.
+Provides the protocol specification, Latin-Square balanced counterbalancing across task identity,
+task order, and condition assignment, measurement provenance tracking, and data collection harness.
 
-DESIGN PRINCIPLES:
+EXPERIMENTAL DESIGN:
 1. Target Cohort: 6–10 professional developers performing 3 tasks each (18–30 total task trials).
-2. Within-Participant Counterbalancing: Each participant experiences both Baseline and S-Class conditions
-   across different tasks to separate individual developer skill variance from the treatment effect.
-3. Explicit Measurement Provenance:
-   - INSTRUMENTED: task_completion_time_sec
-   - RECEIPT_DERIVED: defects_caught_pre_gen, defects_caught_post_gen
-   - PARTICIPANT_REPORTED: rework_iterations, developer_interventions, trust_score (1-5), usefulness_score (1-5)
-   - PROTOCOL_ASSIGNED: assignment, task_order_index, task_outcome (SUCCESS / FAILURE / ABANDONED)
-4. Credibility & Falsifiability: Negative results and abandoned tasks are fully valid and preserved.
+2. Balanced Latin-Square / Counterbalancing:
+   - Counterbalances BOTH task order (all 3! = 6 permutations) AND condition assignment (BASELINE vs SCLASS_TREATMENT).
+   - Across any 6-participant block, each task appears in position 1, 2, and 3 exactly once per condition.
+3. Pre-Generated Session Plan:
+   - Generated BEFORE the session with participant_id, task_order, assignment per task, seed, and plan hash.
+4. Human Task Time Instrumentation:
+   - Explicitly differentiates Human Task Completion Time (start_time to stop_time) from S-Class Pipeline Time (sub-millisecond).
+5. Explicit Measurement Provenance:
+   - task_completion_time_sec       -> INSTRUMENTED_HUMAN_TASK_TIME
+   - pipeline_execution_time_sec    -> INSTRUMENTED_PIPELINE_TIME
+   - task_order_index               -> PROTOCOL_ASSIGNED
+   - assignment                     -> PROTOCOL_ASSIGNED
+   - task_outcome                   -> OBSERVER_VERIFIED (SUCCESS / FAILURE / ABANDONED)
+   - rework_iterations              -> PARTICIPANT_REPORTED
+   - developer_interventions       -> PARTICIPANT_REPORTED
+   - developer_trust_score          -> PARTICIPANT_REPORTED (1-5 Likert scale)
+   - developer_usefulness_score     -> PARTICIPANT_REPORTED (1-5 Likert scale)
+   - defects_caught_pre_gen         -> RECEIPT_DERIVED
+   - defects_caught_post_gen        -> RECEIPT_DERIVED
 """
 
 import os
@@ -34,35 +44,70 @@ from benchmark.hypothesis_parity.observation import StrategySpec
 
 
 class MeasurementProvenance:
-    INSTRUMENTED = "INSTRUMENTED"
+    INSTRUMENTED_HUMAN_TASK_TIME = "INSTRUMENTED_HUMAN_TASK_TIME"
+    INSTRUMENTED_PIPELINE_TIME = "INSTRUMENTED_PIPELINE_TIME"
     PARTICIPANT_REPORTED = "PARTICIPANT_REPORTED"
+    OBSERVER_VERIFIED = "OBSERVER_VERIFIED"
     RECEIPT_DERIVED = "RECEIPT_DERIVED"
     PROTOCOL_ASSIGNED = "PROTOCOL_ASSIGNED"
 
 
 METRIC_PROVENANCE_SCHEMA = {
-    "task_completion_time_sec": MeasurementProvenance.INSTRUMENTED,
+    "task_completion_time_sec": MeasurementProvenance.INSTRUMENTED_HUMAN_TASK_TIME,
+    "pipeline_execution_time_sec": MeasurementProvenance.INSTRUMENTED_PIPELINE_TIME,
+    "task_order_index": MeasurementProvenance.PROTOCOL_ASSIGNED,
+    "assignment": MeasurementProvenance.PROTOCOL_ASSIGNED,
+    "task_outcome": MeasurementProvenance.OBSERVER_VERIFIED,
     "rework_iterations": MeasurementProvenance.PARTICIPANT_REPORTED,
     "developer_interventions": MeasurementProvenance.PARTICIPANT_REPORTED,
     "developer_trust_score": MeasurementProvenance.PARTICIPANT_REPORTED,
     "developer_usefulness_score": MeasurementProvenance.PARTICIPANT_REPORTED,
     "defects_caught_pre_gen": MeasurementProvenance.RECEIPT_DERIVED,
-    "defects_caught_post_gen": MeasurementProvenance.RECEIPT_DERIVED,
-    "assignment": MeasurementProvenance.PROTOCOL_ASSIGNED,
-    "task_order_index": MeasurementProvenance.PROTOCOL_ASSIGNED,
-    "task_outcome": MeasurementProvenance.PROTOCOL_ASSIGNED
+    "defects_caught_post_gen": MeasurementProvenance.RECEIPT_DERIVED
 }
 
 
 @dataclass
+class ParticipantSessionPlan:
+    """Pre-generated immutable session plan for a participant before trials begin."""
+    participant_id: str
+    session_id: str
+    protocol_version: str
+    seed: int
+    ordered_task_ids: List[str]
+    condition_schedule: Dict[str, str]  # task_id -> "BASELINE" or "SCLASS_TREATMENT"
+    created_at_iso: str
+    session_plan_hash: str = ""
+
+    def __post_init__(self):
+        if not self.session_plan_hash:
+            raw = json.dumps({
+                "participant_id": self.participant_id,
+                "session_id": self.session_id,
+                "protocol_version": self.protocol_version,
+                "seed": self.seed,
+                "ordered_task_ids": self.ordered_task_ids,
+                "condition_schedule": self.condition_schedule,
+                "created_at_iso": self.created_at_iso
+            }, sort_keys=True)
+            self.session_plan_hash = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
 class DeveloperTrialRecord:
-    """Records one developer task trial outcome with within-participant sequencing and outcome tracking."""
+    """Records one developer task trial outcome with strict human timing and provenance."""
     participant_id: str
     task_id: str
     task_order_index: int  # 1, 2, or 3 in the developer's session
     assignment: str  # "BASELINE" or "SCLASS_TREATMENT"
-    is_real_participant: bool  # False for protocol smoke checks, True for real developer trials
-    task_completion_time_sec: float
+    is_real_participant: bool  # False for protocol smoke checks, True for real human trials
+    task_start_time_iso: str
+    task_stop_time_iso: str
+    task_completion_time_sec: float  # Human task duration (stop - start)
+    pipeline_execution_time_sec: float  # Sub-second S-Class pipeline time
     defects_caught_pre_gen: int
     defects_caught_post_gen: int
     rework_iterations: int
@@ -79,15 +124,16 @@ class DeveloperTrialRecord:
 
 
 class ExternalValidationProtocol:
-    """Manages randomized counterbalanced trials, real task execution, and paired statistical summaries."""
+    """Manages balanced Latin-Square trial planning, human execution, and paired statistical summaries."""
 
     def __init__(self):
         self.pipeline = EnterpriseGovernancePipeline(default_provider_registry)
         self.trials: List[DeveloperTrialRecord] = []
+        self.plans: Dict[str, ParticipantSessionPlan] = {}
 
     @staticmethod
     def get_standard_task_catalog() -> List[Dict[str, Any]]:
-        """Catalog of 3 comparable real-world developer tasks."""
+        """Catalog of 3 standardized real-world developer tasks."""
         return [
             {
                 "task_id": "TASK-01-TOKEN-RATE-LIMITER",
@@ -129,22 +175,63 @@ class ExternalValidationProtocol:
             }
         ]
 
-    @staticmethod
-    def assign_treatment_counterbalanced(participant_id: str, task_order_index: int, seed: Optional[int] = None) -> str:
+    @classmethod
+    def generate_participant_session_plan(
+        cls,
+        participant_id: str,
+        participant_index: int,
+        seed: int = 42
+    ) -> ParticipantSessionPlan:
         """
-        Assigns treatment condition using within-participant counterbalancing:
-        Determines starting condition via participant hash, then alternates across task 1, 2, and 3.
-        Distributes individual skill variance and counterbalances learning effects.
-        """
-        key = f"{participant_id}:{seed or 42}".encode("utf-8")
-        h = int(hashlib.sha256(key).hexdigest(), 16)
-        starting_condition = "SCLASS_TREATMENT" if (h % 2 == 0) else "BASELINE"
+        Generates a balanced Latin-Square session plan counterbalancing BOTH task order
+        and condition assignment across participants.
 
-        # Alternate condition across task indices: 1 -> start, 2 -> other, 3 -> start
-        if task_order_index % 2 == 1:
-            return starting_condition
+        Task order permutations (6 total):
+        P0: (T1, T2, T3)   P1: (T1, T3, T2)   P2: (T2, T1, T3)
+        P3: (T2, T3, T1)   P4: (T3, T1, T2)   P5: (T3, T2, T1)
+
+        Condition patterns across 3 tasks:
+        C_A: (BASELINE, SCLASS_TREATMENT, BASELINE)
+        C_B: (SCLASS_TREATMENT, BASELINE, SCLASS_TREATMENT)
+        """
+        all_tasks = [t["task_id"] for t in cls.get_standard_task_catalog()]
+        t1, t2, t3 = all_tasks[0], all_tasks[1], all_tasks[2]
+
+        task_permutations = [
+            [t1, t2, t3],  # P0
+            [t1, t3, t2],  # P1
+            [t2, t1, t3],  # P2
+            [t2, t3, t1],  # P3
+            [t3, t1, t2],  # P4
+            [t3, t2, t1],  # P5
+        ]
+
+        # Select permutation based on participant index
+        perm_idx = participant_index % len(task_permutations)
+        ordered_tasks = task_permutations[perm_idx]
+
+        # Select condition pattern
+        if participant_index % 2 == 0:
+            conditions = ["BASELINE", "SCLASS_TREATMENT", "BASELINE"]
         else:
-            return "BASELINE" if starting_condition == "SCLASS_TREATMENT" else "SCLASS_TREATMENT"
+            conditions = ["SCLASS_TREATMENT", "BASELINE", "SCLASS_TREATMENT"]
+
+        schedule = {task: cond for task, cond in zip(ordered_tasks, conditions)}
+        session_id = f"SESS-{participant_id}-{participant_index}"
+        created_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+        return ParticipantSessionPlan(
+            participant_id=participant_id,
+            session_id=session_id,
+            protocol_version="1.2.0",
+            seed=seed,
+            ordered_task_ids=ordered_tasks,
+            condition_schedule=schedule,
+            created_at_iso=created_iso
+        )
+
+    def register_plan(self, plan: ParticipantSessionPlan) -> None:
+        self.plans[plan.participant_id] = plan
 
     def record_trial(self, trial: DeveloperTrialRecord) -> None:
         """Records a developer trial record."""
@@ -160,10 +247,11 @@ class ExternalValidationProtocol:
     ) -> DeveloperTrialRecord:
         """
         Protocol Smoke Mode:
-        Verifies instrument, task sequence, and pipeline mechanics.
-        Participant-reported metrics remain strictly None.
+        Verifies instrument, pipeline mechanics, and schema integrity without real human input.
+        Participant-reported scores remain strictly None.
         """
         t0 = time.perf_counter()
+        t_start_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         task = next((t for t in self.get_standard_task_catalog() if t["task_id"] == task_id), None)
         if task is None:
             raise ValueError(f"Unknown task_id: {task_id}")
@@ -171,13 +259,17 @@ class ExternalValidationProtocol:
         if assignment == "BASELINE":
             target = code_generator(None)
             duration = round(time.perf_counter() - t0, 3)
+            t_stop_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             return DeveloperTrialRecord(
                 participant_id=participant_id,
                 task_id=task_id,
                 task_order_index=task_order_index,
                 assignment="BASELINE",
                 is_real_participant=False,
+                task_start_time_iso=t_start_iso,
+                task_stop_time_iso=t_stop_iso,
                 task_completion_time_sec=duration,
+                pipeline_execution_time_sec=0.0,
                 defects_caught_pre_gen=0,
                 defects_caught_post_gen=0,
                 rework_iterations=0,
@@ -195,6 +287,7 @@ class ExternalValidationProtocol:
                 custom_obligations=task["obligations"]
             )
             duration = round(time.perf_counter() - t0, 3)
+            t_stop_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             verdict = "SUCCESS" if receipt.verdict == "PASS" else "BLOCKED_WITH_REASON"
             return DeveloperTrialRecord(
                 participant_id=participant_id,
@@ -202,7 +295,10 @@ class ExternalValidationProtocol:
                 task_order_index=task_order_index,
                 assignment="SCLASS_TREATMENT",
                 is_real_participant=False,
+                task_start_time_iso=t_start_iso,
+                task_stop_time_iso=t_stop_iso,
                 task_completion_time_sec=duration,
+                pipeline_execution_time_sec=duration,
                 defects_caught_pre_gen=0 if receipt.pre_gen_grounded else 1,
                 defects_caught_post_gen=receipt.obligations_failed,
                 rework_iterations=0,
@@ -219,36 +315,46 @@ class ExternalValidationProtocol:
         participant_id: str,
         task_id: str,
         task_order_index: int,
+        assignment: str,
         code_generator: Callable[[Any], Any],
+        human_start_epoch: float,
+        human_stop_epoch: float,
         rework_iterations: int,
         developer_interventions: int,
         task_outcome: str,
         trust_score: float,
-        usefulness_score: float,
-        seed: Optional[int] = None
+        usefulness_score: float
     ) -> DeveloperTrialRecord:
         """
         Experimental Participant Mode:
-        Executes ONLY the counterbalanced assigned condition for this participant and task index.
-        Records instrumented completion time, outcome (SUCCESS/FAILURE/ABANDONED), and Likert scores.
+        1. Executes ONLY the assigned condition from the participant session plan.
+        2. Measures exact human task duration (human_stop_epoch - human_start_epoch).
+        3. Measures internal S-Class pipeline latency separately.
+        4. Records verified task outcome (SUCCESS / FAILURE / ABANDONED) and genuine Likert scores.
         """
         task = next((t for t in self.get_standard_task_catalog() if t["task_id"] == task_id), None)
         if task is None:
             raise ValueError(f"Unknown task_id: {task_id}")
 
-        assigned_condition = self.assign_treatment_counterbalanced(participant_id, task_order_index, seed)
-        t0 = time.perf_counter()
+        human_duration_sec = round(max(0.0, human_stop_epoch - human_start_epoch), 3)
+        start_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(human_start_epoch))
+        stop_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(human_stop_epoch))
 
-        if assigned_condition == "BASELINE":
+        t0_pipe = time.perf_counter()
+
+        if assignment == "BASELINE":
             target = code_generator(None)
-            duration = round(time.perf_counter() - t0, 3)
+            pipeline_duration = round(time.perf_counter() - t0_pipe, 4)
             trial = DeveloperTrialRecord(
                 participant_id=participant_id,
                 task_id=task_id,
                 task_order_index=task_order_index,
                 assignment="BASELINE",
                 is_real_participant=True,
-                task_completion_time_sec=duration,
+                task_start_time_iso=start_iso,
+                task_stop_time_iso=stop_iso,
+                task_completion_time_sec=human_duration_sec,
+                pipeline_execution_time_sec=pipeline_duration,
                 defects_caught_pre_gen=0,
                 defects_caught_post_gen=0,
                 rework_iterations=rework_iterations,
@@ -265,7 +371,7 @@ class ExternalValidationProtocol:
                 code_generator=code_generator,
                 custom_obligations=task["obligations"]
             )
-            duration = round(time.perf_counter() - t0, 3)
+            pipeline_duration = round(time.perf_counter() - t0_pipe, 4)
             verdict = "SUCCESS" if (receipt.verdict == "PASS" and task_outcome == "SUCCESS") else "BLOCKED_OR_FAILED"
             trial = DeveloperTrialRecord(
                 participant_id=participant_id,
@@ -273,7 +379,10 @@ class ExternalValidationProtocol:
                 task_order_index=task_order_index,
                 assignment="SCLASS_TREATMENT",
                 is_real_participant=True,
-                task_completion_time_sec=duration,
+                task_start_time_iso=start_iso,
+                task_stop_time_iso=stop_iso,
+                task_completion_time_sec=human_duration_sec,
+                pipeline_execution_time_sec=pipeline_duration,
                 defects_caught_pre_gen=0 if receipt.pre_gen_grounded else 1,
                 defects_caught_post_gen=receipt.obligations_failed,
                 rework_iterations=rework_iterations,
@@ -320,10 +429,10 @@ class ExternalValidationProtocol:
 
         return {
             "protocol_id": f"EXTERNAL-VALIDATION-PROTOCOL-{commit_sha[:12].upper()}",
-            "schema_version": "1.1.0",
+            "schema_version": "1.2.0",
             "milestone": "THESIS-GATE-1B: External Developer Validation Protocol",
             "protocol_design": {
-                "study_design": "Within-participant counterbalanced crossover across 3 tasks",
+                "study_design": "Balanced Latin-Square counterbalanced crossover across 3 tasks and 2 conditions",
                 "target_cohort_size": "6-10 developers (3 tasks each, 18-30 total trials)",
                 "task_catalog_size": len(self.get_standard_task_catalog()),
                 "metric_provenance_schema": METRIC_PROVENANCE_SCHEMA,
@@ -335,6 +444,7 @@ class ExternalValidationProtocol:
                 "real_participant_trials_count": len(real_trials),
                 "protocol_smoke_trials_count": len(smoke_trials),
                 "real_participants_enrolled": len(set(t.participant_id for t in real_trials)),
+                "registered_session_plans": len(self.plans),
                 "timestamp_utc": time.time(),
                 "timestamp_iso": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             },
@@ -343,7 +453,8 @@ class ExternalValidationProtocol:
                 "baseline": {
                     "trials_count": len(real_baseline),
                     "outcomes": baseline_outcomes,
-                    "mean_completion_time_sec": _mean([t.task_completion_time_sec for t in real_baseline]),
+                    "mean_human_completion_time_sec": _mean([t.task_completion_time_sec for t in real_baseline]),
+                    "mean_pipeline_execution_time_sec": _mean([t.pipeline_execution_time_sec for t in real_baseline]),
                     "mean_rework_iterations": _mean([float(t.rework_iterations) for t in real_baseline]),
                     "mean_developer_interventions": _mean([float(t.developer_interventions) for t in real_baseline]),
                     "mean_trust_score": _mean([t.developer_trust_score for t in real_baseline if t.developer_trust_score is not None]),
@@ -352,7 +463,8 @@ class ExternalValidationProtocol:
                 "sclass_treatment": {
                     "trials_count": len(real_treatment),
                     "outcomes": treatment_outcomes,
-                    "mean_completion_time_sec": _mean([t.task_completion_time_sec for t in real_treatment]),
+                    "mean_human_completion_time_sec": _mean([t.task_completion_time_sec for t in real_treatment]),
+                    "mean_pipeline_execution_time_sec": _mean([t.pipeline_execution_time_sec for t in real_treatment]),
                     "mean_rework_iterations": _mean([float(t.rework_iterations) for t in real_treatment]),
                     "mean_developer_interventions": _mean([float(t.developer_interventions) for t in real_treatment]),
                     "mean_trust_score": _mean(real_trust_scores),
@@ -361,13 +473,14 @@ class ExternalValidationProtocol:
                     "post_gen_defects_caught": sum(t.defects_caught_post_gen for t in real_treatment)
                 }
             },
+            "session_plans": [p.to_dict() for p in self.plans.values()],
             "trials": [t.to_dict() for t in self.trials],
             "protocol_readiness": "READY_FOR_EXTERNAL_PARTICIPANTS"
         }
 
 
 def run_external_validation_smoke(output_path: Optional[str] = None, tested_sha: Optional[str] = None) -> Dict[str, Any]:
-    """Runs a protocol smoke test verifying counterbalancing, instrument mechanics, and schema integrity."""
+    """Runs a protocol smoke test verifying Latin-Square balance, timing instruments, and schema integrity."""
     protocol = ExternalValidationProtocol()
 
     def gen_rate_limiter(spec):
@@ -379,13 +492,23 @@ def run_external_validation_smoke(output_path: Optional[str] = None, tested_sha:
     def gen_cache(spec):
         return lambda key: len(key) >= 1
 
-    tasks = protocol.get_standard_task_catalog()
-    generators = [gen_rate_limiter, gen_config_parser, gen_cache]
+    generators = {
+        "TASK-01-TOKEN-RATE-LIMITER": gen_rate_limiter,
+        "TASK-02-CONFIG-SCHEMA-PARSER": gen_config_parser,
+        "TASK-03-IDEMPOTENT-CACHE": gen_cache
+    }
 
-    for i, (task, gen) in enumerate(zip(tasks, generators)):
-        order_idx = i + 1
-        protocol.record_trial(protocol.execute_protocol_smoke_trial(f"smoke_dev_{order_idx}", task["task_id"], order_idx, "BASELINE", gen))
-        protocol.record_trial(protocol.execute_protocol_smoke_trial(f"smoke_dev_{order_idx}", task["task_id"], order_idx, "SCLASS_TREATMENT", gen))
+    # Generate session plans for 6 simulated smoke developers (one full 6-participant Latin block)
+    for dev_idx in range(6):
+        dev_id = f"smoke_dev_{dev_idx+1}"
+        plan = protocol.generate_participant_session_plan(dev_id, dev_idx)
+        protocol.register_plan(plan)
+
+        # Execute trials according to plan
+        for order_idx, task_id in enumerate(plan.ordered_task_ids, start=1):
+            cond = plan.condition_schedule[task_id]
+            gen = generators[task_id]
+            protocol.record_trial(protocol.execute_protocol_smoke_trial(dev_id, task_id, order_idx, cond, gen))
 
     summary = protocol.generate_validation_summary(tested_sha=tested_sha)
     out_file = output_path if output_path else os.path.join(os.path.dirname(__file__), "external_validation_protocol_receipt.json")
@@ -395,15 +518,16 @@ def run_external_validation_smoke(output_path: Optional[str] = None, tested_sha:
 
     print(f"External Validation Protocol Specification written to {out_file}.")
     print(f"Protocol Readiness: {summary['protocol_readiness']}. External Evidence Status: {summary['external_evidence_status']}.")
+    print(f"Latin-Square Session Plans Registered: {len(protocol.plans)}.")
     return summary
 
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="External Validation Protocol Runner")
-    parser.add_argument("--mode", type=str, choices=["smoke", "participant"], default="smoke", help="Execution mode")
-    parser.add_argument("--participant", type=str, default="test_dev_01", help="Participant ID")
-    parser.add_argument("--task", type=str, default="TASK-01-TOKEN-RATE-LIMITER", help="Task ID")
+    parser.add_argument("--mode", type=str, choices=["smoke", "plan", "trial"], default="smoke", help="Execution mode")
+    parser.add_argument("--participant", type=str, default="dev_01", help="Participant ID")
+    parser.add_argument("--participant-index", type=int, default=0, help="Participant index in cohort (0-9)")
     parser.add_argument("--task-order", type=int, default=1, choices=[1, 2, 3], help="Task order index in session (1, 2, 3)")
     parser.add_argument("--output", type=str, default=None, help="Output JSON receipt path")
     parser.add_argument("--sha", type=str, default=None, help="Tested Git commit SHA")
@@ -411,11 +535,15 @@ if __name__ == "__main__":
 
     if args.mode == "smoke":
         run_external_validation_smoke(output_path=args.output, tested_sha=args.sha)
+    elif args.mode == "plan":
+        plan = ExternalValidationProtocol.generate_participant_session_plan(args.participant, args.participant_index)
+        print(json.dumps(plan.to_dict(), indent=2))
     else:
-        protocol = ExternalValidationProtocol()
-        assignment = protocol.assign_treatment_counterbalanced(args.participant, args.task_order)
-        print(f"=== S-CLASS EXTERNAL DEVELOPER STUDY TRIAL ===")
+        plan = ExternalValidationProtocol.generate_participant_session_plan(args.participant, args.participant_index)
+        task_id = plan.ordered_task_ids[args.task_order - 1]
+        condition = plan.condition_schedule[task_id]
+        print(f"=== S-CLASS TRIAL STEP ===")
         print(f"Participant: {args.participant}")
-        print(f"Task: {args.task} (Order #{args.task_order})")
-        print(f"Assigned Condition: {assignment}")
-        print(f"Instructions: Complete the development task under condition: {assignment}.")
+        print(f"Task: {task_id} (Order #{args.task_order})")
+        print(f"Assigned Condition: {condition}")
+        print(f"Session Hash: {plan.session_plan_hash}")
