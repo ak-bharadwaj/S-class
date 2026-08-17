@@ -1,7 +1,11 @@
 """
 S-Class EOS V11.2 - Gate 2 Phase 8: Controlled Multi-Trial Performance Benchmark Harness.
-Measures warm campaign latency, generation throughput, cold-start index construction,
-and 5,000-cycle memory soak stability between Reference Hypothesis Adapter and S-Class Clean-Room Engine.
+Measures full property-testing campaign latency (strategy parameter generation +
+property execution + observation recording + health-check overhead), generation throughput,
+cold-start index construction, and 5,000-cycle memory soak stability between Reference
+Hypothesis Adapter and S-Class Clean-Room Engine.
+Note: This benchmarks full property-testing campaign latency across both frameworks,
+not isolated strategy draw operations.
 Supported Python Versions: 3.10-3.13.
 """
 
@@ -34,47 +38,15 @@ GATE_2_SOAK_GROWTH_UPPER = 1.050
 
 
 def get_current_rss_bytes() -> int:
-    """Returns current process Resident Set Size (RSS) in bytes on Windows or POSIX."""
+    """
+    Returns current process Resident Set Size (RSS) in bytes using psutil.
+    Fails closed if psutil is unavailable to avoid unverified memory substitution.
+    """
     try:
         import psutil
         return psutil.Process(os.getpid()).memory_info().rss
-    except Exception:
-        pass
-
-    if sys.platform == "win32":
-        try:
-            import ctypes
-            import ctypes.wintypes
-            class PROCESS_MEMORY_COUNTERS(ctypes.Structure):
-                _fields_ = [
-                    ('cb', ctypes.wintypes.DWORD),
-                    ('PageFaultCount', ctypes.wintypes.DWORD),
-                    ('PeakWorkingSetSize', ctypes.c_size_t),
-                    ('WorkingSetSize', ctypes.c_size_t),
-                    ('QuotaPeakPagedPoolUsage', ctypes.c_size_t),
-                    ('QuotaPagedPoolUsage', ctypes.c_size_t),
-                    ('QuotaPeakNonPagedPoolUsage', ctypes.c_size_t),
-                    ('QuotaNonPagedPoolUsage', ctypes.c_size_t),
-                    ('PagefileUsage', ctypes.c_size_t),
-                    ('PeakPagefileUsage', ctypes.c_size_t),
-                ]
-            counters = PROCESS_MEMORY_COUNTERS()
-            counters.cb = ctypes.sizeof(PROCESS_MEMORY_COUNTERS)
-            func = ctypes.windll.psapi.GetProcessMemoryInfo
-            func.argtypes = [ctypes.wintypes.HANDLE, ctypes.POINTER(PROCESS_MEMORY_COUNTERS), ctypes.wintypes.DWORD]
-            func.restype = ctypes.wintypes.BOOL
-            handle = ctypes.windll.kernel32.GetCurrentProcess()
-            if func(handle, ctypes.byref(counters), counters.cb):
-                return int(counters.WorkingSetSize)
-        except Exception:
-            pass
-    else:
-        try:
-            import resource
-            return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024
-        except Exception:
-            pass
-    return 1024 * 1024
+    except ImportError:
+        raise RuntimeError("psutil is required for authoritative memory RSS measurement in Gate 2 certification")
 
 
 def get_total_ram_bytes() -> int:
@@ -318,6 +290,11 @@ def run_full_gate2_performance_benchmark(
         "certificate_id": f"OSS-PARITY-GATE-2-PROPERTY-TESTING-LINUX-{commit_sha[:12].upper()}",
         "schema_version": "1.0.0",
         "gate_name": "Gate 2: Hypothesis Property Testing & Invariant Verification Parity",
+        "benchmark_scope_description": (
+            "Compares full property-testing campaign latency (strategy parameter generation + "
+            "property execution + observation recording + health-check overhead) between S-Class "
+            "CleanRoomPropertyEngine and ReferenceHypothesisAdapter, not isolated primitive draw operations."
+        ),
         "provenance": {
             "runner_os": os.environ.get("RUNNER_OS", platform.system()),
             "hostname": socket.gethostname(),

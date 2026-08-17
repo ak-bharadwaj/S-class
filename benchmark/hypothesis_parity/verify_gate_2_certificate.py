@@ -14,6 +14,7 @@ from typing import Optional, Dict, Any
 def verify_gate2_certificate(cert: Dict[str, Any], expected_sha: Optional[str] = None) -> bool:
     """
     Validates Gate 2 Parity Certificate against frozen acceptance criteria.
+    Fails closed on missing provenance, UNKNOWN SHA, or statistical gate violations.
     Raises ValueError on any missing key or failed constraint.
     """
     if not isinstance(cert, dict):
@@ -24,12 +25,14 @@ def verify_gate2_certificate(cert: Dict[str, Any], expected_sha: Optional[str] =
         raise ValueError(f"Invalid certificate_id: {cert_id}")
 
     prov = cert.get("provenance", {})
-    if not prov:
+    if not prov or not isinstance(prov, dict):
         raise ValueError("Missing provenance in certificate")
 
-    tested_sha = prov.get("tested_source_sha", "UNKNOWN")
-    if expected_sha and expected_sha != "UNKNOWN":
-        if tested_sha != "UNKNOWN" and tested_sha != expected_sha:
+    tested_sha = prov.get("tested_source_sha", "")
+    if expected_sha:
+        if not tested_sha or tested_sha == "UNKNOWN":
+            raise ValueError(f"Provenance missing or UNKNOWN tested_source_sha in certificate! Expected {expected_sha}, got {repr(tested_sha)}")
+        if tested_sha != expected_sha:
             raise ValueError(f"Tested source SHA mismatch! Expected {expected_sha}, got {tested_sha}")
 
     crit = cert.get("acceptance_criteria", {})
@@ -55,6 +58,8 @@ def verify_gate2_certificate(cert: Dict[str, Any], expected_sha: Optional[str] =
 
     # Domain performance metrics
     dom_metrics = cert.get("domain_performance_metrics", {})
+    if len(dom_metrics) < 6:
+        raise ValueError(f"Expected at least 6 domain benchmarks, got {len(dom_metrics)}")
     for dom_name, dom_info in dom_metrics.items():
         if not dom_info.get("domain_gate_passed"):
             raise ValueError(f"Domain '{dom_name}' failed performance gate")
