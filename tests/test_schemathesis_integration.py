@@ -65,7 +65,7 @@ SAMPLE_INTEGRATION_SCHEMA = {
 
 def test_schemathesis_integration_clean_local_api():
     """Executes Schemathesis in an isolated child process against a compliant WSGI endpoint."""
-    adapter = SchemathesisProviderAdapter(source_sha="integration_test_sha")
+    adapter = SchemathesisProviderAdapter(source_sha="0123456789abcdef0123456789abcdef01234567")
     result = adapter.verify_api_contract(
         schema_dict=SAMPLE_INTEGRATION_SCHEMA,
         target_app=clean_wsgi_app,
@@ -83,7 +83,7 @@ def test_schemathesis_integration_clean_local_api():
 
 def test_schemathesis_integration_contract_violating_api():
     """Executes Schemathesis in an isolated child process against a contract-violating WSGI endpoint."""
-    adapter = SchemathesisProviderAdapter(source_sha="integration_test_sha")
+    adapter = SchemathesisProviderAdapter(source_sha="0123456789abcdef0123456789abcdef01234567")
     result = adapter.verify_api_contract(
         schema_dict=SAMPLE_INTEGRATION_SCHEMA,
         target_app=flawed_wsgi_app,

@@ -1,23 +1,34 @@
 """
-S-Class EOS V11.2 - Schemathesis Isolated Subprocess Worker.
+S-Class EOS V11.2 - Schemathesis Isolated Subprocess Worker (D0 Protocol).
 Runs strictly inside a child process to isolate Schemathesis and Hypothesis execution from S-Class memory.
-Reads execution payload from stdin and emits normalized JSON to stdout.
+Reads WorkerInvocationEnvelope from stdin, verifies input digest, executes bounded property campaigns,
+computes worker_digest bound to the parent's nonce, and emits WorkerOutputEnvelope to stdout.
 """
 
 import sys
 import os
 import json
 import time
+import hashlib
 import importlib
 from typing import Dict, Any, List, Optional
 
 
 def main():
     t_start = time.monotonic()
+    worker_pid = os.getpid()
+
+    # Default fallback identities in case stdin reading fails early
+    execution_id = "UNKNOWN_EXECUTION_ID"
+    parent_nonce = "UNKNOWN_NONCE"
+
     try:
         raw_input = sys.stdin.read()
         if not raw_input.strip():
-            _emit_output(
+            _emit_envelope(
+                execution_id=execution_id,
+                parent_nonce=parent_nonce,
+                worker_pid=worker_pid,
                 status="INPUT_INVALID",
                 exit_code=2,
                 violations=[],
@@ -27,9 +38,12 @@ def main():
             )
             return
 
-        payload = json.loads(raw_input)
+        envelope = json.loads(raw_input)
     except Exception as e:
-        _emit_output(
+        _emit_envelope(
+            execution_id=execution_id,
+            parent_nonce=parent_nonce,
+            worker_pid=worker_pid,
             status="INPUT_INVALID",
             exit_code=2,
             violations=[],
@@ -39,20 +53,29 @@ def main():
         )
         return
 
-    schema_dict = payload.get("schema_dict")
-    base_url = payload.get("base_url")
-    app_module_str = payload.get("app_module")
-    app_attr_str = payload.get("app_callable")
-    max_examples = payload.get("max_examples", 5)
+    # Extract Handshake Identities
+    execution_id = envelope.get("execution_id", execution_id)
+    parent_nonce = envelope.get("parent_nonce", parent_nonce)
+    source_sha = envelope.get("source_sha", "UNKNOWN")
+    provider_version = envelope.get("provider_version", "1.0.0")
+
+    schema_dict = envelope.get("schema_dict")
+    base_url = envelope.get("base_url")
+    app_module_str = envelope.get("app_module")
+    app_attr_str = envelope.get("app_callable")
+    max_examples = envelope.get("max_examples", 5)
 
     # 1. Validate Schema
     if not schema_dict or not isinstance(schema_dict, dict) or not isinstance(schema_dict.get("paths"), dict):
-        _emit_output(
+        _emit_envelope(
+            execution_id=execution_id,
+            parent_nonce=parent_nonce,
+            worker_pid=worker_pid,
             status="INPUT_INVALID",
             exit_code=2,
             violations=[],
             stats={"endpoints_tested": 0, "operations_tested": 0, "checks_executed": 0, "violations_count": 0, "duration_sec": 0.0},
-            diagnostics=[{"error": "Schema is missing or 'paths' is not a dictionary."}],
+            diagnostics=[{"error": "Schema is missing or 'paths' is not a dictionary mapping."}],
             summary="Worker failed: Invalid schema dictionary."
         )
         return
@@ -61,7 +84,10 @@ def main():
     try:
         import schemathesis
     except ImportError as e:
-        _emit_output(
+        _emit_envelope(
+            execution_id=execution_id,
+            parent_nonce=parent_nonce,
+            worker_pid=worker_pid,
             status="TOOL_NOT_AVAILABLE",
             exit_code=3,
             violations=[],
@@ -75,7 +101,6 @@ def main():
     target_app = None
     if app_module_str and app_attr_str:
         try:
-            # Ensure CWD and tests/ are in sys.path
             cwd = os.getcwd()
             if cwd not in sys.path:
                 sys.path.insert(0, cwd)
@@ -93,7 +118,10 @@ def main():
 
             target_app = getattr(mod, app_attr_str)
         except Exception as e:
-            _emit_output(
+            _emit_envelope(
+                execution_id=execution_id,
+                parent_nonce=parent_nonce,
+                worker_pid=worker_pid,
                 status="TOOL_EXECUTION_FAILED",
                 exit_code=1,
                 violations=[],
@@ -116,7 +144,10 @@ def main():
         else:
             schema = schemathesis.openapi.from_dict(schema_dict)
     except Exception as e:
-        _emit_output(
+        _emit_envelope(
+            execution_id=execution_id,
+            parent_nonce=parent_nonce,
+            worker_pid=worker_pid,
             status="INPUT_INVALID",
             exit_code=2,
             violations=[],
@@ -137,7 +168,10 @@ def main():
                 operations.append(op)
 
         if not operations:
-            _emit_output(
+            _emit_envelope(
+                execution_id=execution_id,
+                parent_nonce=parent_nonce,
+                worker_pid=worker_pid,
                 status="INSUFFICIENT_EVIDENCE",
                 exit_code=0,
                 violations=[],
@@ -147,7 +181,10 @@ def main():
             )
             return
     except Exception as e:
-        _emit_output(
+        _emit_envelope(
+            execution_id=execution_id,
+            parent_nonce=parent_nonce,
+            worker_pid=worker_pid,
             status="TOOL_EXECUTION_FAILED",
             exit_code=1,
             violations=[],
@@ -234,7 +271,10 @@ def main():
                         _extract_violations_from_exception(e, violations, path_key, method, getattr(response, "status_code", None), curl_cmd)
 
     except Exception as e:
-        _emit_output(
+        _emit_envelope(
+            execution_id=execution_id,
+            parent_nonce=parent_nonce,
+            worker_pid=worker_pid,
             status="TOOL_EXECUTION_FAILED",
             exit_code=1,
             violations=violations,
@@ -260,7 +300,10 @@ def main():
     }
 
     if len(violations) > 0:
-        _emit_output(
+        _emit_envelope(
+            execution_id=execution_id,
+            parent_nonce=parent_nonce,
+            worker_pid=worker_pid,
             status="TARGET_CONTRACT_VIOLATED",
             exit_code=1,
             violations=violations,
@@ -269,7 +312,10 @@ def main():
             summary=f"Contract violated: {len(violations)} violations across {operations_count} operations."
         )
     elif checks_executed == 0:
-        _emit_output(
+        _emit_envelope(
+            execution_id=execution_id,
+            parent_nonce=parent_nonce,
+            worker_pid=worker_pid,
             status="INSUFFICIENT_EVIDENCE",
             exit_code=0,
             violations=[],
@@ -278,7 +324,10 @@ def main():
             summary="Worker inconclusive: Zero checks evaluated."
         )
     else:
-        _emit_output(
+        _emit_envelope(
+            execution_id=execution_id,
+            parent_nonce=parent_nonce,
+            worker_pid=worker_pid,
             status="TARGET_CLEAN",
             exit_code=0,
             violations=[],
@@ -333,8 +382,11 @@ def _extract_violations_from_exception(exc, violations_list, path, method, statu
         })
 
 
-def _emit_output(status: str, exit_code: int, violations: list, stats: dict, diagnostics: list, summary: str):
-    output = {
+def _emit_envelope(execution_id: str, parent_nonce: str, worker_pid: int, status: str, exit_code: int, violations: list, stats: dict, diagnostics: list, summary: str):
+    payload = {
+        "execution_id": execution_id,
+        "parent_nonce": parent_nonce,
+        "worker_pid": worker_pid,
         "status": status,
         "exit_code": exit_code,
         "violations": violations,
@@ -342,7 +394,11 @@ def _emit_output(status: str, exit_code: int, violations: list, stats: dict, dia
         "diagnostics": diagnostics,
         "summary": summary
     }
-    sys.stdout.write(json.dumps(output) + "\n")
+    raw = json.dumps(payload, sort_keys=True, default=str)
+    worker_digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    payload["worker_digest"] = worker_digest
+
+    sys.stdout.write(json.dumps(payload) + "\n")
     sys.stdout.flush()
     sys.exit(0 if status == "TARGET_CLEAN" else (1 if status == "TARGET_CONTRACT_VIOLATED" else exit_code))
 

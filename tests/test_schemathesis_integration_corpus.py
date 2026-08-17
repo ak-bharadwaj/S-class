@@ -61,7 +61,7 @@ def clean_health_app(environ, start_response):
 
 def test_corpus_scenario_1_clean_api():
     """Scenario 1: Fully conforming API returns valid payload -> TARGET_CLEAN."""
-    adapter = SchemathesisProviderAdapter(source_sha="corpus_test_sha")
+    adapter = SchemathesisProviderAdapter(source_sha="0123456789abcdef0123456789abcdef01234567")
     result = adapter.verify_api_contract(
         schema_dict=CLEAN_CORPUS_SCHEMA,
         target_app=clean_health_app,
@@ -124,7 +124,7 @@ def violating_inventory_app(environ, start_response):
 
 def test_corpus_scenario_2_schema_violation():
     """Scenario 2: API returns response violating type constraints -> TARGET_CONTRACT_VIOLATED."""
-    adapter = SchemathesisProviderAdapter(source_sha="corpus_test_sha")
+    adapter = SchemathesisProviderAdapter(source_sha="0123456789abcdef0123456789abcdef01234567")
     result = adapter.verify_api_contract(
         schema_dict=VIOLATION_CORPUS_SCHEMA,
         target_app=violating_inventory_app,
@@ -149,7 +149,7 @@ def server_error_app(environ, start_response):
 
 def test_corpus_scenario_3_server_error_5xx():
     """Scenario 3: Endpoint crashes with HTTP 500 -> TARGET_CONTRACT_VIOLATED (ServerError)."""
-    adapter = SchemathesisProviderAdapter(source_sha="corpus_test_sha")
+    adapter = SchemathesisProviderAdapter(source_sha="0123456789abcdef0123456789abcdef01234567")
     result = adapter.verify_api_contract(
         schema_dict=CLEAN_CORPUS_SCHEMA,
         target_app=server_error_app,
@@ -168,7 +168,7 @@ def test_corpus_scenario_3_server_error_5xx():
 # -----------------------------------------------------------------------------
 def test_corpus_scenario_4_malformed_schema():
     """Scenario 4: Malformed or unparseable schema dictionary -> INPUT_INVALID."""
-    adapter = SchemathesisProviderAdapter(source_sha="corpus_test_sha")
+    adapter = SchemathesisProviderAdapter(source_sha="0123456789abcdef0123456789abcdef01234567")
 
     # Missing paths
     res_no_paths = adapter.verify_api_contract(schema_dict={"openapi": "3.0.0", "info": {}})
@@ -186,7 +186,7 @@ def test_corpus_scenario_4_malformed_schema():
 # -----------------------------------------------------------------------------
 def test_corpus_scenario_5_unreachable_target():
     """Scenario 5: Live base URL pointing to closed/unreachable port -> TARGET_CONTRACT_VIOLATED."""
-    adapter = SchemathesisProviderAdapter(source_sha="corpus_test_sha")
+    adapter = SchemathesisProviderAdapter(source_sha="0123456789abcdef0123456789abcdef01234567")
     result = adapter.verify_api_contract(
         schema_dict=CLEAN_CORPUS_SCHEMA,
         base_url="http://127.0.0.1:59999",

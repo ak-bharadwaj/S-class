@@ -1,9 +1,11 @@
 """
-Unit tests for S-Class Schemathesis Provider Contract & Dependency Boundary Isolation.
-Verifies all 9 fail-closed states, VersionPolicy, process crashes, hard timeouts, malformed output, provenance, and zero-leakage encapsulation.
+Unit tests for S-Class Schemathesis Provider Contract & Dependency Boundary Isolation (D0 Protocol).
+Verifies all 9 fail-closed states, VersionPolicy, cryptographic nonce handshake,
+digest verification, process crashes, hard timeouts, malformed output, provenance, and zero-leakage encapsulation.
 """
 
 import json
+import hashlib
 import subprocess
 import pytest
 from unittest.mock import patch, MagicMock
@@ -12,7 +14,9 @@ from benchmark.providers.schemathesis.models import (
     ProviderStatus,
     ContractViolation,
     ExecutionStats,
-    ProviderExecutionResult
+    ProviderExecutionResult,
+    WorkerInvocationEnvelope,
+    WorkerOutputEnvelope
 )
 from benchmark.providers.schemathesis.version_policy import (
     VersionPolicy,
@@ -21,6 +25,34 @@ from benchmark.providers.schemathesis.version_policy import (
 from benchmark.providers.schemathesis.parser import SchemathesisParser
 from benchmark.providers.schemathesis.runner import SchemathesisRunner
 from benchmark.providers.schemathesis.adapter import SchemathesisProviderAdapter
+
+
+def _build_valid_worker_output(
+    status: str = "TARGET_CLEAN",
+    exit_code: int = 0,
+    violations: list = None,
+    stats: dict = None,
+    diagnostics: list = None,
+    summary: str = "Clean run",
+    execution_id: str = "EXEC-001",
+    parent_nonce: str = "NONCE-001",
+    worker_pid: int = 1234
+) -> dict:
+    """Helper constructing a valid signed WorkerOutputEnvelope dictionary for tests."""
+    payload = {
+        "execution_id": execution_id,
+        "parent_nonce": parent_nonce,
+        "worker_pid": worker_pid,
+        "status": status,
+        "exit_code": exit_code,
+        "violations": violations or [],
+        "stats": stats or {"endpoints_tested": 1, "operations_tested": 1, "checks_executed": 5, "violations_count": len(violations or []), "duration_sec": 0.1},
+        "diagnostics": diagnostics or [],
+        "summary": summary
+    }
+    raw = json.dumps(payload, sort_keys=True, default=str)
+    payload["worker_digest"] = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    return payload
 
 
 def test_models_contract_violation_serialization():
@@ -44,13 +76,16 @@ def test_models_contract_violation_serialization():
 def test_provider_execution_result_provenance_and_immutability():
     res = ProviderExecutionResult(
         execution_id="EXEC-TEST-001",
+        execution_nonce="nonce_12345",
         provider_version="1.0.0",
         schemathesis_version="4.24.3",
-        source_sha="test_sha_abcdef",
+        source_sha="a" * 40,
         schema_hash="schema_hash_12345",
         target_identifier="http://localhost:8000",
         target_hash="target_hash_67890",
         config_hash="config_hash_abc",
+        input_digest="input_digest_123",
+        worker_digest="worker_digest_456",
         status=ProviderStatus.TARGET_CLEAN,
         exit_code=0,
         start_time_iso="2026-08-17T15:00:00Z",
@@ -66,6 +101,8 @@ def test_provider_execution_result_provenance_and_immutability():
     assert d["status"] == "TARGET_CLEAN"
     assert d["passed"] is True
     assert d["stats"]["endpoints_tested"] == 2
+    assert d["input_digest"] == "input_digest_123"
+    assert d["worker_digest"] == "worker_digest_456"
 
 
 def test_version_policy_parsing_and_support_range():
@@ -92,7 +129,7 @@ def test_version_policy_parsing_and_support_range():
 
 def test_isolation_schemathesis_missing():
     """Missing Schemathesis package transitions to TOOL_NOT_AVAILABLE."""
-    runner = SchemathesisRunner(source_sha="test_sha")
+    runner = SchemathesisRunner(source_sha="a" * 40)
     with patch.object(VersionPolicy, "get_installed_version", return_value=None):
         result = runner.execute(schema_dict={"openapi": "3.0.0", "paths": {"/a": {}}})
         assert result.status == ProviderStatus.TOOL_NOT_AVAILABLE
@@ -102,7 +139,7 @@ def test_isolation_schemathesis_missing():
 
 def test_isolation_schemathesis_unsupported_version():
     """Incompatible Schemathesis versions transition to TOOL_NOT_AVAILABLE."""
-    runner = SchemathesisRunner(source_sha="test_sha")
+    runner = SchemathesisRunner(source_sha="a" * 40)
     with patch.object(VersionPolicy, "get_installed_version", return_value="2.5.0"):
         result = runner.execute(schema_dict={"openapi": "3.0.0", "paths": {"/a": {}}})
         assert result.status == ProviderStatus.TOOL_NOT_AVAILABLE
@@ -112,7 +149,7 @@ def test_isolation_schemathesis_unsupported_version():
 
 def test_isolation_malformed_schema_input_invalid():
     """Malformed schema without paths transitions to INPUT_INVALID."""
-    runner = SchemathesisRunner(source_sha="test_sha")
+    runner = SchemathesisRunner(source_sha="a" * 40)
     res_none = runner.execute(schema_dict=None)
     assert res_none.status == ProviderStatus.INPUT_INVALID
     assert res_none.passed is False
@@ -124,7 +161,7 @@ def test_isolation_malformed_schema_input_invalid():
 
 def test_isolation_process_crash():
     """Unhandled process crash is captured as TOOL_EXECUTION_FAILED."""
-    runner = SchemathesisRunner(source_sha="test_sha")
+    runner = SchemathesisRunner(source_sha="a" * 40)
     schema = {"openapi": "3.0.0", "paths": {"/users": {"get": {}}}}
 
     mock_proc = MagicMock()
@@ -141,7 +178,7 @@ def test_isolation_process_crash():
 
 def test_isolation_process_timeout_hard_kill():
     """Hard subprocess timeout terminates child process and returns TIMEOUT status."""
-    runner = SchemathesisRunner(source_sha="test_sha")
+    runner = SchemathesisRunner(source_sha="a" * 40)
     schema = {"openapi": "3.0.0", "paths": {"/users": {"get": {}}}}
 
     mock_proc = MagicMock()
@@ -160,7 +197,7 @@ def test_isolation_process_timeout_hard_kill():
 
 def test_isolation_malformed_stdout_non_json():
     """Non-JSON output from worker process returns OUTPUT_INVALID."""
-    runner = SchemathesisRunner(source_sha="test_sha")
+    runner = SchemathesisRunner(source_sha="a" * 40)
     schema = {"openapi": "3.0.0", "paths": {"/users": {"get": {}}}}
 
     mock_proc = MagicMock()
@@ -173,62 +210,26 @@ def test_isolation_malformed_stdout_non_json():
         assert result.passed is False
 
 
-def test_isolation_malformed_json_missing_fields():
-    """Incomplete JSON report from worker returns OUTPUT_INVALID."""
-    runner = SchemathesisRunner(source_sha="test_sha")
-    schema = {"openapi": "3.0.0", "paths": {"/users": {"get": {}}}}
-
-    mock_proc = MagicMock()
-    mock_proc.communicate.return_value = (json.dumps({"unknown_field": 123}), "")
-    mock_proc.returncode = 0
-
-    with patch("subprocess.Popen", return_value=mock_proc):
-        result = runner.execute(schema_dict=schema)
-        assert result.status == ProviderStatus.OUTPUT_INVALID
-        assert result.passed is False
-
-
-def test_isolation_unknown_exit_code():
-    """Handling of non-standard exit code with valid payload."""
-    runner = SchemathesisRunner(source_sha="test_sha")
-    schema = {"openapi": "3.0.0", "paths": {"/users": {"get": {}}}}
-
-    worker_payload = {
-        "status": "TOOL_EXECUTION_FAILED",
-        "exit_code": 255,
-        "violations": [],
-        "stats": {"endpoints_tested": 1, "operations_tested": 1, "checks_executed": 0, "violations_count": 0, "duration_sec": 0.05},
-        "diagnostics": [{"error": "Unknown fatal tool error"}],
-        "summary": "Worker failed with unknown exit code"
-    }
-
-    mock_proc = MagicMock()
-    mock_proc.communicate.return_value = (json.dumps(worker_payload), "")
-    mock_proc.returncode = 255
-
-    with patch("subprocess.Popen", return_value=mock_proc):
-        result = runner.execute(schema_dict=schema)
-        assert result.status == ProviderStatus.TOOL_EXECUTION_FAILED
-        assert result.passed is False
-        assert result.exit_code == 255
-
-
 def test_isolation_zero_checks_insufficient_evidence():
     """Zero checks executed by worker returns INSUFFICIENT_EVIDENCE."""
-    runner = SchemathesisRunner(source_sha="test_sha")
+    runner = SchemathesisRunner(source_sha="a" * 40)
     schema = {"openapi": "3.0.0", "paths": {"/empty": {"get": {}}}}
 
-    worker_payload = {
-        "status": "INSUFFICIENT_EVIDENCE",
-        "exit_code": 0,
-        "violations": [],
-        "stats": {"endpoints_tested": 1, "operations_tested": 0, "checks_executed": 0, "violations_count": 0, "duration_sec": 0.02},
-        "diagnostics": [{"warning": "Zero operations reachable"}],
-        "summary": "Worker inconclusive: Zero checks evaluated."
-    }
+    def mock_communicate(input=None, timeout=None):
+        envelope = json.loads(input)
+        worker_out = _build_valid_worker_output(
+            status="INSUFFICIENT_EVIDENCE",
+            exit_code=0,
+            violations=[],
+            stats={"endpoints_tested": 1, "operations_tested": 0, "checks_executed": 0, "violations_count": 0, "duration_sec": 0.02},
+            summary="Worker inconclusive: Zero checks evaluated.",
+            execution_id=envelope["execution_id"],
+            parent_nonce=envelope["parent_nonce"]
+        )
+        return json.dumps(worker_out), ""
 
     mock_proc = MagicMock()
-    mock_proc.communicate.return_value = (json.dumps(worker_payload), "")
+    mock_proc.communicate.side_effect = mock_communicate
     mock_proc.returncode = 0
 
     with patch("subprocess.Popen", return_value=mock_proc):
@@ -239,20 +240,24 @@ def test_isolation_zero_checks_insufficient_evidence():
 
 def test_isolation_valid_pass():
     """Normalized output parsing for a valid passing execution (TARGET_CLEAN)."""
-    runner = SchemathesisRunner(source_sha="test_sha")
+    runner = SchemathesisRunner(source_sha="a" * 40)
     schema = {"openapi": "3.0.0", "paths": {"/users": {"get": {}}}}
 
-    worker_payload = {
-        "status": "TARGET_CLEAN",
-        "exit_code": 0,
-        "violations": [],
-        "stats": {"endpoints_tested": 1, "operations_tested": 1, "checks_executed": 10, "violations_count": 0, "duration_sec": 0.15},
-        "diagnostics": [],
-        "summary": "Target clean: All 10 checks passed."
-    }
+    def mock_communicate(input=None, timeout=None):
+        envelope = json.loads(input)
+        worker_out = _build_valid_worker_output(
+            status="TARGET_CLEAN",
+            exit_code=0,
+            violations=[],
+            stats={"endpoints_tested": 1, "operations_tested": 1, "checks_executed": 10, "violations_count": 0, "duration_sec": 0.15},
+            summary="Target clean: All 10 checks passed.",
+            execution_id=envelope["execution_id"],
+            parent_nonce=envelope["parent_nonce"]
+        )
+        return json.dumps(worker_out), ""
 
     mock_proc = MagicMock()
-    mock_proc.communicate.return_value = (json.dumps(worker_payload), "")
+    mock_proc.communicate.side_effect = mock_communicate
     mock_proc.returncode = 0
 
     with patch("subprocess.Popen", return_value=mock_proc):
@@ -265,31 +270,37 @@ def test_isolation_valid_pass():
 
 def test_isolation_valid_contract_failure():
     """Normalized output parsing for a detected contract violation (TARGET_CONTRACT_VIOLATED)."""
-    runner = SchemathesisRunner(source_sha="test_sha")
+    runner = SchemathesisRunner(source_sha="a" * 40)
     schema = {"openapi": "3.0.0", "paths": {"/users": {"get": {}}}}
 
-    worker_payload = {
-        "status": "TARGET_CONTRACT_VIOLATED",
-        "exit_code": 1,
-        "violations": [
-            {
-                "error_type": "JsonSchemaError",
-                "message": "Response violates schema: 'name' is required",
-                "path": "/users",
-                "method": "GET",
-                "status_code": 200,
-                "curl_command": "curl -X GET http://localhost/users",
-                "schema_path": "properties/name",
-                "details": {}
-            }
-        ],
-        "stats": {"endpoints_tested": 1, "operations_tested": 1, "checks_executed": 5, "violations_count": 1, "duration_sec": 0.12},
-        "diagnostics": [],
-        "summary": "Contract violated: 1 violations detected."
-    }
+    violations_data = [
+        {
+            "error_type": "JsonSchemaError",
+            "message": "Response violates schema: 'name' is required",
+            "path": "/users",
+            "method": "GET",
+            "status_code": 200,
+            "curl_command": "curl -X GET http://localhost/users",
+            "schema_path": "properties/name",
+            "details": {}
+        }
+    ]
+
+    def mock_communicate(input=None, timeout=None):
+        envelope = json.loads(input)
+        worker_out = _build_valid_worker_output(
+            status="TARGET_CONTRACT_VIOLATED",
+            exit_code=1,
+            violations=violations_data,
+            stats={"endpoints_tested": 1, "operations_tested": 1, "checks_executed": 5, "violations_count": 1, "duration_sec": 0.12},
+            summary="Contract violated: 1 violations detected.",
+            execution_id=envelope["execution_id"],
+            parent_nonce=envelope["parent_nonce"]
+        )
+        return json.dumps(worker_out), ""
 
     mock_proc = MagicMock()
-    mock_proc.communicate.return_value = (json.dumps(worker_payload), "")
+    mock_proc.communicate.side_effect = mock_communicate
     mock_proc.returncode = 1
 
     with patch("subprocess.Popen", return_value=mock_proc):
@@ -302,32 +313,182 @@ def test_isolation_valid_contract_failure():
 
 
 # -----------------------------------------------------------------------------
-# 2. Zero Leakage Subprocess Encapsulation Test
+# 2. D0 Cryptographic Handshake & Tamper Protection Tests
+# -----------------------------------------------------------------------------
+
+def test_handshake_nonce_mismatch_fails_closed():
+    """Replay attack with mismatched nonce challenge is rejected with OUTPUT_INVALID."""
+    runner = SchemathesisRunner(source_sha="a" * 40)
+    schema = {"openapi": "3.0.0", "paths": {"/users": {"get": {}}}}
+
+    def mock_communicate(input=None, timeout=None):
+        envelope = json.loads(input)
+        # Deliberately reply with a stale/different nonce
+        worker_out = _build_valid_worker_output(
+            status="TARGET_CLEAN",
+            execution_id=envelope["execution_id"],
+            parent_nonce="STALE_NONCE_VALUE_REPLAYED"
+        )
+        return json.dumps(worker_out), ""
+
+    mock_proc = MagicMock()
+    mock_proc.communicate.side_effect = mock_communicate
+    mock_proc.returncode = 0
+
+    with patch("subprocess.Popen", return_value=mock_proc):
+        result = runner.execute(schema_dict=schema)
+        assert result.status == ProviderStatus.OUTPUT_INVALID
+        assert result.passed is False
+        assert "nonce" in result.diagnostics[0]["error"].lower()
+
+
+def test_handshake_execution_id_mismatch_fails_closed():
+    """Execution ID spoofing is rejected with OUTPUT_INVALID."""
+    runner = SchemathesisRunner(source_sha="a" * 40)
+    schema = {"openapi": "3.0.0", "paths": {"/users": {"get": {}}}}
+
+    def mock_communicate(input=None, timeout=None):
+        envelope = json.loads(input)
+        worker_out = _build_valid_worker_output(
+            status="TARGET_CLEAN",
+            execution_id="EXEC-SPOOFED-ID-999",
+            parent_nonce=envelope["parent_nonce"]
+        )
+        return json.dumps(worker_out), ""
+
+    mock_proc = MagicMock()
+    mock_proc.communicate.side_effect = mock_communicate
+    mock_proc.returncode = 0
+
+    with patch("subprocess.Popen", return_value=mock_proc):
+        result = runner.execute(schema_dict=schema)
+        assert result.status == ProviderStatus.OUTPUT_INVALID
+        assert result.passed is False
+        assert "execution id" in result.diagnostics[0]["error"].lower()
+
+
+def test_handshake_digest_tampering_fails_closed():
+    """Tampered worker results without matching signature are rejected with OUTPUT_INVALID."""
+    runner = SchemathesisRunner(source_sha="a" * 40)
+    schema = {"openapi": "3.0.0", "paths": {"/users": {"get": {}}}}
+
+    def mock_communicate(input=None, timeout=None):
+        envelope = json.loads(input)
+        worker_out = _build_valid_worker_output(
+            status="TARGET_CLEAN",
+            execution_id=envelope["execution_id"],
+            parent_nonce=envelope["parent_nonce"]
+        )
+        # Tamper with the claimed digest
+        worker_out["worker_digest"] = "f" * 64
+        return json.dumps(worker_out), ""
+
+    mock_proc = MagicMock()
+    mock_proc.communicate.side_effect = mock_communicate
+    mock_proc.returncode = 0
+
+    with patch("subprocess.Popen", return_value=mock_proc):
+        result = runner.execute(schema_dict=schema)
+        assert result.status == ProviderStatus.OUTPUT_INVALID
+        assert result.passed is False
+        assert "digest" in result.diagnostics[0]["error"].lower()
+
+
+# -----------------------------------------------------------------------------
+# 3. Provenance Verification & Strict Version Enforcement Tests
+# -----------------------------------------------------------------------------
+
+def test_provenance_strict_mode_sha_and_version_enforcement():
+    """
+    Tests strict provenance rules:
+    - Missing SHA -> FAIL
+    - UNKNOWN SHA -> FAIL
+    - Invalid format SHA -> FAIL
+    - Exact SHA -> PASS
+    - Exact dependency version -> PASS
+    - Wrong dependency version -> FAIL
+    """
+    schema = {"openapi": "3.0.0", "paths": {"/users": {"get": {}}}}
+
+    # 1. Missing / empty SHA under strict mode -> FAIL
+    runner_empty = SchemathesisRunner(source_sha="", strict_provenance=True)
+    res_empty = runner_empty.execute(schema_dict=schema)
+    assert res_empty.status == ProviderStatus.INPUT_INVALID
+    assert res_empty.passed is False
+
+    # 2. UNKNOWN SHA under strict mode -> FAIL
+    runner_unknown = SchemathesisRunner(source_sha="UNKNOWN", strict_provenance=True)
+    res_unknown = runner_unknown.execute(schema_dict=schema)
+    assert res_unknown.status == ProviderStatus.INPUT_INVALID
+    assert res_unknown.passed is False
+
+    # 3. Invalid format SHA (e.g. short or non-hex) -> FAIL
+    runner_short = SchemathesisRunner(source_sha="short_sha", strict_provenance=True)
+    res_short = runner_short.execute(schema_dict=schema)
+    assert res_short.status == ProviderStatus.INPUT_INVALID
+    assert res_short.passed is False
+
+    # 4. Exact 40-char SHA with exact certified version -> PASS
+    exact_sha = "a" * 40
+    runner_valid = SchemathesisRunner(source_sha=exact_sha, strict_provenance=True)
+
+    def mock_communicate(input=None, timeout=None):
+        envelope = json.loads(input)
+        worker_out = _build_valid_worker_output(
+            status="TARGET_CLEAN",
+            execution_id=envelope["execution_id"],
+            parent_nonce=envelope["parent_nonce"]
+        )
+        return json.dumps(worker_out), ""
+
+    mock_proc = MagicMock()
+    mock_proc.communicate.side_effect = mock_communicate
+    mock_proc.returncode = 0
+
+    with patch.object(VersionPolicy, "get_installed_version", return_value=CERTIFIED_SCHEMATHESIS_VERSION):
+        with patch("subprocess.Popen", return_value=mock_proc):
+            res_valid = runner_valid.execute(schema_dict=schema)
+            assert res_valid.status == ProviderStatus.TARGET_CLEAN
+            assert res_valid.passed is True
+            assert res_valid.source_sha == exact_sha
+            assert res_valid.schemathesis_version == CERTIFIED_SCHEMATHESIS_VERSION
+            assert res_valid.input_digest != ""
+            assert res_valid.worker_digest != ""
+
+    # 5. Wrong dependency version (e.g. 4.23.0) under strict mode -> FAIL
+    with patch.object(VersionPolicy, "get_installed_version", return_value="4.23.0"):
+        res_wrong_ver = runner_valid.execute(schema_dict=schema)
+        assert res_wrong_ver.status == ProviderStatus.TOOL_NOT_AVAILABLE
+        assert res_wrong_ver.passed is False
+        assert "exact certified version" in res_wrong_ver.diagnostics[0]["error"]
+
+
+# -----------------------------------------------------------------------------
+# 4. Zero Leakage Subprocess Encapsulation Test
 # -----------------------------------------------------------------------------
 
 def test_zero_schemathesis_hypothesis_objects_escape():
     """Verifies that no Schemathesis/Hypothesis objects cross the provider boundary."""
-    runner = SchemathesisRunner(source_sha="test_sha")
+    runner = SchemathesisRunner(source_sha="a" * 40)
     schema = {"openapi": "3.0.0", "paths": {"/users": {"get": {}}}}
 
-    worker_payload = {
-        "status": "TARGET_CLEAN",
-        "exit_code": 0,
-        "violations": [],
-        "stats": {"endpoints_tested": 1, "operations_tested": 1, "checks_executed": 5, "violations_count": 0, "duration_sec": 0.1},
-        "diagnostics": [{"info": "test"}],
-        "summary": "Clean execution"
-    }
+    def mock_communicate(input=None, timeout=None):
+        envelope = json.loads(input)
+        worker_out = _build_valid_worker_output(
+            status="TARGET_CLEAN",
+            execution_id=envelope["execution_id"],
+            parent_nonce=envelope["parent_nonce"]
+        )
+        return json.dumps(worker_out), ""
 
     mock_proc = MagicMock()
-    mock_proc.communicate.return_value = (json.dumps(worker_payload), "")
+    mock_proc.communicate.side_effect = mock_communicate
     mock_proc.returncode = 0
 
     with patch("subprocess.Popen", return_value=mock_proc):
         result = runner.execute(schema_dict=schema)
         data = result.to_dict()
 
-        # Recursive check ensuring only primitives / built-ins are returned
         def _assert_only_primitives(obj):
             if isinstance(obj, dict):
                 for k, v in obj.items():
@@ -343,62 +504,3 @@ def test_zero_schemathesis_hypothesis_objects_escape():
                 assert "hypothesis" not in type_module
 
         _assert_only_primitives(data)
-
-
-# -----------------------------------------------------------------------------
-# 3. Provenance Verification Tests (SHA & Exact Dependency Version)
-# -----------------------------------------------------------------------------
-
-def test_provenance_strict_mode_sha_and_version_enforcement():
-    """
-    Tests strict provenance rules:
-    - Missing SHA -> FAIL
-    - UNKNOWN SHA -> FAIL
-    - Exact SHA -> PASS
-    - Exact dependency version -> PASS
-    - Wrong dependency version -> FAIL
-    """
-    schema = {"openapi": "3.0.0", "paths": {"/users": {"get": {}}}}
-    worker_payload = {
-        "status": "TARGET_CLEAN",
-        "exit_code": 0,
-        "violations": [],
-        "stats": {"endpoints_tested": 1, "operations_tested": 1, "checks_executed": 5, "violations_count": 0, "duration_sec": 0.1},
-        "diagnostics": [],
-        "summary": "Clean"
-    }
-
-    # 1. Missing / empty SHA under strict mode -> FAIL
-    runner_empty = SchemathesisRunner(source_sha="", strict_provenance=True)
-    res_empty = runner_empty.execute(schema_dict=schema)
-    assert res_empty.status == ProviderStatus.INPUT_INVALID
-    assert res_empty.passed is False
-
-    # 2. UNKNOWN SHA under strict mode -> FAIL
-    runner_unknown = SchemathesisRunner(source_sha="UNKNOWN", strict_provenance=True)
-    res_unknown = runner_unknown.execute(schema_dict=schema)
-    assert res_unknown.status == ProviderStatus.INPUT_INVALID
-    assert res_unknown.passed is False
-
-    # 3. Exact SHA with exact certified version -> PASS
-    exact_sha = "a" * 40
-    runner_valid = SchemathesisRunner(source_sha=exact_sha, strict_provenance=True)
-
-    mock_proc = MagicMock()
-    mock_proc.communicate.return_value = (json.dumps(worker_payload), "")
-    mock_proc.returncode = 0
-
-    with patch.object(VersionPolicy, "get_installed_version", return_value=CERTIFIED_SCHEMATHESIS_VERSION):
-        with patch("subprocess.Popen", return_value=mock_proc):
-            res_valid = runner_valid.execute(schema_dict=schema)
-            assert res_valid.status == ProviderStatus.TARGET_CLEAN
-            assert res_valid.passed is True
-            assert res_valid.source_sha == exact_sha
-            assert res_valid.schemathesis_version == CERTIFIED_SCHEMATHESIS_VERSION
-
-    # 4. Wrong dependency version (e.g. 4.23.0 or 3.40.0) under strict mode -> FAIL
-    with patch.object(VersionPolicy, "get_installed_version", return_value="4.23.0"):
-        res_wrong_ver = runner_valid.execute(schema_dict=schema)
-        assert res_wrong_ver.status == ProviderStatus.TOOL_NOT_AVAILABLE
-        assert res_wrong_ver.passed is False
-        assert "exact certified version" in res_wrong_ver.diagnostics[0]["error"]

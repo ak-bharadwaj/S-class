@@ -1,6 +1,7 @@
 """
-S-Class EOS V11.2 - Schemathesis Provider Models & Evidence Contract.
-Defines the native S-Class data contracts for API behavioral and contract evidence.
+S-Class EOS V11.2 - Schemathesis Provider Models & D0 Evidence Contract.
+Defines the native S-Class data contracts, worker invocation/output envelopes,
+and authenticity-bound multi-layer hash chains.
 Zero external Schemathesis types escape this module.
 """
 
@@ -53,10 +54,97 @@ class ExecutionStats:
 
 
 @dataclass
+class WorkerInvocationEnvelope:
+    """
+    Authenticity-bound envelope sent from parent runner to isolated child worker.
+    Binds execution identity, nonce challenge, source SHA, and target config.
+    """
+    execution_id: str
+    parent_nonce: str
+    source_sha: str
+    provider_version: str
+    target_identifier: str
+    target_hash: str
+    config_hash: str
+    schema_dict: Optional[Dict[str, Any]]
+    base_url: Optional[str] = None
+    app_module: Optional[str] = None
+    app_callable: Optional[str] = None
+    max_examples: int = 5
+    input_digest: str = ""
+
+    def __post_init__(self):
+        if not self.input_digest:
+            self.input_digest = self.compute_input_digest()
+
+    def compute_input_digest(self) -> str:
+        payload = {
+            "execution_id": self.execution_id,
+            "parent_nonce": self.parent_nonce,
+            "source_sha": self.source_sha,
+            "provider_version": self.provider_version,
+            "target_identifier": self.target_identifier,
+            "target_hash": self.target_hash,
+            "config_hash": self.config_hash,
+            "schema_dict": self.schema_dict,
+            "base_url": self.base_url,
+            "app_module": self.app_module,
+            "app_callable": self.app_callable,
+            "max_examples": self.max_examples
+        }
+        raw = json.dumps(payload, sort_keys=True, default=str)
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class WorkerOutputEnvelope:
+    """
+    Authenticity-bound envelope emitted from child worker to parent runner.
+    Contains cryptographic proof of execution matching the parent's nonce.
+    """
+    execution_id: str
+    parent_nonce: str
+    worker_pid: int
+    status: str
+    exit_code: int
+    violations: List[Dict[str, Any]] = field(default_factory=list)
+    stats: Dict[str, Any] = field(default_factory=dict)
+    diagnostics: List[Dict[str, Any]] = field(default_factory=list)
+    summary: str = ""
+    worker_digest: str = ""
+
+    def __post_init__(self):
+        if not self.worker_digest:
+            self.worker_digest = self.compute_worker_digest()
+
+    def compute_worker_digest(self) -> str:
+        payload = {
+            "execution_id": self.execution_id,
+            "parent_nonce": self.parent_nonce,
+            "worker_pid": self.worker_pid,
+            "status": self.status,
+            "exit_code": self.exit_code,
+            "violations": self.violations,
+            "stats": self.stats,
+            "diagnostics": self.diagnostics,
+            "summary": self.summary
+        }
+        raw = json.dumps(payload, sort_keys=True, default=str)
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
 class ProviderExecutionResult:
     """
-    S-Class Native Evidence Contract for API Contract Provider Execution.
+    S-Class Native Evidence Contract for API Contract Provider Execution (D0 Specification).
     No Schemathesis-specific objects are allowed within this structure.
+    Immutably links input_digest, worker_digest, and provenance_hash.
     """
     execution_id: str
     provider_version: str
@@ -71,6 +159,9 @@ class ProviderExecutionResult:
     start_time_iso: str
     stop_time_iso: str
     duration_sec: float
+    execution_nonce: str = ""
+    input_digest: str = ""
+    worker_digest: str = ""
     violations: List[ContractViolation] = field(default_factory=list)
     stats: ExecutionStats = field(default_factory=ExecutionStats)
     diagnostics: List[Dict[str, Any]] = field(default_factory=list)
@@ -86,6 +177,7 @@ class ProviderExecutionResult:
     def compute_provenance_hash(self) -> str:
         payload = {
             "execution_id": self.execution_id,
+            "execution_nonce": self.execution_nonce,
             "provider_version": self.provider_version,
             "schemathesis_version": self.schemathesis_version,
             "source_sha": self.source_sha,
@@ -93,6 +185,8 @@ class ProviderExecutionResult:
             "target_identifier": self.target_identifier,
             "target_hash": self.target_hash,
             "config_hash": self.config_hash,
+            "input_digest": self.input_digest,
+            "worker_digest": self.worker_digest,
             "status": self.status.value,
             "exit_code": self.exit_code,
             "start_time_iso": self.start_time_iso,
@@ -113,6 +207,7 @@ class ProviderExecutionResult:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "execution_id": self.execution_id,
+            "execution_nonce": self.execution_nonce,
             "provider_version": self.provider_version,
             "schemathesis_version": self.schemathesis_version,
             "source_sha": self.source_sha,
@@ -120,6 +215,8 @@ class ProviderExecutionResult:
             "target_identifier": self.target_identifier,
             "target_hash": self.target_hash,
             "config_hash": self.config_hash,
+            "input_digest": self.input_digest,
+            "worker_digest": self.worker_digest,
             "status": self.status.value,
             "passed": self.passed,
             "exit_code": self.exit_code,

@@ -1,7 +1,7 @@
 """
-S-Class EOS V11.2 - Schemathesis Gate 3 Certificate Verifier.
+S-Class EOS V11.2 - Schemathesis Gate 3 Certificate Verifier (D0 Specification).
 Single-source verifier validating Gate 3 Parity Certificates against authoritative source SHA,
-pinned dependency versions, corpus results, and immutable provenance hashes.
+pinned dependency versions, D0 envelope digests, and cryptographic provenance hash chains.
 """
 
 import os
@@ -12,24 +12,27 @@ import argparse
 
 
 def verify_gate_3_certificate(cert_path: str, expected_sha: str, expected_version: str = "4.24.3") -> bool:
-    """Strictly verifies a Gate 3 Parity Certificate."""
+    """Strictly verifies a Gate 3 Parity Certificate under the D0 Provider Contract."""
     if not os.path.exists(cert_path):
         raise FileNotFoundError(f"Certificate not found at: {cert_path}")
 
     with open(cert_path, "r", encoding="utf-8") as f:
         cert = json.load(f)
 
-    # 1. Structural & Verdict Checks
+    # 1. Structural & Contract Spec Checks
     if cert.get("gate") != "PARITY-GATE-3":
         raise ValueError(f"Invalid gate in certificate: expected 'PARITY-GATE-3', got '{cert.get('gate')}'")
+
+    if cert.get("contract_spec") != "D0":
+        raise ValueError(f"Invalid contract spec: expected 'D0', got '{cert.get('contract_spec')}'")
 
     if cert.get("verdict") != "PASS":
         raise ValueError(f"Certificate verdict is not PASS: got '{cert.get('verdict')}'")
 
     # 2. Provenance & Source SHA Checks
     actual_sha = cert.get("source_sha")
-    if not actual_sha or actual_sha == "UNKNOWN":
-        raise ValueError(f"Certificate has missing or UNKNOWN source SHA: '{actual_sha}'")
+    if not actual_sha or actual_sha == "UNKNOWN" or len(actual_sha) != 40:
+        raise ValueError(f"Certificate has missing, UNKNOWN, or invalid source SHA: '{actual_sha}'")
 
     if expected_sha and expected_sha != "UNKNOWN" and actual_sha != expected_sha:
         raise ValueError(f"Source SHA mismatch: expected '{expected_sha}', got '{actual_sha}'")
@@ -50,15 +53,16 @@ def verify_gate_3_certificate(cert_path: str, expected_sha: str, expected_versio
     if cert.get("zero_object_leakage_verified") is not True:
         raise ValueError("Certificate indicates object leakage verification failed or missing.")
 
-    # 5. Corpus Results Validation
+    # 5. Corpus Results & D0 Digest Validation
     corpus = cert.get("corpus_results", {})
     required_scenarios = ["clean_api", "schema_violation", "server_error_5xx", "malformed_schema", "unreachable_target"]
     for sc in required_scenarios:
         if sc not in corpus:
             raise KeyError(f"Missing corpus scenario result: {sc}")
         sc_res = corpus[sc]
-        if "schema_hash" not in sc_res or "config_hash" not in sc_res or "provenance_hash" not in sc_res:
-            raise ValueError(f"Corpus scenario '{sc}' missing required hash provenance.")
+        for req_field in ["schema_hash", "config_hash", "input_digest", "worker_digest", "provenance_hash"]:
+            if req_field not in sc_res or not sc_res[req_field]:
+                raise ValueError(f"Corpus scenario '{sc}' missing required D0 digest field '{req_field}'.")
 
     # Check scenario statuses
     if corpus["clean_api"]["status"] != "TARGET_CLEAN" or not corpus["clean_api"]["passed"]:
@@ -88,12 +92,12 @@ def verify_gate_3_certificate(cert_path: str, expected_sha: str, expected_versio
     if stored_hash != expected_hash:
         raise ValueError(f"Certificate hash tampering detected! Stored: {stored_hash}, Expected: {expected_hash}")
 
-    print(f"VERIFIED: Gate 3 Parity Certificate {cert_path} successfully validated against SHA {actual_sha} and Schemathesis {st_ver}.")
+    print(f"VERIFIED: D0 Gate 3 Parity Certificate {cert_path} successfully validated against SHA {actual_sha} and Schemathesis {st_ver}.")
     return True
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Verify S-Class Gate 3 Parity Certificate")
+    parser = argparse.ArgumentParser(description="Verify S-Class Gate 3 Parity Certificate (D0 Protocol)")
     parser.add_argument("--certificate", required=True, help="Path to certificate JSON file")
     parser.add_argument("--expected-sha", required=True, help="Expected authoritative git commit SHA")
     parser.add_argument("--expected-version", default="4.24.3", help="Expected Schemathesis version (default: 4.24.3)")
