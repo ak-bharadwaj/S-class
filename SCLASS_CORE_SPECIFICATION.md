@@ -1,5 +1,5 @@
 # S-Class — Core Specification (D0 Contract Freeze)
-### Version: 1.1.0 (Canonical D0 Specification — Hardened Precision Release)
+### Version: 1.2.0 (Canonical D0 Specification — Unified Self-Contained Schema Release)
 ### Authority: Master Plan Directive (`SCLASS_MASTER_SYSTEM_DESIGN_AND_BUILD_PLAN.md`)
 ### Status: 🟢 FROZEN CONTRACT
 
@@ -123,7 +123,7 @@ An exhaustive audit of all source files and test suites in `ak-bharadwaj/S-class
 
 ## 3. Canonical Domain Schemas & Data Structures
 
-All S-Class domain models are strictly typed, serializable, and validated via JSON Schema Draft 2020-12 and Pydantic v2 models. Every schema and sub-schema strictly forbids undeclared properties (`additionalProperties: false`).
+All S-Class domain models are strictly typed, self-contained, and validated via JSON Schema Draft 2020-12. Every schema and sub-schema strictly forbids undeclared properties (`additionalProperties: false`) and defines all referenced components within its `$defs` block.
 
 ### 3.1 Task Schema (`Task`)
 
@@ -147,6 +147,17 @@ properties:
     type: "string"
     minLength: 1
   repository_context:
+    $ref: "#/$defs/RepositoryContext"
+  constraints:
+    $ref: "#/$defs/TaskConstraints"
+  environment:
+    type: "object"
+    additionalProperties: { type: "string" }
+  created_at:
+    type: "string"
+    format: "date-time"
+$defs:
+  RepositoryContext:
     type: "object"
     additionalProperties: false
     required:
@@ -167,7 +178,7 @@ properties:
       dirty_working_tree:
         type: "boolean"
         default: false
-  constraints:
+  TaskConstraints:
     type: "object"
     additionalProperties: false
     required:
@@ -186,12 +197,6 @@ properties:
       timeout_seconds:
         type: ["integer", "null"]
         minimum: 1
-  environment:
-    type: "object"
-    additionalProperties: { type: "string" }
-  created_at:
-    type: "string"
-    format: "date-time"
 ```
 
 ### 3.2 Obligation Schema (`Obligation`)
@@ -300,16 +305,7 @@ properties:
       - "V3_SYSTEM_LEVEL"  # Backward compatibility, end-to-end workflow, data integrity
       - "V4_JUDGMENT"      # Maintainability, ergonomics, visual polish (NON-PROVING)
   subject:
-    type: "object"
-    additionalProperties: false
-    required: ["target_type", "identifier"]
-    properties:
-      target_type:
-        type: "string"
-        enum: ["ENDPOINT", "FUNCTION", "CLASS", "FILE", "SCHEMA", "ARCHITECTURE_COMPONENT"]
-      identifier:
-        type: "string"
-        minLength: 1
+    $ref: "#/$defs/ClaimSubject"
   predicate:
     type: "string"
     enum:
@@ -344,61 +340,23 @@ properties:
   required_provider_capabilities:
     type: "array"
     items: { type: "string" }
+$defs:
+  ClaimSubject:
+    type: "object"
+    additionalProperties: false
+    required: ["target_type", "identifier"]
+    properties:
+      target_type:
+        type: "string"
+        enum: ["ENDPOINT", "FUNCTION", "CLASS", "FILE", "SCHEMA", "ARCHITECTURE_COMPONENT"]
+      identifier:
+        type: "string"
+        minLength: 1
 ```
 
 > **Mandatory Rule for V4 (Judgment)**: Evidence for Tier $V_4$ claims can **never** satisfy a mandatory obligation on its own. It requires corroborating $V_0$–$V_3$ deterministic evidence or an explicit, cryptographically signed human exception record (§3.4.2).
 
 ### 3.4 Policy Schema (`Policy`) & Fully Typed Rules
-
-#### 3.4.1 Policy Rule Schema (`PolicyRule`)
-
-Policy rules are strictly typed discriminated structures. Floating-point confidence metrics are banned under CORE-08.
-
-```yaml
-$schema: "https://json-schema.org/draft/2020-12/schema"
-title: "PolicyRule"
-type: "object"
-additionalProperties: false
-required: ["rule_type", "parameters"]
-properties:
-  rule_type:
-    type: "string"
-    enum:
-      - "REQUIRE_CAPABILITY"
-      - "REQUIRE_TIER"
-      - "REQUIRE_EVIDENCE_COUNT"
-      - "NO_CONFLICTS"
-      - "NO_STALE_EVIDENCE"
-      - "REQUIRE_INDEPENDENT_PROVIDERS"
-  parameters:
-    type: "object"
-    additionalProperties: false
-    properties:
-      capability:
-        type: "string"
-        enum:
-          - "PROPERTY_TESTING"
-          - "API_CONTRACT_FUZZING"
-          - "STATIC_AST_ANALYSIS"
-          - "TYPE_CHECK"
-          - "UNIT_TEST_EXECUTION"
-          - "DEPENDENCY_SECURITY_SCAN"
-          - "PROVENANCE_BEARING_HUMAN_REVIEW"
-      tier:
-        type: "string"
-        enum: ["V0_OBSERVABLE", "V1_STRUCTURAL", "V2_BEHAVIORAL", "V3_SYSTEM_LEVEL", "V4_JUDGMENT"]
-      min_count:
-        type: "integer"
-        minimum: 1
-      min_independent_sources:
-        type: "integer"
-        minimum: 1
-      group_by:
-        type: "string"
-        enum: ["PROVIDER_TYPE", "EXECUTION_PROCESS", "AUTHOR"]
-```
-
-#### 3.4.2 Policy Schema (`Policy`)
 
 ```yaml
 $schema: "https://json-schema.org/draft/2020-12/schema"
@@ -425,6 +383,49 @@ properties:
     type: "integer"
     minimum: 1
   expression:
+    $ref: "#/$defs/PolicyExpression"
+$defs:
+  PolicyRule:
+    type: "object"
+    additionalProperties: false
+    required: ["rule_type", "parameters"]
+    properties:
+      rule_type:
+        type: "string"
+        enum:
+          - "REQUIRE_CAPABILITY"
+          - "REQUIRE_TIER"
+          - "REQUIRE_EVIDENCE_COUNT"
+          - "NO_CONFLICTS"
+          - "NO_STALE_EVIDENCE"
+          - "REQUIRE_INDEPENDENT_PROVIDERS"
+      parameters:
+        type: "object"
+        additionalProperties: false
+        properties:
+          capability:
+            type: "string"
+            enum:
+              - "PROPERTY_TESTING"
+              - "API_CONTRACT_FUZZING"
+              - "STATIC_AST_ANALYSIS"
+              - "TYPE_CHECK"
+              - "UNIT_TEST_EXECUTION"
+              - "DEPENDENCY_SECURITY_SCAN"
+              - "PROVENANCE_BEARING_HUMAN_REVIEW"
+          tier:
+            type: "string"
+            enum: ["V0_OBSERVABLE", "V1_STRUCTURAL", "V2_BEHAVIORAL", "V3_SYSTEM_LEVEL", "V4_JUDGMENT"]
+          min_count:
+            type: "integer"
+            minimum: 1
+          min_independent_sources:
+            type: "integer"
+            minimum: 1
+          group_by:
+            type: "string"
+            enum: ["PROVIDER_TYPE", "EXECUTION_PROCESS", "AUTHOR"]
+  PolicyExpression:
     type: "object"
     additionalProperties: false
     required: ["combinator", "rules"]
@@ -440,7 +441,8 @@ properties:
         enum: ["PROVIDER_TYPE", "EXECUTION_PROCESS", "AUTHOR", null]
       rules:
         type: "array"
-        items: { $ref: "#/$defs/PolicyRule" }
+        items:
+          $ref: "#/$defs/PolicyRule"
       condition:
         type: ["object", "null"]
         additionalProperties: false
@@ -448,12 +450,16 @@ properties:
           predicate: { type: "string" }
           value: { type: "string" }
       then_expression:
-        type: ["object", "null"]
+        anyOf:
+          - $ref: "#/$defs/PolicyExpression"
+          - type: "null"
       else_expression:
-        type: ["object", "null"]
+        anyOf:
+          - $ref: "#/$defs/PolicyExpression"
+          - type: "null"
 ```
 
-#### 3.4.3 Policy Exception Record Schema (`PolicyException`)
+### 3.5 Policy Exception Record Schema (`PolicyException`)
 
 ```yaml
 $schema: "https://json-schema.org/draft/2020-12/schema"
@@ -483,13 +489,7 @@ properties:
     type: "string"
     minLength: 20
   authorized_by:
-    type: "object"
-    additionalProperties: false
-    required: ["actor_id", "actor_role", "public_key_fingerprint"]
-    properties:
-      actor_id: { type: "string", minLength: 1 }
-      actor_role: { type: "string", minLength: 1 }
-      public_key_fingerprint: { type: "string", minLength: 8 }
+    $ref: "#/$defs/AuthorizedActor"
   compensating_controls:
     type: "array"
     minItems: 1
@@ -500,9 +500,18 @@ properties:
   hmac_signature:
     type: "string"
     pattern: "^[a-f0-9]{64}$"
+$defs:
+  AuthorizedActor:
+    type: "object"
+    additionalProperties: false
+    required: ["actor_id", "actor_role", "public_key_fingerprint"]
+    properties:
+      actor_id: { type: "string", minLength: 1 }
+      actor_role: { type: "string", minLength: 1 }
+      public_key_fingerprint: { type: "string", minLength: 8 }
 ```
 
-### 3.5 Action Proposal Schema (`ActionProposal`)
+### 3.6 Action Proposal Schema (`ActionProposal`)
 
 ```yaml
 $schema: "https://json-schema.org/draft/2020-12/schema"
@@ -534,13 +543,23 @@ properties:
       - "REQUEST_HUMAN_EVIDENCE"
       - "PROPOSE_ARCHITECTURE_PLAN"
   target:
+    $ref: "#/$defs/ProposalTarget"
+  purpose:
+    $ref: "#/$defs/ProposalPurpose"
+  prerequisites:
+    type: "array"
+    items: { type: "string" }
+  resource_limits:
+    $ref: "#/$defs/ResourceLimits"
+$defs:
+  ProposalTarget:
     type: "object"
     additionalProperties: false
     required: ["target_identifier", "target_kind"]
     properties:
       target_identifier: { type: "string", minLength: 1 }
       target_kind: { type: "string", minLength: 1 }
-  purpose:
+  ProposalPurpose:
     type: "object"
     additionalProperties: false
     required: ["rationale", "target_claim_ids"]
@@ -549,10 +568,7 @@ properties:
       target_claim_ids:
         type: "array"
         items: { type: "string", pattern: "^CLM-[A-Za-z0-9_-]+$" }
-  prerequisites:
-    type: "array"
-    items: { type: "string" }
-  resource_limits:
+  ResourceLimits:
     type: "object"
     additionalProperties: false
     required: ["timeout_ms", "max_memory_mb", "max_cost_usd"]
@@ -562,7 +578,7 @@ properties:
       max_cost_usd: { type: "number", minimum: 0.0, maximum: 50.0 }
 ```
 
-### 3.6 Controller Decision Schema (`ControllerDecision`)
+### 3.7 Controller Decision Schema (`ControllerDecision`)
 
 ```yaml
 $schema: "https://json-schema.org/draft/2020-12/schema"
@@ -596,7 +612,7 @@ properties:
     format: "date-time"
 ```
 
-### 3.7 Evidence Schema (`Evidence`)
+### 3.8 Evidence Schema (`Evidence`)
 
 ```yaml
 $schema: "https://json-schema.org/draft/2020-12/schema"
@@ -644,6 +660,24 @@ properties:
     type: "string"
     pattern: "^[a-f0-9]{40}$"
   scope:
+    $ref: "#/$defs/EvidenceScope"
+  observation:
+    $ref: "#/$defs/EvidenceObservation"
+  polarity:
+    type: "string"
+    enum: ["SUPPORTS", "REFUTES", "NEUTRAL"]
+  validity:
+    type: "string"
+    enum: ["VALID", "STALE", "INVALID", "SUPERSEDED"]
+  independence_group:
+    type: "string"
+    minLength: 1
+  provenance:
+    $ref: "#/$defs/EvidenceProvenance"
+  signature:
+    $ref: "#/$defs/EvidenceSignature"
+$defs:
+  EvidenceScope:
     type: "object"
     additionalProperties: false
     required: ["targets_evaluated", "aspects_covered"]
@@ -654,7 +688,7 @@ properties:
       aspects_covered:
         type: "array"
         items: { type: "string" }
-  observation:
+  EvidenceObservation:
     type: "object"
     additionalProperties: false
     required: ["raw_status", "diagnostics", "counterexample"]
@@ -667,16 +701,7 @@ properties:
         items: { type: "string" }
       counterexample:
         type: ["string", "null"]
-  polarity:
-    type: "string"
-    enum: ["SUPPORTS", "REFUTES", "NEUTRAL"]
-  validity:
-    type: "string"
-    enum: ["VALID", "STALE", "INVALID", "SUPERSEDED"]
-  independence_group:
-    type: "string"
-    minLength: 1
-  provenance:
+  EvidenceProvenance:
     type: "object"
     additionalProperties: false
     required: ["engine_name", "engine_version", "environment_hash", "timestamp"]
@@ -685,7 +710,7 @@ properties:
       engine_version: { type: "string", minLength: 1 }
       environment_hash: { type: "string", pattern: "^[a-f0-9]{64}$" }
       timestamp: { type: "string", format: "date-time" }
-  signature:
+  EvidenceSignature:
     type: "object"
     additionalProperties: false
     required: ["algorithm", "digest", "hmac"]
@@ -695,7 +720,7 @@ properties:
       hmac: { type: "string", pattern: "^[a-f0-9]{64}$" }
 ```
 
-### 3.8 Plan-as-Artifact Schema (`Plan`)
+### 3.9 Plan-as-Artifact Schema (`Plan`)
 
 ```yaml
 $schema: "https://json-schema.org/draft/2020-12/schema"
@@ -736,23 +761,7 @@ properties:
   architecture_claims:
     type: "array"
     items:
-      type: "object"
-      additionalProperties: false
-      required: ["claim_id", "subject", "predicate", "criticality", "evidence_required"]
-      properties:
-        claim_id: { type: "string", pattern: "^CLM-[A-Za-z0-9_-]+$" }
-        subject: { type: "string", minLength: 1 }
-        predicate: { type: "string", minLength: 1 }
-        criticality: { type: "string", enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"] }
-        evidence_required:
-          type: "array"
-          items:
-            type: "object"
-            additionalProperties: false
-            required: ["capability", "tier"]
-            properties:
-              capability: { type: "string" }
-              tier: { type: "string", enum: ["V0_OBSERVABLE", "V1_STRUCTURAL", "V2_BEHAVIORAL", "V3_SYSTEM_LEVEL", "V4_JUDGMENT"] }
+      $ref: "#/$defs/ArchitectureClaim"
   dependency_graph:
     type: "object"
     additionalProperties:
@@ -761,24 +770,47 @@ properties:
   milestone_sequence:
     type: "array"
     items:
-      type: "object"
-      additionalProperties: false
-      required: ["milestone_id", "title", "obligation_ids"]
-      properties:
-        milestone_id: { type: "string" }
-        title: { type: "string" }
-        obligation_ids:
-          type: "array"
-          items: { type: "string", pattern: "^OBL-[A-Za-z0-9_-]+$" }
+      $ref: "#/$defs/Milestone"
   open_risks:
     type: "array"
     items: { type: "string" }
   contradictions:
     type: "array"
     items: { type: "string" }
+$defs:
+  EvidenceRequirement:
+    type: "object"
+    additionalProperties: false
+    required: ["capability", "tier"]
+    properties:
+      capability: { type: "string" }
+      tier: { type: "string", enum: ["V0_OBSERVABLE", "V1_STRUCTURAL", "V2_BEHAVIORAL", "V3_SYSTEM_LEVEL", "V4_JUDGMENT"] }
+  ArchitectureClaim:
+    type: "object"
+    additionalProperties: false
+    required: ["claim_id", "subject", "predicate", "criticality", "evidence_required"]
+    properties:
+      claim_id: { type: "string", pattern: "^CLM-[A-Za-z0-9_-]+$" }
+      subject: { type: "string", minLength: 1 }
+      predicate: { type: "string", minLength: 1 }
+      criticality: { type: "string", enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"] }
+      evidence_required:
+        type: "array"
+        items:
+          $ref: "#/$defs/EvidenceRequirement"
+  Milestone:
+    type: "object"
+    additionalProperties: false
+    required: ["milestone_id", "title", "obligation_ids"]
+    properties:
+      milestone_id: { type: "string" }
+      title: { type: "string" }
+      obligation_ids:
+        type: "array"
+        items: { type: "string", pattern: "^OBL-[A-Za-z0-9_-]+$" }
 ```
 
-### 3.9 Assessment Receipt Schema (`AssessmentReceipt`)
+### 3.10 Assessment Receipt Schema (`AssessmentReceipt`)
 
 ```yaml
 $schema: "https://json-schema.org/draft/2020-12/schema"
@@ -815,18 +847,7 @@ properties:
   claim_assessments:
     type: "array"
     items:
-      type: "object"
-      additionalProperties: false
-      required: ["claim_id", "status", "supporting_evidence_ids", "refuting_evidence_ids"]
-      properties:
-        claim_id: { type: "string", pattern: "^CLM-[A-Za-z0-9_-]+$" }
-        status: { type: "string", enum: ["UNSUPPORTED", "SUPPORTED", "CONTRADICTED", "CONFLICTED", "STALE"] }
-        supporting_evidence_ids:
-          type: "array"
-          items: { type: "string", pattern: "^EV-[A-Za-z0-9_-]+$" }
-        refuting_evidence_ids:
-          type: "array"
-          items: { type: "string", pattern: "^EV-[A-Za-z0-9_-]+$" }
+      $ref: "#/$defs/ClaimAssessmentRecord"
   conflicts:
     type: "array"
     items: { type: "string" }
@@ -839,9 +860,23 @@ properties:
   signer_digest:
     type: "string"
     pattern: "^[a-f0-9]{64}$"
+$defs:
+  ClaimAssessmentRecord:
+    type: "object"
+    additionalProperties: false
+    required: ["claim_id", "status", "supporting_evidence_ids", "refuting_evidence_ids"]
+    properties:
+      claim_id: { type: "string", pattern: "^CLM-[A-Za-z0-9_-]+$" }
+      status: { type: "string", enum: ["UNSUPPORTED", "SUPPORTED", "CONTRADICTED", "CONFLICTED", "STALE"] }
+      supporting_evidence_ids:
+        type: "array"
+        items: { type: "string", pattern: "^EV-[A-Za-z0-9_-]+$" }
+      refuting_evidence_ids:
+        type: "array"
+        items: { type: "string", pattern: "^EV-[A-Za-z0-9_-]+$" }
 ```
 
-### 3.10 Event Envelope Schema (`EventEnvelope`)
+### 3.11 Event Envelope Schema (`EventEnvelope`)
 
 ```yaml
 $schema: "https://json-schema.org/draft/2020-12/schema"
@@ -938,7 +973,7 @@ $$\mathcal{S}_{\text{OBL}} = \{\text{OPEN}, \text{READY}, \text{IN\_PROGRESS}, \
 | `READY` | `ACTION_AUTHORIZED` | Controller issues valid execution token | `IN_PROGRESS` | Lock execution slot |
 | `IN_PROGRESS` | `EVALUATION_COMPLETED` | Policy Engine evaluates: `SATISFIED` $\land \text{Conflicts} = \emptyset$ | `SATISFIED` | Emit `OBLIGATION_CLOSED` + Receipt |
 | `IN_PROGRESS` | `RESOURCE_EXHAUSTED` | Retries $\ge \text{max\_attempts} \lor \text{Timeout}$ | `BLOCKED` | Trigger Escalation / Diagnostics |
-| `IN_PROGRESS` | `EXCEPTION_GRANTED` | Valid cryptographically signed Exception Record (§3.4.3) | `CONDITIONAL` | Mint conditional receipt |
+| `IN_PROGRESS` | `EXCEPTION_GRANTED` | Valid cryptographically signed Exception Record (§3.5) | `CONDITIONAL` | Mint conditional receipt |
 | `SATISFIED` | `SOURCE_MUTATED` | Repository SHA changed $\land \text{Impact}(C) = \text{TRUE}$ | `REQUIRES_REASSESSMENT` | Invalidate evidence, mark claims stale |
 | `CONDITIONAL` | `SOURCE_MUTATED` | Repository SHA changed | `REQUIRES_REASSESSMENT` | Invalidate evidence |
 | `REQUIRES_REASSESSMENT` | `REASSESSMENT_DISPATCHED` | Re-evaluation job enqueued | `READY` | Re-queue for verification |
@@ -1395,7 +1430,7 @@ After a successful repair patch is applied:
 
 Humans are registered in S-Class as **controlled, provenance-bearing evidence actors**.
 - Human actions must be cryptographically signed with the human's authorized key.
-- Human decisions cannot waive Tier $V_0$–$V_3$ deterministic failures without an explicit Policy Exception Record (§3.4.3).
+- Human decisions cannot waive Tier $V_0$–$V_3$ deterministic failures without an explicit Policy Exception Record (§3.5).
 
 ---
 
