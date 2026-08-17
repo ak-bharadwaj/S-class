@@ -47,6 +47,26 @@ def test_pipeline_executes_clean_pass(pipeline):
     assert receipt.provenance_hash != ""
 
 
+def test_pipeline_blocks_on_zero_evaluated_evidence_insufficient_evidence(pipeline):
+    # Request without custom obligations should be blocked due to INSUFFICIENT_EVIDENCE
+    request = "Implement some unknown unverified helper."
+
+    def generator(spec):
+        return lambda x: x
+
+    target, receipt = pipeline.execute_governed_cycle(
+        request_text=request,
+        code_generator=generator,
+        custom_obligations=[]  # Zero obligations provided
+    )
+
+    assert target is None
+    assert receipt.verdict == "BLOCK"
+    assert receipt.post_gen_verified is False
+    assert len(receipt.blocking_reasons) > 0
+    assert "INSUFFICIENT_EVIDENCE" in receipt.blocking_reasons[0]
+
+
 def test_pipeline_blocks_pre_generation_on_contradiction(pipeline):
     # Request contains mutually contradictory constraints
     request = "Implement filter where values must be positive and must allow negative values."

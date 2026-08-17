@@ -215,6 +215,21 @@ class EnterpriseGovernancePipeline:
         )
 
         # Phase 6: Authoritative Policy Gate Evaluation
+        if len(evidence_receipts) == 0:
+            # Policy Gate Rule: Zero evaluated evidence must NEVER produce PASS (INSUFFICIENT_EVIDENCE)
+            receipt = PipelineDecisionReceipt(
+                decision_id=decision_id,
+                request_id=req_id,
+                verdict="BLOCK",
+                pre_gen_grounded=grounding.grounded,
+                post_gen_verified=False,
+                total_obligations=0,
+                obligations_passed=0,
+                obligations_failed=0,
+                blocking_reasons=["Policy gate rejected: Zero evaluated evidence receipts (INSUFFICIENT_EVIDENCE)"]
+            )
+            return None, receipt
+
         passed_count = sum(1 for r in evidence_receipts if r.passed)
         failed_count = len(evidence_receipts) - passed_count
         blocking_reasons = []
@@ -225,9 +240,7 @@ class EnterpriseGovernancePipeline:
                 repro_msg = f" (Counterexample: {r.reproducible_cases})" if r.reproducible_cases else ""
                 blocking_reasons.append(f"Obligation '{r.obligation_id}' failed: {r.status.value} - {diag_msg}{repro_msg}")
 
-        verdict = "PASS" if (failed_count == 0 and len(evidence_receipts) > 0) else "BLOCK"
-        if len(evidence_receipts) == 0:
-            verdict = "PASS" if grounding.grounded else "BLOCK"
+        verdict = "PASS" if (failed_count == 0 and passed_count == len(evidence_receipts)) else "BLOCK"
 
         receipt = PipelineDecisionReceipt(
             decision_id=decision_id,

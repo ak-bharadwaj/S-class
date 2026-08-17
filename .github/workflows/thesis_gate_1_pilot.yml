@@ -1,4 +1,4 @@
-name: S-Class THESIS-GATE-1 - Enterprise Core & Pilot Validation
+name: S-Class THESIS-GATE-1 - Synthetic Efficacy & External Protocol
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   certify-thesis-gate-1:
-    name: THESIS-GATE-1 Pilot Validation (Ubuntu 24.04 / Python ${{ matrix.python-version }})
+    name: THESIS-GATE-1 Validation (Ubuntu 24.04 / Python ${{ matrix.python-version }})
     runs-on: ubuntu-24.04
     strategy:
       matrix:
@@ -39,20 +39,28 @@ jobs:
       run: |
         python -m pytest tests/test_evidence_provider_registry.py tests/test_enterprise_core_pipeline.py tests/test_pilot_evaluation_harness.py -v
 
-    - name: Run Full Pilot Evaluation Campaign
+    - name: Run Synthetic Efficacy Pilot (Controlled Failure Injection)
       env:
         PYTHONPATH: .
       run: |
-        python benchmark/pilot/pilot_evaluation_harness.py --output benchmark/pilot/pilot_validation_receipt_py${{ matrix.python-version }}.json --sha ${{ github.sha }}
+        python benchmark/pilot/synthetic_efficacy_pilot.py --output benchmark/pilot/synthetic_efficacy_receipt_py${{ matrix.python-version }}.json --sha ${{ github.sha }}
 
-    - name: Strict Verification of Pilot Validation Receipt
+    - name: Run External Developer Validation Protocol Demo Cohort
+      env:
+        PYTHONPATH: .
       run: |
-        python -c "import json; r = json.load(open('benchmark/pilot/pilot_validation_receipt_py${{ matrix.python-version }}.json')); assert r['final_pilot_verdict'] == 'PASS' and r['comparative_metrics']['treatment_defects_escaped'] == 0 and r['comparative_metrics']['false_positive_gate_passed'] is True, f'Pilot validation failed: {r}'; print(f'THESIS-GATE-1 Python ${{ matrix.python-version }} Pilot Validation Certified: 100% defect elimination, 0 escaped.')"
+        python benchmark/pilot/external_validation_protocol.py --output benchmark/pilot/external_validation_receipt_py${{ matrix.python-version }}.json --sha ${{ github.sha }}
 
-    - name: Upload Immutable THESIS-GATE-1 Validation Receipt
+    - name: Strict Verification of Synthetic Efficacy Receipt
+      run: |
+        python -c "import json; r = json.load(open('benchmark/pilot/synthetic_efficacy_receipt_py${{ matrix.python-version }}.json')); assert r['pilot_verdict'] == 'PASS' and r['observable_comparative_metrics']['treatment_defects_escaped'] == 0 and r['observable_comparative_metrics']['false_positive_gate_passed'] is True, f'Synthetic pilot failed: {r}'; print(f'THESIS-GATE-1 Python ${{ matrix.python-version }} Synthetic Efficacy Verified.')"
+
+    - name: Upload Immutable THESIS-GATE-1 Audit Receipts
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: thesis-gate-1-pilot-receipt-py${{ matrix.python-version }}-${{ github.sha }}
-        path: benchmark/pilot/pilot_validation_receipt_py${{ matrix.python-version }}.json
+        name: thesis-gate-1-audit-receipts-py${{ matrix.python-version }}-${{ github.sha }}
+        path: |
+          benchmark/pilot/synthetic_efficacy_receipt_py${{ matrix.python-version }}.json
+          benchmark/pilot/external_validation_receipt_py${{ matrix.python-version }}.json
         retention-days: 90

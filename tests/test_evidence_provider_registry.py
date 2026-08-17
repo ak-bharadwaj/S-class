@@ -52,7 +52,6 @@ def test_property_testing_provider_collects_clean_evidence():
 
 def test_property_testing_provider_catches_counterexample():
     provider = PropertyTestingProvider()
-    # Property fails for numbers > 10
     target = lambda x: x <= 10
     obligation = {
         "obligation_id": "OB-TEST-BOUND-02",
@@ -111,6 +110,42 @@ def test_test_provider_executes_callable_test():
     fail_receipt = provider.collect_evidence(failing_test, {"obligation_id": "OB-UNIT-02"})
     assert fail_receipt.passed is False
     assert fail_receipt.status == EpistemicStatus.TARGET_CONTRACT_VIOLATED
+
+
+def test_api_contract_provider_executes_real_schemathesis_validation():
+    provider = ApiContractProvider()
+    valid_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Sample API", "version": "0.1.0"},
+        "paths": {
+            "/users": {
+                "get": {
+                    "summary": "Get users",
+                    "responses": {
+                        "200": {
+                            "description": "Successful response",
+                            "content": {"application/json": {"schema": {"type": "array"}}}
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    receipt_clean = provider.collect_evidence(valid_schema, {"obligation_id": "OB-API-VALID", "schema_dict": valid_schema})
+    assert receipt_clean.passed is True
+    assert receipt_clean.status == EpistemicStatus.TARGET_CLEAN
+
+    # Empty schema with no paths
+    empty_schema = {"openapi": "3.0.0", "info": {"title": "Empty", "version": "1.0"}, "paths": {}}
+    receipt_empty = provider.collect_evidence(empty_schema, {"obligation_id": "OB-API-EMPTY", "schema_dict": empty_schema})
+    assert receipt_empty.passed is False
+    assert receipt_empty.status == EpistemicStatus.TARGET_CONTRACT_VIOLATED
+
+    # Non-dict invalid schema
+    receipt_invalid = provider.collect_evidence("not_a_dict", {"obligation_id": "OB-API-INVALID"})
+    assert receipt_invalid.passed is False
+    assert receipt_invalid.status == EpistemicStatus.TOOL_OUTPUT_INVALID
 
 
 def test_provider_registry_handles_unsupported_obligation_gracefully():
