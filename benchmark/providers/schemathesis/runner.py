@@ -1,15 +1,17 @@
 """
-S-Class EOS V11.2 - Schemathesis Provider Runner.
-Executes API contract verification campaigns strictly bounded within the S-Class provider architecture.
-Translates all outcomes into fail-closed ProviderExecutionResult evidence receipts.
+S-Class EOS V11.2 - Process-Isolated Schemathesis Provider Runner.
+Executes Schemathesis inside an isolated subprocess with hard process termination on timeout.
+Zero external tool or Hypothesis objects cross the process boundary into S-Class memory.
 """
 
 import os
+import sys
 import time
 import json
 import uuid
 import hashlib
-from typing import Dict, Any, List, Optional, Callable, Union, Tuple
+import subprocess
+from typing import Dict, Any, List, Optional, Callable, Union
 
 from .models import (
     ProviderStatus,
@@ -24,10 +26,11 @@ PROVIDER_VERSION = "1.0.0"
 
 
 class SchemathesisRunner:
-    """Executes Schemathesis API verification campaigns and emits native S-Class evidence receipts."""
+    """Process-isolated coordinator executing Schemathesis in a separate child process."""
 
-    def __init__(self, source_sha: Optional[str] = None):
+    def __init__(self, source_sha: Optional[str] = None, strict_provenance: bool = False):
         self.source_sha = source_sha or os.environ.get("GITHUB_SHA", "UNKNOWN")
+        self.strict_provenance = strict_provenance
 
     def execute(
         self,
@@ -40,8 +43,9 @@ class SchemathesisRunner:
         timeout_sec: float = 30.0
     ) -> ProviderExecutionResult:
         """
-        Executes an API contract verification campaign.
-        Fail-Closed Invariant: Any anomaly, missing dependency, timeout, or violation results in non-TARGET_CLEAN status.
+        Executes API contract verification inside an isolated child subprocess.
+        Hard timeout terminates the worker process.
+        Fail-Closed Invariant: Any anomaly, crash, timeout, or missing provenance fails closed.
         """
         execution_id = f"EXEC-SCHEMATHESIS-{uuid.uuid4().hex[:12].upper()}"
         t_start_mono = time.monotonic()
@@ -98,7 +102,19 @@ class SchemathesisRunner:
                 raw_output_summary=summary
             )
 
-        # 1. Dependency Availability & Version Check
+        # 1. Strict Provenance Check
+        if self.strict_provenance and (not self.source_sha or self.source_sha == "UNKNOWN"):
+            return _make_result(
+                status=ProviderStatus.INPUT_INVALID,
+                exit_code=None,
+                violations=[],
+                stats=ExecutionStats(),
+                diagnostics=[{"error": "Strict provenance requirement failed: source_sha is missing or UNKNOWN"}],
+                summary="Execution rejected: Missing authoritative source SHA under strict certification mode.",
+                st_ver=None
+            )
+
+        # 2. Dependency Availability & Version Audit
         is_avail, st_ver, err_msg = VersionPolicy.check_environment()
         if not is_avail:
             return _make_result(
@@ -106,12 +122,12 @@ class SchemathesisRunner:
                 exit_code=None,
                 violations=[],
                 stats=ExecutionStats(),
-                diagnostics=[{"error": err_msg or "Schemathesis is not available"}],
-                summary="Execution aborted: Schemathesis tool is not available or incompatible.",
+                diagnostics=[{"error": err_msg or "Schemathesis tool is not available"}],
+                summary="Execution aborted: Schemathesis is not installed or incompatible with pinned version spec.",
                 st_ver=st_ver
             )
 
-        # 2. Input Validation
+        # 3. Input Validation
         if not schema_dict or not isinstance(schema_dict, dict) or not schema_dict.get("paths"):
             return _make_result(
                 status=ProviderStatus.INPUT_INVALID,
@@ -119,213 +135,151 @@ class SchemathesisRunner:
                 violations=[],
                 stats=ExecutionStats(),
                 diagnostics=[{"error": "Invalid or missing OpenAPI schema dictionary."}],
-                summary="Execution rejected: Schema must be a non-empty dictionary containing 'paths'.",
+                summary="Execution rejected: Schema must be a dictionary containing 'paths'.",
                 st_ver=st_ver
             )
 
-        # Import schemathesis strictly inside runner execution boundary
-        import schemathesis
+        # 4. Prepare Subprocess Payload
+        app_module = None
+        app_callable = None
+        if target_app is not None and callable(target_app):
+            app_module = getattr(target_app, "__module__", None)
+            app_callable = getattr(target_app, "__name__", None)
 
-        # 3. Schema Parsing & Operation Discovery
+        worker_payload = {
+            "schema_dict": schema_dict,
+            "base_url": base_url,
+            "app_module": app_module,
+            "app_callable": app_callable,
+            "max_examples": max_examples_per_operation
+        }
+        payload_str = json.dumps(worker_payload)
+
+        # 5. Spawn Process-Isolated Worker with Hard Timeout
+        cmd = [sys.executable, "-m", "benchmark.providers.schemathesis.worker"]
+        env = dict(os.environ)
+        # Ensure project root is in PYTHONPATH
+        cwd = os.getcwd()
+        env["PYTHONPATH"] = cwd + os.pathsep + env.get("PYTHONPATH", "")
+
+        proc = None
         try:
-            if target_app is not None and callable(target_app):
-                def wrapped_app(environ, start_response):
-                    if environ.get("PATH_INFO") == "/__sclass_schema__.json":
-                        start_response("200 OK", [("Content-Type", "application/json")])
-                        return [json.dumps(schema_dict).encode("utf-8")]
-                    return target_app(environ, start_response)
-
-                schema = schemathesis.openapi.from_wsgi("/__sclass_schema__.json", app=wrapped_app)
-            else:
-                schema = schemathesis.openapi.from_dict(schema_dict)
-        except Exception as e:
+            proc = subprocess.Popen(
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                cwd=cwd,
+                env=env
+            )
+            stdout_data, stderr_data = proc.communicate(input=payload_str, timeout=timeout_sec)
+        except subprocess.TimeoutExpired:
+            # Real hard timeout: forcibly kill the child process
+            if proc:
+                try:
+                    proc.kill()
+                    stdout_data, stderr_data = proc.communicate()
+                except Exception:
+                    pass
             return _make_result(
-                status=ProviderStatus.INPUT_INVALID,
-                exit_code=None,
+                status=ProviderStatus.TIMEOUT,
+                exit_code=124,
                 violations=[],
                 stats=ExecutionStats(),
-                diagnostics=[{"error": f"Failed to parse OpenAPI schema: {type(e).__name__}: {str(e)}"}],
-                summary=f"Schema parsing error: {str(e)}",
+                diagnostics=[{"error": f"Worker process exceeded hard timeout limit of {timeout_sec}s and was terminated."}],
+                summary=f"Execution timed out: Worker process killed after {timeout_sec}s.",
                 st_ver=st_ver
             )
-
-        try:
-            endpoints = list(schema)
-            raw_ops = list(schema.get_all_operations())
-            operations = []
-            for item in raw_ops:
-                op = item.ok() if hasattr(item, "ok") else item
-                if op is not None:
-                    operations.append(op)
-
-            if not operations:
-                return _make_result(
-                    status=ProviderStatus.INSUFFICIENT_EVIDENCE,
-                    exit_code=None,
-                    violations=[],
-                    stats=ExecutionStats(endpoints_tested=len(endpoints)),
-                    diagnostics=[{"warning": "Schema contains zero reachable operations."}],
-                    summary="Execution inconclusive: Zero operations evaluated (INSUFFICIENT_EVIDENCE).",
-                    st_ver=st_ver
-                )
-        except Exception as e:
+        except Exception as spawn_err:
             return _make_result(
                 status=ProviderStatus.TOOL_EXECUTION_FAILED,
                 exit_code=1,
                 violations=[],
                 stats=ExecutionStats(),
-                diagnostics=[{"error": f"Failed inspecting operations: {str(e)}"}],
-                summary=f"Tool execution failed during endpoint discovery: {str(e)}",
+                diagnostics=[{"error": f"Failed to spawn isolated worker process: {type(spawn_err).__name__}: {str(spawn_err)}"}],
+                summary=f"Worker spawn failure: {str(spawn_err)}",
                 st_ver=st_ver
             )
 
-        # 4. Execute Contract Verification Strategy Loop
-        violations: List[ContractViolation] = []
-        checks_executed = 0
-        operations_count = 0
-
-        try:
-            for operation in operations:
-                operations_count += 1
-                path_key = operation.path
-                method = operation.method
-
-                # Check timeout
-                if (time.monotonic() - t_start_mono) > timeout_sec:
-                    return _make_result(
-                        status=ProviderStatus.TIMEOUT,
-                        exit_code=124,
-                        violations=violations,
-                        stats=ExecutionStats(
-                            endpoints_tested=len(endpoints),
-                            operations_tested=operations_count,
-                            checks_executed=checks_executed,
-                            violations_count=len(violations)
-                        ),
-                        diagnostics=[{"error": f"Execution exceeded timeout limit of {timeout_sec}s"}],
-                        summary=f"Execution timed out after {timeout_sec} seconds.",
-                        st_ver=st_ver
-                    )
-
-                strategy = operation.as_strategy()
-                for _ in range(max(1, max_examples_per_operation)):
-                    checks_executed += 1
-                    try:
-                        case = strategy.example()
-                    except Exception as e:
-                        violations.extend(SchemathesisParser.parse_exception(e, path=path_key, method=method))
-                        continue
-
-                    # If callable WSGI application is provided, execute against it
-                    if target_app is not None and callable(target_app):
-                        response = None
-                        curl_str = case.as_curl_command() if hasattr(case, "as_curl_command") else None
-                        try:
-                            response = case.call()
-                            if response.status_code >= 500:
-                                violations.append(
-                                    ContractViolation(
-                                        error_type="ServerError",
-                                        message=f"Server Error ({response.status_code}) on {method.upper()} {path_key}: {response.text[:200]}",
-                                        path=path_key,
-                                        method=method.upper(),
-                                        status_code=response.status_code,
-                                        curl_command=curl_str
-                                    )
-                                )
-                            case.validate_response(response)
-                        except (Exception, BaseException) as e:
-                            violations.extend(
-                                SchemathesisParser.parse_exception(
-                                    e,
-                                    path=path_key,
-                                    method=method,
-                                    status_code=getattr(response, "status_code", None),
-                                    curl_command=curl_str
-                                )
-                            )
-
-                    # If live base_url is provided, execute HTTP request
-                    elif base_url:
-                        response = None
-                        curl_str = case.as_curl_command() if hasattr(case, "as_curl_command") else None
-                        try:
-                            response = case.call(base_url=base_url)
-                            if response.status_code >= 500:
-                                violations.append(
-                                    ContractViolation(
-                                        error_type="ServerError",
-                                        message=f"Server Error ({response.status_code}) on {method.upper()} {path_key}: {response.text[:200]}",
-                                        path=path_key,
-                                        method=method.upper(),
-                                        status_code=response.status_code,
-                                        curl_command=curl_str
-                                    )
-                                )
-                            case.validate_response(response)
-                        except (Exception, BaseException) as e:
-                            violations.extend(
-                                SchemathesisParser.parse_exception(
-                                    e,
-                                    path=path_key,
-                                    method=method,
-                                    status_code=getattr(response, "status_code", None),
-                                    curl_command=curl_str
-                                )
-                            )
-
-        except Exception as e:
+        # 6. Parse and Validate Worker Output
+        raw_out = stdout_data.strip()
+        if not raw_out:
             return _make_result(
                 status=ProviderStatus.TOOL_EXECUTION_FAILED,
-                exit_code=1,
-                violations=violations,
-                stats=ExecutionStats(
-                    endpoints_tested=len(endpoints),
-                    operations_tested=operations_count,
-                    checks_executed=checks_executed,
-                    violations_count=len(violations)
-                ),
-                diagnostics=[{"error": f"Unhandled tool execution exception: {type(e).__name__}: {str(e)}"}],
-                summary=f"Schemathesis execution encountered unhandled error: {str(e)}",
+                exit_code=proc.returncode if proc else 1,
+                violations=[],
+                stats=ExecutionStats(),
+                diagnostics=[{
+                    "error": "Worker process produced empty stdout.",
+                    "stderr": stderr_data[:500] if stderr_data else ""
+                }],
+                summary=f"Worker crashed with exit code {proc.returncode if proc else 1}.",
                 st_ver=st_ver
             )
 
-        # 5. Determine Final Epistemic Status
+        try:
+            parsed_out = json.loads(raw_out)
+        except json.JSONDecodeError as json_err:
+            return _make_result(
+                status=ProviderStatus.OUTPUT_INVALID,
+                exit_code=proc.returncode,
+                violations=[],
+                stats=ExecutionStats(),
+                diagnostics=[{
+                    "error": f"Worker stdout is not valid JSON: {str(json_err)}",
+                    "raw_stdout_sample": raw_out[:300],
+                    "stderr": stderr_data[:300] if stderr_data else ""
+                }],
+                summary="Worker output validation failed: Non-JSON stdout received.",
+                st_ver=st_ver
+            )
+
+        # Validate structure of JSON report
+        if not isinstance(parsed_out, dict) or "status" not in parsed_out:
+            return _make_result(
+                status=ProviderStatus.OUTPUT_INVALID,
+                exit_code=proc.returncode,
+                violations=[],
+                stats=ExecutionStats(),
+                diagnostics=[{"error": "Worker JSON output missing required 'status' attribute."}],
+                summary="Worker output validation failed: Incomplete JSON report.",
+                st_ver=st_ver
+            )
+
+        # Extract normalized fields
+        status_str = parsed_out.get("status", "TOOL_OUTPUT_INVALID")
+        try:
+            status_enum = ProviderStatus(status_str)
+        except ValueError:
+            status_enum = ProviderStatus.OUTPUT_INVALID
+
+        exit_code = parsed_out.get("exit_code", proc.returncode)
+
+        raw_violations = parsed_out.get("violations", [])
+        violations = [SchemathesisParser.parse_raw_failure_entry(v) for v in raw_violations]
+
+        raw_stats = parsed_out.get("stats", {})
         stats = ExecutionStats(
-            endpoints_tested=len(endpoints),
-            operations_tested=operations_count,
-            checks_executed=checks_executed,
-            violations_count=len(violations)
+            endpoints_tested=raw_stats.get("endpoints_tested", 0),
+            operations_tested=raw_stats.get("operations_tested", 0),
+            checks_executed=raw_stats.get("checks_executed", 0),
+            violations_count=len(violations),
+            duration_sec=raw_stats.get("duration_sec", 0.0)
         )
 
-        if len(violations) > 0:
-            return _make_result(
-                status=ProviderStatus.TARGET_CONTRACT_VIOLATED,
-                exit_code=1,
-                violations=violations,
-                stats=stats,
-                diagnostics=[{"violation": v.to_dict()} for v in violations],
-                summary=f"Target contract violated: {len(violations)} violations detected across {operations_count} operations.",
-                st_ver=st_ver
-            )
+        diagnostics = parsed_out.get("diagnostics", [])
+        if stderr_data.strip():
+            diagnostics.append({"worker_stderr_sample": stderr_data[:500]})
 
-        if checks_executed == 0:
-            return _make_result(
-                status=ProviderStatus.INSUFFICIENT_EVIDENCE,
-                exit_code=0,
-                violations=[],
-                stats=stats,
-                diagnostics=[{"warning": "Zero contract checks were executed."}],
-                summary="Execution inconclusive: Zero checks evaluated (INSUFFICIENT_EVIDENCE).",
-                st_ver=st_ver
-            )
+        summary = parsed_out.get("summary", f"Worker execution finished with status {status_enum.value}")
 
         return _make_result(
-            status=ProviderStatus.TARGET_CLEAN,
-            exit_code=0,
-            violations=[],
+            status=status_enum,
+            exit_code=exit_code,
+            violations=violations,
             stats=stats,
-            diagnostics=[],
-            summary=f"Target clean: All {checks_executed} contract checks passed across {len(endpoints)} endpoints.",
+            diagnostics=diagnostics,
+            summary=summary,
             st_ver=st_ver
         )
