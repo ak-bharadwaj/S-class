@@ -5,7 +5,7 @@ Supported Python Versions: 3.10-3.13.
 
 Includes:
 - Global hard-capped shrink evaluation budget (<= 500)
-- Structured FilterExhaustion error handling (verdict='ERROR')
+- Structured FilterExhaustion & InvalidArgument error handling (verdict='ERROR')
 - Exact Unicode category interval indexer with 100% satisfiability coverage
 - AST-driven generic regex generation with start/end anchor awareness (^, $, \b)
 - Portable standard library regex parser compatibility layer
@@ -134,9 +134,9 @@ def _generate_from_regex_string(pattern: str, fullmatch: bool, rng: random.Rando
         parsed = parse_regex_ast(pattern)
         has_start_anchor, has_end_anchor, has_start_b, has_end_b = inspect_regex_anchors(parsed)
     except Exception as err:
-        raise RuntimeError(f"Filter exhaustion: invalid regex pattern '{pattern}': {err}")
+        raise ValueError(f"InvalidArgument: invalid regex pattern '{pattern}': {err}")
 
-    for _ in range(25):
+    for _ in range(50):
         core = _generate_ast_regex(parsed, rng)
         if fullmatch:
             candidate = core
@@ -194,6 +194,9 @@ def _generate_boundary_candidates(spec: StrategySpec) -> List[Any]:
         min_v = p.get("min_value", None)
         max_v = p.get("max_value", None)
 
+        if (min_v is not None or max_v is not None) and allow_nan:
+            raise ValueError("InvalidArgument: Cannot have allow_nan=True with min_value or max_value")
+
         if allow_nan:
             candidates.append(float("nan"))
         if allow_infinity:
@@ -247,7 +250,7 @@ def _generate_boundary_candidates(spec: StrategySpec) -> List[Any]:
         fullmatch = p.get("fullmatch", True)
         try:
             candidates.append(_generate_from_regex_string(pattern, fullmatch, random.Random(0)))
-        except RuntimeError:
+        except (RuntimeError, ValueError):
             pass
 
     elif st_type == "lists":
@@ -277,7 +280,7 @@ def _generate_random_value(spec: StrategySpec, rng: random.Random) -> Any:
     st_type = spec.strategy_type
     p = spec.params
 
-    for _ in range(100):  # Maximum re-sample attempts
+    for _ in range(500):  # Maximum re-sample attempts
         val = None
         if st_type == "integers":
             min_v = p.get("min_value", -1000000)
@@ -287,12 +290,14 @@ def _generate_random_value(spec: StrategySpec, rng: random.Random) -> Any:
         elif st_type == "floats":
             allow_nan = p.get("allow_nan", False)
             allow_infinity = p.get("allow_infinity", False)
-            min_v = p.get("min_value", -10000.0)
-            max_v = p.get("max_value", 10000.0)
-            if min_v is None:
-                min_v = -10000.0
-            if max_v is None:
-                max_v = 10000.0
+            min_v = p.get("min_value", None)
+            max_v = p.get("max_value", None)
+
+            if (min_v is not None or max_v is not None) and allow_nan:
+                raise ValueError("InvalidArgument: Cannot have allow_nan=True with min_value or max_value")
+
+            eff_min = -10000.0 if min_v is None else min_v
+            eff_max = 10000.0 if max_v is None else max_v
 
             choice = rng.random()
             if allow_nan and choice < 0.05:
@@ -300,7 +305,7 @@ def _generate_random_value(spec: StrategySpec, rng: random.Random) -> Any:
             elif allow_infinity and choice < 0.10:
                 val = float("inf") if rng.choice([True, False]) else float("-inf")
             else:
-                val = rng.uniform(min_v, max_v)
+                val = rng.uniform(eff_min, eff_max)
 
         elif st_type == "text":
             alphabet = p.get("alphabet", None)
@@ -563,9 +568,20 @@ class CleanRoomPropertyEngine:
         rng = random.Random(seed if seed is not None else int(time.time_ns() % 1000000000))
         boundary_queue: List[Dict[str, Any]] = []
 
-        boundary_matrix: Dict[str, List[Any]] = {
-            k: _generate_boundary_candidates(spec) for k, spec in strategy_specs.items()
-        }
+        try:
+            boundary_matrix: Dict[str, List[Any]] = {
+                k: _generate_boundary_candidates(spec) for k, spec in strategy_specs.items()
+            }
+        except ValueError as err:
+            return ObservationRecord(
+                engine_name="S-Class/CleanRoom",
+                verdict="ERROR",
+                cases_executed=0,
+                exception_class="InvalidArgument",
+                exception_message=str(err),
+                metadata={"max_examples": max_examples, "seed": seed}
+            )
+
         max_b_len = max((len(v) for v in boundary_matrix.values()), default=0)
         for b_idx in range(min(max_b_len, 5)):
             combo = {}
@@ -575,6 +591,15 @@ class CleanRoomPropertyEngine:
                 else:
                     try:
                         combo[k] = _generate_random_value(strategy_specs[k], rng)
+                    except ValueError as err:
+                        return ObservationRecord(
+                            engine_name="S-Class/CleanRoom",
+                            verdict="ERROR",
+                            cases_executed=0,
+                            exception_class="InvalidArgument",
+                            exception_message=str(err),
+                            metadata={"max_examples": max_examples, "seed": seed}
+                        )
                     except RuntimeError as err:
                         return ObservationRecord(
                             engine_name="S-Class/CleanRoom",
@@ -605,6 +630,15 @@ class CleanRoomPropertyEngine:
                     test_kwargs = {
                         k: _generate_random_value(spec, rng) for k, spec in strategy_specs.items()
                     }
+                except ValueError as err:
+                    return ObservationRecord(
+                        engine_name="S-Class/CleanRoom",
+                        verdict="ERROR",
+                        cases_executed=cases_executed,
+                        exception_class="InvalidArgument",
+                        exception_message=str(err),
+                        metadata={"max_examples": max_examples, "seed": seed}
+                    )
                 except RuntimeError as err:
                     return ObservationRecord(
                         engine_name="S-Class/CleanRoom",
