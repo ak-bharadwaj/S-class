@@ -1,19 +1,19 @@
 """
 S-Class EOS V11.2 - External Developer Validation Protocol & Trial Harness.
 Provides authoritative session plan generation, balanced Latin-Square counterbalancing,
-monotonic human task timing, opaque execution token verification, observer verification enforcement,
+monotonic human task timing, integrity-checked execution context verification, observer verification enforcement,
 slot lifecycle protection, and complete provenance tracking.
 
 CRITICAL EXPERIMENTAL CONTROLS (Fail-Closed):
-1. Authoritative Session Plan & Token Verification:
+1. Authoritative Session Plan & Context Verification:
    - Trials derive condition assignment strictly from the registered ParticipantSessionPlan.
-   - ActiveTaskContext acts as an opaque, cryptographically-signed execution token.
+   - ActiveTaskContext acts as an integrity-checked execution context bound to the authoritative registered session plan.
    - finish_participant_task strictly verifies every field of ActiveTaskContext (participant_id,
      session_id, block_id, participant_index_in_block, task_id, task_order_index, assignment,
      session_plan_hash) against the authoritative registered plan. Any mismatch FAILS CLOSED.
-2. Slot Lifecycle Protection:
+2. Slot Lifecycle Single-Completion Protection:
    - Each planned task slot (participant_id, task_order_index) may be started and completed exactly ONCE.
-   - Replay, duplicate execution, or cross-participant token hijacking FAILS CLOSED.
+   - Replay, duplicate execution, or cross-participant context hijacking FAILS CLOSED.
 3. Monotonic Human Task Timing:
    - Start and stop times measured directly by runner using time.monotonic().
    - Wall-clock timestamps preserved solely for audit logging.
@@ -21,7 +21,7 @@ CRITICAL EXPERIMENTAL CONTROLS (Fail-Closed):
    - task_outcome is verified by an authoritative ObserverVerificationRecord (OBSERVER_VERIFIED).
 5. Balanced Block Provenance:
    - Every plan and trial explicitly records block_id (BLOCK-01..), participant_index_in_block (0..5),
-     protocol_version (1.3.0), and cryptographic session_plan_hash.
+     protocol_version (1.3.0), and session_plan_hash.
 """
 
 import os
@@ -133,7 +133,7 @@ class ParticipantSessionPlan:
 
 @dataclass
 class ActiveTaskContext:
-    """Opaque execution token generated strictly by start_participant_task."""
+    """Integrity-checked execution context generated strictly by start_participant_task."""
     participant_id: str
     session_id: str
     block_id: str
@@ -144,13 +144,13 @@ class ActiveTaskContext:
     start_monotonic: float
     start_wall_iso: str
     session_plan_hash: str
-    token_signature: str = ""
+    context_checksum: str = ""
 
     def __post_init__(self):
-        if not self.token_signature:
-            self.token_signature = self._compute_signature()
+        if not self.context_checksum:
+            self.context_checksum = self._compute_checksum()
 
-    def _compute_signature(self) -> str:
+    def _compute_checksum(self) -> str:
         payload = json.dumps({
             "participant_id": self.participant_id,
             "session_id": self.session_id,
@@ -165,8 +165,8 @@ class ActiveTaskContext:
         }, sort_keys=True)
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
-    def verify_token_integrity(self) -> bool:
-        return self.token_signature == self._compute_signature()
+    def verify_context_integrity(self) -> bool:
+        return self.context_checksum == self._compute_checksum()
 
 
 @dataclass
@@ -394,8 +394,8 @@ class ExternalValidationProtocol:
         if slot in self.completed_slots:
             raise ValueError(f"Task slot {slot} has already been completed.")
 
-        if not active_task.verify_token_integrity():
-            raise ValueError("ActiveTaskContext token signature mismatch / tampered execution token detected.")
+        if not active_task.verify_context_integrity():
+            raise ValueError("ActiveTaskContext context checksum mismatch / tampered execution context detected.")
 
         plan = self.plans.get(active_task.participant_id)
         if plan is None:

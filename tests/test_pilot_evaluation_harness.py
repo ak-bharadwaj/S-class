@@ -145,7 +145,7 @@ def test_tamper_attempt_task_id_fails_closed():
     active_task = protocol.start_participant_task("dev_t1", 1)
     # Attempt to swap task_id
     active_task.task_id = "TASK-02-CONFIG-SCHEMA-PARSER"
-    active_task.token_signature = active_task._compute_signature()
+    active_task.context_checksum = active_task._compute_checksum()
 
     observer = ObserverVerificationRecord(observer_id="obs", verified_outcome="SUCCESS")
     with pytest.raises(ValueError, match="Active task task_id mismatch"):
@@ -168,7 +168,7 @@ def test_tamper_attempt_assignment_fails_closed():
     active_task = protocol.start_participant_task("dev_t2", 1)
     # Attempt to switch BASELINE to SCLASS_TREATMENT
     active_task.assignment = "SCLASS_TREATMENT"
-    active_task.token_signature = active_task._compute_signature()
+    active_task.context_checksum = active_task._compute_checksum()
 
     observer = ObserverVerificationRecord(observer_id="obs", verified_outcome="SUCCESS")
     with pytest.raises(ValueError, match="Active task assignment mismatch"):
@@ -190,7 +190,7 @@ def test_tamper_attempt_session_id_and_block_id_fails_closed():
 
     active_task = protocol.start_participant_task("dev_t3", 1)
     active_task.block_id = "BLOCK-99"
-    active_task.token_signature = active_task._compute_signature()
+    active_task.context_checksum = active_task._compute_checksum()
 
     observer = ObserverVerificationRecord(observer_id="obs", verified_outcome="SUCCESS")
     with pytest.raises(ValueError, match="Active task block_id mismatch"):
@@ -214,9 +214,9 @@ def test_tamper_attempt_cross_participant_reuse_fails_closed():
 
     active_task_a = protocol.start_participant_task("dev_alice", 1)
 
-    # Bob attempts to submit Alice's active task token
+    # Bob attempts to submit Alice's active task context
     active_task_a.participant_id = "dev_bob"
-    active_task_a.token_signature = active_task_a._compute_signature()
+    active_task_a.context_checksum = active_task_a._compute_checksum()
 
     observer = ObserverVerificationRecord(observer_id="obs", verified_outcome="SUCCESS")
     with pytest.raises(ValueError, match="Active task session_id mismatch|Task slot.*not in-flight"):
@@ -231,16 +231,16 @@ def test_tamper_attempt_cross_participant_reuse_fails_closed():
         )
 
 
-def test_tamper_attempt_unsigned_token_fails_closed():
+def test_tamper_attempt_corrupted_checksum_fails_closed():
     protocol = ExternalValidationProtocol()
     plan = protocol.generate_participant_session_plan("dev_t4", 0)
     protocol.register_plan(plan)
 
     active_task = protocol.start_participant_task("dev_t4", 1)
-    active_task.token_signature = "fraudulent_signature_xyz"
+    active_task.context_checksum = "fraudulent_checksum_xyz"
 
     observer = ObserverVerificationRecord(observer_id="obs", verified_outcome="SUCCESS")
-    with pytest.raises(ValueError, match="ActiveTaskContext token signature mismatch"):
+    with pytest.raises(ValueError, match="ActiveTaskContext context checksum mismatch"):
         protocol.finish_participant_task(
             active_task=active_task,
             code_generator=lambda s: (lambda x: x),
