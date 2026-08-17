@@ -3,7 +3,8 @@ S-Class EOS V11.2 - Gate 2 Phase 5: Clean-Room Engine Unit Test Suite.
 Verifies the independent CleanRoomPropertyEngine against the frozen contract.
 Tests strategy generation, boundary bias, monotonic shrinking, determinism, filtering,
 replay mechanics, hard-capped shrink budget, AST regex generation, anchor semantics (^, $, \b),
-fail-closed Unicode character constraints, and structured FilterExhaustion error handling.
+exact Unicode category satisfiability (isolated single codepoints), and regex parser compat layer.
+Supported Python Versions: 3.10-3.13.
 """
 
 import pytest
@@ -16,6 +17,7 @@ from benchmark.hypothesis_parity.observation import StrategySpec, ObservationRec
 from benchmark.hypothesis_parity.cleanroom_engine import CleanRoomPropertyEngine, _generate_random_value, _generate_boundary_candidates
 from benchmark.hypothesis_parity.differential_oracle import IndependentDifferentialOracle, _validate_value_against_spec
 from benchmark.hypothesis_parity.regex_parser_compat import parse_regex_ast, inspect_regex_anchors
+from benchmark.hypothesis_parity.unicode_indexer import sample_codepoint, find_valid_codepoint_intervals
 
 
 # =============================================================================
@@ -79,7 +81,6 @@ def test_cleanroom_boundary_sampling_in_first_segment():
     assert obs.verdict == "PASS"
     assert obs.cases_executed == 40
 
-    # Initial segment (first 4 values) should contain domain boundaries like 0 or 1000
     initial_segment = seen_values[:4]
     assert any(v in (0, 1000, 1, 999) for v in initial_segment)
 
@@ -102,7 +103,6 @@ def test_cleanroom_shrinking_integers():
     assert obs.verdict == "FAIL"
     assert obs.initial_counterexample is not None
     assert obs.shrunk_counterexample is not None
-    # Boundary value > 15 is 16
     assert obs.shrunk_counterexample["x"] == 16
     assert obs.shrink_evaluations is not None
     assert obs.shrink_evaluations <= 500
@@ -253,8 +253,33 @@ def test_cleanroom_regex_anchors_and_boundary_semantics():
 
 
 # =============================================================================
-# 7. Fail-Closed Unicode Character Generation
+# 7. Exact Unicode Category Satisfiability & Isolated Codepoint Tests
 # =============================================================================
+
+def test_cleanroom_isolated_single_codepoint_generation():
+    """
+    Validates that the exact interval indexer successfully finds and generates an isolated single valid codepoint
+    even when it is the ONLY valid character in the entire requested range.
+    """
+    # 1. Greek Capital Omega (937, \u03A9) is the only uppercase letter in range [937, 937]
+    spec_omega = StrategySpec(
+        strategy_type="characters",
+        params={"whitelist_categories": ["Lu"], "min_codepoint": 937, "max_codepoint": 937}
+    )
+    rng = random.Random(42)
+    val_omega = _generate_random_value(spec_omega, rng)
+    assert ord(val_omega) == 937
+    assert unicodedata.category(val_omega) == "Lu"
+
+    # 2. Euro Sign (0x20AC, 8364, category 'Sc') in range [8364, 8364]
+    spec_euro = StrategySpec(
+        strategy_type="characters",
+        params={"whitelist_categories": ["Sc"], "min_codepoint": 8364, "max_codepoint": 8364}
+    )
+    val_euro = _generate_random_value(spec_euro, rng)
+    assert ord(val_euro) == 8364
+    assert unicodedata.category(val_euro) == "Sc"
+
 
 def test_cleanroom_character_fail_closed_on_impossible_constraints():
     """
@@ -277,17 +302,45 @@ def test_cleanroom_character_fail_closed_on_impossible_constraints():
     assert obs2.verdict == "ERROR"
     assert obs2.exception_class == "FilterExhaustion"
 
-    # 3. Valid narrow category generation
-    rng = random.Random(42)
-    spec_digits = StrategySpec(strategy_type="characters", params={"whitelist_categories": ["Nd"], "min_codepoint": 48, "max_codepoint": 57})
-    for _ in range(20):
-        c = _generate_random_value(spec_digits, rng)
-        assert unicodedata.category(c) == "Nd"
-        assert c in "0123456789"
+
+# =============================================================================
+# 8. Regex Parser Compatibility Layer Tests
+# =============================================================================
+
+def test_regex_parser_compat_layer():
+    """
+    Explicitly verifies that regex_parser_compat accurately parses grammar ASTs
+    and extracts anchors across all supported patterns on Python 3.10-3.13.
+    """
+    # 1. Literal & Range
+    ast1 = parse_regex_ast(r"[a-z0-9]+")
+    assert len(ast1) > 0
+
+    # 2. Anchors
+    ast_anchored = parse_regex_ast(r"^test$")
+    has_start, has_end, has_sb, has_eb = inspect_regex_anchors(ast_anchored)
+    assert has_start is True
+    assert has_end is True
+
+    # 3. Word Boundaries
+    ast_boundary = parse_regex_ast(r"\btoken\b")
+    has_start, has_end, has_sb, has_eb = inspect_regex_anchors(ast_boundary)
+    assert has_sb is True
+    assert has_eb is True
+
+    # 4. Branching anchors
+    ast_branch = parse_regex_ast(r"^(GET|POST)$")
+    has_start, has_end, _, _ = inspect_regex_anchors(ast_branch)
+    assert has_start is True
+    assert has_end is True
+
+    # 5. Invalid regex raises ValueError
+    with pytest.raises(ValueError):
+        parse_regex_ast(r"[unclosed_bracket")
 
 
 # =============================================================================
-# 8. Email Contract
+# 9. Email Contract & Deterministic Replay
 # =============================================================================
 
 def test_cleanroom_email_validity_contract():
@@ -303,10 +356,6 @@ def test_cleanroom_email_validity_contract():
         assert len(user) >= 1
         assert "." in domain
 
-
-# =============================================================================
-# 9. Deterministic Replay & Filter Exclusion
-# =============================================================================
 
 def test_cleanroom_deterministic_seed_replay():
     """Validates that fixed seed produces identical input sequence and reproducible counterexample."""

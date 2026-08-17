@@ -1,6 +1,6 @@
 """
 S-Class EOS V11.2 - Standard Library Regex Parser Compatibility Layer.
-Provides a portable, versioned AST parser interface across Python 3.10, 3.11, 3.12, 3.13, and 3.14.
+Provides a portable, versioned AST parser interface across Python 3.10, 3.11, 3.12, and 3.13.
 Does not depend on or imitate Hypothesis internals.
 """
 

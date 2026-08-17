@@ -1,10 +1,12 @@
 """
 S-Class EOS V11.2 - Independent Clean-Room Property Testing Engine.
 Implements the frozen behavioral contract (Phase 2) from first principles.
+Supported Python Versions: 3.10-3.13.
+
 Includes:
 - Global hard-capped shrink evaluation budget (<= 500)
 - Structured FilterExhaustion error handling (verdict='ERROR')
-- Fail-closed Unicode character generation without invalid fallbacks
+- Exact Unicode category interval indexer with 100% satisfiability coverage
 - AST-driven generic regex generation with start/end anchor awareness (^, $, \b)
 - Portable standard library regex parser compatibility layer
 - Deterministic email contract
@@ -18,6 +20,7 @@ import unicodedata
 from typing import Dict, Any, Optional, List, Tuple, Callable
 from benchmark.hypothesis_parity.observation import StrategySpec, ObservationRecord, ReplayOutcome, compute_size
 from benchmark.hypothesis_parity.differential_oracle import _validate_value_against_spec
+from benchmark.hypothesis_parity.unicode_indexer import sample_codepoint
 from benchmark.hypothesis_parity.regex_parser_compat import (
     parse_regex_ast,
     inspect_regex_anchors,
@@ -37,60 +40,22 @@ from benchmark.hypothesis_parity.regex_parser_compat import (
 
 
 # =============================================================================
-# Unicode Category Mappings & Character Generation (Fail-Closed)
+# Unicode Character Generation (Exact Satisfiability via Interval Indexer)
 # =============================================================================
-
-_PRECOMPUTED_CATEGORY_CODEPOINTS = {
-    "Lu": list(range(65, 91)) + list(range(192, 215)) + list(range(216, 223)),   # Uppercase Latin
-    "Ll": list(range(97, 123)) + list(range(223, 247)) + list(range(248, 256)),  # Lowercase Latin
-    "Nd": list(range(48, 58)),                                                   # Decimal digits
-    "P":  [ord(c) for c in "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"],               # Punctuation
-    "Z":  [32, 160],                                                             # Space separators
-    "S":  [ord(c) for c in "$+<=>^`|~£¥€©®™±×÷"],                                # Currency & Math Symbols
-}
-
 
 def _generate_character(whitelist: Optional[List[str]], blacklist: Optional[List[str]], min_cp: int, max_cp: int, rng: random.Random) -> str:
     """
     Generates a character meeting exact category whitelist/blacklist and codepoint bounds.
-    Fails closed if no character can satisfy the constraints (never emits invalid fallback).
+    Utilizes exact Unicode category interval indexing across 0..0x10FFFF.
+    Fails closed with FilterExhaustion if no codepoint satisfies constraints.
     """
-    if min_cp > max_cp:
-        raise RuntimeError(f"Filter exhaustion: min_codepoint ({min_cp}) > max_codepoint ({max_cp})")
-
-    # 1. Fast path from precomputed tables
-    pool: List[int] = []
-    if whitelist:
-        for cat in whitelist:
-            if cat in _PRECOMPUTED_CATEGORY_CODEPOINTS:
-                pool.extend([cp for cp in _PRECOMPUTED_CATEGORY_CODEPOINTS[cat] if min_cp <= cp <= max_cp])
-        if blacklist:
-            pool = [cp for cp in pool if unicodedata.category(chr(cp)) not in blacklist]
-        if pool:
-            return chr(rng.choice(pool))
-
-    # 2. Bounded scan of the codepoint range
-    valid_candidates: List[str] = []
-    step = 1 if (max_cp - min_cp) < 2000 else (max_cp - min_cp) // 1000
-    for cp in range(min_cp, max_cp + 1, max(1, step)):
-        char = chr(cp)
-        cat = unicodedata.category(char)
-        if whitelist and cat not in whitelist:
-            continue
-        if blacklist and cat in blacklist:
-            continue
-        valid_candidates.append(char)
-        if len(valid_candidates) >= 50:
-            break
-
-    if valid_candidates:
-        return rng.choice(valid_candidates)
-
-    # Fail closed: No valid character in range satisfies constraints
-    raise RuntimeError(
-        f"Filter exhaustion: no Unicode character in codepoint range [{min_cp}, {max_cp}] "
-        f"satisfies whitelist={whitelist}, blacklist={blacklist}"
-    )
+    cp = sample_codepoint(whitelist, blacklist, min_cp, max_cp, rng)
+    if cp is None:
+        raise RuntimeError(
+            f"Filter exhaustion: no Unicode character in codepoint range [{min_cp}, {max_cp}] "
+            f"satisfies whitelist={whitelist}, blacklist={blacklist}"
+        )
+    return chr(cp)
 
 
 # =============================================================================
@@ -580,6 +545,7 @@ class CleanRoomPropertyEngine:
     """
     Independent Clean-Room Property Testing Engine conforming strictly to the Phase 2 contract.
     Operates with guaranteed evaluation budgets and structured failure handling.
+    Supported Python Versions: 3.10-3.13.
     """
 
     @classmethod
