@@ -140,7 +140,7 @@ def test_api_contract_provider_executes_real_schemathesis_validation():
     empty_schema = {"openapi": "3.0.0", "info": {"title": "Empty", "version": "1.0"}, "paths": {}}
     receipt_empty = provider.collect_evidence(empty_schema, {"obligation_id": "OB-API-EMPTY", "schema_dict": empty_schema})
     assert receipt_empty.passed is False
-    assert receipt_empty.status == EpistemicStatus.TARGET_CONTRACT_VIOLATED
+    assert receipt_empty.status == EpistemicStatus.TOOL_OUTPUT_INVALID
 
     # Non-dict invalid schema
     receipt_invalid = provider.collect_evidence("not_a_dict", {"obligation_id": "OB-API-INVALID"})
