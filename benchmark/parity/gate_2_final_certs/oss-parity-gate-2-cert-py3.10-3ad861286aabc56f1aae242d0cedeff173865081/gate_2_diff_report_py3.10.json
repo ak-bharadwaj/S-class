@@ -1,0 +1,1033 @@
+{
+  "campaign_timestamp": "2026-08-17T06:14:01Z",
+  "provenance_certification_metadata": {
+    "runner_os": "Linux",
+    "tested_source_sha": "3ad861286aabc56f1aae242d0cedeff173865081",
+    "workflow_run_id": "32000742914",
+    "python_runtime_version": "3.10.20 (main, Jun 16 2026, 21:01:32) [GCC 13.3.0]",
+    "python_version_tuple": [
+      3,
+      10,
+      20
+    ],
+    "unicode_database_version": "13.0.0",
+    "index_sha256_checksum": "1d81679035f9ae847813405aed61e8ce9b4aead7d901f9763612272f49b4e7b6",
+    "campaign_seeds": [
+      42,
+      1337,
+      2026,
+      9999,
+      54321
+    ]
+  },
+  "unicode_provenance": {
+    "python_runtime_version": "3.10.20 (main, Jun 16 2026, 21:01:32) [GCC 13.3.0]",
+    "python_version_info": [
+      3,
+      10,
+      20
+    ],
+    "unicode_database_version": "13.0.0",
+    "index_sha256_checksum": "1d81679035f9ae847813405aed61e8ce9b4aead7d901f9763612272f49b4e7b6",
+    "cold_init_duration_ms": 512.906,
+    "total_categories_indexed": 30,
+    "total_disjoint_intervals": 3876
+  },
+  "total_evaluated_differential_cases": 2542,
+  "total_discrepancies": 0,
+  "all_campaigns_passed": true,
+  "campaign_a_standard_strict": {
+    "campaign_timestamp": "2026-08-17T06:13:40Z",
+    "health_checks_mode": "standard_strict",
+    "total_campaign_cases": 21,
+    "total_discrepancies": 0,
+    "all_passed": true,
+    "shrink_quality_deltas": [
+      {
+        "case_name": "integers_upper_bound_fail_shrink",
+        "ref_shrunk_size": [
+          1,
+          27
+        ],
+        "cand_shrunk_size": [
+          1,
+          28
+        ],
+        "classification": "BOTH_VALID_LOCAL_MINIMA",
+        "cand_shrink_evaluations": 11,
+        "both_valid_failures": true
+      },
+      {
+        "case_name": "text_forbidden_char_fail_shrink",
+        "ref_shrunk_size": [
+          1,
+          3
+        ],
+        "cand_shrunk_size": [
+          1,
+          3
+        ],
+        "classification": "IDENTICAL_MINIMA",
+        "cand_shrink_evaluations": 2,
+        "both_valid_failures": true
+      },
+      {
+        "case_name": "floats_upper_bound_fail_shrink",
+        "ref_shrunk_size": [
+          1,
+          14.0
+        ],
+        "cand_shrunk_size": [
+          1,
+          26.0
+        ],
+        "classification": "BOTH_VALID_LOCAL_MINIMA",
+        "cand_shrink_evaluations": 17,
+        "both_valid_failures": true
+      },
+      {
+        "case_name": "lists_sum_bound_fail_shrink",
+        "ref_shrunk_size": [
+          1,
+          7
+        ],
+        "cand_shrunk_size": [
+          1,
+          7
+        ],
+        "classification": "IDENTICAL_MINIMA",
+        "cand_shrink_evaluations": 18,
+        "both_valid_failures": true
+      }
+    ],
+    "discrepancies": [],
+    "campaign_results": [
+      {
+        "case_name": "integers_addition_commutativity_pass",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 63.592,
+        "candidate_elapsed_ms": 0.219,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "integers_upper_bound_fail_shrink",
+        "overall_status": "PASS",
+        "reference_verdict": "FAIL",
+        "candidate_verdict": "FAIL",
+        "reference_exception_class": "AssertionError",
+        "candidate_exception_class": "AssertionError",
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": {
+          "case_name": "integers_upper_bound_fail_shrink",
+          "ref_shrunk_size": [
+            1,
+            27
+          ],
+          "cand_shrunk_size": [
+            1,
+            28
+          ],
+          "classification": "BOTH_VALID_LOCAL_MINIMA",
+          "cand_shrink_evaluations": 11,
+          "both_valid_failures": true
+        },
+        "candidate_shrink_evaluations": 11,
+        "reference_elapsed_ms": 20.515,
+        "candidate_elapsed_ms": 0.09,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "text_concat_length_pass",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 32.366,
+        "candidate_elapsed_ms": 0.44,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "text_forbidden_char_fail_shrink",
+        "overall_status": "PASS",
+        "reference_verdict": "FAIL",
+        "candidate_verdict": "FAIL",
+        "reference_exception_class": "AssertionError",
+        "candidate_exception_class": "AssertionError",
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": {
+          "case_name": "text_forbidden_char_fail_shrink",
+          "ref_shrunk_size": [
+            1,
+            3
+          ],
+          "cand_shrunk_size": [
+            1,
+            3
+          ],
+          "classification": "IDENTICAL_MINIMA",
+          "cand_shrink_evaluations": 2,
+          "both_valid_failures": true
+        },
+        "candidate_shrink_evaluations": 2,
+        "reference_elapsed_ms": 19.433,
+        "candidate_elapsed_ms": 0.082,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "floats_triangle_inequality_pass",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 24.126,
+        "candidate_elapsed_ms": 0.203,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "floats_upper_bound_fail_shrink",
+        "overall_status": "PASS",
+        "reference_verdict": "FAIL",
+        "candidate_verdict": "FAIL",
+        "reference_exception_class": "AssertionError",
+        "candidate_exception_class": "AssertionError",
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": {
+          "case_name": "floats_upper_bound_fail_shrink",
+          "ref_shrunk_size": [
+            1,
+            14.0
+          ],
+          "cand_shrunk_size": [
+            1,
+            26.0
+          ],
+          "classification": "BOTH_VALID_LOCAL_MINIMA",
+          "cand_shrink_evaluations": 17,
+          "both_valid_failures": true
+        },
+        "candidate_shrink_evaluations": 17,
+        "reference_elapsed_ms": 23.49,
+        "candidate_elapsed_ms": 0.121,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "lists_reverse_involution_pass",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 36.111,
+        "candidate_elapsed_ms": 0.576,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "lists_sum_bound_fail_shrink",
+        "overall_status": "PASS",
+        "reference_verdict": "FAIL",
+        "candidate_verdict": "FAIL",
+        "reference_exception_class": "AssertionError",
+        "candidate_exception_class": "AssertionError",
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": {
+          "case_name": "lists_sum_bound_fail_shrink",
+          "ref_shrunk_size": [
+            1,
+            7
+          ],
+          "cand_shrunk_size": [
+            1,
+            7
+          ],
+          "classification": "IDENTICAL_MINIMA",
+          "cand_shrink_evaluations": 18,
+          "both_valid_failures": true
+        },
+        "candidate_shrink_evaluations": 18,
+        "reference_elapsed_ms": 93.829,
+        "candidate_elapsed_ms": 0.205,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "regex_anchored_fullmatch_pass",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 63.55,
+        "candidate_elapsed_ms": 1.756,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "sampled_from_membership_pass",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 4.397,
+        "candidate_elapsed_ms": 0.083,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "emails_format_validation_pass",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 80.73,
+        "candidate_elapsed_ms": 0.497,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "characters_uppercase_category_pass",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 17.654,
+        "candidate_elapsed_ms": 515.084,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "boundary_empty_text_domain",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 2.417,
+        "candidate_elapsed_ms": 0.124,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "boundary_empty_list_domain",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 2.414,
+        "candidate_elapsed_ms": 0.122,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "boundary_singleton_integer_domain",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 1.787,
+        "candidate_elapsed_ms": 0.089,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "boundary_singleton_sampled_from",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 1.687,
+        "candidate_elapsed_ms": 0.067,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "boundary_extreme_floats_nan_inf",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 18.292,
+        "candidate_elapsed_ms": 0.154,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "boundary_regex_substring_word_boundary",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 29.458,
+        "candidate_elapsed_ms": 0.762,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "boundary_regex_start_end_anchored",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 52.254,
+        "candidate_elapsed_ms": 1.321,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "boundary_nested_heterogeneous_tuple",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 20.851,
+        "candidate_elapsed_ms": 0.526,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "boundary_pathological_filter_diagnostic",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 50.54,
+        "candidate_elapsed_ms": 0.274,
+        "replay_verified": true,
+        "violations": []
+      }
+    ]
+  },
+  "campaign_b_diagnostic_suppressed": {
+    "campaign_timestamp": "2026-08-17T06:13:40Z",
+    "health_checks_mode": "diagnostic_suppressed",
+    "total_campaign_cases": 21,
+    "total_discrepancies": 0,
+    "all_passed": true,
+    "shrink_quality_deltas": [
+      {
+        "case_name": "integers_upper_bound_fail_shrink",
+        "ref_shrunk_size": [
+          1,
+          27
+        ],
+        "cand_shrunk_size": [
+          1,
+          28
+        ],
+        "classification": "BOTH_VALID_LOCAL_MINIMA",
+        "cand_shrink_evaluations": 11,
+        "both_valid_failures": true
+      },
+      {
+        "case_name": "text_forbidden_char_fail_shrink",
+        "ref_shrunk_size": [
+          1,
+          3
+        ],
+        "cand_shrunk_size": [
+          1,
+          3
+        ],
+        "classification": "IDENTICAL_MINIMA",
+        "cand_shrink_evaluations": 2,
+        "both_valid_failures": true
+      },
+      {
+        "case_name": "floats_upper_bound_fail_shrink",
+        "ref_shrunk_size": [
+          1,
+          14.0
+        ],
+        "cand_shrunk_size": [
+          1,
+          26.0
+        ],
+        "classification": "BOTH_VALID_LOCAL_MINIMA",
+        "cand_shrink_evaluations": 17,
+        "both_valid_failures": true
+      },
+      {
+        "case_name": "lists_sum_bound_fail_shrink",
+        "ref_shrunk_size": [
+          1,
+          7
+        ],
+        "cand_shrunk_size": [
+          1,
+          7
+        ],
+        "classification": "IDENTICAL_MINIMA",
+        "cand_shrink_evaluations": 18,
+        "both_valid_failures": true
+      }
+    ],
+    "discrepancies": [],
+    "campaign_results": [
+      {
+        "case_name": "integers_addition_commutativity_pass",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 36.261,
+        "candidate_elapsed_ms": 0.184,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "integers_upper_bound_fail_shrink",
+        "overall_status": "PASS",
+        "reference_verdict": "FAIL",
+        "candidate_verdict": "FAIL",
+        "reference_exception_class": "AssertionError",
+        "candidate_exception_class": "AssertionError",
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": {
+          "case_name": "integers_upper_bound_fail_shrink",
+          "ref_shrunk_size": [
+            1,
+            27
+          ],
+          "cand_shrunk_size": [
+            1,
+            28
+          ],
+          "classification": "BOTH_VALID_LOCAL_MINIMA",
+          "cand_shrink_evaluations": 11,
+          "both_valid_failures": true
+        },
+        "candidate_shrink_evaluations": 11,
+        "reference_elapsed_ms": 18.448,
+        "candidate_elapsed_ms": 0.083,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "text_concat_length_pass",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 24.363,
+        "candidate_elapsed_ms": 0.448,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "text_forbidden_char_fail_shrink",
+        "overall_status": "PASS",
+        "reference_verdict": "FAIL",
+        "candidate_verdict": "FAIL",
+        "reference_exception_class": "AssertionError",
+        "candidate_exception_class": "AssertionError",
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": {
+          "case_name": "text_forbidden_char_fail_shrink",
+          "ref_shrunk_size": [
+            1,
+            3
+          ],
+          "cand_shrunk_size": [
+            1,
+            3
+          ],
+          "classification": "IDENTICAL_MINIMA",
+          "cand_shrink_evaluations": 2,
+          "both_valid_failures": true
+        },
+        "candidate_shrink_evaluations": 2,
+        "reference_elapsed_ms": 17.645,
+        "candidate_elapsed_ms": 0.069,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "floats_triangle_inequality_pass",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 23.66,
+        "candidate_elapsed_ms": 0.195,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "floats_upper_bound_fail_shrink",
+        "overall_status": "PASS",
+        "reference_verdict": "FAIL",
+        "candidate_verdict": "FAIL",
+        "reference_exception_class": "AssertionError",
+        "candidate_exception_class": "AssertionError",
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": {
+          "case_name": "floats_upper_bound_fail_shrink",
+          "ref_shrunk_size": [
+            1,
+            14.0
+          ],
+          "cand_shrunk_size": [
+            1,
+            26.0
+          ],
+          "classification": "BOTH_VALID_LOCAL_MINIMA",
+          "cand_shrink_evaluations": 17,
+          "both_valid_failures": true
+        },
+        "candidate_shrink_evaluations": 17,
+        "reference_elapsed_ms": 22.826,
+        "candidate_elapsed_ms": 0.108,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "lists_reverse_involution_pass",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 35.16,
+        "candidate_elapsed_ms": 0.592,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "lists_sum_bound_fail_shrink",
+        "overall_status": "PASS",
+        "reference_verdict": "FAIL",
+        "candidate_verdict": "FAIL",
+        "reference_exception_class": "AssertionError",
+        "candidate_exception_class": "AssertionError",
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": {
+          "case_name": "lists_sum_bound_fail_shrink",
+          "ref_shrunk_size": [
+            1,
+            7
+          ],
+          "cand_shrunk_size": [
+            1,
+            7
+          ],
+          "classification": "IDENTICAL_MINIMA",
+          "cand_shrink_evaluations": 18,
+          "both_valid_failures": true
+        },
+        "candidate_shrink_evaluations": 18,
+        "reference_elapsed_ms": 91.026,
+        "candidate_elapsed_ms": 0.203,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "regex_anchored_fullmatch_pass",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 44.434,
+        "candidate_elapsed_ms": 1.726,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "sampled_from_membership_pass",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 3.986,
+        "candidate_elapsed_ms": 0.099,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "emails_format_validation_pass",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 68.326,
+        "candidate_elapsed_ms": 0.34,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "characters_uppercase_category_pass",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 17.443,
+        "candidate_elapsed_ms": 0.221,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "boundary_empty_text_domain",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 1.804,
+        "candidate_elapsed_ms": 0.115,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "boundary_empty_list_domain",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 1.705,
+        "candidate_elapsed_ms": 0.116,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "boundary_singleton_integer_domain",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 1.809,
+        "candidate_elapsed_ms": 0.107,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "boundary_singleton_sampled_from",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 1.657,
+        "candidate_elapsed_ms": 0.065,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "boundary_extreme_floats_nan_inf",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 17.894,
+        "candidate_elapsed_ms": 0.128,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "boundary_regex_substring_word_boundary",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 27.084,
+        "candidate_elapsed_ms": 0.76,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "boundary_regex_start_end_anchored",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 50.16,
+        "candidate_elapsed_ms": 1.317,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "boundary_nested_heterogeneous_tuple",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 20.113,
+        "candidate_elapsed_ms": 0.477,
+        "replay_verified": true,
+        "violations": []
+      },
+      {
+        "case_name": "boundary_pathological_filter_diagnostic",
+        "overall_status": "PASS",
+        "reference_verdict": "PASS",
+        "candidate_verdict": "PASS",
+        "reference_exception_class": null,
+        "candidate_exception_class": null,
+        "reference_valid": true,
+        "candidate_valid": true,
+        "verdict_agreement": true,
+        "shrink_quality_delta": null,
+        "candidate_shrink_evaluations": null,
+        "reference_elapsed_ms": 41.504,
+        "candidate_elapsed_ms": 0.24,
+        "replay_verified": true,
+        "violations": []
+      }
+    ]
+  },
+  "campaign_c_meta_fuzz_2500": {
+    "total_meta_fuzz_cases": 2500,
+    "seeds_evaluated": [
+      42,
+      1337,
+      2026,
+      9999,
+      54321
+    ],
+    "total_discrepancies": 0,
+    "all_passed": true,
+    "seed_summaries": {
+      "seed_42": {
+        "cases_executed": 500,
+        "discrepancies": 0,
+        "status": "PASS"
+      },
+      "seed_1337": {
+        "cases_executed": 500,
+        "discrepancies": 0,
+        "status": "PASS"
+      },
+      "seed_2026": {
+        "cases_executed": 500,
+        "discrepancies": 0,
+        "status": "PASS"
+      },
+      "seed_9999": {
+        "cases_executed": 500,
+        "discrepancies": 0,
+        "status": "PASS"
+      },
+      "seed_54321": {
+        "cases_executed": 500,
+        "discrepancies": 0,
+        "status": "PASS"
+      }
+    },
+    "discrepancies": []
+  }
+}

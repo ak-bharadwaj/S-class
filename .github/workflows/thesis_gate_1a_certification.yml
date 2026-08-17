@@ -1,4 +1,4 @@
-name: S-Class THESIS-GATE-1 - Synthetic Efficacy & External Protocol
+name: S-Class THESIS-GATE-1A - Enterprise Core & Synthetic Efficacy
 
 on:
   push:
@@ -9,8 +9,8 @@ permissions:
   contents: read
 
 jobs:
-  certify-thesis-gate-1:
-    name: THESIS-GATE-1 Validation (Ubuntu 24.04 / Python ${{ matrix.python-version }})
+  certify-thesis-gate-1a:
+    name: THESIS-GATE-1A Certification (Ubuntu 24.04 / Python ${{ matrix.python-version }})
     runs-on: ubuntu-24.04
     strategy:
       matrix:
@@ -37,7 +37,7 @@ jobs:
       env:
         PYTHONPATH: .
       run: |
-        python -m pytest tests/test_evidence_provider_registry.py tests/test_enterprise_core_pipeline.py tests/test_pilot_evaluation_harness.py -v
+        python -m pytest tests/test_evidence_provider_registry.py tests/test_enterprise_core_pipeline.py tests/test_pilot_evaluation_harness.py tests/test_thesis_gate_1a_verifier.py -v
 
     - name: Run Synthetic Efficacy Pilot (Controlled Failure Injection)
       env:
@@ -45,22 +45,22 @@ jobs:
       run: |
         python benchmark/pilot/synthetic_efficacy_pilot.py --output benchmark/pilot/synthetic_efficacy_receipt_py${{ matrix.python-version }}.json --sha ${{ github.sha }}
 
-    - name: Run External Developer Validation Protocol Demo Cohort
+    - name: Run External Validation Protocol Smoke Verification
       env:
         PYTHONPATH: .
       run: |
-        python benchmark/pilot/external_validation_protocol.py --output benchmark/pilot/external_validation_receipt_py${{ matrix.python-version }}.json --sha ${{ github.sha }}
+        python benchmark/pilot/external_validation_protocol.py --output benchmark/pilot/external_validation_protocol_receipt_py${{ matrix.python-version }}.json --sha ${{ github.sha }}
 
-    - name: Strict Verification of Synthetic Efficacy Receipt
+    - name: Fail-Closed Verification of THESIS-GATE-1A Certificate
       run: |
-        python -c "import json; r = json.load(open('benchmark/pilot/synthetic_efficacy_receipt_py${{ matrix.python-version }}.json')); assert r['pilot_verdict'] == 'PASS' and r['observable_comparative_metrics']['treatment_defects_escaped'] == 0 and r['observable_comparative_metrics']['false_positive_gate_passed'] is True, f'Synthetic pilot failed: {r}'; print(f'THESIS-GATE-1 Python ${{ matrix.python-version }} Synthetic Efficacy Verified.')"
+        python verify_thesis_gate_1a_certificate.py benchmark/pilot/synthetic_efficacy_receipt_py${{ matrix.python-version }}.json --sha ${{ github.sha }}
 
-    - name: Upload Immutable THESIS-GATE-1 Audit Receipts
+    - name: Upload Immutable THESIS-GATE-1A Certificate Artifacts
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: thesis-gate-1-audit-receipts-py${{ matrix.python-version }}-${{ github.sha }}
+        name: thesis-gate-1a-cert-py${{ matrix.python-version }}-${{ github.sha }}
         path: |
           benchmark/pilot/synthetic_efficacy_receipt_py${{ matrix.python-version }}.json
-          benchmark/pilot/external_validation_receipt_py${{ matrix.python-version }}.json
+          benchmark/pilot/external_validation_protocol_receipt_py${{ matrix.python-version }}.json
         retention-days: 90

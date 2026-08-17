@@ -1,0 +1,275 @@
+{
+  "certificate_id": "OSS-PARITY-GATE-2-PROPERTY-TESTING-LINUX-UNKNOWN",
+  "schema_version": "1.0.0",
+  "gate_name": "Gate 2: Hypothesis Property Testing & Invariant Verification Parity",
+  "provenance": {
+    "runner_os": "Windows",
+    "hostname": "AK",
+    "cpu_count_logical": 12,
+    "total_ram_bytes": 17179869184,
+    "python_runtime_version": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+    "python_version_tuple": [
+      3,
+      14,
+      5
+    ],
+    "hypothesis_reference_version": "6.165.9",
+    "unicode_database_version": "16.0.0",
+    "index_sha256_checksum": "915272d292b21105f601ff500d1f24d69aa00491f82cefaab197f0d6d884174f",
+    "tested_source_sha": "UNKNOWN",
+    "workflow_run_id": "local",
+    "timestamp_utc": 1786946832.2314937,
+    "timestamp_iso": "2026-08-17T06:07:12Z"
+  },
+  "acceptance_criteria": {
+    "trials_per_domain": 100,
+    "total_paired_benchmark_trials": 600,
+    "soak_cycles_executed": 500,
+    "median_ratio_upper_bound": 1.05,
+    "p95_ratio_upper_bound": 1.05,
+    "throughput_ratio_lower_bound": 0.95,
+    "soak_growth_upper_bound": 1.05
+  },
+  "cold_start_metrics": {
+    "cold_init_duration_ms": 255.445,
+    "total_categories_indexed": 30,
+    "total_disjoint_intervals": 4099
+  },
+  "aggregate_performance_metrics": {
+    "median_ratio": 0.0124,
+    "median_ratio_95_ci": [
+      0.0103,
+      0.0151
+    ],
+    "p95_ratio": 0.035,
+    "p95_ratio_95_ci": [
+      0.0315,
+      0.0368
+    ],
+    "throughput_ratio": 52.7059,
+    "throughput_ratio_95_ci": [
+      49.6282,
+      56.3016
+    ],
+    "median_gate_passed": true,
+    "p95_gate_passed": true,
+    "throughput_gate_passed": true,
+    "all_gates_passed": true
+  },
+  "domain_performance_metrics": {
+    "integers": {
+      "cleanroom_engine": {
+        "median_us": 41.35,
+        "p95_us": 56.01,
+        "throughput_campaigns_sec": 24077.2
+      },
+      "reference_hypothesis": {
+        "median_us": 5178.5,
+        "p95_us": 6772.77,
+        "throughput_campaigns_sec": 187.5
+      },
+      "statistical_metrics": {
+        "median_ratio": 0.008,
+        "median_ratio_95_ci": [
+          0.0076,
+          0.0084
+        ],
+        "p95_ratio": 0.0083,
+        "p95_ratio_95_ci": [
+          0.0075,
+          0.0094
+        ],
+        "throughput_ratio": 128.4403,
+        "throughput_ratio_95_ci": [
+          122.3758,
+          134.7863
+        ],
+        "median_gate_passed": true,
+        "p95_gate_passed": true,
+        "throughput_gate_passed": true,
+        "all_gates_passed": true
+      },
+      "domain_gate_passed": true
+    },
+    "floats": {
+      "cleanroom_engine": {
+        "median_us": 44.95,
+        "p95_us": 59.8,
+        "throughput_campaigns_sec": 22518.0
+      },
+      "reference_hypothesis": {
+        "median_us": 4978.3,
+        "p95_us": 6307.52,
+        "throughput_campaigns_sec": 199.2
+      },
+      "statistical_metrics": {
+        "median_ratio": 0.009,
+        "median_ratio_95_ci": [
+          0.0088,
+          0.0094
+        ],
+        "p95_ratio": 0.0095,
+        "p95_ratio_95_ci": [
+          0.0088,
+          0.0105
+        ],
+        "throughput_ratio": 113.0383,
+        "throughput_ratio_95_ci": [
+          108.2482,
+          117.9289
+        ],
+        "median_gate_passed": true,
+        "p95_gate_passed": true,
+        "throughput_gate_passed": true,
+        "all_gates_passed": true
+      },
+      "domain_gate_passed": true
+    },
+    "text": {
+      "cleanroom_engine": {
+        "median_us": 106.7,
+        "p95_us": 154.23,
+        "throughput_campaigns_sec": 8888.3
+      },
+      "reference_hypothesis": {
+        "median_us": 7321.75,
+        "p95_us": 10865.5,
+        "throughput_campaigns_sec": 133.6
+      },
+      "statistical_metrics": {
+        "median_ratio": 0.0146,
+        "median_ratio_95_ci": [
+          0.0137,
+          0.0158
+        ],
+        "p95_ratio": 0.0142,
+        "p95_ratio_95_ci": [
+          0.0133,
+          0.0159
+        ],
+        "throughput_ratio": 66.5484,
+        "throughput_ratio_95_ci": [
+          63.7739,
+          69.4806
+        ],
+        "median_gate_passed": true,
+        "p95_gate_passed": true,
+        "throughput_gate_passed": true,
+        "all_gates_passed": true
+      },
+      "domain_gate_passed": true
+    },
+    "lists": {
+      "cleanroom_engine": {
+        "median_us": 143.3,
+        "p95_us": 213.45,
+        "throughput_campaigns_sec": 6667.7
+      },
+      "reference_hypothesis": {
+        "median_us": 10444.9,
+        "p95_us": 16325.17,
+        "throughput_campaigns_sec": 88.9
+      },
+      "statistical_metrics": {
+        "median_ratio": 0.0137,
+        "median_ratio_95_ci": [
+          0.012,
+          0.0148
+        ],
+        "p95_ratio": 0.0131,
+        "p95_ratio_95_ci": [
+          0.0111,
+          0.0159
+        ],
+        "throughput_ratio": 74.994,
+        "throughput_ratio_95_ci": [
+          70.778,
+          79.6408
+        ],
+        "median_gate_passed": true,
+        "p95_gate_passed": true,
+        "throughput_gate_passed": true,
+        "all_gates_passed": true
+      },
+      "domain_gate_passed": true
+    },
+    "from_regex": {
+      "cleanroom_engine": {
+        "median_us": 489.2,
+        "p95_us": 689.95,
+        "throughput_campaigns_sec": 1956.3
+      },
+      "reference_hypothesis": {
+        "median_us": 14866.65,
+        "p95_us": 21528.19,
+        "throughput_campaigns_sec": 64.6
+      },
+      "statistical_metrics": {
+        "median_ratio": 0.0329,
+        "median_ratio_95_ci": [
+          0.0304,
+          0.0368
+        ],
+        "p95_ratio": 0.032,
+        "p95_ratio_95_ci": [
+          0.029,
+          0.0361
+        ],
+        "throughput_ratio": 30.2999,
+        "throughput_ratio_95_ci": [
+          28.6688,
+          31.8304
+        ],
+        "median_gate_passed": true,
+        "p95_gate_passed": true,
+        "throughput_gate_passed": true,
+        "all_gates_passed": true
+      },
+      "domain_gate_passed": true
+    },
+    "sampled_from": {
+      "cleanroom_engine": {
+        "median_us": 53.75,
+        "p95_us": 73.97,
+        "throughput_campaigns_sec": 18964.5
+      },
+      "reference_hypothesis": {
+        "median_us": 3608.0,
+        "p95_us": 4512.32,
+        "throughput_campaigns_sec": 285.1
+      },
+      "statistical_metrics": {
+        "median_ratio": 0.0149,
+        "median_ratio_95_ci": [
+          0.0143,
+          0.0155
+        ],
+        "p95_ratio": 0.0164,
+        "p95_ratio_95_ci": [
+          0.0137,
+          0.0224
+        ],
+        "throughput_ratio": 66.5151,
+        "throughput_ratio_95_ci": [
+          62.1455,
+          70.8625
+        ],
+        "median_gate_passed": true,
+        "p95_gate_passed": true,
+        "throughput_gate_passed": true,
+        "all_gates_passed": true
+      },
+      "domain_gate_passed": true
+    }
+  },
+  "long_soak_memory": {
+    "soak_cycles_executed": 500,
+    "soak_elapsed_sec": 0.02,
+    "rss_baseline_bytes": 53055488,
+    "rss_final_bytes": 53059584,
+    "rss_growth_ratio": 1.0001,
+    "max_allowed_growth_ratio": 1.05,
+    "soak_gate_passed": true
+  },
+  "final_verdict": "PASS"
+}

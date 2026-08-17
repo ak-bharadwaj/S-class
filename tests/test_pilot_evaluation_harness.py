@@ -10,7 +10,8 @@ from benchmark.pilot.synthetic_efficacy_pilot import (
 )
 from benchmark.pilot.external_validation_protocol import (
     ExternalValidationProtocol,
-    run_external_validation_demo
+    run_external_validation_smoke,
+    MeasurementProvenance
 )
 
 
@@ -31,7 +32,7 @@ def test_synthetic_efficacy_campaign_execution(tmp_path):
     receipt = run_synthetic_efficacy_campaign(output_path=out_file, tested_sha="test_commit_sha_12345")
 
     assert os.path.exists(out_file)
-    assert receipt["milestone"] == "THESIS-GATE-1: Synthetic Efficacy Pilot (Controlled Failure Injection)"
+    assert "THESIS-GATE-1" in receipt["milestone"]
     assert receipt["observable_comparative_metrics"]["baseline_defects_escaped"] > 0
     assert receipt["observable_comparative_metrics"]["treatment_defects_escaped"] == 0
     assert receipt["observable_comparative_metrics"]["pre_gen_defects_caught_by_grounding"] > 0
@@ -42,11 +43,15 @@ def test_synthetic_efficacy_campaign_execution(tmp_path):
 
 
 def test_external_validation_protocol_execution(tmp_path):
-    out_file = str(tmp_path / "external_receipt.json")
-    summary = run_external_validation_demo(output_path=out_file, tested_sha="test_commit_sha_12345")
+    out_file = str(tmp_path / "external_protocol_receipt.json")
+    summary = run_external_validation_smoke(output_path=out_file, tested_sha="test_commit_sha_12345")
 
     assert os.path.exists(out_file)
-    assert summary["protocol_status"] == "READY_FOR_EXTERNAL_PARTICIPANTS"
-    assert summary["provenance"]["total_trials_recorded"] == 6
-    assert summary["comparative_metrics"]["sclass_treatment"]["mean_trust_score"] >= 4.0
-    assert summary["comparative_metrics"]["sclass_treatment"]["mean_usefulness_score"] >= 4.0
+    assert summary["protocol_readiness"] == "READY_FOR_EXTERNAL_PARTICIPANTS"
+    assert summary["external_evidence_status"] == "AWAITING_REAL_PARTICIPANTS"
+    assert summary["provenance"]["protocol_smoke_trials_count"] == 6
+    assert summary["provenance"]["real_participant_trials_count"] == 0
+
+    # Ensure no synthetic fake trust/usefulness scores leaked into real metrics
+    assert summary["real_participant_metrics"]["sclass_treatment"]["mean_trust_score"] is None
+    assert summary["real_participant_metrics"]["sclass_treatment"]["mean_usefulness_score"] is None
