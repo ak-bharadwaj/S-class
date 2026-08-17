@@ -12,6 +12,8 @@ from benchmark.pilot.synthetic_efficacy_pilot import (
 from benchmark.pilot.external_validation_protocol import (
     ExternalValidationProtocol,
     ParticipantSessionPlan,
+    ObserverVerificationRecord,
+    ActiveTaskContext,
     run_external_validation_smoke,
     MeasurementProvenance
 )
@@ -47,24 +49,34 @@ def test_synthetic_efficacy_campaign_execution(tmp_path):
 def test_external_validation_latin_square_counterbalancing():
     protocol = ExternalValidationProtocol()
 
-    # Generate 6 session plans covering full Latin block
     plans = [protocol.generate_participant_session_plan(f"dev_{i}", i) for i in range(6)]
-
-    # 1. Verify all 6 plans have unique task permutations or alternating condition schedules
     hashes = set(p.session_plan_hash for p in plans)
     assert len(hashes) == 6
 
-    # 2. Check balanced distribution across the block
     task_ids = [t["task_id"] for t in protocol.get_standard_task_catalog()]
     for t_id in task_ids:
         positions = [p.ordered_task_ids.index(t_id) + 1 for p in plans]
         conditions = [p.condition_schedule[t_id] for p in plans]
 
-        # Each task appears in positions 1, 2, and 3
         assert set(positions) == {1, 2, 3}
-        # Each task appears in both BASELINE and SCLASS_TREATMENT
         assert "BASELINE" in conditions
         assert "SCLASS_TREATMENT" in conditions
+
+
+def test_external_validation_block_provenance():
+    protocol = ExternalValidationProtocol()
+    plan_0 = protocol.generate_participant_session_plan("dev_0", 0)
+    plan_5 = protocol.generate_participant_session_plan("dev_5", 5)
+    plan_6 = protocol.generate_participant_session_plan("dev_6", 6)
+
+    assert plan_0.block_id == "BLOCK-01"
+    assert plan_0.participant_index_in_block == 0
+
+    assert plan_5.block_id == "BLOCK-01"
+    assert plan_5.participant_index_in_block == 5
+
+    assert plan_6.block_id == "BLOCK-02"
+    assert plan_6.participant_index_in_block == 0
 
 
 def test_external_validation_protocol_smoke_execution(tmp_path):
@@ -74,16 +86,15 @@ def test_external_validation_protocol_smoke_execution(tmp_path):
     assert os.path.exists(out_file)
     assert summary["protocol_readiness"] == "READY_FOR_EXTERNAL_PARTICIPANTS"
     assert summary["external_evidence_status"] == "AWAITING_REAL_PARTICIPANTS"
-    assert summary["provenance"]["protocol_smoke_trials_count"] == 18  # 6 devs x 3 tasks
+    assert summary["provenance"]["protocol_smoke_trials_count"] == 18
     assert summary["provenance"]["real_participant_trials_count"] == 0
     assert len(summary["session_plans"]) == 6
 
-    # Ensure no synthetic fake trust/usefulness scores leaked into real metrics
     assert summary["real_participant_metrics"]["sclass_treatment"]["mean_trust_score"] is None
     assert summary["real_participant_metrics"]["sclass_treatment"]["mean_usefulness_score"] is None
 
 
-def test_external_validation_real_participant_trial_with_human_timing_and_outcomes():
+def test_external_validation_real_participant_trial_authoritative_lifecycle():
     protocol = ExternalValidationProtocol()
     plan = protocol.generate_participant_session_plan("real_dev_01", 0)
     protocol.register_plan(plan)
@@ -91,30 +102,35 @@ def test_external_validation_real_participant_trial_with_human_timing_and_outcom
     def dummy_generator(spec):
         return lambda tokens: tokens >= 0
 
-    t_now = time.time()
-    t_start = t_now - 120.0  # 120 seconds ago
-    t_stop = t_now
+    # Step 1: Start task 1
+    active_task = protocol.start_participant_task("real_dev_01", 1)
+    assert active_task.task_order_index == 1
+    assert active_task.task_id == plan.ordered_task_ids[0]
+    assert active_task.assignment == plan.condition_schedule[active_task.task_id]
 
-    task_1 = plan.ordered_task_ids[0]
-    cond_1 = plan.condition_schedule[task_1]
+    # Observer verification
+    observer = ObserverVerificationRecord(
+        observer_id="observer_dr_smith",
+        verified_outcome="SUCCESS",
+        verification_notes=["Observed clean implementation passing all property obligations"]
+    )
 
-    trial = protocol.execute_participant_trial(
-        participant_id="real_dev_01",
-        task_id=task_1,
-        task_order_index=1,
-        assignment=cond_1,
+    # Step 2: Finish task
+    trial = protocol.finish_participant_task(
+        active_task=active_task,
         code_generator=dummy_generator,
-        human_start_epoch=t_start,
-        human_stop_epoch=t_stop,
+        observer_verification=observer,
         rework_iterations=1,
         developer_interventions=0,
-        task_outcome="SUCCESS",
         trust_score=4.5,
         usefulness_score=4.8
     )
 
     assert trial.is_real_participant is True
-    assert trial.task_completion_time_sec == pytest.approx(120.0, rel=1e-2)
+    assert trial.block_id == "BLOCK-01"
+    assert trial.observer_id == "observer_dr_smith"
+    assert trial.task_outcome == "SUCCESS"
+    assert trial.task_completion_time_sec >= 0.0
     assert trial.measurement_sources["task_completion_time_sec"] == MeasurementProvenance.INSTRUMENTED_HUMAN_TASK_TIME
     assert trial.measurement_sources["task_outcome"] == MeasurementProvenance.OBSERVER_VERIFIED
     assert trial.measurement_sources["developer_trust_score"] == MeasurementProvenance.PARTICIPANT_REPORTED
@@ -122,4 +138,46 @@ def test_external_validation_real_participant_trial_with_human_timing_and_outcom
     summary = protocol.generate_validation_summary(tested_sha="test_sha_real")
     assert summary["provenance"]["real_participant_trials_count"] == 1
     assert summary["provenance"]["real_participants_enrolled"] == 1
-    assert summary["real_participant_metrics"]["baseline" if cond_1 == "BASELINE" else "sclass_treatment"]["mean_human_completion_time_sec"] == pytest.approx(120.0, rel=1e-2)
+
+
+def test_tamper_attempt_to_execute_without_registered_plan_fails_closed():
+    protocol = ExternalValidationProtocol()
+    with pytest.raises(ValueError, match="No registered session plan found"):
+        protocol.start_participant_task("unregistered_dev", 1)
+
+
+def test_tamper_attempt_with_invalid_task_order_index_fails_closed():
+    protocol = ExternalValidationProtocol()
+    plan = protocol.generate_participant_session_plan("dev_02", 1)
+    protocol.register_plan(plan)
+
+    with pytest.raises(ValueError, match="Invalid task_order_index"):
+        protocol.start_participant_task("dev_02", 4)
+
+
+def test_tamper_attempt_with_corrupted_plan_hash_fails_closed():
+    protocol = ExternalValidationProtocol()
+    plan = protocol.generate_participant_session_plan("dev_03", 2)
+    plan.session_plan_hash = "tampered_hash_value_12345"
+
+    with pytest.raises(ValueError, match="integrity verification failed"):
+        protocol.register_plan(plan)
+
+
+def test_tamper_attempt_missing_observer_verification_fails_closed():
+    protocol = ExternalValidationProtocol()
+    plan = protocol.generate_participant_session_plan("dev_04", 3)
+    protocol.register_plan(plan)
+
+    active_task = protocol.start_participant_task("dev_04", 1)
+
+    with pytest.raises(ValueError, match="Missing or invalid ObserverVerificationRecord"):
+        protocol.finish_participant_task(
+            active_task=active_task,
+            code_generator=lambda s: (lambda x: x),
+            observer_verification=None,  # Missing observer
+            rework_iterations=0,
+            developer_interventions=0,
+            trust_score=4.0,
+            usefulness_score=4.0
+        )

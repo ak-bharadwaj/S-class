@@ -1,29 +1,20 @@
 """
 S-Class EOS V11.2 - External Developer Validation Protocol & Trial Harness.
-Provides the protocol specification, Latin-Square balanced counterbalancing across task identity,
-task order, and condition assignment, measurement provenance tracking, and data collection harness.
+Provides authoritative session plan generation, balanced Latin-Square counterbalancing,
+monotonic human task timing, observer verification enforcement, and complete provenance tracking.
 
-EXPERIMENTAL DESIGN:
-1. Target Cohort: 6–10 professional developers performing 3 tasks each (18–30 total task trials).
-2. Balanced Latin-Square / Counterbalancing:
-   - Counterbalances BOTH task order (all 3! = 6 permutations) AND condition assignment (BASELINE vs SCLASS_TREATMENT).
-   - Across any 6-participant block, each task appears in position 1, 2, and 3 exactly once per condition.
-3. Pre-Generated Session Plan:
-   - Generated BEFORE the session with participant_id, task_order, assignment per task, seed, and plan hash.
-4. Human Task Time Instrumentation:
-   - Explicitly differentiates Human Task Completion Time (start_time to stop_time) from S-Class Pipeline Time (sub-millisecond).
-5. Explicit Measurement Provenance:
-   - task_completion_time_sec       -> INSTRUMENTED_HUMAN_TASK_TIME
-   - pipeline_execution_time_sec    -> INSTRUMENTED_PIPELINE_TIME
-   - task_order_index               -> PROTOCOL_ASSIGNED
-   - assignment                     -> PROTOCOL_ASSIGNED
-   - task_outcome                   -> OBSERVER_VERIFIED (SUCCESS / FAILURE / ABANDONED)
-   - rework_iterations              -> PARTICIPANT_REPORTED
-   - developer_interventions       -> PARTICIPANT_REPORTED
-   - developer_trust_score          -> PARTICIPANT_REPORTED (1-5 Likert scale)
-   - developer_usefulness_score     -> PARTICIPANT_REPORTED (1-5 Likert scale)
-   - defects_caught_pre_gen         -> RECEIPT_DERIVED
-   - defects_caught_post_gen        -> RECEIPT_DERIVED
+CRITICAL EXPERIMENTAL CONTROLS (Fail-Closed):
+1. Authoritative Session Plan:
+   - Trials derive condition assignment strictly from the registered ParticipantSessionPlan.
+   - Caller cannot override or alter condition assignment or task ordering.
+2. Monotonic Human Task Timing:
+   - Start and stop times measured directly by runner using time.monotonic().
+   - Wall-clock timestamps preserved solely for audit logging.
+3. Observer Verification:
+   - task_outcome is verified by an authoritative ObserverVerificationRecord (OBSERVER_VERIFIED).
+4. Balanced Block Provenance:
+   - Every plan and trial explicitly records block_id (BLOCK-01..), participant_index_in_block (0..5),
+     protocol_version (1.3.0), and cryptographic session_plan_hash.
 """
 
 import os
@@ -63,8 +54,25 @@ METRIC_PROVENANCE_SCHEMA = {
     "developer_trust_score": MeasurementProvenance.PARTICIPANT_REPORTED,
     "developer_usefulness_score": MeasurementProvenance.PARTICIPANT_REPORTED,
     "defects_caught_pre_gen": MeasurementProvenance.RECEIPT_DERIVED,
-    "defects_caught_post_gen": MeasurementProvenance.RECEIPT_DERIVED
+    "defects_caught_post_gen": MeasurementProvenance.RECEIPT_DERIVED,
+    "block_id": MeasurementProvenance.PROTOCOL_ASSIGNED,
+    "participant_index_in_block": MeasurementProvenance.PROTOCOL_ASSIGNED
 }
+
+
+@dataclass
+class ObserverVerificationRecord:
+    """Authoritative observer verification of task outcome."""
+    observer_id: str
+    verified_outcome: str  # "SUCCESS" | "FAILURE" | "ABANDONED"
+    verification_notes: List[str] = field(default_factory=list)
+    verified_at_iso: str = ""
+
+    def __post_init__(self):
+        if not self.verified_at_iso:
+            self.verified_at_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        if self.verified_outcome not in ["SUCCESS", "FAILURE", "ABANDONED"]:
+            raise ValueError(f"Invalid verified_outcome: '{self.verified_outcome}'. Must be SUCCESS, FAILURE, or ABANDONED.")
 
 
 @dataclass
@@ -72,6 +80,8 @@ class ParticipantSessionPlan:
     """Pre-generated immutable session plan for a participant before trials begin."""
     participant_id: str
     session_id: str
+    block_id: str  # "BLOCK-01", "BLOCK-02", etc.
+    participant_index_in_block: int  # 0..5 in the 6-developer Latin block
     protocol_version: str
     seed: int
     ordered_task_ids: List[str]
@@ -84,6 +94,8 @@ class ParticipantSessionPlan:
             raw = json.dumps({
                 "participant_id": self.participant_id,
                 "session_id": self.session_id,
+                "block_id": self.block_id,
+                "participant_index_in_block": self.participant_index_in_block,
                 "protocol_version": self.protocol_version,
                 "seed": self.seed,
                 "ordered_task_ids": self.ordered_task_ids,
@@ -92,29 +104,62 @@ class ParticipantSessionPlan:
             }, sort_keys=True)
             self.session_plan_hash = hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
+    def verify_integrity(self) -> bool:
+        """Verifies cryptographic hash of session plan."""
+        raw = json.dumps({
+            "participant_id": self.participant_id,
+            "session_id": self.session_id,
+            "block_id": self.block_id,
+            "participant_index_in_block": self.participant_index_in_block,
+            "protocol_version": self.protocol_version,
+            "seed": self.seed,
+            "ordered_task_ids": self.ordered_task_ids,
+            "condition_schedule": self.condition_schedule,
+            "created_at_iso": self.created_at_iso
+        }, sort_keys=True)
+        expected = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+        return self.session_plan_hash == expected
+
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
+
+
+@dataclass
+class ActiveTaskContext:
+    """Context created when a participant begins a task step."""
+    participant_id: str
+    task_id: str
+    task_order_index: int
+    assignment: str
+    start_monotonic: float
+    start_wall_iso: str
+    session_plan_hash: str
 
 
 @dataclass
 class DeveloperTrialRecord:
     """Records one developer task trial outcome with strict human timing and provenance."""
     participant_id: str
+    session_id: str
+    block_id: str
+    participant_index_in_block: int
     task_id: str
     task_order_index: int  # 1, 2, or 3 in the developer's session
     assignment: str  # "BASELINE" or "SCLASS_TREATMENT"
     is_real_participant: bool  # False for protocol smoke checks, True for real human trials
     task_start_time_iso: str
     task_stop_time_iso: str
-    task_completion_time_sec: float  # Human task duration (stop - start)
+    task_completion_time_sec: float  # Measured via monotonic clock
     pipeline_execution_time_sec: float  # Sub-second S-Class pipeline time
     defects_caught_pre_gen: int
     defects_caught_post_gen: int
     rework_iterations: int
     developer_interventions: int
-    task_outcome: str = "SUCCESS"  # "SUCCESS" | "FAILURE" | "ABANDONED"
+    task_outcome: str  # "SUCCESS" | "FAILURE" | "ABANDONED"
+    observer_id: Optional[str] = None
     developer_trust_score: Optional[float] = None  # 1.0 - 5.0 (None if not participant-reported)
     developer_usefulness_score: Optional[float] = None  # 1.0 - 5.0 (None if not participant-reported)
+    session_plan_hash: str = ""
     trial_verdict: str = "SUCCESS"
     audit_notes: List[str] = field(default_factory=list)
     measurement_sources: Dict[str, str] = field(default_factory=lambda: dict(METRIC_PROVENANCE_SCHEMA))
@@ -186,7 +231,7 @@ class ExternalValidationProtocol:
         Generates a balanced Latin-Square session plan counterbalancing BOTH task order
         and condition assignment across participants.
 
-        Task order permutations (6 total):
+        6 task permutations:
         P0: (T1, T2, T3)   P1: (T1, T3, T2)   P2: (T2, T1, T3)
         P3: (T2, T3, T1)   P4: (T3, T1, T2)   P5: (T3, T2, T1)
 
@@ -206,24 +251,25 @@ class ExternalValidationProtocol:
             [t3, t2, t1],  # P5
         ]
 
-        # Select permutation based on participant index
         perm_idx = participant_index % len(task_permutations)
         ordered_tasks = task_permutations[perm_idx]
 
-        # Select condition pattern
         if participant_index % 2 == 0:
             conditions = ["BASELINE", "SCLASS_TREATMENT", "BASELINE"]
         else:
             conditions = ["SCLASS_TREATMENT", "BASELINE", "SCLASS_TREATMENT"]
 
         schedule = {task: cond for task, cond in zip(ordered_tasks, conditions)}
+        block_id = f"BLOCK-{(participant_index // 6) + 1:02d}"
         session_id = f"SESS-{participant_id}-{participant_index}"
         created_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
         return ParticipantSessionPlan(
             participant_id=participant_id,
             session_id=session_id,
-            protocol_version="1.2.0",
+            block_id=block_id,
+            participant_index_in_block=perm_idx,
+            protocol_version="1.3.0",
             seed=seed,
             ordered_task_ids=ordered_tasks,
             condition_schedule=schedule,
@@ -231,11 +277,147 @@ class ExternalValidationProtocol:
         )
 
     def register_plan(self, plan: ParticipantSessionPlan) -> None:
+        if not plan.verify_integrity():
+            raise ValueError(f"Session plan integrity verification failed for participant '{plan.participant_id}'")
         self.plans[plan.participant_id] = plan
 
     def record_trial(self, trial: DeveloperTrialRecord) -> None:
         """Records a developer trial record."""
         self.trials.append(trial)
+
+    def start_participant_task(
+        self,
+        participant_id: str,
+        task_order_index: int
+    ) -> ActiveTaskContext:
+        """
+        Authoritative Task Starter (Fail-Closed):
+        Looks up registered plan, validates order index, derives condition, and captures start monotonic time.
+        """
+        plan = self.plans.get(participant_id)
+        if plan is None:
+            raise ValueError(f"No registered session plan found for participant '{participant_id}'. Must register plan first.")
+
+        if not plan.verify_integrity():
+            raise ValueError(f"Tampered session plan detected for participant '{participant_id}'")
+
+        if task_order_index not in [1, 2, 3]:
+            raise ValueError(f"Invalid task_order_index: {task_order_index}. Must be 1, 2, or 3.")
+
+        task_id = plan.ordered_task_ids[task_order_index - 1]
+        assignment = plan.condition_schedule[task_id]
+
+        start_mono = time.monotonic()
+        start_wall_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+        return ActiveTaskContext(
+            participant_id=participant_id,
+            task_id=task_id,
+            task_order_index=task_order_index,
+            assignment=assignment,
+            start_monotonic=start_mono,
+            start_wall_iso=start_wall_iso,
+            session_plan_hash=plan.session_plan_hash
+        )
+
+    def finish_participant_task(
+        self,
+        active_task: ActiveTaskContext,
+        code_generator: Callable[[Any], Any],
+        observer_verification: ObserverVerificationRecord,
+        rework_iterations: int,
+        developer_interventions: int,
+        trust_score: float,
+        usefulness_score: float
+    ) -> DeveloperTrialRecord:
+        """
+        Authoritative Task Finisher (Fail-Closed):
+        Measures monotonic duration, enforces observer outcome, executes assigned condition, and emits trial record.
+        """
+        stop_mono = time.monotonic()
+        stop_wall_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+        if stop_mono < active_task.start_monotonic:
+            raise ValueError("Non-monotonic timestamp anomaly detected")
+
+        plan = self.plans.get(active_task.participant_id)
+        if plan is None or plan.session_plan_hash != active_task.session_plan_hash:
+            raise ValueError("Session plan hash mismatch or plan unregistered during active task execution")
+
+        if not isinstance(observer_verification, ObserverVerificationRecord):
+            raise ValueError("Missing or invalid ObserverVerificationRecord. Observer verification is mandatory for real trials.")
+
+        task = next((t for t in self.get_standard_task_catalog() if t["task_id"] == active_task.task_id), None)
+        if task is None:
+            raise ValueError(f"Unknown task_id: {active_task.task_id}")
+
+        human_duration_sec = round(stop_mono - active_task.start_monotonic, 3)
+        t0_pipe = time.perf_counter()
+
+        if active_task.assignment == "BASELINE":
+            target = code_generator(None)
+            pipeline_duration = round(time.perf_counter() - t0_pipe, 4)
+            trial = DeveloperTrialRecord(
+                participant_id=active_task.participant_id,
+                session_id=plan.session_id,
+                block_id=plan.block_id,
+                participant_index_in_block=plan.participant_index_in_block,
+                task_id=active_task.task_id,
+                task_order_index=active_task.task_order_index,
+                assignment="BASELINE",
+                is_real_participant=True,
+                task_start_time_iso=active_task.start_wall_iso,
+                task_stop_time_iso=stop_wall_iso,
+                task_completion_time_sec=human_duration_sec,
+                pipeline_execution_time_sec=pipeline_duration,
+                defects_caught_pre_gen=0,
+                defects_caught_post_gen=0,
+                rework_iterations=rework_iterations,
+                developer_interventions=developer_interventions,
+                task_outcome=observer_verification.verified_outcome,
+                observer_id=observer_verification.observer_id,
+                developer_trust_score=trust_score,
+                developer_usefulness_score=usefulness_score,
+                session_plan_hash=plan.session_plan_hash,
+                trial_verdict="SUCCESS" if observer_verification.verified_outcome == "SUCCESS" else "FAILED_OR_ABANDONED",
+                audit_notes=["Real participant trial - Baseline condition", f"Observer: {observer_verification.observer_id}"]
+            )
+        else:
+            target, receipt = self.pipeline.execute_governed_cycle(
+                request_text=task["description"],
+                code_generator=code_generator,
+                custom_obligations=task["obligations"]
+            )
+            pipeline_duration = round(time.perf_counter() - t0_pipe, 4)
+            verdict = "SUCCESS" if (receipt.verdict == "PASS" and observer_verification.verified_outcome == "SUCCESS") else "BLOCKED_OR_FAILED"
+            trial = DeveloperTrialRecord(
+                participant_id=active_task.participant_id,
+                session_id=plan.session_id,
+                block_id=plan.block_id,
+                participant_index_in_block=plan.participant_index_in_block,
+                task_id=active_task.task_id,
+                task_order_index=active_task.task_order_index,
+                assignment="SCLASS_TREATMENT",
+                is_real_participant=True,
+                task_start_time_iso=active_task.start_wall_iso,
+                task_stop_time_iso=stop_wall_iso,
+                task_completion_time_sec=human_duration_sec,
+                pipeline_execution_time_sec=pipeline_duration,
+                defects_caught_pre_gen=0 if receipt.pre_gen_grounded else 1,
+                defects_caught_post_gen=receipt.obligations_failed,
+                rework_iterations=rework_iterations,
+                developer_interventions=developer_interventions,
+                task_outcome=observer_verification.verified_outcome,
+                observer_id=observer_verification.observer_id,
+                developer_trust_score=trust_score,
+                developer_usefulness_score=usefulness_score,
+                session_plan_hash=plan.session_plan_hash,
+                trial_verdict=verdict,
+                audit_notes=receipt.blocking_reasons or ["Real participant trial - S-Class Treatment", f"Observer: {observer_verification.observer_id}"]
+            )
+
+        self.trials.append(trial)
+        return trial
 
     def execute_protocol_smoke_trial(
         self,
@@ -262,6 +444,9 @@ class ExternalValidationProtocol:
             t_stop_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             return DeveloperTrialRecord(
                 participant_id=participant_id,
+                session_id=f"SMOKE-SESS-{participant_id}",
+                block_id="SMOKE-BLOCK",
+                participant_index_in_block=0,
                 task_id=task_id,
                 task_order_index=task_order_index,
                 assignment="BASELINE",
@@ -291,6 +476,9 @@ class ExternalValidationProtocol:
             verdict = "SUCCESS" if receipt.verdict == "PASS" else "BLOCKED_WITH_REASON"
             return DeveloperTrialRecord(
                 participant_id=participant_id,
+                session_id=f"SMOKE-SESS-{participant_id}",
+                block_id="SMOKE-BLOCK",
+                participant_index_in_block=0,
                 task_id=task_id,
                 task_order_index=task_order_index,
                 assignment="SCLASS_TREATMENT",
@@ -310,93 +498,6 @@ class ExternalValidationProtocol:
                 audit_notes=receipt.blocking_reasons or ["Protocol smoke simulation - Governed Pass"]
             )
 
-    def execute_participant_trial(
-        self,
-        participant_id: str,
-        task_id: str,
-        task_order_index: int,
-        assignment: str,
-        code_generator: Callable[[Any], Any],
-        human_start_epoch: float,
-        human_stop_epoch: float,
-        rework_iterations: int,
-        developer_interventions: int,
-        task_outcome: str,
-        trust_score: float,
-        usefulness_score: float
-    ) -> DeveloperTrialRecord:
-        """
-        Experimental Participant Mode:
-        1. Executes ONLY the assigned condition from the participant session plan.
-        2. Measures exact human task duration (human_stop_epoch - human_start_epoch).
-        3. Measures internal S-Class pipeline latency separately.
-        4. Records verified task outcome (SUCCESS / FAILURE / ABANDONED) and genuine Likert scores.
-        """
-        task = next((t for t in self.get_standard_task_catalog() if t["task_id"] == task_id), None)
-        if task is None:
-            raise ValueError(f"Unknown task_id: {task_id}")
-
-        human_duration_sec = round(max(0.0, human_stop_epoch - human_start_epoch), 3)
-        start_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(human_start_epoch))
-        stop_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(human_stop_epoch))
-
-        t0_pipe = time.perf_counter()
-
-        if assignment == "BASELINE":
-            target = code_generator(None)
-            pipeline_duration = round(time.perf_counter() - t0_pipe, 4)
-            trial = DeveloperTrialRecord(
-                participant_id=participant_id,
-                task_id=task_id,
-                task_order_index=task_order_index,
-                assignment="BASELINE",
-                is_real_participant=True,
-                task_start_time_iso=start_iso,
-                task_stop_time_iso=stop_iso,
-                task_completion_time_sec=human_duration_sec,
-                pipeline_execution_time_sec=pipeline_duration,
-                defects_caught_pre_gen=0,
-                defects_caught_post_gen=0,
-                rework_iterations=rework_iterations,
-                developer_interventions=developer_interventions,
-                task_outcome=task_outcome,
-                developer_trust_score=trust_score,
-                developer_usefulness_score=usefulness_score,
-                trial_verdict="SUCCESS" if task_outcome == "SUCCESS" else "FAILED_OR_ABANDONED",
-                audit_notes=["Real participant trial - Baseline condition"]
-            )
-        else:
-            target, receipt = self.pipeline.execute_governed_cycle(
-                request_text=task["description"],
-                code_generator=code_generator,
-                custom_obligations=task["obligations"]
-            )
-            pipeline_duration = round(time.perf_counter() - t0_pipe, 4)
-            verdict = "SUCCESS" if (receipt.verdict == "PASS" and task_outcome == "SUCCESS") else "BLOCKED_OR_FAILED"
-            trial = DeveloperTrialRecord(
-                participant_id=participant_id,
-                task_id=task_id,
-                task_order_index=task_order_index,
-                assignment="SCLASS_TREATMENT",
-                is_real_participant=True,
-                task_start_time_iso=start_iso,
-                task_stop_time_iso=stop_iso,
-                task_completion_time_sec=human_duration_sec,
-                pipeline_execution_time_sec=pipeline_duration,
-                defects_caught_pre_gen=0 if receipt.pre_gen_grounded else 1,
-                defects_caught_post_gen=receipt.obligations_failed,
-                rework_iterations=rework_iterations,
-                developer_interventions=developer_interventions,
-                task_outcome=task_outcome,
-                developer_trust_score=trust_score,
-                developer_usefulness_score=usefulness_score,
-                trial_verdict=verdict,
-                audit_notes=receipt.blocking_reasons or ["Real participant trial - S-Class Treatment"]
-            )
-
-        self.record_trial(trial)
-        return trial
-
     def generate_validation_summary(self, tested_sha: Optional[str] = None) -> Dict[str, Any]:
         """Aggregates recorded trials into paired statistical metrics and outcome breakdowns."""
         commit_sha = tested_sha or os.environ.get("GITHUB_SHA", "UNKNOWN")
@@ -412,7 +513,6 @@ class ExternalValidationProtocol:
         real_trust_scores = [t.developer_trust_score for t in real_treatment if t.developer_trust_score is not None]
         real_usefulness_scores = [t.developer_usefulness_score for t in real_treatment if t.developer_usefulness_score is not None]
 
-        # Count outcomes
         baseline_outcomes = {
             "success": sum(1 for t in real_baseline if t.task_outcome == "SUCCESS"),
             "failure": sum(1 for t in real_baseline if t.task_outcome == "FAILURE"),
@@ -424,12 +524,11 @@ class ExternalValidationProtocol:
             "abandoned": sum(1 for t in real_treatment if t.task_outcome == "ABANDONED")
         }
 
-        # Status: Real evidence is sufficient once at least 6 developers complete all 3 tasks (>= 18 trials)
         has_sufficient_evidence = (len(set(t.participant_id for t in real_trials)) >= 6 and len(real_trials) >= 18)
 
         return {
             "protocol_id": f"EXTERNAL-VALIDATION-PROTOCOL-{commit_sha[:12].upper()}",
-            "schema_version": "1.2.0",
+            "schema_version": "1.3.0",
             "milestone": "THESIS-GATE-1B: External Developer Validation Protocol",
             "protocol_design": {
                 "study_design": "Balanced Latin-Square counterbalanced crossover across 3 tasks and 2 conditions",
@@ -498,13 +597,11 @@ def run_external_validation_smoke(output_path: Optional[str] = None, tested_sha:
         "TASK-03-IDEMPOTENT-CACHE": gen_cache
     }
 
-    # Generate session plans for 6 simulated smoke developers (one full 6-participant Latin block)
     for dev_idx in range(6):
         dev_id = f"smoke_dev_{dev_idx+1}"
         plan = protocol.generate_participant_session_plan(dev_id, dev_idx)
         protocol.register_plan(plan)
 
-        # Execute trials according to plan
         for order_idx, task_id in enumerate(plan.ordered_task_ids, start=1):
             cond = plan.condition_schedule[task_id]
             gen = generators[task_id]
@@ -518,17 +615,16 @@ def run_external_validation_smoke(output_path: Optional[str] = None, tested_sha:
 
     print(f"External Validation Protocol Specification written to {out_file}.")
     print(f"Protocol Readiness: {summary['protocol_readiness']}. External Evidence Status: {summary['external_evidence_status']}.")
-    print(f"Latin-Square Session Plans Registered: {len(protocol.plans)}.")
+    print(f"Latin-Square Session Plans Registered: {len(protocol.plans)} across Block {summary['session_plans'][0]['block_id']}.")
     return summary
 
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="External Validation Protocol Runner")
-    parser.add_argument("--mode", type=str, choices=["smoke", "plan", "trial"], default="smoke", help="Execution mode")
+    parser.add_argument("--mode", type=str, choices=["smoke", "plan"], default="smoke", help="Execution mode")
     parser.add_argument("--participant", type=str, default="dev_01", help="Participant ID")
     parser.add_argument("--participant-index", type=int, default=0, help="Participant index in cohort (0-9)")
-    parser.add_argument("--task-order", type=int, default=1, choices=[1, 2, 3], help="Task order index in session (1, 2, 3)")
     parser.add_argument("--output", type=str, default=None, help="Output JSON receipt path")
     parser.add_argument("--sha", type=str, default=None, help="Tested Git commit SHA")
     args = parser.parse_args()
@@ -538,12 +634,3 @@ if __name__ == "__main__":
     elif args.mode == "plan":
         plan = ExternalValidationProtocol.generate_participant_session_plan(args.participant, args.participant_index)
         print(json.dumps(plan.to_dict(), indent=2))
-    else:
-        plan = ExternalValidationProtocol.generate_participant_session_plan(args.participant, args.participant_index)
-        task_id = plan.ordered_task_ids[args.task_order - 1]
-        condition = plan.condition_schedule[task_id]
-        print(f"=== S-CLASS TRIAL STEP ===")
-        print(f"Participant: {args.participant}")
-        print(f"Task: {task_id} (Order #{args.task_order})")
-        print(f"Assigned Condition: {condition}")
-        print(f"Session Hash: {plan.session_plan_hash}")
