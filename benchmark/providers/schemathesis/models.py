@@ -1,11 +1,12 @@
 """
 S-Class EOS V11.2 - Schemathesis Provider Models & D0 Evidence Contract.
-Defines the native S-Class data contracts, worker invocation/output envelopes,
-and authenticity-bound multi-layer hash chains.
+Defines native S-Class data contracts, worker invocation/output envelopes with keyed HMAC authentication,
+and multi-layer verifiable hash chains.
 Zero external Schemathesis types escape this module.
 """
 
 import json
+import hmac
 import hashlib
 from enum import Enum
 from dataclasses import dataclass, field, asdict
@@ -56,11 +57,12 @@ class ExecutionStats:
 @dataclass
 class WorkerInvocationEnvelope:
     """
-    Authenticity-bound envelope sent from parent runner to isolated child worker.
-    Binds execution identity, nonce challenge, source SHA, and target config.
+    Keyed authenticity-bound envelope sent from parent runner to isolated child worker.
+    Binds execution identity, nonce challenge, parent secret, source SHA, and target config.
     """
     execution_id: str
     parent_nonce: str
+    execution_secret: str
     source_sha: str
     provider_version: str
     target_identifier: str
@@ -102,8 +104,8 @@ class WorkerInvocationEnvelope:
 @dataclass
 class WorkerOutputEnvelope:
     """
-    Authenticity-bound envelope emitted from child worker to parent runner.
-    Contains cryptographic proof of execution matching the parent's nonce.
+    Keyed authenticity-bound envelope emitted from child worker to parent runner.
+    Contains cryptographic proof of execution signed using the parent's secret via HMAC-SHA256.
     """
     execution_id: str
     parent_nonce: str
@@ -115,6 +117,7 @@ class WorkerOutputEnvelope:
     diagnostics: List[Dict[str, Any]] = field(default_factory=list)
     summary: str = ""
     worker_digest: str = ""
+    worker_hmac: str = ""
 
     def __post_init__(self):
         if not self.worker_digest:
@@ -135,6 +138,21 @@ class WorkerOutputEnvelope:
         raw = json.dumps(payload, sort_keys=True, default=str)
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
+    def compute_worker_hmac(self, secret: str) -> str:
+        payload = {
+            "execution_id": self.execution_id,
+            "parent_nonce": self.parent_nonce,
+            "worker_pid": self.worker_pid,
+            "status": self.status,
+            "exit_code": self.exit_code,
+            "violations": self.violations,
+            "stats": self.stats,
+            "diagnostics": self.diagnostics,
+            "summary": self.summary
+        }
+        raw = json.dumps(payload, sort_keys=True, default=str)
+        return hmac.new(secret.encode("utf-8"), raw.encode("utf-8"), hashlib.sha256).hexdigest()
+
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
@@ -144,7 +162,7 @@ class ProviderExecutionResult:
     """
     S-Class Native Evidence Contract for API Contract Provider Execution (D0 Specification).
     No Schemathesis-specific objects are allowed within this structure.
-    Immutably links input_digest, worker_digest, and provenance_hash.
+    Immutably links input_digest, worker_hmac, and provenance_hash.
     """
     execution_id: str
     provider_version: str
@@ -162,6 +180,7 @@ class ProviderExecutionResult:
     execution_nonce: str = ""
     input_digest: str = ""
     worker_digest: str = ""
+    worker_hmac: str = ""
     violations: List[ContractViolation] = field(default_factory=list)
     stats: ExecutionStats = field(default_factory=ExecutionStats)
     diagnostics: List[Dict[str, Any]] = field(default_factory=list)
@@ -187,6 +206,7 @@ class ProviderExecutionResult:
             "config_hash": self.config_hash,
             "input_digest": self.input_digest,
             "worker_digest": self.worker_digest,
+            "worker_hmac": self.worker_hmac,
             "status": self.status.value,
             "exit_code": self.exit_code,
             "start_time_iso": self.start_time_iso,
@@ -217,6 +237,7 @@ class ProviderExecutionResult:
             "config_hash": self.config_hash,
             "input_digest": self.input_digest,
             "worker_digest": self.worker_digest,
+            "worker_hmac": self.worker_hmac,
             "status": self.status.value,
             "passed": self.passed,
             "exit_code": self.exit_code,

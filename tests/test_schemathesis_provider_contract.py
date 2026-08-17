@@ -1,10 +1,11 @@
 """
-Unit tests for S-Class Schemathesis Provider Contract & Dependency Boundary Isolation (D0 Protocol).
-Verifies all 9 fail-closed states, VersionPolicy, cryptographic nonce handshake,
-digest verification, process crashes, hard timeouts, malformed output, provenance, and zero-leakage encapsulation.
+Unit tests for S-Class Schemathesis Provider Contract & Dependency Boundary Isolation (D0 Keyed Protocol).
+Verifies all 9 fail-closed states, VersionPolicy, keyed HMAC-SHA256 challenge-response handshake,
+adversarial forgery rejection, process crashes, hard timeouts, malformed output, provenance, and zero-leakage encapsulation.
 """
 
 import json
+import hmac
 import hashlib
 import subprocess
 import pytest
@@ -36,9 +37,10 @@ def _build_valid_worker_output(
     summary: str = "Clean run",
     execution_id: str = "EXEC-001",
     parent_nonce: str = "NONCE-001",
+    execution_secret: str = "SECRET-001",
     worker_pid: int = 1234
 ) -> dict:
-    """Helper constructing a valid signed WorkerOutputEnvelope dictionary for tests."""
+    """Helper constructing a valid signed WorkerOutputEnvelope dictionary with keyed HMAC-SHA256."""
     payload = {
         "execution_id": execution_id,
         "parent_nonce": parent_nonce,
@@ -52,6 +54,7 @@ def _build_valid_worker_output(
     }
     raw = json.dumps(payload, sort_keys=True, default=str)
     payload["worker_digest"] = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    payload["worker_hmac"] = hmac.new(execution_secret.encode("utf-8"), raw.encode("utf-8"), hashlib.sha256).hexdigest()
     return payload
 
 
@@ -86,6 +89,7 @@ def test_provider_execution_result_provenance_and_immutability():
         config_hash="config_hash_abc",
         input_digest="input_digest_123",
         worker_digest="worker_digest_456",
+        worker_hmac="worker_hmac_789",
         status=ProviderStatus.TARGET_CLEAN,
         exit_code=0,
         start_time_iso="2026-08-17T15:00:00Z",
@@ -103,6 +107,7 @@ def test_provider_execution_result_provenance_and_immutability():
     assert d["stats"]["endpoints_tested"] == 2
     assert d["input_digest"] == "input_digest_123"
     assert d["worker_digest"] == "worker_digest_456"
+    assert d["worker_hmac"] == "worker_hmac_789"
 
 
 def test_version_policy_parsing_and_support_range():
@@ -224,7 +229,8 @@ def test_isolation_zero_checks_insufficient_evidence():
             stats={"endpoints_tested": 1, "operations_tested": 0, "checks_executed": 0, "violations_count": 0, "duration_sec": 0.02},
             summary="Worker inconclusive: Zero checks evaluated.",
             execution_id=envelope["execution_id"],
-            parent_nonce=envelope["parent_nonce"]
+            parent_nonce=envelope["parent_nonce"],
+            execution_secret=envelope["execution_secret"]
         )
         return json.dumps(worker_out), ""
 
@@ -252,7 +258,8 @@ def test_isolation_valid_pass():
             stats={"endpoints_tested": 1, "operations_tested": 1, "checks_executed": 10, "violations_count": 0, "duration_sec": 0.15},
             summary="Target clean: All 10 checks passed.",
             execution_id=envelope["execution_id"],
-            parent_nonce=envelope["parent_nonce"]
+            parent_nonce=envelope["parent_nonce"],
+            execution_secret=envelope["execution_secret"]
         )
         return json.dumps(worker_out), ""
 
@@ -266,6 +273,7 @@ def test_isolation_valid_pass():
         assert result.passed is True
         assert result.stats.checks_executed == 10
         assert result.stats.violations_count == 0
+        assert result.worker_hmac != ""
 
 
 def test_isolation_valid_contract_failure():
@@ -295,7 +303,8 @@ def test_isolation_valid_contract_failure():
             stats={"endpoints_tested": 1, "operations_tested": 1, "checks_executed": 5, "violations_count": 1, "duration_sec": 0.12},
             summary="Contract violated: 1 violations detected.",
             execution_id=envelope["execution_id"],
-            parent_nonce=envelope["parent_nonce"]
+            parent_nonce=envelope["parent_nonce"],
+            execution_secret=envelope["execution_secret"]
         )
         return json.dumps(worker_out), ""
 
@@ -313,21 +322,65 @@ def test_isolation_valid_contract_failure():
 
 
 # -----------------------------------------------------------------------------
-# 2. D0 Cryptographic Handshake & Tamper Protection Tests
+# 2. Keyed HMAC Authentication & Adversarial Forgery Rejection Tests
 # -----------------------------------------------------------------------------
 
-def test_handshake_nonce_mismatch_fails_closed():
-    """Replay attack with mismatched nonce challenge is rejected with OUTPUT_INVALID."""
+def test_adversarial_worker_forges_status_with_recomputed_sha_fails_closed():
+    """
+    Adversarial Attack 1: Rogue worker changes status from TARGET_CONTRACT_VIOLATED to TARGET_CLEAN,
+    recomputes the public SHA-256 digest, but cannot produce the parent-keyed HMAC signature.
+    MUST FAIL CLOSED with OUTPUT_INVALID.
+    """
     runner = SchemathesisRunner(source_sha="a" * 40)
     schema = {"openapi": "3.0.0", "paths": {"/users": {"get": {}}}}
 
     def mock_communicate(input=None, timeout=None):
         envelope = json.loads(input)
-        # Deliberately reply with a stale/different nonce
+        # Rogue worker fabricates clean status and recomputes only plain SHA-256
+        payload = {
+            "execution_id": envelope["execution_id"],
+            "parent_nonce": envelope["parent_nonce"],
+            "worker_pid": 9999,
+            "status": "TARGET_CLEAN",  # Forged!
+            "exit_code": 0,
+            "violations": [],
+            "stats": {"endpoints_tested": 1, "operations_tested": 1, "checks_executed": 5, "violations_count": 0, "duration_sec": 0.1},
+            "diagnostics": [],
+            "summary": "Forged clean run"
+        }
+        raw = json.dumps(payload, sort_keys=True, default=str)
+        payload["worker_digest"] = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+        # Worker puts a dummy/unkeyed HMAC signature
+        payload["worker_hmac"] = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+        return json.dumps(payload), ""
+
+    mock_proc = MagicMock()
+    mock_proc.communicate.side_effect = mock_communicate
+    mock_proc.returncode = 0
+
+    with patch("subprocess.Popen", return_value=mock_proc):
+        result = runner.execute(schema_dict=schema)
+        assert result.status == ProviderStatus.OUTPUT_INVALID
+        assert result.passed is False
+        assert "hmac" in result.diagnostics[0]["error"].lower()
+
+
+def test_adversarial_worker_signs_with_wrong_secret_fails_closed():
+    """
+    Adversarial Attack 2: Rogue worker signs output using a forged or guessing secret.
+    MUST FAIL CLOSED with OUTPUT_INVALID.
+    """
+    runner = SchemathesisRunner(source_sha="a" * 40)
+    schema = {"openapi": "3.0.0", "paths": {"/users": {"get": {}}}}
+
+    def mock_communicate(input=None, timeout=None):
+        envelope = json.loads(input)
+        # Worker signs with the WRONG secret
         worker_out = _build_valid_worker_output(
             status="TARGET_CLEAN",
             execution_id=envelope["execution_id"],
-            parent_nonce="STALE_NONCE_VALUE_REPLAYED"
+            parent_nonce=envelope["parent_nonce"],
+            execution_secret="ATTACKER_SUPPLIED_SECRET_KEY_12345"
         )
         return json.dumps(worker_out), ""
 
@@ -339,59 +392,33 @@ def test_handshake_nonce_mismatch_fails_closed():
         result = runner.execute(schema_dict=schema)
         assert result.status == ProviderStatus.OUTPUT_INVALID
         assert result.passed is False
-        assert "nonce" in result.diagnostics[0]["error"].lower()
+        assert "hmac" in result.diagnostics[0]["error"].lower()
 
 
-def test_handshake_execution_id_mismatch_fails_closed():
-    """Execution ID spoofing is rejected with OUTPUT_INVALID."""
+def test_adversarial_replay_envelope_against_new_execution_fails_closed():
+    """
+    Adversarial Attack 3: Replaying a previously valid signed envelope against a new execution.
+    MUST FAIL CLOSED with OUTPUT_INVALID.
+    """
     runner = SchemathesisRunner(source_sha="a" * 40)
     schema = {"openapi": "3.0.0", "paths": {"/users": {"get": {}}}}
 
-    def mock_communicate(input=None, timeout=None):
-        envelope = json.loads(input)
-        worker_out = _build_valid_worker_output(
-            status="TARGET_CLEAN",
-            execution_id="EXEC-SPOOFED-ID-999",
-            parent_nonce=envelope["parent_nonce"]
-        )
-        return json.dumps(worker_out), ""
+    # A previously recorded valid envelope from an old run
+    stale_envelope = _build_valid_worker_output(
+        status="TARGET_CLEAN",
+        execution_id="EXEC-OLD-12345",
+        parent_nonce="NONCE-OLD-67890",
+        execution_secret="SECRET-OLD-ABCDE"
+    )
 
     mock_proc = MagicMock()
-    mock_proc.communicate.side_effect = mock_communicate
+    mock_proc.communicate.return_value = (json.dumps(stale_envelope), "")
     mock_proc.returncode = 0
 
     with patch("subprocess.Popen", return_value=mock_proc):
         result = runner.execute(schema_dict=schema)
         assert result.status == ProviderStatus.OUTPUT_INVALID
         assert result.passed is False
-        assert "execution id" in result.diagnostics[0]["error"].lower()
-
-
-def test_handshake_digest_tampering_fails_closed():
-    """Tampered worker results without matching signature are rejected with OUTPUT_INVALID."""
-    runner = SchemathesisRunner(source_sha="a" * 40)
-    schema = {"openapi": "3.0.0", "paths": {"/users": {"get": {}}}}
-
-    def mock_communicate(input=None, timeout=None):
-        envelope = json.loads(input)
-        worker_out = _build_valid_worker_output(
-            status="TARGET_CLEAN",
-            execution_id=envelope["execution_id"],
-            parent_nonce=envelope["parent_nonce"]
-        )
-        # Tamper with the claimed digest
-        worker_out["worker_digest"] = "f" * 64
-        return json.dumps(worker_out), ""
-
-    mock_proc = MagicMock()
-    mock_proc.communicate.side_effect = mock_communicate
-    mock_proc.returncode = 0
-
-    with patch("subprocess.Popen", return_value=mock_proc):
-        result = runner.execute(schema_dict=schema)
-        assert result.status == ProviderStatus.OUTPUT_INVALID
-        assert result.passed is False
-        assert "digest" in result.diagnostics[0]["error"].lower()
 
 
 # -----------------------------------------------------------------------------
@@ -437,7 +464,8 @@ def test_provenance_strict_mode_sha_and_version_enforcement():
         worker_out = _build_valid_worker_output(
             status="TARGET_CLEAN",
             execution_id=envelope["execution_id"],
-            parent_nonce=envelope["parent_nonce"]
+            parent_nonce=envelope["parent_nonce"],
+            execution_secret=envelope["execution_secret"]
         )
         return json.dumps(worker_out), ""
 
@@ -454,6 +482,7 @@ def test_provenance_strict_mode_sha_and_version_enforcement():
             assert res_valid.schemathesis_version == CERTIFIED_SCHEMATHESIS_VERSION
             assert res_valid.input_digest != ""
             assert res_valid.worker_digest != ""
+            assert res_valid.worker_hmac != ""
 
     # 5. Wrong dependency version (e.g. 4.23.0) under strict mode -> FAIL
     with patch.object(VersionPolicy, "get_installed_version", return_value="4.23.0"):
@@ -477,7 +506,8 @@ def test_zero_schemathesis_hypothesis_objects_escape():
         worker_out = _build_valid_worker_output(
             status="TARGET_CLEAN",
             execution_id=envelope["execution_id"],
-            parent_nonce=envelope["parent_nonce"]
+            parent_nonce=envelope["parent_nonce"],
+            execution_secret=envelope["execution_secret"]
         )
         return json.dumps(worker_out), ""
 

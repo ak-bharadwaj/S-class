@@ -1,7 +1,7 @@
 """
-S-Class EOS V11.2 - Schemathesis Gate 3 Certification Harness (D0 Specification).
+S-Class EOS V11.2 - Schemathesis Gate 3 Certification Harness (D0 Keyed Specification).
 Executes the authoritative 5-scenario integration corpus and adversarial boundary matrix
-under the D0 cryptographic envelope handshake protocol and emits the immutable Gate 3 Certificate.
+under the D0 keyed HMAC challenge-response handshake protocol and emits the immutable Gate 3 Certificate.
 """
 
 import os
@@ -149,7 +149,7 @@ def run_schemathesis_gate_3_certification(output_path: str = "benchmark/parity/g
     certificate_data = {
         "gate": "PARITY-GATE-3",
         "title": "OSS Parity Gate 3 - Schemathesis Provider Independence Certification",
-        "contract_spec": "D0",
+        "contract_spec": "D0_KEYED_HMAC",
         "certified_subsystem": "benchmark/providers/schemathesis",
         "verdict": "PASS",
         "source_sha": source_sha,
@@ -168,6 +168,7 @@ def run_schemathesis_gate_3_certification(output_path: str = "benchmark/parity/g
                 "config_hash": res_clean.config_hash,
                 "input_digest": res_clean.input_digest,
                 "worker_digest": res_clean.worker_digest,
+                "worker_hmac": res_clean.worker_hmac,
                 "provenance_hash": res_clean.provenance_hash
             },
             "schema_violation": {
@@ -178,6 +179,7 @@ def run_schemathesis_gate_3_certification(output_path: str = "benchmark/parity/g
                 "config_hash": res_violation.config_hash,
                 "input_digest": res_violation.input_digest,
                 "worker_digest": res_violation.worker_digest,
+                "worker_hmac": res_violation.worker_hmac,
                 "provenance_hash": res_violation.provenance_hash
             },
             "server_error_5xx": {
@@ -188,6 +190,7 @@ def run_schemathesis_gate_3_certification(output_path: str = "benchmark/parity/g
                 "config_hash": res_server_error.config_hash,
                 "input_digest": res_server_error.input_digest,
                 "worker_digest": res_server_error.worker_digest,
+                "worker_hmac": res_server_error.worker_hmac,
                 "provenance_hash": res_server_error.provenance_hash
             },
             "malformed_schema": {
@@ -197,6 +200,7 @@ def run_schemathesis_gate_3_certification(output_path: str = "benchmark/parity/g
                 "config_hash": res_malformed.config_hash,
                 "input_digest": res_malformed.input_digest,
                 "worker_digest": res_malformed.worker_digest,
+                "worker_hmac": res_malformed.worker_hmac,
                 "provenance_hash": res_malformed.provenance_hash
             },
             "unreachable_target": {
@@ -206,6 +210,7 @@ def run_schemathesis_gate_3_certification(output_path: str = "benchmark/parity/g
                 "config_hash": res_unreachable.config_hash,
                 "input_digest": res_unreachable.input_digest,
                 "worker_digest": res_unreachable.worker_digest,
+                "worker_hmac": res_unreachable.worker_hmac,
                 "provenance_hash": res_unreachable.provenance_hash
             }
         },
@@ -214,11 +219,14 @@ def run_schemathesis_gate_3_certification(output_path: str = "benchmark/parity/g
             "unknown_sha_fail_closed": "PASS",
             "strict_version_pinning": "PASS",
             "process_isolation_verified": "PASS",
-            "cryptographic_handshake_verified": "PASS",
+            "cryptographic_nonce_handshake_verified": "PASS",
+            "keyed_hmac_authentication_verified": "PASS",
+            "forged_status_rejection_verified": "PASS",
             "digest_chain_verified": "PASS",
             "zero_object_leakage": "PASS"
         },
-        "zero_object_leakage_verified": True
+        "zero_object_leakage_verified": True,
+        "keyed_hmac_authentication_verified": True
     }
 
     # Compute overall certificate provenance hash

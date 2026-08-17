@@ -1,7 +1,7 @@
 """
 S-Class EOS V11.2 - Process-Isolated Schemathesis Provider Runner (D0 Protocol).
-Executes Schemathesis inside an isolated subprocess with cryptographic challenge-response handshake,
-hard process termination on timeout, source revision binding, and multi-layer hash chains.
+Executes Schemathesis inside an isolated subprocess with keyed HMAC-SHA256 challenge-response handshake,
+hard process termination on timeout, source revision binding, and multi-layer verifiable hash chains.
 Zero external tool or Hypothesis objects cross the process boundary into S-Class memory.
 """
 
@@ -10,6 +10,7 @@ import sys
 import time
 import json
 import uuid
+import hmac
 import secrets
 import hashlib
 import subprocess
@@ -43,7 +44,6 @@ class SchemathesisRunner:
         """Validates that a source SHA is well-formed and matches authoritative repository state."""
         if not sha or sha == "UNKNOWN" or len(sha) != 40:
             return False
-        # Must be valid hex
         try:
             int(sha, 16)
         except ValueError:
@@ -62,11 +62,12 @@ class SchemathesisRunner:
     ) -> ProviderExecutionResult:
         """
         Executes API contract verification inside an isolated child subprocess under D0 contract.
-        Performs cryptographic nonce handshake and multi-layer digest chain verification.
-        Fail-Closed Invariant: Any anomaly, crash, timeout, replay, or missing provenance fails closed.
+        Performs keyed HMAC-SHA256 challenge-response handshake and digest chain verification.
+        Fail-Closed Invariant: Any anomaly, crash, timeout, replay, forged signature, or missing provenance fails closed.
         """
         execution_id = f"EXEC-ST-{time.strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:12].upper()}"
         parent_nonce = secrets.token_hex(32)
+        execution_secret = secrets.token_hex(32)
         t_start_mono = time.monotonic()
         start_time_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
@@ -96,6 +97,7 @@ class SchemathesisRunner:
         invocation_envelope = WorkerInvocationEnvelope(
             execution_id=execution_id,
             parent_nonce=parent_nonce,
+            execution_secret=execution_secret,
             source_sha=self.source_sha,
             provider_version=PROVIDER_VERSION,
             target_identifier=target_identifier,
@@ -117,7 +119,8 @@ class SchemathesisRunner:
             diagnostics: List[Dict[str, Any]],
             summary: str,
             st_ver: Optional[str],
-            worker_digest: str = "NONE_PRE_EXECUTION"
+            worker_digest: str = "NONE_PRE_EXECUTION",
+            worker_hmac: str = "NONE_PRE_EXECUTION"
         ) -> ProviderExecutionResult:
             stop_mono = time.monotonic()
             stop_time_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -136,6 +139,7 @@ class SchemathesisRunner:
                 config_hash=config_hash,
                 input_digest=input_digest,
                 worker_digest=worker_digest,
+                worker_hmac=worker_hmac,
                 status=status,
                 exit_code=exit_code,
                 start_time_iso=start_time_iso,
@@ -265,7 +269,7 @@ class SchemathesisRunner:
                 st_ver=st_ver
             )
 
-        # 7. Handshake Verification (Execution ID, Nonce, and Worker Digest)
+        # 7. Keyed Handshake Verification (Execution ID, Nonce, HMAC signature)
         if not isinstance(parsed_out, dict):
             return _make_result(
                 status=ProviderStatus.OUTPUT_INVALID,
@@ -315,7 +319,7 @@ class SchemathesisRunner:
                 st_ver=st_ver
             )
 
-        # Verify digest authenticity over raw worker envelope fields
+        # Canonical raw payload for verification
         digest_check_payload = {
             "execution_id": parsed_out.get("execution_id"),
             "parent_nonce": parsed_out.get("parent_nonce"),
@@ -327,15 +331,41 @@ class SchemathesisRunner:
             "diagnostics": parsed_out.get("diagnostics", []),
             "summary": parsed_out.get("summary", "")
         }
-        recomputed_digest = hashlib.sha256(json.dumps(digest_check_payload, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+        raw_canonical_payload = json.dumps(digest_check_payload, sort_keys=True, default=str)
+        recomputed_digest = hashlib.sha256(raw_canonical_payload.encode("utf-8")).hexdigest()
         if claimed_worker_digest != recomputed_digest:
             return _make_result(
                 status=ProviderStatus.OUTPUT_INVALID,
                 exit_code=proc.returncode,
                 violations=[],
                 stats=ExecutionStats(),
-                diagnostics=[{"error": f"Worker digest signature mismatch! Claimed: '{claimed_worker_digest}', Computed: '{recomputed_digest}'"}],
+                diagnostics=[{"error": f"Worker digest mismatch! Claimed: '{claimed_worker_digest}', Computed: '{recomputed_digest}'"}],
                 summary="Worker output validation failed: Digest tampering detected.",
+                st_ver=st_ver
+            )
+
+        # Keyed HMAC Authentication Verification (Guarantees authenticity with parent secret)
+        claimed_hmac = parsed_out.get("worker_hmac")
+        if not claimed_hmac:
+            return _make_result(
+                status=ProviderStatus.OUTPUT_INVALID,
+                exit_code=proc.returncode,
+                violations=[],
+                stats=ExecutionStats(),
+                diagnostics=[{"error": "Worker output envelope missing required 'worker_hmac' keyed signature."}],
+                summary="Worker output validation failed: Missing HMAC signature.",
+                st_ver=st_ver
+            )
+
+        expected_hmac = hmac.new(execution_secret.encode("utf-8"), raw_canonical_payload.encode("utf-8"), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(claimed_hmac, expected_hmac):
+            return _make_result(
+                status=ProviderStatus.OUTPUT_INVALID,
+                exit_code=proc.returncode,
+                violations=[],
+                stats=ExecutionStats(),
+                diagnostics=[{"error": f"Worker HMAC cryptographic authentication failure! Claimed: '{claimed_hmac}', Expected: '{expected_hmac}'"}],
+                summary="Worker output validation failed: Invalid or forged HMAC signature.",
                 st_ver=st_ver
             )
 
@@ -364,7 +394,8 @@ class SchemathesisRunner:
         diagnostics.append({
             "worker_pid": parsed_out.get("worker_pid"),
             "parent_pid": os.getpid(),
-            "handshake_verified": True
+            "handshake_verified": True,
+            "hmac_verified": True
         })
         if stderr_data.strip():
             diagnostics.append({"worker_stderr_sample": stderr_data[:500]})
@@ -379,5 +410,6 @@ class SchemathesisRunner:
             diagnostics=diagnostics,
             summary=summary,
             st_ver=st_ver,
-            worker_digest=claimed_worker_digest
+            worker_digest=claimed_worker_digest,
+            worker_hmac=claimed_hmac
         )

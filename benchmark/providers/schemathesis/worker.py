@@ -1,14 +1,15 @@
 """
-S-Class EOS V11.2 - Schemathesis Isolated Subprocess Worker (D0 Protocol).
+S-Class EOS V11.2 - Schemathesis Isolated Subprocess Worker (D0 Keyed Protocol).
 Runs strictly inside a child process to isolate Schemathesis and Hypothesis execution from S-Class memory.
-Reads WorkerInvocationEnvelope from stdin, verifies input digest, executes bounded property campaigns,
-computes worker_digest bound to the parent's nonce, and emits WorkerOutputEnvelope to stdout.
+Reads WorkerInvocationEnvelope from stdin, executes bounded property campaigns,
+computes worker_hmac keyed with the parent's secret token, and emits WorkerOutputEnvelope to stdout.
 """
 
 import sys
 import os
 import json
 import time
+import hmac
 import hashlib
 import importlib
 from typing import Dict, Any, List, Optional
@@ -21,6 +22,7 @@ def main():
     # Default fallback identities in case stdin reading fails early
     execution_id = "UNKNOWN_EXECUTION_ID"
     parent_nonce = "UNKNOWN_NONCE"
+    execution_secret = "UNKNOWN_SECRET"
 
     try:
         raw_input = sys.stdin.read()
@@ -28,6 +30,7 @@ def main():
             _emit_envelope(
                 execution_id=execution_id,
                 parent_nonce=parent_nonce,
+                execution_secret=execution_secret,
                 worker_pid=worker_pid,
                 status="INPUT_INVALID",
                 exit_code=2,
@@ -43,6 +46,7 @@ def main():
         _emit_envelope(
             execution_id=execution_id,
             parent_nonce=parent_nonce,
+            execution_secret=execution_secret,
             worker_pid=worker_pid,
             status="INPUT_INVALID",
             exit_code=2,
@@ -53,9 +57,10 @@ def main():
         )
         return
 
-    # Extract Handshake Identities
+    # Extract Handshake Identities & Parent Secret
     execution_id = envelope.get("execution_id", execution_id)
     parent_nonce = envelope.get("parent_nonce", parent_nonce)
+    execution_secret = envelope.get("execution_secret", execution_secret)
     source_sha = envelope.get("source_sha", "UNKNOWN")
     provider_version = envelope.get("provider_version", "1.0.0")
 
@@ -70,6 +75,7 @@ def main():
         _emit_envelope(
             execution_id=execution_id,
             parent_nonce=parent_nonce,
+            execution_secret=execution_secret,
             worker_pid=worker_pid,
             status="INPUT_INVALID",
             exit_code=2,
@@ -87,6 +93,7 @@ def main():
         _emit_envelope(
             execution_id=execution_id,
             parent_nonce=parent_nonce,
+            execution_secret=execution_secret,
             worker_pid=worker_pid,
             status="TOOL_NOT_AVAILABLE",
             exit_code=3,
@@ -121,6 +128,7 @@ def main():
             _emit_envelope(
                 execution_id=execution_id,
                 parent_nonce=parent_nonce,
+                execution_secret=execution_secret,
                 worker_pid=worker_pid,
                 status="TOOL_EXECUTION_FAILED",
                 exit_code=1,
@@ -147,6 +155,7 @@ def main():
         _emit_envelope(
             execution_id=execution_id,
             parent_nonce=parent_nonce,
+            execution_secret=execution_secret,
             worker_pid=worker_pid,
             status="INPUT_INVALID",
             exit_code=2,
@@ -171,6 +180,7 @@ def main():
             _emit_envelope(
                 execution_id=execution_id,
                 parent_nonce=parent_nonce,
+                execution_secret=execution_secret,
                 worker_pid=worker_pid,
                 status="INSUFFICIENT_EVIDENCE",
                 exit_code=0,
@@ -184,6 +194,7 @@ def main():
         _emit_envelope(
             execution_id=execution_id,
             parent_nonce=parent_nonce,
+            execution_secret=execution_secret,
             worker_pid=worker_pid,
             status="TOOL_EXECUTION_FAILED",
             exit_code=1,
@@ -274,6 +285,7 @@ def main():
         _emit_envelope(
             execution_id=execution_id,
             parent_nonce=parent_nonce,
+            execution_secret=execution_secret,
             worker_pid=worker_pid,
             status="TOOL_EXECUTION_FAILED",
             exit_code=1,
@@ -303,6 +315,7 @@ def main():
         _emit_envelope(
             execution_id=execution_id,
             parent_nonce=parent_nonce,
+            execution_secret=execution_secret,
             worker_pid=worker_pid,
             status="TARGET_CONTRACT_VIOLATED",
             exit_code=1,
@@ -315,6 +328,7 @@ def main():
         _emit_envelope(
             execution_id=execution_id,
             parent_nonce=parent_nonce,
+            execution_secret=execution_secret,
             worker_pid=worker_pid,
             status="INSUFFICIENT_EVIDENCE",
             exit_code=0,
@@ -327,6 +341,7 @@ def main():
         _emit_envelope(
             execution_id=execution_id,
             parent_nonce=parent_nonce,
+            execution_secret=execution_secret,
             worker_pid=worker_pid,
             status="TARGET_CLEAN",
             exit_code=0,
@@ -382,7 +397,18 @@ def _extract_violations_from_exception(exc, violations_list, path, method, statu
         })
 
 
-def _emit_envelope(execution_id: str, parent_nonce: str, worker_pid: int, status: str, exit_code: int, violations: list, stats: dict, diagnostics: list, summary: str):
+def _emit_envelope(
+    execution_id: str,
+    parent_nonce: str,
+    execution_secret: str,
+    worker_pid: int,
+    status: str,
+    exit_code: int,
+    violations: list,
+    stats: dict,
+    diagnostics: list,
+    summary: str
+):
     payload = {
         "execution_id": execution_id,
         "parent_nonce": parent_nonce,
@@ -396,7 +422,9 @@ def _emit_envelope(execution_id: str, parent_nonce: str, worker_pid: int, status
     }
     raw = json.dumps(payload, sort_keys=True, default=str)
     worker_digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    worker_hmac = hmac.new(execution_secret.encode("utf-8"), raw.encode("utf-8"), hashlib.sha256).hexdigest()
     payload["worker_digest"] = worker_digest
+    payload["worker_hmac"] = worker_hmac
 
     sys.stdout.write(json.dumps(payload) + "\n")
     sys.stdout.flush()
