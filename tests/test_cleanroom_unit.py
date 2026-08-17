@@ -2,12 +2,15 @@
 S-Class EOS V11.2 - Gate 2 Phase 5: Clean-Room Engine Unit Test Suite.
 Verifies the independent CleanRoomPropertyEngine against the frozen contract.
 Tests strategy generation, boundary bias, monotonic shrinking, determinism, filtering,
-replay mechanics, and independent oracle validation.
+replay mechanics, hard-capped shrink budget, AST regex generation, narrow Unicode categories,
+and structured FilterExhaustion error handling.
 """
 
 import pytest
+import re
 import math
 import random
+import unicodedata
 from typing import List, Dict, Any, Tuple
 from benchmark.hypothesis_parity.observation import StrategySpec, ObservationRecord, ReplayOutcome, compute_size
 from benchmark.hypothesis_parity.cleanroom_engine import CleanRoomPropertyEngine, _generate_random_value, _generate_boundary_candidates
@@ -122,7 +125,6 @@ def test_cleanroom_shrinking_strings():
     assert obs.verdict == "FAIL"
     assert obs.shrunk_counterexample is not None
     assert "z" in obs.shrunk_counterexample["s"]
-    # Shrunk string should be minimal
     assert len(obs.shrunk_counterexample["s"]) <= len(obs.initial_counterexample["s"])
 
     valid, violations = IndependentDifferentialOracle.validate_observation(obs, no_z_char, specs)
@@ -160,7 +162,137 @@ def test_cleanroom_shrinking_lists():
 
 
 # =============================================================================
-# 4. Deterministic Replay Under Fixed Seed
+# 4. Blocker 1: Authoritative Shrink Budget Hard Cap (<= 500)
+# =============================================================================
+
+def test_cleanroom_shrink_evaluation_budget_hard_cap():
+    """
+    Blocker 1 Test: Regression test designed to trigger excessive shrinking steps.
+    Verifies that the shrink budget halts evaluations authoritatively and strictly enforces <= 500 calls.
+    """
+    specs = {
+        "huge_list": StrategySpec(
+            strategy_type="lists",
+            params={
+                "elements": StrategySpec(strategy_type="integers", params={"min_value": 0, "max_value": 100000}),
+                "min_size": 30,
+                "max_size": 50
+            }
+        )
+    }
+
+    # Highly complex condition requiring hundreds of binary reductions
+    def complex_multistep_property(huge_list: List[int]) -> bool:
+        assert len(huge_list) < 25 or sum(huge_list) < 1000, "Too long and too large"
+        return True
+
+    obs = CleanRoomPropertyEngine.run_campaign(specs, complex_multistep_property, max_examples=20, seed=42, enable_shrinking=True)
+    assert obs.verdict == "FAIL"
+    assert obs.shrink_evaluations is not None
+    # Authoritative assertion: MUST NOT exceed 500
+    assert obs.shrink_evaluations <= 500, f"Budget limit violated: {obs.shrink_evaluations} > 500"
+
+    valid, violations = IndependentDifferentialOracle.validate_observation(obs, complex_multistep_property, specs)
+    assert valid is True
+    assert len(violations) == 0
+
+
+# =============================================================================
+# 5. Blocker 2: Filter Exhaustion Error Handling
+# =============================================================================
+
+def test_cleanroom_filter_exhaustion_returns_structured_error():
+    """
+    Blocker 2 Test: Pathological / impossible filter predicate.
+    Verifies that filter exhaustion is caught and returned as structured ObservationRecord(verdict='ERROR', exception_class='FilterExhaustion').
+    """
+    specs = {
+        "impossible_val": StrategySpec(
+            strategy_type="integers",
+            params={"min_value": 0, "max_value": 100},
+            filter_fn=lambda x: x > 500 and x < -500  # Impossible condition
+        )
+    }
+
+    obs = CleanRoomPropertyEngine.run_campaign(specs, lambda x: True, max_examples=10, seed=42)
+    assert obs.verdict == "ERROR"
+    assert obs.exception_class == "FilterExhaustion"
+    assert obs.shrunk_counterexample is None
+
+
+# =============================================================================
+# 6. Blocker 3: Generic AST Regex Generation
+# =============================================================================
+
+def test_cleanroom_generic_ast_regex_generation():
+    """
+    Blocker 3 Test: Validates generic AST regex generation across various grammar patterns.
+    """
+    rng = random.Random(42)
+    test_patterns = [
+        (r"\d{3}-\d{2}-\d{4}", True),
+        (r"[A-Z]{2,4}-[a-z]{3,5}", True),
+        (r"GET|POST|PUT|DELETE|PATCH", True),
+        (r"[0-9a-f]{8}-[0-9a-f]{4}", True),
+        (r"\d{3}", False)  # fullmatch=False
+    ]
+
+    for pat, fullmatch in test_patterns:
+        spec = StrategySpec(strategy_type="from_regex", params={"pattern": pat, "fullmatch": fullmatch})
+        for _ in range(15):
+            val = _generate_random_value(spec, rng)
+            assert isinstance(val, str)
+            if fullmatch:
+                assert re.fullmatch(pat, val), f"Regex mismatch for {pat}: '{val}'"
+            else:
+                assert re.search(pat, val), f"Substring regex mismatch for {pat}: '{val}'"
+
+
+# =============================================================================
+# 7. Blocker 4: Unicode Character Categories
+# =============================================================================
+
+def test_cleanroom_character_narrow_categories():
+    """
+    Blocker 4 Test: Validates targeted generation for narrow Unicode categories (digits, uppercase, punctuation).
+    """
+    rng = random.Random(42)
+
+    spec_digits = StrategySpec(strategy_type="characters", params={"whitelist_categories": ["Nd"], "min_codepoint": 48, "max_codepoint": 57})
+    for _ in range(20):
+        c = _generate_random_value(spec_digits, rng)
+        assert unicodedata.category(c) == "Nd"
+        assert c in "0123456789"
+
+    spec_upper = StrategySpec(strategy_type="characters", params={"whitelist_categories": ["Lu"], "min_codepoint": 65, "max_codepoint": 90})
+    for _ in range(20):
+        c = _generate_random_value(spec_upper, rng)
+        assert unicodedata.category(c) == "Lu"
+        assert c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+
+# =============================================================================
+# 8. Blocker 5: Email Validity Contract
+# =============================================================================
+
+def test_cleanroom_email_validity_contract():
+    """
+    Blocker 5 Test: Validates email contract (user@domain.tld) format.
+    """
+    rng = random.Random(42)
+    spec_email = StrategySpec(strategy_type="emails")
+
+    email_regex = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+    for _ in range(30):
+        email = _generate_random_value(spec_email, rng)
+        assert email_regex.match(email), f"Invalid email generated: {email}"
+        user, domain = email.split("@")
+        assert len(user) >= 1
+        assert "." in domain
+
+
+# =============================================================================
+# 9. Deterministic Replay & Filter Exclusion
 # =============================================================================
 
 def test_cleanroom_deterministic_seed_replay():
@@ -182,10 +314,6 @@ def test_cleanroom_deterministic_seed_replay():
     assert obs1.initial_counterexample == obs2.initial_counterexample
     assert obs1.shrunk_counterexample == obs2.shrunk_counterexample
 
-
-# =============================================================================
-# 5. Filter Exclusion Correctness
-# =============================================================================
 
 def test_cleanroom_filter_exclusion():
     """Validates that strategy filter_fn strictly prevents invalid values from reaching the property."""
@@ -212,10 +340,6 @@ def test_cleanroom_filter_exclusion():
     assert valid is True
     assert len(violations) == 0
 
-
-# =============================================================================
-# 6. Structured Replay Outcome
-# =============================================================================
 
 def test_cleanroom_replay_outcome_integrity():
     """Validates structured replay outcomes for reproduced, corrupted, and error cases."""

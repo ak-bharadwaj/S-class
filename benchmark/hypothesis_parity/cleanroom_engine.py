@@ -1,7 +1,12 @@
 """
 S-Class EOS V11.2 - Independent Clean-Room Property Testing Engine.
 Implements the frozen behavioral contract (Phase 2) from first principles.
-Does not utilize or imitate Hypothesis internal data structures or algorithms.
+Includes:
+- Global hard-capped shrink evaluation budget (<= 500)
+- Structured FilterExhaustion handling (verdict='ERROR')
+- AST-driven generic regex generation (re._parser / sre_parse)
+- Targeted Unicode category generation
+- Deterministic email contract
 """
 
 import re
@@ -13,6 +18,137 @@ from typing import Dict, Any, Optional, List, Tuple, Callable
 from benchmark.hypothesis_parity.observation import StrategySpec, ObservationRecord, ReplayOutcome, compute_size
 from benchmark.hypothesis_parity.differential_oracle import _validate_value_against_spec
 
+try:
+    import re._parser as sre_parse
+except ImportError:
+    import sre_parse
+
+
+# =============================================================================
+# Unicode Category Mappings & Character Generation
+# =============================================================================
+
+_PRECOMPUTED_CATEGORY_CODEPOINTS = {
+    "Lu": list(range(65, 91)) + list(range(192, 215)) + list(range(216, 223)),   # Uppercase Latin
+    "Ll": list(range(97, 123)) + list(range(223, 247)) + list(range(248, 256)),  # Lowercase Latin
+    "Nd": list(range(48, 58)),                                                   # Decimal digits
+    "P":  [ord(c) for c in "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"],               # Punctuation
+    "Z":  [32, 160],                                                             # Space separators
+    "S":  [ord(c) for c in "$+<=>^`|~£¥€©®™±×÷"],                                # Currency & Math Symbols
+}
+
+
+def _generate_character(whitelist: Optional[List[str]], blacklist: Optional[List[str]], min_cp: int, max_cp: int, rng: random.Random) -> str:
+    """Generates a character meeting exact category whitelist/blacklist and codepoint bounds."""
+    pool: List[int] = []
+    if whitelist:
+        for cat in whitelist:
+            if cat in _PRECOMPUTED_CATEGORY_CODEPOINTS:
+                pool.extend([cp for cp in _PRECOMPUTED_CATEGORY_CODEPOINTS[cat] if min_cp <= cp <= max_cp])
+    if pool:
+        return chr(rng.choice(pool))
+
+    for _ in range(100):
+        cp = rng.randint(min_cp, max_cp)
+        char = chr(cp)
+        cat = unicodedata.category(char)
+        if whitelist and cat not in whitelist:
+            continue
+        if blacklist and cat in blacklist:
+            continue
+        return char
+
+    # Fallback to bounded ASCII printable
+    return chr(rng.randint(max(32, min_cp), min(126, max_cp)))
+
+
+# =============================================================================
+# Generic AST-Driven Regex Generation
+# =============================================================================
+
+def _generate_ast_regex(nodes, rng: random.Random) -> str:
+    """Recursively walks standard library regex AST nodes to synthesize conforming strings."""
+    parts = []
+    for item in nodes:
+        op, av = item
+        if op == sre_parse.LITERAL:
+            parts.append(chr(av))
+        elif op == sre_parse.NOT_LITERAL:
+            cand = chr(rng.randint(32, 126))
+            while cand == chr(av):
+                cand = chr(rng.randint(32, 126))
+            parts.append(cand)
+        elif op == sre_parse.RANGE:
+            lo, hi = av
+            parts.append(chr(rng.randint(lo, hi)))
+        elif op == sre_parse.IN:
+            # Pick an element from character class
+            choice_item = rng.choice(av)
+            c_op, c_av = choice_item
+            if c_op == sre_parse.LITERAL:
+                parts.append(chr(c_av))
+            elif c_op == sre_parse.RANGE:
+                parts.append(chr(rng.randint(c_av[0], c_av[1])))
+            elif c_op == sre_parse.CATEGORY:
+                if "DIGIT" in str(c_av):
+                    parts.append(chr(rng.randint(48, 57)))
+                elif "WORD" in str(c_av):
+                    parts.append(rng.choice("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"))
+                elif "SPACE" in str(c_av):
+                    parts.append(" ")
+                else:
+                    parts.append(chr(rng.randint(65, 90)))
+            else:
+                parts.append("a")
+        elif op == sre_parse.BRANCH:
+            _, branch_list = av
+            chosen = rng.choice(branch_list)
+            parts.append(_generate_ast_regex(chosen, rng))
+        elif op == sre_parse.SUBPATTERN:
+            sub_nodes = av[-1]
+            parts.append(_generate_ast_regex(sub_nodes, rng))
+        elif op in (sre_parse.MAX_REPEAT, sre_parse.MIN_REPEAT):
+            min_rep, max_rep, sub_nodes = av
+            effective_max = min_rep + 4 if max_rep == sre_parse.MAXREPEAT or max_rep > min_rep + 8 else max_rep
+            reps = rng.randint(min_rep, max(min_rep, effective_max))
+            for _ in range(reps):
+                parts.append(_generate_ast_regex(sub_nodes, rng))
+        elif op == sre_parse.ANY:
+            parts.append(chr(rng.randint(32, 126)))
+        elif op == sre_parse.AT:
+            # Boundary anchor (^, $, \b) - no characters emitted
+            pass
+        elif op == sre_parse.CATEGORY:
+            if "DIGIT" in str(av):
+                parts.append(chr(rng.randint(48, 57)))
+            elif "WORD" in str(av):
+                parts.append(rng.choice("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"))
+            elif "SPACE" in str(av):
+                parts.append(" ")
+            else:
+                parts.append("a")
+    return "".join(parts)
+
+
+def _generate_from_regex_string(pattern: str, fullmatch: bool, rng: random.Random) -> str:
+    """Synthesizes a conforming regex string from any supported pattern."""
+    try:
+        parsed = sre_parse.parse(pattern)
+        core = _generate_ast_regex(parsed, rng)
+        if fullmatch:
+            return core
+        # If fullmatch=False, optionally add noise prefix/suffix
+        prefix = "".join(rng.choice("abcdefghijklmnopqrstuvwxyz") for _ in range(rng.randint(0, 3)))
+        suffix = "".join(rng.choice("abcdefghijklmnopqrstuvwxyz") for _ in range(rng.randint(0, 3)))
+        return f"{prefix}{core}{suffix}"
+    except Exception:
+        # Fallback if pattern contains unsupported extensions
+        return "fallback123"
+
+
+# =============================================================================
+# Boundary Candidates
+# =============================================================================
 
 def _generate_boundary_candidates(spec: StrategySpec) -> List[Any]:
     """Generates deterministic boundary and extreme values for a given strategy spec."""
@@ -23,9 +159,9 @@ def _generate_boundary_candidates(spec: StrategySpec) -> List[Any]:
     if st_type == "integers":
         min_v = p.get("min_value", -1000000)
         max_v = p.get("max_value", 1000000)
-        potential = [0, 1, -1, min_v, max_v, min_v + 1 if min_v is not None else 0, max_v - 1 if max_v is not None else 0]
+        potential = [0, 1, -1, min_v, max_v, (min_v + 1) if min_v is not None else 0, (max_v - 1) if max_v is not None else 0]
         for v in potential:
-            if (min_v is None or v >= min_v) and (max_v is None or v <= max_v):
+            if v is not None and (min_v is None or v >= min_v) and (max_v is None or v <= max_v):
                 if v not in candidates:
                     candidates.append(v)
 
@@ -68,8 +204,7 @@ def _generate_boundary_candidates(spec: StrategySpec) -> List[Any]:
         blacklist = p.get("blacklist_categories", None)
         min_cp = p.get("min_codepoint", 32)
         max_cp = p.get("max_codepoint", 126)
-        candidates.append(chr(min_cp))
-        candidates.append(chr(max_cp))
+        candidates.append(_generate_character(whitelist, blacklist, min_cp, max_cp, random.Random(0)))
 
     elif st_type == "emails":
         candidates.extend(["user@example.com", "admin@domain.org", "test.user+tag@sub.domain.co"])
@@ -83,12 +218,8 @@ def _generate_boundary_candidates(spec: StrategySpec) -> List[Any]:
 
     elif st_type == "from_regex":
         pattern = p["pattern"]
-        if r"\d{3}-\d{2}-\d{4}" in pattern:
-            candidates.append("000-00-0000")
-        elif "email" in pattern or "@" in pattern:
-            candidates.append("a@b.co")
-        else:
-            candidates.append("A" * 10)
+        fullmatch = p.get("fullmatch", True)
+        candidates.append(_generate_from_regex_string(pattern, fullmatch, random.Random(0)))
 
     elif st_type == "lists":
         min_s = p.get("min_size", 0)
@@ -108,12 +239,16 @@ def _generate_boundary_candidates(spec: StrategySpec) -> List[Any]:
     return [c for c in candidates if _validate_value_against_spec(c, spec)]
 
 
+# =============================================================================
+# Value Generation
+# =============================================================================
+
 def _generate_random_value(spec: StrategySpec, rng: random.Random) -> Any:
     """Generates a random valid domain value conforming strictly to StrategySpec."""
     st_type = spec.strategy_type
     p = spec.params
 
-    for _ in range(100):  # Re-sample loop for filters
+    for _ in range(100):  # Maximum re-sample attempts
         val = None
         if st_type == "integers":
             min_v = p.get("min_value", -1000000)
@@ -151,14 +286,17 @@ def _generate_random_value(spec: StrategySpec, rng: random.Random) -> Any:
                 val = "".join(chr(rng.randint(32, 126)) for _ in range(length))
 
         elif st_type == "characters":
+            whitelist = p.get("whitelist_categories", None)
+            blacklist = p.get("blacklist_categories", None)
             min_cp = p.get("min_codepoint", 32)
             max_cp = p.get("max_codepoint", 126)
-            val = chr(rng.randint(min_cp, max_cp))
+            val = _generate_character(whitelist, blacklist, min_cp, max_cp, rng)
 
         elif st_type == "emails":
-            user = "".join(rng.choice("abcdefghijklmnopqrstuvwxyz") for _ in range(rng.randint(3, 8)))
-            dom = "".join(rng.choice("abcdefghijklmnopqrstuvwxyz") for _ in range(rng.randint(3, 6)))
-            tld = rng.choice(["com", "org", "net", "io"])
+            user_chars = "abcdefghijklmnopqrstuvwxyz0123456789._"
+            user = "".join(rng.choice(user_chars) for _ in range(rng.randint(3, 10))).strip(".")
+            dom = "".join(rng.choice("abcdefghijklmnopqrstuvwxyz") for _ in range(rng.randint(3, 8)))
+            tld = rng.choice(["com", "org", "net", "io", "edu"])
             val = f"{user}@{dom}.{tld}"
 
         elif st_type == "sampled_from":
@@ -168,17 +306,7 @@ def _generate_random_value(spec: StrategySpec, rng: random.Random) -> Any:
         elif st_type == "from_regex":
             pattern = p["pattern"]
             fullmatch = p.get("fullmatch", True)
-            if r"\d{3}-\d{2}-\d{4}" in pattern:
-                n1, n2, n3 = rng.randint(100, 999), rng.randint(10, 99), rng.randint(1000, 9999)
-                val = f"{n1:03d}-{n2:02d}-{n3:04d}"
-            elif r"\d{3}" in pattern or r"[0-9]{3}" in pattern:
-                core = f"{rng.randint(100, 999):03d}"
-                val = core if fullmatch else f"pfx_{core}_sfx"
-            elif "[A-Z]" in pattern:
-                letters = "".join(rng.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(3))
-                val = letters if fullmatch else f"abc_{letters}_123"
-            else:
-                val = "".join(rng.choice("abcdefghijklmnopqrstuvwxyz") for _ in range(8))
+            val = _generate_from_regex_string(pattern, fullmatch, rng)
 
         elif st_type == "lists":
             elem_spec = p["elements"]
@@ -202,17 +330,37 @@ def _generate_random_value(spec: StrategySpec, rng: random.Random) -> Any:
 
 
 # =============================================================================
-# Clean-Room Shrinking Mechanics
+# Shrink Evaluation Budget Controller (Hard Capped <= 500)
 # =============================================================================
 
-def _shrink_integer(val: int, spec: StrategySpec, test_fn: Callable[[int], bool]) -> Tuple[int, int]:
-    """Binary-reduction shrinker for integer domain."""
+class ShrinkBudget:
+    """Enforces strict evaluation budget limit (<= 500) across all argument shrinkers."""
+    def __init__(self, limit: int = 500):
+        self.limit = limit
+        self.evaluations = 0
+
+    def test(self, property_fn: Callable[..., Any], kwargs: Dict[str, Any]) -> Tuple[bool, bool]:
+        """
+        Evaluates the property against test inputs within budget.
+        Returns (passes: bool, exhausted: bool).
+        If budget is exhausted, returns (True, True) to immediately stop shrinking.
+        """
+        if self.evaluations >= self.limit:
+            return True, True
+        self.evaluations += 1
+        try:
+            res = property_fn(**kwargs)
+            return (res is not False), False
+        except (AssertionError, Exception):
+            return False, False
+
+
+def _shrink_integer(val: int, spec: StrategySpec, budget: ShrinkBudget, make_kwargs: Callable[[int], Dict[str, Any]], prop_fn: Callable) -> int:
+    """Binary-reduction shrinker for integer domain under authoritative budget."""
     min_v = spec.params.get("min_value", None)
     max_v = spec.params.get("max_value", None)
     current = val
-    evals = 0
 
-    # 1. Try zero or domain target
     target = 0
     if min_v is not None and min_v > 0:
         target = min_v
@@ -220,156 +368,154 @@ def _shrink_integer(val: int, spec: StrategySpec, test_fn: Callable[[int], bool]
         target = max_v
 
     if target != current and _validate_value_against_spec(target, spec):
-        evals += 1
-        if test_fn(target) is False:
+        passes, exhausted = budget.test(prop_fn, make_kwargs(target))
+        if exhausted:
+            return current
+        if not passes:
             current = target
 
-    # 2. Binary search towards target
     step = abs(current - target) // 2
-    while step > 0 and evals < 200:
+    while step > 0:
         direction = -1 if current > target else 1
-        candidate = current + (direction * step)
-        if _validate_value_against_spec(candidate, spec) and compute_size(candidate) < compute_size(current):
-            evals += 1
-            if test_fn(candidate) is False:
-                current = candidate
+        cand = current + (direction * step)
+        if _validate_value_against_spec(cand, spec) and compute_size(cand) < compute_size(current):
+            passes, exhausted = budget.test(prop_fn, make_kwargs(cand))
+            if exhausted:
+                return current
+            if not passes:
+                current = cand
         step //= 2
 
-    # 3. Linear single-step boundary reduction
     for delta in [-1, 1]:
         cand = current + delta
         if _validate_value_against_spec(cand, spec) and compute_size(cand) < compute_size(current):
-            evals += 1
-            if test_fn(cand) is False:
+            passes, exhausted = budget.test(prop_fn, make_kwargs(cand))
+            if exhausted:
+                return current
+            if not passes:
                 current = cand
 
-    return current, evals
+    return current
 
 
-def _shrink_float(val: float, spec: StrategySpec, test_fn: Callable[[float], bool]) -> Tuple[float, int]:
-    """Monotonic float shrinker towards zero / integer bounds."""
+def _shrink_float(val: float, spec: StrategySpec, budget: ShrinkBudget, make_kwargs: Callable[[float], Dict[str, Any]], prop_fn: Callable) -> float:
+    """Monotonic float shrinker towards zero under authoritative budget."""
     current = val
-    evals = 0
-
     if math.isnan(current):
-        return current, 0  # NaN cannot be shrunk further
+        return current
 
-    # Try 0.0
     if current != 0.0 and _validate_value_against_spec(0.0, spec):
-        evals += 1
-        if test_fn(0.0) is False:
-            return 0.0, evals
+        passes, exhausted = budget.test(prop_fn, make_kwargs(0.0))
+        if exhausted:
+            return current
+        if not passes:
+            return 0.0
 
-    # Try rounding to int
     rounded = float(int(current))
     if rounded != current and _validate_value_against_spec(rounded, spec) and compute_size(rounded) <= compute_size(current):
-        evals += 1
-        if test_fn(rounded) is False:
+        passes, exhausted = budget.test(prop_fn, make_kwargs(rounded))
+        if exhausted:
+            return current
+        if not passes:
             current = rounded
 
-    # Binary halving towards 0
     step_val = current / 2.0
-    while abs(step_val) > 0.001 and evals < 150:
+    while abs(step_val) > 0.001:
         if _validate_value_against_spec(step_val, spec) and compute_size(step_val) < compute_size(current):
-            evals += 1
-            if test_fn(step_val) is False:
+            passes, exhausted = budget.test(prop_fn, make_kwargs(step_val))
+            if exhausted:
+                return current
+            if not passes:
                 current = step_val
         step_val /= 2.0
 
-    return current, evals
+    return current
 
 
-def _shrink_string(val: str, spec: StrategySpec, test_fn: Callable[[str], bool]) -> Tuple[str, int]:
-    """Chunk removal and character replacement shrinker for strings."""
+def _shrink_string(val: str, spec: StrategySpec, budget: ShrinkBudget, make_kwargs: Callable[[str], Dict[str, Any]], prop_fn: Callable) -> str:
+    """Chunk deletion and character simplification under authoritative budget."""
     current = val
     min_s = spec.params.get("min_size", 0)
-    evals = 0
 
-    # 1. Chunk deletion (halving, prefix/suffix removal)
     chunk_size = len(current) // 2
-    while chunk_size > 0 and evals < 200:
+    while chunk_size > 0:
         for i in range(len(current) - chunk_size + 1):
             cand = current[:i] + current[i + chunk_size:]
             if len(cand) >= min_s and _validate_value_against_spec(cand, spec):
                 if compute_size(cand) < compute_size(current):
-                    evals += 1
-                    if test_fn(cand) is False:
+                    passes, exhausted = budget.test(prop_fn, make_kwargs(cand))
+                    if exhausted:
+                        return current
+                    if not passes:
                         current = cand
                         break
         chunk_size //= 2
 
-    # 2. Individual character simplification (e.g. replace with 'a' or '0')
     alphabet = spec.params.get("alphabet", None)
     simplest_char = alphabet[0] if alphabet else "a"
-
     chars = list(current)
     for idx in range(len(chars)):
-        if evals >= 300:
-            break
         orig = chars[idx]
         if orig != simplest_char:
             chars[idx] = simplest_char
             cand = "".join(chars)
             if _validate_value_against_spec(cand, spec) and compute_size(cand) < compute_size(current):
-                evals += 1
-                if test_fn(cand) is False:
+                passes, exhausted = budget.test(prop_fn, make_kwargs(cand))
+                if exhausted:
+                    return current
+                if not passes:
                     current = cand
                     continue
-            chars[idx] = orig  # Revert
+            chars[idx] = orig
 
-    return current, evals
+    return current
 
 
-def _shrink_list(val: list, spec: StrategySpec, test_fn: Callable[[list], bool]) -> Tuple[list, int]:
-    """Delta-reduction shrinker for list structures."""
+def _shrink_list(val: list, spec: StrategySpec, budget: ShrinkBudget, make_kwargs: Callable[[list], Dict[str, Any]], prop_fn: Callable) -> list:
+    """Delta reduction and element-wise shrinking under authoritative budget."""
     current = list(val)
     min_s = spec.params.get("min_size", 0)
     elem_spec = spec.params.get("elements")
-    evals = 0
 
-    # 1. Remove slices
     chunk = len(current) // 2
-    while chunk > 0 and evals < 200:
+    while chunk > 0:
         i = 0
         while i <= len(current) - chunk:
             cand = current[:i] + current[i + chunk:]
             if len(cand) >= min_s and _validate_value_against_spec(cand, spec):
                 if compute_size(cand) < compute_size(current):
-                    evals += 1
-                    if test_fn(cand) is False:
+                    passes, exhausted = budget.test(prop_fn, make_kwargs(cand))
+                    if exhausted:
+                        return current
+                    if not passes:
                         current = cand
                         i = 0
                         continue
             i += 1
         chunk //= 2
 
-    # 2. Shrink individual elements
     if isinstance(elem_spec, StrategySpec):
         for idx in range(len(current)):
-            if evals >= 350:
-                break
             elem = current[idx]
-            def elem_test(e):
+            def make_elem_kw(new_e):
                 test_lst = list(current)
-                test_lst[idx] = e
-                return test_fn(test_lst)
+                test_lst[idx] = new_e
+                return make_kwargs(test_lst)
 
             if elem_spec.strategy_type == "integers":
-                shrunk_e, e_evals = _shrink_integer(elem, elem_spec, elem_test)
-                evals += e_evals
-                current[idx] = shrunk_e
+                current[idx] = _shrink_integer(elem, elem_spec, budget, make_elem_kw, prop_fn)
 
-    return current, evals
+    return current
 
 
 # =============================================================================
-# S-Class Clean-Room Engine
+# Clean-Room Property Engine Implementation
 # =============================================================================
 
 class CleanRoomPropertyEngine:
     """
     Independent Clean-Room Property Testing Engine conforming strictly to the Phase 2 contract.
-    Operates without any external dependency on Hypothesis runtime or internals.
+    Operates with guaranteed evaluation budgets and structured failure handling.
     """
 
     @classmethod
@@ -382,12 +528,11 @@ class CleanRoomPropertyEngine:
         enable_shrinking: bool = True
     ) -> ObservationRecord:
         """
-        Executes a deterministic property testing campaign and produces a normalized ObservationRecord.
+        Executes a property testing campaign and produces a normalized ObservationRecord.
         """
         rng = random.Random(seed if seed is not None else int(time.time_ns() % 1000000000))
         boundary_queue: List[Dict[str, Any]] = []
 
-        # 1. Synthesize boundary combinations for initial exploration
         boundary_matrix: Dict[str, List[Any]] = {
             k: _generate_boundary_candidates(spec) for k, spec in strategy_specs.items()
         }
@@ -395,7 +540,20 @@ class CleanRoomPropertyEngine:
         for b_idx in range(min(max_b_len, 5)):
             combo = {}
             for k, b_list in boundary_matrix.items():
-                combo[k] = b_list[b_idx % len(b_list)] if b_list else _generate_random_value(strategy_specs[k], rng)
+                if b_list:
+                    combo[k] = b_list[b_idx % len(b_list)]
+                else:
+                    try:
+                        combo[k] = _generate_random_value(strategy_specs[k], rng)
+                    except RuntimeError as err:
+                        return ObservationRecord(
+                            engine_name="S-Class/CleanRoom",
+                            verdict="ERROR",
+                            cases_executed=0,
+                            exception_class="FilterExhaustion",
+                            exception_message=str(err),
+                            metadata={"max_examples": max_examples, "seed": seed}
+                        )
             boundary_queue.append(combo)
 
         cases_executed = 0
@@ -407,17 +565,25 @@ class CleanRoomPropertyEngine:
         verdict = "PASS"
 
         t0 = time.perf_counter_ns()
-
-        # 2. Main generation loop
         boundary_budget = max(1, int(max_examples * 0.10))
 
         for case_idx in range(max_examples):
             if boundary_queue and case_idx < boundary_budget:
                 test_kwargs = boundary_queue.pop(0)
             else:
-                test_kwargs = {
-                    k: _generate_random_value(spec, rng) for k, spec in strategy_specs.items()
-                }
+                try:
+                    test_kwargs = {
+                        k: _generate_random_value(spec, rng) for k, spec in strategy_specs.items()
+                    }
+                except RuntimeError as err:
+                    return ObservationRecord(
+                        engine_name="S-Class/CleanRoom",
+                        verdict="ERROR",
+                        cases_executed=cases_executed,
+                        exception_class="FilterExhaustion",
+                        exception_message=str(err),
+                        metadata={"max_examples": max_examples, "seed": seed}
+                    )
 
             cases_executed += 1
             total_evals += 1
@@ -439,42 +605,36 @@ class CleanRoomPropertyEngine:
                 exception_msg = str(err)
                 break
 
-        # 3. Shrinking loop
-        shrink_evaluations = 0
+        # Shrinking phase with strict budget <= 500
+        budget = ShrinkBudget(limit=500)
         if verdict == "FAIL" and enable_shrinking and first_failing_case is not None:
             current_failing = dict(first_failing_case)
 
             for arg_name, spec in strategy_specs.items():
-                if shrink_evaluations >= 450:
+                if budget.evaluations >= 500:
                     break
 
                 val = current_failing[arg_name]
-
-                def arg_test(cand_val: Any) -> bool:
-                    nonlocal shrink_evaluations
-                    shrink_evaluations += 1
-                    t_kwargs = dict(current_failing)
-                    t_kwargs[arg_name] = cand_val
-                    try:
-                        res = property_fn(**t_kwargs)
-                        return bool(res is not False)
-                    except (AssertionError, Exception):
-                        return False
+                def make_arg_kw(cand_val, k_name=arg_name):
+                    kw = dict(current_failing)
+                    kw[k_name] = cand_val
+                    return kw
 
                 if spec.strategy_type == "integers":
-                    shrunk_v, s_evals = _shrink_integer(val, spec, arg_test)
-                    current_failing[arg_name] = shrunk_v
+                    current_failing[arg_name] = _shrink_integer(val, spec, budget, make_arg_kw, property_fn)
                 elif spec.strategy_type == "floats":
-                    shrunk_v, s_evals = _shrink_float(val, spec, arg_test)
-                    current_failing[arg_name] = shrunk_v
+                    current_failing[arg_name] = _shrink_float(val, spec, budget, make_arg_kw, property_fn)
                 elif spec.strategy_type == "text":
-                    shrunk_v, s_evals = _shrink_string(val, spec, arg_test)
-                    current_failing[arg_name] = shrunk_v
+                    current_failing[arg_name] = _shrink_string(val, spec, budget, make_arg_kw, property_fn)
                 elif spec.strategy_type == "lists":
-                    shrunk_v, s_evals = _shrink_list(val, spec, arg_test)
-                    current_failing[arg_name] = shrunk_v
+                    current_failing[arg_name] = _shrink_list(val, spec, budget, make_arg_kw, property_fn)
 
             shrunk_case = current_failing
+
+        # Authoritative contract assertion: shrink evaluations MUST NOT exceed 500
+        shrink_evaluations = budget.evaluations if verdict == "FAIL" else None
+        if shrink_evaluations is not None:
+            assert shrink_evaluations <= 500, f"Shrink evaluations exceeded budget limit: {shrink_evaluations} > 500"
 
         t_elapsed = time.perf_counter_ns() - t0
 
@@ -486,12 +646,12 @@ class CleanRoomPropertyEngine:
             shrunk_counterexample=shrunk_case,
             exception_class=exception_class,
             exception_message=exception_msg,
-            shrink_evaluations=shrink_evaluations if verdict == "FAIL" else None,
+            shrink_evaluations=shrink_evaluations,
             execution_time_ns=t_elapsed,
             metadata={
                 "max_examples": max_examples,
                 "seed": seed,
-                "total_property_calls": total_evals + shrink_evaluations
+                "total_property_calls": total_evals + (shrink_evaluations or 0)
             }
         )
 
