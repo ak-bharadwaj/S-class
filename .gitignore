@@ -9,7 +9,15 @@ __pycache__/
 *.key
 *.pem
 *.secret
+*.lock
 capability_plugins/emil-skills/
 capability_plugins/impeccable/
 capability_plugins/taste-skill/
+benchmark/**/ci_receipts/
+benchmark/**/ci_receipts_gate2/
+benchmark/**/cert_*/
+benchmark/**/gate_2_final_certs/
+benchmark/**/win32_*/
 benchmark/parity/*_downloaded/
+benchmark/hypothesis_parity/gate_2_parity_certificate.json
+benchmark/pilot/ci_receipts/

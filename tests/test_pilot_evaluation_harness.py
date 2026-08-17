@@ -42,7 +42,7 @@ def test_synthetic_efficacy_campaign_execution(tmp_path):
     assert receipt["pilot_verdict"] == "PASS"
 
 
-def test_external_validation_protocol_execution(tmp_path):
+def test_external_validation_protocol_smoke_execution(tmp_path):
     out_file = str(tmp_path / "external_protocol_receipt.json")
     summary = run_external_validation_smoke(output_path=out_file, tested_sha="test_commit_sha_12345")
 
@@ -55,3 +55,33 @@ def test_external_validation_protocol_execution(tmp_path):
     # Ensure no synthetic fake trust/usefulness scores leaked into real metrics
     assert summary["real_participant_metrics"]["sclass_treatment"]["mean_trust_score"] is None
     assert summary["real_participant_metrics"]["sclass_treatment"]["mean_usefulness_score"] is None
+
+
+def test_external_validation_real_participant_trial_execution():
+    protocol = ExternalValidationProtocol()
+
+    def dummy_generator(spec):
+        return lambda tokens: tokens >= 0
+
+    # Real participant completes a randomized trial with genuine self-reported metrics
+    trial = protocol.execute_participant_trial(
+        participant_id="real_dev_42",
+        task_id="TASK-01-TOKEN-RATE-LIMITER",
+        code_generator=dummy_generator,
+        rework_iterations=0,
+        developer_interventions=0,
+        trust_score=4.5,
+        usefulness_score=4.8,
+        seed=101
+    )
+
+    assert trial.is_real_participant is True
+    assert trial.assignment in ["BASELINE", "SCLASS_TREATMENT"]
+    assert trial.developer_trust_score == 4.5
+    assert trial.developer_usefulness_score == 4.8
+    assert trial.measurement_sources["task_completion_time_sec"] == MeasurementProvenance.INSTRUMENTED
+    assert trial.measurement_sources["developer_trust_score"] == MeasurementProvenance.PARTICIPANT_REPORTED
+
+    summary = protocol.generate_validation_summary(tested_sha="test_commit_real_trial")
+    assert summary["provenance"]["real_participant_trials_count"] == 1
+    assert summary["real_participant_metrics"]["real_participants_enrolled"] == 1

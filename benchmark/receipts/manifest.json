@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "manifest_version": "1.0.0",
+  "project": "S-Class EOS V11.2",
+  "certified_receipts": [
+    {
+      "gate": "PARITY-GATE-1-POSIX",
+      "milestone": "FileLock / Concurrency POSIX Parity",
+      "certified_sha": "9ecce482076019deacf7aa3285d475e58bea55dc",
+      "workflow_name": "OSS Parity Gate 1 - POSIX / Linux Certification",
+      "workflow_run_id": 31994644520,
+      "runner_os": "ubuntu-24.04",
+      "python_matrix": ["3.10", "3.11", "3.12", "3.13"],
+      "artifact_name": "oss-parity-gate-1-posix-9ecce482076019deacf7aa3285d475e58bea55dc",
+      "verdict": "CERTIFIED_CLOSED"
+    },
+    {
+      "gate": "PARITY-GATE-1-WIN32",
+      "milestone": "FileLock / Concurrency Windows Parity",
+      "certified_sha": "c60ee97760ea0353da76bdf7a7b083b6ac252b51",
+      "workflow_name": "OSS Parity Gate 1 - Windows Certification",
+      "workflow_run_id": 31994998782,
+      "runner_os": "windows-2025",
+      "python_matrix": ["3.10", "3.11", "3.12", "3.13"],
+      "artifact_name": "oss-parity-gate-1-win32-c60ee97760ea0353da76bdf7a7b083b6ac252b51",
+      "verdict": "CERTIFIED_CLOSED"
+    },
+    {
+      "gate": "PARITY-GATE-2",
+      "milestone": "Hypothesis Property Testing & Invariant Parity",
+      "certified_sha": "3ad861286aabc56f1aae242d0cedeff173865081",
+      "workflow_name": "OSS Parity Gate 2 - Differential & Performance Certification",
+      "workflow_run_id": 32000742914,
+      "runner_os": "ubuntu-24.04",
+      "python_matrix": ["3.10", "3.11", "3.12", "3.13"],
+      "artifact_name_prefix": "oss-parity-gate-2-cert-",
+      "verdict": "CERTIFIED_CLOSED"
+    },
+    {
+      "gate": "THESIS-GATE-1A",
+      "milestone": "Enterprise Core / Synthetic Efficacy (Controlled Failure Injection)",
+      "certified_sha": "725fe90daf8b4d20c33e1e466ec8fc6460a10f83",
+      "workflow_name": "S-Class THESIS-GATE-1A - Enterprise Core & Synthetic Efficacy",
+      "workflow_run_id": 32003191497,
+      "runner_os": "ubuntu-24.04",
+      "python_matrix": ["3.10", "3.11", "3.12", "3.13"],
+      "artifact_name_prefix": "thesis-gate-1a-cert-",
+      "verdict": "CERTIFIED_CLOSED"
+    },
+    {
+      "gate": "THESIS-GATE-1B",
+      "milestone": "External Developer Validation Protocol & Trial Cohort",
+      "certified_sha": null,
+      "workflow_name": "Protocol Ready",
+      "workflow_run_id": null,
+      "runner_os": null,
+      "python_matrix": ["3.10", "3.11", "3.12", "3.13"],
+      "artifact_name_prefix": null,
+      "verdict": "AWAITING_REAL_PARTICIPANTS"
+    }
+  ]
+}
