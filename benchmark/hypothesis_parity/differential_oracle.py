@@ -1,9 +1,11 @@
 """
 S-Class EOS V11.2 - Independent Differential Property Oracle.
 Evaluates observations and target functions independently of framework self-reporting.
+Implements exact IEEE-754 semantics, substring regex parsing, and multi-tier complexity sizing.
 """
 
 import re
+import math
 import unicodedata
 from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, Callable, List, Tuple
@@ -11,7 +13,11 @@ from benchmark.hypothesis_parity.observation import ObservationRecord, StrategyS
 
 
 def _validate_value_against_spec(val: Any, spec: StrategySpec) -> bool:
-    """Independently validates whether a value strictly conforms to a StrategySpec."""
+    """
+    Independently validates whether a value strictly conforms to a StrategySpec.
+    Covers exact IEEE-754 floats (NaN, +inf, -inf, -0.0, subnormals), regex fullmatch vs search,
+    and recursive/composite structures.
+    """
     st_type = spec.strategy_type
     p = spec.params
 
@@ -24,22 +30,34 @@ def _validate_value_against_spec(val: Any, spec: StrategySpec) -> bool:
             return False
         if max_v is not None and val > max_v:
             return False
+
     elif st_type == "floats":
         if not isinstance(val, (int, float)) or isinstance(val, bool):
             return False
-        import math
         allow_nan = p.get("allow_nan", False)
         allow_infinity = p.get("allow_infinity", False)
-        if math.isnan(val):
-            return bool(allow_nan)
-        if math.isinf(val):
-            return bool(allow_infinity)
         min_v = p.get("min_value", None)
         max_v = p.get("max_value", None)
+
+        if math.isnan(val):
+            return bool(allow_nan)
+
+        if math.isinf(val):
+            if not allow_infinity:
+                return False
+            # If finite bounds exist, infinity violates them
+            if val > 0 and max_v is not None and not math.isinf(max_v):
+                return False
+            if val < 0 and min_v is not None and not math.isinf(min_v):
+                return False
+            return True
+
+        # Finite floats (including -0.0 and subnormals)
         if min_v is not None and val < min_v:
             return False
         if max_v is not None and val > max_v:
             return False
+
     elif st_type == "text":
         if not isinstance(val, str):
             return False
@@ -52,6 +70,7 @@ def _validate_value_against_spec(val: Any, spec: StrategySpec) -> bool:
             return False
         if max_s is not None and len(val) > max_s:
             return False
+
     elif st_type == "characters":
         if not isinstance(val, str) or len(val) != 1:
             return False
@@ -69,27 +88,34 @@ def _validate_value_against_spec(val: Any, spec: StrategySpec) -> bool:
             return False
         if blacklist is not None and cat in blacklist:
             return False
+
     elif st_type == "emails":
         if not isinstance(val, str):
             return False
         email_pattern = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
         if not re.match(email_pattern, val):
             return False
+
     elif st_type == "from_regex":
         if not isinstance(val, str):
             return False
         pattern = p["pattern"]
         fullmatch = p.get("fullmatch", True)
-        if fullmatch:
-            if not re.fullmatch(pattern, val):
-                return False
-        else:
-            if not re.search(pattern, val):
-                return False
+        try:
+            if fullmatch:
+                if not re.fullmatch(pattern, val):
+                    return False
+            else:
+                if not re.search(pattern, val):
+                    return False
+        except re.error:
+            return False
+
     elif st_type == "sampled_from":
         elements = p["elements"]
         if val not in elements:
             return False
+
     elif st_type == "lists":
         if not isinstance(val, list):
             return False
@@ -103,6 +129,7 @@ def _validate_value_against_spec(val: Any, spec: StrategySpec) -> bool:
         if isinstance(elem_spec, StrategySpec):
             if not all(_validate_value_against_spec(x, elem_spec) for x in val):
                 return False
+
     elif st_type == "tuples":
         if not isinstance(val, tuple):
             return False

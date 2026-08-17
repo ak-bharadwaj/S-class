@@ -1,0 +1,128 @@
+{
+  "iterations_completed": 100,
+  "oracle_violations_count": 0,
+  "oracle_violations": [],
+  "strategy_types_tested": [
+    "floats",
+    "from_regex",
+    "integers",
+    "lists",
+    "sampled_from",
+    "text"
+  ],
+  "all_oracle_checks_passed": true,
+  "sample_records": [
+    {
+      "strategy_type": "integers",
+      "params": {
+        "min_value": 0,
+        "max_value": 1
+      },
+      "verdict": "PASS",
+      "cases_executed": 2,
+      "oracle_valid": true
+    },
+    {
+      "strategy_type": "text",
+      "params": {
+        "alphabet": null,
+        "min_size": 0,
+        "max_size": 3
+      },
+      "verdict": "PASS",
+      "cases_executed": 15,
+      "oracle_valid": true
+    },
+    {
+      "strategy_type": "text",
+      "params": {
+        "alphabet": "0123456789",
+        "min_size": 1,
+        "max_size": 7
+      },
+      "verdict": "PASS",
+      "cases_executed": 15,
+      "oracle_valid": true
+    },
+    {
+      "strategy_type": "lists",
+      "params": {
+        "elements": {
+          "strategy_type": "integers",
+          "params": {
+            "min_value": 0,
+            "max_value": 50
+          }
+        },
+        "min_size": 0,
+        "max_size": 3
+      },
+      "verdict": "PASS",
+      "cases_executed": 15,
+      "oracle_valid": true
+    },
+    {
+      "strategy_type": "text",
+      "params": {
+        "alphabet": "0123456789",
+        "min_size": 2,
+        "max_size": 3
+      },
+      "verdict": "PASS",
+      "cases_executed": 15,
+      "oracle_valid": true
+    },
+    {
+      "strategy_type": "text",
+      "params": {
+        "alphabet": "0123456789",
+        "min_size": 2,
+        "max_size": 6
+      },
+      "verdict": "PASS",
+      "cases_executed": 15,
+      "oracle_valid": true
+    },
+    {
+      "strategy_type": "from_regex",
+      "params": {
+        "pattern": "\\d{3}-\\d{2}-\\d{4}",
+        "fullmatch": false
+      },
+      "verdict": "PASS",
+      "cases_executed": 15,
+      "oracle_valid": true
+    },
+    {
+      "strategy_type": "from_regex",
+      "params": {
+        "pattern": "\\d{3}-\\d{2}-\\d{4}",
+        "fullmatch": true
+      },
+      "verdict": "PASS",
+      "cases_executed": 15,
+      "oracle_valid": true
+    },
+    {
+      "strategy_type": "from_regex",
+      "params": {
+        "pattern": "[A-Z]{2,4}-\\d{3,5}",
+        "fullmatch": false
+      },
+      "verdict": "PASS",
+      "cases_executed": 15,
+      "oracle_valid": true
+    },
+    {
+      "strategy_type": "sampled_from",
+      "params": {
+        "elements": [
+          0
+        ]
+      },
+      "verdict": "PASS",
+      "cases_executed": 1,
+      "oracle_valid": true
+    }
+  ]
+}
