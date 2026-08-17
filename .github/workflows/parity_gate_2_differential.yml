@@ -1,4 +1,4 @@
-name: OSS Parity Gate 2 - Differential Conformance Certification
+name: OSS Parity Gate 2 - Differential & Performance Certification
 
 on:
   push:
@@ -9,8 +9,8 @@ permissions:
   contents: read
 
 jobs:
-  certify-gate-2-differential:
-    name: Gate 2 Differential Certification (Ubuntu 24.04 / Python ${{ matrix.python-version }})
+  certify-gate-2:
+    name: Gate 2 Parity Certification (Ubuntu 24.04 / Python ${{ matrix.python-version }})
     runs-on: ubuntu-24.04
     strategy:
       matrix:
@@ -33,7 +33,12 @@ jobs:
         pip install pytest portalocker==4.1.0 hypothesis==6.165.9 schemathesis==4.24.3 psutil pyright ruff pydantic
         pip list
 
-    - name: Run Gate 2 Pytest Suites (Unit, Baseline, Adversarial, Mutation)
+    - name: Clean Workspace Benchmark Artifacts
+      run: |
+        rm -f benchmark/hypothesis_parity/gate_2_diff_report_*.json
+        rm -f benchmark/hypothesis_parity/gate_2_parity_certificate_*.json
+
+    - name: Run Gate 2 Pytest Suites (Baseline, Adversarial, Unit, Differential, Mutation)
       env:
         PYTHONPATH: .
       run: |
@@ -47,12 +52,24 @@ jobs:
 
     - name: Strict Verification of CI-Generated Differential Receipt
       run: |
-        python -c "import json, sys; d = json.load(open('benchmark/hypothesis_parity/gate_2_diff_report_py${{ matrix.python-version }}.json')); assert d['all_campaigns_passed'] is True and d['total_discrepancies'] == 0, f'Discrepancies found: {d[\"total_discrepancies\"]}'; print(f'Gate 2 Python ${{ matrix.python-version }} Certified: {d[\"total_evaluated_differential_cases\"]} cases, 0 discrepancies.')"
+        python -c "import json, sys; d = json.load(open('benchmark/hypothesis_parity/gate_2_diff_report_py${{ matrix.python-version }}.json')); assert d['all_campaigns_passed'] is True and d['total_discrepancies'] == 0, f'Discrepancies found: {d[\"total_discrepancies\"]}'; print(f'Gate 2 Python ${{ matrix.python-version }} Differential Certified: {d[\"total_evaluated_differential_cases\"]} cases, 0 discrepancies.')"
 
-    - name: Upload Immutable Gate 2 Differential Receipt
+    - name: Run Full 6,000-Trial Performance & 5,000-Cycle Soak Benchmark Harness
+      env:
+        PYTHONPATH: .
+      run: |
+        python benchmark/hypothesis_parity/performance_harness.py --output benchmark/hypothesis_parity/gate_2_parity_certificate_py${{ matrix.python-version }}.json --sha ${{ github.sha }} --run-id ${{ github.run_id }} --trials 1000 --soak 5000
+
+    - name: Strict Parity Certificate Verification & Assertions
+      run: |
+        python benchmark/hypothesis_parity/verify_gate_2_certificate.py --certificate benchmark/hypothesis_parity/gate_2_parity_certificate_py${{ matrix.python-version }}.json --expected-sha ${{ github.sha }}
+
+    - name: Upload Immutable Gate 2 Certification Artifacts
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: oss-parity-gate-2-diff-py${{ matrix.python-version }}-${{ github.sha }}
-        path: benchmark/hypothesis_parity/gate_2_diff_report_py${{ matrix.python-version }}.json
+        name: oss-parity-gate-2-cert-py${{ matrix.python-version }}-${{ github.sha }}
+        path: |
+          benchmark/hypothesis_parity/gate_2_diff_report_py${{ matrix.python-version }}.json
+          benchmark/hypothesis_parity/gate_2_parity_certificate_py${{ matrix.python-version }}.json
         retention-days: 90
