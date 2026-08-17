@@ -1,0 +1,58 @@
+name: OSS Parity Gate 2 - Differential Conformance Certification
+
+on:
+  push:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  certify-gate-2-differential:
+    name: Gate 2 Differential Certification (Ubuntu 24.04 / Python ${{ matrix.python-version }})
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+    - name: Checkout S-Class Plugin Repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install Pinned Parity Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest portalocker==4.1.0 hypothesis==6.165.9 schemathesis==4.24.3 psutil pyright ruff pydantic
+        pip list
+
+    - name: Run Gate 2 Pytest Suites (Unit, Baseline, Adversarial, Mutation)
+      env:
+        PYTHONPATH: .
+      run: |
+        python -m pytest tests/test_hypothesis_reference_adapter_baseline.py tests/test_hypothesis_adversarial_oracle.py tests/test_cleanroom_unit.py tests/test_hypothesis_cleanroom_differential.py tests/test_hypothesis_mutation_injections.py -v
+
+    - name: Run Full 2,542-Case Differential Campaign with Runtime Provenance
+      env:
+        PYTHONPATH: .
+      run: |
+        python benchmark/hypothesis_parity/differential_campaign_runner.py --output benchmark/hypothesis_parity/gate_2_diff_report_py${{ matrix.python-version }}.json --sha ${{ github.sha }} --run-id ${{ github.run_id }} --runner-os Linux
+
+    - name: Strict Verification of CI-Generated Differential Receipt
+      run: |
+        python -c "import json, sys; d = json.load(open('benchmark/hypothesis_parity/gate_2_diff_report_py${{ matrix.python-version }}.json')); assert d['all_campaigns_passed'] is True and d['total_discrepancies'] == 0, f'Discrepancies found: {d[\"total_discrepancies\"]}'; print(f'Gate 2 Python ${{ matrix.python-version }} Certified: {d[\"total_evaluated_differential_cases\"]} cases, 0 discrepancies.')"
+
+    - name: Upload Immutable Gate 2 Differential Receipt
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: oss-parity-gate-2-diff-py${{ matrix.python-version }}-${{ github.sha }}
+        path: benchmark/hypothesis_parity/gate_2_diff_report_py${{ matrix.python-version }}.json
+        retention-days: 90

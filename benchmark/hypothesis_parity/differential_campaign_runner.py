@@ -476,6 +476,14 @@ def run_generated_meta_fuzz_differential_campaign(
 
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="S-Class Differential Campaign Runner")
+    parser.add_argument("--output", type=str, default=None, help="Output JSON receipt path")
+    parser.add_argument("--sha", type=str, default=None, help="Exact source Git commit SHA")
+    parser.add_argument("--run-id", type=str, default=None, help="GitHub Actions Workflow Run ID")
+    parser.add_argument("--runner-os", type=str, default=None, help="CI Runner OS")
+    args = parser.parse_args()
+
     t0 = time.perf_counter()
     print("Starting Comprehensive Differential Campaign...")
 
@@ -492,17 +500,32 @@ if __name__ == "__main__":
     rep_meta = run_generated_meta_fuzz_differential_campaign(iterations_per_seed=500, seeds=[42, 1337, 2026, 9999, 54321])
     print(f"Campaign C (Meta-Fuzzing): {rep_meta['total_meta_fuzz_cases']} cases, {rep_meta['total_discrepancies']} discrepancies.")
 
+    unicode_prov = get_unicode_provenance()
+
+    ci_metadata = {
+        "runner_os": args.runner_os or os.environ.get("RUNNER_OS", sys.platform),
+        "tested_source_sha": args.sha or os.environ.get("GITHUB_SHA", "local_development"),
+        "workflow_run_id": args.run_id or os.environ.get("GITHUB_RUN_ID", "local"),
+        "python_runtime_version": sys.version,
+        "python_version_tuple": list(sys.version_info[:3]),
+        "unicode_database_version": unicode_prov.get("unicode_database_version"),
+        "index_sha256_checksum": unicode_prov.get("index_sha256_checksum"),
+        "campaign_seeds": [42, 1337, 2026, 9999, 54321]
+    }
+
     combined_report = {
         "campaign_timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "unicode_provenance": get_unicode_provenance(),
+        "provenance_certification_metadata": ci_metadata,
+        "unicode_provenance": unicode_prov,
         "total_evaluated_differential_cases": rep_strict["total_campaign_cases"] + rep_suppressed["total_campaign_cases"] + rep_meta["total_meta_fuzz_cases"],
+        "total_discrepancies": rep_strict["total_discrepancies"] + rep_suppressed["total_discrepancies"] + rep_meta["total_discrepancies"],
         "all_campaigns_passed": rep_strict["all_passed"] and rep_suppressed["all_passed"] and rep_meta["all_passed"],
         "campaign_a_standard_strict": rep_strict,
         "campaign_b_diagnostic_suppressed": rep_suppressed,
         "campaign_c_meta_fuzz_2500": rep_meta
     }
 
-    out_path = os.path.join(os.path.dirname(__file__), "differential_campaign_report.json")
+    out_path = args.output if args.output else os.path.join(os.path.dirname(__file__), "differential_campaign_report.json")
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(combined_report, f, indent=2)
 
