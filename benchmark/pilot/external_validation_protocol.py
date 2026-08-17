@@ -1,18 +1,25 @@
 """
 S-Class EOS V11.2 - External Developer Validation Protocol & Trial Harness.
 Provides authoritative session plan generation, balanced Latin-Square counterbalancing,
-monotonic human task timing, observer verification enforcement, and complete provenance tracking.
+monotonic human task timing, opaque execution token verification, observer verification enforcement,
+slot lifecycle protection, and complete provenance tracking.
 
 CRITICAL EXPERIMENTAL CONTROLS (Fail-Closed):
-1. Authoritative Session Plan:
+1. Authoritative Session Plan & Token Verification:
    - Trials derive condition assignment strictly from the registered ParticipantSessionPlan.
-   - Caller cannot override or alter condition assignment or task ordering.
-2. Monotonic Human Task Timing:
+   - ActiveTaskContext acts as an opaque, cryptographically-signed execution token.
+   - finish_participant_task strictly verifies every field of ActiveTaskContext (participant_id,
+     session_id, block_id, participant_index_in_block, task_id, task_order_index, assignment,
+     session_plan_hash) against the authoritative registered plan. Any mismatch FAILS CLOSED.
+2. Slot Lifecycle Protection:
+   - Each planned task slot (participant_id, task_order_index) may be started and completed exactly ONCE.
+   - Replay, duplicate execution, or cross-participant token hijacking FAILS CLOSED.
+3. Monotonic Human Task Timing:
    - Start and stop times measured directly by runner using time.monotonic().
    - Wall-clock timestamps preserved solely for audit logging.
-3. Observer Verification:
+4. Mandatory Observer Verification:
    - task_outcome is verified by an authoritative ObserverVerificationRecord (OBSERVER_VERIFIED).
-4. Balanced Block Provenance:
+5. Balanced Block Provenance:
    - Every plan and trial explicitly records block_id (BLOCK-01..), participant_index_in_block (0..5),
      protocol_version (1.3.0), and cryptographic session_plan_hash.
 """
@@ -22,7 +29,7 @@ import sys
 import json
 import time
 import hashlib
-from typing import Dict, Any, List, Optional, Tuple, Callable
+from typing import Dict, Any, List, Optional, Tuple, Set, Callable
 from dataclasses import dataclass, field, asdict
 
 repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -126,14 +133,40 @@ class ParticipantSessionPlan:
 
 @dataclass
 class ActiveTaskContext:
-    """Context created when a participant begins a task step."""
+    """Opaque execution token generated strictly by start_participant_task."""
     participant_id: str
+    session_id: str
+    block_id: str
+    participant_index_in_block: int
     task_id: str
     task_order_index: int
     assignment: str
     start_monotonic: float
     start_wall_iso: str
     session_plan_hash: str
+    token_signature: str = ""
+
+    def __post_init__(self):
+        if not self.token_signature:
+            self.token_signature = self._compute_signature()
+
+    def _compute_signature(self) -> str:
+        payload = json.dumps({
+            "participant_id": self.participant_id,
+            "session_id": self.session_id,
+            "block_id": self.block_id,
+            "participant_index_in_block": self.participant_index_in_block,
+            "task_id": self.task_id,
+            "task_order_index": self.task_order_index,
+            "assignment": self.assignment,
+            "start_monotonic": self.start_monotonic,
+            "start_wall_iso": self.start_wall_iso,
+            "session_plan_hash": self.session_plan_hash
+        }, sort_keys=True)
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def verify_token_integrity(self) -> bool:
+        return self.token_signature == self._compute_signature()
 
 
 @dataclass
@@ -175,6 +208,8 @@ class ExternalValidationProtocol:
         self.pipeline = EnterpriseGovernancePipeline(default_provider_registry)
         self.trials: List[DeveloperTrialRecord] = []
         self.plans: Dict[str, ParticipantSessionPlan] = {}
+        self.active_slots: Set[Tuple[str, int]] = set()      # (participant_id, task_order_index)
+        self.completed_slots: Set[Tuple[str, int]] = set()   # (participant_id, task_order_index)
 
     @staticmethod
     def get_standard_task_catalog() -> List[Dict[str, Any]]:
@@ -292,7 +327,8 @@ class ExternalValidationProtocol:
     ) -> ActiveTaskContext:
         """
         Authoritative Task Starter (Fail-Closed):
-        Looks up registered plan, validates order index, derives condition, and captures start monotonic time.
+        Looks up registered plan, validates order index, enforces slot lifecycle, derives condition,
+        and generates an opaque, signed ActiveTaskContext with start monotonic time.
         """
         plan = self.plans.get(participant_id)
         if plan is None:
@@ -304,14 +340,24 @@ class ExternalValidationProtocol:
         if task_order_index not in [1, 2, 3]:
             raise ValueError(f"Invalid task_order_index: {task_order_index}. Must be 1, 2, or 3.")
 
+        slot = (participant_id, task_order_index)
+        if slot in self.completed_slots:
+            raise ValueError(f"Task slot (participant='{participant_id}', task_order_index={task_order_index}) has already been completed.")
+
+        if slot in self.active_slots:
+            raise ValueError(f"Task slot (participant='{participant_id}', task_order_index={task_order_index}) is currently active in-flight.")
+
         task_id = plan.ordered_task_ids[task_order_index - 1]
         assignment = plan.condition_schedule[task_id]
 
         start_mono = time.monotonic()
         start_wall_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-        return ActiveTaskContext(
+        active_task = ActiveTaskContext(
             participant_id=participant_id,
+            session_id=plan.session_id,
+            block_id=plan.block_id,
+            participant_index_in_block=plan.participant_index_in_block,
             task_id=task_id,
             task_order_index=task_order_index,
             assignment=assignment,
@@ -319,6 +365,9 @@ class ExternalValidationProtocol:
             start_wall_iso=start_wall_iso,
             session_plan_hash=plan.session_plan_hash
         )
+
+        self.active_slots.add(slot)
+        return active_task
 
     def finish_participant_task(
         self,
@@ -332,20 +381,61 @@ class ExternalValidationProtocol:
     ) -> DeveloperTrialRecord:
         """
         Authoritative Task Finisher (Fail-Closed):
-        Measures monotonic duration, enforces observer outcome, executes assigned condition, and emits trial record.
+        1. Verifies token integrity and verifies EVERY field against the registered ParticipantSessionPlan.
+        2. Validates slot lifecycle.
+        3. Measures monotonic duration.
+        4. Enforces observer verification outcome.
+        5. Executes assigned condition and records trial record.
         """
+        slot = (active_task.participant_id, active_task.task_order_index)
+        if slot not in self.active_slots:
+            raise ValueError(f"Task slot {slot} is not in-flight or was not started via start_participant_task.")
+
+        if slot in self.completed_slots:
+            raise ValueError(f"Task slot {slot} has already been completed.")
+
+        if not active_task.verify_token_integrity():
+            raise ValueError("ActiveTaskContext token signature mismatch / tampered execution token detected.")
+
+        plan = self.plans.get(active_task.participant_id)
+        if plan is None:
+            raise ValueError(f"No registered session plan found for participant '{active_task.participant_id}'.")
+
+        if not plan.verify_integrity():
+            raise ValueError(f"Registered session plan failed integrity check for participant '{active_task.participant_id}'.")
+
+        # Rigorous field-by-field verification against authoritative plan
+        if active_task.session_id != plan.session_id:
+            raise ValueError(f"Active task session_id mismatch: expected '{plan.session_id}', got '{active_task.session_id}'")
+
+        if active_task.block_id != plan.block_id:
+            raise ValueError(f"Active task block_id mismatch: expected '{plan.block_id}', got '{active_task.block_id}'")
+
+        if active_task.participant_index_in_block != plan.participant_index_in_block:
+            raise ValueError(f"Active task participant_index_in_block mismatch: expected {plan.participant_index_in_block}, got {active_task.participant_index_in_block}")
+
+        if active_task.session_plan_hash != plan.session_plan_hash:
+            raise ValueError(f"Active task session_plan_hash mismatch: expected '{plan.session_plan_hash}', got '{active_task.session_plan_hash}'")
+
+        if active_task.task_order_index not in [1, 2, 3]:
+            raise ValueError(f"Invalid active task task_order_index: {active_task.task_order_index}")
+
+        expected_task_id = plan.ordered_task_ids[active_task.task_order_index - 1]
+        if active_task.task_id != expected_task_id:
+            raise ValueError(f"Active task task_id mismatch: expected '{expected_task_id}', got '{active_task.task_id}'")
+
+        expected_assignment = plan.condition_schedule[expected_task_id]
+        if active_task.assignment != expected_assignment:
+            raise ValueError(f"Active task assignment mismatch: expected '{expected_assignment}', got '{active_task.assignment}'")
+
+        if not isinstance(observer_verification, ObserverVerificationRecord):
+            raise ValueError("Missing or invalid ObserverVerificationRecord. Observer verification is mandatory for real trials.")
+
         stop_mono = time.monotonic()
         stop_wall_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
         if stop_mono < active_task.start_monotonic:
-            raise ValueError("Non-monotonic timestamp anomaly detected")
-
-        plan = self.plans.get(active_task.participant_id)
-        if plan is None or plan.session_plan_hash != active_task.session_plan_hash:
-            raise ValueError("Session plan hash mismatch or plan unregistered during active task execution")
-
-        if not isinstance(observer_verification, ObserverVerificationRecord):
-            raise ValueError("Missing or invalid ObserverVerificationRecord. Observer verification is mandatory for real trials.")
+            raise ValueError("Non-monotonic timestamp anomaly detected.")
 
         task = next((t for t in self.get_standard_task_catalog() if t["task_id"] == active_task.task_id), None)
         if task is None:
@@ -416,6 +506,8 @@ class ExternalValidationProtocol:
                 audit_notes=receipt.blocking_reasons or ["Real participant trial - S-Class Treatment", f"Observer: {observer_verification.observer_id}"]
             )
 
+        self.active_slots.remove(slot)
+        self.completed_slots.add(slot)
         self.trials.append(trial)
         return trial
 

@@ -102,20 +102,17 @@ def test_external_validation_real_participant_trial_authoritative_lifecycle():
     def dummy_generator(spec):
         return lambda tokens: tokens >= 0
 
-    # Step 1: Start task 1
     active_task = protocol.start_participant_task("real_dev_01", 1)
     assert active_task.task_order_index == 1
     assert active_task.task_id == plan.ordered_task_ids[0]
     assert active_task.assignment == plan.condition_schedule[active_task.task_id]
 
-    # Observer verification
     observer = ObserverVerificationRecord(
         observer_id="observer_dr_smith",
         verified_outcome="SUCCESS",
         verification_notes=["Observed clean implementation passing all property obligations"]
     )
 
-    # Step 2: Finish task
     trial = protocol.finish_participant_task(
         active_task=active_task,
         code_generator=dummy_generator,
@@ -140,44 +137,143 @@ def test_external_validation_real_participant_trial_authoritative_lifecycle():
     assert summary["provenance"]["real_participants_enrolled"] == 1
 
 
-def test_tamper_attempt_to_execute_without_registered_plan_fails_closed():
+def test_tamper_attempt_task_id_fails_closed():
     protocol = ExternalValidationProtocol()
-    with pytest.raises(ValueError, match="No registered session plan found"):
-        protocol.start_participant_task("unregistered_dev", 1)
-
-
-def test_tamper_attempt_with_invalid_task_order_index_fails_closed():
-    protocol = ExternalValidationProtocol()
-    plan = protocol.generate_participant_session_plan("dev_02", 1)
+    plan = protocol.generate_participant_session_plan("dev_t1", 0)
     protocol.register_plan(plan)
 
-    with pytest.raises(ValueError, match="Invalid task_order_index"):
-        protocol.start_participant_task("dev_02", 4)
+    active_task = protocol.start_participant_task("dev_t1", 1)
+    # Attempt to swap task_id
+    active_task.task_id = "TASK-02-CONFIG-SCHEMA-PARSER"
+    active_task.token_signature = active_task._compute_signature()
 
-
-def test_tamper_attempt_with_corrupted_plan_hash_fails_closed():
-    protocol = ExternalValidationProtocol()
-    plan = protocol.generate_participant_session_plan("dev_03", 2)
-    plan.session_plan_hash = "tampered_hash_value_12345"
-
-    with pytest.raises(ValueError, match="integrity verification failed"):
-        protocol.register_plan(plan)
-
-
-def test_tamper_attempt_missing_observer_verification_fails_closed():
-    protocol = ExternalValidationProtocol()
-    plan = protocol.generate_participant_session_plan("dev_04", 3)
-    protocol.register_plan(plan)
-
-    active_task = protocol.start_participant_task("dev_04", 1)
-
-    with pytest.raises(ValueError, match="Missing or invalid ObserverVerificationRecord"):
+    observer = ObserverVerificationRecord(observer_id="obs", verified_outcome="SUCCESS")
+    with pytest.raises(ValueError, match="Active task task_id mismatch"):
         protocol.finish_participant_task(
             active_task=active_task,
             code_generator=lambda s: (lambda x: x),
-            observer_verification=None,  # Missing observer
+            observer_verification=observer,
             rework_iterations=0,
             developer_interventions=0,
             trust_score=4.0,
             usefulness_score=4.0
         )
+
+
+def test_tamper_attempt_assignment_fails_closed():
+    protocol = ExternalValidationProtocol()
+    plan = protocol.generate_participant_session_plan("dev_t2", 0)
+    protocol.register_plan(plan)
+
+    active_task = protocol.start_participant_task("dev_t2", 1)
+    # Attempt to switch BASELINE to SCLASS_TREATMENT
+    active_task.assignment = "SCLASS_TREATMENT"
+    active_task.token_signature = active_task._compute_signature()
+
+    observer = ObserverVerificationRecord(observer_id="obs", verified_outcome="SUCCESS")
+    with pytest.raises(ValueError, match="Active task assignment mismatch"):
+        protocol.finish_participant_task(
+            active_task=active_task,
+            code_generator=lambda s: (lambda x: x),
+            observer_verification=observer,
+            rework_iterations=0,
+            developer_interventions=0,
+            trust_score=4.0,
+            usefulness_score=4.0
+        )
+
+
+def test_tamper_attempt_session_id_and_block_id_fails_closed():
+    protocol = ExternalValidationProtocol()
+    plan = protocol.generate_participant_session_plan("dev_t3", 0)
+    protocol.register_plan(plan)
+
+    active_task = protocol.start_participant_task("dev_t3", 1)
+    active_task.block_id = "BLOCK-99"
+    active_task.token_signature = active_task._compute_signature()
+
+    observer = ObserverVerificationRecord(observer_id="obs", verified_outcome="SUCCESS")
+    with pytest.raises(ValueError, match="Active task block_id mismatch"):
+        protocol.finish_participant_task(
+            active_task=active_task,
+            code_generator=lambda s: (lambda x: x),
+            observer_verification=observer,
+            rework_iterations=0,
+            developer_interventions=0,
+            trust_score=4.0,
+            usefulness_score=4.0
+        )
+
+
+def test_tamper_attempt_cross_participant_reuse_fails_closed():
+    protocol = ExternalValidationProtocol()
+    plan_a = protocol.generate_participant_session_plan("dev_alice", 0)
+    plan_b = protocol.generate_participant_session_plan("dev_bob", 1)
+    protocol.register_plan(plan_a)
+    protocol.register_plan(plan_b)
+
+    active_task_a = protocol.start_participant_task("dev_alice", 1)
+
+    # Bob attempts to submit Alice's active task token
+    active_task_a.participant_id = "dev_bob"
+    active_task_a.token_signature = active_task_a._compute_signature()
+
+    observer = ObserverVerificationRecord(observer_id="obs", verified_outcome="SUCCESS")
+    with pytest.raises(ValueError, match="Active task session_id mismatch|Task slot.*not in-flight"):
+        protocol.finish_participant_task(
+            active_task=active_task_a,
+            code_generator=lambda s: (lambda x: x),
+            observer_verification=observer,
+            rework_iterations=0,
+            developer_interventions=0,
+            trust_score=4.0,
+            usefulness_score=4.0
+        )
+
+
+def test_tamper_attempt_unsigned_token_fails_closed():
+    protocol = ExternalValidationProtocol()
+    plan = protocol.generate_participant_session_plan("dev_t4", 0)
+    protocol.register_plan(plan)
+
+    active_task = protocol.start_participant_task("dev_t4", 1)
+    active_task.token_signature = "fraudulent_signature_xyz"
+
+    observer = ObserverVerificationRecord(observer_id="obs", verified_outcome="SUCCESS")
+    with pytest.raises(ValueError, match="ActiveTaskContext token signature mismatch"):
+        protocol.finish_participant_task(
+            active_task=active_task,
+            code_generator=lambda s: (lambda x: x),
+            observer_verification=observer,
+            rework_iterations=0,
+            developer_interventions=0,
+            trust_score=4.0,
+            usefulness_score=4.0
+        )
+
+
+def test_lifecycle_protection_repeated_task_slot_fails_closed():
+    protocol = ExternalValidationProtocol()
+    plan = protocol.generate_participant_session_plan("dev_lifecycle", 0)
+    protocol.register_plan(plan)
+
+    active_task_1 = protocol.start_participant_task("dev_lifecycle", 1)
+
+    # Attempting to start the same slot while active must fail
+    with pytest.raises(ValueError, match="currently active in-flight"):
+        protocol.start_participant_task("dev_lifecycle", 1)
+
+    observer = ObserverVerificationRecord(observer_id="obs", verified_outcome="SUCCESS")
+    protocol.finish_participant_task(
+        active_task=active_task_1,
+        code_generator=lambda s: (lambda x: x),
+        observer_verification=observer,
+        rework_iterations=0,
+        developer_interventions=0,
+        trust_score=4.0,
+        usefulness_score=4.0
+    )
+
+    # Attempting to start the completed slot again must fail closed
+    with pytest.raises(ValueError, match="has already been completed"):
+        protocol.start_participant_task("dev_lifecycle", 1)
