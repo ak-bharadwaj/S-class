@@ -1,3 +1,4 @@
+# Exact pinned dependencies for OSS Parity Gate 3 (Schemathesis Provider Independence)
 pytest==9.0.3
 hypothesis==6.165.9
 schemathesis==4.24.3

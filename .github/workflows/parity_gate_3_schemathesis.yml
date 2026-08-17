@@ -1,0 +1,73 @@
+name: OSS Parity Gate 3 - Schemathesis Provider Independence Certification
+
+on:
+  push:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  certify-schemathesis-gate-3:
+    name: Schemathesis Gate 3 Certification (Ubuntu / Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+    - name: Checkout S-Class Plugin Repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: false
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install Pinned Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-parity-gate3.txt
+        pip list
+
+    - name: Verify Strict Dependency Version Policy
+      env:
+        PYTHONPATH: .
+      run: |
+        python -c "from benchmark.providers.schemathesis.version_policy import VersionPolicy; is_ok, ver, msg = VersionPolicy.check_environment(require_certified=True); assert is_ok, f'Version check failed: {msg}'; print(f'Exact certified version verified: {ver}')"
+
+    - name: Clean Workspace Benchmark Artifacts
+      run: |
+        rm -f benchmark/parity/gate_3_parity_certificate.json
+
+    - name: Run Pytest Provider Boundary & Adversarial Suite
+      env:
+        PYTHONPATH: .
+      run: |
+        python -m pytest tests/test_schemathesis_provider_contract.py tests/test_schemathesis_integration_corpus.py tests/test_schemathesis_integration.py -v
+
+    - name: Run Full Schemathesis Gate 3 Certification Harness
+      env:
+        PYTHONPATH: .
+        GITHUB_SHA: ${{ github.sha }}
+      run: |
+        python benchmark/parity/schemathesis_gate_3_harness.py benchmark/parity/gate_3_parity_certificate.json
+
+    - name: Strict Certificate Verification & Provenance Assertions
+      env:
+        PYTHONPATH: .
+      run: |
+        python benchmark/parity/verify_gate_3_certificate.py --certificate benchmark/parity/gate_3_parity_certificate.json --expected-sha ${{ github.sha }} --expected-version "4.24.3"
+
+    - name: Upload Immutable Gate 3 Certificate
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: oss-parity-gate-3-${{ github.sha }}-py${{ matrix.python-version }}
+        path: |
+          benchmark/parity/gate_3_parity_certificate.json
