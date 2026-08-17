@@ -386,22 +386,26 @@ properties:
     $ref: "#/$defs/PolicyExpression"
 $defs:
   PolicyRule:
+    oneOf:
+      - $ref: "#/$defs/RequireCapabilityRule"
+      - $ref: "#/$defs/RequireTierRule"
+      - $ref: "#/$defs/RequireEvidenceCountRule"
+      - $ref: "#/$defs/NoConflictsRule"
+      - $ref: "#/$defs/NoStaleEvidenceRule"
+      - $ref: "#/$defs/RequireIndependentProvidersRule"
+
+  RequireCapabilityRule:
     type: "object"
     additionalProperties: false
     required: ["rule_type", "parameters"]
     properties:
       rule_type:
         type: "string"
-        enum:
-          - "REQUIRE_CAPABILITY"
-          - "REQUIRE_TIER"
-          - "REQUIRE_EVIDENCE_COUNT"
-          - "NO_CONFLICTS"
-          - "NO_STALE_EVIDENCE"
-          - "REQUIRE_INDEPENDENT_PROVIDERS"
+        const: "REQUIRE_CAPABILITY"
       parameters:
         type: "object"
         additionalProperties: false
+        required: ["capability"]
         properties:
           capability:
             type: "string"
@@ -413,50 +417,163 @@ $defs:
               - "UNIT_TEST_EXECUTION"
               - "DEPENDENCY_SECURITY_SCAN"
               - "PROVENANCE_BEARING_HUMAN_REVIEW"
+
+  RequireTierRule:
+    type: "object"
+    additionalProperties: false
+    required: ["rule_type", "parameters"]
+    properties:
+      rule_type:
+        type: "string"
+        const: "REQUIRE_TIER"
+      parameters:
+        type: "object"
+        additionalProperties: false
+        required: ["tier"]
+        properties:
           tier:
             type: "string"
             enum: ["V0_OBSERVABLE", "V1_STRUCTURAL", "V2_BEHAVIORAL", "V3_SYSTEM_LEVEL", "V4_JUDGMENT"]
           min_count:
             type: "integer"
             minimum: 1
+            default: 1
+
+  RequireEvidenceCountRule:
+    type: "object"
+    additionalProperties: false
+    required: ["rule_type", "parameters"]
+    properties:
+      rule_type:
+        type: "string"
+        const: "REQUIRE_EVIDENCE_COUNT"
+      parameters:
+        type: "object"
+        additionalProperties: false
+        required: ["min_count"]
+        properties:
+          min_count:
+            type: "integer"
+            minimum: 1
+
+  NoConflictsRule:
+    type: "object"
+    additionalProperties: false
+    required: ["rule_type", "parameters"]
+    properties:
+      rule_type:
+        type: "string"
+        const: "NO_CONFLICTS"
+      parameters:
+        type: "object"
+        additionalProperties: false
+
+  NoStaleEvidenceRule:
+    type: "object"
+    additionalProperties: false
+    required: ["rule_type", "parameters"]
+    properties:
+      rule_type:
+        type: "string"
+        const: "NO_STALE_EVIDENCE"
+      parameters:
+        type: "object"
+        additionalProperties: false
+
+  RequireIndependentProvidersRule:
+    type: "object"
+    additionalProperties: false
+    required: ["rule_type", "parameters"]
+    properties:
+      rule_type:
+        type: "string"
+        const: "REQUIRE_INDEPENDENT_PROVIDERS"
+      parameters:
+        type: "object"
+        additionalProperties: false
+        required: ["min_independent_sources", "group_by"]
+        properties:
           min_independent_sources:
             type: "integer"
             minimum: 1
           group_by:
             type: "string"
             enum: ["PROVIDER_TYPE", "EXECUTION_PROCESS", "AUTHOR"]
+
   PolicyExpression:
+    oneOf:
+      - $ref: "#/$defs/AllExpression"
+      - $ref: "#/$defs/AnyExpression"
+      - $ref: "#/$defs/AtLeastExpression"
+      - $ref: "#/$defs/ConditionalExpression"
+
+  AllExpression:
     type: "object"
     additionalProperties: false
     required: ["combinator", "rules"]
     properties:
       combinator:
         type: "string"
-        enum: ["ALL", "ANY", "AT_LEAST", "CONDITIONAL"]
-      min_count:
-        type: ["integer", "null"]
-        minimum: 1
-      independent_by:
-        type: ["string", "null"]
-        enum: ["PROVIDER_TYPE", "EXECUTION_PROCESS", "AUTHOR", null]
+        const: "ALL"
       rules:
         type: "array"
+        minItems: 1
         items:
           $ref: "#/$defs/PolicyRule"
+
+  AnyExpression:
+    type: "object"
+    additionalProperties: false
+    required: ["combinator", "rules"]
+    properties:
+      combinator:
+        type: "string"
+        const: "ANY"
+      rules:
+        type: "array"
+        minItems: 1
+        items:
+          $ref: "#/$defs/PolicyRule"
+
+  AtLeastExpression:
+    type: "object"
+    additionalProperties: false
+    required: ["combinator", "min_count", "rules"]
+    properties:
+      combinator:
+        type: "string"
+        const: "AT_LEAST"
+      min_count:
+        type: "integer"
+        minimum: 1
+      independent_by:
+        type: "string"
+        enum: ["PROVIDER_TYPE", "EXECUTION_PROCESS", "AUTHOR"]
+      rules:
+        type: "array"
+        minItems: 1
+        items:
+          $ref: "#/$defs/PolicyRule"
+
+  ConditionalExpression:
+    type: "object"
+    additionalProperties: false
+    required: ["combinator", "condition", "then_expression", "else_expression"]
+    properties:
+      combinator:
+        type: "string"
+        const: "CONDITIONAL"
       condition:
-        type: ["object", "null"]
+        type: "object"
         additionalProperties: false
+        required: ["predicate", "value"]
         properties:
-          predicate: { type: "string" }
+          predicate: { type: "string", minLength: 1 }
           value: { type: "string" }
       then_expression:
-        anyOf:
-          - $ref: "#/$defs/PolicyExpression"
-          - type: "null"
+        $ref: "#/$defs/PolicyExpression"
       else_expression:
-        anyOf:
-          - $ref: "#/$defs/PolicyExpression"
-          - type: "null"
+        $ref: "#/$defs/PolicyExpression"
 ```
 
 ### 3.5 Policy Exception Record Schema (`PolicyException`)
@@ -474,7 +591,7 @@ required:
   - "authorized_by"
   - "compensating_controls"
   - "expiry"
-  - "hmac_signature"
+  - "signature"
 properties:
   exception_id:
     type: "string"
@@ -497,9 +614,8 @@ properties:
   expiry:
     type: ["string", "null"]
     format: "date-time"
-  hmac_signature:
-    type: "string"
-    pattern: "^[a-f0-9]{64}$"
+  signature:
+    $ref: "#/$defs/AsymmetricAuthoritySignature"
 $defs:
   AuthorizedActor:
     type: "object"
@@ -508,7 +624,36 @@ $defs:
     properties:
       actor_id: { type: "string", minLength: 1 }
       actor_role: { type: "string", minLength: 1 }
-      public_key_fingerprint: { type: "string", minLength: 8 }
+      public_key_fingerprint: { type: "string", pattern: "^[a-f0-9]{64}$" }
+  AsymmetricAuthoritySignature:
+    type: "object"
+    additionalProperties: false
+    required:
+      - "algorithm"
+      - "signer_identity"
+      - "public_key_fingerprint"
+      - "payload_digest"
+      - "signature_hex"
+      - "timestamp"
+    properties:
+      algorithm:
+        type: "string"
+        enum: ["ED25519", "ECDSA-P256-SHA256"]
+      signer_identity:
+        type: "string"
+        minLength: 1
+      public_key_fingerprint:
+        type: "string"
+        pattern: "^[a-f0-9]{64}$"
+      payload_digest:
+        type: "string"
+        pattern: "^[a-f0-9]{64}$"
+      signature_hex:
+        type: "string"
+        pattern: "^[a-f0-9]{64,128}$"
+      timestamp:
+        type: "string"
+        format: "date-time"
 ```
 
 ### 3.6 Action Proposal Schema (`ActionProposal`)
@@ -675,7 +820,7 @@ properties:
   provenance:
     $ref: "#/$defs/EvidenceProvenance"
   signature:
-    $ref: "#/$defs/EvidenceSignature"
+    $ref: "#/$defs/HmacSessionSignature"
 $defs:
   EvidenceScope:
     type: "object"
@@ -710,14 +855,35 @@ $defs:
       engine_version: { type: "string", minLength: 1 }
       environment_hash: { type: "string", pattern: "^[a-f0-9]{64}$" }
       timestamp: { type: "string", format: "date-time" }
-  EvidenceSignature:
+  HmacSessionSignature:
     type: "object"
     additionalProperties: false
-    required: ["algorithm", "digest", "hmac"]
+    required:
+      - "algorithm"
+      - "key_id"
+      - "nonce"
+      - "raw_stdout_digest"
+      - "signature_hex"
+      - "timestamp"
     properties:
-      algorithm: { type: "string", enum: ["HMAC-SHA256", "ED25519"] }
-      digest: { type: "string", pattern: "^[a-f0-9]{64}$" }
-      hmac: { type: "string", pattern: "^[a-f0-9]{64}$" }
+      algorithm:
+        type: "string"
+        const: "HMAC-SHA256"
+      key_id:
+        type: "string"
+        minLength: 1
+      nonce:
+        type: "string"
+        minLength: 1
+      raw_stdout_digest:
+        type: "string"
+        pattern: "^[a-f0-9]{64}$"
+      signature_hex:
+        type: "string"
+        pattern: "^[a-f0-9]{64}$"
+      timestamp:
+        type: "string"
+        format: "date-time"
 ```
 
 ### 3.9 Plan-as-Artifact Schema (`Plan`)
@@ -827,7 +993,7 @@ required:
   - "conflicts"
   - "stale_evidence"
   - "evaluated_at"
-  - "signer_digest"
+  - "signature"
 properties:
   receipt_id:
     type: "string"
@@ -857,10 +1023,38 @@ properties:
   evaluated_at:
     type: "string"
     format: "date-time"
-  signer_digest:
-    type: "string"
-    pattern: "^[a-f0-9]{64}$"
+  signature:
+    $ref: "#/$defs/AsymmetricAuthoritySignature"
 $defs:
+  AsymmetricAuthoritySignature:
+    type: "object"
+    additionalProperties: false
+    required:
+      - "algorithm"
+      - "signer_identity"
+      - "public_key_fingerprint"
+      - "payload_digest"
+      - "signature_hex"
+      - "timestamp"
+    properties:
+      algorithm:
+        type: "string"
+        enum: ["ED25519", "ECDSA-P256-SHA256"]
+      signer_identity:
+        type: "string"
+        minLength: 1
+      public_key_fingerprint:
+        type: "string"
+        pattern: "^[a-f0-9]{64}$"
+      payload_digest:
+        type: "string"
+        pattern: "^[a-f0-9]{64}$"
+      signature_hex:
+        type: "string"
+        pattern: "^[a-f0-9]{64,128}$"
+      timestamp:
+        type: "string"
+        format: "date-time"
   ClaimAssessmentRecord:
     type: "object"
     additionalProperties: false

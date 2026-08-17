@@ -2,14 +2,16 @@
 
 Validates that all D0 schemas:
 1. Formally resolve all internal $defs and $ref pointers.
-2. Strictly reject undeclared/unknown fields via additionalProperties: false (ADV-17).
-3. Validate compliant domain payloads.
-4. Enforce strict ID patterns, hex formats, and domain constraints (CORE-02, CORE-03, CORE-08).
+2. Enforce strict discriminated PolicyRule and PolicyExpression semantics (closed parameters per rule).
+3. Enforce cryptographic signature schemas (HmacSessionSignature for IPC, AsymmetricAuthoritySignature for Authority/Exceptions/Receipts).
+4. Strictly reject undeclared/unknown fields via additionalProperties: false (ADV-17).
+5. Validate compliant domain payloads.
+6. Enforce strict ID patterns, hex formats, and domain constraints (CORE-02, CORE-03, CORE-04, CORE-06, CORE-08, CORE-18).
 """
 
 import copy
 import jsonschema
-from jsonschema import Draft202012Validator, validate
+from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 import pytest
 
@@ -248,24 +250,25 @@ POLICY_SCHEMA = {
     },
     "$defs": {
         "PolicyRule": {
+            "oneOf": [
+                {"$ref": "#/$defs/RequireCapabilityRule"},
+                {"$ref": "#/$defs/RequireTierRule"},
+                {"$ref": "#/$defs/RequireEvidenceCountRule"},
+                {"$ref": "#/$defs/NoConflictsRule"},
+                {"$ref": "#/$defs/NoStaleEvidenceRule"},
+                {"$ref": "#/$defs/RequireIndependentProvidersRule"},
+            ]
+        },
+        "RequireCapabilityRule": {
             "type": "object",
             "additionalProperties": False,
             "required": ["rule_type", "parameters"],
             "properties": {
-                "rule_type": {
-                    "type": "string",
-                    "enum": [
-                        "REQUIRE_CAPABILITY",
-                        "REQUIRE_TIER",
-                        "REQUIRE_EVIDENCE_COUNT",
-                        "NO_CONFLICTS",
-                        "NO_STALE_EVIDENCE",
-                        "REQUIRE_INDEPENDENT_PROVIDERS",
-                    ],
-                },
+                "rule_type": {"type": "string", "const": "REQUIRE_CAPABILITY"},
                 "parameters": {
                     "type": "object",
                     "additionalProperties": False,
+                    "required": ["capability"],
                     "properties": {
                         "capability": {
                             "type": "string",
@@ -278,7 +281,22 @@ POLICY_SCHEMA = {
                                 "DEPENDENCY_SECURITY_SCAN",
                                 "PROVENANCE_BEARING_HUMAN_REVIEW",
                             ],
-                        },
+                        }
+                    },
+                },
+            },
+        },
+        "RequireTierRule": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["rule_type", "parameters"],
+            "properties": {
+                "rule_type": {"type": "string", "const": "REQUIRE_TIER"},
+                "parameters": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["tier"],
+                    "properties": {
                         "tier": {
                             "type": "string",
                             "enum": [
@@ -289,8 +307,73 @@ POLICY_SCHEMA = {
                                 "V4_JUDGMENT",
                             ],
                         },
-                        "min_count": {"type": "integer", "minimum": 1},
-                        "min_independent_sources": {"type": "integer", "minimum": 1},
+                        "min_count": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 1,
+                        },
+                    },
+                },
+            },
+        },
+        "RequireEvidenceCountRule": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["rule_type", "parameters"],
+            "properties": {
+                "rule_type": {"type": "string", "const": "REQUIRE_EVIDENCE_COUNT"},
+                "parameters": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["min_count"],
+                    "properties": {
+                        "min_count": {"type": "integer", "minimum": 1}
+                    },
+                },
+            },
+        },
+        "NoConflictsRule": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["rule_type", "parameters"],
+            "properties": {
+                "rule_type": {"type": "string", "const": "NO_CONFLICTS"},
+                "parameters": {
+                    "type": "object",
+                    "additionalProperties": False,
+                },
+            },
+        },
+        "NoStaleEvidenceRule": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["rule_type", "parameters"],
+            "properties": {
+                "rule_type": {"type": "string", "const": "NO_STALE_EVIDENCE"},
+                "parameters": {
+                    "type": "object",
+                    "additionalProperties": False,
+                },
+            },
+        },
+        "RequireIndependentProvidersRule": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["rule_type", "parameters"],
+            "properties": {
+                "rule_type": {
+                    "type": "string",
+                    "const": "REQUIRE_INDEPENDENT_PROVIDERS",
+                },
+                "parameters": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["min_independent_sources", "group_by"],
+                    "properties": {
+                        "min_independent_sources": {
+                            "type": "integer",
+                            "minimum": 1,
+                        },
                         "group_by": {
                             "type": "string",
                             "enum": [
@@ -304,43 +387,79 @@ POLICY_SCHEMA = {
             },
         },
         "PolicyExpression": {
+            "oneOf": [
+                {"$ref": "#/$defs/AllExpression"},
+                {"$ref": "#/$defs/AnyExpression"},
+                {"$ref": "#/$defs/AtLeastExpression"},
+                {"$ref": "#/$defs/ConditionalExpression"},
+            ]
+        },
+        "AllExpression": {
             "type": "object",
             "additionalProperties": False,
             "required": ["combinator", "rules"],
             "properties": {
-                "combinator": {
-                    "type": "string",
-                    "enum": ["ALL", "ANY", "AT_LEAST", "CONDITIONAL"],
+                "combinator": {"type": "string", "const": "ALL"},
+                "rules": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"$ref": "#/$defs/PolicyRule"},
                 },
-                "min_count": {"type": ["integer", "null"], "minimum": 1},
+            },
+        },
+        "AnyExpression": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["combinator", "rules"],
+            "properties": {
+                "combinator": {"type": "string", "const": "ANY"},
+                "rules": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"$ref": "#/$defs/PolicyRule"},
+                },
+            },
+        },
+        "AtLeastExpression": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["combinator", "min_count", "rules"],
+            "properties": {
+                "combinator": {"type": "string", "const": "AT_LEAST"},
+                "min_count": {"type": "integer", "minimum": 1},
                 "independent_by": {
-                    "type": ["string", "null"],
-                    "enum": ["PROVIDER_TYPE", "EXECUTION_PROCESS", "AUTHOR", None],
+                    "type": "string",
+                    "enum": ["PROVIDER_TYPE", "EXECUTION_PROCESS", "AUTHOR"],
                 },
                 "rules": {
                     "type": "array",
+                    "minItems": 1,
                     "items": {"$ref": "#/$defs/PolicyRule"},
                 },
+            },
+        },
+        "ConditionalExpression": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": [
+                "combinator",
+                "condition",
+                "then_expression",
+                "else_expression",
+            ],
+            "properties": {
+                "combinator": {"type": "string", "const": "CONDITIONAL"},
                 "condition": {
-                    "type": ["object", "null"],
+                    "type": "object",
                     "additionalProperties": False,
+                    "required": ["predicate", "value"],
                     "properties": {
-                        "predicate": {"type": "string"},
+                        "predicate": {"type": "string", "minLength": 1},
                         "value": {"type": "string"},
                     },
                 },
-                "then_expression": {
-                    "anyOf": [
-                        {"$ref": "#/$defs/PolicyExpression"},
-                        {"type": "null"},
-                    ]
-                },
-                "else_expression": {
-                    "anyOf": [
-                        {"$ref": "#/$defs/PolicyExpression"},
-                        {"type": "null"},
-                    ]
-                },
+                "then_expression": {"$ref": "#/$defs/PolicyExpression"},
+                "else_expression": {"$ref": "#/$defs/PolicyExpression"},
             },
         },
     },
@@ -359,7 +478,7 @@ POLICY_EXCEPTION_SCHEMA = {
         "authorized_by",
         "compensating_controls",
         "expiry",
-        "hmac_signature",
+        "signature",
     ],
     "properties": {
         "exception_id": {"type": "string", "pattern": "^EXC-[A-Za-z0-9_-]+$"},
@@ -373,7 +492,7 @@ POLICY_EXCEPTION_SCHEMA = {
             "items": {"type": "string", "minLength": 5},
         },
         "expiry": {"type": ["string", "null"], "format": "date-time"},
-        "hmac_signature": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "signature": {"$ref": "#/$defs/AsymmetricAuthoritySignature"},
     },
     "$defs": {
         "AuthorizedActor": {
@@ -383,9 +502,44 @@ POLICY_EXCEPTION_SCHEMA = {
             "properties": {
                 "actor_id": {"type": "string", "minLength": 1},
                 "actor_role": {"type": "string", "minLength": 1},
-                "public_key_fingerprint": {"type": "string", "minLength": 8},
+                "public_key_fingerprint": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$",
+                },
             },
-        }
+        },
+        "AsymmetricAuthoritySignature": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": [
+                "algorithm",
+                "signer_identity",
+                "public_key_fingerprint",
+                "payload_digest",
+                "signature_hex",
+                "timestamp",
+            ],
+            "properties": {
+                "algorithm": {
+                    "type": "string",
+                    "enum": ["ED25519", "ECDSA-P256-SHA256"],
+                },
+                "signer_identity": {"type": "string", "minLength": 1},
+                "public_key_fingerprint": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$",
+                },
+                "payload_digest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$",
+                },
+                "signature_hex": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64,128}$",
+                },
+                "timestamp": {"type": "string", "format": "date-time"},
+            },
+        },
     },
 }
 
@@ -508,7 +662,7 @@ EVIDENCE_SCHEMA = {
         },
         "independence_group": {"type": "string", "minLength": 1},
         "provenance": {"$ref": "#/$defs/EvidenceProvenance"},
-        "signature": {"$ref": "#/$defs/EvidenceSignature"},
+        "signature": {"$ref": "#/$defs/HmacSessionSignature"},
     },
     "$defs": {
         "EvidenceScope": {
@@ -558,17 +712,33 @@ EVIDENCE_SCHEMA = {
                 "timestamp": {"type": "string", "format": "date-time"},
             },
         },
-        "EvidenceSignature": {
+        "HmacSessionSignature": {
             "type": "object",
             "additionalProperties": False,
-            "required": ["algorithm", "digest", "hmac"],
+            "required": [
+                "algorithm",
+                "key_id",
+                "nonce",
+                "raw_stdout_digest",
+                "signature_hex",
+                "timestamp",
+            ],
             "properties": {
                 "algorithm": {
                     "type": "string",
-                    "enum": ["HMAC-SHA256", "ED25519"],
+                    "const": "HMAC-SHA256",
                 },
-                "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
-                "hmac": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+                "key_id": {"type": "string", "minLength": 1},
+                "nonce": {"type": "string", "minLength": 1},
+                "raw_stdout_digest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$",
+                },
+                "signature_hex": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$",
+                },
+                "timestamp": {"type": "string", "format": "date-time"},
             },
         },
     },
@@ -688,6 +858,111 @@ PLAN_SCHEMA = {
     },
 }
 
+ASSESSMENT_RECEIPT_SCHEMA = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "AssessmentReceipt",
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "receipt_id",
+        "obligation_id",
+        "policy_version",
+        "repository_sha",
+        "verdict",
+        "claim_assessments",
+        "conflicts",
+        "stale_evidence",
+        "evaluated_at",
+        "signature",
+    ],
+    "properties": {
+        "receipt_id": {"type": "string", "pattern": "^RCPT-[A-Za-z0-9_-]+$"},
+        "obligation_id": {"type": "string", "pattern": "^OBL-[A-Za-z0-9_-]+$"},
+        "policy_version": {"type": "integer", "minimum": 1},
+        "repository_sha": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+        "verdict": {
+            "type": "string",
+            "enum": ["SATISFIED", "UNSATISFIED", "CONFLICTED", "BLOCKED"],
+        },
+        "claim_assessments": {
+            "type": "array",
+            "items": {"$ref": "#/$defs/ClaimAssessmentRecord"},
+        },
+        "conflicts": {"type": "array", "items": {"type": "string"}},
+        "stale_evidence": {"type": "array", "items": {"type": "string"}},
+        "evaluated_at": {"type": "string", "format": "date-time"},
+        "signature": {"$ref": "#/$defs/AsymmetricAuthoritySignature"},
+    },
+    "$defs": {
+        "AsymmetricAuthoritySignature": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": [
+                "algorithm",
+                "signer_identity",
+                "public_key_fingerprint",
+                "payload_digest",
+                "signature_hex",
+                "timestamp",
+            ],
+            "properties": {
+                "algorithm": {
+                    "type": "string",
+                    "enum": ["ED25519", "ECDSA-P256-SHA256"],
+                },
+                "signer_identity": {"type": "string", "minLength": 1},
+                "public_key_fingerprint": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$",
+                },
+                "payload_digest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$",
+                },
+                "signature_hex": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64,128}$",
+                },
+                "timestamp": {"type": "string", "format": "date-time"},
+            },
+        },
+        "ClaimAssessmentRecord": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": [
+                "claim_id",
+                "status",
+                "supporting_evidence_ids",
+                "refuting_evidence_ids",
+            ],
+            "properties": {
+                "claim_id": {
+                    "type": "string",
+                    "pattern": "^CLM-[A-Za-z0-9_-]+$",
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "UNSUPPORTED",
+                        "SUPPORTED",
+                        "CONTRADICTED",
+                        "CONFLICTED",
+                        "STALE",
+                    ],
+                },
+                "supporting_evidence_ids": {
+                    "type": "array",
+                    "items": {"type": "string", "pattern": "^EV-[A-Za-z0-9_-]+$"},
+                },
+                "refuting_evidence_ids": {
+                    "type": "array",
+                    "items": {"type": "string", "pattern": "^EV-[A-Za-z0-9_-]+$"},
+                },
+            },
+        },
+    },
+}
+
 EVENT_ENVELOPE_SCHEMA = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "EventEnvelope",
@@ -735,7 +1010,7 @@ EVENT_ENVELOPE_SCHEMA = {
 
 
 # ============================================================================
-# Canonical Sample Payloads
+# Canonical Valid Payloads
 # ============================================================================
 
 VALID_TASK = {
@@ -757,31 +1032,6 @@ VALID_TASK = {
     "created_at": "2026-08-17T21:42:00Z",
 }
 
-VALID_POLICY = {
-    "policy_id": "POL-001",
-    "scope_level": "PROJECT",
-    "version": 1,
-    "expression": {
-        "combinator": "ALL",
-        "min_count": None,
-        "independent_by": None,
-        "rules": [
-            {
-                "rule_type": "REQUIRE_CAPABILITY",
-                "parameters": {"capability": "PROPERTY_TESTING"},
-            },
-            {
-                "rule_type": "REQUIRE_TIER",
-                "parameters": {"tier": "V2_BEHAVIORAL", "min_count": 2},
-            },
-            {"rule_type": "NO_CONFLICTS", "parameters": {}},
-        ],
-        "condition": None,
-        "then_expression": None,
-        "else_expression": None,
-    },
-}
-
 VALID_CLAIM = {
     "claim_id": "CLM-101",
     "obligation_id": "OBL-001",
@@ -798,13 +1048,117 @@ VALID_CLAIM = {
     "required_provider_capabilities": ["API_CONTRACT_FUZZING"],
 }
 
+VALID_POLICY = {
+    "policy_id": "POL-001",
+    "scope_level": "PROJECT",
+    "version": 1,
+    "expression": {
+        "combinator": "ALL",
+        "rules": [
+            {
+                "rule_type": "REQUIRE_CAPABILITY",
+                "parameters": {"capability": "PROPERTY_TESTING"},
+            },
+            {
+                "rule_type": "REQUIRE_TIER",
+                "parameters": {"tier": "V2_BEHAVIORAL", "min_count": 2},
+            },
+            {"rule_type": "NO_CONFLICTS", "parameters": {}},
+        ],
+    },
+}
+
+VALID_EVIDENCE = {
+    "evidence_id": "EV-001",
+    "claim_id": "CLM-101",
+    "provider_id": "schemathesis",
+    "capability": "API_CONTRACT_FUZZING",
+    "execution_id": "EXEC-99",
+    "source_sha": "b" * 40,
+    "scope": {
+        "targets_evaluated": ["DELETE:/users/{id}"],
+        "aspects_covered": ["status_code", "authorization_boundary"],
+    },
+    "observation": {
+        "raw_status": "PASS",
+        "diagnostics": ["200 responses verified", "403 on non-admin"],
+        "counterexample": None,
+    },
+    "polarity": "SUPPORTS",
+    "validity": "VALID",
+    "independence_group": "SCHEMATHESIS_RUN_1",
+    "provenance": {
+        "engine_name": "schemathesis",
+        "engine_version": "4.24.3",
+        "environment_hash": "c" * 64,
+        "timestamp": "2026-08-17T21:44:00Z",
+    },
+    "signature": {
+        "algorithm": "HMAC-SHA256",
+        "key_id": "SESSION-KEY-001",
+        "nonce": "NONCE-9921",
+        "raw_stdout_digest": "d" * 64,
+        "signature_hex": "e" * 64,
+        "timestamp": "2026-08-17T21:44:01Z",
+    },
+}
+
+VALID_EXCEPTION = {
+    "exception_id": "EXC-001",
+    "obligation_id": "OBL-001",
+    "policy_id": "POL-001",
+    "justification": "Manual verification approved by security officer with biometric key.",
+    "authorized_by": {
+        "actor_id": "HUMAN-SEC-01",
+        "actor_role": "SECURITY_LEAD",
+        "public_key_fingerprint": "f" * 64,
+    },
+    "compensating_controls": ["WAF rule rate limit enabled", "Audit log monitor enabled"],
+    "expiry": "2026-09-01T00:00:00Z",
+    "signature": {
+        "algorithm": "ED25519",
+        "signer_identity": "HUMAN-SEC-01",
+        "public_key_fingerprint": "f" * 64,
+        "payload_digest": "a" * 64,
+        "signature_hex": "b" * 128,
+        "timestamp": "2026-08-17T22:00:00Z",
+    },
+}
+
+VALID_RECEIPT = {
+    "receipt_id": "RCPT-001",
+    "obligation_id": "OBL-001",
+    "policy_version": 1,
+    "repository_sha": "a" * 40,
+    "verdict": "SATISFIED",
+    "claim_assessments": [
+        {
+            "claim_id": "CLM-101",
+            "status": "SUPPORTED",
+            "supporting_evidence_ids": ["EV-001"],
+            "refuting_evidence_ids": [],
+        }
+    ],
+    "conflicts": [],
+    "stale_evidence": [],
+    "evaluated_at": "2026-08-17T22:01:00Z",
+    "signature": {
+        "algorithm": "ED25519",
+        "signer_identity": "SCLASS_CORE_EVALUATOR",
+        "public_key_fingerprint": "e" * 64,
+        "payload_digest": "1" * 64,
+        "signature_hex": "2" * 128,
+        "timestamp": "2026-08-17T22:01:01Z",
+    },
+}
+
 
 # ============================================================================
 # Test Suite
 # ============================================================================
 
 def test_all_schemas_are_valid_draft202012():
-    """Verify that every canonical schema compiles under Draft 2020-12 validator."""
+    """Verify that all canonical schemas compile under Draft 2020-12 validator."""
     schemas = [
         TASK_SCHEMA,
         OBLIGATION_SCHEMA,
@@ -814,56 +1168,148 @@ def test_all_schemas_are_valid_draft202012():
         ACTION_PROPOSAL_SCHEMA,
         EVIDENCE_SCHEMA,
         PLAN_SCHEMA,
+        ASSESSMENT_RECEIPT_SCHEMA,
         EVENT_ENVELOPE_SCHEMA,
     ]
     for schema in schemas:
         Draft202012Validator.check_schema(schema)
 
 
-def test_policy_schema_resolves_defs_and_recursive_refs():
-    """Verify that Policy schema correctly resolves #/$defs/PolicyRule and #/$defs/PolicyExpression."""
+def test_policy_semantic_schema_enforces_discriminated_rule_parameters():
+    """Policy semantic validation: each rule_type only accepts its exact required parameters."""
     validator = Draft202012Validator(POLICY_SCHEMA)
-    # Valid payload should pass cleanly
+
+    # 1. Valid policy passes
     validator.validate(VALID_POLICY)
 
-    # Test recursive then/else expression resolution
-    recursive_policy = copy.deepcopy(VALID_POLICY)
-    recursive_policy["expression"] = {
-        "combinator": "CONDITIONAL",
-        "min_count": None,
-        "independent_by": None,
-        "rules": [],
-        "condition": {"predicate": "IS_PROD", "value": "true"},
-        "then_expression": {
+    # 2. REQUIRE_CAPABILITY without capability -> Rejection
+    bad_rule_1 = {
+        "policy_id": "POL-002",
+        "scope_level": "PROJECT",
+        "version": 1,
+        "expression": {
             "combinator": "ALL",
-            "min_count": None,
-            "independent_by": None,
             "rules": [
                 {
                     "rule_type": "REQUIRE_CAPABILITY",
-                    "parameters": {"capability": "API_CONTRACT_FUZZING"},
+                    "parameters": {}  # Missing 'capability'
                 }
-            ],
-            "condition": None,
-            "then_expression": None,
-            "else_expression": None,
-        },
-        "else_expression": {
-            "combinator": "ANY",
-            "min_count": None,
-            "independent_by": None,
+            ]
+        }
+    }
+    with pytest.raises(ValidationError):
+        validator.validate(bad_rule_1)
+
+    # 3. REQUIRE_CAPABILITY with extraneous parameter (e.g. tier) -> Rejection
+    bad_rule_2 = {
+        "policy_id": "POL-003",
+        "scope_level": "PROJECT",
+        "version": 1,
+        "expression": {
+            "combinator": "ALL",
             "rules": [
                 {
-                    "rule_type": "REQUIRE_TIER",
-                    "parameters": {"tier": "V0_OBSERVABLE", "min_count": 1},
+                    "rule_type": "REQUIRE_CAPABILITY",
+                    "parameters": {
+                        "capability": "PROPERTY_TESTING",
+                        "tier": "V2_BEHAVIORAL"  # Extraneous forbidden parameter
+                    }
                 }
-            ],
-            "condition": None,
-            "then_expression": None,
-            "else_expression": None,
-        },
+            ]
+        }
     }
-    validator.validate(recursive_policy)
+    with pytest.raises(ValidationError):
+        validator.validate(bad_rule_2)
+
+    # 4. REQUIRE_INDEPENDENT_PROVIDERS missing group_by -> Rejection
+    bad_rule_3 = {
+        "policy_id": "POL-004",
+        "scope_level": "PROJECT",
+        "version": 1,
+        "expression": {
+            "combinator": "ALL",
+            "rules": [
+                {
+                    "rule_type": "REQUIRE_INDEPENDENT_PROVIDERS",
+                    "parameters": {"min_independent_sources": 2}  # Missing 'group_by'
+                }
+            ]
+        }
+    }
+    with pytest.raises(ValidationError):
+        validator.validate(bad_rule_3)
+
+
+def test_policy_combinator_semantic_structures():
+    """Verify combinators require their exact semantic properties."""
+    validator = Draft202012Validator(POLICY_SCHEMA)
+
+    # 1. AT_LEAST requires min_count
+    at_least_missing_count = {
+        "policy_id": "POL-005",
+        "scope_level": "PROJECT",
+        "version": 1,
+        "expression": {
+            "combinator": "AT_LEAST",
+            "rules": [{"rule_type": "NO_CONFLICTS", "parameters": {}}]
+            # Missing min_count
+        }
+    }
+    with pytest.raises(ValidationError):
+        validator.validate(at_least_missing_count)
+
+    # 2. CONDITIONAL requires condition, then_expression, else_expression
+    conditional_policy = {
+        "policy_id": "POL-006",
+        "scope_level": "PROJECT",
+        "version": 1,
+        "expression": {
+            "combinator": "CONDITIONAL",
+            "condition": {"predicate": "ENV", "value": "PROD"},
+            "then_expression": {
+                "combinator": "ALL",
+                "rules": [{"rule_type": "REQUIRE_CAPABILITY", "parameters": {"capability": "API_CONTRACT_FUZZING"}}]
+            },
+            "else_expression": {
+                "combinator": "ANY",
+                "rules": [{"rule_type": "NO_CONFLICTS", "parameters": {}}]
+            }
+        }
+    }
+    validator.validate(conditional_policy)
+
+
+def test_hmac_session_signature_schema_validation():
+    """Verify Evidence enforces exact HmacSessionSignature schema."""
+    validator = Draft202012Validator(EVIDENCE_SCHEMA)
+    validator.validate(VALID_EVIDENCE)
+
+    # Malformed digest (not 64 hex chars)
+    bad_digest_ev = copy.deepcopy(VALID_EVIDENCE)
+    bad_digest_ev["signature"]["raw_stdout_digest"] = "invalid_short_digest"
+    with pytest.raises(ValidationError):
+        validator.validate(bad_digest_ev)
+
+    # Wrong algorithm
+    bad_algo_ev = copy.deepcopy(VALID_EVIDENCE)
+    bad_algo_ev["signature"]["algorithm"] = "UNSUPPORTED_ALGO"
+    with pytest.raises(ValidationError):
+        validator.validate(bad_algo_ev)
+
+
+def test_asymmetric_authority_signature_schema_validation():
+    """Verify PolicyException and AssessmentReceipt enforce exact AsymmetricAuthoritySignature."""
+    exc_validator = Draft202012Validator(POLICY_EXCEPTION_SCHEMA)
+    exc_validator.validate(VALID_EXCEPTION)
+
+    rcpt_validator = Draft202012Validator(ASSESSMENT_RECEIPT_SCHEMA)
+    rcpt_validator.validate(VALID_RECEIPT)
+
+    # Injected unknown field in signature
+    polluted_rcpt = copy.deepcopy(VALID_RECEIPT)
+    polluted_rcpt["signature"]["unauthorized_extra"] = "injected"
+    with pytest.raises(ValidationError):
+        rcpt_validator.validate(polluted_rcpt)
 
 
 def test_adv17_schema_pollution_rejected_on_top_level():
@@ -885,30 +1331,11 @@ def test_adv17_schema_pollution_rejected_on_nested_defs():
     with pytest.raises(ValidationError):
         Draft202012Validator(TASK_SCHEMA).validate(polluted_task)
 
-    # 2. Pollution in PolicyRule.parameters
-    polluted_policy = copy.deepcopy(VALID_POLICY)
-    polluted_policy["expression"]["rules"][0]["parameters"]["floating_confidence"] = 0.95
-    with pytest.raises(ValidationError):
-        Draft202012Validator(POLICY_SCHEMA).validate(polluted_policy)
-
-    # 3. Pollution in Claim.subject
+    # 2. Pollution in Claim.subject
     polluted_claim = copy.deepcopy(VALID_CLAIM)
     polluted_claim["subject"]["unauthorized_extra"] = 123
     with pytest.raises(ValidationError):
         Draft202012Validator(CLAIM_SCHEMA).validate(polluted_claim)
-
-
-def test_core08_confidence_score_rejection():
-    """CORE-08: PolicyRule rejects unknown parameters or untyped rule types."""
-    bad_rule_policy = copy.deepcopy(VALID_POLICY)
-    bad_rule_policy["expression"]["rules"] = [
-        {
-            "rule_type": "REQUIRE_CONFIDENCE_SCORE",  # Not in closed enum
-            "parameters": {},
-        }
-    ]
-    with pytest.raises(ValidationError):
-        Draft202012Validator(POLICY_SCHEMA).validate(bad_rule_policy)
 
 
 def test_id_pattern_validation_enforcement():
@@ -939,47 +1366,21 @@ def test_unresolved_ref_intentionally_detected():
         validator.validate({"broken_field": {"any": "value"}})
 
 
-def test_evidence_and_plan_schemas_resolve_defs_and_reject_pollution():
-    """Verify Evidence and Plan schemas resolve all sub-$defs and reject injected properties."""
-    valid_evidence = {
-        "evidence_id": "EV-001",
-        "claim_id": "CLM-101",
-        "provider_id": "schemathesis",
-        "capability": "API_CONTRACT_FUZZING",
-        "execution_id": "EXEC-99",
-        "source_sha": "b" * 40,
-        "scope": {
-            "targets_evaluated": ["DELETE:/users/{id}"],
-            "aspects_covered": ["status_code", "authorization_boundary"]
-        },
-        "observation": {
-            "raw_status": "PASS",
-            "diagnostics": ["200 responses verified", "403 on non-admin"],
-            "counterexample": None
-        },
-        "polarity": "SUPPORTS",
-        "validity": "VALID",
-        "independence_group": "SCHEMATHESIS_RUN_1",
-        "provenance": {
-            "engine_name": "schemathesis",
-            "engine_version": "4.24.3",
-            "environment_hash": "c" * 64,
-            "timestamp": "2026-08-17T21:44:00Z"
-        },
-        "signature": {
-            "algorithm": "HMAC-SHA256",
-            "digest": "d" * 64,
-            "hmac": "e" * 64
+def test_core08_confidence_score_rejection():
+    """CORE-08: PolicyRule rejects unknown parameters or untyped rule types."""
+    bad_rule_policy = copy.deepcopy(VALID_POLICY)
+    bad_rule_policy["expression"]["rules"] = [
+        {
+            "rule_type": "REQUIRE_CONFIDENCE_SCORE",
+            "parameters": {},
         }
-    }
-    Draft202012Validator(EVIDENCE_SCHEMA).validate(valid_evidence)
-
-    # Injected field inside Evidence.signature ($defs.EvidenceSignature)
-    polluted_evidence = copy.deepcopy(valid_evidence)
-    polluted_evidence["signature"]["fake_signature_key"] = "bypass"
+    ]
     with pytest.raises(ValidationError):
-        Draft202012Validator(EVIDENCE_SCHEMA).validate(polluted_evidence)
+        Draft202012Validator(POLICY_SCHEMA).validate(bad_rule_policy)
 
+
+def test_plan_schema_resolves_defs_and_rejects_pollution():
+    """Verify Plan schema resolves all sub-$defs and rejects injected properties."""
     valid_plan = {
         "plan_id": "PLAN-001",
         "origin": "SELF_PLANNING",
