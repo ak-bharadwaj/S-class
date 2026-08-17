@@ -3,9 +3,10 @@ S-Class EOS V11.2 - Independent Clean-Room Property Testing Engine.
 Implements the frozen behavioral contract (Phase 2) from first principles.
 Includes:
 - Global hard-capped shrink evaluation budget (<= 500)
-- Structured FilterExhaustion handling (verdict='ERROR')
-- AST-driven generic regex generation (re._parser / sre_parse)
-- Targeted Unicode category generation
+- Structured FilterExhaustion error handling (verdict='ERROR')
+- Fail-closed Unicode character generation without invalid fallbacks
+- AST-driven generic regex generation with start/end anchor awareness (^, $, \b)
+- Portable standard library regex parser compatibility layer
 - Deterministic email contract
 """
 
@@ -17,15 +18,26 @@ import unicodedata
 from typing import Dict, Any, Optional, List, Tuple, Callable
 from benchmark.hypothesis_parity.observation import StrategySpec, ObservationRecord, ReplayOutcome, compute_size
 from benchmark.hypothesis_parity.differential_oracle import _validate_value_against_spec
-
-try:
-    import re._parser as sre_parse
-except ImportError:
-    import sre_parse
+from benchmark.hypothesis_parity.regex_parser_compat import (
+    parse_regex_ast,
+    inspect_regex_anchors,
+    OP_LITERAL,
+    OP_NOT_LITERAL,
+    OP_RANGE,
+    OP_IN,
+    OP_BRANCH,
+    OP_SUBPATTERN,
+    OP_MAX_REPEAT,
+    OP_MIN_REPEAT,
+    OP_ANY,
+    OP_AT,
+    OP_CATEGORY,
+    MAXREPEAT
+)
 
 
 # =============================================================================
-# Unicode Category Mappings & Character Generation
+# Unicode Category Mappings & Character Generation (Fail-Closed)
 # =============================================================================
 
 _PRECOMPUTED_CATEGORY_CODEPOINTS = {
@@ -39,57 +51,75 @@ _PRECOMPUTED_CATEGORY_CODEPOINTS = {
 
 
 def _generate_character(whitelist: Optional[List[str]], blacklist: Optional[List[str]], min_cp: int, max_cp: int, rng: random.Random) -> str:
-    """Generates a character meeting exact category whitelist/blacklist and codepoint bounds."""
+    """
+    Generates a character meeting exact category whitelist/blacklist and codepoint bounds.
+    Fails closed if no character can satisfy the constraints (never emits invalid fallback).
+    """
+    if min_cp > max_cp:
+        raise RuntimeError(f"Filter exhaustion: min_codepoint ({min_cp}) > max_codepoint ({max_cp})")
+
+    # 1. Fast path from precomputed tables
     pool: List[int] = []
     if whitelist:
         for cat in whitelist:
             if cat in _PRECOMPUTED_CATEGORY_CODEPOINTS:
                 pool.extend([cp for cp in _PRECOMPUTED_CATEGORY_CODEPOINTS[cat] if min_cp <= cp <= max_cp])
-    if pool:
-        return chr(rng.choice(pool))
+        if blacklist:
+            pool = [cp for cp in pool if unicodedata.category(chr(cp)) not in blacklist]
+        if pool:
+            return chr(rng.choice(pool))
 
-    for _ in range(100):
-        cp = rng.randint(min_cp, max_cp)
+    # 2. Bounded scan of the codepoint range
+    valid_candidates: List[str] = []
+    step = 1 if (max_cp - min_cp) < 2000 else (max_cp - min_cp) // 1000
+    for cp in range(min_cp, max_cp + 1, max(1, step)):
         char = chr(cp)
         cat = unicodedata.category(char)
         if whitelist and cat not in whitelist:
             continue
         if blacklist and cat in blacklist:
             continue
-        return char
+        valid_candidates.append(char)
+        if len(valid_candidates) >= 50:
+            break
 
-    # Fallback to bounded ASCII printable
-    return chr(rng.randint(max(32, min_cp), min(126, max_cp)))
+    if valid_candidates:
+        return rng.choice(valid_candidates)
+
+    # Fail closed: No valid character in range satisfies constraints
+    raise RuntimeError(
+        f"Filter exhaustion: no Unicode character in codepoint range [{min_cp}, {max_cp}] "
+        f"satisfies whitelist={whitelist}, blacklist={blacklist}"
+    )
 
 
 # =============================================================================
-# Generic AST-Driven Regex Generation
+# Generic AST-Driven Regex Generation with Anchor Awareness
 # =============================================================================
 
 def _generate_ast_regex(nodes, rng: random.Random) -> str:
-    """Recursively walks standard library regex AST nodes to synthesize conforming strings."""
+    """Recursively walks parsed AST nodes to synthesize conforming strings."""
     parts = []
     for item in nodes:
         op, av = item
-        if op == sre_parse.LITERAL:
+        if op == OP_LITERAL:
             parts.append(chr(av))
-        elif op == sre_parse.NOT_LITERAL:
+        elif op == OP_NOT_LITERAL:
             cand = chr(rng.randint(32, 126))
             while cand == chr(av):
                 cand = chr(rng.randint(32, 126))
             parts.append(cand)
-        elif op == sre_parse.RANGE:
+        elif op == OP_RANGE:
             lo, hi = av
             parts.append(chr(rng.randint(lo, hi)))
-        elif op == sre_parse.IN:
-            # Pick an element from character class
+        elif op == OP_IN:
             choice_item = rng.choice(av)
             c_op, c_av = choice_item
-            if c_op == sre_parse.LITERAL:
+            if c_op == OP_LITERAL:
                 parts.append(chr(c_av))
-            elif c_op == sre_parse.RANGE:
+            elif c_op == OP_RANGE:
                 parts.append(chr(rng.randint(c_av[0], c_av[1])))
-            elif c_op == sre_parse.CATEGORY:
+            elif c_op == OP_CATEGORY:
                 if "DIGIT" in str(c_av):
                     parts.append(chr(rng.randint(48, 57)))
                 elif "WORD" in str(c_av):
@@ -100,25 +130,25 @@ def _generate_ast_regex(nodes, rng: random.Random) -> str:
                     parts.append(chr(rng.randint(65, 90)))
             else:
                 parts.append("a")
-        elif op == sre_parse.BRANCH:
+        elif op == OP_BRANCH:
             _, branch_list = av
             chosen = rng.choice(branch_list)
             parts.append(_generate_ast_regex(chosen, rng))
-        elif op == sre_parse.SUBPATTERN:
+        elif op == OP_SUBPATTERN:
             sub_nodes = av[-1]
             parts.append(_generate_ast_regex(sub_nodes, rng))
-        elif op in (sre_parse.MAX_REPEAT, sre_parse.MIN_REPEAT):
+        elif op in (OP_MAX_REPEAT, OP_MIN_REPEAT):
             min_rep, max_rep, sub_nodes = av
-            effective_max = min_rep + 4 if max_rep == sre_parse.MAXREPEAT or max_rep > min_rep + 8 else max_rep
+            effective_max = min_rep + 4 if max_rep == MAXREPEAT or max_rep > min_rep + 8 else max_rep
             reps = rng.randint(min_rep, max(min_rep, effective_max))
             for _ in range(reps):
                 parts.append(_generate_ast_regex(sub_nodes, rng))
-        elif op == sre_parse.ANY:
+        elif op == OP_ANY:
             parts.append(chr(rng.randint(32, 126)))
-        elif op == sre_parse.AT:
-            # Boundary anchor (^, $, \b) - no characters emitted
+        elif op == OP_AT:
+            # Anchor tokens (^, $, \b) do not emit characters directly
             pass
-        elif op == sre_parse.CATEGORY:
+        elif op == OP_CATEGORY:
             if "DIGIT" in str(av):
                 parts.append(chr(rng.randint(48, 57)))
             elif "WORD" in str(av):
@@ -131,19 +161,47 @@ def _generate_ast_regex(nodes, rng: random.Random) -> str:
 
 
 def _generate_from_regex_string(pattern: str, fullmatch: bool, rng: random.Random) -> str:
-    """Synthesizes a conforming regex string from any supported pattern."""
+    """
+    Synthesizes a conforming regex string from any supported pattern.
+    Properly respects start (^), end ($), and word boundary (\\b) anchors under fullmatch=False.
+    """
     try:
-        parsed = sre_parse.parse(pattern)
+        parsed = parse_regex_ast(pattern)
+        has_start_anchor, has_end_anchor, has_start_b, has_end_b = inspect_regex_anchors(parsed)
+    except Exception as err:
+        raise RuntimeError(f"Filter exhaustion: invalid regex pattern '{pattern}': {err}")
+
+    for _ in range(25):
         core = _generate_ast_regex(parsed, rng)
         if fullmatch:
-            return core
-        # If fullmatch=False, optionally add noise prefix/suffix
-        prefix = "".join(rng.choice("abcdefghijklmnopqrstuvwxyz") for _ in range(rng.randint(0, 3)))
-        suffix = "".join(rng.choice("abcdefghijklmnopqrstuvwxyz") for _ in range(rng.randint(0, 3)))
-        return f"{prefix}{core}{suffix}"
-    except Exception:
-        # Fallback if pattern contains unsupported extensions
-        return "fallback123"
+            candidate = core
+        else:
+            # Respect anchors and boundaries when constructing partial matches
+            if has_start_anchor:
+                prefix = ""
+            elif has_start_b:
+                prefix = rng.choice([" ", "\t", "---", ""])
+            else:
+                prefix = "".join(rng.choice("abcdefghijklmnopqrstuvwxyz") for _ in range(rng.randint(0, 3)))
+
+            if has_end_anchor:
+                suffix = ""
+            elif has_end_b:
+                suffix = rng.choice([" ", "\t", "---", ""])
+            else:
+                suffix = "".join(rng.choice("abcdefghijklmnopqrstuvwxyz") for _ in range(rng.randint(0, 3)))
+
+            candidate = f"{prefix}{core}{suffix}"
+
+        # Verify candidate matches regex specification
+        if fullmatch:
+            if re.fullmatch(pattern, candidate):
+                return candidate
+        else:
+            if re.search(pattern, candidate):
+                return candidate
+
+    raise RuntimeError(f"Filter exhaustion: unable to synthesize conforming regex match for '{pattern}'")
 
 
 # =============================================================================
@@ -204,7 +262,10 @@ def _generate_boundary_candidates(spec: StrategySpec) -> List[Any]:
         blacklist = p.get("blacklist_categories", None)
         min_cp = p.get("min_codepoint", 32)
         max_cp = p.get("max_codepoint", 126)
-        candidates.append(_generate_character(whitelist, blacklist, min_cp, max_cp, random.Random(0)))
+        try:
+            candidates.append(_generate_character(whitelist, blacklist, min_cp, max_cp, random.Random(0)))
+        except RuntimeError:
+            pass
 
     elif st_type == "emails":
         candidates.extend(["user@example.com", "admin@domain.org", "test.user+tag@sub.domain.co"])
@@ -219,7 +280,10 @@ def _generate_boundary_candidates(spec: StrategySpec) -> List[Any]:
     elif st_type == "from_regex":
         pattern = p["pattern"]
         fullmatch = p.get("fullmatch", True)
-        candidates.append(_generate_from_regex_string(pattern, fullmatch, random.Random(0)))
+        try:
+            candidates.append(_generate_from_regex_string(pattern, fullmatch, random.Random(0)))
+        except RuntimeError:
+            pass
 
     elif st_type == "lists":
         min_s = p.get("min_size", 0)

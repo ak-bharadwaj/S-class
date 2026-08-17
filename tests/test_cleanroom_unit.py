@@ -2,8 +2,8 @@
 S-Class EOS V11.2 - Gate 2 Phase 5: Clean-Room Engine Unit Test Suite.
 Verifies the independent CleanRoomPropertyEngine against the frozen contract.
 Tests strategy generation, boundary bias, monotonic shrinking, determinism, filtering,
-replay mechanics, hard-capped shrink budget, AST regex generation, narrow Unicode categories,
-and structured FilterExhaustion error handling.
+replay mechanics, hard-capped shrink budget, AST regex generation, anchor semantics (^, $, \b),
+fail-closed Unicode character constraints, and structured FilterExhaustion error handling.
 """
 
 import pytest
@@ -15,6 +15,7 @@ from typing import List, Dict, Any, Tuple
 from benchmark.hypothesis_parity.observation import StrategySpec, ObservationRecord, ReplayOutcome, compute_size
 from benchmark.hypothesis_parity.cleanroom_engine import CleanRoomPropertyEngine, _generate_random_value, _generate_boundary_candidates
 from benchmark.hypothesis_parity.differential_oracle import IndependentDifferentialOracle, _validate_value_against_spec
+from benchmark.hypothesis_parity.regex_parser_compat import parse_regex_ast, inspect_regex_anchors
 
 
 # =============================================================================
@@ -162,12 +163,12 @@ def test_cleanroom_shrinking_lists():
 
 
 # =============================================================================
-# 4. Blocker 1: Authoritative Shrink Budget Hard Cap (<= 500)
+# 4. Authoritative Shrink Budget Hard Cap (<= 500)
 # =============================================================================
 
 def test_cleanroom_shrink_evaluation_budget_hard_cap():
     """
-    Blocker 1 Test: Regression test designed to trigger excessive shrinking steps.
+    Regression test designed to trigger excessive shrinking steps.
     Verifies that the shrink budget halts evaluations authoritatively and strictly enforces <= 500 calls.
     """
     specs = {
@@ -181,7 +182,6 @@ def test_cleanroom_shrink_evaluation_budget_hard_cap():
         )
     }
 
-    # Highly complex condition requiring hundreds of binary reductions
     def complex_multistep_property(huge_list: List[int]) -> bool:
         assert len(huge_list) < 25 or sum(huge_list) < 1000, "Too long and too large"
         return True
@@ -189,7 +189,6 @@ def test_cleanroom_shrink_evaluation_budget_hard_cap():
     obs = CleanRoomPropertyEngine.run_campaign(specs, complex_multistep_property, max_examples=20, seed=42, enable_shrinking=True)
     assert obs.verdict == "FAIL"
     assert obs.shrink_evaluations is not None
-    # Authoritative assertion: MUST NOT exceed 500
     assert obs.shrink_evaluations <= 500, f"Budget limit violated: {obs.shrink_evaluations} > 500"
 
     valid, violations = IndependentDifferentialOracle.validate_observation(obs, complex_multistep_property, specs)
@@ -198,19 +197,19 @@ def test_cleanroom_shrink_evaluation_budget_hard_cap():
 
 
 # =============================================================================
-# 5. Blocker 2: Filter Exhaustion Error Handling
+# 5. Filter Exhaustion Error Handling
 # =============================================================================
 
 def test_cleanroom_filter_exhaustion_returns_structured_error():
     """
-    Blocker 2 Test: Pathological / impossible filter predicate.
+    Pathological / impossible filter predicate.
     Verifies that filter exhaustion is caught and returned as structured ObservationRecord(verdict='ERROR', exception_class='FilterExhaustion').
     """
     specs = {
         "impossible_val": StrategySpec(
             strategy_type="integers",
             params={"min_value": 0, "max_value": 100},
-            filter_fn=lambda x: x > 500 and x < -500  # Impossible condition
+            filter_fn=lambda x: x > 500 and x < -500
         )
     }
 
@@ -221,20 +220,21 @@ def test_cleanroom_filter_exhaustion_returns_structured_error():
 
 
 # =============================================================================
-# 6. Blocker 3: Generic AST Regex Generation
+# 6. Regex AST Generation & Anchor Semantics (^, $, \b)
 # =============================================================================
 
-def test_cleanroom_generic_ast_regex_generation():
+def test_cleanroom_regex_anchors_and_boundary_semantics():
     """
-    Blocker 3 Test: Validates generic AST regex generation across various grammar patterns.
+    Validates generic AST regex generation with strict start (^) and end ($) anchor handling under fullmatch=False.
     """
     rng = random.Random(42)
     test_patterns = [
-        (r"\d{3}-\d{2}-\d{4}", True),
-        (r"[A-Z]{2,4}-[a-z]{3,5}", True),
-        (r"GET|POST|PUT|DELETE|PATCH", True),
-        (r"[0-9a-f]{8}-[0-9a-f]{4}", True),
-        (r"\d{3}", False)  # fullmatch=False
+        (r"^abc$", False),          # Exact start and end anchored
+        (r"^foo", False),           # Start anchored only
+        (r"bar$", False),           # End anchored only
+        (r"\bword\b", False),       # Word boundary
+        (r"[A-Z]{2,4}-\d{3,5}", True),
+        (r"GET|POST|PUT|DELETE", True)
     ]
 
     for pat, fullmatch in test_patterns:
@@ -243,42 +243,55 @@ def test_cleanroom_generic_ast_regex_generation():
             val = _generate_random_value(spec, rng)
             assert isinstance(val, str)
             if fullmatch:
-                assert re.fullmatch(pat, val), f"Regex mismatch for {pat}: '{val}'"
+                assert re.fullmatch(pat, val), f"Fullmatch regex failed for {pat}: '{val}'"
             else:
-                assert re.search(pat, val), f"Substring regex mismatch for {pat}: '{val}'"
+                assert re.search(pat, val), f"Substring regex search failed for {pat}: '{val}'"
+                if pat.startswith("^"):
+                    assert val.startswith("foo") or val == "abc", f"Start anchor violated: {val}"
+                if pat.endswith("$"):
+                    assert val.endswith("bar") or val == "abc", f"End anchor violated: {val}"
 
 
 # =============================================================================
-# 7. Blocker 4: Unicode Character Categories
+# 7. Fail-Closed Unicode Character Generation
 # =============================================================================
 
-def test_cleanroom_character_narrow_categories():
+def test_cleanroom_character_fail_closed_on_impossible_constraints():
     """
-    Blocker 4 Test: Validates targeted generation for narrow Unicode categories (digits, uppercase, punctuation).
+    Validates that impossible Unicode category/bounds combinations fail closed with FilterExhaustion
+    and NEVER emit invalid fallback values outside StrategySpec.
     """
+    # 1. Lu (Uppercase) within lowercase ASCII range [97, 122]
+    impossible_lu = {
+        "c": StrategySpec(strategy_type="characters", params={"whitelist_categories": ["Lu"], "min_codepoint": 97, "max_codepoint": 122})
+    }
+    obs1 = CleanRoomPropertyEngine.run_campaign(impossible_lu, lambda c: True, max_examples=10, seed=42)
+    assert obs1.verdict == "ERROR"
+    assert obs1.exception_class == "FilterExhaustion"
+
+    # 2. Empty intersection: whitelist and blacklist same category
+    empty_intersection = {
+        "c": StrategySpec(strategy_type="characters", params={"whitelist_categories": ["Nd"], "blacklist_categories": ["Nd"]})
+    }
+    obs2 = CleanRoomPropertyEngine.run_campaign(empty_intersection, lambda c: True, max_examples=10, seed=42)
+    assert obs2.verdict == "ERROR"
+    assert obs2.exception_class == "FilterExhaustion"
+
+    # 3. Valid narrow category generation
     rng = random.Random(42)
-
     spec_digits = StrategySpec(strategy_type="characters", params={"whitelist_categories": ["Nd"], "min_codepoint": 48, "max_codepoint": 57})
     for _ in range(20):
         c = _generate_random_value(spec_digits, rng)
         assert unicodedata.category(c) == "Nd"
         assert c in "0123456789"
 
-    spec_upper = StrategySpec(strategy_type="characters", params={"whitelist_categories": ["Lu"], "min_codepoint": 65, "max_codepoint": 90})
-    for _ in range(20):
-        c = _generate_random_value(spec_upper, rng)
-        assert unicodedata.category(c) == "Lu"
-        assert c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
 
 # =============================================================================
-# 8. Blocker 5: Email Validity Contract
+# 8. Email Contract
 # =============================================================================
 
 def test_cleanroom_email_validity_contract():
-    """
-    Blocker 5 Test: Validates email contract (user@domain.tld) format.
-    """
+    """Validates email contract format."""
     rng = random.Random(42)
     spec_email = StrategySpec(strategy_type="emails")
 
@@ -347,17 +360,14 @@ def test_cleanroom_replay_outcome_integrity():
         assert x < 5, "x >= 5"
         return True
 
-    # 1. Clean failure reproduction
     outcome_clean = CleanRoomPropertyEngine.replay_case(target_prop, {"x": 10}, expected_exception_class="AssertionError")
     assert outcome_clean.reproduced_failure is True
     assert outcome_clean.unexpected_error is False
 
-    # 2. Corrupted counterexample (passes)
     outcome_pass = CleanRoomPropertyEngine.replay_case(target_prop, {"x": 2}, expected_exception_class="AssertionError")
     assert outcome_pass.reproduced_failure is False
     assert outcome_pass.unexpected_error is False
 
-    # 3. Unexpected error
     def buggy_prop(x: int) -> bool:
         return x / "invalid_str"
 
