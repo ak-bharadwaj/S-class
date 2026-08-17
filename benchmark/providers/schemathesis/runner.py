@@ -377,15 +377,91 @@ class SchemathesisRunner:
             status_enum = ProviderStatus.OUTPUT_INVALID
 
         exit_code = parsed_out.get("exit_code", proc.returncode)
-
         raw_violations = parsed_out.get("violations", [])
+        raw_stats = parsed_out.get("stats", {})
+        checks_executed = raw_stats.get("checks_executed", 0)
+        violations_count = raw_stats.get("violations_count", len(raw_violations))
+
+        # 8. Independent Semantic & Mathematical Evidence Verification (Parent Authority Boundary)
+        # Rule A: Mathematical consistency
+        if violations_count != len(raw_violations):
+            return _make_result(
+                status=ProviderStatus.OUTPUT_INVALID,
+                exit_code=proc.returncode,
+                violations=[],
+                stats=ExecutionStats(),
+                diagnostics=[{"error": f"Statistical mismatch: stats.violations_count ({violations_count}) != len(violations) ({len(raw_violations)})"}],
+                summary="Worker output validation failed: Mathematical inconsistency in violation count.",
+                st_ver=st_ver
+            )
+
+        # Rule B: Status vs Evidence consistency
+        if status_enum == ProviderStatus.TARGET_CLEAN:
+            if len(raw_violations) > 0:
+                return _make_result(
+                    status=ProviderStatus.OUTPUT_INVALID,
+                    exit_code=proc.returncode,
+                    violations=[],
+                    stats=ExecutionStats(),
+                    diagnostics=[{"error": f"Semantic contradiction: status is TARGET_CLEAN but worker provided {len(raw_violations)} violations."}],
+                    summary="Worker output validation failed: TARGET_CLEAN contradiction with non-empty violations.",
+                    st_ver=st_ver
+                )
+            if checks_executed == 0:
+                return _make_result(
+                    status=ProviderStatus.OUTPUT_INVALID,
+                    exit_code=proc.returncode,
+                    violations=[],
+                    stats=ExecutionStats(),
+                    diagnostics=[{"error": "Semantic contradiction: status is TARGET_CLEAN but checks_executed is 0."}],
+                    summary="Worker output validation failed: TARGET_CLEAN contradiction with 0 checks.",
+                    st_ver=st_ver
+                )
+            if exit_code != 0:
+                return _make_result(
+                    status=ProviderStatus.OUTPUT_INVALID,
+                    exit_code=proc.returncode,
+                    violations=[],
+                    stats=ExecutionStats(),
+                    diagnostics=[{"error": f"Exit code contradiction: status is TARGET_CLEAN but exit code is {exit_code}."}],
+                    summary="Worker output validation failed: Non-zero exit code on TARGET_CLEAN.",
+                    st_ver=st_ver
+                )
+
+        elif status_enum == ProviderStatus.TARGET_CONTRACT_VIOLATED:
+            if len(raw_violations) == 0:
+                return _make_result(
+                    status=ProviderStatus.OUTPUT_INVALID,
+                    exit_code=proc.returncode,
+                    violations=[],
+                    stats=ExecutionStats(),
+                    diagnostics=[{"error": "Semantic contradiction: status is TARGET_CONTRACT_VIOLATED but violations list is empty."}],
+                    summary="Worker output validation failed: TARGET_CONTRACT_VIOLATED contradiction with empty violations.",
+                    st_ver=st_ver
+                )
+
+        # Rule C: Authoritative Schema Scope & Path Conformance
+        if schema_dict and isinstance(schema_dict.get("paths"), dict):
+            valid_paths = set(schema_dict["paths"].keys())
+            for v_entry in raw_violations:
+                v_path = v_entry.get("path")
+                if v_path and v_path != "unknown" and v_path not in valid_paths:
+                    return _make_result(
+                        status=ProviderStatus.OUTPUT_INVALID,
+                        exit_code=proc.returncode,
+                        violations=[],
+                        stats=ExecutionStats(),
+                        diagnostics=[{"error": f"Scope violation: Reported violation path '{v_path}' does not exist in authoritative schema."}],
+                        summary="Worker output validation failed: Fabricated or unknown endpoint path.",
+                        st_ver=st_ver
+                    )
+
         violations = [SchemathesisParser.parse_raw_failure_entry(v) for v in raw_violations]
 
-        raw_stats = parsed_out.get("stats", {})
         stats = ExecutionStats(
             endpoints_tested=raw_stats.get("endpoints_tested", 0),
             operations_tested=raw_stats.get("operations_tested", 0),
-            checks_executed=raw_stats.get("checks_executed", 0),
+            checks_executed=checks_executed,
             violations_count=len(violations),
             duration_sec=raw_stats.get("duration_sec", 0.0)
         )
@@ -395,7 +471,8 @@ class SchemathesisRunner:
             "worker_pid": parsed_out.get("worker_pid"),
             "parent_pid": os.getpid(),
             "handshake_verified": True,
-            "hmac_verified": True
+            "hmac_verified": True,
+            "semantic_consistency_verified": True
         })
         if stderr_data.strip():
             diagnostics.append({"worker_stderr_sample": stderr_data[:500]})

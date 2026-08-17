@@ -421,6 +421,168 @@ def test_adversarial_replay_envelope_against_new_execution_fails_closed():
         assert result.passed is False
 
 
+def test_adversarial_worker_with_valid_secret_forges_clean_status_with_violations_fails_closed():
+    """
+    Adversarial Attack 4: Compromised worker possesses the real secret and computes a valid HMAC,
+    but flips status to TARGET_CLEAN while including real contract violations.
+    Parent semantic validator MUST FAIL CLOSED with OUTPUT_INVALID.
+    """
+    runner = SchemathesisRunner(source_sha="a" * 40)
+    schema = {"openapi": "3.0.0", "paths": {"/users": {"get": {}}}}
+
+    def mock_communicate(input=None, timeout=None):
+        envelope = json.loads(input)
+        # Worker signs with the REAL secret, but tries to assert TARGET_CLEAN while violations exist
+        worker_out = _build_valid_worker_output(
+            status="TARGET_CLEAN",  # Contradiction!
+            exit_code=0,
+            violations=[{"error_type": "ServerError", "message": "Crash", "path": "/users", "method": "GET"}],
+            stats={"endpoints_tested": 1, "operations_tested": 1, "checks_executed": 5, "violations_count": 1, "duration_sec": 0.1},
+            execution_id=envelope["execution_id"],
+            parent_nonce=envelope["parent_nonce"],
+            execution_secret=envelope["execution_secret"]
+        )
+        return json.dumps(worker_out), ""
+
+    mock_proc = MagicMock()
+    mock_proc.communicate.side_effect = mock_communicate
+    mock_proc.returncode = 0
+
+    with patch("subprocess.Popen", return_value=mock_proc):
+        result = runner.execute(schema_dict=schema)
+        assert result.status == ProviderStatus.OUTPUT_INVALID
+        assert result.passed is False
+        assert "contradiction" in result.diagnostics[0]["error"].lower()
+
+
+def test_adversarial_worker_with_valid_secret_forges_clean_status_with_zero_checks_fails_closed():
+    """
+    Adversarial Attack 5: Compromised worker signs with valid HMAC claiming TARGET_CLEAN with 0 checks executed.
+    Parent semantic validator MUST FAIL CLOSED with OUTPUT_INVALID.
+    """
+    runner = SchemathesisRunner(source_sha="a" * 40)
+    schema = {"openapi": "3.0.0", "paths": {"/users": {"get": {}}}}
+
+    def mock_communicate(input=None, timeout=None):
+        envelope = json.loads(input)
+        worker_out = _build_valid_worker_output(
+            status="TARGET_CLEAN",  # Claiming clean without doing work
+            exit_code=0,
+            violations=[],
+            stats={"endpoints_tested": 1, "operations_tested": 1, "checks_executed": 0, "violations_count": 0, "duration_sec": 0.1},
+            execution_id=envelope["execution_id"],
+            parent_nonce=envelope["parent_nonce"],
+            execution_secret=envelope["execution_secret"]
+        )
+        return json.dumps(worker_out), ""
+
+    mock_proc = MagicMock()
+    mock_proc.communicate.side_effect = mock_communicate
+    mock_proc.returncode = 0
+
+    with patch("subprocess.Popen", return_value=mock_proc):
+        result = runner.execute(schema_dict=schema)
+        assert result.status == ProviderStatus.OUTPUT_INVALID
+        assert result.passed is False
+        assert "checks_executed is 0" in result.diagnostics[0]["error"].lower()
+
+
+def test_adversarial_worker_with_valid_secret_forges_violation_status_with_empty_violations_fails_closed():
+    """
+    Adversarial Attack 6: Compromised worker signs with valid HMAC claiming TARGET_CONTRACT_VIOLATED but provides 0 violations.
+    Parent semantic validator MUST FAIL CLOSED with OUTPUT_INVALID.
+    """
+    runner = SchemathesisRunner(source_sha="a" * 40)
+    schema = {"openapi": "3.0.0", "paths": {"/users": {"get": {}}}}
+
+    def mock_communicate(input=None, timeout=None):
+        envelope = json.loads(input)
+        worker_out = _build_valid_worker_output(
+            status="TARGET_CONTRACT_VIOLATED",
+            exit_code=1,
+            violations=[],  # Empty violations list
+            stats={"endpoints_tested": 1, "operations_tested": 1, "checks_executed": 5, "violations_count": 0, "duration_sec": 0.1},
+            execution_id=envelope["execution_id"],
+            parent_nonce=envelope["parent_nonce"],
+            execution_secret=envelope["execution_secret"]
+        )
+        return json.dumps(worker_out), ""
+
+    mock_proc = MagicMock()
+    mock_proc.communicate.side_effect = mock_communicate
+    mock_proc.returncode = 1
+
+    with patch("subprocess.Popen", return_value=mock_proc):
+        result = runner.execute(schema_dict=schema)
+        assert result.status == ProviderStatus.OUTPUT_INVALID
+        assert result.passed is False
+        assert "empty" in result.diagnostics[0]["error"].lower()
+
+
+def test_adversarial_worker_with_valid_secret_forges_unknown_endpoint_path_fails_closed():
+    """
+    Adversarial Attack 7: Compromised worker fabricates violations on an endpoint path not in the authoritative schema.
+    Parent scope validator MUST FAIL CLOSED with OUTPUT_INVALID.
+    """
+    runner = SchemathesisRunner(source_sha="a" * 40)
+    schema = {"openapi": "3.0.0", "paths": {"/users": {"get": {}}}}
+
+    def mock_communicate(input=None, timeout=None):
+        envelope = json.loads(input)
+        worker_out = _build_valid_worker_output(
+            status="TARGET_CONTRACT_VIOLATED",
+            exit_code=1,
+            violations=[{"error_type": "JsonSchemaError", "message": "Fake", "path": "/fabricated_endpoint_admin", "method": "GET"}],
+            stats={"endpoints_tested": 1, "operations_tested": 1, "checks_executed": 5, "violations_count": 1, "duration_sec": 0.1},
+            execution_id=envelope["execution_id"],
+            parent_nonce=envelope["parent_nonce"],
+            execution_secret=envelope["execution_secret"]
+        )
+        return json.dumps(worker_out), ""
+
+    mock_proc = MagicMock()
+    mock_proc.communicate.side_effect = mock_communicate
+    mock_proc.returncode = 1
+
+    with patch("subprocess.Popen", return_value=mock_proc):
+        result = runner.execute(schema_dict=schema)
+        assert result.status == ProviderStatus.OUTPUT_INVALID
+        assert result.passed is False
+        assert "does not exist in authoritative schema" in result.diagnostics[0]["error"]
+
+
+def test_adversarial_worker_with_valid_secret_inconsistent_violation_counts_fails_closed():
+    """
+    Adversarial Attack 8: Compromised worker produces mismatched stats.violations_count vs len(violations).
+    Parent statistical validator MUST FAIL CLOSED with OUTPUT_INVALID.
+    """
+    runner = SchemathesisRunner(source_sha="a" * 40)
+    schema = {"openapi": "3.0.0", "paths": {"/users": {"get": {}}}}
+
+    def mock_communicate(input=None, timeout=None):
+        envelope = json.loads(input)
+        worker_out = _build_valid_worker_output(
+            status="TARGET_CONTRACT_VIOLATED",
+            exit_code=1,
+            violations=[{"error_type": "ServerError", "message": "Crash", "path": "/users", "method": "GET"}],
+            stats={"endpoints_tested": 1, "operations_tested": 1, "checks_executed": 5, "violations_count": 99, "duration_sec": 0.1},  # Mismatched 99 vs 1
+            execution_id=envelope["execution_id"],
+            parent_nonce=envelope["parent_nonce"],
+            execution_secret=envelope["execution_secret"]
+        )
+        return json.dumps(worker_out), ""
+
+    mock_proc = MagicMock()
+    mock_proc.communicate.side_effect = mock_communicate
+    mock_proc.returncode = 1
+
+    with patch("subprocess.Popen", return_value=mock_proc):
+        result = runner.execute(schema_dict=schema)
+        assert result.status == ProviderStatus.OUTPUT_INVALID
+        assert result.passed is False
+        assert "statistical mismatch" in result.diagnostics[0]["error"].lower()
+
+
 # -----------------------------------------------------------------------------
 # 3. Provenance Verification & Strict Version Enforcement Tests
 # -----------------------------------------------------------------------------
