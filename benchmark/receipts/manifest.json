@@ -39,9 +39,9 @@
     {
       "gate": "THESIS-GATE-1A",
       "milestone": "Enterprise Core / Synthetic Efficacy (Controlled Failure Injection)",
-      "certified_sha": "725fe90daf8b4d20c33e1e466ec8fc6460a10f83",
+      "certified_sha": "4e8a4fbae6692d50a93a7ed6e16a13c10e882469",
       "workflow_name": "S-Class THESIS-GATE-1A - Enterprise Core & Synthetic Efficacy",
-      "workflow_run_id": 32003191497,
+      "workflow_run_id": 32003605810,
       "runner_os": "ubuntu-24.04",
       "python_matrix": ["3.10", "3.11", "3.12", "3.13"],
       "artifact_name_prefix": "thesis-gate-1a-cert-",
