@@ -40,10 +40,44 @@ class SchemathesisRunner:
             self.source_sha = source_sha
         self.strict_provenance = strict_provenance
 
+    @staticmethod
+    def get_authoritative_revision() -> Optional[str]:
+        """
+        Retrieves the authoritative revision for the current environment:
+        1. GITHUB_SHA if running in GitHub Actions CI and well-formed.
+        2. Otherwise, current repository HEAD commit via `git rev-parse HEAD`.
+        """
+        ci_sha = os.environ.get("GITHUB_SHA")
+        if ci_sha and ci_sha != "UNKNOWN" and len(ci_sha) == 40:
+            try:
+                int(ci_sha, 16)
+                return ci_sha.lower()
+            except ValueError:
+                pass
+
+        try:
+            res = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                capture_output=True,
+                text=True,
+                cwd=os.getcwd(),
+                timeout=5.0
+            )
+            if res.returncode == 0:
+                head_sha = res.stdout.strip()
+                if len(head_sha) == 40:
+                    int(head_sha, 16)
+                    return head_sha.lower()
+        except Exception:
+            pass
+
+        return None
+
     def _verify_source_sha_authenticity(self, sha: Optional[str]) -> bool:
         """
-        Validates that a source SHA is well-formed AND corresponds to an authentic,
-        existing commit object in the repository object database.
+        Validates that a source SHA is well-formed AND strictly matches the authoritative
+        revision being certified (CI GITHUB_SHA or current repository HEAD).
+        Stale historical commits, uncommitted hashes, and fabricated SHAs fail closed.
         """
         if not sha or sha == "UNKNOWN" or len(sha) != 40:
             return False
@@ -52,26 +86,11 @@ class SchemathesisRunner:
         except ValueError:
             return False
 
-        # In CI environments, cross-verify with GITHUB_SHA
-        ci_sha = os.environ.get("GITHUB_SHA")
-        if ci_sha and ci_sha != "UNKNOWN" and ci_sha.lower() == sha.lower():
-            return True
+        auth_rev = self.get_authoritative_revision()
+        if not auth_rev:
+            return False
 
-        # Verify against authoritative Git repository object database
-        try:
-            proc = subprocess.run(
-                ["git", "rev-parse", "--verify", "--quiet", f"{sha}^{{commit}}"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                cwd=os.getcwd(),
-                timeout=5.0
-            )
-            if proc.returncode == 0:
-                return True
-        except Exception:
-            pass
-
-        return False
+        return auth_rev.lower() == sha.lower()
 
     def _spawn_worker_process(self, cmd: List[str], cwd: str, env: Dict[str, str]) -> subprocess.Popen:
         """Spawns the isolated child worker process."""

@@ -626,7 +626,18 @@ def test_provenance_strict_mode_sha_and_version_enforcement():
     assert res_fabricated.passed is False
     assert "strict provenance requirement failed" in res_fabricated.diagnostics[0]["error"].lower()
 
-    # 5. Authentic repository commit SHA -> PASS
+    # 5. Stale historical commit SHA (HEAD~1) -> FAIL CLOSED (Not current authoritative revision)
+    try:
+        stale_sha = subprocess.check_output(["git", "rev-parse", "HEAD~1"], text=True).strip()
+        runner_stale = SchemathesisRunner(source_sha=stale_sha, strict_provenance=True)
+        res_stale = runner_stale.execute(schema_dict=schema)
+        assert res_stale.status == ProviderStatus.INPUT_INVALID
+        assert res_stale.passed is False
+        assert "strict provenance requirement failed" in res_stale.diagnostics[0]["error"].lower()
+    except Exception:
+        pass
+
+    # 6. Current authentic repository HEAD commit SHA -> PASS
     try:
         head_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     except Exception:
@@ -662,7 +673,7 @@ def test_provenance_strict_mode_sha_and_version_enforcement():
             assert res_valid.worker_digest != ""
             assert res_valid.worker_hmac != ""
 
-    # 6. Wrong dependency version (e.g. 4.23.0) under strict mode -> FAIL
+    # 7. Wrong dependency version (e.g. 4.23.0) under strict mode -> FAIL
     with patch.object(VersionPolicy, "get_installed_version", return_value="4.23.0"):
         res_wrong_ver = runner_valid.execute(schema_dict=schema)
         assert res_wrong_ver.status == ProviderStatus.TOOL_NOT_AVAILABLE
