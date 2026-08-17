@@ -41,14 +41,49 @@ class SchemathesisRunner:
         self.strict_provenance = strict_provenance
 
     def _verify_source_sha_authenticity(self, sha: Optional[str]) -> bool:
-        """Validates that a source SHA is well-formed and matches authoritative repository state."""
+        """
+        Validates that a source SHA is well-formed AND corresponds to an authentic,
+        existing commit object in the repository object database.
+        """
         if not sha or sha == "UNKNOWN" or len(sha) != 40:
             return False
         try:
             int(sha, 16)
         except ValueError:
             return False
-        return True
+
+        # In CI environments, cross-verify with GITHUB_SHA
+        ci_sha = os.environ.get("GITHUB_SHA")
+        if ci_sha and ci_sha != "UNKNOWN" and ci_sha.lower() == sha.lower():
+            return True
+
+        # Verify against authoritative Git repository object database
+        try:
+            proc = subprocess.run(
+                ["git", "rev-parse", "--verify", "--quiet", f"{sha}^{{commit}}"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                cwd=os.getcwd(),
+                timeout=5.0
+            )
+            if proc.returncode == 0:
+                return True
+        except Exception:
+            pass
+
+        return False
+
+    def _spawn_worker_process(self, cmd: List[str], cwd: str, env: Dict[str, str]) -> subprocess.Popen:
+        """Spawns the isolated child worker process."""
+        return subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            cwd=cwd,
+            env=env
+        )
 
     def execute(
         self,
@@ -60,6 +95,8 @@ class SchemathesisRunner:
         checks: Optional[List[str]] = None,
         timeout_sec: float = 30.0
     ) -> ProviderExecutionResult:
+        # ...
+
         """
         Executes API contract verification inside an isolated child subprocess under D0 contract.
         Performs keyed HMAC-SHA256 challenge-response handshake and digest chain verification.
@@ -199,15 +236,7 @@ class SchemathesisRunner:
 
         proc = None
         try:
-            proc = subprocess.Popen(
-                cmd,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                cwd=cwd,
-                env=env
-            )
+            proc = self._spawn_worker_process(cmd=cmd, cwd=cwd, env=env)
             stdout_data, stderr_data = proc.communicate(input=payload_str, timeout=timeout_sec)
         except subprocess.TimeoutExpired:
             if proc:

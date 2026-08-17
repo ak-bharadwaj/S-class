@@ -173,7 +173,7 @@ def test_isolation_process_crash():
     mock_proc.communicate.return_value = ("", "Segmentation fault (core dumped)")
     mock_proc.returncode = 139
 
-    with patch("subprocess.Popen", return_value=mock_proc):
+    with patch.object(SchemathesisRunner, "_spawn_worker_process", return_value=mock_proc):
         result = runner.execute(schema_dict=schema)
         assert result.status == ProviderStatus.TOOL_EXECUTION_FAILED
         assert result.passed is False
@@ -192,7 +192,7 @@ def test_isolation_process_timeout_hard_kill():
         ("", "")
     ]
 
-    with patch("subprocess.Popen", return_value=mock_proc):
+    with patch.object(SchemathesisRunner, "_spawn_worker_process", return_value=mock_proc):
         result = runner.execute(schema_dict=schema, timeout_sec=5.0)
         mock_proc.kill.assert_called_once()
         assert result.status == ProviderStatus.TIMEOUT
@@ -209,7 +209,7 @@ def test_isolation_malformed_stdout_non_json():
     mock_proc.communicate.return_value = ("Traceback: SyntaxError in internal worker", "")
     mock_proc.returncode = 1
 
-    with patch("subprocess.Popen", return_value=mock_proc):
+    with patch.object(SchemathesisRunner, "_spawn_worker_process", return_value=mock_proc):
         result = runner.execute(schema_dict=schema)
         assert result.status == ProviderStatus.OUTPUT_INVALID
         assert result.passed is False
@@ -238,7 +238,7 @@ def test_isolation_zero_checks_insufficient_evidence():
     mock_proc.communicate.side_effect = mock_communicate
     mock_proc.returncode = 0
 
-    with patch("subprocess.Popen", return_value=mock_proc):
+    with patch.object(SchemathesisRunner, "_spawn_worker_process", return_value=mock_proc):
         result = runner.execute(schema_dict=schema)
         assert result.status == ProviderStatus.INSUFFICIENT_EVIDENCE
         assert result.passed is False
@@ -267,7 +267,7 @@ def test_isolation_valid_pass():
     mock_proc.communicate.side_effect = mock_communicate
     mock_proc.returncode = 0
 
-    with patch("subprocess.Popen", return_value=mock_proc):
+    with patch.object(SchemathesisRunner, "_spawn_worker_process", return_value=mock_proc):
         result = runner.execute(schema_dict=schema)
         assert result.status == ProviderStatus.TARGET_CLEAN
         assert result.passed is True
@@ -312,7 +312,7 @@ def test_isolation_valid_contract_failure():
     mock_proc.communicate.side_effect = mock_communicate
     mock_proc.returncode = 1
 
-    with patch("subprocess.Popen", return_value=mock_proc):
+    with patch.object(SchemathesisRunner, "_spawn_worker_process", return_value=mock_proc):
         result = runner.execute(schema_dict=schema)
         assert result.status == ProviderStatus.TARGET_CONTRACT_VIOLATED
         assert result.passed is False
@@ -358,7 +358,7 @@ def test_adversarial_worker_forges_status_with_recomputed_sha_fails_closed():
     mock_proc.communicate.side_effect = mock_communicate
     mock_proc.returncode = 0
 
-    with patch("subprocess.Popen", return_value=mock_proc):
+    with patch.object(SchemathesisRunner, "_spawn_worker_process", return_value=mock_proc):
         result = runner.execute(schema_dict=schema)
         assert result.status == ProviderStatus.OUTPUT_INVALID
         assert result.passed is False
@@ -388,7 +388,7 @@ def test_adversarial_worker_signs_with_wrong_secret_fails_closed():
     mock_proc.communicate.side_effect = mock_communicate
     mock_proc.returncode = 0
 
-    with patch("subprocess.Popen", return_value=mock_proc):
+    with patch.object(SchemathesisRunner, "_spawn_worker_process", return_value=mock_proc):
         result = runner.execute(schema_dict=schema)
         assert result.status == ProviderStatus.OUTPUT_INVALID
         assert result.passed is False
@@ -415,7 +415,7 @@ def test_adversarial_replay_envelope_against_new_execution_fails_closed():
     mock_proc.communicate.return_value = (json.dumps(stale_envelope), "")
     mock_proc.returncode = 0
 
-    with patch("subprocess.Popen", return_value=mock_proc):
+    with patch.object(SchemathesisRunner, "_spawn_worker_process", return_value=mock_proc):
         result = runner.execute(schema_dict=schema)
         assert result.status == ProviderStatus.OUTPUT_INVALID
         assert result.passed is False
@@ -448,7 +448,7 @@ def test_adversarial_worker_with_valid_secret_forges_clean_status_with_violation
     mock_proc.communicate.side_effect = mock_communicate
     mock_proc.returncode = 0
 
-    with patch("subprocess.Popen", return_value=mock_proc):
+    with patch.object(SchemathesisRunner, "_spawn_worker_process", return_value=mock_proc):
         result = runner.execute(schema_dict=schema)
         assert result.status == ProviderStatus.OUTPUT_INVALID
         assert result.passed is False
@@ -480,7 +480,7 @@ def test_adversarial_worker_with_valid_secret_forges_clean_status_with_zero_chec
     mock_proc.communicate.side_effect = mock_communicate
     mock_proc.returncode = 0
 
-    with patch("subprocess.Popen", return_value=mock_proc):
+    with patch.object(SchemathesisRunner, "_spawn_worker_process", return_value=mock_proc):
         result = runner.execute(schema_dict=schema)
         assert result.status == ProviderStatus.OUTPUT_INVALID
         assert result.passed is False
@@ -512,7 +512,7 @@ def test_adversarial_worker_with_valid_secret_forges_violation_status_with_empty
     mock_proc.communicate.side_effect = mock_communicate
     mock_proc.returncode = 1
 
-    with patch("subprocess.Popen", return_value=mock_proc):
+    with patch.object(SchemathesisRunner, "_spawn_worker_process", return_value=mock_proc):
         result = runner.execute(schema_dict=schema)
         assert result.status == ProviderStatus.OUTPUT_INVALID
         assert result.passed is False
@@ -544,7 +544,7 @@ def test_adversarial_worker_with_valid_secret_forges_unknown_endpoint_path_fails
     mock_proc.communicate.side_effect = mock_communicate
     mock_proc.returncode = 1
 
-    with patch("subprocess.Popen", return_value=mock_proc):
+    with patch.object(SchemathesisRunner, "_spawn_worker_process", return_value=mock_proc):
         result = runner.execute(schema_dict=schema)
         assert result.status == ProviderStatus.OUTPUT_INVALID
         assert result.passed is False
@@ -576,7 +576,7 @@ def test_adversarial_worker_with_valid_secret_inconsistent_violation_counts_fail
     mock_proc.communicate.side_effect = mock_communicate
     mock_proc.returncode = 1
 
-    with patch("subprocess.Popen", return_value=mock_proc):
+    with patch.object(SchemathesisRunner, "_spawn_worker_process", return_value=mock_proc):
         result = runner.execute(schema_dict=schema)
         assert result.status == ProviderStatus.OUTPUT_INVALID
         assert result.passed is False
@@ -593,7 +593,8 @@ def test_provenance_strict_mode_sha_and_version_enforcement():
     - Missing SHA -> FAIL
     - UNKNOWN SHA -> FAIL
     - Invalid format SHA -> FAIL
-    - Exact SHA -> PASS
+    - Fabricated 40-char SHA not in Git object database -> FAIL
+    - Authentic repository commit SHA -> PASS
     - Exact dependency version -> PASS
     - Wrong dependency version -> FAIL
     """
@@ -617,14 +618,29 @@ def test_provenance_strict_mode_sha_and_version_enforcement():
     assert res_short.status == ProviderStatus.INPUT_INVALID
     assert res_short.passed is False
 
-    # 4. Exact 40-char SHA with exact certified version -> PASS
-    exact_sha = "a" * 40
-    runner_valid = SchemathesisRunner(source_sha=exact_sha, strict_provenance=True)
+    # 4. Fabricated 40-char hex SHA not in git repository -> FAIL CLOSED
+    fabricated_sha = "f" * 40
+    runner_fabricated = SchemathesisRunner(source_sha=fabricated_sha, strict_provenance=True)
+    res_fabricated = runner_fabricated.execute(schema_dict=schema)
+    assert res_fabricated.status == ProviderStatus.INPUT_INVALID
+    assert res_fabricated.passed is False
+    assert "strict provenance requirement failed" in res_fabricated.diagnostics[0]["error"].lower()
+
+    # 5. Authentic repository commit SHA -> PASS
+    try:
+        head_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    except Exception:
+        head_sha = "a" * 40
+
+    runner_valid = SchemathesisRunner(source_sha=head_sha, strict_provenance=True)
 
     def mock_communicate(input=None, timeout=None):
         envelope = json.loads(input)
         worker_out = _build_valid_worker_output(
             status="TARGET_CLEAN",
+            exit_code=0,
+            violations=[],
+            stats={"endpoints_tested": 1, "operations_tested": 1, "checks_executed": 5, "violations_count": 0, "duration_sec": 0.1},
             execution_id=envelope["execution_id"],
             parent_nonce=envelope["parent_nonce"],
             execution_secret=envelope["execution_secret"]
@@ -636,17 +652,17 @@ def test_provenance_strict_mode_sha_and_version_enforcement():
     mock_proc.returncode = 0
 
     with patch.object(VersionPolicy, "get_installed_version", return_value=CERTIFIED_SCHEMATHESIS_VERSION):
-        with patch("subprocess.Popen", return_value=mock_proc):
+        with patch.object(SchemathesisRunner, "_spawn_worker_process", return_value=mock_proc):
             res_valid = runner_valid.execute(schema_dict=schema)
             assert res_valid.status == ProviderStatus.TARGET_CLEAN
             assert res_valid.passed is True
-            assert res_valid.source_sha == exact_sha
+            assert res_valid.source_sha == head_sha
             assert res_valid.schemathesis_version == CERTIFIED_SCHEMATHESIS_VERSION
             assert res_valid.input_digest != ""
             assert res_valid.worker_digest != ""
             assert res_valid.worker_hmac != ""
 
-    # 5. Wrong dependency version (e.g. 4.23.0) under strict mode -> FAIL
+    # 6. Wrong dependency version (e.g. 4.23.0) under strict mode -> FAIL
     with patch.object(VersionPolicy, "get_installed_version", return_value="4.23.0"):
         res_wrong_ver = runner_valid.execute(schema_dict=schema)
         assert res_wrong_ver.status == ProviderStatus.TOOL_NOT_AVAILABLE
@@ -677,7 +693,7 @@ def test_zero_schemathesis_hypothesis_objects_escape():
     mock_proc.communicate.side_effect = mock_communicate
     mock_proc.returncode = 0
 
-    with patch("subprocess.Popen", return_value=mock_proc):
+    with patch.object(SchemathesisRunner, "_spawn_worker_process", return_value=mock_proc):
         result = runner.execute(schema_dict=schema)
         data = result.to_dict()
 
