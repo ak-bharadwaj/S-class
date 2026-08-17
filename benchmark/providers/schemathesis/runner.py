@@ -118,7 +118,7 @@ class SchemathesisRunner:
             )
 
         # 2. Dependency Availability & Version Audit
-        is_avail, st_ver, err_msg = VersionPolicy.check_environment()
+        is_avail, st_ver, err_msg = VersionPolicy.check_environment(require_certified=self.strict_provenance)
         if not is_avail:
             return _make_result(
                 status=ProviderStatus.TOOL_NOT_AVAILABLE,
@@ -126,19 +126,19 @@ class SchemathesisRunner:
                 violations=[],
                 stats=ExecutionStats(),
                 diagnostics=[{"error": err_msg or "Schemathesis tool is not available"}],
-                summary="Execution aborted: Schemathesis is not installed or incompatible with pinned version spec.",
+                summary="Execution aborted: Schemathesis is not installed or does not match exact certified version.",
                 st_ver=st_ver
             )
 
         # 3. Input Validation
-        if not schema_dict or not isinstance(schema_dict, dict) or not schema_dict.get("paths"):
+        if not schema_dict or not isinstance(schema_dict, dict) or not isinstance(schema_dict.get("paths"), dict):
             return _make_result(
                 status=ProviderStatus.INPUT_INVALID,
                 exit_code=None,
                 violations=[],
                 stats=ExecutionStats(),
-                diagnostics=[{"error": "Invalid or missing OpenAPI schema dictionary."}],
-                summary="Execution rejected: Schema must be a dictionary containing 'paths'.",
+                diagnostics=[{"error": "Invalid or missing OpenAPI schema dictionary: 'paths' must be a dictionary."}],
+                summary="Execution rejected: Schema must be a dictionary containing 'paths' mapping.",
                 st_ver=st_ver
             )
 

@@ -46,13 +46,13 @@ def main():
     max_examples = payload.get("max_examples", 5)
 
     # 1. Validate Schema
-    if not schema_dict or not isinstance(schema_dict, dict) or not schema_dict.get("paths"):
+    if not schema_dict or not isinstance(schema_dict, dict) or not isinstance(schema_dict.get("paths"), dict):
         _emit_output(
             status="INPUT_INVALID",
             exit_code=2,
             violations=[],
             stats={"endpoints_tested": 0, "operations_tested": 0, "checks_executed": 0, "violations_count": 0, "duration_sec": 0.0},
-            diagnostics=[{"error": "Schema is missing or contains no paths."}],
+            diagnostics=[{"error": "Schema is missing or 'paths' is not a dictionary."}],
             summary="Worker failed: Invalid schema dictionary."
         )
         return
