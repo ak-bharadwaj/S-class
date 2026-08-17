@@ -57,31 +57,80 @@ def test_external_validation_protocol_smoke_execution(tmp_path):
     assert summary["real_participant_metrics"]["sclass_treatment"]["mean_usefulness_score"] is None
 
 
-def test_external_validation_real_participant_trial_execution():
+def test_external_validation_within_participant_counterbalancing():
+    protocol = ExternalValidationProtocol()
+
+    # Verify that conditions alternate across tasks for the same participant
+    cond_1 = protocol.assign_treatment_counterbalanced("dev_alpha", 1, seed=42)
+    cond_2 = protocol.assign_treatment_counterbalanced("dev_alpha", 2, seed=42)
+    cond_3 = protocol.assign_treatment_counterbalanced("dev_alpha", 3, seed=42)
+
+    assert cond_1 in ["BASELINE", "SCLASS_TREATMENT"]
+    assert cond_2 in ["BASELINE", "SCLASS_TREATMENT"]
+    assert cond_1 != cond_2
+    assert cond_1 == cond_3
+
+
+def test_external_validation_real_participant_trial_with_outcomes():
     protocol = ExternalValidationProtocol()
 
     def dummy_generator(spec):
         return lambda tokens: tokens >= 0
 
-    # Real participant completes a randomized trial with genuine self-reported metrics
-    trial = protocol.execute_participant_trial(
-        participant_id="real_dev_42",
+    # Real participant completes 3 counterbalanced tasks with recorded outcomes
+    trial_1 = protocol.execute_participant_trial(
+        participant_id="real_dev_101",
         task_id="TASK-01-TOKEN-RATE-LIMITER",
+        task_order_index=1,
         code_generator=dummy_generator,
         rework_iterations=0,
         developer_interventions=0,
+        task_outcome="SUCCESS",
         trust_score=4.5,
         usefulness_score=4.8,
         seed=101
     )
 
-    assert trial.is_real_participant is True
-    assert trial.assignment in ["BASELINE", "SCLASS_TREATMENT"]
-    assert trial.developer_trust_score == 4.5
-    assert trial.developer_usefulness_score == 4.8
-    assert trial.measurement_sources["task_completion_time_sec"] == MeasurementProvenance.INSTRUMENTED
-    assert trial.measurement_sources["developer_trust_score"] == MeasurementProvenance.PARTICIPANT_REPORTED
+    trial_2 = protocol.execute_participant_trial(
+        participant_id="real_dev_101",
+        task_id="TASK-02-CONFIG-SCHEMA-PARSER",
+        task_order_index=2,
+        code_generator=dummy_generator,
+        rework_iterations=1,
+        developer_interventions=1,
+        task_outcome="SUCCESS",
+        trust_score=4.0,
+        usefulness_score=4.2,
+        seed=101
+    )
+
+    trial_3 = protocol.execute_participant_trial(
+        participant_id="real_dev_101",
+        task_id="TASK-03-IDEMPOTENT-CACHE",
+        task_order_index=3,
+        code_generator=dummy_generator,
+        rework_iterations=2,
+        developer_interventions=2,
+        task_outcome="ABANDONED",
+        trust_score=2.0,
+        usefulness_score=2.5,
+        seed=101
+    )
+
+    assert trial_1.task_outcome == "SUCCESS"
+    assert trial_3.task_outcome == "ABANDONED"
+    assert trial_1.assignment != trial_2.assignment
 
     summary = protocol.generate_validation_summary(tested_sha="test_commit_real_trial")
-    assert summary["provenance"]["real_participant_trials_count"] == 1
-    assert summary["real_participant_metrics"]["real_participants_enrolled"] == 1
+    assert summary["provenance"]["real_participant_trials_count"] == 3
+    assert summary["provenance"]["real_participants_enrolled"] == 1
+    # Check that outcomes are recorded in metrics
+    total_outcomes = (
+        summary["real_participant_metrics"]["baseline"]["outcomes"]["success"] +
+        summary["real_participant_metrics"]["baseline"]["outcomes"]["failure"] +
+        summary["real_participant_metrics"]["baseline"]["outcomes"]["abandoned"] +
+        summary["real_participant_metrics"]["sclass_treatment"]["outcomes"]["success"] +
+        summary["real_participant_metrics"]["sclass_treatment"]["outcomes"]["failure"] +
+        summary["real_participant_metrics"]["sclass_treatment"]["outcomes"]["abandoned"]
+    )
+    assert total_outcomes == 3

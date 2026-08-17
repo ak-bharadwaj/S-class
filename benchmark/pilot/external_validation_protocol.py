@@ -1,24 +1,25 @@
 """
 S-Class EOS V11.2 - External Developer Validation Protocol & Trial Harness.
-Provides the protocol specification, randomized A/B trial assignment, measurement provenance tracking,
-and data collection harness for evaluating real developer tasks comparing Baseline (Ungoverned) vs S-Class Treatment.
+Provides the protocol specification, within-participant counterbalanced A/B trial assignment,
+measurement provenance tracking, and data collection harness for evaluating real developer tasks
+comparing Baseline (Ungoverned) vs S-Class Treatment.
 
-CRITICAL INVARIANTS:
-1. Protocol Smoke Mode (!= Experimental Participant Mode):
-   - Smoke mode runs both arms for instrumentation, schema, and pipeline mechanics verification.
-   - All participant-reported metrics (trust, usefulness) remain strictly None.
-2. Experimental Participant Mode:
-   - Evaluates randomized assignment (assign_treatment_randomized) and executes ONLY the assigned condition.
-   - Collects instrumented completion time and receipt evidence.
-   - Collects participant-reported metrics (rework, developer interventions, 1-5 Likert trust/usefulness).
-   - Marks is_real_participant = True.
+DESIGN PRINCIPLES:
+1. Target Cohort: 6–10 professional developers performing 3 tasks each (18–30 total task trials).
+2. Within-Participant Counterbalancing: Each participant experiences both Baseline and S-Class conditions
+   across different tasks to separate individual developer skill variance from the treatment effect.
+3. Explicit Measurement Provenance:
+   - INSTRUMENTED: task_completion_time_sec
+   - RECEIPT_DERIVED: defects_caught_pre_gen, defects_caught_post_gen
+   - PARTICIPANT_REPORTED: rework_iterations, developer_interventions, trust_score (1-5), usefulness_score (1-5)
+   - PROTOCOL_ASSIGNED: assignment, task_order_index, task_outcome (SUCCESS / FAILURE / ABANDONED)
+4. Credibility & Falsifiability: Negative results and abandoned tasks are fully valid and preserved.
 """
 
 import os
 import sys
 import json
 import time
-import random
 import hashlib
 from typing import Dict, Any, List, Optional, Tuple, Callable
 from dataclasses import dataclass, field, asdict
@@ -47,22 +48,26 @@ METRIC_PROVENANCE_SCHEMA = {
     "developer_usefulness_score": MeasurementProvenance.PARTICIPANT_REPORTED,
     "defects_caught_pre_gen": MeasurementProvenance.RECEIPT_DERIVED,
     "defects_caught_post_gen": MeasurementProvenance.RECEIPT_DERIVED,
-    "assignment": MeasurementProvenance.PROTOCOL_ASSIGNED
+    "assignment": MeasurementProvenance.PROTOCOL_ASSIGNED,
+    "task_order_index": MeasurementProvenance.PROTOCOL_ASSIGNED,
+    "task_outcome": MeasurementProvenance.PROTOCOL_ASSIGNED
 }
 
 
 @dataclass
 class DeveloperTrialRecord:
-    """Records one developer task trial outcome with strict measurement provenance."""
+    """Records one developer task trial outcome with within-participant sequencing and outcome tracking."""
     participant_id: str
     task_id: str
+    task_order_index: int  # 1, 2, or 3 in the developer's session
     assignment: str  # "BASELINE" or "SCLASS_TREATMENT"
-    is_real_participant: bool  # False for protocol smoke simulations, True for real human trials
+    is_real_participant: bool  # False for protocol smoke checks, True for real developer trials
     task_completion_time_sec: float
     defects_caught_pre_gen: int
     defects_caught_post_gen: int
     rework_iterations: int
     developer_interventions: int
+    task_outcome: str = "SUCCESS"  # "SUCCESS" | "FAILURE" | "ABANDONED"
     developer_trust_score: Optional[float] = None  # 1.0 - 5.0 (None if not participant-reported)
     developer_usefulness_score: Optional[float] = None  # 1.0 - 5.0 (None if not participant-reported)
     trial_verdict: str = "SUCCESS"
@@ -74,7 +79,7 @@ class DeveloperTrialRecord:
 
 
 class ExternalValidationProtocol:
-    """Manages randomized trials, real task execution, and comparative metric aggregation."""
+    """Manages randomized counterbalanced trials, real task execution, and paired statistical summaries."""
 
     def __init__(self):
         self.pipeline = EnterpriseGovernancePipeline(default_provider_registry)
@@ -82,7 +87,7 @@ class ExternalValidationProtocol:
 
     @staticmethod
     def get_standard_task_catalog() -> List[Dict[str, Any]]:
-        """Catalog of real-world developer tasks for external validation."""
+        """Catalog of 3 comparable real-world developer tasks."""
         return [
             {
                 "task_id": "TASK-01-TOKEN-RATE-LIMITER",
@@ -125,27 +130,38 @@ class ExternalValidationProtocol:
         ]
 
     @staticmethod
-    def assign_treatment_randomized(participant_id: str, task_id: str, seed: Optional[int] = None) -> str:
-        """Deterministically randomized A/B assignment based on participant and task hash."""
-        key = f"{participant_id}:{task_id}:{seed or 42}".encode("utf-8")
+    def assign_treatment_counterbalanced(participant_id: str, task_order_index: int, seed: Optional[int] = None) -> str:
+        """
+        Assigns treatment condition using within-participant counterbalancing:
+        Determines starting condition via participant hash, then alternates across task 1, 2, and 3.
+        Distributes individual skill variance and counterbalances learning effects.
+        """
+        key = f"{participant_id}:{seed or 42}".encode("utf-8")
         h = int(hashlib.sha256(key).hexdigest(), 16)
-        return "SCLASS_TREATMENT" if (h % 2 == 0) else "BASELINE"
+        starting_condition = "SCLASS_TREATMENT" if (h % 2 == 0) else "BASELINE"
+
+        # Alternate condition across task indices: 1 -> start, 2 -> other, 3 -> start
+        if task_order_index % 2 == 1:
+            return starting_condition
+        else:
+            return "BASELINE" if starting_condition == "SCLASS_TREATMENT" else "SCLASS_TREATMENT"
 
     def record_trial(self, trial: DeveloperTrialRecord) -> None:
-        """Records an external participant trial."""
+        """Records a developer trial record."""
         self.trials.append(trial)
 
     def execute_protocol_smoke_trial(
         self,
         participant_id: str,
         task_id: str,
+        task_order_index: int,
         assignment: str,
         code_generator: Callable[[Any], Any]
     ) -> DeveloperTrialRecord:
         """
         Protocol Smoke Mode:
-        Executes a synthetic smoke trial to verify instrument and pipeline mechanics.
-        DOES NOT record participant-reported trust/usefulness scores (leaves them None).
+        Verifies instrument, task sequence, and pipeline mechanics.
+        Participant-reported metrics remain strictly None.
         """
         t0 = time.perf_counter()
         task = next((t for t in self.get_standard_task_catalog() if t["task_id"] == task_id), None)
@@ -158,6 +174,7 @@ class ExternalValidationProtocol:
             return DeveloperTrialRecord(
                 participant_id=participant_id,
                 task_id=task_id,
+                task_order_index=task_order_index,
                 assignment="BASELINE",
                 is_real_participant=False,
                 task_completion_time_sec=duration,
@@ -165,6 +182,7 @@ class ExternalValidationProtocol:
                 defects_caught_post_gen=0,
                 rework_iterations=0,
                 developer_interventions=0,
+                task_outcome="SUCCESS",
                 developer_trust_score=None,
                 developer_usefulness_score=None,
                 trial_verdict="SUCCESS",
@@ -181,6 +199,7 @@ class ExternalValidationProtocol:
             return DeveloperTrialRecord(
                 participant_id=participant_id,
                 task_id=task_id,
+                task_order_index=task_order_index,
                 assignment="SCLASS_TREATMENT",
                 is_real_participant=False,
                 task_completion_time_sec=duration,
@@ -188,6 +207,7 @@ class ExternalValidationProtocol:
                 defects_caught_post_gen=receipt.obligations_failed,
                 rework_iterations=0,
                 developer_interventions=0,
+                task_outcome="SUCCESS",
                 developer_trust_score=None,
                 developer_usefulness_score=None,
                 trial_verdict=verdict,
@@ -198,24 +218,25 @@ class ExternalValidationProtocol:
         self,
         participant_id: str,
         task_id: str,
+        task_order_index: int,
         code_generator: Callable[[Any], Any],
         rework_iterations: int,
         developer_interventions: int,
+        task_outcome: str,
         trust_score: float,
         usefulness_score: float,
         seed: Optional[int] = None
     ) -> DeveloperTrialRecord:
         """
         Experimental Participant Mode:
-        1. Determines randomized condition (BASELINE or SCLASS_TREATMENT).
-        2. Executes ONLY the assigned condition (no cross-arm execution).
-        3. Records instrumented metrics and genuine participant-reported survey ratings.
+        Executes ONLY the counterbalanced assigned condition for this participant and task index.
+        Records instrumented completion time, outcome (SUCCESS/FAILURE/ABANDONED), and Likert scores.
         """
         task = next((t for t in self.get_standard_task_catalog() if t["task_id"] == task_id), None)
         if task is None:
             raise ValueError(f"Unknown task_id: {task_id}")
 
-        assigned_condition = self.assign_treatment_randomized(participant_id, task_id, seed)
+        assigned_condition = self.assign_treatment_counterbalanced(participant_id, task_order_index, seed)
         t0 = time.perf_counter()
 
         if assigned_condition == "BASELINE":
@@ -224,6 +245,7 @@ class ExternalValidationProtocol:
             trial = DeveloperTrialRecord(
                 participant_id=participant_id,
                 task_id=task_id,
+                task_order_index=task_order_index,
                 assignment="BASELINE",
                 is_real_participant=True,
                 task_completion_time_sec=duration,
@@ -231,9 +253,10 @@ class ExternalValidationProtocol:
                 defects_caught_post_gen=0,
                 rework_iterations=rework_iterations,
                 developer_interventions=developer_interventions,
+                task_outcome=task_outcome,
                 developer_trust_score=trust_score,
                 developer_usefulness_score=usefulness_score,
-                trial_verdict="SUCCESS",
+                trial_verdict="SUCCESS" if task_outcome == "SUCCESS" else "FAILED_OR_ABANDONED",
                 audit_notes=["Real participant trial - Baseline condition"]
             )
         else:
@@ -243,10 +266,11 @@ class ExternalValidationProtocol:
                 custom_obligations=task["obligations"]
             )
             duration = round(time.perf_counter() - t0, 3)
-            verdict = "SUCCESS" if receipt.verdict == "PASS" else "BLOCKED_WITH_REASON"
+            verdict = "SUCCESS" if (receipt.verdict == "PASS" and task_outcome == "SUCCESS") else "BLOCKED_OR_FAILED"
             trial = DeveloperTrialRecord(
                 participant_id=participant_id,
                 task_id=task_id,
+                task_order_index=task_order_index,
                 assignment="SCLASS_TREATMENT",
                 is_real_participant=True,
                 task_completion_time_sec=duration,
@@ -254,6 +278,7 @@ class ExternalValidationProtocol:
                 defects_caught_post_gen=receipt.obligations_failed,
                 rework_iterations=rework_iterations,
                 developer_interventions=developer_interventions,
+                task_outcome=task_outcome,
                 developer_trust_score=trust_score,
                 developer_usefulness_score=usefulness_score,
                 trial_verdict=verdict,
@@ -264,7 +289,7 @@ class ExternalValidationProtocol:
         return trial
 
     def generate_validation_summary(self, tested_sha: Optional[str] = None) -> Dict[str, Any]:
-        """Aggregates all recorded developer trials into a provenance-audited summary."""
+        """Aggregates recorded trials into paired statistical metrics and outcome breakdowns."""
         commit_sha = tested_sha or os.environ.get("GITHUB_SHA", "UNKNOWN")
         real_trials = [t for t in self.trials if t.is_real_participant]
         smoke_trials = [t for t in self.trials if not t.is_real_participant]
@@ -278,28 +303,46 @@ class ExternalValidationProtocol:
         real_trust_scores = [t.developer_trust_score for t in real_treatment if t.developer_trust_score is not None]
         real_usefulness_scores = [t.developer_usefulness_score for t in real_treatment if t.developer_usefulness_score is not None]
 
+        # Count outcomes
+        baseline_outcomes = {
+            "success": sum(1 for t in real_baseline if t.task_outcome == "SUCCESS"),
+            "failure": sum(1 for t in real_baseline if t.task_outcome == "FAILURE"),
+            "abandoned": sum(1 for t in real_baseline if t.task_outcome == "ABANDONED")
+        }
+        treatment_outcomes = {
+            "success": sum(1 for t in real_treatment if t.task_outcome == "SUCCESS"),
+            "failure": sum(1 for t in real_treatment if t.task_outcome == "FAILURE"),
+            "abandoned": sum(1 for t in real_treatment if t.task_outcome == "ABANDONED")
+        }
+
+        # Status: Real evidence is sufficient once at least 6 developers complete all 3 tasks (>= 18 trials)
+        has_sufficient_evidence = (len(set(t.participant_id for t in real_trials)) >= 6 and len(real_trials) >= 18)
+
         return {
             "protocol_id": f"EXTERNAL-VALIDATION-PROTOCOL-{commit_sha[:12].upper()}",
-            "schema_version": "1.0.0",
+            "schema_version": "1.1.0",
             "milestone": "THESIS-GATE-1B: External Developer Validation Protocol",
-            "protocol_specification": {
-                "metric_provenance_schema": METRIC_PROVENANCE_SCHEMA,
+            "protocol_design": {
+                "study_design": "Within-participant counterbalanced crossover across 3 tasks",
+                "target_cohort_size": "6-10 developers (3 tasks each, 18-30 total trials)",
                 "task_catalog_size": len(self.get_standard_task_catalog()),
-                "target_participant_cohort_size": "3-5 developers (3 tasks each)"
+                "metric_provenance_schema": METRIC_PROVENANCE_SCHEMA,
+                "recorded_outcomes": ["SUCCESS", "FAILURE", "ABANDONED"]
             },
             "provenance": {
                 "tested_source_sha": commit_sha,
                 "total_trials_recorded": len(self.trials),
                 "real_participant_trials_count": len(real_trials),
                 "protocol_smoke_trials_count": len(smoke_trials),
+                "real_participants_enrolled": len(set(t.participant_id for t in real_trials)),
                 "timestamp_utc": time.time(),
                 "timestamp_iso": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             },
-            "external_evidence_status": "REAL_EVIDENCE_AVAILABLE" if len(real_trials) >= 9 else "AWAITING_REAL_PARTICIPANTS",
+            "external_evidence_status": "REAL_EVIDENCE_AVAILABLE" if has_sufficient_evidence else "AWAITING_REAL_PARTICIPANTS",
             "real_participant_metrics": {
-                "real_participants_enrolled": len(set(t.participant_id for t in real_trials)),
                 "baseline": {
                     "trials_count": len(real_baseline),
+                    "outcomes": baseline_outcomes,
                     "mean_completion_time_sec": _mean([t.task_completion_time_sec for t in real_baseline]),
                     "mean_rework_iterations": _mean([float(t.rework_iterations) for t in real_baseline]),
                     "mean_developer_interventions": _mean([float(t.developer_interventions) for t in real_baseline]),
@@ -308,6 +351,7 @@ class ExternalValidationProtocol:
                 },
                 "sclass_treatment": {
                     "trials_count": len(real_treatment),
+                    "outcomes": treatment_outcomes,
                     "mean_completion_time_sec": _mean([t.task_completion_time_sec for t in real_treatment]),
                     "mean_rework_iterations": _mean([float(t.rework_iterations) for t in real_treatment]),
                     "mean_developer_interventions": _mean([float(t.developer_interventions) for t in real_treatment]),
@@ -323,7 +367,7 @@ class ExternalValidationProtocol:
 
 
 def run_external_validation_smoke(output_path: Optional[str] = None, tested_sha: Optional[str] = None) -> Dict[str, Any]:
-    """Runs a protocol smoke test to verify instrument integrity and schema conformance."""
+    """Runs a protocol smoke test verifying counterbalancing, instrument mechanics, and schema integrity."""
     protocol = ExternalValidationProtocol()
 
     def gen_rate_limiter(spec):
@@ -339,9 +383,9 @@ def run_external_validation_smoke(output_path: Optional[str] = None, tested_sha:
     generators = [gen_rate_limiter, gen_config_parser, gen_cache]
 
     for i, (task, gen) in enumerate(zip(tasks, generators)):
-        # Protocol smoke test runs both arms for instrumentation validation
-        protocol.record_trial(protocol.execute_protocol_smoke_trial(f"smoke_user_{i+1}", task["task_id"], "BASELINE", gen))
-        protocol.record_trial(protocol.execute_protocol_smoke_trial(f"smoke_user_{i+1}", task["task_id"], "SCLASS_TREATMENT", gen))
+        order_idx = i + 1
+        protocol.record_trial(protocol.execute_protocol_smoke_trial(f"smoke_dev_{order_idx}", task["task_id"], order_idx, "BASELINE", gen))
+        protocol.record_trial(protocol.execute_protocol_smoke_trial(f"smoke_dev_{order_idx}", task["task_id"], order_idx, "SCLASS_TREATMENT", gen))
 
     summary = protocol.generate_validation_summary(tested_sha=tested_sha)
     out_file = output_path if output_path else os.path.join(os.path.dirname(__file__), "external_validation_protocol_receipt.json")
@@ -360,6 +404,7 @@ if __name__ == "__main__":
     parser.add_argument("--mode", type=str, choices=["smoke", "participant"], default="smoke", help="Execution mode")
     parser.add_argument("--participant", type=str, default="test_dev_01", help="Participant ID")
     parser.add_argument("--task", type=str, default="TASK-01-TOKEN-RATE-LIMITER", help="Task ID")
+    parser.add_argument("--task-order", type=int, default=1, choices=[1, 2, 3], help="Task order index in session (1, 2, 3)")
     parser.add_argument("--output", type=str, default=None, help="Output JSON receipt path")
     parser.add_argument("--sha", type=str, default=None, help="Tested Git commit SHA")
     args = parser.parse_args()
@@ -368,6 +413,9 @@ if __name__ == "__main__":
         run_external_validation_smoke(output_path=args.output, tested_sha=args.sha)
     else:
         protocol = ExternalValidationProtocol()
-        print(f"Participant {args.participant} assigned to {args.task}.")
-        assignment = protocol.assign_treatment_randomized(args.participant, args.task)
+        assignment = protocol.assign_treatment_counterbalanced(args.participant, args.task_order)
+        print(f"=== S-CLASS EXTERNAL DEVELOPER STUDY TRIAL ===")
+        print(f"Participant: {args.participant}")
+        print(f"Task: {args.task} (Order #{args.task_order})")
         print(f"Assigned Condition: {assignment}")
+        print(f"Instructions: Complete the development task under condition: {assignment}.")
