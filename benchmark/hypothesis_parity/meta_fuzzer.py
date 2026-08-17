@@ -38,7 +38,9 @@ def build_random_strategy_spec_generator():
         st.booleans(),
         st.booleans()
     ).filter(
-        lambda t: (t[0] is None or t[1] is None or t[0] <= t[1]) and (not t[2] or (t[0] is None and t[1] is None))
+        lambda t: (t[0] is None or t[1] is None or t[0] <= t[1])
+        and (not t[2] or (t[0] is None and t[1] is None))
+        and (not t[3] or t[0] is None or t[1] is None)
     ).map(
         lambda t: StrategySpec(strategy_type="floats", params={"min_value": t[0], "max_value": t[1], "allow_nan": t[2], "allow_infinity": t[3]})
     )

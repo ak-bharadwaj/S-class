@@ -27,8 +27,8 @@ def test_full_differential_campaign_canonical_and_boundary_zero_discrepancies():
 
 
 def test_differential_meta_fuzz_property_based_campaign():
-    """Runs the 50-iteration property-based meta-spec differential campaign."""
-    report = run_generated_meta_fuzz_differential_campaign(iterations=30, seed=42)
+    """Runs the property-based meta-spec differential campaign."""
+    report = run_generated_meta_fuzz_differential_campaign(iterations_per_seed=25, seeds=[42, 1337])
     assert report["all_passed"] is True, f"Meta-fuzz differential discrepancies: {report['discrepancies']}"
     assert report["total_discrepancies"] == 0
 

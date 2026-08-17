@@ -196,6 +196,8 @@ def _generate_boundary_candidates(spec: StrategySpec) -> List[Any]:
 
         if (min_v is not None or max_v is not None) and allow_nan:
             raise ValueError("InvalidArgument: Cannot have allow_nan=True with min_value or max_value")
+        if min_v is not None and max_v is not None and allow_infinity:
+            raise ValueError("InvalidArgument: Cannot have allow_infinity=True with both min_value and max_value")
 
         if allow_nan:
             candidates.append(float("nan"))
@@ -295,6 +297,8 @@ def _generate_random_value(spec: StrategySpec, rng: random.Random) -> Any:
 
             if (min_v is not None or max_v is not None) and allow_nan:
                 raise ValueError("InvalidArgument: Cannot have allow_nan=True with min_value or max_value")
+            if min_v is not None and max_v is not None and allow_infinity:
+                raise ValueError("InvalidArgument: Cannot have allow_infinity=True with both min_value and max_value")
 
             eff_min = -10000.0 if min_v is None else min_v
             eff_max = 10000.0 if max_v is None else max_v
