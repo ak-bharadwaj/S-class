@@ -1,5 +1,5 @@
 {
-  "campaign_timestamp": "2026-08-17T05:54:16Z",
+  "campaign_timestamp": "2026-08-17T05:57:25Z",
   "unicode_provenance": {
     "python_runtime_version": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
     "python_version_info": [
@@ -9,14 +9,14 @@
     ],
     "unicode_database_version": "16.0.0",
     "index_sha256_checksum": "915272d292b21105f601ff500d1f24d69aa00491f82cefaab197f0d6d884174f",
-    "cold_init_duration_ms": 251.231,
+    "cold_init_duration_ms": 256.538,
     "total_categories_indexed": 30,
     "total_disjoint_intervals": 4099
   },
   "total_evaluated_differential_cases": 2542,
   "all_campaigns_passed": true,
   "campaign_a_standard_strict": {
-    "campaign_timestamp": "2026-08-17T05:54:02Z",
+    "campaign_timestamp": "2026-08-17T05:57:09Z",
     "health_checks_mode": "standard_strict",
     "total_campaign_cases": 21,
     "total_discrepancies": 0,
@@ -93,8 +93,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 106.114,
-        "candidate_elapsed_ms": 0.096,
+        "reference_elapsed_ms": 86.181,
+        "candidate_elapsed_ms": 0.093,
         "replay_verified": true,
         "violations": []
       },
@@ -123,8 +123,8 @@
           "both_valid_failures": true
         },
         "candidate_shrink_evaluations": 11,
-        "reference_elapsed_ms": 22.862,
-        "candidate_elapsed_ms": 0.109,
+        "reference_elapsed_ms": 21.739,
+        "candidate_elapsed_ms": 0.056,
         "replay_verified": true,
         "violations": []
       },
@@ -140,8 +140,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 19.681,
-        "candidate_elapsed_ms": 0.281,
+        "reference_elapsed_ms": 19.644,
+        "candidate_elapsed_ms": 0.195,
         "replay_verified": true,
         "violations": []
       },
@@ -170,8 +170,8 @@
           "both_valid_failures": true
         },
         "candidate_shrink_evaluations": 2,
-        "reference_elapsed_ms": 16.482,
-        "candidate_elapsed_ms": 0.062,
+        "reference_elapsed_ms": 18.315,
+        "candidate_elapsed_ms": 0.057,
         "replay_verified": true,
         "violations": []
       },
@@ -187,8 +187,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 14.058,
-        "candidate_elapsed_ms": 0.1,
+        "reference_elapsed_ms": 12.333,
+        "candidate_elapsed_ms": 0.102,
         "replay_verified": true,
         "violations": []
       },
@@ -217,8 +217,8 @@
           "both_valid_failures": true
         },
         "candidate_shrink_evaluations": 17,
-        "reference_elapsed_ms": 27.093,
-        "candidate_elapsed_ms": 0.071,
+        "reference_elapsed_ms": 28.744,
+        "candidate_elapsed_ms": 0.082,
         "replay_verified": true,
         "violations": []
       },
@@ -234,8 +234,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 20.987,
-        "candidate_elapsed_ms": 0.232,
+        "reference_elapsed_ms": 17.744,
+        "candidate_elapsed_ms": 0.225,
         "replay_verified": true,
         "violations": []
       },
@@ -264,8 +264,8 @@
           "both_valid_failures": true
         },
         "candidate_shrink_evaluations": 18,
-        "reference_elapsed_ms": 83.236,
-        "candidate_elapsed_ms": 0.112,
+        "reference_elapsed_ms": 82.811,
+        "candidate_elapsed_ms": 0.102,
         "replay_verified": true,
         "violations": []
       },
@@ -281,8 +281,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 38.46,
-        "candidate_elapsed_ms": 0.743,
+        "reference_elapsed_ms": 40.364,
+        "candidate_elapsed_ms": 0.641,
         "replay_verified": true,
         "violations": []
       },
@@ -298,8 +298,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 3.432,
-        "candidate_elapsed_ms": 0.052,
+        "reference_elapsed_ms": 2.303,
+        "candidate_elapsed_ms": 0.047,
         "replay_verified": true,
         "violations": []
       },
@@ -315,8 +315,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 54.895,
-        "candidate_elapsed_ms": 0.252,
+        "reference_elapsed_ms": 54.869,
+        "candidate_elapsed_ms": 0.233,
         "replay_verified": true,
         "violations": []
       },
@@ -332,8 +332,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 9.605,
-        "candidate_elapsed_ms": 253.764,
+        "reference_elapsed_ms": 10.213,
+        "candidate_elapsed_ms": 257.729,
         "replay_verified": true,
         "violations": []
       },
@@ -349,8 +349,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 1.404,
-        "candidate_elapsed_ms": 0.054,
+        "reference_elapsed_ms": 1.365,
+        "candidate_elapsed_ms": 0.052,
         "replay_verified": true,
         "violations": []
       },
@@ -366,8 +366,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 1.199,
-        "candidate_elapsed_ms": 0.05,
+        "reference_elapsed_ms": 1.179,
+        "candidate_elapsed_ms": 0.049,
         "replay_verified": true,
         "violations": []
       },
@@ -383,7 +383,7 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 0.837,
+        "reference_elapsed_ms": 1.032,
         "candidate_elapsed_ms": 0.035,
         "replay_verified": true,
         "violations": []
@@ -400,8 +400,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 0.91,
-        "candidate_elapsed_ms": 0.044,
+        "reference_elapsed_ms": 0.849,
+        "candidate_elapsed_ms": 0.031,
         "replay_verified": true,
         "violations": []
       },
@@ -417,8 +417,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 10.444,
-        "candidate_elapsed_ms": 0.066,
+        "reference_elapsed_ms": 8.773,
+        "candidate_elapsed_ms": 0.063,
         "replay_verified": true,
         "violations": []
       },
@@ -434,8 +434,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 16.248,
-        "candidate_elapsed_ms": 0.313,
+        "reference_elapsed_ms": 15.499,
+        "candidate_elapsed_ms": 0.401,
         "replay_verified": true,
         "violations": []
       },
@@ -451,8 +451,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 28.901,
-        "candidate_elapsed_ms": 0.683,
+        "reference_elapsed_ms": 31.535,
+        "candidate_elapsed_ms": 0.477,
         "replay_verified": true,
         "violations": []
       },
@@ -468,8 +468,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 13.324,
-        "candidate_elapsed_ms": 0.452,
+        "reference_elapsed_ms": 10.778,
+        "candidate_elapsed_ms": 0.199,
         "replay_verified": true,
         "violations": []
       },
@@ -485,15 +485,15 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 34.522,
-        "candidate_elapsed_ms": 0.103,
+        "reference_elapsed_ms": 32.019,
+        "candidate_elapsed_ms": 0.096,
         "replay_verified": true,
         "violations": []
       }
     ]
   },
   "campaign_b_diagnostic_suppressed": {
-    "campaign_timestamp": "2026-08-17T05:54:02Z",
+    "campaign_timestamp": "2026-08-17T05:57:09Z",
     "health_checks_mode": "diagnostic_suppressed",
     "total_campaign_cases": 21,
     "total_discrepancies": 0,
@@ -570,8 +570,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 14.858,
-        "candidate_elapsed_ms": 0.083,
+        "reference_elapsed_ms": 12.166,
+        "candidate_elapsed_ms": 0.076,
         "replay_verified": true,
         "violations": []
       },
@@ -600,8 +600,8 @@
           "both_valid_failures": true
         },
         "candidate_shrink_evaluations": 11,
-        "reference_elapsed_ms": 20.941,
-        "candidate_elapsed_ms": 0.048,
+        "reference_elapsed_ms": 19.588,
+        "candidate_elapsed_ms": 0.056,
         "replay_verified": true,
         "violations": []
       },
@@ -617,8 +617,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 13.141,
-        "candidate_elapsed_ms": 0.192,
+        "reference_elapsed_ms": 12.075,
+        "candidate_elapsed_ms": 0.313,
         "replay_verified": true,
         "violations": []
       },
@@ -647,8 +647,8 @@
           "both_valid_failures": true
         },
         "candidate_shrink_evaluations": 2,
-        "reference_elapsed_ms": 14.69,
-        "candidate_elapsed_ms": 0.047,
+        "reference_elapsed_ms": 16.421,
+        "candidate_elapsed_ms": 0.048,
         "replay_verified": true,
         "violations": []
       },
@@ -664,8 +664,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 12.549,
-        "candidate_elapsed_ms": 0.093,
+        "reference_elapsed_ms": 15.161,
+        "candidate_elapsed_ms": 0.092,
         "replay_verified": true,
         "violations": []
       },
@@ -694,8 +694,8 @@
           "both_valid_failures": true
         },
         "candidate_shrink_evaluations": 17,
-        "reference_elapsed_ms": 25.036,
-        "candidate_elapsed_ms": 0.057,
+        "reference_elapsed_ms": 27.738,
+        "candidate_elapsed_ms": 0.062,
         "replay_verified": true,
         "violations": []
       },
@@ -711,8 +711,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 21.946,
-        "candidate_elapsed_ms": 0.299,
+        "reference_elapsed_ms": 21.97,
+        "candidate_elapsed_ms": 0.245,
         "replay_verified": true,
         "violations": []
       },
@@ -741,8 +741,8 @@
           "both_valid_failures": true
         },
         "candidate_shrink_evaluations": 18,
-        "reference_elapsed_ms": 84.023,
-        "candidate_elapsed_ms": 0.192,
+        "reference_elapsed_ms": 79.68,
+        "candidate_elapsed_ms": 0.17,
         "replay_verified": true,
         "violations": []
       },
@@ -758,8 +758,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 23.439,
-        "candidate_elapsed_ms": 0.662,
+        "reference_elapsed_ms": 24.469,
+        "candidate_elapsed_ms": 0.619,
         "replay_verified": true,
         "violations": []
       },
@@ -775,8 +775,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 2.246,
-        "candidate_elapsed_ms": 0.079,
+        "reference_elapsed_ms": 2.994,
+        "candidate_elapsed_ms": 0.043,
         "replay_verified": true,
         "violations": []
       },
@@ -792,8 +792,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 43.351,
-        "candidate_elapsed_ms": 0.165,
+        "reference_elapsed_ms": 43.794,
+        "candidate_elapsed_ms": 0.147,
         "replay_verified": true,
         "violations": []
       },
@@ -809,8 +809,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 15.666,
-        "candidate_elapsed_ms": 0.096,
+        "reference_elapsed_ms": 14.297,
+        "candidate_elapsed_ms": 0.098,
         "replay_verified": true,
         "violations": []
       },
@@ -826,8 +826,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 0.965,
-        "candidate_elapsed_ms": 0.053,
+        "reference_elapsed_ms": 1.091,
+        "candidate_elapsed_ms": 0.056,
         "replay_verified": true,
         "violations": []
       },
@@ -843,8 +843,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 0.78,
-        "candidate_elapsed_ms": 0.049,
+        "reference_elapsed_ms": 1.736,
+        "candidate_elapsed_ms": 0.122,
         "replay_verified": true,
         "violations": []
       },
@@ -860,8 +860,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 0.792,
-        "candidate_elapsed_ms": 0.034,
+        "reference_elapsed_ms": 1.385,
+        "candidate_elapsed_ms": 0.04,
         "replay_verified": true,
         "violations": []
       },
@@ -877,8 +877,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 1.068,
-        "candidate_elapsed_ms": 0.033,
+        "reference_elapsed_ms": 1.017,
+        "candidate_elapsed_ms": 0.041,
         "replay_verified": true,
         "violations": []
       },
@@ -894,8 +894,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 10.218,
-        "candidate_elapsed_ms": 0.066,
+        "reference_elapsed_ms": 13.27,
+        "candidate_elapsed_ms": 0.073,
         "replay_verified": true,
         "violations": []
       },
@@ -911,7 +911,7 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 15.187,
+        "reference_elapsed_ms": 15.609,
         "candidate_elapsed_ms": 0.287,
         "replay_verified": true,
         "violations": []
@@ -928,8 +928,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 26.073,
-        "candidate_elapsed_ms": 0.48,
+        "reference_elapsed_ms": 25.831,
+        "candidate_elapsed_ms": 0.469,
         "replay_verified": true,
         "violations": []
       },
@@ -945,8 +945,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 11.306,
-        "candidate_elapsed_ms": 0.214,
+        "reference_elapsed_ms": 10.837,
+        "candidate_elapsed_ms": 0.211,
         "replay_verified": true,
         "violations": []
       },
@@ -962,8 +962,8 @@
         "verdict_agreement": true,
         "shrink_quality_delta": null,
         "candidate_shrink_evaluations": null,
-        "reference_elapsed_ms": 21.996,
-        "candidate_elapsed_ms": 0.097,
+        "reference_elapsed_ms": 25.305,
+        "candidate_elapsed_ms": 0.099,
         "replay_verified": true,
         "violations": []
       }
