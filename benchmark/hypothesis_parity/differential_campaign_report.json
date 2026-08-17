@@ -1,0 +1,238 @@
+{
+  "campaign_timestamp": "2026-08-17T05:06:31Z",
+  "total_campaign_cases": 12,
+  "total_discrepancies": 0,
+  "all_passed": true,
+  "unicode_provenance": {
+    "python_runtime_version": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+    "python_version_info": [
+      3,
+      14,
+      5
+    ],
+    "unicode_database_version": "16.0.0",
+    "index_sha256_checksum": "915272d292b21105f601ff500d1f24d69aa00491f82cefaab197f0d6d884174f",
+    "cold_init_duration_ms": 312.954,
+    "total_categories_indexed": 30,
+    "total_disjoint_intervals": 4099
+  },
+  "discrepancies": [],
+  "campaign_results": [
+    {
+      "case_name": "integers_addition_commutativity_pass",
+      "overall_status": "PASS",
+      "reference_verdict": "PASS",
+      "candidate_verdict": "PASS",
+      "reference_valid": true,
+      "candidate_valid": true,
+      "verdict_agreement": true,
+      "reference_shrunk_size": null,
+      "candidate_shrunk_size": null,
+      "candidate_shrink_evaluations": null,
+      "reference_elapsed_ms": 166.668,
+      "candidate_elapsed_ms": 0.094,
+      "replay_verified": true,
+      "violations": []
+    },
+    {
+      "case_name": "integers_upper_bound_fail_shrink",
+      "overall_status": "PASS",
+      "reference_verdict": "FAIL",
+      "candidate_verdict": "FAIL",
+      "reference_valid": true,
+      "candidate_valid": true,
+      "verdict_agreement": true,
+      "reference_shrunk_size": [
+        1,
+        27
+      ],
+      "candidate_shrunk_size": [
+        1,
+        28
+      ],
+      "candidate_shrink_evaluations": 11,
+      "reference_elapsed_ms": 28.762,
+      "candidate_elapsed_ms": 0.063,
+      "replay_verified": true,
+      "violations": []
+    },
+    {
+      "case_name": "text_concat_length_pass",
+      "overall_status": "PASS",
+      "reference_verdict": "PASS",
+      "candidate_verdict": "PASS",
+      "reference_valid": true,
+      "candidate_valid": true,
+      "verdict_agreement": true,
+      "reference_shrunk_size": null,
+      "candidate_shrunk_size": null,
+      "candidate_shrink_evaluations": null,
+      "reference_elapsed_ms": 31.84,
+      "candidate_elapsed_ms": 0.193,
+      "replay_verified": true,
+      "violations": []
+    },
+    {
+      "case_name": "text_forbidden_char_fail_shrink",
+      "overall_status": "PASS",
+      "reference_verdict": "FAIL",
+      "candidate_verdict": "FAIL",
+      "reference_valid": true,
+      "candidate_valid": true,
+      "verdict_agreement": true,
+      "reference_shrunk_size": [
+        1,
+        3
+      ],
+      "candidate_shrunk_size": [
+        1,
+        3
+      ],
+      "candidate_shrink_evaluations": 2,
+      "reference_elapsed_ms": 23.154,
+      "candidate_elapsed_ms": 0.051,
+      "replay_verified": true,
+      "violations": []
+    },
+    {
+      "case_name": "floats_triangle_inequality_pass",
+      "overall_status": "PASS",
+      "reference_verdict": "PASS",
+      "candidate_verdict": "PASS",
+      "reference_valid": true,
+      "candidate_valid": true,
+      "verdict_agreement": true,
+      "reference_shrunk_size": null,
+      "candidate_shrunk_size": null,
+      "candidate_shrink_evaluations": null,
+      "reference_elapsed_ms": 16.869,
+      "candidate_elapsed_ms": 0.098,
+      "replay_verified": true,
+      "violations": []
+    },
+    {
+      "case_name": "floats_upper_bound_fail_shrink",
+      "overall_status": "PASS",
+      "reference_verdict": "FAIL",
+      "candidate_verdict": "FAIL",
+      "reference_valid": true,
+      "candidate_valid": true,
+      "verdict_agreement": true,
+      "reference_shrunk_size": [
+        1,
+        14.0
+      ],
+      "candidate_shrunk_size": [
+        1,
+        26.0
+      ],
+      "candidate_shrink_evaluations": 17,
+      "reference_elapsed_ms": 38.55,
+      "candidate_elapsed_ms": 0.062,
+      "replay_verified": true,
+      "violations": []
+    },
+    {
+      "case_name": "lists_reverse_involution_pass",
+      "overall_status": "PASS",
+      "reference_verdict": "PASS",
+      "candidate_verdict": "PASS",
+      "reference_valid": true,
+      "candidate_valid": true,
+      "verdict_agreement": true,
+      "reference_shrunk_size": null,
+      "candidate_shrunk_size": null,
+      "candidate_shrink_evaluations": null,
+      "reference_elapsed_ms": 27.287,
+      "candidate_elapsed_ms": 0.267,
+      "replay_verified": true,
+      "violations": []
+    },
+    {
+      "case_name": "lists_sum_bound_fail_shrink",
+      "overall_status": "PASS",
+      "reference_verdict": "FAIL",
+      "candidate_verdict": "FAIL",
+      "reference_valid": true,
+      "candidate_valid": true,
+      "verdict_agreement": true,
+      "reference_shrunk_size": [
+        1,
+        7
+      ],
+      "candidate_shrunk_size": [
+        1,
+        7
+      ],
+      "candidate_shrink_evaluations": 18,
+      "reference_elapsed_ms": 99.015,
+      "candidate_elapsed_ms": 0.134,
+      "replay_verified": true,
+      "violations": []
+    },
+    {
+      "case_name": "regex_anchored_fullmatch_pass",
+      "overall_status": "PASS",
+      "reference_verdict": "PASS",
+      "candidate_verdict": "PASS",
+      "reference_valid": true,
+      "candidate_valid": true,
+      "verdict_agreement": true,
+      "reference_shrunk_size": null,
+      "candidate_shrunk_size": null,
+      "candidate_shrink_evaluations": null,
+      "reference_elapsed_ms": 51.29,
+      "candidate_elapsed_ms": 0.66,
+      "replay_verified": true,
+      "violations": []
+    },
+    {
+      "case_name": "sampled_from_membership_pass",
+      "overall_status": "PASS",
+      "reference_verdict": "PASS",
+      "candidate_verdict": "PASS",
+      "reference_valid": true,
+      "candidate_valid": true,
+      "verdict_agreement": true,
+      "reference_shrunk_size": null,
+      "candidate_shrunk_size": null,
+      "candidate_shrink_evaluations": null,
+      "reference_elapsed_ms": 3.549,
+      "candidate_elapsed_ms": 0.09,
+      "replay_verified": true,
+      "violations": []
+    },
+    {
+      "case_name": "emails_format_validation_pass",
+      "overall_status": "PASS",
+      "reference_verdict": "PASS",
+      "candidate_verdict": "PASS",
+      "reference_valid": true,
+      "candidate_valid": true,
+      "verdict_agreement": true,
+      "reference_shrunk_size": null,
+      "candidate_shrunk_size": null,
+      "candidate_shrink_evaluations": null,
+      "reference_elapsed_ms": 77.372,
+      "candidate_elapsed_ms": 0.241,
+      "replay_verified": true,
+      "violations": []
+    },
+    {
+      "case_name": "characters_uppercase_category_pass",
+      "overall_status": "PASS",
+      "reference_verdict": "PASS",
+      "candidate_verdict": "PASS",
+      "reference_valid": true,
+      "candidate_valid": true,
+      "verdict_agreement": true,
+      "reference_shrunk_size": null,
+      "candidate_shrunk_size": null,
+      "candidate_shrink_evaluations": null,
+      "reference_elapsed_ms": 10.041,
+      "candidate_elapsed_ms": 315.754,
+      "replay_verified": true,
+      "violations": []
+    }
+  ]
+}
