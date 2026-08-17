@@ -1,5 +1,5 @@
 # S-Class — Core Specification (D0 Contract Freeze)
-### Version: 1.0.0 (Canonical D0 Specification)
+### Version: 1.1.0 (Canonical D0 Specification — Hardened Precision Release)
 ### Authority: Master Plan Directive (`SCLASS_MASTER_SYSTEM_DESIGN_AND_BUILD_PLAN.md`)
 ### Status: 🟢 FROZEN CONTRACT
 
@@ -68,7 +68,7 @@ $$\text{APPEND-ONLY EVENT LOG} + \text{CRYPTOGRAPHIC PROVENANCE} + \text{DEPENDE
 
 ## 2. Existing Codebase Audit & Architectural Disposition
 
-An exhaustive audit of all 73 source files and test suites in `ak-bharadwaj/S-class` against the Master Plan produces the following disposition matrix:
+An exhaustive audit of all source files and test suites in `ak-bharadwaj/S-class` against the Master Plan produces the following disposition matrix:
 
 ### 2.1 Summary Disposition Table
 
@@ -82,7 +82,7 @@ An exhaustive audit of all 73 source files and test suites in `ak-bharadwaj/S-cl
 ### 2.2 Component-by-Component Disposition
 
 #### 2.2.1 Core Kernel & Runtime Layer
-- `evidence_provider.py` $\to$ 🟢 **REUSE (Provider Base)**: Base provider classes, HMAC verification, and child-process worker protocol from Gate 3 work.
+- `evidence_provider.py` $\to$ 🟢 **REUSE (Provider Base)**: Base provider classes, HMAC IPC verification, and child-process worker protocol from Gate 3 work.
 - `benchmark/providers/schemathesis/*` $\to$ 🟢 **REUSE**: Certified Schemathesis 4.24.3 integration, process isolation, SHA binding.
 - `property_verifier.py` $\to$ 🟢 **REUSE**: Clean-Room Hypothesis execution engine.
 - `file_lock.py` $\to$ 🟢 **REUSE**: Portalocker backend, cross-platform POSIX/Windows byte-range locking.
@@ -91,7 +91,7 @@ An exhaustive audit of all 73 source files and test suites in `ak-bharadwaj/S-cl
 - `config_gc.py` $\to$ 🟡 **ADAPT**: Hardened garbage collection logic for runtime workspace artifacts.
 - `static_analysis_provider.py` $\to$ 🟡 **ADAPT**: Ruff/Semgrep subprocess runner adapts to D6 provider interface.
 - `type_verification_provider.py` $\to$ 🟡 **ADAPT**: Pyright runner adapts to D6 provider interface.
-- `event_store.py` $\to$ 🔴 **REWRITE**: Replace ad-hoc JSONL appender with D2 strict append-only typed event log with digest chains.
+- `event_store.py` $\to$ 🔴 **REWRITE**: Replace ad-hoc JSONL appender with D2 strict append-only typed event log with digest chains and RFC 8785 canonical serialization.
 - `sclass_kernel.py` $\to$ 🔴 **REWRITE**: Eliminate V11 monolithic orchestration in favor of D5 Controller + D2 Reducer.
 - `runtime.py` $\to$ 🔴 **REWRITE**: Split 1229-line God file into distinct modular subsystems (Execution Fabric, Sandbox, Tool Runner).
 - `context_compressor.py` $\to$ 🗑️ **DISCARD**: Heuristic string compressor that stealthily triggered DB writes.
@@ -123,7 +123,7 @@ An exhaustive audit of all 73 source files and test suites in `ak-bharadwaj/S-cl
 
 ## 3. Canonical Domain Schemas & Data Structures
 
-All S-Class domain models are strictly typed, serializable, and validated via JSON Schema Draft 2020-12 and Pydantic v2 models.
+All S-Class domain models are strictly typed, serializable, and validated via JSON Schema Draft 2020-12 and Pydantic v2 models. Every schema and sub-schema strictly forbids undeclared properties (`additionalProperties: false`).
 
 ### 3.1 Task Schema (`Task`)
 
@@ -131,10 +131,13 @@ All S-Class domain models are strictly typed, serializable, and validated via JS
 $schema: "https://json-schema.org/draft/2020-12/schema"
 title: "Task"
 type: "object"
+additionalProperties: false
 required:
   - "task_id"
   - "raw_prompt"
   - "repository_context"
+  - "constraints"
+  - "environment"
   - "created_at"
 properties:
   task_id:
@@ -145,23 +148,31 @@ properties:
     minLength: 1
   repository_context:
     type: "object"
+    additionalProperties: false
     required:
       - "repository_id"
       - "base_commit_sha"
       - "branch"
+      - "dirty_working_tree"
     properties:
       repository_id:
         type: "string"
+        minLength: 1
       base_commit_sha:
         type: "string"
         pattern: "^[a-f0-9]{40}$"
       branch:
         type: "string"
+        minLength: 1
       dirty_working_tree:
         type: "boolean"
         default: false
   constraints:
     type: "object"
+    additionalProperties: false
+    required:
+      - "languages"
+      - "frameworks"
     properties:
       languages:
         type: "array"
@@ -170,10 +181,10 @@ properties:
         type: "array"
         items: { type: "string" }
       max_budget_usd:
-        type: "number"
+        type: ["number", "null"]
         minimum: 0.0
       timeout_seconds:
-        type: "integer"
+        type: ["integer", "null"]
         minimum: 1
   environment:
     type: "object"
@@ -189,14 +200,19 @@ properties:
 $schema: "https://json-schema.org/draft/2020-12/schema"
 title: "Obligation"
 type: "object"
+additionalProperties: false
 required:
   - "obligation_id"
   - "task_id"
+  - "parent_obligation_id"
   - "title"
+  - "description"
   - "category"
   - "criticality"
   - "status"
   - "depends_on"
+  - "claim_ids"
+  - "policy_id"
 properties:
   obligation_id:
     type: "string"
@@ -209,6 +225,7 @@ properties:
     pattern: "^OBL-[A-Za-z0-9_-]+$"
   title:
     type: "string"
+    minLength: 1
   description:
     type: "string"
   category:
@@ -245,18 +262,17 @@ properties:
       type: "string"
       pattern: "^CLM-[A-Za-z0-9_-]+$"
   policy_id:
-    type: "string"
+    type: ["string", "null"]
     pattern: "^POL-[A-Za-z0-9_-]+$"
 ```
 
 ### 3.3 Claim Schema (`Claim`) & 5-Tier Taxonomy
 
-Every claim is a machine-checkable proposition decomposed into Subject, Predicate, Context, and Expected Outcome.
-
 ```yaml
 $schema: "https://json-schema.org/draft/2020-12/schema"
 title: "Claim"
 type: "object"
+additionalProperties: false
 required:
   - "claim_id"
   - "obligation_id"
@@ -267,6 +283,7 @@ required:
   - "expected"
   - "criticality"
   - "status"
+  - "required_provider_capabilities"
 properties:
   claim_id:
     type: "string"
@@ -284,6 +301,7 @@ properties:
       - "V4_JUDGMENT"      # Maintainability, ergonomics, visual polish (NON-PROVING)
   subject:
     type: "object"
+    additionalProperties: false
     required: ["target_type", "identifier"]
     properties:
       target_type:
@@ -291,6 +309,7 @@ properties:
         enum: ["ENDPOINT", "FUNCTION", "CLASS", "FILE", "SCHEMA", "ARCHITECTURE_COMPONENT"]
       identifier:
         type: "string"
+        minLength: 1
   predicate:
     type: "string"
     enum:
@@ -303,6 +322,8 @@ properties:
       - "SATISFIES_PROPERTY_INVARIANT"
       - "PRESERVES_BACKWARD_COMPATIBILITY"
       - "TERMINATES_WITHIN_BOUNDS"
+      - "PREVENTS_UNAUTHORIZED_ACTION"
+      - "NO_SILENT_DATA_LOSS_ON_CONCURRENT_WRITES"
   context:
     type: "object"
     additionalProperties: true
@@ -327,19 +348,68 @@ properties:
 
 > **Mandatory Rule for V4 (Judgment)**: Evidence for Tier $V_4$ claims can **never** satisfy a mandatory obligation on its own. It requires corroborating $V_0$–$V_3$ deterministic evidence or an explicit, cryptographically signed human exception record (§3.4.2).
 
-### 3.4 Policy Schema (`Policy`) & Exception Model
+### 3.4 Policy Schema (`Policy`) & Fully Typed Rules
 
-#### 3.4.1 Policy Rule Schema
+#### 3.4.1 Policy Rule Schema (`PolicyRule`)
+
+Policy rules are strictly typed discriminated structures. Floating-point confidence metrics are banned under CORE-08.
+
+```yaml
+$schema: "https://json-schema.org/draft/2020-12/schema"
+title: "PolicyRule"
+type: "object"
+additionalProperties: false
+required: ["rule_type", "parameters"]
+properties:
+  rule_type:
+    type: "string"
+    enum:
+      - "REQUIRE_CAPABILITY"
+      - "REQUIRE_TIER"
+      - "REQUIRE_EVIDENCE_COUNT"
+      - "NO_CONFLICTS"
+      - "NO_STALE_EVIDENCE"
+      - "REQUIRE_INDEPENDENT_PROVIDERS"
+  parameters:
+    type: "object"
+    additionalProperties: false
+    properties:
+      capability:
+        type: "string"
+        enum:
+          - "PROPERTY_TESTING"
+          - "API_CONTRACT_FUZZING"
+          - "STATIC_AST_ANALYSIS"
+          - "TYPE_CHECK"
+          - "UNIT_TEST_EXECUTION"
+          - "DEPENDENCY_SECURITY_SCAN"
+          - "PROVENANCE_BEARING_HUMAN_REVIEW"
+      tier:
+        type: "string"
+        enum: ["V0_OBSERVABLE", "V1_STRUCTURAL", "V2_BEHAVIORAL", "V3_SYSTEM_LEVEL", "V4_JUDGMENT"]
+      min_count:
+        type: "integer"
+        minimum: 1
+      min_independent_sources:
+        type: "integer"
+        minimum: 1
+      group_by:
+        type: "string"
+        enum: ["PROVIDER_TYPE", "EXECUTION_PROCESS", "AUTHOR"]
+```
+
+#### 3.4.2 Policy Schema (`Policy`)
 
 ```yaml
 $schema: "https://json-schema.org/draft/2020-12/schema"
 title: "Policy"
 type: "object"
+additionalProperties: false
 required:
   - "policy_id"
   - "scope_level"
-  - "expression"
   - "version"
+  - "expression"
 properties:
   policy_id:
     type: "string"
@@ -356,30 +426,40 @@ properties:
     minimum: 1
   expression:
     type: "object"
+    additionalProperties: false
     required: ["combinator", "rules"]
     properties:
       combinator:
         type: "string"
         enum: ["ALL", "ANY", "AT_LEAST", "CONDITIONAL"]
       min_count:
-        type: "integer"
+        type: ["integer", "null"]
         minimum: 1
       independent_by:
-        type: "string"
-        enum: ["PROVIDER_TYPE", "EXECUTION_PROCESS", "AUTHOR"]
+        type: ["string", "null"]
+        enum: ["PROVIDER_TYPE", "EXECUTION_PROCESS", "AUTHOR", null]
       rules:
         type: "array"
-        items: { type: "object" }
+        items: { $ref: "#/$defs/PolicyRule" }
       condition:
-        type: "object"
+        type: ["object", "null"]
+        additionalProperties: false
+        properties:
+          predicate: { type: "string" }
+          value: { type: "string" }
+      then_expression:
+        type: ["object", "null"]
+      else_expression:
+        type: ["object", "null"]
 ```
 
-#### 3.4.2 Policy Exception Record Schema
+#### 3.4.3 Policy Exception Record Schema (`PolicyException`)
 
 ```yaml
 $schema: "https://json-schema.org/draft/2020-12/schema"
 title: "PolicyException"
 type: "object"
+additionalProperties: false
 required:
   - "exception_id"
   - "obligation_id"
@@ -395,24 +475,27 @@ properties:
     pattern: "^EXC-[A-Za-z0-9_-]+$"
   obligation_id:
     type: "string"
+    pattern: "^OBL-[A-Za-z0-9_-]+$"
   policy_id:
     type: "string"
+    pattern: "^POL-[A-Za-z0-9_-]+$"
   justification:
     type: "string"
     minLength: 20
   authorized_by:
     type: "object"
+    additionalProperties: false
     required: ["actor_id", "actor_role", "public_key_fingerprint"]
     properties:
-      actor_id: { type: "string" }
-      actor_role: { type: "string" }
-      public_key_fingerprint: { type: "string" }
+      actor_id: { type: "string", minLength: 1 }
+      actor_role: { type: "string", minLength: 1 }
+      public_key_fingerprint: { type: "string", minLength: 8 }
   compensating_controls:
     type: "array"
     minItems: 1
-    items: { type: "string" }
+    items: { type: "string", minLength: 5 }
   expiry:
-    type: "string"
+    type: ["string", "null"]
     format: "date-time"
   hmac_signature:
     type: "string"
@@ -425,6 +508,7 @@ properties:
 $schema: "https://json-schema.org/draft/2020-12/schema"
 title: "ActionProposal"
 type: "object"
+additionalProperties: false
 required:
   - "proposal_id"
   - "task_id"
@@ -439,6 +523,7 @@ properties:
     pattern: "^PROP-[A-Za-z0-9_-]+$"
   task_id:
     type: "string"
+    pattern: "^TASK-[A-Za-z0-9_-]+$"
   action_type:
     type: "string"
     enum:
@@ -450,28 +535,31 @@ properties:
       - "PROPOSE_ARCHITECTURE_PLAN"
   target:
     type: "object"
+    additionalProperties: false
     required: ["target_identifier", "target_kind"]
     properties:
-      target_identifier: { type: "string" }
-      target_kind: { type: "string" }
+      target_identifier: { type: "string", minLength: 1 }
+      target_kind: { type: "string", minLength: 1 }
   purpose:
     type: "object"
+    additionalProperties: false
     required: ["rationale", "target_claim_ids"]
     properties:
-      rationale: { type: "string" }
+      rationale: { type: "string", minLength: 5 }
       target_claim_ids:
         type: "array"
-        items: { type: "string" }
+        items: { type: "string", pattern: "^CLM-[A-Za-z0-9_-]+$" }
   prerequisites:
     type: "array"
     items: { type: "string" }
   resource_limits:
     type: "object"
-    required: ["timeout_ms", "max_memory_mb"]
+    additionalProperties: false
+    required: ["timeout_ms", "max_memory_mb", "max_cost_usd"]
     properties:
-      timeout_ms: { type: "integer", maximum: 600000 }
-      max_memory_mb: { type: "integer", maximum: 8192 }
-      max_cost_usd: { type: "number", default: 1.0 }
+      timeout_ms: { type: "integer", minimum: 100, maximum: 600000 }
+      max_memory_mb: { type: "integer", minimum: 64, maximum: 8192 }
+      max_cost_usd: { type: "number", minimum: 0.0, maximum: 50.0 }
 ```
 
 ### 3.6 Controller Decision Schema (`ControllerDecision`)
@@ -480,10 +568,13 @@ properties:
 $schema: "https://json-schema.org/draft/2020-12/schema"
 title: "ControllerDecision"
 type: "object"
+additionalProperties: false
 required:
   - "decision_id"
   - "proposal_id"
   - "verdict"
+  - "rejection_reasons"
+  - "execution_token"
   - "decided_at"
 properties:
   decision_id:
@@ -491,6 +582,7 @@ properties:
     pattern: "^DEC-[A-Za-z0-9_-]+$"
   proposal_id:
     type: "string"
+    pattern: "^PROP-[A-Za-z0-9_-]+$"
   verdict:
     type: "string"
     enum: ["APPROVED", "REJECTED", "DEFERRED"]
@@ -510,6 +602,7 @@ properties:
 $schema: "https://json-schema.org/draft/2020-12/schema"
 title: "Evidence"
 type: "object"
+additionalProperties: false
 required:
   - "evidence_id"
   - "claim_id"
@@ -521,6 +614,7 @@ required:
   - "observation"
   - "polarity"
   - "validity"
+  - "independence_group"
   - "provenance"
   - "signature"
 properties:
@@ -532,6 +626,7 @@ properties:
     pattern: "^CLM-[A-Za-z0-9_-]+$"
   provider_id:
     type: "string"
+    minLength: 1
   capability:
     type: "string"
     enum:
@@ -544,12 +639,14 @@ properties:
       - "PROVENANCE_BEARING_HUMAN_REVIEW"
   execution_id:
     type: "string"
+    minLength: 1
   source_sha:
     type: "string"
     pattern: "^[a-f0-9]{40}$"
   scope:
     type: "object"
-    required: ["targets_evaluated"]
+    additionalProperties: false
+    required: ["targets_evaluated", "aspects_covered"]
     properties:
       targets_evaluated:
         type: "array"
@@ -559,16 +656,17 @@ properties:
         items: { type: "string" }
   observation:
     type: "object"
-    required: ["raw_status", "diagnostics"]
+    additionalProperties: false
+    required: ["raw_status", "diagnostics", "counterexample"]
     properties:
       raw_status:
         type: "string"
         enum: ["PASS", "FAIL", "ERROR", "TIMEOUT", "INCONCLUSIVE"]
       diagnostics:
         type: "array"
-        items: { type: "object" }
+        items: { type: "string" }
       counterexample:
-        type: ["object", "null"]
+        type: ["string", "null"]
   polarity:
     type: "string"
     enum: ["SUPPORTS", "REFUTES", "NEUTRAL"]
@@ -577,16 +675,19 @@ properties:
     enum: ["VALID", "STALE", "INVALID", "SUPERSEDED"]
   independence_group:
     type: "string"
+    minLength: 1
   provenance:
     type: "object"
+    additionalProperties: false
     required: ["engine_name", "engine_version", "environment_hash", "timestamp"]
     properties:
-      engine_name: { type: "string" }
-      engine_version: { type: "string" }
-      environment_hash: { type: "string" }
+      engine_name: { type: "string", minLength: 1 }
+      engine_version: { type: "string", minLength: 1 }
+      environment_hash: { type: "string", pattern: "^[a-f0-9]{64}$" }
       timestamp: { type: "string", format: "date-time" }
   signature:
     type: "object"
+    additionalProperties: false
     required: ["algorithm", "digest", "hmac"]
     properties:
       algorithm: { type: "string", enum: ["HMAC-SHA256", "ED25519"] }
@@ -600,17 +701,19 @@ properties:
 $schema: "https://json-schema.org/draft/2020-12/schema"
 title: "Plan"
 type: "object"
+additionalProperties: false
 required:
   - "plan_id"
   - "origin"
   - "source_prompt"
   - "status"
+  - "revision"
+  - "revision_of"
   - "architecture_claims"
   - "dependency_graph"
   - "milestone_sequence"
   - "open_risks"
   - "contradictions"
-  - "revision"
 properties:
   plan_id:
     type: "string"
@@ -620,6 +723,7 @@ properties:
     enum: ["TASK_DECOMPOSITION", "SELF_PLANNING", "HUMAN_DIRECTIVE"]
   source_prompt:
     type: "string"
+    minLength: 1
   status:
     type: "string"
     enum: ["DRAFT", "UNDER_REVIEW", "VALIDATED", "REJECTED", "SUPERSEDED"]
@@ -628,24 +732,27 @@ properties:
     minimum: 1
   revision_of:
     type: ["string", "null"]
+    pattern: "^PLAN-[A-Za-z0-9_-]+$"
   architecture_claims:
     type: "array"
     items:
       type: "object"
+      additionalProperties: false
       required: ["claim_id", "subject", "predicate", "criticality", "evidence_required"]
       properties:
-        claim_id: { type: "string" }
-        subject: { type: "string" }
-        predicate: { type: "string" }
+        claim_id: { type: "string", pattern: "^CLM-[A-Za-z0-9_-]+$" }
+        subject: { type: "string", minLength: 1 }
+        predicate: { type: "string", minLength: 1 }
         criticality: { type: "string", enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"] }
         evidence_required:
           type: "array"
           items:
             type: "object"
+            additionalProperties: false
             required: ["capability", "tier"]
             properties:
               capability: { type: "string" }
-              tier: { type: "string" }
+              tier: { type: "string", enum: ["V0_OBSERVABLE", "V1_STRUCTURAL", "V2_BEHAVIORAL", "V3_SYSTEM_LEVEL", "V4_JUDGMENT"] }
   dependency_graph:
     type: "object"
     additionalProperties:
@@ -655,11 +762,14 @@ properties:
     type: "array"
     items:
       type: "object"
+      additionalProperties: false
       required: ["milestone_id", "title", "obligation_ids"]
       properties:
         milestone_id: { type: "string" }
         title: { type: "string" }
-        obligation_ids: { type: "array", items: { type: "string" } }
+        obligation_ids:
+          type: "array"
+          items: { type: "string", pattern: "^OBL-[A-Za-z0-9_-]+$" }
   open_risks:
     type: "array"
     items: { type: "string" }
@@ -674,6 +784,7 @@ properties:
 $schema: "https://json-schema.org/draft/2020-12/schema"
 title: "AssessmentReceipt"
 type: "object"
+additionalProperties: false
 required:
   - "receipt_id"
   - "obligation_id"
@@ -691,8 +802,10 @@ properties:
     pattern: "^RCPT-[A-Za-z0-9_-]+$"
   obligation_id:
     type: "string"
+    pattern: "^OBL-[A-Za-z0-9_-]+$"
   policy_version:
     type: "integer"
+    minimum: 1
   repository_sha:
     type: "string"
     pattern: "^[a-f0-9]{40}$"
@@ -703,12 +816,17 @@ properties:
     type: "array"
     items:
       type: "object"
+      additionalProperties: false
       required: ["claim_id", "status", "supporting_evidence_ids", "refuting_evidence_ids"]
       properties:
-        claim_id: { type: "string" }
-        status: { type: "string" }
-        supporting_evidence_ids: { type: "array", items: { type: "string" } }
-        refuting_evidence_ids: { type: "array", items: { type: "string" } }
+        claim_id: { type: "string", pattern: "^CLM-[A-Za-z0-9_-]+$" }
+        status: { type: "string", enum: ["UNSUPPORTED", "SUPPORTED", "CONTRADICTED", "CONFLICTED", "STALE"] }
+        supporting_evidence_ids:
+          type: "array"
+          items: { type: "string", pattern: "^EV-[A-Za-z0-9_-]+$" }
+        refuting_evidence_ids:
+          type: "array"
+          items: { type: "string", pattern: "^EV-[A-Za-z0-9_-]+$" }
   conflicts:
     type: "array"
     items: { type: "string" }
@@ -729,6 +847,7 @@ properties:
 $schema: "https://json-schema.org/draft/2020-12/schema"
 title: "EventEnvelope"
 type: "object"
+additionalProperties: false
 required:
   - "event_id"
   - "event_type"
@@ -744,11 +863,27 @@ properties:
     pattern: "^EVT-[A-Za-z0-9_-]+$"
   event_type:
     type: "string"
+    enum:
+      - "TASK_CREATED"
+      - "OBLIGATION_EXTRACTED"
+      - "OBLIGATION_DEPENDENCY_LINKED"
+      - "CLAIM_COMPILED"
+      - "ACTION_PROPOSED"
+      - "ACTION_AUTHORIZED"
+      - "ACTION_REJECTED"
+      - "EVIDENCE_INGESTED"
+      - "CLAIM_REDUCED"
+      - "OBLIGATION_ASSESSED"
+      - "OBLIGATION_REOPENED"
+      - "PLAN_PROPOSED"
+      - "PLAN_VALIDATED"
+      - "PLAN_REJECTED"
   sequence_number:
     type: "integer"
     minimum: 1
   aggregate_id:
     type: "string"
+    minLength: 1
   timestamp:
     type: "string"
     format: "date-time"
@@ -803,7 +938,7 @@ $$\mathcal{S}_{\text{OBL}} = \{\text{OPEN}, \text{READY}, \text{IN\_PROGRESS}, \
 | `READY` | `ACTION_AUTHORIZED` | Controller issues valid execution token | `IN_PROGRESS` | Lock execution slot |
 | `IN_PROGRESS` | `EVALUATION_COMPLETED` | Policy Engine evaluates: `SATISFIED` $\land \text{Conflicts} = \emptyset$ | `SATISFIED` | Emit `OBLIGATION_CLOSED` + Receipt |
 | `IN_PROGRESS` | `RESOURCE_EXHAUSTED` | Retries $\ge \text{max\_attempts} \lor \text{Timeout}$ | `BLOCKED` | Trigger Escalation / Diagnostics |
-| `IN_PROGRESS` | `EXCEPTION_GRANTED` | Valid cryptographically signed Exception Record (§3.4.2) | `CONDITIONAL` | Mint conditional receipt |
+| `IN_PROGRESS` | `EXCEPTION_GRANTED` | Valid cryptographically signed Exception Record (§3.4.3) | `CONDITIONAL` | Mint conditional receipt |
 | `SATISFIED` | `SOURCE_MUTATED` | Repository SHA changed $\land \text{Impact}(C) = \text{TRUE}$ | `REQUIRES_REASSESSMENT` | Invalidate evidence, mark claims stale |
 | `CONDITIONAL` | `SOURCE_MUTATED` | Repository SHA changed | `REQUIRES_REASSESSMENT` | Invalidate evidence |
 | `REQUIRES_REASSESSMENT` | `REASSESSMENT_DISPATCHED` | Re-evaluation job enqueued | `READY` | Re-queue for verification |
@@ -863,8 +998,18 @@ $$\mathcal{S}_{\text{CTRL}} = \{\text{PROPOSED}, \text{EVALUATING}, \text{AUTHOR
 ### 5.1 Append-Only Event Log Specification
 
 1. **Immutability**: Once appended, an event cannot be modified, deleted, or reordered.
-2. **Digest Hash Chaining**: Every event envelope contains `parent_digest = SHA256(Event_{n-1})` and `digest = SHA256(Event_n)`.
-3. **Total Ordering**: Sequence numbers are strictly monotonically increasing integers ($1, 2, 3, \dots$).
+2. **Total Ordering**: Sequence numbers are strictly monotonically increasing integers ($t = 1, 2, 3, \dots$).
+3. **Genesis Digest Constant**:
+   $$\text{GENESIS\_DIGEST} = \text{"0"}^{64} = \text{"0000000000000000000000000000000000000000000000000000000000000000"}$$
+   For the root event where `sequence_number == 1`, `parent_digest` MUST equal `GENESIS_DIGEST`.
+4. **Domain Separation Constant**:
+   $$\text{DOMAIN\_SEPARATOR} = \text{"SCLASS\_EVENT\_V1:"}$$
+5. **Canonical RFC 8785 JSON Serialization (JCS)**:
+   All event hashing uses RFC 8785 canonical serialization (deterministic UTF-8 byte encoding, strictly sorted keys, whitespace stripped, strict float/integer normalization).
+6. **Digest Hash Chaining**:
+   Let $\text{Env}_{-d}$ be the EventEnvelope object omitting the `digest` field.
+   $$\text{canonical\_payload} = \text{JCS}(\text{Env}_{-d})$$
+   $$\text{digest} = \text{SHA256}(\text{UTF8}(\text{DOMAIN\_SEPARATOR}) \parallel \text{UTF8}(\text{parent\_digest}) \parallel \text{canonical\_payload})$$
 
 ### 5.2 Canonical Event Catalog
 
@@ -882,26 +1027,35 @@ $$\mathcal{S}_{\text{CTRL}} = \{\text{PROPOSED}, \text{EVALUATING}, \text{AUTHOR
 | `OBLIGATION_ASSESSED` | Obligation | Obligation ID, assessment receipt, verdict (`SATISFIED`, `UNSATISFIED`). |
 | `OBLIGATION_REOPENED` | Obligation | Obligation ID, mutation reason, invalidated claim IDs. |
 | `PLAN_PROPOSED` | Plan | Plan ID, prompt, architecture claims, dependency graph. |
-| `PLAN_VALIDATED` | Plan | Plan ID, validation receipt, timestamp. |
+| `PLAN_VALIDATED` | Plan | Plan ID, validation receipt. |
 | `PLAN_REJECTED` | Plan | Plan ID, refuting evidence IDs, contradiction list. |
 
 ### 5.3 Deterministic Reduction Function
 
-The system state $\mathcal{S}_t$ at sequence $t$ is a deterministic fold over the event log:
+The system state $\mathcal{S}_t$ at sequence $t$ is a deterministic mathematical fold over the sequence of events:
 
 $$\mathcal{S}_0 = \emptyset$$
 $$\mathcal{S}_{t+1} = \text{Reduce}(\mathcal{S}_t, \mathcal{E}_{t+1})$$
+
+> **Logical Time Invariant**: The reducer relies exclusively on the totally ordered logical clock ($t$) and causal event contents. The `timestamp` field in `EventEnvelope` is preserved strictly as audit metadata and has zero effect on state branching. Bit-for-bit identical state is guaranteed across all platforms and replays.
 
 ```python
 def reduce_event(state: SystemState, event: EventEnvelope) -> SystemState:
     """
     Pure deterministic state reduction function.
-    Must have zero side-effects, zero I/O, and zero non-deterministic calls.
+    Zero I/O, zero wall-clock dependencies, zero side-effects.
     """
     event_type = event.event_type
     payload = event.payload
     
-    if event_type == "CLAIM_COMPILED":
+    if event_type == "TASK_CREATED":
+        task_id = payload["task_id"]
+        state.tasks[task_id] = TaskState(
+            task_id=task_id,
+            base_commit_sha=payload["repository_context"]["base_commit_sha"],
+            created_at=event.timestamp  # Recorded purely as epistemic metadata
+        )
+    elif event_type == "CLAIM_COMPILED":
         claim_id = payload["claim_id"]
         state.claims[claim_id] = ClaimState(
             claim_id=claim_id,
@@ -919,7 +1073,10 @@ def reduce_event(state: SystemState, event: EventEnvelope) -> SystemState:
         claim.evidence_refs.append(ev_id)
         
         # Deterministic Epistemic Reduction
-        active_evidence = [state.evidence[eid] for eid in claim.evidence_refs if state.evidence[eid]["validity"] == "VALID"]
+        active_evidence = [
+            state.evidence[eid] for eid in claim.evidence_refs 
+            if state.evidence[eid]["validity"] == "VALID"
+        ]
         has_supports = any(e["polarity"] == "SUPPORTS" for e in active_evidence)
         has_refutes = any(e["polarity"] == "REFUTES" for e in active_evidence)
         
@@ -977,12 +1134,6 @@ Where $\sqcap$ denotes rule intersection (strengthening). Lower levels may **add
                | ANY ( <Rule>+ )
                | AT_LEAST <Integer> INDEPENDENT_BY <GroupKey> ( <Rule>+ )
                | CONDITIONAL ( IF <Condition> THEN <Expression> ELSE <Expression> )
-
-<Rule>       ::= REQUIRE_CAPABILITY ( <CapabilityName> )
-               | REQUIRE_TIER ( <TierName> )
-               | REQUIRE_EVIDENCE_COUNT ( <Integer> )
-               | NO_CONFLICTS
-               | NO_STALE_EVIDENCE
 ```
 
 ### 6.3 Universal Confidence Score Ban
@@ -1002,8 +1153,8 @@ Where $\sqcap$ denotes rule intersection (strengthening). Lower levels may **add
 | `STATIC_AST_ANALYSIS` | Ruff, Semgrep, LibCST | $V_1$ Structural | AST nodes, forbidden patterns, syntax |
 | `TYPE_CHECK` | Pyright, Mypy | $V_1$ Structural | Strict typing, signature compatibility |
 | `UNIT_TEST_EXECUTION`| Pytest | $V_0, V_2$ | Specific input/output examples, assertions |
-| `SECURITY_SCAN` | OSV-Scanner, Semgrep | $V_1, V_3$ | CVE database lookups, security rules |
-| `HUMAN_PROVENANCE` | S-Class Authorized Human | $V_4$ Judgment (only) | Cryptographically signed UX/Design approval |
+| `DEPENDENCY_SECURITY_SCAN` | OSV-Scanner, Semgrep | $V_1, V_3$ | CVE database lookups, security rules |
+| `PROVENANCE_BEARING_HUMAN_REVIEW` | S-Class Authorized Human | $V_4$ Judgment (only) | Cryptographically signed UX/Design approval |
 
 ### 7.2 Relevance Derivation Function
 
@@ -1055,9 +1206,9 @@ Two pytest runs on the same execution instance belong to the same group and coun
                                         ┌────────────────┴────────────────┐
                                         ▼                                 ▼
                                    [REJECTED]                        [AUTHORIZED]
-                                                                          │ (Issue Token)
-                                                                          ▼
-                                                                  [EXECUTION FABRIC]
+                                                                           │ (Issue Token)
+                                                                           ▼
+                                                                   [EXECUTION FABRIC]
 ```
 
 ### 8.2 Controller Verification Preconditions
@@ -1099,7 +1250,7 @@ When S-Class is tasked with designing a new system or subsystem from scratch:
 
 ---
 
-## 10. Provider Adapter Contract & Isolation Protocol
+## 10. Provider Adapter Contract & Zero-Trust Threat Model
 
 ### 10.1 Abstract Base Provider Interface
 
@@ -1129,15 +1280,33 @@ class EvidenceProvider(ABC):
         pass
 ```
 
-### 10.2 Child Process Worker Isolation & HMAC Handshake
+### 10.2 Dual-Layer Security & Zero-Trust Worker Threat Model
 
-1. **Process Isolation**: All provider executions run in separate child processes with hard memory, CPU, and wall-clock timeout limits.
-2. **HMAC-SHA256 Handshake**:
-   - Parent generates ephemeral 32-byte secret $K$.
-   - Child process executes tool and calculates observation digest: $D = \text{SHA256}(\text{RawOutput})$.
-   - Child signs receipt: $\text{HMAC} = \text{HMAC-SHA256}(K, D \parallel \text{ExecutionID} \parallel \text{SourceSHA})$.
-   - Parent verifies signature before accepting evidence into the event log.
-3. **Rogue Child Protection**: Any child process output with invalid HMAC, mismatched SHA, or unhandled exit is mapped to `TOOL_EXECUTION_FAILED` with `NEUTRAL` polarity.
+S-Class enforces a dual-layer security model that explicitly separates IPC session integrity from semantic truth:
+
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│                        LAYER 1: IPC SESSION INTEGRITY                  │
+│  - Parent generates ephemeral 32-byte secret K + per-execution nonce. │
+│  - Child process captures raw execution and computes HMAC signature.   │
+│  - Guards against: transport tampering, pipe collisions, crashed runs. │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Passes IPC signature check
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                   LAYER 2: ZERO-TRUST SEMANTIC VERIFICATION            │
+│  - Worker is treated as UNTRUSTED. Child cannot grant validity.        │
+│  - Parent recalculates raw output digest SHA256(RawStdout).            │
+│  - Parent re-verifies commit SHA binding against repository HEAD.      │
+│  - Parent matches capability & AST/endpoint scope against claim.       │
+│  - Parent evaluates polarity and assigns validity status.              │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+1. **Rogue Worker Protection**: If a compromised child process with access to $K$ attempts to forge an observation or fabricate a `PASS` on an out-of-scope endpoint:
+   - Layer 1 verifies the IPC signature.
+   - Layer 2 detects the scope or SHA mismatch, evaluates $\mathcal{R}(C, E) = 0$, and discards the evidence as `IRRELEVANT`.
+2. **Process Sandboxing**: All tool executions run in isolated subprocesses with memory limits (e.g. 2048 MB), CPU timeout enforcement, and unhandled exit sanitization (mapped to `NEUTRAL` status).
 
 ---
 
@@ -1226,7 +1395,7 @@ After a successful repair patch is applied:
 
 Humans are registered in S-Class as **controlled, provenance-bearing evidence actors**.
 - Human actions must be cryptographically signed with the human's authorized key.
-- Human decisions cannot waive Tier $V_0$–$V_3$ deterministic failures without an explicit Policy Exception Record (§3.4.2).
+- Human decisions cannot waive Tier $V_0$–$V_3$ deterministic failures without an explicit Policy Exception Record (§3.4.3).
 
 ---
 
@@ -1241,11 +1410,11 @@ The following 21 Core Invariants are mathematically formalized and enforced acro
 | **CORE-03** | Evidence as 1st-Class | $\forall \text{Evidence } e: \text{SchemaValid}(e) \land \text{DigestValid}(e)$ | Evidence Ingestion Gate |
 | **CORE-04** | Policy Gated Acceptance| $\text{ObligationClosed}(o) \iff \text{PolicyEvaluate}(\text{Policy}(o), \text{State}) = \text{SATISFIED}$ | Assessment Reducer |
 | **CORE-05** | Planner Proposes / Controller Disposes | $\text{ExecutionAllowed}(a) \iff \text{ControllerVerdict}(a) = \text{APPROVED}$ | Execution Dispatcher |
-| **CORE-06** | Explicit Provenance | $\forall e \in \text{Evidence}: e.\text{signature}.\text{hmac} = \text{HMAC}(K, e.\text{digest} \parallel e.\text{sha})$ | Provider Adapter Ingestion |
+| **CORE-06** | Dual-Layer Provenance | IPC HMAC verified $\land$ Parent Zero-Trust semantic validation passes | Provider Ingestion Gate |
 | **CORE-07** | Relevance & Coverage | $\text{Supports}(e, c) \implies \mathcal{R}(c, e) = 1 \land \text{Coverage}(c, e) > 0$ | Epistemic Reducer |
 | **CORE-08** | No Confidence Score | $\forall p \in \text{Policies}: \text{Formula}(p) \text{ uses only } \{\text{ALL}, \text{ANY}, \text{AT\_LEAST}, \text{CONDITIONAL}\}$ | Policy Parser Linter |
-| **CORE-09** | Immutable Event History| $\forall t: \text{Digest}(\mathcal{E}_t) = \text{SHA256}(\mathcal{E}_t \parallel \text{Digest}(\mathcal{E}_{t-1}))$ | Event Log Hash Chain |
-| **CORE-10** | Deterministic Reducer | $\text{Reduce}(S, E) \text{ is a pure mathematical function with zero I/O}$ | Cleanroom Replay Suite |
+| **CORE-09** | JCS Digest Hash Chaining | $\text{Digest}(\mathcal{E}_t) = \text{SHA256}(\text{"SCLASS\_EVENT\_V1:"} \parallel \text{ParentDigest} \parallel \text{JCS}(\mathcal{E}_{t,-d}))$ | Event Log Hash Chain |
+| **CORE-10** | Pure Logical Clock Reducer| $\text{Reduce}(S, E) \text{ is a pure function driven by sequence } t \text{ with zero wall-clock effect}$ | Cleanroom Replay Suite |
 | **CORE-11** | Explicit Contradiction | $(\text{Supports}(e_1, c) \land \text{Refutes}(e_2, c)) \implies \text{Status}(c) = \text{CONFLICTED}$ | Epistemic Reducer |
 | **CORE-12** | Dependency Staleness | $\text{Mutated}(X) \implies \forall e \in \text{Scope}(X): e.\text{validity} = \text{STALE}$ | Staleness Engine |
 | **CORE-13** | Parallel Obligation DAG| $\text{IsDAG}(\mathcal{G}) \land \forall (u, v) \in \mathcal{E}: \text{Schedule}(u) \text{ after } \text{Satisfied}(v)$ | DAG Scheduler |
@@ -1265,19 +1434,19 @@ The following 21 Core Invariants are mathematically formalized and enforced acro
 ### 14.1 Test Hierarchy
 
 ```text
-Tier 1: Schema & Contract Tests (Pydantic / JSONSchema strict validation)
-Tier 2: Clean-Room Deterministic Reducer Tests (Property & Invariant tests)
-Tier 3: Provider Adapter Isolation & Handshake Tests (HMAC, process bounds)
+Tier 1: Schema & Contract Tests (Pydantic / JSONSchema strict validation, additionalProperties: false)
+Tier 2: Clean-Room Deterministic Reducer Tests (Pure logical time replay, JCS digest verification)
+Tier 3: Provider Adapter Isolation & Handshake Tests (HMAC IPC, Parent Zero-Trust semantic validation)
 Tier 4: State Machine & DAG Scheduler Concurrency Tests (Thread & Process safety)
 Tier 5: Policy Calculus & Non-Weakening Tests (Mutation & Metamorphic tests)
-Tier 6: Adversarial Red-Team Injection Suite (16 Attack Vectors)
+Tier 6: Adversarial Red-Team Injection Suite (17 Attack Vectors)
 ```
 
 ### 14.2 Adversarial Red-Team Attack Vector Suite
 
 | Attack ID | Attack Vector Description | Expected System Defense Behavior | Invariant Enforced |
 | :--- | :--- | :--- | :--- |
-| **ADV-01** | Rogue provider sends fake `PASS` with invalid HMAC signature | Evidence immediately rejected as `INVALID`; mapped to `TOOL_OUTPUT_INVALID` | CORE-06 |
+| **ADV-01** | Rogue child process attempts to forge HMAC or claim out-of-scope PASS | IPC verification fails on bad key; on valid key, Parent Zero-Trust semantic validation rejects out-of-scope claim | CORE-06, CORE-07 |
 | **ADV-02** | Stale evidence replayed against newer repository commit SHA | Scope check detects SHA mismatch $\to \mathcal{R}(C, E) = 0 \to$ Discarded | CORE-06, CORE-12 |
 | **ADV-03** | Scope mismatch (Evidence tests `GET /users`, Claim is `DELETE /users`) | Scope resolver detects target mismatch $\to \mathcal{R}(C, E) = 0$ | CORE-07 |
 | **ADV-04** | Concurrent contradictory writes (Worker A `SUPPORTS`, Worker B `REFUTES`) | Reducer produces `CONFLICTED` state; neither write dropped | CORE-10, CORE-11 |
@@ -1285,14 +1454,15 @@ Tier 6: Adversarial Red-Team Injection Suite (16 Attack Vectors)
 | **ADV-06** | Autonomous infinite repair loop injection (perpetually failing test) | Bounded recovery exhausts budget $\to$ Transitions to `BLOCKED` and alerts | CORE-16 |
 | **ADV-07** | Self-planning generated plan omitting mandatory security obligations | Assessment engine detects missing mandatory claims $\to \text{Plan } = \text{REJECTED}$ | CORE-21 |
 | **ADV-08** | Cyclic dependency injection into Obligation DAG | DAG compiler rejects insertion with `CYCLIC_DEPENDENCY_ERROR` | CORE-13 |
-| **ADV-09** | Replayed event log with mutated parent digest | Hash chain validation fails $\to$ Event Store halts on corrupted state | CORE-09 |
+| **ADV-09** | Replayed event log with mutated parent digest, invalid genesis, or non-JCS formatting | RFC 8785 JCS hash chain validation fails $\to$ Event Store halts on corrupted state | CORE-09 |
 | **ADV-10** | Floating-point confidence score passed to gate obligation | Policy parser rejects score; throws `INVALID_POLICY_EXPRESSION_ERROR` | CORE-08 |
 | **ADV-11** | Unprivileged LLM planner attempting to execute unauthorized shell tool | Controller intercepts proposal $\to$ Verdict: `REJECTED` | CORE-05 |
 | **ADV-12** | Partial coverage masquerading as full coverage | Multi-dimensional coverage calculus evaluates `PARTIAL` $\to$ Close blocked | CORE-07 |
 | **ADV-13** | Duplicate provider results masquerading as independent sources | Independence deduplication collapses runs into single group $\to$ Policy fails | CORE-04, CORE-07 |
 | **ADV-14** | Code edit applied without running regression suite | Assessment engine flags missing regression evidence $\to$ Closing blocked | CORE-17 |
 | **ADV-15** | Forged human approval without valid cryptographic signature | Signature verification fails $\to$ Exception rejected $\to$ Obligation stays open | CORE-18 |
-| **ADV-16** | Replay of historical state with non-deterministic timestamps | Reducer uses event log timestamps strictly; produces identical bit-for-bit state | CORE-10 |
+| **ADV-16** | Replay of historical state with altered wall-clock timestamps | Reducer relies purely on logical clock sequence $t$; produces identical bit-for-bit state | CORE-10 |
+| **ADV-17** | Schema pollution attack: injection of undeclared properties into PolicyRule or Claim | Strict `additionalProperties: false` validation immediately rejects payload | CORE-02, CORE-03 |
 
 ---
 
