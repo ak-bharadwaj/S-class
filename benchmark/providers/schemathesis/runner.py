@@ -29,7 +29,10 @@ class SchemathesisRunner:
     """Process-isolated coordinator executing Schemathesis in a separate child process."""
 
     def __init__(self, source_sha: Optional[str] = None, strict_provenance: bool = False):
-        self.source_sha = source_sha or os.environ.get("GITHUB_SHA", "UNKNOWN")
+        if source_sha is None:
+            self.source_sha = os.environ.get("GITHUB_SHA", "UNKNOWN")
+        else:
+            self.source_sha = source_sha
         self.strict_provenance = strict_provenance
 
     def execute(

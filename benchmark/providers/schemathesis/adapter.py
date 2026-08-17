@@ -20,7 +20,10 @@ class SchemathesisProviderAdapter:
     """Adapter establishing the S-Class provider boundary around the external Schemathesis tool."""
 
     def __init__(self, source_sha: Optional[str] = None, strict_provenance: bool = False):
-        self.source_sha = source_sha or os.environ.get("GITHUB_SHA", "UNKNOWN")
+        if source_sha is None:
+            self.source_sha = os.environ.get("GITHUB_SHA", "UNKNOWN")
+        else:
+            self.source_sha = source_sha
         self.strict_provenance = strict_provenance
         self.runner = SchemathesisRunner(source_sha=self.source_sha, strict_provenance=self.strict_provenance)
 
