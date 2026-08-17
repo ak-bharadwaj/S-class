@@ -9,7 +9,7 @@ import os
 import sys
 import json
 import time
-from typing import Dict, Any, List, Tuple, Callable
+from typing import Dict, Any, List, Tuple, Callable, Optional
 
 repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if repo_root not in sys.path:
