@@ -44,10 +44,15 @@ def _check_valid_exception(
     policy_id: str,
     eval_timestamp: str,
 ) -> None:
-    """Validates that a PolicyException is active, unexpired, and matches target obligation and policy."""
+    """Validates that a PolicyException is active, unexpired, and strictly bound to target obligation and policy."""
     if exception.obligation_id != obligation_id:
         raise InvalidExceptionError(
             f"Exception obligation mismatch: got '{exception.obligation_id}', expected '{obligation_id}'."
+        )
+
+    if exception.policy_id != policy_id:
+        raise InvalidExceptionError(
+            f"Exception policy mismatch: got '{exception.policy_id}', expected '{policy_id}'."
         )
 
     if exception.expiry is not None:
@@ -65,7 +70,11 @@ def _check_valid_exception(
 
 
 def _extract_coverage_pct(evidence_item: Evidence) -> Optional[float]:
-    """Extracts and validates code coverage percentage from an Evidence item."""
+    """Extracts trusted structured code coverage percentage from an Evidence item.
+    
+    Free-form text in observation.diagnostics is strictly rejected as unauthoritative.
+    Coverage metrics must be provided in trusted structured observation payloads.
+    """
     if evidence_item.validity != EvidenceValidity.VALID:
         return None
     if evidence_item.polarity != EvidencePolarity.SUPPORTS:
@@ -75,41 +84,34 @@ def _extract_coverage_pct(evidence_item: Evidence) -> Optional[float]:
 
     obs = evidence_item.observation
 
-    # 1. Check structured counterexample / observation mapping
-    if obs.counterexample:
-        for k in ("coverage_pct", "line_coverage", "coverage", "pct", "statement_coverage", "branch_coverage"):
-            if k in obs.counterexample:
-                val = obs.counterexample[k]
-                try:
-                    if isinstance(val, (int, float)):
-                        cov = float(val)
-                        if math.isnan(cov) or math.isinf(cov) or cov < 0.0 or cov > 100.0:
+    # Only accept structured, typed observation mapping from trusted provider
+    if not obs.counterexample:
+        return None
+
+    for k in ("coverage_pct", "line_coverage", "coverage", "statement_coverage", "branch_coverage"):
+        if k in obs.counterexample:
+            val = obs.counterexample[k]
+            try:
+                if isinstance(val, (int, float)):
+                    cov = float(val)
+                    if math.isnan(cov) or math.isinf(cov) or cov < 0.0 or cov > 100.0:
+                        raise PolicyValidationError(f"Invalid coverage range: {cov}")
+                    return cov
+                elif isinstance(val, str):
+                    m = re.search(r"^([0-9]+(?:\.[0-9]+)?)\s*%?$", val.strip())
+                    if m:
+                        cov = float(m.group(1))
+                        if cov < 0.0 or cov > 100.0:
                             raise PolicyValidationError(f"Invalid coverage range: {cov}")
                         return cov
-                    elif isinstance(val, str):
-                        m = re.search(r"^([0-9]+(?:\.[0-9]+)?)\s*%?$", val.strip())
-                        if m:
-                            cov = float(m.group(1))
-                            if cov < 0.0 or cov > 100.0:
-                                raise PolicyValidationError(f"Invalid coverage range: {cov}")
-                            return cov
-                        else:
-                            raise PolicyValidationError(f"Malformed coverage string: '{val}'")
                     else:
-                        raise PolicyValidationError(f"Malformed coverage type: '{type(val).__name__}'")
-                except Exception as exc:
-                    if isinstance(exc, PolicyValidationError):
-                        raise
-                    raise PolicyValidationError(f"Malformed code coverage value: {val}") from exc
-
-    # 2. Check diagnostics strings
-    for diag in obs.diagnostics:
-        m = re.search(r"(?:coverage|cov|line_coverage)[\s:=]+([0-9]+(?:\.[0-9]+)?)\s*%", diag, re.IGNORECASE)
-        if m:
-            cov = float(m.group(1))
-            if cov < 0.0 or cov > 100.0:
-                raise PolicyValidationError(f"Invalid coverage range in diagnostics: {cov}")
-            return cov
+                        raise PolicyValidationError(f"Malformed coverage string: '{val}'")
+                else:
+                    raise PolicyValidationError(f"Malformed coverage type: '{type(val).__name__}'")
+            except Exception as exc:
+                if isinstance(exc, PolicyValidationError):
+                    raise
+                raise PolicyValidationError(f"Malformed code coverage value: {val}") from exc
 
     return None
 
@@ -308,7 +310,7 @@ def evaluate_rule(
             return RuleEvaluationResult(
                 rule=rule,
                 passed=False,
-                reason="Missing code coverage evidence in evaluation context.",
+                reason="Missing structured code coverage evidence in evaluation context.",
             )
 
         max_actual_coverage = max(extracted_coverages)

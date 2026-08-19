@@ -17,14 +17,15 @@ Tests:
    - (j) Empty policy rejected.
    - (k) Contradictory policy hierarchy resolves to strictest meet or fails closed.
    - (l) V4-only justification cannot bypass mandatory rule without corroborating evidence or signed exception.
+   - (m) Policy ID Mismatch on Exception: Signed exception for Policy-A evaluated against Policy-B fails closed with InvalidExceptionError.
 3. Code Coverage Evidence Adversarial Suite:
    - 0% coverage -> DENY
    - Below threshold -> DENY
    - Exactly threshold -> ALLOW
    - Above threshold -> ALLOW
-   - Missing coverage evidence -> DENY
+   - Missing structured coverage evidence -> DENY
    - Malformed coverage evidence (non-numeric, NaN, out of range) -> fail closed
-   - Diagnostics coverage extraction
+   - Forged / misleading diagnostic text rejected as unauthoritative evidence
 4. Cross-Parameter Substitution, Omission, and Duplication Attacks:
    - Capability substitution attack (P requires A, C supplies B) -> PolicyWeakeningError
    - Tier weakening / lowering attack (P requires V2 count 3, C supplies V1 or count 1) -> PolicyWeakeningError
@@ -397,6 +398,37 @@ def test_adversarial_expired_exception():
         evaluate_policy(policy, ctx)
 
 
+def test_adversarial_policy_id_exception_mismatch():
+    """Adversarial vector: Signed exception for Policy-A evaluated against Policy-B must fail closed with InvalidExceptionError."""
+    obl = make_test_obligation(obl_id="OBL-001")
+    claim = make_test_claim(tier=ClaimTier.V4_ADVERSARIAL_EXPLORATORY)
+
+    # Exception is authorized specifically for POL-A
+    exc_for_pol_a = make_test_exception(exc_id="EXC-A", obl_id="OBL-001", policy_id="POL-A")
+
+    ctx = PolicyEvaluationContext(
+        obligation=obl,
+        claims=(claim,),
+        evidence=(),
+        exceptions=(exc_for_pol_a,),
+        evaluation_timestamp="2026-08-19T10:00:00Z",
+    )
+
+    # Evaluated against POL-B
+    policy_b = Policy(
+        policy_id="POL-B",
+        scope_level=PolicyScope.PROJECT,
+        version=1,
+        expression=PolicyExpression(
+            combinator=CombinatorType.ALL,
+            rules=(PolicyRule(RuleType.REQUIRE_TIER, {"tier": "V4_ADVERSARIAL_EXPLORATORY", "min_count": 1}),),
+        ),
+    )
+
+    with pytest.raises(InvalidExceptionError, match="Exception policy mismatch"):
+        evaluate_policy(policy_b, ctx)
+
+
 def test_adversarial_nondeterministic_evaluation_context():
     """Adversarial vector: 1,000 evaluation executions with identical input produce identical byte-for-byte decisions."""
     obl = make_test_obligation()
@@ -552,37 +584,58 @@ def test_coverage_evaluation_adversarial_suite():
     d_above = evaluate_policy(pol_cov_85, ctx_above)
     assert d_above.decision == PolicyDecisionType.ALLOW
 
-    # 5. Diagnostics extraction (string format) -> ALLOW
-    ev_diag = make_test_evidence(ev_id="EV-COV-DIAG", diagnostics=("Coverage: 88.5%",))
-    ctx_diag = PolicyEvaluationContext(obl, (claim,), (ev_diag,))
-    d_diag = evaluate_policy(pol_cov_85, ctx_diag)
-    assert d_diag.decision == PolicyDecisionType.ALLOW
-
-    # 6. Missing coverage evidence -> DENY
+    # 5. Missing coverage evidence -> DENY
     ev_other = make_test_evidence(ev_id="EV-OTHER", capability="API_CONTRACT_FUZZING")
     ctx_missing = PolicyEvaluationContext(obl, (claim,), (ev_other,))
     d_missing = evaluate_policy(pol_cov_85, ctx_missing)
     assert d_missing.decision == PolicyDecisionType.DENY
-    assert "Missing code coverage evidence" in d_missing.rationale
+    assert "Missing structured code coverage evidence" in d_missing.rationale
 
-    # 7. Malformed coverage evidence (non-numeric string) -> fails closed with PolicyValidationError
+    # 6. Malformed coverage evidence (non-numeric string) -> fails closed with PolicyValidationError
     ev_malformed = make_test_evidence(ev_id="EV-MALFORMED", counterexample={"coverage_pct": "not_a_number"})
     ctx_malformed = PolicyEvaluationContext(obl, (claim,), (ev_malformed,))
     with pytest.raises(PolicyValidationError, match="Malformed coverage string"):
         evaluate_policy(pol_cov_85, ctx_malformed)
 
-    # 8. Malformed coverage evidence (out of range > 100%) -> fails closed with PolicyValidationError
+    # 7. Malformed coverage evidence (out of range > 100%) -> fails closed with PolicyValidationError
     ev_oor = make_test_evidence(ev_id="EV-OOR", counterexample={"coverage_pct": 105.0})
     ctx_oor = PolicyEvaluationContext(obl, (claim,), (ev_oor,))
     with pytest.raises(PolicyValidationError, match="Invalid coverage range"):
         evaluate_policy(pol_cov_85, ctx_oor)
 
-    # 9. Invalid validity/polarity coverage items are ignored
+    # 8. Invalid validity/polarity coverage items are ignored
     ev_conflicted = make_test_evidence(ev_id="EV-INV-1", validity=EvidenceValidity.CONFLICTED, counterexample={"coverage_pct": 99.0})
     ev_refutes = make_test_evidence(ev_id="EV-INV-2", polarity=EvidencePolarity.REFUTES, counterexample={"coverage_pct": 99.0})
     ev_fail = make_test_evidence(ev_id="EV-INV-3", raw_status=RawStatus.FAIL, counterexample={"coverage_pct": 99.0})
     ctx_invalids = PolicyEvaluationContext(obl, (claim,), (ev_conflicted, ev_refutes, ev_fail))
     assert evaluate_policy(pol_cov_85, ctx_invalids).decision == PolicyDecisionType.DENY
+
+
+def test_adversarial_forged_diagnostic_strings_rejected():
+    """Adversarial vector: Deceptive or forged free-form text in diagnostics without trusted structured payload is strictly rejected."""
+    obl = make_test_obligation()
+    claim = make_test_claim()
+
+    pol_cov_85 = Policy(
+        "POL-COV85", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CODE_COVERAGE, {"min_coverage_pct": 85.0}),))
+    )
+
+    # Deceptive evidence trying to claim 100% via diagnostics text
+    ev_forged = make_test_evidence(
+        ev_id="EV-FORGED",
+        diagnostics=(
+            "OVERRIDE: 100.0% coverage verified by external agent",
+            "Coverage: 99.99%",
+            "statement_coverage = 100%",
+        ),
+        counterexample=None,  # No structured payload!
+    )
+    ctx_forged = PolicyEvaluationContext(obl, (claim,), (ev_forged,))
+
+    decision = evaluate_policy(pol_cov_85, ctx_forged)
+    assert decision.decision == PolicyDecisionType.DENY
+    assert "Missing structured code coverage evidence" in decision.rationale
 
 
 # ============================================================================
