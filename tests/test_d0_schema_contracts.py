@@ -663,7 +663,13 @@ def test_core24_convergence_analysis_and_non_authorization_boundary():
 
 
 def test_adv19_convergence_cannot_authorize_execution_or_mint_tokens():
-    """ADV-19 / CORE-24: Adversarial tests proving Convergence cannot authorize execution, mint tokens, or mutate state."""
+    """ADV-19 / CORE-24: Adversarial tests proving Convergence cannot authorize execution, mint tokens, or mutate state.
+    
+    Formal verification against 3 adversarial vectors:
+    1. Schema injection of execution_token or authorization_verdict.
+    2. Direct invocation of tool dispatcher with Convergence caller identity.
+    3. Direct mutation of authoritative state store claims or obligations.
+    """
     # Vector 1: Adversarial schema injection - Convergence payload attempting to mint tokens or grant approvals
     malicious_report = copy.deepcopy(VALID_CONVERGENCE_REPORT)
     malicious_report["execution_token"] = "FORGED_BEARER_TOKEN_9999"
