@@ -1182,10 +1182,10 @@ $defs:
         type: "array"
         items: { type: "string" }
       max_budget_usd:
-        type: ["number", "null"],
+        type: ["number", "null"]
         minimum: 0.0
       timeout_seconds:
-        type: ["integer", "null"],
+        type: ["integer", "null"]
         minimum: 1
   FrontierSnapshot:
     type: "object"
