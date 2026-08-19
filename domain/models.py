@@ -1,9 +1,10 @@
-"""Pure Immutable Domain Models for S-Class D1 Domain Kernel."""
+"""Pure Deeply Immutable Domain Models for S-Class D1 Domain Kernel."""
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import json
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from types import MappingProxyType
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 from domain.exceptions import DomainValidationError
 from domain.types import (
@@ -38,6 +39,24 @@ from domain.types import (
 )
 
 
+def _freeze_nested(val: Any) -> Any:
+    """Recursively converts dicts to MappingProxyType and sequences to tuples."""
+    if isinstance(val, (dict, Mapping)):
+        return MappingProxyType({k: _freeze_nested(v) for k, v in val.items()})
+    elif isinstance(val, (list, tuple, set)):
+        return tuple(_freeze_nested(x) for x in val)
+    return val
+
+
+def _unfreeze_nested(val: Any) -> Any:
+    """Recursively converts mapping proxies to dicts and tuples to lists for serialization."""
+    if isinstance(val, (dict, Mapping)):
+        return {k: _unfreeze_nested(v) for k, v in val.items()}
+    elif isinstance(val, (list, tuple)):
+        return [_unfreeze_nested(x) for x in val]
+    return val
+
+
 def _validate_pattern(val: str, pattern, name: str):
     if not isinstance(val, str) or not pattern.match(val):
         raise DomainValidationError(f"Invalid {name}: '{val}' does not match required pattern.")
@@ -47,7 +66,6 @@ def _validate_iso8601(val: str, name: str):
     if not isinstance(val, str):
         raise DomainValidationError(f"Invalid {name}: must be an ISO 8601 string.")
     try:
-        # Standard parsing
         if val.endswith("Z"):
             datetime.fromisoformat(val[:-1] + "+00:00")
         else:
@@ -97,7 +115,7 @@ class Task:
     raw_prompt: str
     repository_context: RepositoryContext
     constraints: TaskConstraints = field(default_factory=TaskConstraints)
-    environment: Dict[str, str] = field(default_factory=dict)
+    environment: Mapping[str, str] = field(default_factory=dict)
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def __post_init__(self):
@@ -109,8 +127,7 @@ class Task:
         if not isinstance(self.constraints, TaskConstraints):
             raise DomainValidationError("constraints must be a TaskConstraints instance.")
         _validate_iso8601(self.created_at, "created_at")
-        # Ensure environment copy is immutable
-        object.__setattr__(self, "environment", dict(self.environment))
+        object.__setattr__(self, "environment", _freeze_nested(self.environment))
 
 
 # ============================================================================
@@ -149,7 +166,6 @@ class Obligation:
         if self.policy_id is not None:
             _validate_pattern(self.policy_id, POLICY_ID_PATTERN, "policy_id")
 
-        # Freeze collections
         deps = tuple(self.depends_on)
         for dep in deps:
             _validate_pattern(dep, OBLIGATION_ID_PATTERN, "depends_on item")
@@ -184,8 +200,8 @@ class Claim:
     tier: ClaimTier
     subject: ClaimSubject
     predicate: str
-    context: Dict[str, Any] = field(default_factory=dict)
-    expected: Dict[str, Any] = field(default_factory=dict)
+    context: Mapping[str, Any] = field(default_factory=dict)
+    expected: Mapping[str, Any] = field(default_factory=dict)
     criticality: Criticality = Criticality.HIGH
     status: ClaimStatus = ClaimStatus.UNSUPPORTED
     required_provider_capabilities: Tuple[str, ...] = field(default_factory=tuple)
@@ -205,8 +221,8 @@ class Claim:
             raise DomainValidationError(f"Invalid status: {self.status}")
 
         object.__setattr__(self, "required_provider_capabilities", tuple(self.required_provider_capabilities))
-        object.__setattr__(self, "context", dict(self.context))
-        object.__setattr__(self, "expected", dict(self.expected))
+        object.__setattr__(self, "context", _freeze_nested(self.context))
+        object.__setattr__(self, "expected", _freeze_nested(self.expected))
 
 
 # ============================================================================
@@ -216,14 +232,13 @@ class Claim:
 @dataclass(frozen=True)
 class PolicyRule:
     rule_type: RuleType
-    parameters: Dict[str, Any] = field(default_factory=dict)
+    parameters: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         if not isinstance(self.rule_type, RuleType):
             raise DomainValidationError(f"Invalid rule_type: {self.rule_type}")
 
         params = dict(self.parameters)
-        # Enforce discriminated parameter contract per rule type
         if self.rule_type == RuleType.REQUIRE_CAPABILITY:
             if "capability" not in params or not isinstance(params["capability"], str):
                 raise DomainValidationError("REQUIRE_CAPABILITY requires string 'capability' parameter.")
@@ -247,7 +262,7 @@ class PolicyRule:
             if len(params) > 0:
                 raise DomainValidationError("NO_CONFLICTS does not accept parameters.")
 
-        object.__setattr__(self, "parameters", params)
+        object.__setattr__(self, "parameters", _freeze_nested(params))
 
 
 @dataclass(frozen=True)
@@ -255,7 +270,7 @@ class PolicyExpression:
     combinator: CombinatorType
     rules: Tuple[PolicyRule, ...] = field(default_factory=tuple)
     min_count: Optional[int] = None
-    condition: Optional[Dict[str, Any]] = None
+    condition: Optional[Mapping[str, Any]] = None
     then_expression: Optional['PolicyExpression'] = None
     else_expression: Optional['PolicyExpression'] = None
 
@@ -264,6 +279,9 @@ class PolicyExpression:
             raise DomainValidationError(f"Invalid combinator: {self.combinator}")
 
         object.__setattr__(self, "rules", tuple(self.rules))
+
+        if self.condition is not None:
+            object.__setattr__(self, "condition", _freeze_nested(self.condition))
 
         if self.combinator == CombinatorType.AT_LEAST:
             if self.min_count is None or self.min_count < 1:
@@ -312,14 +330,14 @@ class EvidenceScope:
 class EvidenceObservation:
     raw_status: RawStatus
     diagnostics: Tuple[str, ...] = field(default_factory=tuple)
-    counterexample: Optional[Dict[str, Any]] = None
+    counterexample: Optional[Mapping[str, Any]] = None
 
     def __post_init__(self):
         if not isinstance(self.raw_status, RawStatus):
             raise DomainValidationError(f"Invalid raw_status: {self.raw_status}")
         object.__setattr__(self, "diagnostics", tuple(self.diagnostics))
         if self.counterexample is not None:
-            object.__setattr__(self, "counterexample", dict(self.counterexample))
+            object.__setattr__(self, "counterexample", _freeze_nested(self.counterexample))
 
 
 @dataclass(frozen=True)
@@ -494,7 +512,7 @@ class EventEnvelope:
     sequence_number: int
     aggregate_id: str
     timestamp: str
-    payload: Dict[str, Any]
+    payload: Mapping[str, Any]
     parent_digest: str
     digest: str
 
@@ -509,4 +527,4 @@ class EventEnvelope:
         _validate_iso8601(self.timestamp, "timestamp")
         _validate_pattern(self.parent_digest, HEX_64_PATTERN, "parent_digest")
         _validate_pattern(self.digest, HEX_64_PATTERN, "digest")
-        object.__setattr__(self, "payload", dict(self.payload))
+        object.__setattr__(self, "payload", _freeze_nested(self.payload))
