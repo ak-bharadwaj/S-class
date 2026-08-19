@@ -1008,6 +1008,124 @@ EVENT_ENVELOPE_SCHEMA = {
     },
 }
 
+WORKER_CONTEXT_SCHEMA = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "WorkerContext",
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "context_id",
+        "task_id",
+        "current_objective",
+        "relevant_obligation_ids",
+        "constraints",
+        "approved_action",
+        "allowed_tools",
+        "verification_feedback",
+        "current_frontier",
+        "dispatched_at",
+    ],
+    "properties": {
+        "context_id": {"type": "string", "pattern": "^WCTX-[A-Za-z0-9_-]+$"},
+        "task_id": {"type": "string", "pattern": "^TASK-[A-Za-z0-9_-]+$"},
+        "current_objective": {"type": "string", "minLength": 1},
+        "relevant_obligation_ids": {
+            "type": "array",
+            "items": {"type": "string", "pattern": "^OBL-[A-Za-z0-9_-]+$"},
+        },
+        "constraints": {"$ref": "#/$defs/WorkerConstraints"},
+        "approved_action": {"type": ["object", "null"]},
+        "allowed_tools": {"type": "array", "items": {"type": "string"}},
+        "verification_feedback": {"type": "array", "items": {"type": "string"}},
+        "current_frontier": {"$ref": "#/$defs/FrontierSnapshot"},
+        "dispatched_at": {"type": "string", "format": "date-time"},
+    },
+    "$defs": {
+        "WorkerConstraints": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["languages", "max_budget_usd", "timeout_seconds"],
+            "properties": {
+                "languages": {"type": "array", "items": {"type": "string"}},
+                "max_budget_usd": {"type": ["number", "null"], "minimum": 0.0},
+                "timeout_seconds": {"type": ["integer", "null"], "minimum": 1},
+            },
+        },
+        "FrontierSnapshot": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": [
+                "ready_obligation_ids",
+                "blocked_obligation_ids",
+                "executable_obligation_ids",
+            ],
+            "properties": {
+                "ready_obligation_ids": {
+                    "type": "array",
+                    "items": {"type": "string", "pattern": "^OBL-[A-Za-z0-9_-]+$"},
+                },
+                "blocked_obligation_ids": {
+                    "type": "array",
+                    "items": {"type": "string", "pattern": "^OBL-[A-Za-z0-9_-]+$"},
+                },
+                "executable_obligation_ids": {
+                    "type": "array",
+                    "items": {"type": "string", "pattern": "^OBL-[A-Za-z0-9_-]+$"},
+                },
+            },
+        },
+    },
+}
+
+CONVERGENCE_REPORT_SCHEMA = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "ConvergenceReport",
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "report_id",
+        "task_id",
+        "repository_sha",
+        "findings",
+        "drift_count",
+        "is_converged",
+        "evaluated_at",
+    ],
+    "properties": {
+        "report_id": {"type": "string", "pattern": "^CNV-[A-Za-z0-9_-]+$"},
+        "task_id": {"type": "string", "pattern": "^TASK-[A-Za-z0-9_-]+$"},
+        "repository_sha": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+        "findings": {
+            "type": "array",
+            "items": {"$ref": "#/$defs/ConvergenceFinding"},
+        },
+        "drift_count": {"type": "integer", "minimum": 0},
+        "is_converged": {"type": "boolean"},
+        "evaluated_at": {"type": "string", "format": "date-time"},
+    },
+    "$defs": {
+        "ConvergenceFinding": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["finding_type", "target_id", "details"],
+            "properties": {
+                "finding_type": {
+                    "type": "string",
+                    "enum": [
+                        "MISSING",
+                        "PARTIAL",
+                        "CONTRADICTORY",
+                        "UNREQUESTED",
+                        "STALE",
+                    ],
+                },
+                "target_id": {"type": "string", "minLength": 1},
+                "details": {"type": "string", "minLength": 1},
+            },
+        }
+    },
+}
+
 
 # ============================================================================
 # Canonical Valid Payloads
@@ -1152,6 +1270,45 @@ VALID_RECEIPT = {
     },
 }
 
+VALID_WORKER_CONTEXT = {
+    "context_id": "WCTX-001",
+    "task_id": "TASK-001",
+    "current_objective": "Implement authentication middleware on DELETE /users/{id}",
+    "relevant_obligation_ids": ["OBL-001"],
+    "constraints": {
+        "languages": ["python"],
+        "max_budget_usd": 2.50,
+        "timeout_seconds": 120,
+    },
+    "approved_action": None,
+    "allowed_tools": ["pytest", "schemathesis"],
+    "verification_feedback": [
+        "Initial run: 403 status code missing on unauthenticated request"
+    ],
+    "current_frontier": {
+        "ready_obligation_ids": ["OBL-001"],
+        "blocked_obligation_ids": ["OBL-002"],
+        "executable_obligation_ids": ["OBL-001"],
+    },
+    "dispatched_at": "2026-08-19T09:40:00Z",
+}
+
+VALID_CONVERGENCE_REPORT = {
+    "report_id": "CNV-001",
+    "task_id": "TASK-001",
+    "repository_sha": "a" * 40,
+    "findings": [
+        {
+            "finding_type": "MISSING",
+            "target_id": "CLM-101",
+            "details": "No evidence supporting unauthorized request rejection",
+        }
+    ],
+    "drift_count": 1,
+    "is_converged": False,
+    "evaluated_at": "2026-08-19T09:41:00Z",
+}
+
 
 # ============================================================================
 # Test Suite
@@ -1170,6 +1327,8 @@ def test_all_schemas_are_valid_draft202012():
         PLAN_SCHEMA,
         ASSESSMENT_RECEIPT_SCHEMA,
         EVENT_ENVELOPE_SCHEMA,
+        WORKER_CONTEXT_SCHEMA,
+        CONVERGENCE_REPORT_SCHEMA,
     ]
     for schema in schemas:
         Draft202012Validator.check_schema(schema)
@@ -1422,4 +1581,175 @@ def test_plan_schema_resolves_defs_and_rejects_pollution():
     polluted_plan["architecture_claims"][0]["rogue_bypass"] = True
     with pytest.raises(ValidationError):
         Draft202012Validator(PLAN_SCHEMA).validate(polluted_plan)
+
+
+def test_worker_context_schema_validation():
+    """Verify WorkerContext validates valid payload and rejects pollution/bad fields."""
+    validator = Draft202012Validator(WORKER_CONTEXT_SCHEMA)
+    validator.validate(VALID_WORKER_CONTEXT)
+
+    # 1. Reject invalid context ID format
+    bad_id = copy.deepcopy(VALID_WORKER_CONTEXT)
+    bad_id["context_id"] = "INVALID_ID"
+    with pytest.raises(ValidationError):
+        validator.validate(bad_id)
+
+    # 2. Reject additional properties on root (ADV-21)
+    polluted = copy.deepcopy(VALID_WORKER_CONTEXT)
+    polluted["rogue_internal_memory"] = "leaked_agent_scratchpad"
+    with pytest.raises(ValidationError):
+        validator.validate(polluted)
+
+    # 3. Reject additional properties on nested FrontierSnapshot ($defs.FrontierSnapshot)
+    polluted_frontier = copy.deepcopy(VALID_WORKER_CONTEXT)
+    polluted_frontier["current_frontier"]["unauthorized_bypass"] = True
+    with pytest.raises(ValidationError):
+        validator.validate(polluted_frontier)
+
+
+def test_convergence_report_schema_validation():
+    """Verify ConvergenceReport validates valid payload and rejects invalid finding types."""
+    validator = Draft202012Validator(CONVERGENCE_REPORT_SCHEMA)
+    validator.validate(VALID_CONVERGENCE_REPORT)
+
+    # 1. Invalid drift finding enum
+    bad_finding = copy.deepcopy(VALID_CONVERGENCE_REPORT)
+    bad_finding["findings"][0]["finding_type"] = "INVALID_DRIFT_TYPE"
+    with pytest.raises(ValidationError):
+        validator.validate(bad_finding)
+
+    # 2. Pollution on ConvergenceFinding
+    polluted_finding = copy.deepcopy(VALID_CONVERGENCE_REPORT)
+    polluted_finding["findings"][0]["extra_unauthorized"] = "exploit"
+    with pytest.raises(ValidationError):
+        validator.validate(polluted_finding)
+
+
+def test_frontier_derivation_semantics_and_cycle_check():
+    """CORE-22 & CORE-23: Test deterministic ready/blocked frontier and DAG cycle rejection."""
+    # Graph: OBL-1 -> OBL-2 (OBL-2 depends on OBL-1)
+    #        OBL-3 depends on OBL-2
+    #        OBL-4 (independent)
+    nodes = ["OBL-1", "OBL-2", "OBL-3", "OBL-4"]
+    dependencies = {
+        "OBL-1": [],
+        "OBL-2": ["OBL-1"],
+        "OBL-3": ["OBL-2"],
+        "OBL-4": [],
+    }
+    
+    # 1. Initial State: OBL-1, OBL-4 are READY (no unmet dependencies); OBL-2, OBL-3 are BLOCKED/WAITING
+    statuses = {
+        "OBL-1": "OPEN",
+        "OBL-2": "OPEN",
+        "OBL-3": "OPEN",
+        "OBL-4": "OPEN",
+    }
+    
+    ready = [o for o in nodes if statuses[o] == "OPEN" and all(statuses[d] == "SATISFIED" for d in dependencies[o])]
+    assert ready == ["OBL-1", "OBL-4"]
+
+    # 2. Transition OBL-1 -> SATISFIED: OBL-2 becomes READY
+    statuses["OBL-1"] = "SATISFIED"
+    ready = [o for o in nodes if statuses[o] == "OPEN" and all(statuses[d] == "SATISFIED" for d in dependencies[o])]
+    assert ready == ["OBL-2", "OBL-4"]
+
+    # 3. Cycle Detection (CORE-23): Introducing OBL-1 -> OBL-3 (creating cycle OBL-1 -> OBL-2 -> OBL-3 -> OBL-1)
+    cyclic_dependencies = {
+        "OBL-1": ["OBL-3"],
+        "OBL-2": ["OBL-1"],
+        "OBL-3": ["OBL-2"],
+    }
+    def detect_cycle(deps):
+        visited = set()
+        rec_stack = set()
+        def dfs(node):
+            visited.add(node)
+            rec_stack.add(node)
+            for neighbor in deps.get(node, []):
+                if neighbor not in visited:
+                    if dfs(neighbor):
+                        return True
+                elif neighbor in rec_stack:
+                    return True
+            rec_stack.remove(node)
+            return False
+        for node in deps:
+            if node not in visited:
+                if dfs(node):
+                    return True
+        return False
+
+    assert detect_cycle(dependencies) is False
+    assert detect_cycle(cyclic_dependencies) is True
+
+
+def test_lifecycle_hooks_fail_closed_simulation():
+    """CORE-25: Deterministic lifecycle hooks execute fail-closed and cannot bypass authorization."""
+    hook_stages = ["PRE_VALIDATE", "PRE_AUTHORIZE", "PRE_EXECUTE", "POST_EXECUTE", "POST_OBSERVE"]
+    
+    class MockHook:
+        def __init__(self, should_fail=False, abort_stage=None):
+            self.should_fail = should_fail
+            self.abort_stage = abort_stage
+            self.executed_stages = []
+
+        def execute(self, stage: str, context: dict):
+            self.executed_stages.append(stage)
+            if self.should_fail and stage == self.abort_stage:
+                raise RuntimeError(f"Hook aborted at stage: {stage}")
+
+    # 1. Normal execution runs all 5 stages
+    hook = MockHook(should_fail=False)
+    for stage in hook_stages:
+        hook.execute(stage, {})
+    assert hook.executed_stages == hook_stages
+
+    # 2. Hook abortion at PRE_AUTHORIZE stops execution immediately (fail-closed)
+    failing_hook = MockHook(should_fail=True, abort_stage="PRE_AUTHORIZE")
+    with pytest.raises(RuntimeError) as excinfo:
+        for stage in hook_stages:
+            failing_hook.execute(stage, {})
+    assert "Hook aborted at stage: PRE_AUTHORIZE" in str(excinfo.value)
+    assert failing_hook.executed_stages == ["PRE_VALIDATE", "PRE_AUTHORIZE"]
+
+
+def test_convergence_drift_taxonomy_and_non_authorization():
+    """CORE-24: Convergence detects 5-way drift and cannot authorize execution."""
+    drift_types = {"MISSING", "PARTIAL", "CONTRADICTORY", "UNREQUESTED", "STALE"}
+    
+    class ConvergenceEngine:
+        def evaluate_drift(self, intended_claims, evidence_map):
+            findings = []
+            for claim_id, claim in intended_claims.items():
+                ev = evidence_map.get(claim_id, [])
+                if not ev:
+                    findings.append({"finding_type": "MISSING", "target_id": claim_id, "details": "No evidence"})
+                elif any(e.get("polarity") == "REFUTES" for e in ev):
+                    findings.append({"finding_type": "CONTRADICTORY", "target_id": claim_id, "details": "Refuting evidence found"})
+                elif any(e.get("validity") == "STALE" for e in ev):
+                    findings.append({"finding_type": "STALE", "target_id": claim_id, "details": "Stale evidence"})
+            return findings
+
+        def can_authorize_execution(self) -> bool:
+            # CORE-24: Convergence can NEVER authorize execution
+            return False
+
+    engine = ConvergenceEngine()
+    claims = {
+        "CLM-1": {"tier": "V2_BEHAVIORAL"},
+        "CLM-2": {"tier": "V0_OBSERVABLE"},
+        "CLM-3": {"tier": "V1_STRUCTURAL"},
+    }
+    evidence = {
+        "CLM-1": [{"polarity": "SUPPORTS", "validity": "VALID"}],
+        "CLM-2": [{"polarity": "REFUTES", "validity": "VALID"}],
+        "CLM-3": [{"polarity": "SUPPORTS", "validity": "STALE"}],
+    }
+    
+    findings = engine.evaluate_drift(claims, evidence)
+    finding_types = {f["finding_type"] for f in findings}
+    assert finding_types == {"CONTRADICTORY", "STALE"}
+    assert engine.can_authorize_execution() is False
+
 

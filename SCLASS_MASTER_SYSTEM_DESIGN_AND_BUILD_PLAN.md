@@ -484,6 +484,31 @@ S-Class answers: *"Was this verification required, was it executed against the c
 
 We don't need every tool on day one — the architecture just makes adding them cheap.
 
+
+### 14.1 Reference Architecture Adaptation Policy
+
+External projects are design references, not runtime authorities or architectural dependencies.
+
+S-Class uses four decisions:
+
+```text
+INTEGRATE  = mature infrastructure that is expensive to recreate
+ADAPT      = useful algorithms/patterns that S-Class must own
+REBUILD    = small/core mechanisms that define S-Class semantics
+REJECT     = patterns that conflict with determinism, provenance, policy, or fail-closed control
+```
+
+Reference-derived mechanisms currently approved for evaluation:
+
+- **OpenSpec:** artifact dependency graphs, deterministic ready/blocked frontier, topological ordering.
+- **Spec-Kit:** clarify → specify → plan → tasks → analyze → implement → converge workflow discipline.
+- **Matt Pocock Skills:** shared project vocabulary, implementation seams, tracer-bullet work, disciplined diagnosis/review, decision frontiers.
+- **Ruflo:** lifecycle hook boundaries, capability/harness abstraction, plugin boundaries; not autonomous authority.
+- **QM:** scoped execution contexts, replaceable agent harnesses, permission layering, durable runtime boundaries.
+
+No external project becomes a prerequisite for the S-Class core. Any adopted mechanism is reimplemented behind S-Class contracts and must satisfy the existing invariants.
+
+
 ---
 
 ## 15. Evidence Engine
@@ -991,6 +1016,337 @@ The exact API is finalized only after the domain schemas are frozen.
 
 ---
 
+## 33.4 Startup Operating Model & Commercialization
+
+The long-term architecture is conditional on product validation. The company must not optimize for technical completeness before demand.
+
+### 33.4.1 Competitive Reality & Speed Strategy
+
+Passing the Early Thesis Gate does **not** establish a defensible company.
+
+The relevant competitive baseline includes:
+
+```text
+RAW CODING AGENT
+Cursor / Claude / Codex / Antigravity
+        ↓
+AI CODE REVIEW / VERIFICATION
+CodeRabbit / Cursor Bugbot / Sonar-family tools
+        ↓
+LIGHTWEIGHT AGENT GOVERNANCE
+Agentic OS-class workflows
+        ↓
+RUNTIME AGENT GOVERNANCE
+Microsoft Agent Governance Toolkit and adjacent platforms
+        ↓
+S-CLASS
+functional-correctness assurance for AI-generated software
+```
+
+Current competitive pressure is real and active. Cursor reports Bugbot improvements in speed, cost, and bug-finding rate, while CodeRabbit continues expanding AI-review workflows. citeturn392701search1turn392701search3 Microsoft is also shipping a broad agent-governance stack with policy enforcement, identity, runtime controls, SRE, compliance, and framework integrations. citeturn392701search0turn392701search6 Agentic OS demonstrates that lightweight evidence-gated workflows are already shippable and multi-agent-platform compatible. citeturn392701search2
+
+### Competitive test requirement
+
+The Early Thesis Gate must therefore answer two separate questions:
+
+```text
+Q1: Does S-Class add value over RAW agent workflows?
+Q2: Does S-Class add enough value over LIGHTWEIGHT governance /
+    existing review tools to justify its additional complexity?
+```
+
+A result that beats only the raw baseline is **insufficient for a startup GO**.
+
+### Speed requirement after technical GO
+
+If the technical and customer gates both pass:
+
+```text
+validated wedge
+→ immediately ship narrow pilot
+→ collect real usage/evidence
+→ improve moat
+→ expand only when demand pulls it
+```
+
+Do not spend months completing the entire D6–D12 architecture before shipping the validated wedge.
+
+### Narrow-wedge defense
+
+S-Class will not win by matching the breadth of Cursor, CodeRabbit, Microsoft, or other platform vendors.
+
+The defense must be:
+
+```text
+narrow painful problem
++
+superior evidence quality
++
+workflow fit
++
+accumulated real-world assurance data
++
+deep domain knowledge
+```
+
+Architecture alone is **not** treated as a moat.
+
+### Evidence trajectory as moat
+
+Every real task processed by S-Class should, where legally and contractually permitted, improve anonymized/product-level knowledge about:
+
+```text
+requirement patterns
+claim → evidence relationships
+failure modes
+verification effectiveness
+repair patterns
+false-positive / false-negative behavior
+workflow cost
+```
+
+This must never bypass customer privacy, IP, or data-use commitments.
+
+The strategic objective is to build a proprietary **assurance dataset / evaluation trajectory** that becomes harder to reproduce as adoption grows.
+
+### Platform-incumbent risk
+
+Assume that any validated workflow feature can be copied by a larger platform.
+
+Therefore:
+
+```text
+DO NOT depend on "first to market" alone.
+DO NOT depend on one novel UI.
+DO NOT depend on architecture secrecy.
+```
+
+Prioritize:
+
+```text
+measured efficacy
+deep integration into customer workflow
+proprietary evaluation data
+domain-specific evidence models
+customer switching cost created by useful history/assurance records
+```
+
+### Strategic outcome
+
+A successful narrow wedge may result in:
+
+```text
+independent SaaS
+OR
+developer-platform integration
+OR
+strategic partnership
+OR
+acquisition
+```
+
+All are valid company outcomes if they create durable value.
+
+
+### Business model hypothesis
+
+Initial commercial hypothesis:
+
+```text
+PRIMARY: developer/team software subscription
+SECONDARY: higher-priced team/enterprise deployment
+LATER: usage-based verification / execution volume where measurement supports it
+```
+
+The first paid wedge should optimize for a narrow, painful engineering outcome rather than the entire S-Class architecture.
+
+Candidate packaging to test with customers:
+
+```text
+Developer       → single-user/local workflow
+Team            → shared policies, evidence, team visibility
+Enterprise      → private deployment, governance, support, security controls
+```
+
+Prices are **not fixed by this document**. Early customer conversations determine willingness-to-pay, buyer, packaging, and acceptable overhead before pricing is locked.
+
+### Go-to-market hypothesis
+
+Initial customer discovery targets:
+
+```text
+1. AI-heavy software teams already using coding agents
+2. Teams experiencing costly requirement misses / regressions
+3. Security- or correctness-sensitive engineering teams
+4. Developer-platform / engineering-productivity owners
+```
+
+Acquisition channels for the first 5–10 conversations:
+
+```text
+founder network
+direct outreach to engineering leads / CTOs
+developer communities
+technical demos / open-source credibility
+warm introductions
+```
+
+Every conversation must identify:
+
+- current workflow and incumbent tools
+- concrete failure cost
+- buyer / budget owner
+- deployment constraints
+- minimum acceptable product
+- willingness to pilot
+- willingness to pay
+
+### Funding hypothesis
+
+Default path before product validation:
+
+```text
+bootstrap / self-funded
+        ↓
+Early Thesis Gate
+        ↓
+customer validation
+        ↓
+pilot / paid commitment
+        ↓
+decide whether external funding accelerates the validated wedge
+```
+
+Do not raise solely to build the full architecture. Fundraising becomes justified by evidence of a differentiated wedge, customer demand, or unusually strong measured traction.
+
+### Founder-capacity constraint
+
+S-Class development is constrained by founder bandwidth and placement obligations.
+
+Until product validation produces strong pull:
+
+```text
+S-Class = high-leverage product/research track
+         + placement-compatible execution
+```
+
+Do not assume full-time startup capacity before it exists.
+
+The project must prioritize:
+
+```text
+validated learning > architectural breadth > polishing
+```
+
+A placement opportunity is not automatically abandoned because S-Class exists. The decision to commit full-time follows evidence of demand, traction, funding, or a deliberate founder decision.
+
+### Early commercial kill switch
+
+A technical GO does not imply a company GO.
+
+The company remains **NO-GO / PIVOT** if customer discovery cannot identify a specific buyer, painful recurring problem, and credible willingness to pay.
+
+## 33.5 External Reference Repositories & Direct-View Strategy
+
+These repositories are **reference inputs**, not dependencies of the S-Class core.
+
+### Primary engineering references
+
+| Repository | Purpose | S-Class action |
+|---|---|---|
+| https://github.com/mattpocock/skills | Agent skills, shared vocabulary, decision/frontier discipline, TDD, diagnosis, review | **Direct-view selected skills; adapt patterns** |
+| https://github.com/ruvnet/ruflo | Agent orchestration, lifecycle hooks, capability/plugin patterns, multi-agent runtime | **Direct-view core/hook/runtime files; adapt only safe mechanisms** |
+| https://github.com/Fission-AI/OpenSpec | Artifact graph, dependency/readiness model, spec-driven workflow | **Direct-view artifact-graph core; reimplement/adapt algorithms** |
+| https://github.com/github/spec-kit | Constitution/spec/plan/tasks/analyze/converge workflow | **Direct-view command/templates/analyze/converge; adapt workflow discipline** |
+| https://github.com/yc-software/qm | Scoped runtime, permissions, harness abstraction, durable agent environment | **Direct-view core/security/scope interfaces; adapt boundaries** |
+
+### Thesis / minimum-viable-governance references
+
+| Repository | Purpose | S-Class action |
+|---|---|---|
+| https://github.com/KbWen/agentic-os | Lightweight evidence-gated agent workflow | **Benchmark the minimum viable S-Class gate; use as early external comparison** |
+| PIC Standard / Provenance & Intent Contracts | Verifier-derived trust and producer/verifier separation | **Study verifier/policy boundary and provenance contracts** |
+| HUQAN | Local-first judgment/verification, deterministic policy gates, provenance and trust receipts | **Study claim/evaluation/provenance schema ideas** |
+
+### Direct-view rule
+
+Do not clone or broadly integrate these repositories.
+
+For each reference, inspect only the files that answer the current architectural question:
+
+```text
+question
+ ↓
+candidate file(s)
+ ↓
+algorithm / data model
+ ↓
+strength
+ ↓
+failure mode
+ ↓
+S-Class adaptation decision
+```
+
+Classify each result as:
+
+```text
+INTEGRATE  = mature external infrastructure
+ADAPT      = mechanism worth owning behind S-Class contracts
+REBUILD    = small/core S-Class semantics
+REJECT     = conflicts with S-Class invariants
+```
+
+No external reference can redefine S-Class policy, evidence semantics, acceptance, provenance, or Controller authority.
+
+
+### 33.6 License / IP Diligence Gate
+
+Reference study and commercial incorporation are separate decisions.
+
+Current repository-level license observations:
+
+| Reference | Current observed license | Commercial handling |
+|---|---|---|
+| mattpocock/skills | MIT | Permissive; retain notices when incorporating covered material |
+| ruvnet/ruflo | MIT | Permissive; retain notices when incorporating covered material |
+| Fission-AI/OpenSpec | MIT | Permissive; retain notices when incorporating covered material |
+| github/spec-kit | MIT | Permissive; retain notices when incorporating covered material |
+| yc-software/qm | MIT | Permissive; retain notices when incorporating covered material |
+| KbWen/agentic-os | MIT | Permissive; retain notices when incorporating covered material |
+| PIC Standard | Apache-2.0 | Permissive with notice/patent requirements; preserve required notices |
+| HUQAN | AGPL-3.0 | **RESEARCH-ONLY by default. No code adaptation, linking, bundling, or hosted incorporation without explicit legal review/permission.** |
+
+The S-Class repository is currently **proprietary/restricted**; this is a commercial-control decision, not an open-source license. fileciteturn72file0L2-L2
+
+The AGPL status of HUQAN is verified from its repository license. fileciteturn74file0L2-L2
+
+### Mandatory IP workflow
+
+Before any reference-derived code enters shipped S-Class:
+
+```text
+reference file identified
+        ↓
+license verified at repository + file/package level
+        ↓
+copyright / NOTICE obligations recorded
+        ↓
+dependency and transitive-license scan
+        ↓
+implementation classified:
+  clean-room reimplementation / adaptation / direct dependency
+        ↓
+legal/IP sign-off when non-permissive or ambiguous
+        ↓
+commercial incorporation
+```
+
+“Algorithm inspiration” and “code adaptation” must never be treated as legally identical.
+
+When license status is ambiguous, **do not ship the code**. Continue with clean-room reimplementation or seek permission/legal review.
+
+
 ## 34. Build Roadmap
 
 ### D0 — Design Freeze
@@ -998,34 +1354,388 @@ Freeze: architecture, domain objects, state machines, policy semantics, evidence
 
 **Deliverable: `SCLASS_CORE_SPECIFICATION.md`**
 
-### D1 — Domain Kernel
-Task, Obligation, Claim, Policy, Evidence, Evaluation, Event. No LLM. No external tools. No fancy UI. Everything deterministic.
+### D1 — Domain Kernel — Deterministic Core
+
+Implement Task, Obligation, Claim, Policy, Evidence, Evaluation, and Event as pure domain objects.
+
+Add the canonical dependency/frontier model:
+
+```text
+obligation / claim dependencies
+        ↓
+READY / BLOCKED / UNKNOWN / CONFLICTED / STALE
+        ↓
+deterministic frontier
+```
+
+No LLM, planner, external provider, database-specific behavior, or UI.
 
 ### D2 — State & Event Engine
-Event store, reducer, versioning, dependency graph, staleness propagation, conflict handling, idempotency, concurrency.
+
+Implement append-only events, canonical JCS event hashing, deterministic reducer, versioning, dependency graph, staleness propagation, conflict handling, idempotency, and concurrency.
+
+Expose deterministic:
+
+```text
+get_ready()
+get_blocked()
+get_unmet_dependencies()
+get_dependency_order()
+```
 
 ### D3 — Policy Engine
-Hierarchy, acceptance expressions, mandatory requirements, criticality, exceptions, policy versions, fail-closed behavior. Mutation-test it aggressively.
+
+Implement hierarchy, acceptance expressions, mandatory requirements, criticality, exceptions, policy versions, and fail-closed behavior.
+
+Policy filters the canonical frontier:
+
+```text
+READY
+ ↓
+policy / permission / resource checks
+ ↓
+executable frontier
+```
 
 ### D4 — Claim / Evidence Engine
-Claim contracts, claim decomposition, provider capabilities, scope matching, relevance, coverage, polarity, provenance, evidence combination, evaluation receipts. At this point S-Class can reason about evidence without executing any code.
+
+Implement claim decomposition, provider capabilities, scope matching, relevance, coverage, polarity, provenance, evidence combination, and evaluation receipts.
+
+Add convergence analysis:
+
+```text
+INTENDED STATE
+(obligations + claims + accepted plan)
+        vs
+CURRENT STATE
+(repository + evidence + canonical state)
+        ↓
+MISSING / PARTIAL / CONTRADICTORY / UNREQUESTED / STALE
+```
+
+Convergence may create/reopen governed obligations and claims, but cannot authorize execution.
 
 ### D5 — Controller
-Deterministic state machine: proposal → preconditions → authorization → execution → observation → transition. No autonomous planner yet. Test it heavily.
+
+Implement:
+
+```text
+proposal
+→ prerequisites
+→ policy
+→ dependency/frontier check
+→ permissions
+→ resource limits
+→ authorization
+→ execution token
+→ observation
+→ state transition
+```
+
+Add deterministic lifecycle hooks:
+
+```text
+PRE_VALIDATE
+PRE_AUTHORIZE
+PRE_EXECUTE
+POST_EXECUTE
+POST_OBSERVE
+```
+
+Hooks cannot bypass Controller authority.
+
+### EARLY THESIS GATE — Minimum Viable S-Class / Pre-Registered
+
+This is the **company-level go/no-go experiment**, not merely an engineering checkpoint.
+
+Compare three conditions on the same class of real coding tasks:
+
+```text
+A — RAW BASELINE
+    Normal expert workflow using the chosen coding agent.
+
+B — LIGHTWEIGHT EVIDENCE GATE
+    Agentic-OS-class workflow:
+    plan → build → review → test → ship
+    with external evidence gates.
+
+C — S-CLASS-LITE
+    task
+    → obligations
+    → claims
+    → required evidence
+    → deterministic gate
+    → BLOCK / ACCEPT
+```
+
+### Pre-registration rule
+
+The decision thresholds below are fixed **before collecting the outcome data**.
+
+Do not change the primary metric, threshold, sample floor, or exclusion rules after seeing results.
+
+### Primary outcome
+
+Primary metric:
+
+> **Verified engineering failure rate per task** = proportion of required seeded requirements/defects that remain undetected or incorrectly accepted at task close.
+
+Measure from an objective task rubric and hidden acceptance tests, not participant self-report.
+
+Secondary metrics:
+
+```text
+completion time
+verification overhead
+false completion rate
+repair cycles
+developer interventions
+developer trust
+developer friction
+```
+
+### Minimum experiment size
+
+The pilot must reach:
+
+```text
+≥ 45 completed task instances per arm
+Target: 60 per arm
+```
+
+Task instances should be distributed across multiple developers and multiple task families. Analysis must account for repeated measurements by developer/task.
+
+If the minimum sample floor is not reached, the result is **INCONCLUSIVE**, not GO.
+
+### GO criterion
+
+S-Class-lite (C) is a **GO** only if all of the following are satisfied:
+
+1. C shows at least **25% relative reduction** in verified engineering failure rate versus A.
+2. The estimated improvement has a **95% confidence interval whose lower bound is > 0**.
+3. C does not increase median task completion time by more than **20%** versus A.
+4. C is not materially worse than B on failure rate while requiring more than 20% additional verification overhead.
+5. No critical safety/security seeded defect is incorrectly accepted by C.
+6. C must show a **meaningful advantage over B** on at least one primary engineering outcome; merely matching B is not sufficient for Company GO.
+
+### STOP / PIVOT criterion
+
+If C fails criterion 1 or 2, the company thesis is **not validated**.
+
+Do not respond by adding architecture until the failure mechanism is understood.
+
+If C passes against A but does not materially beat B, treat the result as evidence that **lightweight evidence gating may capture most of the value**. Consider reducing S-Class scope rather than automatically building the larger architecture.
+
+### INCONCLUSIVE
+
+Results are INCONCLUSIVE when:
+
+- sample floor is not reached;
+- task quality/rubric is invalidated;
+- confidence intervals remain too wide to distinguish the preregistered effect;
+- substantial protocol deviations occur.
+
+Do not classify inconclusive results as success.
+
+### Experiment integrity
+
+Before execution, freeze:
+
+```text
+task bank
+task difficulty rubric
+hidden acceptance tests
+primary metric definition
+analysis method
+sample floor
+GO threshold
+STOP/PIVOT threshold
+exclusion rules
+```
+
+The experiment compares the governance layer itself, not a specially optimized demo.
+
+### CUSTOMER VALIDATION GATE — Mandatory after GO
+
+A positive Early Thesis Gate proves the mechanism has promise; it does **not** prove a company.
+
+Before resuming D6–D9 investment, conduct:
+
+```text
+5–10 conversations
+with real engineering teams / potential buyers
+```
+
+Questions must establish:
+
+```text
+current alternative
+pain severity
+cost of the problem
+who owns the budget
+what outcome they would pay for
+acceptable workflow overhead
+security / deployment constraints
+why existing tools are insufficient
+```
+
+### Customer GO condition
+
+Proceed with substantial post-gate product investment only if at least **3 of 5** interviewed teams independently describe:
+
+```text
+a concrete recurring problem
++
+a credible current budget/owner
++
+a specific outcome they would pay for
+```
+
+A polite "interesting" or "cool idea" does not count.
+
+If fewer than 3/5 qualify, **STOP/PIVOT the product wedge** before building D6–D9.
+
+This gate is intentionally outside engineering validation: product demand is a separate hypothesis.
+
+
+### COMPETITIVE WEDGE GATE
+
+After Technical GO + Customer GO, perform a focused competitive evaluation before substantial scale-up:
+
+```text
+S-Class-lite / pilot
+vs
+the customer's current alternative
+vs
+one closest lightweight governance alternative
+vs
+one dominant review/platform alternative where applicable
+```
+
+Record:
+
+- setup/integration time
+- time-to-useful-result
+- correctness / failure-detection advantage
+- workflow friction
+- verification overhead
+- switching cost
+- missing capabilities
+- reasons a customer would stay with S-Class
+
+**Competitive GO condition:** the chosen wedge has a concrete reason to exist beyond "more features" and the customer can articulate why the incumbent/current alternative is insufficient.
+
+
+### COMPANY GO / NO-GO GATE
+
+The Early Thesis Gate and Customer Validation Gate are jointly required before substantial D6–D9 investment.
+
+```text
+TECHNICAL GO?
+   +
+CUSTOMER GO?
+   +
+COMPETITIVE WEDGE?
+   +
+LICENSE/IP CLEAR?
+   ↓
+CONTINUE
+
+otherwise
+   ↓
+PIVOT / NARROW / STOP
+```
+
+A technically strong result with no credible buyer is **not** startup validation.
+
 
 ### D6 — Tool Adapter Fabric
-Start with the highest-value providers. Existing Hypothesis and Schemathesis work becomes provider infrastructure. Likely sequence: pytest → Ruff/Pyright → Semgrep → OSV-Scanner → additional fuzzing. Exact order determined by the claims the prototype needs to support.
+
+Integrate mature providers rather than recreating them:
+
+```text
+pytest / Hypothesis / Schemathesis / Ruff / Pyright /
+Semgrep / OSV-Scanner / fuzzers
+```
+
+S-Class owns provider contracts, provenance, revision binding, capabilities, scope validation, integrity, normalization, and evidence semantics.
+
+Use direct-view reference code from OpenSpec, Spec-Kit, Matt Skills, Ruflo, and QM only where it accelerates implementation without making them core dependencies.
 
 ### D7 — Coding Agent Integration
-Connect an actual AI coding agent. It receives: current objective, relevant obligations, constraints, approved action, verification feedback. It does not need internal S-Class implementation details.
 
-### D8 — Planner (incl. Self-Planning)
-Give the planner open obligations, failed claims, available tools, evidence, dependencies, cost, and history — it proposes; the controller validates. **This phase also implements the Self-Planning / Plan-as-Artifact model (§11):** the planner may draft a full product/subsystem plan from an ambiguous prompt, but that plan is decomposed into architecture claims and validated through the normal evidence pipeline before it is trusted.
+Connect a real AI coding agent through a replaceable worker/harness interface.
 
-### D9 — Recovery & Regression
-Failure diagnosis, repair planning, bounded retries, impact analysis, regression verification, escalation.
+Provide:
+
+```text
+current objective
+relevant obligations
+constraints
+approved action
+allowed tools
+verification feedback
+current frontier
+```
+
+Use scoped runtime contexts and explicit permissions/resources.
+
+### D8 — Planner / Reasoner + Self-Planning
+
+Planner receives open obligations, failed claims, ready frontier, blocked dependencies, available capabilities, evidence, policy, resource limits, history, and convergence findings.
+
+It proposes; Controller authorizes.
+
+For large efforts, use decision-frontier discipline:
+
+```text
+unknown decision
+ ↓
+research / prototype / human decision / task
+ ↓
+decision recorded
+ ↓
+frontier recomputed
+```
+
+Self-planning remains governed by the Plan-as-Artifact model.
+
+### D9 — Recovery, Convergence & Regression
+
+```text
+failure / drift
+→ diagnosis
+→ repair obligation
+→ planner
+→ controller
+→ execution
+→ evidence
+→ convergence
+→ regression
+→ frontier recomputation
+```
+
+Bound retries by attempts, time, cost, and recursive depth.
 
 ### D10 — Prototype
+
+Demonstrate one complete vertical slice:
+
+```text
+feature request
+→ obligations
+→ claims
+→ dependency frontier
+→ AI implementation
+→ verification
+→ defect / drift detected
+→ repair obligation
+→ AI repair
+→ convergence
+→ regression verification
+→ assurance receipt
+```
+
 Demonstrate one complete task end-to-end:
 
 ```text
@@ -1043,8 +1753,14 @@ feature request
 ### D11 — Adversarial Product Testing
 Attack S-Class itself: fabricated/stale evidence, wrong revision, scope mismatch, provider lies/failures, duplicate/contradictory evidence, policy/criticality downgrade, missing obligations, malicious action proposals, concurrent claim writes, replayed events, mutated reducer, infinite repair, provenance corruption, incomplete coverage, false claim decomposition, **and a self-planning-specific case: a generated plan that quietly omits a mandatory security obligation.**
 
-### D12 — External Validation (THESIS-GATE-1B)
-Compare BASELINE vs S-CLASS with real developers. Measure: task completion time, defects caught before/after generation, rework, developer interventions, trust, usefulness, requirement misses, regressions. This is evidence for the product hypothesis — not a prerequisite for building the prototype.
+### D12 — Final External Validation (THESIS-GATE-1B)
+
+Repeat the A/B/C validation against the fully-built system.
+
+Compare the final system against the preregistered Early Thesis Gate baseline and quantify:
+task correctness, failure reduction, workflow overhead, developer intervention, trust, and regressions.
+
+D12 validates the mature product; it does not replace the earlier product/customer gates. Measure: task completion time, defects caught before/after generation, rework, developer interventions, trust, usefulness, requirement misses, regressions. This is evidence for the product hypothesis — not a prerequisite for building the prototype.
 
 ---
 
@@ -1140,6 +1856,11 @@ CORE-18  Explicit human escalation
 CORE-19  Policy hierarchy with non-weakening semantics
 CORE-20  Unknown claims remain unknown
 CORE-21  A self-generated plan is a governed claim-bearing artifact, never a privileged one
+CORE-22  Ready/blocked frontier is a deterministic derived view of canonical state
+CORE-23  Dependency graphs are validated and cycle-safe before scheduling
+CORE-24  Convergence detects drift between intended and observed repository state
+CORE-25  Lifecycle hooks cannot bypass Controller authorization
+CORE-26  Worker/harness/runtime implementations are replaceable behind S-Class contracts
 ```
 
 ---
@@ -1194,6 +1915,33 @@ CORE-21  A self-generated plan is a governed claim-bearing artifact, never a pri
 
 ### Hard Rule
 
+### Startup Scope Rule
+
+Until Technical GO + Customer GO + Competitive Wedge GO are all satisfied, D6–D12 remain **hypotheses**, not commitments.
+
+Do not build infrastructure, enterprise controls, or broad platform features solely because they appear in the long-term architecture.
+
+Build only what is necessary to:
+1. test the thesis,
+2. win the next real customer,
+3. collect evidence that strengthens the wedge.
+
+
+
+### Pre-registered Experiment Rule
+
+The Early Thesis Gate is a **decision boundary**, not a progress ceremony.
+
+D6–D12 are conditional roadmap stages. A failed or inconclusive Early Thesis Gate does not justify continuing because earlier architectural work has already been invested.
+
+The team must be willing to stop, narrow, or pivot the thesis when the preregistered evidence says to do so.
+
+
+**No document proliferation**
+
+`SCLASS_MASTER_SYSTEM_DESIGN_AND_BUILD_PLAN.md` remains the single roadmap authority. `SCLASS_CORE_SPECIFICATION.md` remains the canonical D0 contract. Do not create another master architecture document merely to restate or improve the roadmap. A genuine contract defect is corrected in the canonical specification; an implementation discovery is recorded in code/tests/targeted ADR material.
+
+
 **Do not implement a layer until its contract above it is frozen.**
 
 This prevents building substantial machinery before the product architecture is completely settled — including letting the planner self-design an architecture before the plan-as-artifact governance model (§11) exists to check it.
@@ -1205,8 +1953,11 @@ This prevents building substantial machinery before the product architecture is 
 ```text
 PARITY-GATE-1          🟢 CLOSED
 PARITY-GATE-2          🟢 CLOSED
-PARITY-GATE-3          🟡 PROVIDER
-S-CLASS CORE DESIGN    🟢 ARCHITECTURE FROZEN (this document)
+PARITY-GATE-3          🟢 CLOSED
+S-CLASS CORE DESIGN    🟢 ARCHITECTURE FROZEN
+EARLY THESIS GATE       🟡 NEXT GO/STOP DECISION
+CUSTOMER VALIDATION     🟡 REQUIRED AFTER EARLY-GATE GO
+COMMERCIAL/IP GATE      🟡 REQUIRED BEFORE SCALE-UP
 ```
 
 **Next actual artifact: `SCLASS_CORE_SPECIFICATION.md`** — canonical schemas, state-transition tables, event definitions, policy grammar, evidence contract, claim contract, planner/controller contract, **plan-as-artifact contract**, adapter contract, concurrency semantics, staleness algorithm, security boundaries, invariants, and test architecture.

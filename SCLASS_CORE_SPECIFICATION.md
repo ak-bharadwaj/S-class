@@ -1126,6 +1126,137 @@ properties:
     pattern: "^[a-f0-9]{64}$"
 ```
 
+### 3.12 Scoped Worker Context Schema (`WorkerContext`)
+
+```yaml
+$schema: "https://json-schema.org/draft/2020-12/schema"
+title: "WorkerContext"
+type: "object"
+additionalProperties: false
+required:
+  - "context_id"
+  - "task_id"
+  - "current_objective"
+  - "relevant_obligation_ids"
+  - "constraints"
+  - "approved_action"
+  - "allowed_tools"
+  - "verification_feedback"
+  - "current_frontier"
+  - "dispatched_at"
+properties:
+  context_id:
+    type: "string"
+    pattern: "^WCTX-[A-Za-z0-9_-]+$"
+  task_id:
+    type: "string"
+    pattern: "^TASK-[A-Za-z0-9_-]+$"
+  current_objective:
+    type: "string"
+    minLength: 1
+  relevant_obligation_ids:
+    type: "array"
+    items: { type: "string", pattern: "^OBL-[A-Za-z0-9_-]+$" }
+  constraints:
+    $ref: "#/$defs/WorkerConstraints"
+  approved_action:
+    type: ["object", "null"]
+  allowed_tools:
+    type: "array"
+    items: { type: "string" }
+  verification_feedback:
+    type: "array"
+    items: { type: "string" }
+  current_frontier:
+    $ref: "#/$defs/FrontierSnapshot"
+  dispatched_at:
+    type: "string"
+    format: "date-time"
+$defs:
+  WorkerConstraints:
+    type: "object"
+    additionalProperties: false
+    required: ["languages", "max_budget_usd", "timeout_seconds"]
+    properties:
+      languages:
+        type: "array"
+        items: { type: "string" }
+      max_budget_usd:
+        type: ["number", "null"],
+        minimum: 0.0
+      timeout_seconds:
+        type: ["integer", "null"],
+        minimum: 1
+  FrontierSnapshot:
+    type: "object"
+    additionalProperties: false
+    required: ["ready_obligation_ids", "blocked_obligation_ids", "executable_obligation_ids"]
+    properties:
+      ready_obligation_ids:
+        type: "array"
+        items: { type: "string", pattern: "^OBL-[A-Za-z0-9_-]+$" }
+      blocked_obligation_ids:
+        type: "array"
+        items: { type: "string", pattern: "^OBL-[A-Za-z0-9_-]+$" }
+      executable_obligation_ids:
+        type: "array"
+        items: { type: "string", pattern: "^OBL-[A-Za-z0-9_-]+$" }
+```
+
+### 3.13 Convergence Report Schema (`ConvergenceReport`)
+
+```yaml
+$schema: "https://json-schema.org/draft/2020-12/schema"
+title: "ConvergenceReport"
+type: "object"
+additionalProperties: false
+required:
+  - "report_id"
+  - "task_id"
+  - "repository_sha"
+  - "findings"
+  - "drift_count"
+  - "is_converged"
+  - "evaluated_at"
+properties:
+  report_id:
+    type: "string"
+    pattern: "^CNV-[A-Za-z0-9_-]+$"
+  task_id:
+    type: "string"
+    pattern: "^TASK-[A-Za-z0-9_-]+$"
+  repository_sha:
+    type: "string"
+    pattern: "^[a-f0-9]{40}$"
+  findings:
+    type: "array"
+    items:
+      $ref: "#/$defs/ConvergenceFinding"
+  drift_count:
+    type: "integer"
+    minimum: 0
+  is_converged:
+    type: "boolean"
+  evaluated_at:
+    type: "string"
+    format: "date-time"
+$defs:
+  ConvergenceFinding:
+    type: "object"
+    additionalProperties: false
+    required: ["finding_type", "target_id", "details"]
+    properties:
+      finding_type:
+        type: "string"
+        enum: ["MISSING", "PARTIAL", "CONTRADICTORY", "UNREQUESTED", "STALE"]
+      target_id:
+        type: "string"
+        minLength: 1
+      details:
+        type: "string"
+        minLength: 1
+```
+
 ---
 
 ## 4. State Machines & Formal Transition Tables
@@ -1408,6 +1539,36 @@ $$\text{DistinctSources}(\{E_1, \dots, E_m\}) = \left| \{ E_i.\text{provenance}.
 
 Two pytest runs on the same execution instance belong to the same group and count as $1$ independent source.
 
+### 7.5 Assessment Receipts & Provenance Trail
+
+Upon evaluating an obligation, the Assessment Engine issues an immutable, cryptographically signed `AssessmentReceipt` (§3.10) containing:
+- Specific claim assessments (`SUPPORTED`, `CONTRADICTED`, `CONFLICTED`, `STALE`).
+- Active conflicts and stale evidence identifiers.
+- Cryptographic signature generated with `AsymmetricAuthoritySignature`.
+
+### 7.6 Convergence Analysis Engine & Drift Calculus
+
+S-Class continuously computes the convergence delta $\Delta_{\text{conv}}$ between intended architectural/behavioral state and observed repository evidence:
+
+$$\Delta_{\text{conv}} = \text{Convergence}(\text{IntendedState}, \text{ObservedState})$$
+
+Where:
+- $\text{IntendedState} = \langle \text{Obligations}, \text{Claims}, \text{AcceptedPlan} \rangle$
+- $\text{ObservedState} = \langle \text{RepositoryHEAD}, \text{ValidEvidence}, \text{CanonicalState} \rangle$
+
+#### 7.6.1 Drift Classification Taxonomy
+
+| Drift Classification | Mathematical / Semantic Definition | Resulting Engine Action |
+| :--- | :--- | :--- |
+| `MISSING` | $\exists c \in \text{IntendedClaims}: \text{Evidence}(c) = \emptyset$ | Flag gap; enqueue verification obligation |
+| `PARTIAL` | $\exists c \in \text{IntendedClaims}: 0 < \text{Coverage}(c) < 1$ | Flag incomplete aspect coverage |
+| `CONTRADICTORY` | $\exists c \in \text{IntendedClaims}: \text{Status}(c) \in \{\text{CONTRADICTED}, \text{CONFLICTED}\}$ | Mint Repair Obligation $O_{\text{repair}}$ |
+| `UNREQUESTED` | $\exists a \in \text{RepositoryMutations}: \forall c \in \text{IntendedClaims}: a \notin \text{Scope}(c)$ | Flag untracked drift / unverified side effects |
+| `STALE` | $\exists e \in \text{Evidence}: e.\text{source\_sha} \ne \text{HEAD}.\text{sha} \land \text{Impacted}(e)$ | Mark $e$ as `STALE`; reopen claim |
+
+#### 7.6.2 Non-Authorization Boundary (CORE-24)
+> **CORE-24 Invariant**: Convergence analysis is strictly observational and diagnostic. It detects drift and may generate repair obligations or emit events, but **can never authorize code execution or dispose action proposals**. All actions resulting from convergence findings must be submitted as `ActionProposal` records to the Controller.
+
 ---
 
 ## 8. Planner / Controller Separation Contract
@@ -1446,6 +1607,45 @@ Two pytest runs on the same execution instance belong to the same group and coun
 2. **Permission Check**: Action type must be permitted under the current active security profile.
 3. **Resource Bound**: Estimated cost and timeout must not exceed remaining budget.
 4. **Dependency Check**: All prerequisites listed in the proposal must be in `SATISFIED` state.
+
+### 8.3 Controller Deterministic Lifecycle Hooks
+
+The Controller executes proposals through a deterministic 5-stage pipeline with strict lifecycle hook intercepts:
+
+```text
+[Action Proposal Ingested]
+        │
+        ▼
+   PRE_VALIDATE ────► [Structural Schema & Target Check]
+        │
+        ▼
+   PRE_AUTHORIZE ───► [Policy Evaluation & Permission Check]
+        │
+        ▼
+   PRE_EXECUTE ─────► [Execution Token Issuance & Slot Lock]
+        │
+   (Child Subprocess Execution)
+        │
+        ▼
+   POST_EXECUTE ────► [Process Exit Sanitization & Timeout Bound Check]
+        │
+        ▼
+   POST_OBSERVE ────► [Raw Stdout Digest & HMAC IPC Ingestion Gate]
+        │
+        ▼
+[Deterministic State Reduction]
+```
+
+#### 8.3.1 Lifecycle Hook Specifications
+
+1. `PRE_VALIDATE`: Invoked immediately upon receipt of `ActionProposal`. Validates syntax, JSON schema, and target identifiers.
+2. `PRE_AUTHORIZE`: Invoked before policy evaluation. Verifies prerequisites, active security profiles, and budget boundaries.
+3. `PRE_EXECUTE`: Invoked immediately prior to issuing execution token. Allocates lock slots and initial environment parameters.
+4. `POST_EXECUTE`: Invoked upon child process termination. Captures exit codes, CPU/memory limits, and unhandled exceptions.
+5. `POST_OBSERVE`: Invoked after raw stdout capture and HMAC validation. Normalizes observation into `Evidence` before reducer ingestion.
+
+#### 8.3.2 Hook Safety & Non-Bypass Invariant (CORE-25)
+> **CORE-25 Invariant**: Lifecycle hooks execute in a strictly fail-closed manner. A hook may abort a proposal by returning an explicit error payload, but **no hook can ever bypass Controller authorization, forge execution tokens, waive policy constraints, or mutate canonical claim states**.
 
 ---
 
@@ -1537,6 +1737,41 @@ S-Class enforces a dual-layer security model that explicitly separates IPC sessi
    - Layer 2 detects the scope or SHA mismatch, evaluates $\mathcal{R}(C, E) = 0$, and discards the evidence as `IRRELEVANT`.
 2. **Process Sandboxing**: All tool executions run in isolated subprocesses with memory limits (e.g. 2048 MB), CPU timeout enforcement, and unhandled exit sanitization (mapped to `NEUTRAL` status).
 
+### 10.3 Scoped Worker Protocol & Replaceable Harness Boundary
+
+AI coding agents and external workers interact with S-Class through a strictly scoped harness interface:
+
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│                        S-CLASS CONTROLLER DISPATCH                     │
+│  Context provided to Worker (WorkerContext §3.12):                     │
+│  - current_objective                                                   │
+│  - relevant_obligations                                                │
+│  - constraints (languages, frameworks, budgets)                       │
+│  - approved_action & allowed_tools                                     │
+│  - verification_feedback & diagnostics                                 │
+│  - current_frontier (Ready & Blocked obligation sets)                 │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Worker executes in scoped harness
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                        REPLACEABLE WORKER HARNESS                      │
+│  - AI Coding Agent (LLM, IDE extension, subprocess worker)             │
+│  - Generates patch / tool invocation proposal                          │
+│  - Returns: ActionProposal OR raw subprocess output                    │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Normalized proposal / IPC output
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                    S-CLASS INGESTION & DISPOSAL GATE                   │
+│  - Controller verifies token / authorization                           │
+│  - S-Class Core absorbs evidence; rejects rogue internal state         │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 10.3.1 Boundary Invariant (CORE-26)
+> **CORE-26 Invariant**: Worker, harness, and agent runtime implementations are fully replaceable behind S-Class contracts. No worker-internal mutable memory, prompt scratchpad, or harness-specific state may contaminate the S-Class event log or bypass Controller disposal.
+
 ---
 
 ## 11. Dependency Graph, Concurrency & Staleness Engine
@@ -1586,6 +1821,52 @@ Transition Obligation O -> REQUIRES_REASSESSMENT
 Emit Event OBLIGATION_REOPENED
 ```
 
+### 11.4 Deterministic Ready / Blocked Frontier Model
+
+The system state $\mathcal{S}$ determines an exact, mathematically derived **Execution Frontier**:
+
+$$\text{Frontier}(\mathcal{S}) = \langle \text{Ready}(\mathcal{S}), \text{Blocked}(\mathcal{S}), \text{Executable}(\mathcal{S}) \rangle$$
+
+#### 11.4.1 Formal Definitions
+
+1. **Ready Frontier ($\text{Ready}(\mathcal{S})$)**:
+   $$\text{Ready}(\mathcal{S}) = \left\{ o \in \text{Obligations}(\mathcal{S}) \mid \text{Status}(o) = \text{OPEN} \land \forall d \in \text{depends\_on}(o): \text{Status}(d) \in \{\text{SATISFIED}, \text{CONDITIONAL}\} \right\}$$
+
+2. **Blocked Frontier ($\text{Blocked}(\mathcal{S})$)**:
+   $$\text{Blocked}(\mathcal{S}) = \left\{ o \in \text{Obligations}(\mathcal{S}) \mid \text{Status}(o) = \text{BLOCKED} \lor \exists d \in \text{depends\_on}(o): \text{Status}(d) = \text{BLOCKED} \right\}$$
+
+3. **Executable Frontier ($\text{Executable}(\mathcal{S})$)**:
+   $$\text{Executable}(\mathcal{S}) = \left\{ o \in \text{Ready}(\mathcal{S}) \mid \text{PolicyCheck}(\text{Policy}(o), \mathcal{S}) = \text{PERMITTED} \land \text{ResourceLimitsMet}(o) \right\}$$
+
+#### 11.4.2 Query Interface Specification
+
+The Core State Engine exposes deterministic, pure query interfaces:
+```python
+def get_ready(state: SystemState, dag: ObligationDAG) -> List[Obligation]:
+    """Returns all obligations whose prerequisites are SATISFIED or CONDITIONAL."""
+    ...
+
+def get_blocked(state: SystemState, dag: ObligationDAG) -> List[Obligation]:
+    """Returns all obligations blocked directly or transitively by unmet/failed prerequisites."""
+    ...
+
+def get_unmet_dependencies(state: SystemState, obligation_id: str) -> List[str]:
+    """Returns the list of unsatisfied prerequisite obligation IDs for a given obligation."""
+    ...
+
+def get_dependency_order(dag: ObligationDAG) -> List[str]:
+    """Returns the deterministic topological sort ordering of all obligations in the DAG."""
+    ...
+
+def get_executable_frontier(state: SystemState, dag: ObligationDAG) -> List[Obligation]:
+    """Returns the filtered Ready obligations satisfying active policy and resource boundaries."""
+    ...
+```
+
+#### 11.4.3 Frontier Invariants (CORE-22, CORE-23)
+> **CORE-22 Invariant**: The Ready/Blocked frontier is a pure deterministic derived view of canonical state. It cannot be manually overridden or persisted out of sync with the underlying obligation status and DAG dependencies.
+> **CORE-23 Invariant**: Dependency graphs must be strictly validated as directed acyclic graphs ($\text{IsAcyclic}(\mathcal{G}) = \text{TRUE}$) before any scheduling or execution dispatch takes place.
+
 ---
 
 ## 12. Failure, Bounded Recovery & Regression Engine
@@ -1630,7 +1911,7 @@ Humans are registered in S-Class as **controlled, provenance-bearing evidence ac
 
 ## 13. Security Boundaries & Core Invariants
 
-The following 21 Core Invariants are mathematically formalized and enforced across all layers:
+The following 26 Core Invariants are mathematically formalized and enforced across all layers:
 
 | ID | Invariant Name | Mathematical / Formal Specification | Verification Checkpoint |
 | :--- | :--- | :--- | :--- |
@@ -1655,6 +1936,11 @@ The following 21 Core Invariants are mathematically formalized and enforced acro
 | **CORE-19** | Non-Weakening Policy | $\text{EffectivePolicy} = \text{System} \sqcap \text{Org} \sqcap \text{Project} \sqcap \text{Obligation}$ | Policy Compiler |
 | **CORE-20** | Unknown Stays Unknown | Absence of evidence yields `UNSUPPORTED`, never `SUPPORTED` | Epistemic Reducer |
 | **CORE-21** | Governed Self-Planning | $\forall \text{Plan } P: P \text{ is governed by Architecture Claims before validation}$ | Self-Planning Module |
+| **CORE-22** | Deterministic Frontier | $\text{Frontier}(\mathcal{S}) = \langle \text{Ready}(\mathcal{S}), \text{Blocked}(\mathcal{S}) \rangle \text{ derived deterministically from } \mathcal{S}$ | Scheduler Query Gateway |
+| **CORE-23** | Cycle-Safe DAG | $\text{IsAcyclic}(\mathcal{G}) = \text{TRUE} \quad \forall \text{ObligationDAG } \mathcal{G}$ | DAG Compiler Gate |
+| **CORE-24** | Convergence Boundary | $\Delta = \text{Convergence}(\text{Intended}, \text{Observed}) \text{ detects drift; cannot authorize execution}$ | Convergence Reducer |
+| **CORE-25** | Lifecycle Hook Integrity | $\forall h \in \text{Hooks}: h \text{ fail-closed; cannot bypass Controller authorization}$ | Controller Hook Dispatcher |
+| **CORE-26** | Replaceable Worker Boundary | Scoped harness protocol; zero worker-internal mutable state leakage | Worker Adapter Dispatcher |
 
 ---
 
@@ -1668,7 +1954,7 @@ Tier 2: Clean-Room Deterministic Reducer Tests (Pure logical time replay, JCS di
 Tier 3: Provider Adapter Isolation & Handshake Tests (HMAC IPC, Parent Zero-Trust semantic validation)
 Tier 4: State Machine & DAG Scheduler Concurrency Tests (Thread & Process safety)
 Tier 5: Policy Calculus & Non-Weakening Tests (Mutation & Metamorphic tests)
-Tier 6: Adversarial Red-Team Injection Suite (17 Attack Vectors)
+Tier 6: Adversarial Red-Team Injection Suite (21 Attack Vectors)
 ```
 
 ### 14.2 Adversarial Red-Team Attack Vector Suite
@@ -1682,7 +1968,7 @@ Tier 6: Adversarial Red-Team Injection Suite (17 Attack Vectors)
 | **ADV-05** | Policy downgrade attempt (Project policy tries to remove security scan) | Policy compiler calculates intersection $\sqcap$; mandatory rule preserved | CORE-19 |
 | **ADV-06** | Autonomous infinite repair loop injection (perpetually failing test) | Bounded recovery exhausts budget $\to$ Transitions to `BLOCKED` and alerts | CORE-16 |
 | **ADV-07** | Self-planning generated plan omitting mandatory security obligations | Assessment engine detects missing mandatory claims $\to \text{Plan } = \text{REJECTED}$ | CORE-21 |
-| **ADV-08** | Cyclic dependency injection into Obligation DAG | DAG compiler rejects insertion with `CYCLIC_DEPENDENCY_ERROR` | CORE-13 |
+| **ADV-08** | Cyclic dependency injection into Obligation DAG | DAG compiler rejects insertion with `CYCLIC_DEPENDENCY_ERROR` | CORE-13, CORE-23 |
 | **ADV-09** | Replayed event log with mutated parent digest, invalid genesis, or non-JCS formatting | RFC 8785 JCS hash chain validation fails $\to$ Event Store halts on corrupted state | CORE-09 |
 | **ADV-10** | Floating-point confidence score passed to gate obligation | Policy parser rejects score; throws `INVALID_POLICY_EXPRESSION_ERROR` | CORE-08 |
 | **ADV-11** | Unprivileged LLM planner attempting to execute unauthorized shell tool | Controller intercepts proposal $\to$ Verdict: `REJECTED` | CORE-05 |
@@ -1692,6 +1978,10 @@ Tier 6: Adversarial Red-Team Injection Suite (17 Attack Vectors)
 | **ADV-15** | Forged human approval without valid cryptographic signature | Signature verification fails $\to$ Exception rejected $\to$ Obligation stays open | CORE-18 |
 | **ADV-16** | Replay of historical state with altered wall-clock timestamps | Reducer relies purely on logical clock sequence $t$; produces identical bit-for-bit state | CORE-10 |
 | **ADV-17** | Schema pollution attack: injection of undeclared properties into PolicyRule or Claim | Strict `additionalProperties: false` validation immediately rejects payload | CORE-02, CORE-03 |
+| **ADV-18** | Action proposal target outside derived Executable Frontier | Controller detects target obligation not in `Executable(S)` $\to$ Verdict: `REJECTED` | CORE-05, CORE-22 |
+| **ADV-19** | Convergence engine attempting direct code execution or claim state mutation | Core rejects direct mutation; requires Controller proposal protocol | CORE-05, CORE-24 |
+| **ADV-20** | Compromised lifecycle hook attempting to force execution token issuance on rejected proposal | Controller enforces invariant; fails closed with `LIFECYCLE_HOOK_INTEGRITY_ERROR` | CORE-25 |
+| **ADV-21** | Rogue worker attempting to inject internal harness memory or bypass token limits | Ingestion gate accepts only strictly schema-validated `ActionProposal`/`Evidence` | CORE-03, CORE-26 |
 
 ---
 
