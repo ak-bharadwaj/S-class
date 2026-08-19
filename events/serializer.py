@@ -2,46 +2,86 @@
 
 Integrates the standard-compliant, mature, permissively licensed rfc8785 library
 for deterministic JSON Canonicalization Scheme (JCS) encoding:
-1. Whitespace: zero whitespace outside strings (compact tokens).
-2. Numbers: IEEE 754 double precision without trailing .0 and with ECMAScript exponent formatting.
-3. Strings: UTF-8 with strict control character escaping (\b, \t, \n, \f, \r, \u0000..\u001f);
-   forward slash / and raw Unicode characters are NOT escaped.
-4. Object Keys: strictly sorted lexicographically by UTF-16 code units (key.encode('utf-16-be')).
-5. SHA-256 event digest computation and verification over canonical preimage bytes.
+1. Canonical JSON domain: null, bool, finite numbers (int, float), str, ordered arrays (list, tuple),
+   and mappings (dict, MappingProxyType, Mapping) with string keys.
+2. Explicit S-Class domain types: Enum instances and pure domain model dataclasses.
+3. Strict Fail-Closed Input Boundary:
+   - Sets and frozensets are REJECTED with CanonicalSerializationError (no non-deterministic conversion).
+   - Generic __dict__ and str(obj) fallbacks are REMOVED. Unsupported objects fail closed.
+4. Cryptographic SHA-256 event digest computation and verification over canonical preimage bytes.
 """
 
+import dataclasses
+from enum import Enum
 import hashlib
 import math
-import re
 from typing import Any, Mapping
 from types import MappingProxyType
 import rfc8785
 
 from domain.models import EventEnvelope
 from domain.types import EventType
-from events.exceptions import DigestMismatchError
+from events.exceptions import CanonicalSerializationError, DigestMismatchError
 
 
 def _prepare_for_rfc8785(obj: Any) -> Any:
-    """Recursively converts custom dataclasses, enums, mapping proxies, and sets into standard JSON primitives for RFC 8785 canonicalization."""
-    if obj is None or isinstance(obj, (bool, int, float, str)):
+    """Strictly validates and converts supported canonical JSON domain types into primitives for RFC 8785.
+    
+    Supported domain:
+    - None (null)
+    - bool (true/false)
+    - int, float (finite numbers; NaN and Inf fail closed)
+    - str (string)
+    - Enum (converted to .value string)
+    - list, tuple (ordered arrays)
+    - dict, MappingProxyType, Mapping (mappings with string keys)
+    - Pure S-Class domain model dataclasses (converted to dict of fields)
+    
+    Any other type (including set, frozenset, arbitrary custom classes, generator, etc.) fails closed.
+    """
+    if obj is None:
+        return None
+    elif isinstance(obj, bool):
         return obj
-    elif isinstance(obj, EventType):
+    elif isinstance(obj, (int, float)):
+        if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+            raise CanonicalSerializationError(f"Non-finite float value '{obj}' cannot be canonicalized under RFC 8785.")
+        return obj
+    elif isinstance(obj, str):
+        return obj
+    elif isinstance(obj, Enum):
         return obj.value
-    elif isinstance(obj, (dict, MappingProxyType)):
-        return {str(k): _prepare_for_rfc8785(v) for k, v in obj.items()}
-    elif isinstance(obj, (list, tuple, set, frozenset)):
+    elif isinstance(obj, (list, tuple)):
         return [_prepare_for_rfc8785(x) for x in obj]
-    elif hasattr(obj, "__dict__"):
-        return {str(k): _prepare_for_rfc8785(v) for k, v in obj.__dict__.items()}
+    elif isinstance(obj, (dict, MappingProxyType, Mapping)):
+        out = {}
+        for k, v in obj.items():
+            if not isinstance(k, str):
+                raise CanonicalSerializationError(f"Mapping key must be a string, got '{type(k).__name__}'.")
+            out[k] = _prepare_for_rfc8785(v)
+        return out
+    elif dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+        module_name = getattr(obj.__class__, "__module__", "")
+        if "domain." in module_name or module_name == "domain" or "models" in module_name:
+            fields_dict = {f.name: getattr(obj, f.name) for f in dataclasses.fields(obj)}
+            return _prepare_for_rfc8785(fields_dict)
+        else:
+            raise CanonicalSerializationError(f"Unsupported custom dataclass: '{obj.__class__.__name__}' from module '{module_name}'.")
     else:
-        return str(obj)
+        raise CanonicalSerializationError(
+            f"Unsupported canonical serialization type: '{type(obj).__name__}'. Sets, frozensets, and arbitrary custom objects fail closed."
+        )
 
 
 def canonicalize_json(data: Any) -> bytes:
     """Serializes arbitrary data to standard-compliant RFC 8785 / JCS canonical UTF-8 bytes using the mature rfc8785 library."""
     prepared = _prepare_for_rfc8785(data)
-    return rfc8785.dumps(prepared)
+    try:
+        return rfc8785.dumps(prepared)
+    except Exception as exc:
+        if isinstance(exc, CanonicalSerializationError):
+            raise
+        raise CanonicalSerializationError(f"RFC 8785 canonicalization failed: {exc}") from exc
 
 
 def compute_event_preimage(

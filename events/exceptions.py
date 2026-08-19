@@ -5,6 +5,11 @@ class EventEngineError(Exception):
     pass
 
 
+class CanonicalSerializationError(TypeError, EventEngineError):
+    """Raised when an object, mapping key, or field cannot be canonicalized under RFC 8785."""
+    pass
+
+
 class DigestMismatchError(EventEngineError):
     """Raised when an event digest does not match its canonical hash."""
     pass
@@ -31,5 +36,5 @@ class ConcurrencyConflictError(EventEngineError):
 
 
 class CorruptEventLogError(EventEngineError):
-    """Raised when an event log file contains unparseable or truncated data."""
+    """Raised when an event log file contains unparseable or corrupted data."""
     pass

@@ -1,10 +1,8 @@
-"""S-Class D2 State & Event Engine Package."""
-
-from domain.models import EventEnvelope
-from domain.types import EventType
+"""D2 State & Event Engine for S-Class EOS."""
 
 from events.exceptions import (
     EventEngineError,
+    CanonicalSerializationError,
     DigestMismatchError,
     InvalidParentDigestError,
     SequenceGapError,
@@ -19,24 +17,16 @@ from events.serializer import (
     verify_event_digest,
     create_event,
 )
-from events.state import (
-    MaterializedState,
-    GENESIS_PARENT_DIGEST,
-)
-from events.reducer import (
-    reduce_event,
-    replay_events,
-)
+from events.state import MaterializedState, GENESIS_PARENT_DIGEST
+from events.reducer import reduce_event, replay_events
 from events.interfaces import EventStoreInterface
-from events.store import (
-    InMemoryEventStore,
-    FileAppendEventStore,
-)
+from events.store import InMemoryEventStore, FileAppendEventStore
+from domain.models import EventEnvelope
+from domain.types import EventType
 
 __all__ = [
-    "EventEnvelope",
-    "EventType",
     "EventEngineError",
+    "CanonicalSerializationError",
     "DigestMismatchError",
     "InvalidParentDigestError",
     "SequenceGapError",
@@ -55,4 +45,6 @@ __all__ = [
     "EventStoreInterface",
     "InMemoryEventStore",
     "FileAppendEventStore",
+    "EventEnvelope",
+    "EventType",
 ]

@@ -2,26 +2,33 @@
 
 Tests:
 1. RFC 8785 (JCS) Standard Conformance: numbers, strings, control characters, unescaped slashes/Unicode, UTF-16 key sorting.
-2. Genesis event verification (sequence=1, parent_digest="0"*64).
-3. Single event append, reduction, and state materialization.
-4. Multi-event cryptographic digest chaining across sequence.
-5. Full domain model reduction: Task, Obligation, Claim, Evidence, AssessmentReceipt.
-6. Adversarial vector: Tampered payload rejected with DigestMismatchError.
-7. Adversarial vector: Tampered parent_digest rejected with InvalidParentDigestError.
-8. Adversarial vector: Tampered stored digest rejected with DigestMismatchError.
-9. Replay determinism: identical event stream always produces identical MaterializedState.
-10. Sequence violation: Duplicate sequence number rejected with DuplicateSequenceError.
-11. Sequence violation: Sequence gap rejected with SequenceGapError.
-12. Type violation: Invalid event type string rejected fail-closed.
-13. Structural violation: Malformed event envelope rejected fail-closed.
-14. Concurrency safety: Thread-safe concurrent append race fails safely without data corruption.
-15. Recovery & Corruption Distinctions:
+2. Canonicalization Input Boundary & Adversarial Vectors:
+   - (a) Unsupported set → fails closed with CanonicalSerializationError.
+   - (b) Unsupported frozenset → fails closed with CanonicalSerializationError.
+   - (c) Custom arbitrary object → fails closed with CanonicalSerializationError.
+   - (d) Non-string mapping key → fails closed with CanonicalSerializationError.
+   - (e) Same valid payload → produces identical bytes and identical digest.
+   - (f) Reordered mapping → produces identical digest.
+   - (g) Changed array order → produces different digest.
+3. Genesis event verification (sequence=1, parent_digest="0"*64).
+4. Single event append, reduction, and state materialization.
+5. Multi-event cryptographic digest chaining across sequence.
+6. Full domain model reduction: Task, Obligation, Claim, Evidence, AssessmentReceipt.
+7. Adversarial vector: Tampered payload rejected with DigestMismatchError.
+8. Adversarial vector: Tampered parent_digest rejected with InvalidParentDigestError.
+9. Adversarial vector: Tampered stored digest rejected with DigestMismatchError.
+10. Replay determinism: identical event stream always produces identical MaterializedState.
+11. Sequence violation: Duplicate sequence number rejected with DuplicateSequenceError.
+12. Sequence violation: Sequence gap rejected with SequenceGapError.
+13. Type violation: Invalid event type string rejected fail-closed.
+14. Structural violation: Malformed event envelope rejected fail-closed.
+15. Concurrency safety: Thread-safe concurrent append race fails safely without data corruption.
+16. Recovery & Corruption Distinctions:
     - (a) Truncated final record at EOF (torn write) is safely recovered and truncated.
     - (b) Malformed JSON in historical log raises CorruptEventLogError and is never silently discarded.
     - (c) Validly parsed but digest-corrupted record raises CorruptEventLogError and is never silently discarded.
     - (d) Parent-chain corruption raises CorruptEventLogError and is never silently discarded.
-16. File store operations: get_events, limits, offsets, empty stores, invalid parameters.
-17. Canonical serializer type coverage: sets, frozensets, custom objects, bools, floats, NaN/inf rejections.
+17. File store operations: get_events, limits, offsets, empty stores, invalid parameters.
 18. Large-log benchmark: 1k, 10k, and 100k event log append, verification, replay throughput, and explicit peak RSS memory (MB).
 """
 
@@ -75,6 +82,7 @@ from events import (
     EventEnvelope,
     EventType,
     EventEngineError,
+    CanonicalSerializationError,
     DigestMismatchError,
     InvalidParentDigestError,
     SequenceGapError,
@@ -146,10 +154,10 @@ def test_rfc8785_number_conformance():
     assert canonicalize_json(100.0) == b"100"
     assert canonicalize_json(0.5) == b"0.5"
 
-    with pytest.raises(Exception):
+    with pytest.raises(CanonicalSerializationError):
         canonicalize_json(float("nan"))
 
-    with pytest.raises(Exception):
+    with pytest.raises(CanonicalSerializationError):
         canonicalize_json(float("inf"))
 
 
@@ -184,7 +192,7 @@ def test_rfc8785_utf16_code_unit_key_sorting():
 
 
 def test_rfc8785_data_structures_and_types():
-    """Verify serialization of sets, frozensets, custom objects, and enums."""
+    """Verify canonical serialization of lists, tuples, booleans, None, and enums."""
     assert canonicalize_json([1, 2, 3]) == b"[1,2,3]"
     assert canonicalize_json((1, 2)) == b"[1,2]"
     assert canonicalize_json(None) == b"null"
@@ -192,15 +200,85 @@ def test_rfc8785_data_structures_and_types():
     assert canonicalize_json(False) == b"false"
     assert canonicalize_json(EventType.TASK_CREATED) == b'"TASK_CREATED"'
 
-    class CustomData:
-        def __init__(self):
-            self.foo = "bar"
 
-    assert canonicalize_json(CustomData()) == b'{"foo":"bar"}'
+# ============================================================================
+# 2. Canonicalization Input Boundary & Adversarial Vectors
+# ============================================================================
+
+def test_canonicalization_unsupported_set_fails_closed():
+    """Adversarial vector: Sets and frozensets are rejected fail closed with CanonicalSerializationError."""
+    with pytest.raises(CanonicalSerializationError):
+        canonicalize_json({1, 2, 3})
+
+    with pytest.raises(CanonicalSerializationError):
+        canonicalize_json(frozenset(["a", "b"]))
+
+    with pytest.raises(CanonicalSerializationError):
+        canonicalize_json({"valid_key": {10, 20}})
+
+
+def test_canonicalization_custom_object_fails_closed():
+    """Adversarial vector: Arbitrary custom classes without domain schema definition fail closed."""
+    class ArbitraryClass:
+        def __init__(self):
+            self.val = 42
+
+    with pytest.raises(CanonicalSerializationError):
+        canonicalize_json(ArbitraryClass())
+
+    with pytest.raises(CanonicalSerializationError):
+        canonicalize_json({"nested": ArbitraryClass()})
+
+
+def test_canonicalization_non_string_mapping_key_fails_closed():
+    """Adversarial vector: Mappings with non-string keys fail closed."""
+    with pytest.raises(CanonicalSerializationError):
+        canonicalize_json({123: "number_key"})
+
+    with pytest.raises(CanonicalSerializationError):
+        canonicalize_json({(1, 2): "tuple_key"})
+
+
+def test_canonicalization_same_valid_payload_identical_bytes_and_digest():
+    """Adversarial vector: Identical payloads always produce byte-for-byte identical canonical serialization and digest."""
+    p1 = {"task_id": "TASK-001", "constraints": ["PYTHON", "SECURITY"], "budget": 100.5}
+    p2 = {"task_id": "TASK-001", "constraints": ["PYTHON", "SECURITY"], "budget": 100.5}
+
+    b1 = canonicalize_json(p1)
+    b2 = canonicalize_json(p2)
+    assert b1 == b2
+
+    d1 = compute_event_digest("EVT-001", EventType.TASK_CREATED, 1, "TASK-001", "2026-08-19T10:00:00Z", p1, GENESIS_PARENT_DIGEST)
+    d2 = compute_event_digest("EVT-001", EventType.TASK_CREATED, 1, "TASK-001", "2026-08-19T10:00:00Z", p2, GENESIS_PARENT_DIGEST)
+    assert d1 == d2
+
+
+def test_canonicalization_reordered_mapping_identical_digest():
+    """Adversarial vector: Reordering keys in a dictionary (and nested sub-dictionaries) produces identical canonical digest."""
+    m1 = {"z": 100, "a": 200, "meta": {"owner": "alice", "active": True}}
+    m2 = {"a": 200, "meta": {"active": True, "owner": "alice"}, "z": 100}
+
+    assert canonicalize_json(m1) == canonicalize_json(m2)
+
+    d1 = compute_event_digest("EVT-001", EventType.TASK_CREATED, 1, "TASK-001", "2026-08-19T10:00:00Z", m1, GENESIS_PARENT_DIGEST)
+    d2 = compute_event_digest("EVT-001", EventType.TASK_CREATED, 1, "TASK-001", "2026-08-19T10:00:00Z", m2, GENESIS_PARENT_DIGEST)
+    assert d1 == d2
+
+
+def test_canonicalization_changed_array_order_different_digest():
+    """Adversarial vector: Changing array/list element ordering strictly produces different canonical bytes and different digest."""
+    a1 = {"elements": [1, 2, 3]}
+    a2 = {"elements": [3, 2, 1]}
+
+    assert canonicalize_json(a1) != canonicalize_json(a2)
+
+    d1 = compute_event_digest("EVT-001", EventType.TASK_CREATED, 1, "TASK-001", "2026-08-19T10:00:00Z", a1, GENESIS_PARENT_DIGEST)
+    d2 = compute_event_digest("EVT-001", EventType.TASK_CREATED, 1, "TASK-001", "2026-08-19T10:00:00Z", a2, GENESIS_PARENT_DIGEST)
+    assert d1 != d2
 
 
 # ============================================================================
-# 2. Genesis, Single Event, and Multi-Event Chaining
+# 3. Genesis, Single Event, and Multi-Event Chaining
 # ============================================================================
 
 def make_test_task_event(
@@ -441,7 +519,7 @@ def test_full_domain_model_reduction():
 
 
 # ============================================================================
-# 3. Adversarial Tampering Vectors & Replay Determinism
+# 4. Adversarial Tampering Vectors & Replay Determinism
 # ============================================================================
 
 def test_tampered_payload_rejected():
@@ -623,7 +701,7 @@ def test_concurrent_append_race_fails_safely():
 
 
 # ============================================================================
-# 4. Four Distinct Recovery & Corruption Tests
+# 5. Four Distinct Recovery & Corruption Tests
 # ============================================================================
 
 def test_recovery_truncated_final_record():
@@ -771,7 +849,7 @@ def test_file_store_operations_and_error_handling():
 
 
 # ============================================================================
-# 5. Large-Log Replay Benchmark with Peak Memory Tracking (1k / 10k / 100k Events)
+# 6. Large-Log Replay Benchmark with Peak Memory Tracking (1k / 10k / 100k Events)
 # ============================================================================
 
 def test_large_log_replay_benchmark_with_memory():
