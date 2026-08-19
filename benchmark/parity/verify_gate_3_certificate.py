@@ -12,8 +12,6 @@ import hashlib
 import hmac
 import argparse
 from typing import Any, Dict, Optional
-from cryptography.hazmat.primitives.asymmetric import ed25519
-from cryptography.exceptions import InvalidSignature
 from domain.models import AsymmetricAuthoritySignature
 from events.serializer import canonicalize_json
 
@@ -22,12 +20,10 @@ TRUSTED_VERIFIER_IDENTITIES = frozenset({"PARITY-GATE-3", "Gate3AuthoritativeVer
 
 class Gate3PublicKeystore:
     """Public keystore boundary for verifiers."""
-    _public_key: Optional[ed25519.Ed25519PublicKey] = None
+    _public_key: Optional[Any] = None
 
     @classmethod
-    def set_public_key(cls, public_key: ed25519.Ed25519PublicKey) -> None:
-        if not isinstance(public_key, ed25519.Ed25519PublicKey):
-            raise TypeError("Expected Ed25519PublicKey.")
+    def set_public_key(cls, public_key: Any) -> None:
         cls._public_key = public_key
 
     @classmethod
@@ -35,19 +31,23 @@ class Gate3PublicKeystore:
         cls._public_key = None
 
     @classmethod
-    def get_public_key(cls) -> Optional[ed25519.Ed25519PublicKey]:
+    def get_public_key(cls) -> Optional[Any]:
         if cls._public_key is not None:
             return cls._public_key
         env_pub_hex = os.environ.get("GATE3_AUTHORITY_PUBLIC_KEY")
         if env_pub_hex and len(env_pub_hex) == 64:
-            return ed25519.Ed25519PublicKey.from_public_bytes(bytes.fromhex(env_pub_hex))
+            try:
+                from cryptography.hazmat.primitives.asymmetric import ed25519
+                return ed25519.Ed25519PublicKey.from_public_bytes(bytes.fromhex(env_pub_hex))
+            except ImportError:
+                return None
         return None
 
 
 def verify_gate_3_evidence_trust_certificate(
     cert: Any,
     expected_source_sha: Optional[str] = None,
-    public_key: Optional[ed25519.Ed25519PublicKey] = None,
+    public_key: Optional[Any] = None,
 ) -> bool:
     """Strictly validates an EvidenceTrustCertificate against the Gate 3 Asymmetric Authority."""
     from policy.models import EvidenceTrustCertificate
@@ -116,9 +116,10 @@ def verify_gate_3_evidence_trust_certificate(
 
     # 5. Cryptographic Ed25519 signature verification using public key
     try:
+        from cryptography.exceptions import InvalidSignature
         sig_bytes = bytes.fromhex(cert.authority_signature.signature_hex)
         pub_key.verify(sig_bytes, canonical_bytes)
-    except (InvalidSignature, ValueError, TypeError):
+    except Exception:
         return False
 
     return True
