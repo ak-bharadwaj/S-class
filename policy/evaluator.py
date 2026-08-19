@@ -41,19 +41,24 @@ from policy.exceptions import (
     InvalidExceptionError,
     ExpiredExceptionError,
 )
-from policy.verifier import verify_evidence_authenticity
 
 
 class CoverageTrustPredicate:
     """Narrow trust consumer interface for S-Class D3 Policy Engine.
     
-    Verifies:
+    Consumes external verifier-produced EvidenceTrustCertificate (e.g. from Gate 3):
     1. Exact expected revision binding (expected_source_sha is mandatory for policy decisions)
     2. Valid schema and lifecycle state (VALID + SUPPORTS + PASS)
     3. Provider capability matches coverage authorization
     4. Provider identity non-synthetic
     5. Provenance engine non-synthetic
-    6. Verified cryptographic trust certificate (digest, signature, revision, and provenance verified by verifier)
+    6. Verified cryptographic trust certificate produced by external verifier:
+       - certificate.is_verified == True
+       - certificate.digest_verified == True
+       - certificate.signature_verified == True
+       - certificate.provenance_verified == True
+       - certificate.source_sha == context.expected_source_sha
+       - certificate.evidence_id == evidence.evidence_id
     """
 
     TRUSTED_COVERAGE_CAPABILITIES: Set[str] = {
@@ -109,16 +114,24 @@ class CoverageTrustPredicate:
         if not engine_name or any(f in engine_name for f in cls.FORBIDDEN_ENGINES):
             return False
 
-        # 6. Consume cryptographic trust certificate (from context or standard verifier)
+        # 6. Consume cryptographic trust certificate produced by external verifier (Gate 3)
         cert = context.trust_certificates.get(evidence.evidence_id)
         if cert is None:
-            cert = verify_evidence_authenticity(evidence, expected_source_sha=context.expected_source_sha)
-
-        if not isinstance(cert, EvidenceTrustCertificate) or not cert.is_verified:
             return False
-        if not cert.digest_verified or not cert.signature_verified or not cert.provenance_verified:
+
+        if not isinstance(cert, EvidenceTrustCertificate):
+            return False
+        if not cert.is_verified:
+            return False
+        if not cert.digest_verified:
+            return False
+        if not cert.signature_verified:
+            return False
+        if not cert.provenance_verified:
             return False
         if cert.source_sha != context.expected_source_sha:
+            return False
+        if cert.evidence_id != evidence.evidence_id:
             return False
 
         return True
@@ -167,7 +180,7 @@ def _extract_coverage_pct(
     - Provider capability matches coverage
     - Provenance present & valid
     - Target/revision binding valid
-    - Cryptographic certificate verified
+    - Consumes verified trust certificate from Gate 3 verifier
     
     Free-form text in observation.diagnostics is strictly rejected as unauthoritative.
     """

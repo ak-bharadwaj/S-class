@@ -31,6 +31,7 @@ Tests:
    - Altered payload with unchanged signature -> reject
    - Valid certificate for different source_sha -> reject
    - Missing expected revision -> reject
+   - D3 cannot independently manufacture a valid trust certificate -> fail closed
 4. Cross-Parameter Substitution, Omission, and Duplication Attacks:
    - Capability substitution attack (P requires A, C supplies B) -> PolicyWeakeningError
    - Tier weakening / lowering attack (P requires V2 count 3, C supplies V1 or count 1) -> PolicyWeakeningError
@@ -45,6 +46,8 @@ Tests:
 """
 
 from copy import deepcopy
+import hashlib
+import hmac
 import json
 import os
 import re
@@ -86,6 +89,7 @@ from domain.types import (
     RawStatus,
 )
 from domain.exceptions import DomainValidationError
+from events.serializer import canonicalize_json
 from policy import (
     PolicyDecision,
     PolicyDecisionType,
@@ -100,9 +104,6 @@ from policy import (
     InvalidExceptionError,
     ExpiredExceptionError,
     CoverageTrustPredicate,
-    compute_canonical_evidence_digest,
-    compute_evidence_hmac,
-    verify_evidence_authenticity,
     meet_policies,
     compose_policies,
     verify_and_merge_rules,
@@ -113,11 +114,91 @@ from policy import (
 )
 
 DEFAULT_TEST_SHA = "a" * 40
+GATE3_TEST_SESSION_KEY = "GATE3_TEST_AUTHENTIC_SESSION_KEY_001"
 
 
 # ============================================================================
-# Helpers & Fixtures
+# Helpers & Fixtures (Gate 3 Verifier Simulation with RFC 8785 / JCS)
 # ============================================================================
+
+def _compute_gate3_jcs_evidence_digest(evidence: Evidence) -> str:
+    """Computes the authoritative RFC 8785 / JCS canonical digest for an Evidence item."""
+    payload = {
+        "evidence_id": evidence.evidence_id,
+        "claim_id": evidence.claim_id,
+        "provider_id": evidence.provider_id,
+        "capability": evidence.capability,
+        "execution_id": evidence.execution_id,
+        "source_sha": evidence.source_sha,
+        "observation": {
+            "raw_status": evidence.observation.raw_status.value if hasattr(evidence.observation.raw_status, "value") else str(evidence.observation.raw_status),
+            "diagnostics": list(evidence.observation.diagnostics),
+            "counterexample": evidence.observation.counterexample,
+        },
+        "provenance": {
+            "engine_name": evidence.provenance.engine_name,
+            "engine_version": evidence.provenance.engine_version,
+            "environment_hash": evidence.provenance.environment_hash,
+            "timestamp": evidence.provenance.timestamp,
+        },
+    }
+    canonical_bytes = canonicalize_json(payload)
+    return hashlib.sha256(canonical_bytes).hexdigest()
+
+
+def _compute_gate3_hmac(digest: str, secret_key: str = GATE3_TEST_SESSION_KEY) -> str:
+    """Computes the authoritative HMAC signature for Gate 3 verification."""
+    return hmac.new(secret_key.encode("utf-8"), digest.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def verify_gate3_evidence_to_certificate(
+    evidence: Evidence,
+    expected_source_sha: str,
+    secret_key: str = GATE3_TEST_SESSION_KEY,
+) -> EvidenceTrustCertificate:
+    """Simulates the authoritative Gate-3 verifier generating EvidenceTrustCertificate using D2 RFC 8785 JCS."""
+    if not expected_source_sha or evidence.source_sha != expected_source_sha:
+        return EvidenceTrustCertificate(
+            evidence_id=evidence.evidence_id,
+            source_sha=evidence.source_sha,
+            is_verified=False,
+            digest_verified=False,
+            signature_verified=False,
+            provenance_verified=False,
+            verifier_identity="Gate3AuthoritativeVerifier",
+            rejection_reason="Source revision mismatch or missing.",
+        )
+
+    computed_digest = _compute_gate3_jcs_evidence_digest(evidence)
+    claimed_digest = getattr(evidence.signature, "raw_stdout_digest", None)
+    digest_verified = (claimed_digest == computed_digest)
+
+    claimed_sig = getattr(evidence.signature, "signature_hex", None)
+    expected_hmac = _compute_gate3_hmac(computed_digest, secret_key)
+    signature_verified = bool(claimed_sig and hmac.compare_digest(claimed_sig, expected_hmac))
+
+    prov = evidence.provenance
+    provenance_verified = bool(
+        prov
+        and prov.engine_name
+        and not any(f in prov.engine_name.lower() for f in ["synthetic", "simulation", "untrusted"])
+        and prov.environment_hash
+        and len(prov.environment_hash) == 64
+        and prov.timestamp
+    )
+
+    is_verified = (digest_verified and signature_verified and provenance_verified)
+
+    return EvidenceTrustCertificate(
+        evidence_id=evidence.evidence_id,
+        source_sha=evidence.source_sha,
+        is_verified=is_verified,
+        digest_verified=digest_verified,
+        signature_verified=signature_verified,
+        provenance_verified=provenance_verified,
+        verifier_identity="Gate3AuthoritativeVerifier",
+    )
+
 
 def make_test_obligation(
     obl_id: str = "OBL-001",
@@ -197,7 +278,6 @@ def make_test_evidence(
     if custom_signature is not None:
         sig = custom_signature
     else:
-        # Construct un-signed dummy to compute exact canonical digest
         dummy_sig = HmacSessionSignature(
             algorithm="HMAC-SHA256",
             key_id="KEY-001",
@@ -221,8 +301,8 @@ def make_test_evidence(
             provenance=prov,
             signature=dummy_sig,
         )
-        real_digest = compute_canonical_evidence_digest(temp_ev)
-        real_hmac = compute_evidence_hmac(real_digest)
+        real_digest = _compute_gate3_jcs_evidence_digest(temp_ev)
+        real_hmac = _compute_gate3_hmac(real_digest)
         sig = HmacSessionSignature(
             algorithm="HMAC-SHA256",
             key_id="KEY-001",
@@ -246,6 +326,35 @@ def make_test_evidence(
         independence_group=independence_group,
         provenance=prov,
         signature=sig,
+    )
+
+
+def make_test_context(
+    obligation: Obligation,
+    claims: Tuple[Claim, ...],
+    evidence: Tuple[Evidence, ...],
+    exceptions: Tuple[PolicyException, ...] = (),
+    expected_source_sha: Optional[str] = DEFAULT_TEST_SHA,
+    auto_verify_certificates: bool = True,
+    trust_certificates: Dict[str, EvidenceTrustCertificate] = None,
+    evaluation_timestamp: str = "2026-08-19T10:00:00Z",
+) -> PolicyEvaluationContext:
+    """Helper creating PolicyEvaluationContext with Gate 3 certified trust certificates."""
+    certs = {}
+    if trust_certificates is not None:
+        certs.update(trust_certificates)
+    elif auto_verify_certificates and expected_source_sha:
+        for ev in evidence:
+            certs[ev.evidence_id] = verify_gate3_evidence_to_certificate(ev, expected_source_sha)
+
+    return PolicyEvaluationContext(
+        obligation=obligation,
+        claims=claims,
+        evidence=evidence,
+        exceptions=exceptions,
+        expected_source_sha=expected_source_sha,
+        trust_certificates=certs,
+        evaluation_timestamp=evaluation_timestamp,
     )
 
 
@@ -334,13 +443,7 @@ def test_adversarial_conflicting_allow_deny():
         validity=EvidenceValidity.CONFLICTED,
     )
 
-    ctx = PolicyEvaluationContext(
-        obligation=obl,
-        claims=(claim,),
-        evidence=(ev_pass, ev_fail),
-        expected_source_sha=DEFAULT_TEST_SHA,
-        evaluation_timestamp="2026-08-19T10:00:00Z",
-    )
+    ctx = make_test_context(obl, (claim,), (ev_pass, ev_fail))
 
     policy = Policy(
         policy_id="POL-001",
@@ -423,15 +526,13 @@ def test_adversarial_expired_exception():
     """Adversarial vector: Expired exception raises ExpiredExceptionError during evaluation."""
     obl = make_test_obligation()
     claim = make_test_claim(tier=ClaimTier.V4_ADVERSARIAL_EXPLORATORY)
-
     exc = make_test_exception(expiry="2026-08-01T00:00:00Z")
 
-    ctx = PolicyEvaluationContext(
+    ctx = make_test_context(
         obligation=obl,
         claims=(claim,),
         evidence=(),
         exceptions=(exc,),
-        expected_source_sha=DEFAULT_TEST_SHA,
         evaluation_timestamp="2026-08-19T10:00:00Z",  # After expiry!
     )
 
@@ -455,20 +556,15 @@ def test_adversarial_policy_id_exception_mismatch():
     """Adversarial vector: Signed exception for Policy-A evaluated against Policy-B must fail closed with InvalidExceptionError."""
     obl = make_test_obligation(obl_id="OBL-001")
     claim = make_test_claim(tier=ClaimTier.V4_ADVERSARIAL_EXPLORATORY)
-
-    # Exception is authorized specifically for POL-A
     exc_for_pol_a = make_test_exception(exc_id="EXC-A", obl_id="OBL-001", policy_id="POL-A")
 
-    ctx = PolicyEvaluationContext(
+    ctx = make_test_context(
         obligation=obl,
         claims=(claim,),
         evidence=(),
         exceptions=(exc_for_pol_a,),
-        expected_source_sha=DEFAULT_TEST_SHA,
-        evaluation_timestamp="2026-08-19T10:00:00Z",
     )
 
-    # Evaluated against POL-B
     policy_b = Policy(
         policy_id="POL-B",
         scope_level=PolicyScope.PROJECT,
@@ -489,13 +585,7 @@ def test_adversarial_nondeterministic_evaluation_context():
     claim = make_test_claim()
     ev = make_test_evidence(capability="API_CONTRACT_FUZZING")
 
-    ctx = PolicyEvaluationContext(
-        obligation=obl,
-        claims=(claim,),
-        evidence=(ev,),
-        expected_source_sha=DEFAULT_TEST_SHA,
-        evaluation_timestamp="2026-08-19T10:00:00Z",
-    )
+    ctx = make_test_context(obl, (claim,), (ev,))
 
     policy = Policy(
         policy_id="POL-001",
@@ -575,26 +665,12 @@ def test_adversarial_v4_judgment_cannot_bypass_mandatory_rule():
         ),
     )
 
-    ctx_unauthorized = PolicyEvaluationContext(
-        obligation=obl,
-        claims=(claim_v4,),
-        evidence=(),
-        exceptions=(),
-        expected_source_sha=DEFAULT_TEST_SHA,
-        evaluation_timestamp="2026-08-19T10:00:00Z",
-    )
+    ctx_unauthorized = make_test_context(obl, (claim_v4,), ())
     decision = evaluate_policy(policy, ctx_unauthorized)
     assert decision.decision == PolicyDecisionType.REQUIRE_EXCEPTION
 
     exc = make_test_exception(obl_id="OBL-001", policy_id="POL-001")
-    ctx_authorized = PolicyEvaluationContext(
-        obligation=obl,
-        claims=(claim_v4,),
-        evidence=(),
-        exceptions=(exc,),
-        expected_source_sha=DEFAULT_TEST_SHA,
-        evaluation_timestamp="2026-08-19T10:00:00Z",
-    )
+    ctx_authorized = make_test_context(obl, (claim_v4,), (), exceptions=(exc,))
     decision_exc = evaluate_policy(policy, ctx_authorized)
     assert decision_exc.decision == PolicyDecisionType.ALLOW
     assert "EXC-001" in decision_exc.exceptions_applied
@@ -616,47 +692,47 @@ def test_coverage_evaluation_adversarial_suite():
 
     # 1. 0% Coverage -> DENY
     ev_0 = make_test_evidence(ev_id="EV-COV-0", counterexample={"coverage_pct": 0.0})
-    ctx_0 = PolicyEvaluationContext(obl, (claim,), (ev_0,), expected_source_sha=DEFAULT_TEST_SHA)
+    ctx_0 = make_test_context(obl, (claim,), (ev_0,))
     d_0 = evaluate_policy(pol_cov_85, ctx_0)
     assert d_0.decision == PolicyDecisionType.DENY
     assert "0.00% < required threshold 85.00%" in d_0.rationale
 
     # 2. Below threshold (84.9%) -> DENY
     ev_below = make_test_evidence(ev_id="EV-COV-BELOW", counterexample={"coverage_pct": 84.9})
-    ctx_below = PolicyEvaluationContext(obl, (claim,), (ev_below,), expected_source_sha=DEFAULT_TEST_SHA)
+    ctx_below = make_test_context(obl, (claim,), (ev_below,))
     d_below = evaluate_policy(pol_cov_85, ctx_below)
     assert d_below.decision == PolicyDecisionType.DENY
     assert "84.90% < required threshold 85.00%" in d_below.rationale
 
     # 3. Exactly threshold (85.0%) -> ALLOW
     ev_exact = make_test_evidence(ev_id="EV-COV-EXACT", counterexample={"coverage_pct": 85.0})
-    ctx_exact = PolicyEvaluationContext(obl, (claim,), (ev_exact,), expected_source_sha=DEFAULT_TEST_SHA)
+    ctx_exact = make_test_context(obl, (claim,), (ev_exact,))
     d_exact = evaluate_policy(pol_cov_85, ctx_exact)
     assert d_exact.decision == PolicyDecisionType.ALLOW
     assert d_exact.rules_evaluated[0].passed is True
 
     # 4. Above threshold (92.5%) -> ALLOW
     ev_above = make_test_evidence(ev_id="EV-COV-ABOVE", counterexample={"coverage_pct": 92.5})
-    ctx_above = PolicyEvaluationContext(obl, (claim,), (ev_above,), expected_source_sha=DEFAULT_TEST_SHA)
+    ctx_above = make_test_context(obl, (claim,), (ev_above,))
     d_above = evaluate_policy(pol_cov_85, ctx_above)
     assert d_above.decision == PolicyDecisionType.ALLOW
 
     # 5. Missing coverage evidence -> DENY
     ev_other = make_test_evidence(ev_id="EV-OTHER", capability="API_CONTRACT_FUZZING")
-    ctx_missing = PolicyEvaluationContext(obl, (claim,), (ev_other,), expected_source_sha=DEFAULT_TEST_SHA)
+    ctx_missing = make_test_context(obl, (claim,), (ev_other,))
     d_missing = evaluate_policy(pol_cov_85, ctx_missing)
     assert d_missing.decision == PolicyDecisionType.DENY
     assert "Missing trusted structured code coverage evidence" in d_missing.rationale
 
     # 6. Malformed coverage evidence (non-numeric string) -> fails closed with PolicyValidationError
     ev_malformed = make_test_evidence(ev_id="EV-MALFORMED", counterexample={"coverage_pct": "not_a_number"})
-    ctx_malformed = PolicyEvaluationContext(obl, (claim,), (ev_malformed,), expected_source_sha=DEFAULT_TEST_SHA)
+    ctx_malformed = make_test_context(obl, (claim,), (ev_malformed,))
     with pytest.raises(PolicyValidationError, match="Malformed coverage string"):
         evaluate_policy(pol_cov_85, ctx_malformed)
 
     # 7. Malformed coverage evidence (out of range > 100%) -> fails closed with PolicyValidationError
     ev_oor = make_test_evidence(ev_id="EV-OOR", counterexample={"coverage_pct": 105.0})
-    ctx_oor = PolicyEvaluationContext(obl, (claim,), (ev_oor,), expected_source_sha=DEFAULT_TEST_SHA)
+    ctx_oor = make_test_context(obl, (claim,), (ev_oor,))
     with pytest.raises(PolicyValidationError, match="Invalid coverage range"):
         evaluate_policy(pol_cov_85, ctx_oor)
 
@@ -664,7 +740,7 @@ def test_coverage_evaluation_adversarial_suite():
     ev_conflicted = make_test_evidence(ev_id="EV-INV-1", validity=EvidenceValidity.CONFLICTED, counterexample={"coverage_pct": 99.0})
     ev_refutes = make_test_evidence(ev_id="EV-INV-2", polarity=EvidencePolarity.REFUTES, counterexample={"coverage_pct": 99.0})
     ev_fail = make_test_evidence(ev_id="EV-INV-3", raw_status=RawStatus.FAIL, counterexample={"coverage_pct": 99.0})
-    ctx_invalids = PolicyEvaluationContext(obl, (claim,), (ev_conflicted, ev_refutes, ev_fail), expected_source_sha=DEFAULT_TEST_SHA)
+    ctx_invalids = make_test_context(obl, (claim,), (ev_conflicted, ev_refutes, ev_fail))
     assert evaluate_policy(pol_cov_85, ctx_invalids).decision == PolicyDecisionType.DENY
 
 
@@ -678,7 +754,6 @@ def test_adversarial_forged_diagnostic_strings_rejected():
         PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CODE_COVERAGE, {"min_coverage_pct": 85.0}),))
     )
 
-    # Deceptive evidence trying to claim 100% via diagnostics text
     ev_forged = make_test_evidence(
         ev_id="EV-FORGED",
         diagnostics=(
@@ -686,9 +761,9 @@ def test_adversarial_forged_diagnostic_strings_rejected():
             "Coverage: 99.99%",
             "statement_coverage = 100%",
         ),
-        counterexample=None,  # No structured payload!
+        counterexample=None,
     )
-    ctx_forged = PolicyEvaluationContext(obl, (claim,), (ev_forged,), expected_source_sha=DEFAULT_TEST_SHA)
+    ctx_forged = make_test_context(obl, (claim,), (ev_forged,))
 
     decision = evaluate_policy(pol_cov_85, ctx_forged)
     assert decision.decision == PolicyDecisionType.DENY
@@ -696,7 +771,7 @@ def test_adversarial_forged_diagnostic_strings_rejected():
 
 
 def test_adversarial_cryptographic_trust_suite():
-    """Adversarial suite for cryptographic verification:
+    """Adversarial suite for Gate 3 cryptographic verification:
     1. Random 64-char signature -> reject (DENY)
     2. Random 64-char stdout digest -> reject (DENY)
     3. Altered payload with unchanged signature -> reject (DENY)
@@ -707,45 +782,110 @@ def test_adversarial_cryptographic_trust_suite():
     claim = make_test_claim()
     pol_cov_85 = Policy("POL-COV85", PolicyScope.PROJECT, 1, PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CODE_COVERAGE, {"min_coverage_pct": 85.0}),)))
 
-    # Base valid evidence
     valid_ev = make_test_evidence(ev_id="EV-BASE", counterexample={"coverage_pct": 90.0}, source_sha=DEFAULT_TEST_SHA)
     valid_digest = valid_ev.signature.raw_stdout_digest
     valid_sig = valid_ev.signature.signature_hex
 
-    # 1. Random 64-char signature -> reject
+    # 1. Random 64-char signature -> Gate 3 verifier rejects signature
     fake_sig = HmacSessionSignature("HMAC-SHA256", "KEY-1", "NONCE-1", valid_digest, "f" * 64, "2026-08-19T10:00:00Z")
     ev_fake_sig = make_test_evidence(ev_id="EV-FAKE-SIG", counterexample={"coverage_pct": 90.0}, custom_signature=fake_sig)
-    ctx_fake_sig = PolicyEvaluationContext(obl, (claim,), (ev_fake_sig,), expected_source_sha=DEFAULT_TEST_SHA)
+    ctx_fake_sig = make_test_context(obl, (claim,), (ev_fake_sig,))
     d_fake_sig = evaluate_policy(pol_cov_85, ctx_fake_sig)
     assert d_fake_sig.decision == PolicyDecisionType.DENY
     assert "Missing trusted structured code coverage evidence" in d_fake_sig.rationale
 
-    # 2. Random 64-char stdout digest -> reject
+    # 2. Random 64-char stdout digest -> Gate 3 verifier rejects digest
     fake_digest_sig = HmacSessionSignature("HMAC-SHA256", "KEY-1", "NONCE-1", "e" * 64, valid_sig, "2026-08-19T10:00:00Z")
     ev_fake_digest = make_test_evidence(ev_id="EV-FAKE-DIG", counterexample={"coverage_pct": 90.0}, custom_signature=fake_digest_sig)
-    ctx_fake_digest = PolicyEvaluationContext(obl, (claim,), (ev_fake_digest,), expected_source_sha=DEFAULT_TEST_SHA)
+    ctx_fake_digest = make_test_context(obl, (claim,), (ev_fake_digest,))
     d_fake_digest = evaluate_policy(pol_cov_85, ctx_fake_digest)
     assert d_fake_digest.decision == PolicyDecisionType.DENY
 
-    # 3. Altered payload with unchanged signature -> reject
-    # Payload claims 95.0% coverage, but signature was computed for 80.0% coverage
+    # 3. Altered payload with unchanged signature -> Gate 3 JCS digest mismatch
     ev_orig = make_test_evidence(ev_id="EV-ORIG", counterexample={"coverage_pct": 80.0})
     orig_sig = ev_orig.signature
     ev_tampered = make_test_evidence(ev_id="EV-ORIG", counterexample={"coverage_pct": 95.0}, custom_signature=orig_sig)
-    ctx_tampered = PolicyEvaluationContext(obl, (claim,), (ev_tampered,), expected_source_sha=DEFAULT_TEST_SHA)
+    ctx_tampered = make_test_context(obl, (claim,), (ev_tampered,))
     d_tampered = evaluate_policy(pol_cov_85, ctx_tampered)
     assert d_tampered.decision == PolicyDecisionType.DENY
 
-    # 4. Valid certificate for different source_sha -> reject
+    # 4. Valid certificate for different source_sha -> D3 rejects revision mismatch
     ev_diff_sha = make_test_evidence(ev_id="EV-DIFF-SHA", counterexample={"coverage_pct": 90.0}, source_sha="b" * 40)
-    ctx_diff_sha = PolicyEvaluationContext(obl, (claim,), (ev_diff_sha,), expected_source_sha=DEFAULT_TEST_SHA)
+    # Generate certificate bound to "b" * 40, but evaluated in context expecting DEFAULT_TEST_SHA
+    cert_diff = verify_gate3_evidence_to_certificate(ev_diff_sha, expected_source_sha="b" * 40)
+    ctx_diff_sha = make_test_context(
+        obl, (claim,), (ev_diff_sha,),
+        expected_source_sha=DEFAULT_TEST_SHA,
+        trust_certificates={ev_diff_sha.evidence_id: cert_diff}
+    )
     d_diff_sha = evaluate_policy(pol_cov_85, ctx_diff_sha)
     assert d_diff_sha.decision == PolicyDecisionType.DENY
 
-    # 5. Missing expected revision -> reject
-    ctx_missing_rev = PolicyEvaluationContext(obl, (claim,), (valid_ev,), expected_source_sha=None)
+    # 5. Missing expected revision -> D3 fails closed
+    ctx_missing_rev = make_test_context(obl, (claim,), (valid_ev,), expected_source_sha=None)
     d_missing_rev = evaluate_policy(pol_cov_85, ctx_missing_rev)
     assert d_missing_rev.decision == PolicyDecisionType.DENY
+
+
+def test_d3_cannot_independently_manufacture_valid_trust_certificate():
+    """Adversarial proof: D3 has no internal signing authority or keys.
+    Without an externally supplied, verified EvidenceTrustCertificate produced by Gate 3,
+    D3 strictly fails closed and cannot manufacture trust.
+    """
+    obl = make_test_obligation()
+    claim = make_test_claim()
+    pol_cov_85 = Policy("POL-COV85", PolicyScope.PROJECT, 1, PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CODE_COVERAGE, {"min_coverage_pct": 85.0}),)))
+
+    ev = make_test_evidence(ev_id="EV-NO-CERT", counterexample={"coverage_pct": 99.0})
+
+    # 1. Raw evidence passed without any certificate in context -> DENY
+    ctx_no_cert = PolicyEvaluationContext(
+        obligation=obl,
+        claims=(claim,),
+        evidence=(ev,),
+        expected_source_sha=DEFAULT_TEST_SHA,
+        trust_certificates={},  # Empty! No verifier certificate provided
+    )
+    assert evaluate_policy(pol_cov_85, ctx_no_cert).decision == PolicyDecisionType.DENY
+    assert CoverageTrustPredicate.is_trusted(ev, ctx_no_cert) is False
+
+    # 2. Fabricated certificate with is_verified=False -> DENY
+    cert_unverified = EvidenceTrustCertificate(
+        evidence_id=ev.evidence_id,
+        source_sha=DEFAULT_TEST_SHA,
+        is_verified=False,
+        digest_verified=True,
+        signature_verified=True,
+        provenance_verified=True,
+    )
+    ctx_unverified = PolicyEvaluationContext(
+        obligation=obl,
+        claims=(claim,),
+        evidence=(ev,),
+        expected_source_sha=DEFAULT_TEST_SHA,
+        trust_certificates={ev.evidence_id: cert_unverified},
+    )
+    assert evaluate_policy(pol_cov_85, ctx_unverified).decision == PolicyDecisionType.DENY
+    assert CoverageTrustPredicate.is_trusted(ev, ctx_unverified) is False
+
+    # 3. Fabricated certificate with signature_verified=False -> DENY
+    cert_bad_sig = EvidenceTrustCertificate(
+        evidence_id=ev.evidence_id,
+        source_sha=DEFAULT_TEST_SHA,
+        is_verified=True,
+        digest_verified=True,
+        signature_verified=False,
+        provenance_verified=True,
+    )
+    ctx_bad_sig = PolicyEvaluationContext(
+        obligation=obl,
+        claims=(claim,),
+        evidence=(ev,),
+        expected_source_sha=DEFAULT_TEST_SHA,
+        trust_certificates={ev.evidence_id: cert_bad_sig},
+    )
+    assert evaluate_policy(pol_cov_85, ctx_bad_sig).decision == PolicyDecisionType.DENY
+    assert CoverageTrustPredicate.is_trusted(ev, ctx_bad_sig) is False
 
 
 # ============================================================================
@@ -754,7 +894,6 @@ def test_adversarial_cryptographic_trust_suite():
 
 def test_cross_parameter_substitution_and_duplication_attacks():
     """Verify semantic matching rejects capability substitution, provider weakening, and duplication attacks."""
-    # 1. Capability substitution: Parent requires Cap A, Child tries to supply Cap B
     p_cap_a = Policy(
         "POL-CAP-A", PolicyScope.GLOBAL_ORGANIZATIONAL, 1,
         PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "PROPERTY_TESTING"}),))
@@ -766,7 +905,6 @@ def test_cross_parameter_substitution_and_duplication_attacks():
     with pytest.raises(PolicyWeakeningError, match="Cross-parameter substitution / omission attack"):
         meet_policies(p_cap_a, c_cap_b)
 
-    # 2. Multiple capabilities: Child supplies superset (Cap A + Cap B) -> Valid
     c_cap_ab = Policy(
         "POL-CAP-AB", PolicyScope.PROJECT, 1,
         PolicyExpression(CombinatorType.ALL, (
@@ -777,7 +915,6 @@ def test_cross_parameter_substitution_and_duplication_attacks():
     composed_ab = meet_policies(p_cap_a, c_cap_ab)
     assert len(composed_ab.expression.rules) == 2
 
-    # 3. Duplication attack: Child contains conflicting duplicates to dilute parent
     p_tier_3 = Policy(
         "POL-TIER-3", PolicyScope.GLOBAL_ORGANIZATIONAL, 1,
         PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_TIER, {"tier": "V2_BEHAVIORAL", "min_count": 3}),))
@@ -792,7 +929,6 @@ def test_cross_parameter_substitution_and_duplication_attacks():
     with pytest.raises(PolicyWeakeningError, match="Duplication weakening attack"):
         meet_policies(p_tier_3, c_tier_dup)
 
-    # 4. Independent providers weakening attack
     p_prov_2 = Policy(
         "POL-PROV-2", PolicyScope.GLOBAL_ORGANIZATIONAL, 1,
         PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_INDEPENDENT_PROVIDERS, {"min_independent_sources": 2, "group_by": "PROVIDER_TYPE"}),))
@@ -804,7 +940,6 @@ def test_cross_parameter_substitution_and_duplication_attacks():
     with pytest.raises(PolicyWeakeningError, match="Weakening / omission attack on independent providers"):
         meet_policies(p_prov_2, c_prov_1)
 
-    # 5. Min trials weakening attack
     p_tr_5 = Policy(
         "POL-TR-5", PolicyScope.GLOBAL_ORGANIZATIONAL, 1,
         PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_MIN_TRIALS, {"min_trials": 5}),))
@@ -816,7 +951,6 @@ def test_cross_parameter_substitution_and_duplication_attacks():
     with pytest.raises(PolicyWeakeningError, match="Weakening / omission attack on min_trials"):
         meet_policies(p_tr_5, c_tr_2)
 
-    # 6. Coverage weakening attack
     p_cov_90 = Policy(
         "POL-COV-90", PolicyScope.GLOBAL_ORGANIZATIONAL, 1,
         PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CODE_COVERAGE, {"min_coverage_pct": 90.0}),))
@@ -828,7 +962,6 @@ def test_cross_parameter_substitution_and_duplication_attacks():
     with pytest.raises(PolicyWeakeningError, match="Weakening / omission attack on code coverage"):
         meet_policies(p_cov_90, c_cov_80)
 
-    # 7. Staleness commits weakening attack (allowing more commits)
     p_st_5 = Policy(
         "POL-ST-5", PolicyScope.GLOBAL_ORGANIZATIONAL, 1,
         PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.MAX_STALENESS_COMMITS, {"max_commits": 5}),))
@@ -899,7 +1032,6 @@ def test_policy_stack_full_composition():
 
     composed = compose_policies(org_pol, proj_pol, task_pol)
     assert composed.scope_level == PolicyScope.TASK
-    # Verify merged tightening
     for r in composed.expression.rules:
         if r.rule_type == RuleType.REQUIRE_CODE_COVERAGE:
             assert r.parameters["min_coverage_pct"] == 90.0
@@ -930,8 +1062,8 @@ def test_conditional_expression_evaluation():
     pol = Policy("POL-COND", PolicyScope.PROJECT, 1, cond_expr)
 
     claim = make_test_claim(tier=ClaimTier.V2_BEHAVIORAL, status=ClaimStatus.SUPPORTED)
-    ctx_crit = PolicyEvaluationContext(obl_critical, (claim,), (), expected_source_sha=DEFAULT_TEST_SHA)
-    ctx_low = PolicyEvaluationContext(obl_low, (claim,), (), expected_source_sha=DEFAULT_TEST_SHA)
+    ctx_crit = make_test_context(obl_critical, (claim,), ())
+    ctx_low = make_test_context(obl_low, (claim,), ())
 
     assert evaluate_policy(pol, ctx_crit).decision == PolicyDecisionType.DENY
     assert evaluate_policy(pol, ctx_low).decision == PolicyDecisionType.ALLOW
@@ -944,10 +1076,10 @@ def test_evaluator_require_independent_providers():
 
     e1 = make_test_evidence(ev_id="EV-1", provider_id="prov-A", execution_id="EXEC-1")
     e2 = make_test_evidence(ev_id="EV-2", provider_id="prov-A", execution_id="EXEC-2")
-    ctx_same = PolicyEvaluationContext(obl, (claim,), (e1, e2), expected_source_sha=DEFAULT_TEST_SHA)
+    ctx_same = make_test_context(obl, (claim,), (e1, e2))
 
     e3 = make_test_evidence(ev_id="EV-3", provider_id="prov-B", execution_id="EXEC-3")
-    ctx_distinct = PolicyEvaluationContext(obl, (claim,), (e1, e3), expected_source_sha=DEFAULT_TEST_SHA)
+    ctx_distinct = make_test_context(obl, (claim,), (e1, e3))
 
     pol = Policy(
         "POL-INDEP", PolicyScope.PROJECT, 1,
@@ -967,7 +1099,7 @@ def test_evaluator_forbid_synthetic():
     claim = make_test_claim()
 
     e_synth = make_test_evidence(ev_id="EV-SYNTH", provider_id="synthetic-generator")
-    ctx_synth = PolicyEvaluationContext(obl, (claim,), (e_synth,), expected_source_sha=DEFAULT_TEST_SHA)
+    ctx_synth = make_test_context(obl, (claim,), (e_synth,))
 
     pol = Policy(
         "POL-FORBID-SYNTH", PolicyScope.PROJECT, 1,
@@ -983,7 +1115,7 @@ def test_evaluator_any_combinator():
     claim = make_test_claim()
     ev = make_test_evidence(capability="API_CONTRACT_FUZZING")
 
-    ctx = PolicyEvaluationContext(obl, (claim,), (ev,), expected_source_sha=DEFAULT_TEST_SHA)
+    ctx = make_test_context(obl, (claim,), (ev,))
 
     pol = Policy(
         "POL-ANY", PolicyScope.PROJECT, 1,
@@ -1005,7 +1137,7 @@ def test_evaluator_at_least_combinator():
     claim = make_test_claim()
     ev = make_test_evidence(capability="API_CONTRACT_FUZZING")
 
-    ctx = PolicyEvaluationContext(obl, (claim,), (ev,), expected_source_sha=DEFAULT_TEST_SHA)
+    ctx = make_test_context(obl, (claim,), (ev,))
 
     pol = Policy(
         "POL-AT-LEAST", PolicyScope.PROJECT, 1,
@@ -1056,8 +1188,8 @@ def test_evaluator_max_staleness_and_min_trials():
     ev_valid = make_test_evidence(capability="CODE_COVERAGE")
     ev_stale = make_test_evidence(ev_id="EV-STALE", validity=EvidenceValidity.STALE)
 
-    ctx_fresh = PolicyEvaluationContext(obl, (claim,), (ev_valid,), expected_source_sha=DEFAULT_TEST_SHA)
-    ctx_stale = PolicyEvaluationContext(obl, (claim,), (ev_stale,), expected_source_sha=DEFAULT_TEST_SHA)
+    ctx_fresh = make_test_context(obl, (claim,), (ev_valid,))
+    ctx_stale = make_test_context(obl, (claim,), (ev_stale,))
 
     pol_stale = Policy(
         "POL-STALE", PolicyScope.PROJECT, 1,
@@ -1077,7 +1209,7 @@ def test_evaluator_exception_mismatch_and_type_errors():
     """Verify exception mismatch and evaluator type checking."""
     obl = make_test_obligation(obl_id="OBL-001")
     exc_wrong = make_test_exception(obl_id="OBL-OTHER")
-    ctx = PolicyEvaluationContext(obl, (), (), (exc_wrong,), expected_source_sha=DEFAULT_TEST_SHA)
+    ctx = make_test_context(obl, (), (), exceptions=(exc_wrong,))
     pol = Policy("POL-1", PolicyScope.PROJECT, 1, PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),)))
 
     with pytest.raises(InvalidExceptionError, match="Exception obligation mismatch"):

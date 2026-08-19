@@ -121,7 +121,7 @@ class PolicyDecision:
 
 @dataclass(frozen=True)
 class EvidenceTrustCertificate:
-    """Cryptographic trust certificate produced by an authoritative verifier and consumed by D3."""
+    """Cryptographic trust certificate produced by an authoritative verifier (e.g. Gate 3) and consumed by D3."""
     evidence_id: str
     source_sha: str
     is_verified: bool
@@ -134,7 +134,7 @@ class EvidenceTrustCertificate:
 
 @dataclass(frozen=True)
 class PolicyEvaluationContext:
-    """Immutable evaluation context capturing target obligation, claims, evidence, and exact revision binding."""
+    """Immutable evaluation context capturing target obligation, claims, evidence, trust certificates, and exact revision binding."""
     obligation: Obligation
     claims: Tuple[Claim, ...]
     evidence: Tuple[Evidence, ...]

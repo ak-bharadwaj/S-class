@@ -24,11 +24,6 @@ from policy.lattice import (
     verify_and_merge_rules,
     verify_non_weakening_rule,
 )
-from policy.verifier import (
-    compute_canonical_evidence_digest,
-    compute_evidence_hmac,
-    verify_evidence_authenticity,
-)
 from policy.evaluator import (
     CoverageTrustPredicate,
     evaluate_rule,
@@ -60,9 +55,6 @@ __all__ = [
     "verify_and_merge_rules",
     "verify_non_weakening_rule",
     "CoverageTrustPredicate",
-    "compute_canonical_evidence_digest",
-    "compute_evidence_hmac",
-    "verify_evidence_authenticity",
     "evaluate_rule",
     "evaluate_expression",
     "evaluate_policy",
