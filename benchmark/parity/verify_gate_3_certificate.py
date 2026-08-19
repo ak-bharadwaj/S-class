@@ -2,6 +2,7 @@
 S-Class EOS V11.2 - Schemathesis Gate 3 Certificate Verifier (D0 Keyed Specification).
 Single-source verifier validating Gate 3 Parity Certificates against authoritative source SHA,
 pinned dependency versions, keyed HMAC-SHA256 digests, and cryptographic provenance hash chains.
+Contains no hardcoded secrets; verification key is acquired through controlled trust boundary.
 """
 
 import os
@@ -12,129 +13,18 @@ import hmac
 import argparse
 from typing import Any, Dict, Optional
 
-GATE3_AUTHORITY_IDENTITY = "Gate3AuthoritativeVerifier"
-GATE3_DEFAULT_SECRET = "GATE3_D0_KEYED_HMAC_AUTHENTICATION_SECRET_2026"
 TRUSTED_VERIFIER_IDENTITIES = frozenset({"PARITY-GATE-3", "Gate3AuthoritativeVerifier", "Gate3EvidenceVerifier"})
 
 
-def compute_gate3_evidence_digest(evidence: Any) -> str:
-    """Computes the authoritative RFC 8785 / JCS canonical digest for an Evidence item."""
-    from events.serializer import canonicalize_json
-    payload = {
-        "evidence_id": evidence.evidence_id,
-        "claim_id": evidence.claim_id,
-        "provider_id": evidence.provider_id,
-        "capability": evidence.capability,
-        "execution_id": evidence.execution_id,
-        "source_sha": evidence.source_sha,
-        "observation": {
-            "raw_status": evidence.observation.raw_status.value if hasattr(evidence.observation.raw_status, "value") else str(evidence.observation.raw_status),
-            "diagnostics": list(evidence.observation.diagnostics),
-            "counterexample": evidence.observation.counterexample,
-        },
-        "provenance": {
-            "engine_name": evidence.provenance.engine_name,
-            "engine_version": evidence.provenance.engine_version,
-            "environment_hash": evidence.provenance.environment_hash,
-            "timestamp": evidence.provenance.timestamp,
-        },
-    }
-    canonical_bytes = canonicalize_json(payload)
-    return hashlib.sha256(canonical_bytes).hexdigest()
-
-
-def issue_gate_3_evidence_certificate(
-    evidence: Any,
-    expected_source_sha: str,
-    secret_key: str = GATE3_DEFAULT_SECRET,
-    verifier_identity: str = GATE3_AUTHORITY_IDENTITY,
-) -> Any:
-    """Gate 3 Authority: Produces an authentic, signed EvidenceTrustCertificate."""
-    from events.serializer import canonicalize_json
-    from policy.models import EvidenceTrustCertificate
-
-    timestamp_iso = "2026-08-19T10:00:00Z"
-    
-    if not expected_source_sha or evidence.source_sha != expected_source_sha:
-        cert_data = {
-            "evidence_id": evidence.evidence_id,
-            "source_sha": evidence.source_sha,
-            "is_verified": False,
-            "digest_verified": False,
-            "signature_verified": False,
-            "provenance_verified": False,
-            "verifier_identity": verifier_identity,
-            "timestamp": timestamp_iso,
-        }
-        canonical_bytes = canonicalize_json(cert_data)
-        cert_hash = hashlib.sha256(canonical_bytes).hexdigest()
-        issuer_sig = hmac.new(secret_key.encode("utf-8"), canonical_bytes, hashlib.sha256).hexdigest()
-        return EvidenceTrustCertificate(
-            evidence_id=evidence.evidence_id,
-            source_sha=evidence.source_sha,
-            is_verified=False,
-            digest_verified=False,
-            signature_verified=False,
-            provenance_verified=False,
-            verifier_identity=verifier_identity,
-            timestamp=timestamp_iso,
-            certificate_hash=cert_hash,
-            issuer_signature=issuer_sig,
-            rejection_reason="Source revision mismatch or missing.",
-        )
-
-    computed_digest = compute_gate3_evidence_digest(evidence)
-    claimed_digest = getattr(evidence.signature, "raw_stdout_digest", None)
-    digest_verified = (claimed_digest == computed_digest)
-
-    claimed_sig = getattr(evidence.signature, "signature_hex", None)
-    expected_hmac = hmac.new(secret_key.encode("utf-8"), computed_digest.encode("utf-8"), hashlib.sha256).hexdigest()
-    signature_verified = bool(claimed_sig and hmac.compare_digest(claimed_sig, expected_hmac))
-
-    prov = evidence.provenance
-    provenance_verified = bool(
-        prov
-        and prov.engine_name
-        and not any(f in prov.engine_name.lower() for f in ["synthetic", "simulation", "untrusted"])
-        and prov.environment_hash
-        and len(prov.environment_hash) == 64
-        and prov.timestamp
-    )
-
-    is_verified = (digest_verified and signature_verified and provenance_verified)
-
-    cert_data = {
-        "evidence_id": evidence.evidence_id,
-        "source_sha": evidence.source_sha,
-        "is_verified": is_verified,
-        "digest_verified": digest_verified,
-        "signature_verified": signature_verified,
-        "provenance_verified": provenance_verified,
-        "verifier_identity": verifier_identity,
-        "timestamp": timestamp_iso,
-    }
-    canonical_bytes = canonicalize_json(cert_data)
-    cert_hash = hashlib.sha256(canonical_bytes).hexdigest()
-    issuer_sig = hmac.new(secret_key.encode("utf-8"), canonical_bytes, hashlib.sha256).hexdigest()
-
-    return EvidenceTrustCertificate(
-        evidence_id=evidence.evidence_id,
-        source_sha=evidence.source_sha,
-        is_verified=is_verified,
-        digest_verified=digest_verified,
-        signature_verified=signature_verified,
-        provenance_verified=provenance_verified,
-        verifier_identity=verifier_identity,
-        timestamp=timestamp_iso,
-        certificate_hash=cert_hash,
-        issuer_signature=issuer_sig,
-    )
+def get_gate3_verification_key() -> Optional[str]:
+    """Retrieves verification key from controlled trust boundary (environment / keystore)."""
+    return os.environ.get("GATE3_AUTHORITY_SECRET") or os.environ.get("SCLASS_GATE3_KEY")
 
 
 def verify_gate_3_evidence_trust_certificate(
     cert: Any,
     expected_source_sha: Optional[str] = None,
-    secret_key: str = GATE3_DEFAULT_SECRET,
+    verification_key: Optional[str] = None,
 ) -> bool:
     """Strictly validates an EvidenceTrustCertificate against the Gate 3 Authority."""
     from events.serializer import canonicalize_json
@@ -153,6 +43,11 @@ def verify_gate_3_evidence_trust_certificate(
         return False
 
     if expected_source_sha is not None and cert.source_sha != expected_source_sha:
+        return False
+
+    key = verification_key or get_gate3_verification_key()
+    if not key:
+        # Fails closed if verification key is absent from the trust boundary
         return False
 
     # 1. Canonical JCS byte representation of certificate fields
@@ -177,7 +72,7 @@ def verify_gate_3_evidence_trust_certificate(
         return False
 
     # 3. Verify Gate-3 keyed HMAC issuer signature / seal
-    expected_sig = hmac.new(secret_key.encode("utf-8"), canonical_bytes, hashlib.sha256).hexdigest()
+    expected_sig = hmac.new(key.encode("utf-8"), canonical_bytes, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(cert.issuer_signature, expected_sig):
         return False
 
