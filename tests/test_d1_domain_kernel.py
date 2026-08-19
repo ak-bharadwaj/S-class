@@ -4,10 +4,11 @@ Validates:
 1. Canonical pure domain models (Task, Obligation, Claim, Policy, Evidence, Assessment, Event).
 2. Deep immutability and defensive isolation on dict/list/set-like nested payloads (MappingProxyType / tuples).
 3. Declaration-order deterministic scheduling matching OpenSpec properties.
-4. Exact compatibility of FrontierSnapshot with D0 WorkerContext Draft-2020-12 schema (including executable_obligation_ids).
-5. O(V + E) linear DAG traversal without pop(0) / repeated sorting.
-6. Large-DAG performance benchmark (1,000 nodes, multi-tier dependency chains).
-7. Comprehensive adversarial DAG scenarios:
+4. Non-authorization boundary: READY != EXECUTABLE in pure D1 domain until Policy/Controller authorization exists.
+5. Exact compatibility of FrontierSnapshot with D0 WorkerContext Draft-2020-12 schema (including executable_obligation_ids).
+6. O(V + E) linear DAG traversal without pop(0) / repeated sorting.
+7. Large-DAG performance benchmark (1,000 nodes, multi-tier dependency chains).
+8. Comprehensive adversarial DAG scenarios:
    - Duplicate IDs (DuplicateObligationError)
    - Missing dependency references (MissingDependencyError)
    - Self-cycles, 2-node cycles, multi-node cycles, disconnected cycles (CyclicDependencyError)
@@ -390,7 +391,6 @@ def test_collections_inside_models_are_defensively_copied():
 def test_dag_preserves_declaration_order_on_simultaneous_ready_queries():
     """Verify declaration-order preservation for simultaneous ready obligations."""
     graph = ObligationGraph(task_id="TASK-001")
-    # Add obligations in deliberate non-alphabetical declaration order
     declaration_sequence = ("OBL-ZETA", "OBL-ALPHA", "OBL-GAMMA", "OBL-BETA")
     for obl_id in declaration_sequence:
         graph.add_obligation(make_valid_obligation(obligation_id=obl_id, depends_on=()))
@@ -402,11 +402,9 @@ def test_dag_preserves_declaration_order_on_simultaneous_ready_queries():
 def test_dag_preserves_declaration_order_in_topological_sort_ties():
     """Verify Kahn's topological sort preserves declaration order when breaking ties among ready nodes."""
     graph = ObligationGraph(task_id="TASK-001")
-    # Tier 0: Roots in declaration order [OBL-ROOT-2, OBL-ROOT-1]
     graph.add_obligation(make_valid_obligation(obligation_id="OBL-ROOT-2", depends_on=()))
     graph.add_obligation(make_valid_obligation(obligation_id="OBL-ROOT-1", depends_on=()))
 
-    # Tier 1: Children in declaration order [OBL-CHILD-B, OBL-CHILD-A]
     graph.add_obligation(make_valid_obligation(obligation_id="OBL-CHILD-B", depends_on=("OBL-ROOT-2", "OBL-ROOT-1")))
     graph.add_obligation(make_valid_obligation(obligation_id="OBL-CHILD-A", depends_on=("OBL-ROOT-2", "OBL-ROOT-1")))
 
@@ -415,8 +413,28 @@ def test_dag_preserves_declaration_order_in_topological_sort_ties():
 
 
 # ============================================================================
-# 4. FrontierSnapshot Compatibility with D0 WorkerContext Schema
+# 4. Non-Authorization Boundary: READY != EXECUTABLE in Pure D1
 # ============================================================================
+
+def test_ready_does_not_equal_executable_in_d1_pure_domain():
+    """Verify D1 establishes structural readiness only; executable is empty without Policy/Controller authorization."""
+    graph = ObligationGraph(task_id="TASK-001")
+    obl1 = make_valid_obligation(obligation_id="OBL-001", status=ObligationStatus.OPEN)
+    obl2 = make_valid_obligation(obligation_id="OBL-002", status=ObligationStatus.OPEN)
+    graph.add_obligation(obl1).add_obligation(obl2)
+
+    # In pure D1 domain without policy/controller authorization, ready has nodes but executable is strictly empty
+    frontier = graph.get_frontier()
+    assert frontier.ready_obligation_ids == ("OBL-001", "OBL-002")
+    assert frontier.executable_obligation_ids == ()
+    assert frontier.ready_obligation_ids != frontier.executable_obligation_ids
+
+    # When explicit authorization filter is passed (simulating D3/D5 controller token issuance):
+    # Authorized IDs must be filtered to structurally ready nodes in declaration order
+    auth_frontier = graph.get_frontier(authorized_executable_ids=["OBL-002"])
+    assert auth_frontier.ready_obligation_ids == ("OBL-001", "OBL-002")
+    assert auth_frontier.executable_obligation_ids == ("OBL-002",)
+
 
 def test_frontier_snapshot_matches_d0_worker_context_schema():
     """Verify FrontierSnapshot structure conforms exactly to D0 WorkerContext $defs/FrontierSnapshot Draft-2020-12 schema."""
@@ -427,11 +445,11 @@ def test_frontier_snapshot_matches_d0_worker_context_schema():
 
     frontier = graph.get_frontier()
 
-    # In D1, executable_obligation_ids must be present
+    # In D1, executable_obligation_ids is present and compliant
     assert hasattr(frontier, "executable_obligation_ids")
-    assert frontier.executable_obligation_ids == ("OBL-A",)
     assert frontier.ready_obligation_ids == ("OBL-A",)
     assert frontier.blocked_obligation_ids == ("OBL-B",)
+    assert frontier.executable_obligation_ids == ()
 
     frontier_dict = frontier.to_dict()
     assert "ready_obligation_ids" in frontier_dict
@@ -439,7 +457,6 @@ def test_frontier_snapshot_matches_d0_worker_context_schema():
     assert "executable_obligation_ids" in frontier_dict
     assert "satisfied_obligation_ids" not in frontier_dict  # Strict additionalProperties: false compliance
 
-    # Validate against actual specification schema
     frontier_schema = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
@@ -555,11 +572,9 @@ def test_dag_topological_sort_diamond_graph():
     oblC = make_valid_obligation(obligation_id="OBL-C", depends_on=("OBL-A",))
     oblD = make_valid_obligation(obligation_id="OBL-D", depends_on=("OBL-B", "OBL-C"))
 
-    # Declaration order: D, B, A, C
     graph.add_obligation(oblD).add_obligation(oblB).add_obligation(oblA).add_obligation(oblC)
 
     order = [o.obligation_id for o in graph.get_dependency_order()]
-    # Root OBL-A must come first, followed by children in declaration order B, C, then D
     assert order == ["OBL-A", "OBL-B", "OBL-C", "OBL-D"]
 
 
@@ -582,7 +597,6 @@ def test_large_dag_linear_traversal_performance():
             if tier == 0:
                 deps = ()
             else:
-                # Depend on previous tier nodes (2 edges per node)
                 dep1 = f"OBL-T{tier-1:03d}-N{idx:02d}"
                 dep2 = f"OBL-T{tier-1:03d}-N{(idx+1)%nodes_per_tier:02d}"
                 deps = (dep1, dep2)
@@ -590,7 +604,6 @@ def test_large_dag_linear_traversal_performance():
             graph.add_obligation(make_valid_obligation(obligation_id=node_id, task_id="TASK-PERF", depends_on=deps))
             total_nodes += 1
 
-    build_time = time.perf_counter() - t0_build
     assert total_nodes == 1000
 
     # Benchmark validation & topological sort
@@ -599,7 +612,6 @@ def test_large_dag_linear_traversal_performance():
     topo_time = time.perf_counter() - t0_topo
 
     assert len(order) == 1000
-    # Traversal of 1,000 nodes and ~1,800 edges must execute under 50ms in Python
     assert topo_time < 0.05, f"Topological sort took too long: {topo_time:.4f}s"
 
     # Benchmark Frontier derivation
@@ -609,4 +621,5 @@ def test_large_dag_linear_traversal_performance():
 
     assert len(frontier.ready_obligation_ids) == 10  # Tier 0 nodes
     assert len(frontier.blocked_obligation_ids) == 990  # Remaining tiers
+    assert len(frontier.executable_obligation_ids) == 0  # Zero authorization in pure D1
     assert frontier_time < 0.05, f"Frontier calculation took too long: {frontier_time:.4f}s"
