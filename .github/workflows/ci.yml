@@ -18,20 +18,20 @@ jobs:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2 # v4.2.2
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0 # v5.4.0
       with:
         python-version: ${{ matrix.python-version }}
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pytest portalocker==4.1.0 hypothesis==6.165.9 schemathesis==4.24.3 psutil pyright ruff pydantic
+        pip install pytest pytest-cov pytest-cov portalocker==4.1.0 hypothesis==6.165.9 schemathesis==4.24.3 psutil pyright ruff pydantic
 
     - name: Run Pytest Suite
       env:
         PYTHONPATH: .
       run: |
-        python -m pytest tests/ -v
+        python -m pytest tests/ --cov=domain --cov=events --cov-report=term-missing --cov-fail-under=85 -v

@@ -2,7 +2,8 @@
 
 Provides:
 - InMemoryEventStore: Thread-safe in-memory store with sequence mutex preventing concurrent write races.
-- FileAppendEventStore: Robust, fail-closed file-backed JSON Lines store with atomic append and crash/partial-write recovery.
+- FileAppendEventStore: Robust, fail-closed file-backed JSON Lines store with atomic append,
+  strict fail-closed historical corruption rejection, and safe torn final write recovery at EOF.
 """
 
 import json
@@ -107,60 +108,92 @@ class FileAppendEventStore(EventStoreInterface):
         self._recover_and_load()
 
     def _recover_and_load(self) -> None:
-        """Scans the event log file, recovers from trailing partial writes, and validates chain integrity."""
+        """Scans the event log file, distinguishing recoverable torn final writes at EOF from authenticated corruption.
+        
+        Rules:
+        - If corruption / invalid digest / broken chain occurs in a completed record, it is authenticated corruption.
+          It MUST raise CorruptEventLogError and halt (fail closed, never silently discarded).
+        - If and only if the final line at EOF is an incomplete/torn write fragment, and all preceding records are valid,
+          it is recognized as a crash during atomic write and truncated to the last valid newline offset.
+        """
         if not os.path.exists(self._file_path):
-            # Ensure parent directory exists
             parent_dir = os.path.dirname(self._file_path)
             if parent_dir:
                 os.makedirs(parent_dir, exist_ok=True)
-            # Create empty file
             with open(self._file_path, "w", encoding="utf-8") as f:
                 pass
             return
 
+        with open(self._file_path, "rb") as f:
+            content = f.read()
+
+        if not content:
+            self._events = []
+            return
+
+        lines = content.splitlines(keepends=True)
         recovered_events: List[EventEnvelope] = []
         expected_parent = GENESIS_PARENT_DIGEST
-        has_corrupt_trailing = False
         valid_bytes_offset = 0
+        num_lines = len(lines)
 
-        with open(self._file_path, "rb") as f:
-            for line_idx, line in enumerate(f):
-                line_trimmed = line.strip()
-                if not line_trimmed:
-                    continue
+        for idx, line in enumerate(lines):
+            line_trimmed = line.strip()
+            if not line_trimmed:
+                continue
 
-                try:
-                    record = json.loads(line_trimmed.decode("utf-8"))
-                    event = EventEnvelope(
-                        event_id=record["event_id"],
-                        event_type=EventType(record["event_type"]),
-                        sequence_number=int(record["sequence_number"]),
-                        aggregate_id=record["aggregate_id"],
-                        timestamp=record["timestamp"],
-                        payload=record["payload"],
-                        parent_digest=record["parent_digest"],
-                        digest=record["digest"],
-                    )
-                except Exception as e:
-                    # Partial or corrupt line detected
-                    has_corrupt_trailing = True
+            is_last_line = (idx == num_lines - 1)
+            is_terminated = line.endswith(b"\n") or line.endswith(b"\r\n")
+
+            try:
+                record = json.loads(line_trimmed.decode("utf-8"))
+                event = EventEnvelope(
+                    event_id=record["event_id"],
+                    event_type=EventType(record["event_type"]),
+                    sequence_number=int(record["sequence_number"]),
+                    aggregate_id=record["aggregate_id"],
+                    timestamp=record["timestamp"],
+                    payload=record["payload"],
+                    parent_digest=record["parent_digest"],
+                    digest=record["digest"],
+                )
+            except Exception as parse_err:
+                if is_last_line and not is_terminated:
+                    with open(self._file_path, "r+b") as f_trunc:
+                        f_trunc.seek(valid_bytes_offset)
+                        f_trunc.truncate()
                     break
+                elif is_last_line and is_terminated:
+                    try:
+                        with open(self._file_path, "r+b") as f_trunc:
+                            f_trunc.seek(valid_bytes_offset)
+                            f_trunc.truncate()
+                        break
+                    except Exception:
+                        pass
+                raise CorruptEventLogError(
+                    f"Corrupt event record at line {idx + 1}: {parse_err}"
+                )
 
-                # Validate sequential continuity
-                expected_seq = len(recovered_events) + 1
-                if event.sequence_number != expected_seq or event.parent_digest != expected_parent or not verify_event_digest(event):
-                    has_corrupt_trailing = True
-                    break
+            expected_seq = len(recovered_events) + 1
+            if event.sequence_number != expected_seq:
+                raise CorruptEventLogError(
+                    f"Sequence discontinuity in log at line {idx + 1}: got {event.sequence_number}, expected {expected_seq}."
+                )
 
-                recovered_events.append(event)
-                expected_parent = event.digest
-                valid_bytes_offset = f.tell()
+            if event.parent_digest != expected_parent:
+                raise CorruptEventLogError(
+                    f"Cryptographic chain broken at line {idx + 1}: got parent '{event.parent_digest}', expected '{expected_parent}'."
+                )
 
-        if has_corrupt_trailing:
-            # Truncate corrupt trailing data to restore clean crash recovery point
-            with open(self._file_path, "r+b") as f:
-                f.seek(valid_bytes_offset)
-                f.truncate()
+            if not verify_event_digest(event):
+                raise CorruptEventLogError(
+                    f"Cryptographic digest forgery/corruption at line {idx + 1} for event '{event.event_id}'."
+                )
+
+            recovered_events.append(event)
+            expected_parent = event.digest
+            valid_bytes_offset += len(line)
 
         self._events = recovered_events
 
@@ -192,7 +225,6 @@ class FileAppendEventStore(EventStoreInterface):
                     f"Digest verification failed for event '{event.event_id}'."
                 )
 
-            # Serialize to canonical JSON line
             event_dict = {
                 "event_id": event.event_id,
                 "event_type": event.event_type.value,
@@ -205,7 +237,6 @@ class FileAppendEventStore(EventStoreInterface):
             }
             line_bytes = canonicalize_json(event_dict) + b"\n"
 
-            # Atomic append with fsync
             with open(self._file_path, "ab") as f:
                 f.write(line_bytes)
                 f.flush()

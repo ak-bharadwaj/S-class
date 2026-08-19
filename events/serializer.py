@@ -1,14 +1,17 @@
-"""RFC 8785 / JCS Canonical JSON Serialization and SHA-256 Digest Engine for D2.
+"""RFC 8785 (JSON Canonicalization Scheme / JCS) Serializer and SHA-256 Engine.
 
-Provides:
-- RFC 8785 canonical JSON byte serialization.
-- Canonical event preimage generation (excluding digest).
-- Deterministic SHA-256 event digest computation.
-- Canonical event factory and cryptographic verification.
+Implements standard-compliant RFC 8785 JSON Canonicalization:
+1. Whitespace: zero whitespace outside strings (compact tokens).
+2. Numbers: IEEE 754 double precision without trailing .0 and with ECMAScript exponent formatting.
+3. Strings: UTF-8 with strict control character escaping (\b, \t, \n, \f, \r, \u0000..\u001f);
+   forward slash / and raw Unicode characters are NOT escaped.
+4. Object Keys: strictly sorted lexicographically by UTF-16 code units (key.encode('utf-16-be')).
+5. SHA-256 event digest computation and verification over canonical preimage bytes.
 """
 
 import hashlib
-import json
+import math
+import re
 from typing import Any, Mapping
 from types import MappingProxyType
 
@@ -17,33 +20,72 @@ from domain.types import EventType
 from events.exceptions import DigestMismatchError
 
 
-def _canonicalize_obj(obj: Any) -> Any:
-    """Recursively converts mapping proxies, tuples, and custom structures into canonical JSON primitives."""
-    if isinstance(obj, (dict, MappingProxyType)):
-        return {str(k): _canonicalize_obj(v) for k, v in obj.items()}
+_ESCAPE_MAP = {
+    0x08: b"\\b",
+    0x09: b"\\t",
+    0x0A: b"\\n",
+    0x0C: b"\\f",
+    0x0D: b"\\r",
+    0x22: b'\\"',
+    0x5C: b"\\\\",
+}
+for i in range(0x20):
+    if i not in _ESCAPE_MAP:
+        _ESCAPE_MAP[i] = f"\\u{i:04x}".encode("ascii")
+
+_ESCAPE_RE = re.compile(r'[\x00-\x1f"\\]')
+
+
+def _canonical_encode_value(obj: Any) -> bytes:
+    """Recursively serializes any Python object according to RFC 8785 rules."""
+    if obj is None:
+        return b"null"
+    elif isinstance(obj, bool):
+        return b"true" if obj else b"false"
+    elif isinstance(obj, int):
+        return str(obj).encode("ascii")
+    elif isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            raise ValueError("NaN and Infinity are not permitted in RFC 8785 JSON.")
+        if obj == 0.0:
+            return b"0"
+        if obj.is_integer() and abs(obj) < 1e21:
+            return str(int(obj)).encode("ascii")
+        s = f"{obj:.16g}".replace("e+", "e")
+        return s.encode("ascii")
+    elif isinstance(obj, str):
+        if not _ESCAPE_RE.search(obj):
+            return b'"' + obj.encode("utf-8") + b'"'
+        buf = bytearray(b'"')
+        for ch in obj:
+            cp = ord(ch)
+            if cp in _ESCAPE_MAP:
+                buf.extend(_ESCAPE_MAP[cp])
+            else:
+                buf.extend(ch.encode("utf-8"))
+        buf.append(ord('"'))
+        return bytes(buf)
     elif isinstance(obj, (list, tuple, set, frozenset)):
-        return [_canonicalize_obj(item) for item in obj]
+        return b"[" + b",".join(_canonical_encode_value(item) for item in obj) + b"]"
+    elif isinstance(obj, (dict, MappingProxyType)):
+        sorted_keys = sorted(obj.keys(), key=lambda k: str(k).encode("utf-16-be"))
+        parts = []
+        for k in sorted_keys:
+            k_bytes = _canonical_encode_value(str(k))
+            v_bytes = _canonical_encode_value(obj[k])
+            parts.append(k_bytes + b":" + v_bytes)
+        return b"{" + b",".join(parts) + b"}"
     elif isinstance(obj, EventType):
-        return obj.value
-    return obj
+        return _canonical_encode_value(obj.value)
+    elif hasattr(obj, "__dict__"):
+        return _canonical_encode_value(obj.__dict__)
+    else:
+        return _canonical_encode_value(str(obj))
 
 
 def canonicalize_json(data: Any) -> bytes:
-    """Serializes arbitrary JSON-serializable structure to RFC 8785 / JCS canonical UTF-8 bytes.
-    
-    Rules:
-    - Object keys sorted lexicographically.
-    - Compact separators (',' and ':') with zero extraneous whitespace.
-    - UTF-8 encoding without ASCII escapes for non-ASCII characters.
-    """
-    clean_data = _canonicalize_obj(data)
-    json_str = json.dumps(
-        clean_data,
-        sort_keys=True,
-        ensure_ascii=False,
-        separators=(",", ":"),
-    )
-    return json_str.encode("utf-8")
+    """Serializes arbitrary data to standard-compliant RFC 8785 / JCS canonical UTF-8 bytes."""
+    return _canonical_encode_value(data)
 
 
 def compute_event_preimage(

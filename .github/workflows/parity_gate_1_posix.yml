@@ -15,13 +15,13 @@ jobs:
 
     steps:
     - name: Checkout S-Class Plugin Repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2 # v4.2.2
       with:
         fetch-depth: 0
         submodules: false
 
     - name: Set up Python 3.12
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0 # v5.4.0
       with:
         python-version: "3.12"
 
@@ -51,7 +51,7 @@ jobs:
         python -m benchmark.parity.verify_certificate --certificate benchmark/parity/gate_1_parity_certificate_posix.json --expected-sha ${{ github.sha }}
 
     - name: Upload Immutable Parity Certificate and Raw Results
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb99ba841c # v4.6.1 # v4.6.1
       if: always()
       with:
         name: oss-parity-gate-1-posix-${{ github.sha }}

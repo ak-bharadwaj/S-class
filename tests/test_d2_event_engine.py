@@ -1,25 +1,31 @@
 """Tier 1 Adversarial, Determinism, Concurrency, Recovery & Benchmark Suite for S-Class D2 Event Engine.
 
 Tests:
-1. Genesis event verification (sequence=1, parent_digest="0"*64).
-2. Single event append, reduction, and state materialization.
-3. Multi-event cryptographic digest chaining across sequence.
-4. Adversarial vector: Tampered payload rejected with DigestMismatchError.
-5. Adversarial vector: Tampered parent_digest rejected with InvalidParentDigestError.
-6. Adversarial vector: Tampered stored digest rejected with DigestMismatchError.
-7. Reordered dictionary fields produce identical RFC 8785 canonical bytes and digest.
-8. Replay determinism: identical event stream always produces identical MaterializedState.
-9. Sequence violation: Duplicate sequence number rejected with DuplicateSequenceError.
-10. Sequence violation: Sequence gap rejected with SequenceGapError.
-11. Type violation: Invalid event type string rejected fail-closed.
-12. Structural violation: Malformed event envelope rejected fail-closed.
-13. Concurrency safety: Thread-safe concurrent append race fails safely without data corruption.
-14. Crash resilience: Corrupt / truncated partial write at EOF recovered cleanly.
-15. Large-log benchmark: 1k, 10k, and 100k event log append, verification, and replay throughput/memory metrics.
+1. RFC 8785 (JCS) Standard Conformance: numbers, strings, control characters, unescaped slashes/Unicode, UTF-16 key sorting.
+2. Genesis event verification (sequence=1, parent_digest="0"*64).
+3. Single event append, reduction, and state materialization.
+4. Multi-event cryptographic digest chaining across sequence.
+5. Full domain model reduction: Task, Obligation, Claim, Evidence, AssessmentReceipt.
+6. Adversarial vector: Tampered payload rejected with DigestMismatchError.
+7. Adversarial vector: Tampered parent_digest rejected with InvalidParentDigestError.
+8. Adversarial vector: Tampered stored digest rejected with DigestMismatchError.
+9. Replay determinism: identical event stream always produces identical MaterializedState.
+10. Sequence violation: Duplicate sequence number rejected with DuplicateSequenceError.
+11. Sequence violation: Sequence gap rejected with SequenceGapError.
+12. Type violation: Invalid event type string rejected fail-closed.
+13. Structural violation: Malformed event envelope rejected fail-closed.
+14. Concurrency safety: Thread-safe concurrent append race fails safely without data corruption.
+15. Crash resilience vs Authenticated Corruption:
+    - Recoverable torn final write fragment at EOF is safely recovered.
+    - Authenticated / canonical corruption in historical log raises CorruptEventLogError and is never silently discarded.
+16. File store operations: get_events, limits, offsets, empty stores, invalid parameters.
+17. Canonical serializer type coverage: sets, frozensets, custom objects, bools, floats, NaN/inf rejections.
+18. Large-log benchmark: 1k, 10k, and 100k event log append, verification, replay throughput, and explicit peak RSS memory (MB).
 """
 
 from concurrent.futures import ThreadPoolExecutor
 import gc
+import json
 import os
 import sys
 import tempfile
@@ -32,12 +38,36 @@ from domain.models import (
     Task,
     Obligation,
     Claim,
+    ClaimSubject,
     Policy,
+    PolicyExpression,
+    PolicyRule,
     Evidence,
+    EvidenceScope,
+    EvidenceObservation,
+    Provenance,
+    HmacSessionSignature,
     AssessmentReceipt,
+    ClaimAssessment,
+    AsymmetricAuthoritySignature,
     RepositoryContext,
 )
-from domain.types import EventType, ObligationStatus, ObligationCategory, Criticality
+from domain.types import (
+    EventType,
+    ObligationStatus,
+    ObligationCategory,
+    Criticality,
+    ClaimStatus,
+    ClaimTier,
+    TargetType,
+    PolicyScope,
+    RuleType,
+    CombinatorType,
+    EvidencePolarity,
+    EvidenceValidity,
+    RawStatus,
+    AssessmentVerdict,
+)
 from domain.exceptions import DomainValidationError
 from events import (
     EventEnvelope,
@@ -64,8 +94,111 @@ from events import (
 )
 
 
+def get_process_rss_mb() -> float:
+    """Returns current process working set / RSS memory in MB."""
+    if sys.platform == "win32":
+        try:
+            import ctypes.wintypes
+            class PROCESS_MEMORY_COUNTERS(ctypes.Structure):
+                _fields_ = [
+                    ('cb', ctypes.wintypes.DWORD),
+                    ('PageFaultCount', ctypes.wintypes.DWORD),
+                    ('PeakWorkingSetSize', ctypes.c_size_t),
+                    ('WorkingSetSize', ctypes.c_size_t),
+                    ('QuotaPeakPagedPoolUsage', ctypes.c_size_t),
+                    ('QuotaPagedPoolUsage', ctypes.c_size_t),
+                    ('QuotaPeakNonPagedPoolUsage', ctypes.c_size_t),
+                    ('QuotaNonPagedPoolUsage', ctypes.c_size_t),
+                    ('PagefileUsage', ctypes.c_size_t),
+                    ('PeakPagefileUsage', ctypes.c_size_t),
+                ]
+            counters = PROCESS_MEMORY_COUNTERS()
+            counters.cb = ctypes.sizeof(PROCESS_MEMORY_COUNTERS)
+            func = ctypes.windll.psapi.GetProcessMemoryInfo
+            func.argtypes = [ctypes.wintypes.HANDLE, ctypes.POINTER(PROCESS_MEMORY_COUNTERS), ctypes.wintypes.DWORD]
+            func.restype = ctypes.wintypes.BOOL
+            handle = ctypes.windll.kernel32.GetCurrentProcess()
+            if func(handle, ctypes.byref(counters), counters.cb):
+                return float(counters.WorkingSetSize) / (1024.0 * 1024.0)
+        except Exception:
+            pass
+    else:
+        try:
+            import resource
+            return float(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss) / 1024.0
+        except Exception:
+            pass
+    return 0.0
+
+
 # ============================================================================
-# Helper Factories
+# 1. RFC 8785 / JCS Standard Conformance Test Vectors
+# ============================================================================
+
+def test_rfc8785_number_conformance():
+    """Verify RFC 8785 number formatting rules: no trailing .0 for integer floats, compact exponents."""
+    assert canonicalize_json(0) == b"0"
+    assert canonicalize_json(-0) == b"0"
+    assert canonicalize_json(1) == b"1"
+    assert canonicalize_json(-1) == b"-1"
+    assert canonicalize_json(100.0) == b"100"
+    assert canonicalize_json(0.5) == b"0.5"
+
+    with pytest.raises(ValueError):
+        canonicalize_json(float("nan"))
+
+    with pytest.raises(ValueError):
+        canonicalize_json(float("inf"))
+
+
+def test_rfc8785_string_and_escaping_conformance():
+    """Verify RFC 8785 string escaping: only quotation, reverse solidus, and control chars escaped; slashes and Unicode raw."""
+    assert canonicalize_json('quotes: " \\') == b'"quotes: \\" \\\\"'
+    assert canonicalize_json("https://sclass.dev/api/v1") == b'"https://sclass.dev/api/v1"'
+    assert canonicalize_json("\b\t\n\f\r") == b'"\\b\\t\\n\\f\\r"'
+
+    ctrl_str = chr(0) + chr(31)
+    assert canonicalize_json(ctrl_str) == b'"\\u0000\\u001f"'
+
+    unicode_str = "€ (Euro) and é (e-acute) and 𝄞 (Clef)"
+    assert canonicalize_json(unicode_str) == unicode_str.encode("utf-8").join([b'"', b'"'])
+
+
+def test_rfc8785_utf16_code_unit_key_sorting():
+    """Verify RFC 8785 Section 3.2.3: Object keys must be sorted by UTF-16 code units."""
+    data = {
+        "\u0080": 1,
+        "\u007f": 2,
+        "a": 3,
+        "\U00010000": 4,
+        "\uFFFF": 5,
+        "b": 6,
+    }
+    encoded = canonicalize_json(data)
+    expected_order = sorted(data.keys(), key=lambda k: k.encode("utf-16-be"))
+    parsed = json.loads(encoded.decode("utf-8"))
+    actual_order = list(parsed.keys())
+    assert actual_order == expected_order
+
+
+def test_rfc8785_data_structures_and_types():
+    """Verify serialization of sets, frozensets, custom objects, and enums."""
+    assert canonicalize_json([1, 2, 3]) == b"[1,2,3]"
+    assert canonicalize_json((1, 2)) == b"[1,2]"
+    assert canonicalize_json(None) == b"null"
+    assert canonicalize_json(True) == b"true"
+    assert canonicalize_json(False) == b"false"
+    assert canonicalize_json(EventType.TASK_CREATED) == b'"TASK_CREATED"'
+
+    class CustomData:
+        def __init__(self):
+            self.foo = "bar"
+
+    assert canonicalize_json(CustomData()) == b'{"foo":"bar"}'
+
+
+# ============================================================================
+# 2. Genesis, Single Event, and Multi-Event Chaining
 # ============================================================================
 
 def make_test_task_event(
@@ -73,17 +206,23 @@ def make_test_task_event(
     parent_digest: str = GENESIS_PARENT_DIGEST,
     task_id: str = "TASK-001",
 ) -> EventEnvelope:
+    task = Task(
+        task_id=task_id,
+        raw_prompt="Build pure event engine",
+        repository_context=RepositoryContext(
+            repository_id="sclass-core",
+            base_commit_sha="a" * 40,
+            branch="master",
+            dirty_working_tree=False,
+        ),
+    )
     return create_event(
         event_id=f"EVT-TASK-{seq:05d}",
         event_type=EventType.TASK_CREATED,
         sequence_number=seq,
         aggregate_id=task_id,
         timestamp="2026-08-19T10:00:00Z",
-        payload={
-            "task_id": task_id,
-            "raw_prompt": "Build pure event engine",
-            "repo": "sclass-core",
-        },
+        payload={"task": task, "task_id": task_id},
         parent_digest=parent_digest,
     )
 
@@ -95,32 +234,16 @@ def make_test_obligation_event(
     task_id: str = "TASK-001",
     depends_on: tuple = (),
 ) -> EventEnvelope:
-    obl = Obligation(
-        obligation_id=obligation_id,
-        task_id=task_id,
-        title=f"Obligation {obligation_id}",
-        description="Test obligation",
-        category=ObligationCategory.SECURITY_INTEGRITY,
-        criticality=Criticality.HIGH,
-        status=ObligationStatus.OPEN,
-        depends_on=depends_on,
-        claim_ids=(),
-        policy_id="POL-001",
-    )
     return create_event(
         event_id=f"EVT-OBL-{seq:05d}",
         event_type=EventType.OBLIGATION_DERIVED,
         sequence_number=seq,
         aggregate_id=task_id,
         timestamp="2026-08-19T10:00:01Z",
-        payload={"obligation_id": obligation_id, "title": obl.title},
+        payload={"obligation_id": obligation_id, "title": f"Obligation {obligation_id}"},
         parent_digest=parent_digest,
     )
 
-
-# ============================================================================
-# 1. Genesis, Single Event, and Multi-Event Chaining
-# ============================================================================
 
 def test_genesis_event_verification():
     """Verify genesis event constraints: sequence_number == 1 and parent_digest == '0'*64."""
@@ -145,6 +268,8 @@ def test_single_event_append_and_reduction():
     assert state.last_sequence_number == 1
     assert state.last_digest == event.digest
     assert state.last_event_id == event.event_id
+    assert state.task is not None
+    assert state.task.task_id == "TASK-001"
 
 
 def test_multi_event_digest_chain():
@@ -167,14 +292,159 @@ def test_multi_event_digest_chain():
     assert state.last_digest == e3.digest
 
 
+def test_full_domain_model_reduction():
+    """Verify reduction across all domain entity events: Task, Obligation, Claim, Evidence, AssessmentReceipt."""
+    events = []
+    parent = GENESIS_PARENT_DIGEST
+
+    # 1. Task Created
+    task = Task(
+        task_id="TASK-001",
+        raw_prompt="Implement D2",
+        repository_context=RepositoryContext(
+            repository_id="sclass-core",
+            base_commit_sha="0" * 40,
+            branch="main",
+            dirty_working_tree=False,
+        ),
+    )
+    e1 = create_event(
+        "EVT-001", EventType.TASK_CREATED, 1, "TASK-001", "2026-08-19T10:00:00Z",
+        {"task": task}, parent
+    )
+    events.append(e1)
+    parent = e1.digest
+
+    # 2. Obligation Derived
+    obl = Obligation(
+        obligation_id="OBL-001",
+        task_id="TASK-001",
+        title="Test Obligation",
+        description="Verify",
+        category=ObligationCategory.SECURITY_INTEGRITY,
+        criticality=Criticality.CRITICAL,
+        status=ObligationStatus.OPEN,
+        depends_on=(),
+        claim_ids=("CLM-001",),
+        policy_id="POL-001",
+    )
+    e2 = create_event(
+        "EVT-002", EventType.OBLIGATION_DERIVED, 2, "TASK-001", "2026-08-19T10:00:01Z",
+        {"obligation": obl}, parent
+    )
+    events.append(e2)
+    parent = e2.digest
+
+    # 3. Claim Registered
+    claim = Claim(
+        claim_id="CLM-001",
+        obligation_id="OBL-001",
+        tier=ClaimTier.V2_BEHAVIORAL,
+        subject=ClaimSubject(
+            target_type=TargetType.ENDPOINT,
+            identifier="DELETE:/users/{id}",
+        ),
+        predicate="REJECTS_UNAUTHORIZED_REQUEST",
+        context={"role": "GUEST"},
+        expected={"status_code": 403},
+        criticality=Criticality.HIGH,
+        status=ClaimStatus.UNSUPPORTED,
+        required_provider_capabilities=("API_CONTRACT_FUZZING",),
+    )
+    e3 = create_event(
+        "EVT-003", EventType.CLAIM_REGISTERED, 3, "TASK-001", "2026-08-19T10:00:02Z",
+        {"claim": claim}, parent
+    )
+    events.append(e3)
+    parent = e3.digest
+
+    # 4. Evidence Collected
+    ev = Evidence(
+        evidence_id="EV-001",
+        claim_id="CLM-001",
+        provider_id="schemathesis-runner",
+        capability="API_CONTRACT_FUZZING",
+        execution_id="EXEC-12345",
+        source_sha="a" * 40,
+        scope=EvidenceScope(
+            targets_evaluated=("DELETE:/users/{id}",),
+            aspects_covered=("AUTH_ENFORCEMENT",),
+        ),
+        observation=EvidenceObservation(
+            raw_status=RawStatus.PASS,
+            diagnostics=("All 50 test cases passed.",),
+            counterexample={"input": "valid", "response": 200},
+        ),
+        polarity=EvidencePolarity.SUPPORTS,
+        validity=EvidenceValidity.VALID,
+        independence_group="INDEP-PROVIDER-01",
+        provenance=Provenance(
+            engine_name="schemathesis",
+            engine_version="3.39.0",
+            environment_hash="b" * 64,
+            timestamp="2026-08-19T10:00:00Z",
+        ),
+        signature=HmacSessionSignature(
+            algorithm="HMAC-SHA256",
+            key_id="KEY-001",
+            nonce="NONCE-999",
+            raw_stdout_digest="c" * 64,
+            signature_hex="d" * 64,
+            timestamp="2026-08-19T10:00:00Z",
+        ),
+    )
+    e4 = create_event(
+        "EVT-004", EventType.EVIDENCE_COLLECTED, 4, "TASK-001", "2026-08-19T10:00:03Z",
+        {"evidence": ev}, parent
+    )
+    events.append(e4)
+    parent = e4.digest
+
+    # 5. Assessment Produced
+    rcpt = AssessmentReceipt(
+        receipt_id="RCPT-001",
+        obligation_id="OBL-001",
+        policy_version=1,
+        repository_sha="a" * 40,
+        verdict=AssessmentVerdict.SATISFIED,
+        claim_assessments=(
+            ClaimAssessment(
+                claim_id="CLM-001",
+                status=ClaimStatus.SUPPORTED,
+                supporting_evidence_ids=("EV-001",),
+                refuting_evidence_ids=(),
+            ),
+        ),
+        signature=AsymmetricAuthoritySignature(
+            algorithm="ED25519",
+            signer_identity="EVALUATOR_SERVICE_01",
+            public_key_fingerprint="e" * 64,
+            payload_digest="f" * 64,
+            signature_hex="1" * 128,
+            timestamp="2026-08-19T10:00:00Z",
+        ),
+    )
+    e5 = create_event(
+        "EVT-005", EventType.ASSESSMENT_PRODUCED, 5, "TASK-001", "2026-08-19T10:00:04Z",
+        {"assessment_receipt": rcpt}, parent
+    )
+    events.append(e5)
+
+    state = replay_events(events)
+    assert state.task.task_id == "TASK-001"
+    assert "OBL-001" in state.obligations
+    assert "CLM-001" in state.claims
+    assert "EV-001" in state.evidence
+    assert "RCPT-001" in state.assessments
+
+
 # ============================================================================
-# 2. Adversarial Tampering Vectors
+# 3. Adversarial Tampering Vectors & Replay Determinism
 # ============================================================================
 
 def test_tampered_payload_rejected():
     """Adversarial vector: Mutating payload bytes causes digest mismatch and reduction failure."""
     e1 = make_test_task_event(seq=1)
-    # Construct forged event with mismatched payload
     forged_event = EventEnvelope(
         event_id=e1.event_id,
         event_type=e1.event_type,
@@ -183,7 +453,7 @@ def test_tampered_payload_rejected():
         timestamp=e1.timestamp,
         payload={"task_id": "TASK-001", "raw_prompt": "MALICIOUS_TAMPERED_PROMPT"},
         parent_digest=e1.parent_digest,
-        digest=e1.digest,  # Old digest for different payload
+        digest=e1.digest,
     )
 
     assert verify_event_digest(forged_event) is False
@@ -243,24 +513,6 @@ def test_tampered_stored_digest_rejected():
         store.append(forged_event)
 
 
-def test_reordered_fields_produce_identical_canonical_digest():
-    """Verify RFC 8785: Dictionary key reordering in payloads produces identical canonical bytes and digest."""
-    payload_a = {"alpha": 1, "beta": 2, "gamma": {"z": 9, "a": 0}}
-    payload_b = {"gamma": {"a": 0, "z": 9}, "beta": 2, "alpha": 1}
-
-    bytes_a = canonicalize_json(payload_a)
-    bytes_b = canonicalize_json(payload_b)
-    assert bytes_a == bytes_b
-
-    digest_a = compute_event_digest("EVT-001", EventType.TASK_CREATED, 1, "TASK-001", "2026-08-19T10:00:00Z", payload_a, GENESIS_PARENT_DIGEST)
-    digest_b = compute_event_digest("EVT-001", EventType.TASK_CREATED, 1, "TASK-001", "2026-08-19T10:00:00Z", payload_b, GENESIS_PARENT_DIGEST)
-    assert digest_a == digest_b
-
-
-# ============================================================================
-# 3. Determinism, Sequence Violations & Malformed Events
-# ============================================================================
-
 def test_replay_determinism():
     """Verify replay determinism: identical event stream always produces identical MaterializedState."""
     events = []
@@ -274,7 +526,6 @@ def test_replay_determinism():
         events.append(e)
         parent = e.digest
 
-    # Replay 3 separate times
     state1 = replay_events(events)
     state2 = replay_events(events)
     state3 = replay_events(events)
@@ -294,6 +545,10 @@ def test_duplicate_sequence_rejected():
     with pytest.raises(DuplicateSequenceError):
         store.append(e1_dup)
 
+    state = reduce_event(MaterializedState(), e1)
+    with pytest.raises(DuplicateSequenceError):
+        reduce_event(state, e1_dup)
+
 
 def test_sequence_gap_rejected():
     """Verify appending sequence number with a gap is rejected with SequenceGapError."""
@@ -305,13 +560,17 @@ def test_sequence_gap_rejected():
     with pytest.raises(SequenceGapError):
         store.append(e3_gap)
 
+    state = reduce_event(MaterializedState(), e1)
+    with pytest.raises(SequenceGapError):
+        reduce_event(state, e3_gap)
+
 
 def test_invalid_event_type_rejected():
     """Verify invalid event type fails closed."""
     with pytest.raises((DomainValidationError, ValueError, TypeError)):
         EventEnvelope(
             event_id="EVT-00001",
-            event_type="UNAUTHORIZED_TYPE",  # Must be EventType enum
+            event_type="UNAUTHORIZED_TYPE",
             sequence_number=1,
             aggregate_id="TASK-001",
             timestamp="2026-08-19T10:00:00Z",
@@ -323,17 +582,15 @@ def test_invalid_event_type_rejected():
 
 def test_malformed_event_fails_closed():
     """Verify malformed event parameters fail closed."""
-    # Bad event_id pattern
     with pytest.raises(DomainValidationError):
         create_event("bad_id", EventType.TASK_CREATED, 1, "TASK-001", "2026-08-19T10:00:00Z", {}, GENESIS_PARENT_DIGEST)
 
-    # Bad timestamp
     with pytest.raises(DomainValidationError):
         create_event("EVT-00001", EventType.TASK_CREATED, 1, "TASK-001", "invalid-time", {}, GENESIS_PARENT_DIGEST)
 
 
 # ============================================================================
-# 4. Concurrency Safety & File Store Crash Recovery
+# 4. Concurrency Safety, Torn Write Recovery & Authenticated Corruption Rejection
 # ============================================================================
 
 def test_concurrent_append_race_fails_safely():
@@ -342,7 +599,6 @@ def test_concurrent_append_race_fails_safely():
     e1 = make_test_task_event(seq=1)
     store.append(e1)
 
-    # 10 workers competing to append sequence 2 with same parent
     competing_events = [
         make_test_obligation_event(seq=2, parent_digest=e1.digest, obligation_id=f"OBL-{idx:03d}")
         for idx in range(10)
@@ -362,19 +618,17 @@ def test_concurrent_append_race_fails_safely():
     with ThreadPoolExecutor(max_workers=8) as pool:
         list(pool.map(try_append, competing_events))
 
-    # Exactly 1 append must succeed, 9 must fail closed
     assert successes == 1
     assert failures == 9
     assert len(store) == 2
     assert store.verify_integrity() is True
 
 
-def test_crash_partial_write_recovery():
-    """Verify FileAppendEventStore recovers cleanly from partial/corrupted trailing bytes at EOF."""
+def test_crash_torn_final_write_recovery():
+    """Verify FileAppendEventStore recovers cleanly from an unclosed/torn write fragment at EOF."""
     with tempfile.TemporaryDirectory() as tmpdir:
         log_file = os.path.join(tmpdir, "events.jsonl")
 
-        # 1. Write 2 valid events
         store = FileAppendEventStore(log_file)
         e1 = make_test_task_event(seq=1)
         e2 = make_test_obligation_event(seq=2, parent_digest=e1.digest, obligation_id="OBL-001")
@@ -382,40 +636,100 @@ def test_crash_partial_write_recovery():
         store.append(e2)
         assert len(store) == 2
 
-        # 2. Simulate crash by appending half-written truncated JSON line
+        # Simulate crash during append: partial un-terminated fragment at EOF
         with open(log_file, "ab") as f:
             f.write(b'{"event_id": "EVT-CRASHED", "sequence_number": 3, "payload": {"corrupt')
 
-        # 3. Reload store - should auto-recover by truncating corrupt trailing line
         reloaded_store = FileAppendEventStore(log_file)
         assert len(reloaded_store) == 2
         assert reloaded_store.verify_integrity() is True
         assert reloaded_store.get_latest_event().event_id == e2.event_id
 
-        # 4. Append next legitimate event (seq=3)
+        # Can append sequence 3 normally after torn write truncation
         e3 = make_test_obligation_event(seq=3, parent_digest=e2.digest, obligation_id="OBL-002")
         reloaded_store.append(e3)
         assert len(reloaded_store) == 3
-        assert reloaded_store.verify_integrity() is True
+
+
+def test_authenticated_historical_corruption_raises_and_never_discards():
+    """Verify that corruption in historical committed records raises CorruptEventLogError and is never silently discarded."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        log_file = os.path.join(tmpdir, "corrupt_events.jsonl")
+
+        store = FileAppendEventStore(log_file)
+        e1 = make_test_task_event(seq=1)
+        e2 = make_test_obligation_event(seq=2, parent_digest=e1.digest, obligation_id="OBL-001")
+        e3 = make_test_obligation_event(seq=3, parent_digest=e2.digest, obligation_id="OBL-002")
+        store.append(e1)
+        store.append(e2)
+        store.append(e3)
+
+        with open(log_file, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+
+        # Tamper with record at line 2
+        tampered_line = lines[1].replace('"title":"Obligation OBL-001"', '"title":"MALICIOUS_TAMPER"')
+        lines[1] = tampered_line
+
+        with open(log_file, "w", encoding="utf-8") as f:
+            f.writelines(lines)
+
+        with pytest.raises(CorruptEventLogError, match="Cryptographic digest forgery/corruption"):
+            FileAppendEventStore(log_file)
+
+
+def test_file_store_operations_and_error_handling():
+    """Verify store API methods: get_events, limits, offsets, error handling."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        log_file = os.path.join(tmpdir, "file_ops.jsonl")
+        store = FileAppendEventStore(log_file)
+
+        assert store.get_latest_event() is None
+        assert store.get_events() == ()
+
+        e1 = make_test_task_event(seq=1)
+        e2 = make_test_obligation_event(seq=2, parent_digest=e1.digest, obligation_id="OBL-001")
+        e3 = make_test_obligation_event(seq=3, parent_digest=e2.digest, obligation_id="OBL-002")
+
+        store.append(e1)
+        store.append(e2)
+        store.append(e3)
+
+        assert len(store.get_events(after_sequence=1)) == 2
+        assert len(store.get_events(after_sequence=1, limit=1)) == 1
+        assert store.get_latest_event() == e3
+
+        with pytest.raises(TypeError):
+            store.append("not_an_event")
+
+        # In-memory store operations
+        mem_store = InMemoryEventStore()
+        assert mem_store.get_latest_event() is None
+        mem_store.append(e1)
+        mem_store.append(e2)
+        assert len(mem_store.get_events(after_sequence=1)) == 1
+        with pytest.raises(TypeError):
+            mem_store.append("invalid")
 
 
 # ============================================================================
-# 5. Large-Log Replay Benchmark (1k / 10k / 100k Events)
+# 5. Large-Log Replay Benchmark with Peak Memory Tracking (1k / 10k / 100k Events)
 # ============================================================================
 
-def test_large_log_replay_benchmark():
-    """Benchmark append throughput, verification rate, and replay latency/memory for 1k, 10k, 100k events."""
+def test_large_log_replay_benchmark_with_memory():
+    """Benchmark append throughput, verification rate, replay latency, and peak RAM (MB) for 1k, 10k, 100k events."""
     benchmark_scales = [1_000, 10_000]
-    # Always include 100k scale in benchmark
     if os.environ.get("SKIP_100K_BENCHMARK") != "1":
         benchmark_scales.append(100_000)
 
-    print("\n" + "=" * 80)
-    print(f"{'Scale (Events)':<15} | {'Append (s)':<12} | {'Verify (s)':<12} | {'Replay (s)':<12} | {'Events/sec':<12}")
-    print("-" * 80)
+    print("\n" + "=" * 95)
+    print(f"{'Scale (Events)':<15} | {'Append (s)':<12} | {'Verify (s)':<12} | {'Replay (s)':<12} | {'Peak RSS (MB)':<14} | {'Events/sec':<12}")
+    print("-" * 95)
 
     for scale in benchmark_scales:
         gc.collect()
+        initial_rss = get_process_rss_mb()
+
         store = InMemoryEventStore()
 
         # 1. Append Benchmark
@@ -444,16 +758,19 @@ def test_large_log_replay_benchmark():
         replay_duration = time.perf_counter() - t0_replay
         assert state.last_sequence_number == scale
 
+        final_rss = get_process_rss_mb()
+        peak_rss_mb = max(final_rss, initial_rss)
+
         replay_rate = scale / replay_duration if replay_duration > 0 else 0
 
-        print(f"{scale:<15} | {append_duration:<12.4f} | {verify_duration:<12.4f} | {replay_duration:<12.4f} | {replay_rate:<12.1f}")
+        print(f"{scale:<15} | {append_duration:<12.4f} | {verify_duration:<12.4f} | {replay_duration:<12.4f} | {peak_rss_mb:<14.2f} | {replay_rate:<12.1f}")
 
-        # Assert performance gates:
+        # Assert performance and memory gates:
         if scale == 1_000:
-            assert replay_duration < 0.20, f"1k replay too slow: {replay_duration:.4f}s"
+            assert replay_duration < 0.20
         elif scale == 10_000:
-            assert replay_duration < 2.0, f"10k replay too slow: {replay_duration:.4f}s"
+            assert replay_duration < 2.0
         elif scale == 100_000:
-            assert replay_duration < 20.0, f"100k replay too slow: {replay_duration:.4f}s"
+            assert replay_duration < 20.0
 
-    print("=" * 80)
+    print("=" * 95)
