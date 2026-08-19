@@ -132,7 +132,7 @@ class EvidenceTrustCertificate:
     verifier_identity: str
     timestamp: str
     certificate_hash: str
-    issuer_signature: str
+    authority_signature: AsymmetricAuthoritySignature
     rejection_reason: Optional[str] = None
 
 

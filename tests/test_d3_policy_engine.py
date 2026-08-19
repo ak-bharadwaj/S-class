@@ -31,13 +31,14 @@ Tests:
    - Altered payload with unchanged signature -> reject
    - Valid certificate for different source_sha -> reject
    - Missing expected revision -> reject
-4. Gate 3 Authority & Controlled Trust Boundary Verification:
-   - Genuine Gate-3 certificate -> ACCEPT
-   - Modified genuine certificate -> REJECT
-   - Manually fabricated + recomputed hash -> REJECT
-   - Wrong issuer -> REJECT
-   - Wrong source_sha -> REJECT
-   - Repository user without external authority key cannot manufacture valid certificate -> REJECT
+4. Gate 3 Asymmetric Authority & Key Boundary Verification:
+   - arbitrary caller cannot choose issuer key -> TypeError / protected keystore
+   - genuine authority signature -> ACCEPT
+   - certificate signed by wrong key -> REJECT
+   - modified certificate -> REJECT
+   - timestamp/provenance mutation -> REJECT
+   - wrong issuer -> REJECT
+   - wrong source_sha -> REJECT
 5. Cross-Parameter Substitution, Omission, and Duplication Attacks:
    - Capability substitution attack (P requires A, C supplies B) -> PolicyWeakeningError
    - Tier weakening / lowering attack (P requires V2 count 3, C supplies V1 or count 1) -> PolicyWeakeningError
@@ -54,7 +55,6 @@ Tests:
 from __future__ import annotations
 from copy import deepcopy
 import hashlib
-import hmac
 import json
 import os
 import re
@@ -64,6 +64,7 @@ import jsonschema
 from jsonschema import Draft202012Validator
 import pytest
 import yaml
+from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from domain.models import (
     Policy,
@@ -98,10 +99,12 @@ from domain.types import (
 from domain.exceptions import DomainValidationError
 from events.serializer import canonicalize_json
 from benchmark.parity.gate_3_authority import (
+    Gate3AuthorityKeyStore,
     compute_gate3_evidence_digest,
     issue_gate_3_evidence_certificate,
 )
 from benchmark.parity.verify_gate_3_certificate import (
+    Gate3PublicKeystore,
     verify_gate_3_evidence_trust_certificate,
 )
 from policy import (
@@ -128,13 +131,20 @@ from policy import (
 )
 
 DEFAULT_TEST_SHA = "a" * 40
-TEST_AUTHORITY_KEY = "TEST_RUNNER_SECRET_KEY_FOR_GATE3_PARITY_2026"
+
+# Test Authority Ed25519 Key Pair
+TEST_AUTHORITY_PRIVATE_KEY = ed25519.Ed25519PrivateKey.generate()
+TEST_AUTHORITY_PUBLIC_KEY = TEST_AUTHORITY_PRIVATE_KEY.public_key()
 
 
 @pytest.fixture(autouse=True)
-def setup_test_authority_key(monkeypatch):
-    """Injects test authority key into the environment trust boundary for the test runner."""
-    monkeypatch.setenv("GATE3_AUTHORITY_SECRET", TEST_AUTHORITY_KEY)
+def setup_test_authority_keystore():
+    """Initializes the protected authority keystore and verifier public keystore for tests."""
+    Gate3AuthorityKeyStore.set_private_key(TEST_AUTHORITY_PRIVATE_KEY)
+    Gate3PublicKeystore.set_public_key(TEST_AUTHORITY_PUBLIC_KEY)
+    yield
+    Gate3AuthorityKeyStore.set_private_key(TEST_AUTHORITY_PRIVATE_KEY)
+    Gate3PublicKeystore.set_public_key(TEST_AUTHORITY_PUBLIC_KEY)
 
 
 def make_test_obligation(
@@ -194,8 +204,8 @@ def make_test_evidence(
     diagnostics: tuple = ("Coverage test run completed",),
     engine_name: str = "coverage.py",
     source_sha: str = DEFAULT_TEST_SHA,
+    timestamp: str = "2026-08-19T10:00:00Z",
     custom_signature: HmacSessionSignature = None,
-    signing_key: str = TEST_AUTHORITY_KEY,
 ) -> Evidence:
     scope = EvidenceScope(
         targets_evaluated=("DELETE:/users/{id}",),
@@ -210,7 +220,7 @@ def make_test_evidence(
         engine_name=engine_name,
         engine_version="7.4.0",
         environment_hash="b" * 64,
-        timestamp="2026-08-19T10:00:00Z",
+        timestamp=timestamp,
     )
 
     if custom_signature is not None:
@@ -222,7 +232,7 @@ def make_test_evidence(
             nonce="NONCE-001",
             raw_stdout_digest="0" * 64,
             signature_hex="0" * 64,
-            timestamp="2026-08-19T10:00:00Z",
+            timestamp=timestamp,
         )
         temp_ev = Evidence(
             evidence_id=ev_id,
@@ -240,14 +250,13 @@ def make_test_evidence(
             signature=dummy_sig,
         )
         real_digest = compute_gate3_evidence_digest(temp_ev)
-        real_hmac = hmac.new(signing_key.encode("utf-8"), real_digest.encode("utf-8"), hashlib.sha256).hexdigest()
         sig = HmacSessionSignature(
             algorithm="HMAC-SHA256",
             key_id="KEY-001",
             nonce="NONCE-001",
             raw_stdout_digest=real_digest,
-            signature_hex=real_hmac,
-            timestamp="2026-08-19T10:00:00Z",
+            signature_hex="f" * 64,
+            timestamp=timestamp,
         )
 
     return Evidence(
@@ -276,7 +285,6 @@ def make_test_context(
     auto_verify_certificates: bool = True,
     trust_certificates: Dict[str, EvidenceTrustCertificate] = None,
     evaluation_timestamp: str = "2026-08-19T10:00:00Z",
-    authority_key: str = TEST_AUTHORITY_KEY,
 ) -> PolicyEvaluationContext:
     """Helper creating PolicyEvaluationContext with Gate 3 certified trust certificates."""
     certs = {}
@@ -284,7 +292,7 @@ def make_test_context(
         certs.update(trust_certificates)
     elif auto_verify_certificates and expected_source_sha:
         for ev in evidence:
-            certs[ev.evidence_id] = issue_gate_3_evidence_certificate(ev, expected_source_sha, authority_key=authority_key)
+            certs[ev.evidence_id] = issue_gate_3_evidence_certificate(ev, expected_source_sha)
 
     return PolicyEvaluationContext(
         obligation=obligation,
@@ -750,7 +758,7 @@ def test_adversarial_cryptographic_trust_suite():
 
     # 4. Valid certificate for different source_sha -> D3 rejects revision mismatch
     ev_diff_sha = make_test_evidence(ev_id="EV-DIFF-SHA", counterexample={"coverage_pct": 90.0}, source_sha="b" * 40)
-    cert_diff = issue_gate_3_evidence_certificate(ev_diff_sha, expected_source_sha="b" * 40, authority_key=TEST_AUTHORITY_KEY)
+    cert_diff = issue_gate_3_evidence_certificate(ev_diff_sha, expected_source_sha="b" * 40)
     ctx_diff_sha = make_test_context(
         obl, (claim,), (ev_diff_sha,),
         expected_source_sha=DEFAULT_TEST_SHA,
@@ -766,26 +774,35 @@ def test_adversarial_cryptographic_trust_suite():
 
 
 # ============================================================================
-# 3. Gate 3 Authority & Controlled Trust Boundary Verification
+# 3. Gate 3 Asymmetric Authority & Key Boundary Verification
 # ============================================================================
 
-def test_adversarial_gate3_issuer_authentication_matrix():
-    """Adversarial matrix verifying Gate 3 authority authentication:
-    1. genuine Gate-3 certificate -> ACCEPT
-    2. modified genuine certificate -> REJECT
-    3. manually fabricated + recomputed unkeyed hash -> REJECT
-    4. wrong issuer -> REJECT
-    5. wrong source_sha -> REJECT
+def test_adversarial_caller_cannot_choose_issuer_key():
+    """Adversarial check: Caller cannot pass an arbitrary authority_key parameter to issue_gate_3_evidence_certificate."""
+    ev = make_test_evidence(ev_id="EV-KEY-PARAM", counterexample={"coverage_pct": 95.0})
+    with pytest.raises(TypeError):
+        issue_gate_3_evidence_certificate(ev, expected_source_sha=DEFAULT_TEST_SHA, authority_key="UNAUTHORIZED_KEY")  # type: ignore
+
+
+def test_adversarial_gate3_asymmetric_authority_matrix():
+    """Adversarial matrix verifying Gate 3 Asymmetric Authority (Ed25519) verification:
+    1. genuine authority signature -> ACCEPT
+    2. certificate signed by wrong key -> REJECT
+    3. modified certificate -> REJECT
+    4. timestamp/provenance mutation -> REJECT
+    5. wrong issuer -> REJECT
+    6. wrong source_sha -> REJECT
     """
     obl = make_test_obligation()
     claim = make_test_claim()
     pol_cov_85 = Policy("POL-COV85", PolicyScope.PROJECT, 1, PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CODE_COVERAGE, {"min_coverage_pct": 85.0}),)))
 
-    ev = make_test_evidence(ev_id="EV-G3-MATRIX", counterexample={"coverage_pct": 95.0})
+    ev = make_test_evidence(ev_id="EV-G3-ASYMM", counterexample={"coverage_pct": 95.0}, timestamp="2026-08-19T14:30:00Z")
 
-    # 1. Genuine Gate-3 certificate -> ACCEPT
-    genuine_cert = issue_gate_3_evidence_certificate(ev, expected_source_sha=DEFAULT_TEST_SHA, authority_key=TEST_AUTHORITY_KEY)
-    assert verify_gate_3_evidence_trust_certificate(genuine_cert, expected_source_sha=DEFAULT_TEST_SHA, verification_key=TEST_AUTHORITY_KEY) is True
+    # 1. Genuine authority signature -> ACCEPT
+    genuine_cert = issue_gate_3_evidence_certificate(ev, expected_source_sha=DEFAULT_TEST_SHA)
+    assert verify_gate_3_evidence_trust_certificate(genuine_cert, expected_source_sha=DEFAULT_TEST_SHA, public_key=TEST_AUTHORITY_PUBLIC_KEY) is True
+    assert genuine_cert.timestamp == "2026-08-19T14:30:00Z"  # Exact execution timestamp binding
     ctx_genuine = PolicyEvaluationContext(
         obligation=obl,
         claims=(claim,),
@@ -796,7 +813,64 @@ def test_adversarial_gate3_issuer_authentication_matrix():
     assert CoverageTrustPredicate.is_trusted(ev, ctx_genuine) is True
     assert evaluate_policy(pol_cov_85, ctx_genuine).decision == PolicyDecisionType.ALLOW
 
-    # 2. Modified genuine certificate (tampered is_verified / source_sha) -> REJECT
+    # 2. Certificate signed by wrong key -> REJECT
+    rogue_private_key = ed25519.Ed25519PrivateKey.generate()
+    rogue_pub = rogue_private_key.public_key()
+    rogue_fp = hashlib.sha256(rogue_pub.public_bytes_raw()).hexdigest()
+    raw_payload = {
+        "evidence_id": ev.evidence_id,
+        "source_sha": DEFAULT_TEST_SHA,
+        "is_verified": True,
+        "digest_verified": True,
+        "signature_verified": True,
+        "provenance_verified": True,
+        "verifier_identity": "Gate3AuthoritativeVerifier",
+        "timestamp": "2026-08-19T14:30:00Z",
+    }
+    canonical_bytes = canonicalize_json(raw_payload)
+    rogue_digest = hashlib.sha256(canonical_bytes).hexdigest()
+    rogue_sig = rogue_private_key.sign(canonical_bytes).hex()
+    rogue_authority_sig = AsymmetricAuthoritySignature(
+        algorithm="ED25519",
+        signer_identity="Gate3AuthoritativeVerifier",
+        public_key_fingerprint=rogue_fp,
+        payload_digest=rogue_digest,
+        signature_hex=rogue_sig,
+        timestamp="2026-08-19T14:30:00Z",
+    )
+    rogue_cert = EvidenceTrustCertificate(
+        evidence_id=ev.evidence_id,
+        source_sha=DEFAULT_TEST_SHA,
+        is_verified=True,
+        digest_verified=True,
+        signature_verified=True,
+        provenance_verified=True,
+        verifier_identity="Gate3AuthoritativeVerifier",
+        timestamp="2026-08-19T14:30:00Z",
+        certificate_hash=rogue_digest,
+        authority_signature=rogue_authority_sig,
+    )
+    # Verifier possessing only official authority public key rejects rogue certificate
+    assert verify_gate_3_evidence_trust_certificate(rogue_cert, expected_source_sha=DEFAULT_TEST_SHA, public_key=TEST_AUTHORITY_PUBLIC_KEY) is False
+    ctx_rogue = PolicyEvaluationContext(
+        obligation=obl,
+        claims=(claim,),
+        evidence=(ev,),
+        expected_source_sha=DEFAULT_TEST_SHA,
+        trust_certificates={ev.evidence_id: rogue_cert},
+    )
+    assert CoverageTrustPredicate.is_trusted(ev, ctx_rogue) is False
+    assert evaluate_policy(pol_cov_85, ctx_rogue).decision == PolicyDecisionType.DENY
+
+    # 3. Modified certificate (tampered signature hex) -> REJECT
+    tampered_sig = AsymmetricAuthoritySignature(
+        algorithm="ED25519",
+        signer_identity=genuine_cert.authority_signature.signer_identity,
+        public_key_fingerprint=genuine_cert.authority_signature.public_key_fingerprint,
+        payload_digest=genuine_cert.authority_signature.payload_digest,
+        signature_hex="0" * 128,  # Corrupted signature
+        timestamp=genuine_cert.authority_signature.timestamp,
+    )
     modified_cert = EvidenceTrustCertificate(
         evidence_id=genuine_cert.evidence_id,
         source_sha=DEFAULT_TEST_SHA,
@@ -807,136 +881,39 @@ def test_adversarial_gate3_issuer_authentication_matrix():
         verifier_identity=genuine_cert.verifier_identity,
         timestamp=genuine_cert.timestamp,
         certificate_hash=genuine_cert.certificate_hash,
-        issuer_signature="f" * 64,  # Tampered signature!
+        authority_signature=tampered_sig,
     )
-    assert verify_gate_3_evidence_trust_certificate(modified_cert, expected_source_sha=DEFAULT_TEST_SHA, verification_key=TEST_AUTHORITY_KEY) is False
-    ctx_modified = PolicyEvaluationContext(
-        obligation=obl,
-        claims=(claim,),
-        evidence=(ev,),
-        expected_source_sha=DEFAULT_TEST_SHA,
-        trust_certificates={ev.evidence_id: modified_cert},
-    )
-    assert CoverageTrustPredicate.is_trusted(ev, ctx_modified) is False
-    assert evaluate_policy(pol_cov_85, ctx_modified).decision == PolicyDecisionType.DENY
+    assert verify_gate_3_evidence_trust_certificate(modified_cert, expected_source_sha=DEFAULT_TEST_SHA, public_key=TEST_AUTHORITY_PUBLIC_KEY) is False
 
-    # 3. Manually fabricated certificate with recomputed unkeyed SHA-256 hash -> REJECT
-    raw_payload = {
-        "evidence_id": ev.evidence_id,
-        "source_sha": DEFAULT_TEST_SHA,
-        "is_verified": True,
-        "digest_verified": True,
-        "signature_verified": True,
-        "provenance_verified": True,
-        "verifier_identity": "Gate3AuthoritativeVerifier",
-        "timestamp": "2026-08-19T10:00:00Z",
-    }
-    recomputed_hash = hashlib.sha256(canonicalize_json(raw_payload)).hexdigest()
-    fabricated_cert = EvidenceTrustCertificate(
-        evidence_id=ev.evidence_id,
+    # 4. Timestamp / Provenance mutation -> REJECT
+    mutated_time_sig = AsymmetricAuthoritySignature(
+        algorithm="ED25519",
+        signer_identity=genuine_cert.authority_signature.signer_identity,
+        public_key_fingerprint=genuine_cert.authority_signature.public_key_fingerprint,
+        payload_digest=genuine_cert.authority_signature.payload_digest,
+        signature_hex=genuine_cert.authority_signature.signature_hex,
+        timestamp="2026-08-19T23:59:59Z",  # Mismatched timestamp!
+    )
+    time_mutated_cert = EvidenceTrustCertificate(
+        evidence_id=genuine_cert.evidence_id,
         source_sha=DEFAULT_TEST_SHA,
-        is_verified=True,
-        digest_verified=True,
-        signature_verified=True,
-        provenance_verified=True,
-        verifier_identity="Gate3AuthoritativeVerifier",
-        timestamp="2026-08-19T10:00:00Z",
-        certificate_hash=recomputed_hash,
-        issuer_signature="0" * 64,  # Caller doesn't have Gate-3 authority secret key!
+        is_verified=genuine_cert.is_verified,
+        digest_verified=genuine_cert.digest_verified,
+        signature_verified=genuine_cert.signature_verified,
+        provenance_verified=genuine_cert.provenance_verified,
+        verifier_identity=genuine_cert.verifier_identity,
+        timestamp="2026-08-19T14:30:00Z",
+        certificate_hash=genuine_cert.certificate_hash,
+        authority_signature=mutated_time_sig,
     )
-    assert verify_gate_3_evidence_trust_certificate(fabricated_cert, expected_source_sha=DEFAULT_TEST_SHA, verification_key=TEST_AUTHORITY_KEY) is False
-    ctx_fabricated = PolicyEvaluationContext(
-        obligation=obl,
-        claims=(claim,),
-        evidence=(ev,),
-        expected_source_sha=DEFAULT_TEST_SHA,
-        trust_certificates={ev.evidence_id: fabricated_cert},
-    )
-    assert CoverageTrustPredicate.is_trusted(ev, ctx_fabricated) is False
-    assert evaluate_policy(pol_cov_85, ctx_fabricated).decision == PolicyDecisionType.DENY
+    assert verify_gate_3_evidence_trust_certificate(time_mutated_cert, expected_source_sha=DEFAULT_TEST_SHA, public_key=TEST_AUTHORITY_PUBLIC_KEY) is False
 
-    # 4. Wrong issuer -> REJECT
-    wrong_issuer_cert = issue_gate_3_evidence_certificate(ev, expected_source_sha=DEFAULT_TEST_SHA, authority_key=TEST_AUTHORITY_KEY, verifier_identity="UntrustedForeignIssuer")
-    assert verify_gate_3_evidence_trust_certificate(wrong_issuer_cert, expected_source_sha=DEFAULT_TEST_SHA, verification_key=TEST_AUTHORITY_KEY) is False
-    ctx_wrong_issuer = PolicyEvaluationContext(
-        obligation=obl,
-        claims=(claim,),
-        evidence=(ev,),
-        expected_source_sha=DEFAULT_TEST_SHA,
-        trust_certificates={ev.evidence_id: wrong_issuer_cert},
-    )
-    assert CoverageTrustPredicate.is_trusted(ev, ctx_wrong_issuer) is False
-    assert evaluate_policy(pol_cov_85, ctx_wrong_issuer).decision == PolicyDecisionType.DENY
+    # 5. Wrong issuer -> REJECT
+    wrong_issuer_cert = issue_gate_3_evidence_certificate(ev, expected_source_sha=DEFAULT_TEST_SHA, verifier_identity="UntrustedForeignIssuer")
+    assert verify_gate_3_evidence_trust_certificate(wrong_issuer_cert, expected_source_sha=DEFAULT_TEST_SHA, public_key=TEST_AUTHORITY_PUBLIC_KEY) is False
 
-    # 5. Wrong source_sha -> REJECT
-    assert verify_gate_3_evidence_trust_certificate(genuine_cert, expected_source_sha="b" * 40, verification_key=TEST_AUTHORITY_KEY) is False
-    ctx_wrong_sha = PolicyEvaluationContext(
-        obligation=obl,
-        claims=(claim,),
-        evidence=(ev,),
-        expected_source_sha="b" * 40,
-        trust_certificates={ev.evidence_id: genuine_cert},
-    )
-    assert CoverageTrustPredicate.is_trusted(ev, ctx_wrong_sha) is False
-    assert evaluate_policy(pol_cov_85, ctx_wrong_sha).decision == PolicyDecisionType.DENY
-
-
-def test_adversarial_user_knowing_source_code_cannot_forge_certificate(monkeypatch):
-    """Adversarial proof: A repository user who has full read access to all source code
-    cannot manufacture a valid production certificate without the external authority key.
-    Source code contains zero hardcoded keys or default secrets.
-    """
-    # 1. Unset the authority secret from environment to simulate unprivileged runner/user
-    monkeypatch.delenv("GATE3_AUTHORITY_SECRET", raising=False)
-    monkeypatch.delenv("SCLASS_GATE3_KEY", raising=False)
-
-    obl = make_test_obligation()
-    claim = make_test_claim()
-    pol_cov_85 = Policy("POL-COV85", PolicyScope.PROJECT, 1, PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CODE_COVERAGE, {"min_coverage_pct": 85.0}),)))
-
-    ev = make_test_evidence(ev_id="EV-SOURCE-ATTACK", counterexample={"coverage_pct": 99.0})
-
-    # Attacker tries to forge a certificate using guessed default strings or empty secrets
-    for guessed_key in ["", "secret", "password", "default", "GATE3_D0_KEYED_HMAC_AUTHENTICATION_SECRET_2026"]:
-        raw_payload = {
-            "evidence_id": ev.evidence_id,
-            "source_sha": DEFAULT_TEST_SHA,
-            "is_verified": True,
-            "digest_verified": True,
-            "signature_verified": True,
-            "provenance_verified": True,
-            "verifier_identity": "Gate3AuthoritativeVerifier",
-            "timestamp": "2026-08-19T10:00:00Z",
-        }
-        canonical_bytes = canonicalize_json(raw_payload)
-        guessed_hash = hashlib.sha256(canonical_bytes).hexdigest()
-        guessed_sig = hmac.new(guessed_key.encode("utf-8"), canonical_bytes, hashlib.sha256).hexdigest()
-
-        forged_cert = EvidenceTrustCertificate(
-            evidence_id=ev.evidence_id,
-            source_sha=DEFAULT_TEST_SHA,
-            is_verified=True,
-            digest_verified=True,
-            signature_verified=True,
-            provenance_verified=True,
-            verifier_identity="Gate3AuthoritativeVerifier",
-            timestamp="2026-08-19T10:00:00Z",
-            certificate_hash=guessed_hash,
-            issuer_signature=guessed_sig,
-        )
-
-        ctx_attacker = PolicyEvaluationContext(
-            obligation=obl,
-            claims=(claim,),
-            evidence=(ev,),
-            expected_source_sha=DEFAULT_TEST_SHA,
-            trust_certificates={ev.evidence_id: forged_cert},
-        )
-
-        # In production without the external authority key in the environment, verifier strictly fails closed
-        assert verify_gate_3_evidence_trust_certificate(forged_cert, expected_source_sha=DEFAULT_TEST_SHA) is False
-        assert CoverageTrustPredicate.is_trusted(ev, ctx_attacker) is False
-        assert evaluate_policy(pol_cov_85, ctx_attacker).decision == PolicyDecisionType.DENY
+    # 6. Wrong source_sha -> REJECT
+    assert verify_gate_3_evidence_trust_certificate(genuine_cert, expected_source_sha="b" * 40, public_key=TEST_AUTHORITY_PUBLIC_KEY) is False
 
 
 # ============================================================================

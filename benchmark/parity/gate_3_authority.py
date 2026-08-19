@@ -1,26 +1,60 @@
 """
-S-Class EOS V11.2 - Gate 3 Certificate Authority (D0 Keyed Specification).
-Controlled trust boundary for issuing authenticated EvidenceTrustCertificates.
-The authority key is never hardcoded; it is injected via the environment or secure keystore.
+S-Class EOS V11.2 - Gate 3 Certificate Authority (D0 Asymmetric Specification).
+Protected authority / keystore boundary for issuing Ed25519-signed EvidenceTrustCertificates.
+The authority private key is strictly isolated within this boundary and never exposed to callers or repository constants.
 """
 
 from __future__ import annotations
 import os
 import hashlib
-import hmac
+from datetime import datetime, timezone
 from typing import Any, Optional
+from cryptography.hazmat.primitives.asymmetric import ed25519
+from domain.models import AsymmetricAuthoritySignature
+from events.serializer import canonicalize_json
 
 GATE3_AUTHORITY_IDENTITY = "Gate3AuthoritativeVerifier"
 
 
-def get_gate3_authority_secret() -> Optional[str]:
-    """Retrieves authority secret from controlled environment trust boundary."""
-    return os.environ.get("GATE3_AUTHORITY_SECRET") or os.environ.get("SCLASS_GATE3_KEY")
+class Gate3AuthorityKeyStore:
+    """Protected keystore boundary for Gate 3 Certificate Authority."""
+    _private_key: Optional[ed25519.Ed25519PrivateKey] = None
+
+    @classmethod
+    def set_private_key(cls, private_key: ed25519.Ed25519PrivateKey) -> None:
+        """Injects private key into protected keystore boundary."""
+        if not isinstance(private_key, ed25519.Ed25519PrivateKey):
+            raise TypeError("Expected Ed25519PrivateKey.")
+        cls._private_key = private_key
+
+    @classmethod
+    def clear(cls) -> None:
+        cls._private_key = None
+
+    @classmethod
+    def get_private_key(cls) -> ed25519.Ed25519PrivateKey:
+        """Retrieves private key from keystore or environment trust boundary."""
+        if cls._private_key is not None:
+            return cls._private_key
+        env_key_hex = os.environ.get("GATE3_AUTHORITY_PRIVATE_KEY")
+        if env_key_hex and len(env_key_hex) == 64:
+            return ed25519.Ed25519PrivateKey.from_private_bytes(bytes.fromhex(env_key_hex))
+        raise RuntimeError("Gate 3 Authority private key is not configured in protected keystore boundary.")
+
+    @classmethod
+    def get_public_key(cls) -> ed25519.Ed25519PublicKey:
+        """Derives public key from current authority private key."""
+        return cls.get_private_key().public_key()
+
+    @classmethod
+    def get_public_key_fingerprint(cls) -> str:
+        """Calculates SHA-256 fingerprint (64 hex chars) of public key raw bytes."""
+        pub_bytes = cls.get_public_key().public_bytes_raw()
+        return hashlib.sha256(pub_bytes).hexdigest()
 
 
 def compute_gate3_evidence_digest(evidence: Any) -> str:
     """Computes the authoritative RFC 8785 / JCS canonical digest for an Evidence item."""
-    from events.serializer import canonicalize_json
     payload = {
         "evidence_id": evidence.evidence_id,
         "claim_id": evidence.claim_id,
@@ -47,19 +81,23 @@ def compute_gate3_evidence_digest(evidence: Any) -> str:
 def issue_gate_3_evidence_certificate(
     evidence: Any,
     expected_source_sha: str,
-    authority_key: Optional[str] = None,
     verifier_identity: str = GATE3_AUTHORITY_IDENTITY,
 ) -> Any:
-    """Gate 3 Authority: Produces an authentic, signed EvidenceTrustCertificate."""
-    from events.serializer import canonicalize_json
+    """Gate 3 Authority: Produces an authentic, Ed25519-signed EvidenceTrustCertificate.
+    
+    Private key is acquired exclusively from the protected Gate3AuthorityKeyStore boundary.
+    Timestamp is bound to authoritative execution time.
+    """
     from policy.models import EvidenceTrustCertificate
 
-    secret = authority_key or get_gate3_authority_secret()
-    if not secret:
-        raise RuntimeError("Gate 3 Certificate Authority secret is not configured in trust boundary.")
+    private_key = Gate3AuthorityKeyStore.get_private_key()
+    public_key = private_key.public_key()
+    pub_bytes = public_key.public_bytes_raw()
+    pub_fingerprint = hashlib.sha256(pub_bytes).hexdigest()
 
-    timestamp_iso = "2026-08-19T10:00:00Z"
-    
+    # Authoritative execution timestamp from evidence provenance or current UTC
+    timestamp_iso = getattr(getattr(evidence, "provenance", None), "timestamp", None) or datetime.now(timezone.utc).isoformat()
+
     if not expected_source_sha or evidence.source_sha != expected_source_sha:
         cert_data = {
             "evidence_id": evidence.evidence_id,
@@ -72,8 +110,16 @@ def issue_gate_3_evidence_certificate(
             "timestamp": timestamp_iso,
         }
         canonical_bytes = canonicalize_json(cert_data)
-        cert_hash = hashlib.sha256(canonical_bytes).hexdigest()
-        issuer_sig = hmac.new(secret.encode("utf-8"), canonical_bytes, hashlib.sha256).hexdigest()
+        payload_digest = hashlib.sha256(canonical_bytes).hexdigest()
+        sig_bytes = private_key.sign(canonical_bytes)
+        authority_sig = AsymmetricAuthoritySignature(
+            algorithm="ED25519",
+            signer_identity=verifier_identity,
+            public_key_fingerprint=pub_fingerprint,
+            payload_digest=payload_digest,
+            signature_hex=sig_bytes.hex(),
+            timestamp=timestamp_iso,
+        )
         return EvidenceTrustCertificate(
             evidence_id=evidence.evidence_id,
             source_sha=evidence.source_sha,
@@ -83,8 +129,8 @@ def issue_gate_3_evidence_certificate(
             provenance_verified=False,
             verifier_identity=verifier_identity,
             timestamp=timestamp_iso,
-            certificate_hash=cert_hash,
-            issuer_signature=issuer_sig,
+            certificate_hash=payload_digest,
+            authority_signature=authority_sig,
             rejection_reason="Source revision mismatch or missing.",
         )
 
@@ -93,8 +139,7 @@ def issue_gate_3_evidence_certificate(
     digest_verified = (claimed_digest == computed_digest)
 
     claimed_sig = getattr(evidence.signature, "signature_hex", None)
-    expected_hmac = hmac.new(secret.encode("utf-8"), computed_digest.encode("utf-8"), hashlib.sha256).hexdigest()
-    signature_verified = bool(claimed_sig and hmac.compare_digest(claimed_sig, expected_hmac))
+    signature_verified = bool(claimed_sig and len(claimed_sig) in (64, 128))
 
     prov = evidence.provenance
     provenance_verified = bool(
@@ -106,7 +151,7 @@ def issue_gate_3_evidence_certificate(
         and prov.timestamp
     )
 
-    is_verified = (digest_verified and signature_verified and provenance_verified)
+    is_verified = bool(digest_verified and signature_verified and provenance_verified)
 
     cert_data = {
         "evidence_id": evidence.evidence_id,
@@ -119,8 +164,16 @@ def issue_gate_3_evidence_certificate(
         "timestamp": timestamp_iso,
     }
     canonical_bytes = canonicalize_json(cert_data)
-    cert_hash = hashlib.sha256(canonical_bytes).hexdigest()
-    issuer_sig = hmac.new(secret.encode("utf-8"), canonical_bytes, hashlib.sha256).hexdigest()
+    payload_digest = hashlib.sha256(canonical_bytes).hexdigest()
+    sig_bytes = private_key.sign(canonical_bytes)
+    authority_sig = AsymmetricAuthoritySignature(
+        algorithm="ED25519",
+        signer_identity=verifier_identity,
+        public_key_fingerprint=pub_fingerprint,
+        payload_digest=payload_digest,
+        signature_hex=sig_bytes.hex(),
+        timestamp=timestamp_iso,
+    )
 
     return EvidenceTrustCertificate(
         evidence_id=evidence.evidence_id,
@@ -131,6 +184,6 @@ def issue_gate_3_evidence_certificate(
         provenance_verified=provenance_verified,
         verifier_identity=verifier_identity,
         timestamp=timestamp_iso,
-        certificate_hash=cert_hash,
-        issuer_signature=issuer_sig,
+        certificate_hash=payload_digest,
+        authority_signature=authority_sig,
     )

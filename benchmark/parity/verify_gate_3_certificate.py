@@ -1,10 +1,10 @@
 """
-S-Class EOS V11.2 - Schemathesis Gate 3 Certificate Verifier (D0 Keyed Specification).
-Single-source verifier validating Gate 3 Parity Certificates against authoritative source SHA,
-pinned dependency versions, keyed HMAC-SHA256 digests, and cryptographic provenance hash chains.
-Contains no hardcoded secrets; verification key is acquired through controlled trust boundary.
+S-Class EOS V11.2 - Schemathesis Gate 3 Certificate Verifier (D0 Asymmetric Specification).
+Single-source verifier validating Gate 3 Parity Certificates and EvidenceTrustCertificates.
+The verifier receives and possesses only public verification keys.
 """
 
+from __future__ import annotations
 import os
 import sys
 import json
@@ -12,22 +12,44 @@ import hashlib
 import hmac
 import argparse
 from typing import Any, Dict, Optional
+from cryptography.hazmat.primitives.asymmetric import ed25519
+from cryptography.exceptions import InvalidSignature
+from domain.models import AsymmetricAuthoritySignature
+from events.serializer import canonicalize_json
 
 TRUSTED_VERIFIER_IDENTITIES = frozenset({"PARITY-GATE-3", "Gate3AuthoritativeVerifier", "Gate3EvidenceVerifier"})
 
 
-def get_gate3_verification_key() -> Optional[str]:
-    """Retrieves verification key from controlled trust boundary (environment / keystore)."""
-    return os.environ.get("GATE3_AUTHORITY_SECRET") or os.environ.get("SCLASS_GATE3_KEY")
+class Gate3PublicKeystore:
+    """Public keystore boundary for verifiers."""
+    _public_key: Optional[ed25519.Ed25519PublicKey] = None
+
+    @classmethod
+    def set_public_key(cls, public_key: ed25519.Ed25519PublicKey) -> None:
+        if not isinstance(public_key, ed25519.Ed25519PublicKey):
+            raise TypeError("Expected Ed25519PublicKey.")
+        cls._public_key = public_key
+
+    @classmethod
+    def clear(cls) -> None:
+        cls._public_key = None
+
+    @classmethod
+    def get_public_key(cls) -> Optional[ed25519.Ed25519PublicKey]:
+        if cls._public_key is not None:
+            return cls._public_key
+        env_pub_hex = os.environ.get("GATE3_AUTHORITY_PUBLIC_KEY")
+        if env_pub_hex and len(env_pub_hex) == 64:
+            return ed25519.Ed25519PublicKey.from_public_bytes(bytes.fromhex(env_pub_hex))
+        return None
 
 
 def verify_gate_3_evidence_trust_certificate(
     cert: Any,
     expected_source_sha: Optional[str] = None,
-    verification_key: Optional[str] = None,
+    public_key: Optional[ed25519.Ed25519PublicKey] = None,
 ) -> bool:
-    """Strictly validates an EvidenceTrustCertificate against the Gate 3 Authority."""
-    from events.serializer import canonicalize_json
+    """Strictly validates an EvidenceTrustCertificate against the Gate 3 Asymmetric Authority."""
     from policy.models import EvidenceTrustCertificate
 
     if not isinstance(cert, EvidenceTrustCertificate):
@@ -36,7 +58,19 @@ def verify_gate_3_evidence_trust_certificate(
     if not cert.verifier_identity or cert.verifier_identity not in TRUSTED_VERIFIER_IDENTITIES:
         return False
 
-    if not cert.certificate_hash or not cert.issuer_signature or not cert.timestamp:
+    if not cert.certificate_hash or not cert.timestamp or not cert.authority_signature:
+        return False
+
+    if not isinstance(cert.authority_signature, AsymmetricAuthoritySignature):
+        return False
+
+    if cert.authority_signature.algorithm != "ED25519":
+        return False
+
+    if cert.authority_signature.signer_identity != cert.verifier_identity:
+        return False
+
+    if cert.authority_signature.timestamp != cert.timestamp:
         return False
 
     if not cert.is_verified or not cert.digest_verified or not cert.signature_verified or not cert.provenance_verified:
@@ -45,12 +79,19 @@ def verify_gate_3_evidence_trust_certificate(
     if expected_source_sha is not None and cert.source_sha != expected_source_sha:
         return False
 
-    key = verification_key or get_gate3_verification_key()
-    if not key:
-        # Fails closed if verification key is absent from the trust boundary
+    # 1. Obtain public verification key (verifier possesses ONLY public key)
+    pub_key = public_key or Gate3PublicKeystore.get_public_key()
+    if pub_key is None:
+        # Fails closed if public verification key is absent from the trust boundary
         return False
 
-    # 1. Canonical JCS byte representation of certificate fields
+    # 2. Check public key fingerprint match
+    pub_bytes = pub_key.public_bytes_raw()
+    expected_fp = hashlib.sha256(pub_bytes).hexdigest()
+    if not hmac.compare_digest(cert.authority_signature.public_key_fingerprint, expected_fp):
+        return False
+
+    # 3. Canonical JCS byte representation of certificate fields
     cert_data = {
         "evidence_id": cert.evidence_id,
         "source_sha": cert.source_sha,
@@ -66,14 +107,18 @@ def verify_gate_3_evidence_trust_certificate(
     except Exception:
         return False
 
-    # 2. Verify certificate hash integrity
-    expected_hash = hashlib.sha256(canonical_bytes).hexdigest()
-    if not hmac.compare_digest(cert.certificate_hash, expected_hash):
+    # 4. Verify canonical payload digest match
+    expected_digest = hashlib.sha256(canonical_bytes).hexdigest()
+    if not hmac.compare_digest(cert.certificate_hash, expected_digest):
+        return False
+    if not hmac.compare_digest(cert.authority_signature.payload_digest, expected_digest):
         return False
 
-    # 3. Verify Gate-3 keyed HMAC issuer signature / seal
-    expected_sig = hmac.new(key.encode("utf-8"), canonical_bytes, hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(cert.issuer_signature, expected_sig):
+    # 5. Cryptographic Ed25519 signature verification using public key
+    try:
+        sig_bytes = bytes.fromhex(cert.authority_signature.signature_hex)
+        pub_key.verify(sig_bytes, canonical_bytes)
+    except (InvalidSignature, ValueError, TypeError):
         return False
 
     return True
