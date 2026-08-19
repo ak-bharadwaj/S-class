@@ -4,11 +4,12 @@ Validates:
 1. Canonical pure domain models (Task, Obligation, Claim, Policy, Evidence, Assessment, Event).
 2. Deep immutability and defensive isolation on dict/list/set-like nested payloads (MappingProxyType / tuples).
 3. Declaration-order deterministic scheduling matching OpenSpec properties.
-4. Non-authorization boundary: READY != EXECUTABLE in pure D1 domain until Policy/Controller authorization exists.
+4. Non-authorization boundary: READY != EXECUTABLE in pure D1 domain; executable_obligation_ids is strictly ().
 5. Exact compatibility of FrontierSnapshot with D0 WorkerContext Draft-2020-12 schema (including executable_obligation_ids).
 6. O(V + E) linear DAG traversal without pop(0) / repeated sorting.
 7. Large-DAG performance benchmark (1,000 nodes, multi-tier dependency chains).
-8. Comprehensive adversarial DAG scenarios:
+8. Regression proof that no D1 API can produce a non-empty executable frontier.
+9. Comprehensive adversarial DAG scenarios:
    - Duplicate IDs (DuplicateObligationError)
    - Missing dependency references (MissingDependencyError)
    - Self-cycles, 2-node cycles, multi-node cycles, disconnected cycles (CyclicDependencyError)
@@ -20,6 +21,7 @@ Validates:
 """
 
 from dataclasses import FrozenInstanceError
+import inspect
 import time
 import pytest
 from jsonschema import Draft202012Validator
@@ -417,23 +419,52 @@ def test_dag_preserves_declaration_order_in_topological_sort_ties():
 # ============================================================================
 
 def test_ready_does_not_equal_executable_in_d1_pure_domain():
-    """Verify D1 establishes structural readiness only; executable is empty without Policy/Controller authorization."""
+    """Verify D1 establishes structural readiness only; executable is ALWAYS empty in D1."""
     graph = ObligationGraph(task_id="TASK-001")
     obl1 = make_valid_obligation(obligation_id="OBL-001", status=ObligationStatus.OPEN)
     obl2 = make_valid_obligation(obligation_id="OBL-002", status=ObligationStatus.OPEN)
     graph.add_obligation(obl1).add_obligation(obl2)
 
-    # In pure D1 domain without policy/controller authorization, ready has nodes but executable is strictly empty
+    # In pure D1 domain, ready has nodes but executable is strictly empty
     frontier = graph.get_frontier()
     assert frontier.ready_obligation_ids == ("OBL-001", "OBL-002")
     assert frontier.executable_obligation_ids == ()
     assert frontier.ready_obligation_ids != frontier.executable_obligation_ids
 
-    # When explicit authorization filter is passed (simulating D3/D5 controller token issuance):
-    # Authorized IDs must be filtered to structurally ready nodes in declaration order
-    auth_frontier = graph.get_frontier(authorized_executable_ids=["OBL-002"])
-    assert auth_frontier.ready_obligation_ids == ("OBL-001", "OBL-002")
-    assert auth_frontier.executable_obligation_ids == ("OBL-002",)
+
+def test_no_d1_api_can_produce_non_empty_executable_frontier():
+    """Regression test proving no D1 API can produce a non-empty executable frontier."""
+    # 1. Signature inspection: get_frontier accepts no authorization args
+    sig = inspect.signature(ObligationGraph.get_frontier)
+    assert len(sig.parameters) == 1, "get_frontier must take only 'self'"
+
+    # 2. Comprehensive state permutations: all emit executable_obligation_ids == ()
+    statuses = [
+        ObligationStatus.OPEN,
+        ObligationStatus.IN_PROGRESS,
+        ObligationStatus.SATISFIED,
+        ObligationStatus.CONDITIONAL,
+        ObligationStatus.BLOCKED,
+        ObligationStatus.WAIVED,
+    ]
+
+    for status in statuses:
+        graph = ObligationGraph(task_id="TASK-001")
+        graph.add_obligation(make_valid_obligation(obligation_id="OBL-TEST", task_id="TASK-001", status=status))
+        frontier = graph.get_frontier()
+        assert frontier.executable_obligation_ids == (), f"Non-empty executable emitted for status {status}"
+
+    # 3. Complex diamond graph under partial completion
+    graph_diamond = ObligationGraph(task_id="TASK-001")
+    graph_diamond.add_obligation(make_valid_obligation(obligation_id="OBL-A", task_id="TASK-001", status=ObligationStatus.SATISFIED))
+    graph_diamond.add_obligation(make_valid_obligation(obligation_id="OBL-B", task_id="TASK-001", depends_on=("OBL-A",), status=ObligationStatus.OPEN))
+    graph_diamond.add_obligation(make_valid_obligation(obligation_id="OBL-C", task_id="TASK-001", depends_on=("OBL-A",), status=ObligationStatus.OPEN))
+    graph_diamond.add_obligation(make_valid_obligation(obligation_id="OBL-D", task_id="TASK-001", depends_on=("OBL-B", "OBL-C"), status=ObligationStatus.OPEN))
+
+    frontier_diamond = graph_diamond.get_frontier()
+    assert frontier_diamond.ready_obligation_ids == ("OBL-B", "OBL-C")
+    assert frontier_diamond.executable_obligation_ids == ()
+    assert frontier_diamond.blocked_obligation_ids == ("OBL-D",)
 
 
 def test_frontier_snapshot_matches_d0_worker_context_schema():
@@ -445,7 +476,7 @@ def test_frontier_snapshot_matches_d0_worker_context_schema():
 
     frontier = graph.get_frontier()
 
-    # In D1, executable_obligation_ids is present and compliant
+    # In D1, executable_obligation_ids is present, empty, and schema-compliant
     assert hasattr(frontier, "executable_obligation_ids")
     assert frontier.ready_obligation_ids == ("OBL-A",)
     assert frontier.blocked_obligation_ids == ("OBL-B",)

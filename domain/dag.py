@@ -6,14 +6,14 @@ Adapts OpenSpec-validated topological concepts:
 3. Universal cycle rejection (self-loop, 2-node cycle, multi-node, disconnected).
 4. O(V + E) deterministic topological ordering using Kahn's algorithm with declaration-order queue preservation.
 5. Exact compatibility with D0 WorkerContext frontier contract (including executable_obligation_ids).
-6. Non-authorization boundary: READY != EXECUTABLE in pure D1 domain.
+6. Non-authorization boundary: D1 establishes structural readiness only; executable_obligation_ids is always ().
 7. Cross-task dependency contamination rejection.
 8. Anti-aliasing and defensive isolation.
 """
 
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from domain.exceptions import (
     DuplicateObligationError,
@@ -193,29 +193,16 @@ class ObligationGraph:
 
         return tuple(blocked)
 
-    def get_frontier(
-        self,
-        authorized_executable_ids: Optional[Sequence[str]] = None,
-    ) -> FrontierSnapshot:
+    def get_frontier(self) -> FrontierSnapshot:
         """Returns an immutable FrontierSnapshot compliant with D0 WorkerContext schema.
         
         In D1 (pure domain kernel), structural readiness is established, but execution authorization
-        is NOT granted. Therefore, executable_obligation_ids is strictly empty by default unless
-        explicit authorized IDs (from downstream Policy/Controller in D3/D5) are supplied.
+        is NOT granted. Therefore, executable_obligation_ids is ALWAYS empty in D1:
+            executable_obligation_ids = ()
+        D3/D5 will later construct the executable frontier from policy/controller state.
         """
         ready_ids = tuple(o.obligation_id for o in self.get_ready())
         blocked_ids = tuple(o.obligation_id for o in self.get_blocked())
-        
-        # Enforce that executable is a subset of ready
-        if authorized_executable_ids is not None:
-            ready_set = set(ready_ids)
-            executable = tuple(
-                obl_id for obl_id in self._order
-                if obl_id in authorized_executable_ids and obl_id in ready_set
-            )
-        else:
-            executable = ()  # D1 does NOT authorize execution; READY != EXECUTABLE
-            
         satisfied = tuple(
             obl_id
             for obl_id in self._order
@@ -224,7 +211,7 @@ class ObligationGraph:
         return FrontierSnapshot(
             ready_obligation_ids=ready_ids,
             blocked_obligation_ids=blocked_ids,
-            executable_obligation_ids=executable,
+            executable_obligation_ids=(),
             satisfied_obligation_ids=satisfied,
         )
 
