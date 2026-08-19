@@ -163,14 +163,6 @@ class FileAppendEventStore(EventStoreInterface):
                         f_trunc.seek(valid_bytes_offset)
                         f_trunc.truncate()
                     break
-                elif is_last_line and is_terminated:
-                    try:
-                        with open(self._file_path, "r+b") as f_trunc:
-                            f_trunc.seek(valid_bytes_offset)
-                            f_trunc.truncate()
-                        break
-                    except Exception:
-                        pass
                 raise CorruptEventLogError(
                     f"Corrupt event record at line {idx + 1}: {parse_err}"
                 )

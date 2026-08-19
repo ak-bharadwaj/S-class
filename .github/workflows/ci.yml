@@ -28,7 +28,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pytest pytest-cov pytest-cov portalocker==4.1.0 hypothesis==6.165.9 schemathesis==4.24.3 psutil pyright ruff pydantic
+        pip install pytest rfc8785==0.1.4 pytest-cov pytest-cov portalocker==4.1.0 hypothesis==6.165.9 schemathesis==4.24.3 psutil pyright ruff pydantic
 
     - name: Run Pytest Suite
       env:

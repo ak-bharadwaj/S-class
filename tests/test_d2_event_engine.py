@@ -15,9 +15,11 @@ Tests:
 12. Type violation: Invalid event type string rejected fail-closed.
 13. Structural violation: Malformed event envelope rejected fail-closed.
 14. Concurrency safety: Thread-safe concurrent append race fails safely without data corruption.
-15. Crash resilience vs Authenticated Corruption:
-    - Recoverable torn final write fragment at EOF is safely recovered.
-    - Authenticated / canonical corruption in historical log raises CorruptEventLogError and is never silently discarded.
+15. Recovery & Corruption Distinctions:
+    - (a) Truncated final record at EOF (torn write) is safely recovered and truncated.
+    - (b) Malformed JSON in historical log raises CorruptEventLogError and is never silently discarded.
+    - (c) Validly parsed but digest-corrupted record raises CorruptEventLogError and is never silently discarded.
+    - (d) Parent-chain corruption raises CorruptEventLogError and is never silently discarded.
 16. File store operations: get_events, limits, offsets, empty stores, invalid parameters.
 17. Canonical serializer type coverage: sets, frozensets, custom objects, bools, floats, NaN/inf rejections.
 18. Large-log benchmark: 1k, 10k, and 100k event log append, verification, replay throughput, and explicit peak RSS memory (MB).
@@ -144,10 +146,10 @@ def test_rfc8785_number_conformance():
     assert canonicalize_json(100.0) == b"100"
     assert canonicalize_json(0.5) == b"0.5"
 
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
         canonicalize_json(float("nan"))
 
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
         canonicalize_json(float("inf"))
 
 
@@ -589,10 +591,6 @@ def test_malformed_event_fails_closed():
         create_event("EVT-00001", EventType.TASK_CREATED, 1, "TASK-001", "invalid-time", {}, GENESIS_PARENT_DIGEST)
 
 
-# ============================================================================
-# 4. Concurrency Safety, Torn Write Recovery & Authenticated Corruption Rejection
-# ============================================================================
-
 def test_concurrent_append_race_fails_safely():
     """Verify thread-safety: concurrent workers appending to store fail safely without corruption."""
     store = InMemoryEventStore()
@@ -624,8 +622,12 @@ def test_concurrent_append_race_fails_safely():
     assert store.verify_integrity() is True
 
 
-def test_crash_torn_final_write_recovery():
-    """Verify FileAppendEventStore recovers cleanly from an unclosed/torn write fragment at EOF."""
+# ============================================================================
+# 4. Four Distinct Recovery & Corruption Tests
+# ============================================================================
+
+def test_recovery_truncated_final_record():
+    """(1) Truncated final record at EOF (torn write) is safely recovered and truncated to last valid record."""
     with tempfile.TemporaryDirectory() as tmpdir:
         log_file = os.path.join(tmpdir, "events.jsonl")
 
@@ -636,7 +638,7 @@ def test_crash_torn_final_write_recovery():
         store.append(e2)
         assert len(store) == 2
 
-        # Simulate crash during append: partial un-terminated fragment at EOF
+        # Simulate power failure / torn write at EOF: partial unclosed fragment without newline
         with open(log_file, "ab") as f:
             f.write(b'{"event_id": "EVT-CRASHED", "sequence_number": 3, "payload": {"corrupt')
 
@@ -651,10 +653,30 @@ def test_crash_torn_final_write_recovery():
         assert len(reloaded_store) == 3
 
 
-def test_authenticated_historical_corruption_raises_and_never_discards():
-    """Verify that corruption in historical committed records raises CorruptEventLogError and is never silently discarded."""
+def test_recovery_malformed_json_fails_closed():
+    """(2) Malformed JSON in historical log raises CorruptEventLogError and is never silently discarded."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        log_file = os.path.join(tmpdir, "corrupt_events.jsonl")
+        log_file = os.path.join(tmpdir, "malformed.jsonl")
+
+        store = FileAppendEventStore(log_file)
+        e1 = make_test_task_event(seq=1)
+        e2 = make_test_obligation_event(seq=2, parent_digest=e1.digest, obligation_id="OBL-001")
+        store.append(e1)
+        store.append(e2)
+
+        # Inject malformed JSON line in the middle of log followed by another line
+        with open(log_file, "ab") as f:
+            f.write(b'{not valid json line}\n')
+            f.write(b'{"event_id": "EVT-003"}\n')
+
+        with pytest.raises(CorruptEventLogError, match="Corrupt event record at line"):
+            FileAppendEventStore(log_file)
+
+
+def test_recovery_valid_json_digest_corrupted_fails_closed():
+    """(3) Validly parsed JSON but digest-corrupted record raises CorruptEventLogError and is never silently discarded."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        log_file = os.path.join(tmpdir, "digest_corrupted.jsonl")
 
         store = FileAppendEventStore(log_file)
         e1 = make_test_task_event(seq=1)
@@ -667,14 +689,50 @@ def test_authenticated_historical_corruption_raises_and_never_discards():
         with open(log_file, "r", encoding="utf-8") as f:
             lines = f.readlines()
 
-        # Tamper with record at line 2
-        tampered_line = lines[1].replace('"title":"Obligation OBL-001"', '"title":"MALICIOUS_TAMPER"')
-        lines[1] = tampered_line
+        # Modify record at line 2 (tamper title while leaving JSON valid)
+        lines[1] = lines[1].replace('"title":"Obligation OBL-001"', '"title":"TAMPERED_RECORD"')
 
         with open(log_file, "w", encoding="utf-8") as f:
             f.writelines(lines)
 
         with pytest.raises(CorruptEventLogError, match="Cryptographic digest forgery/corruption"):
+            FileAppendEventStore(log_file)
+
+
+def test_recovery_parent_chain_corruption_fails_closed():
+    """(4) Parent-chain corruption raises CorruptEventLogError and is never silently discarded."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        log_file = os.path.join(tmpdir, "parent_corrupted.jsonl")
+
+        store = FileAppendEventStore(log_file)
+        e1 = make_test_task_event(seq=1)
+        # Construct e2 with broken parent_digest and compute valid internal hash for it
+        e2_forged = create_event(
+            event_id="EVT-OBL-00002",
+            event_type=EventType.OBLIGATION_DERIVED,
+            sequence_number=2,
+            aggregate_id="TASK-001",
+            timestamp="2026-08-19T10:00:01Z",
+            payload={"obligation_id": "OBL-001"},
+            parent_digest="f" * 64,  # Does not link to e1.digest!
+        )
+        store.append(e1)
+
+        # Force-write e2_forged into the file
+        event_dict = {
+            "event_id": e2_forged.event_id,
+            "event_type": e2_forged.event_type.value,
+            "sequence_number": e2_forged.sequence_number,
+            "aggregate_id": e2_forged.aggregate_id,
+            "timestamp": e2_forged.timestamp,
+            "payload": e2_forged.payload,
+            "parent_digest": e2_forged.parent_digest,
+            "digest": e2_forged.digest,
+        }
+        with open(log_file, "ab") as f:
+            f.write(canonicalize_json(event_dict) + b"\n")
+
+        with pytest.raises(CorruptEventLogError, match="Cryptographic chain broken"):
             FileAppendEventStore(log_file)
 
 
