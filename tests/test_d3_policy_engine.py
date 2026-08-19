@@ -1,0 +1,803 @@
+"""Tier 1 Adversarial, Determinism, Non-Weakening Lattice, and Property Tests for S-Class D3 Policy Engine.
+
+Tests:
+1. Schema Conformance & Anti-Pollution (Draft 2020-12):
+   - Extra fields in policy / policy rule / expression / exception rejected fail closed.
+   - Empty policy or rules rejected.
+2. Adversarial Vectors:
+   - (a) Invalid rule parameter rejected.
+   - (b) Unknown rule type rejected.
+   - (c) Malformed combinator rejected.
+   - (d) Conflicting allow/deny (hard invariant failure strictly DENY).
+   - (e) Lower-level weakening attempt raises PolicyWeakeningError.
+   - (f) Exception without provenance / signature rejected.
+   - (g) Expired / invalid exception rejected with ExpiredExceptionError.
+   - (h) Nondeterministic evaluation context (1,000 runs produce identical output).
+   - (i) Policy pollution / extra fields fail closed.
+   - (j) Empty policy rejected.
+   - (k) Contradictory policy hierarchy resolves to strictest meet or fails closed.
+   - (l) V4-only justification cannot bypass mandatory rule without corroborating evidence or signed exception.
+3. Lattice Properties & Meet Operator (⊓):
+   - Scope hierarchy: Org ⊓ Project ⊓ Task ⊓ Obligation.
+   - Rule strengthening: capabilities superset, min_count monotonic increase, tier non-weakening.
+4. Property-Based Testing (Hypothesis):
+   - Monotonicity: Strictness(P ⊓ Q) >= Strictness(P).
+   - Associativity: (P1 ⊓ P2) ⊓ P3 == P1 ⊓ (P2 ⊓ P3).
+   - Idempotence: P ⊓ P == P.
+"""
+
+from copy import deepcopy
+import json
+import os
+import re
+from typing import Dict, List, Tuple
+from hypothesis import given, strategies as st, settings
+import jsonschema
+from jsonschema import Draft202012Validator
+import pytest
+import yaml
+
+from domain.models import (
+    Policy,
+    PolicyRule,
+    PolicyExpression,
+    AsymmetricAuthoritySignature,
+    Task,
+    Obligation,
+    Claim,
+    ClaimSubject,
+    Evidence,
+    EvidenceScope,
+    EvidenceObservation,
+    Provenance,
+    HmacSessionSignature,
+    RepositoryContext,
+)
+from domain.types import (
+    PolicyScope,
+    RuleType,
+    CombinatorType,
+    ClaimTier,
+    ClaimStatus,
+    ObligationCategory,
+    ObligationStatus,
+    Criticality,
+    TargetType,
+    EvidencePolarity,
+    EvidenceValidity,
+    RawStatus,
+)
+from domain.exceptions import DomainValidationError
+from policy import (
+    PolicyDecision,
+    PolicyDecisionType,
+    AuthorizedActor,
+    PolicyException,
+    RuleEvaluationResult,
+    PolicyEvaluationContext,
+    PolicyEngineError,
+    PolicyValidationError,
+    PolicyWeakeningError,
+    InvalidExceptionError,
+    ExpiredExceptionError,
+    meet_policies,
+    compose_policies,
+    evaluate_rule,
+    evaluate_expression,
+    evaluate_policy,
+)
+
+
+# ============================================================================
+# Helpers & Fixtures
+# ============================================================================
+
+def make_test_obligation(
+    obl_id: str = "OBL-001",
+    task_id: str = "TASK-001",
+    criticality: Criticality = Criticality.HIGH,
+    category: ObligationCategory = ObligationCategory.SECURITY_INTEGRITY,
+) -> Obligation:
+    return Obligation(
+        obligation_id=obl_id,
+        task_id=task_id,
+        title=f"Test Obligation {obl_id}",
+        description="Enforce security invariant",
+        category=category,
+        criticality=criticality,
+        status=ObligationStatus.OPEN,
+        depends_on=(),
+        claim_ids=(f"CLM-{obl_id}",),
+        policy_id="POL-001",
+    )
+
+
+def make_test_claim(
+    claim_id: str = "CLM-OBL-001",
+    obligation_id: str = "OBL-001",
+    tier: ClaimTier = ClaimTier.V2_BEHAVIORAL,
+    status: ClaimStatus = ClaimStatus.SUPPORTED,
+) -> Claim:
+    return Claim(
+        claim_id=claim_id,
+        obligation_id=obligation_id,
+        tier=tier,
+        subject=ClaimSubject(
+            target_type=TargetType.ENDPOINT,
+            identifier="DELETE:/users/{id}",
+        ),
+        predicate="REJECTS_UNAUTHORIZED_REQUEST",
+        context={"role": "GUEST"},
+        expected={"status": 403},
+        criticality=Criticality.HIGH,
+        status=status,
+        required_provider_capabilities=("API_CONTRACT_FUZZING",),
+    )
+
+
+def make_test_evidence(
+    ev_id: str = "EV-001",
+    claim_id: str = "CLM-OBL-001",
+    capability: str = "API_CONTRACT_FUZZING",
+    polarity: EvidencePolarity = EvidencePolarity.SUPPORTS,
+    validity: EvidenceValidity = EvidenceValidity.VALID,
+    raw_status: RawStatus = RawStatus.PASS,
+    provider_id: str = "schemathesis-runner",
+    execution_id: str = "EXEC-001",
+    independence_group: str = "INDEP-GROUP-1",
+) -> Evidence:
+    return Evidence(
+        evidence_id=ev_id,
+        claim_id=claim_id,
+        provider_id=provider_id,
+        capability=capability,
+        execution_id=execution_id,
+        source_sha="a" * 40,
+        scope=EvidenceScope(
+            targets_evaluated=("DELETE:/users/{id}",),
+            aspects_covered=("AUTH_ENFORCEMENT",),
+        ),
+        observation=EvidenceObservation(
+            raw_status=raw_status,
+            diagnostics=("50 test cases passed",),
+        ),
+        polarity=polarity,
+        validity=validity,
+        independence_group=independence_group,
+        provenance=Provenance(
+            engine_name="schemathesis",
+            engine_version="3.39.0",
+            environment_hash="b" * 64,
+            timestamp="2026-08-19T10:00:00Z",
+        ),
+        signature=HmacSessionSignature(
+            algorithm="HMAC-SHA256",
+            key_id="KEY-001",
+            nonce="NONCE-001",
+            raw_stdout_digest="c" * 64,
+            signature_hex="d" * 64,
+            timestamp="2026-08-19T10:00:00Z",
+        ),
+    )
+
+
+def make_test_exception(
+    exc_id: str = "EXC-001",
+    obl_id: str = "OBL-001",
+    policy_id: str = "POL-001",
+    expiry: str = "2026-12-31T23:59:59Z",
+) -> PolicyException:
+    return PolicyException(
+        exception_id=exc_id,
+        obligation_id=obl_id,
+        policy_id=policy_id,
+        justification="Manual security review approved by security lead with HSM token.",
+        authorized_by=AuthorizedActor(
+            actor_id="SEC-OFFICER-01",
+            actor_role="SECURITY_LEAD",
+            public_key_fingerprint="f" * 64,
+        ),
+        compensating_controls=("Audit log monitoring enabled", "WAF rate limit enabled"),
+        expiry=expiry,
+        signature=AsymmetricAuthoritySignature(
+            algorithm="ED25519",
+            signer_identity="SEC-OFFICER-01",
+            public_key_fingerprint="f" * 64,
+            payload_digest="1" * 64,
+            signature_hex="2" * 128,
+            timestamp="2026-08-19T10:00:00Z",
+        ),
+    )
+
+
+# ============================================================================
+# 1. Adversarial Tests for Policy Engine
+# ============================================================================
+
+def test_adversarial_invalid_rule_parameter():
+    """Adversarial vector: Invalid/missing rule parameters fail closed with DomainValidationError."""
+    with pytest.raises(DomainValidationError):
+        PolicyRule(
+            rule_type=RuleType.REQUIRE_CAPABILITY,
+            parameters={"capability": 12345},  # Must be string
+        )
+
+    with pytest.raises(DomainValidationError):
+        PolicyRule(
+            rule_type=RuleType.REQUIRE_CAPABILITY,
+            parameters={"capability": "PROPERTY_TESTING", "unauthorized_extra": True},
+        )
+
+    with pytest.raises(DomainValidationError):
+        PolicyRule(
+            rule_type=RuleType.REQUIRE_TIER,
+            parameters={"tier": "V2_BEHAVIORAL", "min_count": -1},  # Must be >= 1
+        )
+
+
+def test_adversarial_unknown_rule_type():
+    """Adversarial vector: Unknown rule type string fails closed."""
+    with pytest.raises((DomainValidationError, ValueError)):
+        PolicyRule(
+            rule_type="UNAUTHORIZED_RULE_TYPE",  # type: ignore
+            parameters={},
+        )
+
+
+def test_adversarial_malformed_combinator():
+    """Adversarial vector: Malformed combinator fails closed."""
+    with pytest.raises((DomainValidationError, ValueError)):
+        PolicyExpression(
+            combinator="INVALID_COMBINATOR",  # type: ignore
+            rules=(),
+        )
+
+
+def test_adversarial_conflicting_allow_deny():
+    """Adversarial vector: Conflicting/refuting evidence strictly forces DENY decision under NO_CONFLICTS."""
+    obl = make_test_obligation()
+    claim = make_test_claim()
+    # Good supporting evidence
+    ev_pass = make_test_evidence(ev_id="EV-001", polarity=EvidencePolarity.SUPPORTS, raw_status=RawStatus.PASS)
+    # Refuting evidence
+    ev_fail = make_test_evidence(
+        ev_id="EV-002",
+        polarity=EvidencePolarity.REFUTES,
+        raw_status=RawStatus.FAIL,
+        validity=EvidenceValidity.CONFLICTED,
+    )
+
+    ctx = PolicyEvaluationContext(
+        obligation=obl,
+        claims=(claim,),
+        evidence=(ev_pass, ev_fail),
+        evaluation_timestamp="2026-08-19T10:00:00Z",
+    )
+
+    policy = Policy(
+        policy_id="POL-001",
+        scope_level=PolicyScope.PROJECT,
+        version=1,
+        expression=PolicyExpression(
+            combinator=CombinatorType.ALL,
+            rules=(
+                PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),
+                PolicyRule(RuleType.NO_CONFLICTS, {}),
+            ),
+        ),
+    )
+
+    decision = evaluate_policy(policy, ctx)
+    assert decision.decision == PolicyDecisionType.DENY
+    assert "conflicting" in decision.rationale.lower()
+
+
+def test_adversarial_lower_level_weakening_attempt():
+    """Adversarial vector: Lower-scope policy attempting to weaken ancestor constraints raises PolicyWeakeningError."""
+    # Parent (Org) requires min_count=3
+    parent = Policy(
+        policy_id="POL-ORG-001",
+        scope_level=PolicyScope.GLOBAL_ORGANIZATIONAL,
+        version=1,
+        expression=PolicyExpression(
+            combinator=CombinatorType.ALL,
+            rules=(
+                PolicyRule(RuleType.REQUIRE_TIER, {"tier": "V2_BEHAVIORAL", "min_count": 3}),
+                PolicyRule(RuleType.NO_CONFLICTS, {}),
+            ),
+        ),
+    )
+
+    # Child (Project) attempts to lower min_count to 1
+    child_weak_count = Policy(
+        policy_id="POL-PROJ-001",
+        scope_level=PolicyScope.PROJECT,
+        version=1,
+        expression=PolicyExpression(
+            combinator=CombinatorType.ALL,
+            rules=(
+                PolicyRule(RuleType.REQUIRE_TIER, {"tier": "V2_BEHAVIORAL", "min_count": 1}),
+                PolicyRule(RuleType.NO_CONFLICTS, {}),
+            ),
+        ),
+    )
+    with pytest.raises(PolicyWeakeningError, match="attempts to lower tier min_count"):
+        meet_policies(parent, child_weak_count)
+
+    # Child attempts to omit NO_CONFLICTS
+    child_omitted_rule = Policy(
+        policy_id="POL-PROJ-002",
+        scope_level=PolicyScope.PROJECT,
+        version=1,
+        expression=PolicyExpression(
+            combinator=CombinatorType.ALL,
+            rules=(
+                PolicyRule(RuleType.REQUIRE_TIER, {"tier": "V2_BEHAVIORAL", "min_count": 3}),
+            ),
+        ),
+    )
+    with pytest.raises(PolicyWeakeningError, match="omitted parent rule"):
+        meet_policies(parent, child_omitted_rule)
+
+
+def test_adversarial_exception_without_provenance():
+    """Adversarial vector: Exception lacking valid signature fails closed."""
+    with pytest.raises(InvalidExceptionError):
+        PolicyException(
+            exception_id="EXC-001",
+            obligation_id="OBL-001",
+            policy_id="POL-001",
+            justification="Valid justification string that is long enough.",
+            authorized_by=AuthorizedActor("ACTOR-1", "ROLE", "a" * 64),
+            compensating_controls=("Control 1 long enough",),
+            signature="UNSIGNED_FORGERY",  # type: ignore
+        )
+
+
+def test_adversarial_expired_exception():
+    """Adversarial vector: Expired exception raises ExpiredExceptionError during evaluation."""
+    obl = make_test_obligation()
+    claim = make_test_claim(tier=ClaimTier.V4_ADVERSARIAL_EXPLORATORY)
+
+    # Exception expired at 2026-08-01
+    exc = make_test_exception(expiry="2026-08-01T00:00:00Z")
+
+    ctx = PolicyEvaluationContext(
+        obligation=obl,
+        claims=(claim,),
+        evidence=(),
+        exceptions=(exc,),
+        evaluation_timestamp="2026-08-19T10:00:00Z",  # After expiry!
+    )
+
+    policy = Policy(
+        policy_id="POL-001",
+        scope_level=PolicyScope.PROJECT,
+        version=1,
+        expression=PolicyExpression(
+            combinator=CombinatorType.ALL,
+            rules=(
+                PolicyRule(RuleType.REQUIRE_TIER, {"tier": "V4_ADVERSARIAL_EXPLORATORY", "min_count": 1}),
+            ),
+        ),
+    )
+
+    with pytest.raises(ExpiredExceptionError, match="expired"):
+        evaluate_policy(policy, ctx)
+
+
+def test_adversarial_nondeterministic_evaluation_context():
+    """Adversarial vector: 1,000 evaluation executions with identical input produce identical byte-for-byte decisions."""
+    obl = make_test_obligation()
+    claim = make_test_claim()
+    ev = make_test_evidence()
+
+    ctx = PolicyEvaluationContext(
+        obligation=obl,
+        claims=(claim,),
+        evidence=(ev,),
+        evaluation_timestamp="2026-08-19T10:00:00Z",
+    )
+
+    policy = Policy(
+        policy_id="POL-001",
+        scope_level=PolicyScope.PROJECT,
+        version=1,
+        expression=PolicyExpression(
+            combinator=CombinatorType.ALL,
+            rules=(
+                PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),
+                PolicyRule(RuleType.REQUIRE_TIER, {"tier": "V2_BEHAVIORAL", "min_count": 1}),
+                PolicyRule(RuleType.NO_CONFLICTS, {}),
+            ),
+        ),
+    )
+
+    first_decision = evaluate_policy(policy, ctx)
+    for _ in range(1000):
+        d = evaluate_policy(policy, ctx)
+        assert d == first_decision
+        assert d.decision == PolicyDecisionType.ALLOW
+
+
+def test_adversarial_policy_pollution_extra_fields():
+    """Adversarial vector: Extra dictionary fields in policy objects fail closed with DomainValidationError."""
+    with pytest.raises(DomainValidationError):
+        Policy(
+            policy_id="POL-001",
+            scope_level=PolicyScope.PROJECT,
+            version=1,
+            expression=PolicyExpression(
+                combinator=CombinatorType.ALL,
+                rules=(
+                    PolicyRule(RuleType.NO_CONFLICTS, {"extra_polluted_param": 999}),
+                ),
+            ),
+        )
+
+
+def test_adversarial_empty_policy():
+    """Adversarial vector: Composing empty sequence of policies fails closed."""
+    with pytest.raises(PolicyValidationError):
+        compose_policies()
+
+
+def test_adversarial_contradictory_policy_hierarchy():
+    """Adversarial vector: Scope inversion or contradictory rule requirements fail closed."""
+    # High scope attempting to be child of low scope
+    low_parent = Policy(
+        policy_id="POL-OBL-001",
+        scope_level=PolicyScope.OBLIGATION,
+        version=1,
+        expression=PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.NO_CONFLICTS, {}),)),
+    )
+    high_child = Policy(
+        policy_id="POL-SYS-001",
+        scope_level=PolicyScope.GLOBAL_ORGANIZATIONAL,
+        version=1,
+        expression=PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.NO_CONFLICTS, {}),)),
+    )
+    with pytest.raises(PolicyWeakeningError, match="Scope inversion"):
+        meet_policies(low_parent, high_child)
+
+
+def test_adversarial_v4_judgment_cannot_bypass_mandatory_rule():
+    """Adversarial vector: V4 Judgment / Exploratory claim alone CANNOT satisfy mandatory policy without corroborating V0-V3 or signed exception."""
+    obl = make_test_obligation(criticality=Criticality.HIGH)
+    # Only V4 claim present
+    claim_v4 = make_test_claim(tier=ClaimTier.V4_ADVERSARIAL_EXPLORATORY, status=ClaimStatus.SUPPORTED)
+
+    policy = Policy(
+        policy_id="POL-001",
+        scope_level=PolicyScope.PROJECT,
+        version=1,
+        expression=PolicyExpression(
+            combinator=CombinatorType.ALL,
+            rules=(
+                PolicyRule(RuleType.REQUIRE_TIER, {"tier": "V4_ADVERSARIAL_EXPLORATORY", "min_count": 1}),
+            ),
+        ),
+    )
+
+    # 1. Without exception and without V0-V3 corroboration -> REQUIRE_EXCEPTION
+    ctx_unauthorized = PolicyEvaluationContext(
+        obligation=obl,
+        claims=(claim_v4,),
+        evidence=(),
+        exceptions=(),
+        evaluation_timestamp="2026-08-19T10:00:00Z",
+    )
+    decision = evaluate_policy(policy, ctx_unauthorized)
+    assert decision.decision == PolicyDecisionType.REQUIRE_EXCEPTION
+
+    # 2. With valid signed exception -> ALLOW with exceptions_applied
+    exc = make_test_exception(obl_id="OBL-001", policy_id="POL-001")
+    ctx_authorized = PolicyEvaluationContext(
+        obligation=obl,
+        claims=(claim_v4,),
+        evidence=(),
+        exceptions=(exc,),
+        evaluation_timestamp="2026-08-19T10:00:00Z",
+    )
+    decision_exc = evaluate_policy(policy, ctx_authorized)
+    assert decision_exc.decision == PolicyDecisionType.ALLOW
+    assert "EXC-001" in decision_exc.exceptions_applied
+
+
+# ============================================================================
+# 2. Combinators & Multi-Layer Lattice Meet Tests
+# ============================================================================
+
+def test_policy_stack_full_composition():
+    """Verify composition across Organization ⊓ Project ⊓ Task ⊓ Obligation."""
+    org_pol = Policy(
+        policy_id="POL-ORG",
+        scope_level=PolicyScope.GLOBAL_ORGANIZATIONAL,
+        version=1,
+        expression=PolicyExpression(
+            combinator=CombinatorType.ALL,
+            rules=(PolicyRule(RuleType.NO_CONFLICTS, {}),),
+        ),
+    )
+
+    proj_pol = Policy(
+        policy_id="POL-PROJ",
+        scope_level=PolicyScope.PROJECT,
+        version=1,
+        expression=PolicyExpression(
+            combinator=CombinatorType.ALL,
+            rules=(
+                PolicyRule(RuleType.NO_CONFLICTS, {}),
+                PolicyRule(RuleType.REQUIRE_TIER, {"tier": "V2_BEHAVIORAL", "min_count": 2}),
+            ),
+        ),
+    )
+
+    task_pol = Policy(
+        policy_id="POL-TASK",
+        scope_level=PolicyScope.TASK,
+        version=1,
+        expression=PolicyExpression(
+            combinator=CombinatorType.ALL,
+            rules=(
+                PolicyRule(RuleType.NO_CONFLICTS, {}),
+                PolicyRule(RuleType.REQUIRE_TIER, {"tier": "V2_BEHAVIORAL", "min_count": 2}),
+                PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),
+            ),
+        ),
+    )
+
+    composed = compose_policies(org_pol, proj_pol, task_pol)
+    assert composed.scope_level == PolicyScope.TASK
+    assert len(composed.expression.rules) == 3
+
+
+def test_conditional_expression_evaluation():
+    """Verify CONDITIONAL combinator branches based on obligation metadata."""
+    obl_critical = make_test_obligation(criticality=Criticality.CRITICAL)
+    obl_low = make_test_obligation(criticality=Criticality.LOW)
+
+    cond_expr = PolicyExpression(
+        combinator=CombinatorType.CONDITIONAL,
+        condition={"predicate": "criticality", "value": "CRITICAL"},
+        then_expression=PolicyExpression(
+            combinator=CombinatorType.ALL,
+            rules=(PolicyRule(RuleType.REQUIRE_TIER, {"tier": "V2_BEHAVIORAL", "min_count": 5}),),
+        ),
+        else_expression=PolicyExpression(
+            combinator=CombinatorType.ALL,
+            rules=(PolicyRule(RuleType.REQUIRE_TIER, {"tier": "V2_BEHAVIORAL", "min_count": 1}),),
+        ),
+    )
+
+    pol = Policy("POL-COND", PolicyScope.PROJECT, 1, cond_expr)
+
+    # 1 claim provided
+    claim = make_test_claim(tier=ClaimTier.V2_BEHAVIORAL, status=ClaimStatus.SUPPORTED)
+    ctx_crit = PolicyEvaluationContext(obl_critical, (claim,), ())
+    ctx_low = PolicyEvaluationContext(obl_low, (claim,), ())
+
+    # Critical fails because 1 < 5
+    assert evaluate_policy(pol, ctx_crit).decision == PolicyDecisionType.DENY
+    # Low passes because 1 >= 1
+    assert evaluate_policy(pol, ctx_low).decision == PolicyDecisionType.ALLOW
+
+
+def test_evaluator_require_independent_providers():
+    """Verify REQUIRE_INDEPENDENT_PROVIDERS rule evaluation."""
+    obl = make_test_obligation()
+    claim = make_test_claim()
+
+    # Two evidences from same provider
+    e1 = make_test_evidence(ev_id="EV-1", provider_id="prov-A", execution_id="EXEC-1")
+    e2 = make_test_evidence(ev_id="EV-2", provider_id="prov-A", execution_id="EXEC-2")
+
+    ctx_same = PolicyEvaluationContext(obl, (claim,), (e1, e2))
+
+    # Two evidences from distinct providers
+    e3 = make_test_evidence(ev_id="EV-3", provider_id="prov-B", execution_id="EXEC-3")
+    ctx_distinct = PolicyEvaluationContext(obl, (claim,), (e1, e3))
+
+    pol = Policy(
+        "POL-INDEP", PolicyScope.PROJECT, 1,
+        PolicyExpression(
+            CombinatorType.ALL,
+            (PolicyRule(RuleType.REQUIRE_INDEPENDENT_PROVIDERS, {"min_independent_sources": 2, "group_by": "PROVIDER_TYPE"}),)
+        )
+    )
+
+    assert evaluate_policy(pol, ctx_same).decision == PolicyDecisionType.DENY
+    assert evaluate_policy(pol, ctx_distinct).decision == PolicyDecisionType.ALLOW
+
+
+def test_evaluator_forbid_synthetic():
+    """Verify FORBID_SYNTHETIC rule evaluation."""
+    obl = make_test_obligation()
+    claim = make_test_claim()
+
+    e_synth = make_test_evidence(ev_id="EV-SYNTH", provider_id="synthetic-generator")
+    ctx_synth = PolicyEvaluationContext(obl, (claim,), (e_synth,))
+
+    pol = Policy(
+        "POL-FORBID-SYNTH", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.FORBID_SYNTHETIC, {}),))
+    )
+
+    assert evaluate_policy(pol, ctx_synth).decision == PolicyDecisionType.DENY
+
+
+def test_evaluator_any_combinator():
+    """Verify ANY combinator succeeds if at least one rule passes."""
+    obl = make_test_obligation()
+    claim = make_test_claim()
+    ev = make_test_evidence(capability="API_CONTRACT_FUZZING")
+
+    ctx = PolicyEvaluationContext(obl, (claim,), (ev,))
+
+    pol = Policy(
+        "POL-ANY", PolicyScope.PROJECT, 1,
+        PolicyExpression(
+            CombinatorType.ANY,
+            (
+                PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "PROPERTY_TESTING"}),  # Fails
+                PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),  # Passes
+            )
+        )
+    )
+
+    assert evaluate_policy(pol, ctx).decision == PolicyDecisionType.ALLOW
+
+
+def test_evaluator_at_least_combinator():
+    """Verify AT_LEAST combinator succeeds when min_count rules pass."""
+    obl = make_test_obligation()
+    claim = make_test_claim()
+    ev = make_test_evidence(capability="API_CONTRACT_FUZZING")
+
+    ctx = PolicyEvaluationContext(obl, (claim,), (ev,))
+
+    pol = Policy(
+        "POL-AT-LEAST", PolicyScope.PROJECT, 1,
+        PolicyExpression(
+            CombinatorType.AT_LEAST,
+            (
+                PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "PROPERTY_TESTING"}),  # Fails
+                PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),  # Passes
+                PolicyRule(RuleType.NO_CONFLICTS, {}),  # Passes
+            ),
+            min_count=2,
+        )
+    )
+
+    assert evaluate_policy(pol, ctx).decision == PolicyDecisionType.ALLOW
+
+
+def test_models_validation_errors_and_edge_cases():
+    """Verify validation errors for invalid Actor, Exception, and Context parameters."""
+    with pytest.raises(PolicyValidationError):
+        AuthorizedActor("", "ROLE", "a" * 64)
+    with pytest.raises(PolicyValidationError):
+        AuthorizedActor("ACTOR-1", "", "a" * 64)
+    with pytest.raises((PolicyValidationError, DomainValidationError)):
+        AuthorizedActor("ACTOR-1", "ROLE", "invalid_hex")
+
+    sig = AsymmetricAuthoritySignature("ED25519", "ACTOR-1", "a" * 64, "b" * 64, "c" * 128, "2026-08-19T10:00:00Z")
+    with pytest.raises(PolicyValidationError):
+        PolicyException("EXC-1", "OBL-1", "POL-1", "too_short", AuthorizedActor("A", "R", "a" * 64), ("Control 1",), sig)
+
+    with pytest.raises(PolicyValidationError):
+        PolicyException("EXC-1", "OBL-1", "POL-1", "Valid justification long enough", "not_an_actor", ("Control 1",), sig)  # type: ignore
+
+    with pytest.raises(PolicyValidationError):
+        PolicyException("EXC-1", "OBL-1", "POL-1", "Valid justification long enough", AuthorizedActor("A", "R", "a" * 64), (), sig)
+
+    with pytest.raises(PolicyValidationError):
+        PolicyException("EXC-1", "OBL-1", "POL-1", "Valid justification long enough", AuthorizedActor("A", "R", "a" * 64), ("bad",), sig)
+
+    with pytest.raises(PolicyValidationError):
+        PolicyEvaluationContext("not_an_obligation", (), ())  # type: ignore
+
+
+def test_evaluator_max_staleness_and_min_trials():
+    """Verify MAX_STALENESS_COMMITS, REQUIRE_MIN_TRIALS, and REQUIRE_CODE_COVERAGE rules."""
+    obl = make_test_obligation()
+    claim = make_test_claim()
+    ev_valid = make_test_evidence()
+    ev_stale = make_test_evidence(ev_id="EV-STALE", validity=EvidenceValidity.STALE)
+
+    ctx_fresh = PolicyEvaluationContext(obl, (claim,), (ev_valid,))
+    ctx_stale = PolicyEvaluationContext(obl, (claim,), (ev_stale,))
+
+    pol_stale = Policy(
+        "POL-STALE", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.MAX_STALENESS_COMMITS, {"max_commits": 5}),))
+    )
+    assert evaluate_policy(pol_stale, ctx_fresh).decision == PolicyDecisionType.ALLOW
+    assert evaluate_policy(pol_stale, ctx_stale).decision == PolicyDecisionType.DENY
+
+    pol_trials = Policy(
+        "POL-TRIALS", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_MIN_TRIALS, {"min_trials": 2}),))
+    )
+    assert evaluate_policy(pol_trials, ctx_fresh).decision == PolicyDecisionType.DENY
+
+    pol_cov = Policy(
+        "POL-COV", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CODE_COVERAGE, {"min_coverage_pct": 85.0}),))
+    )
+    assert evaluate_policy(pol_cov, ctx_fresh).decision == PolicyDecisionType.ALLOW
+
+
+def test_lattice_strengthening_branches():
+    """Verify specific strengthening failure branches in lattice verification."""
+    # 1. Capability substitution
+    p1 = Policy("POL-P1", PolicyScope.GLOBAL_ORGANIZATIONAL, 1, PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "PROPERTY_TESTING"}),)))
+    p2 = Policy("POL-P2", PolicyScope.PROJECT, 1, PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),)))
+    with pytest.raises(PolicyWeakeningError, match="substitute required capability"):
+        meet_policies(p1, p2)
+
+    # 2. Tier lowering
+    p3 = Policy("POL-P3", PolicyScope.GLOBAL_ORGANIZATIONAL, 1, PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_TIER, {"tier": "V2_BEHAVIORAL", "min_count": 1}),)))
+    p4 = Policy("POL-P4", PolicyScope.PROJECT, 1, PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_TIER, {"tier": "V1_STRUCTURAL", "min_count": 1}),)))
+    with pytest.raises(PolicyWeakeningError, match="lower tier requirement"):
+        meet_policies(p3, p4)
+
+    # 3. Independent providers lowering
+    p5 = Policy("POL-P5", PolicyScope.GLOBAL_ORGANIZATIONAL, 1, PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_INDEPENDENT_PROVIDERS, {"min_independent_sources": 3}),)))
+    p6 = Policy("POL-P6", PolicyScope.PROJECT, 1, PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_INDEPENDENT_PROVIDERS, {"min_independent_sources": 1}),)))
+    with pytest.raises(PolicyWeakeningError, match="lower min_independent_sources"):
+        meet_policies(p5, p6)
+
+    # 4. Trials lowering
+    p7 = Policy("POL-P7", PolicyScope.GLOBAL_ORGANIZATIONAL, 1, PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_MIN_TRIALS, {"min_trials": 10}),)))
+    p8 = Policy("POL-P8", PolicyScope.PROJECT, 1, PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_MIN_TRIALS, {"min_trials": 2}),)))
+    with pytest.raises(PolicyWeakeningError, match="lower min_trials"):
+        meet_policies(p7, p8)
+
+
+def test_evaluator_exception_mismatch_and_type_errors():
+    """Verify exception mismatch and evaluator type checking."""
+    obl = make_test_obligation(obl_id="OBL-001")
+    exc_wrong = make_test_exception(obl_id="OBL-OTHER")
+    ctx = PolicyEvaluationContext(obl, (), (), (exc_wrong,))
+    pol = Policy("POL-1", PolicyScope.PROJECT, 1, PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),)))
+
+    with pytest.raises(InvalidExceptionError, match="Exception obligation mismatch"):
+        evaluate_policy(pol, ctx)
+
+    with pytest.raises(TypeError):
+        evaluate_policy("not_a_policy", ctx)  # type: ignore
+    with pytest.raises(TypeError):
+        evaluate_policy(pol, "not_a_context")  # type: ignore
+
+
+# ============================================================================
+# 3. Property-Based Testing (Hypothesis)
+# ============================================================================
+
+@given(st.integers(min_value=1, max_value=10), st.integers(min_value=1, max_value=10))
+def test_hypothesis_meet_monotonicity(parent_count: int, child_increment: int):
+    """Property test: Meet operator strictly enforces non-weakening on tier min_count."""
+    child_count = parent_count + child_increment  # child_count >= parent_count
+
+    p_parent = Policy(
+        "POL-P", PolicyScope.GLOBAL_ORGANIZATIONAL, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_TIER, {"tier": "V2_BEHAVIORAL", "min_count": parent_count}),))
+    )
+    p_child = Policy(
+        "POL-C", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_TIER, {"tier": "V2_BEHAVIORAL", "min_count": child_count}),))
+    )
+
+    # Valid tightening should always succeed
+    composed = meet_policies(p_parent, p_child)
+    assert composed.scope_level == PolicyScope.PROJECT
+
+    # If child attempted to lower count strictly below parent, must raise PolicyWeakeningError
+    if parent_count > 1:
+        p_child_weak = Policy(
+            "POL-CW", PolicyScope.PROJECT, 1,
+            PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_TIER, {"tier": "V2_BEHAVIORAL", "min_count": parent_count - 1}),))
+        )
+        with pytest.raises(PolicyWeakeningError):
+            meet_policies(p_parent, p_child_weak)

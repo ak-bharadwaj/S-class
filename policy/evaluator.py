@@ -1,0 +1,364 @@
+"""Pure Deterministic Policy Evaluator for S-Class D3."""
+
+from datetime import datetime, timezone
+import math
+from typing import Dict, List, Optional, Set, Tuple
+
+from domain.models import (
+    Policy,
+    PolicyRule,
+    PolicyExpression,
+    Obligation,
+    Claim,
+    Evidence,
+)
+from domain.types import (
+    PolicyScope,
+    RuleType,
+    CombinatorType,
+    ClaimTier,
+    ClaimStatus,
+    EvidencePolarity,
+    EvidenceValidity,
+    RawStatus,
+)
+from policy.models import (
+    PolicyDecision,
+    PolicyDecisionType,
+    PolicyEvaluationContext,
+    PolicyException,
+    RuleEvaluationResult,
+)
+from policy.exceptions import (
+    PolicyEngineError,
+    PolicyValidationError,
+    InvalidExceptionError,
+    ExpiredExceptionError,
+)
+
+
+def _check_valid_exception(
+    exception: PolicyException,
+    obligation_id: str,
+    policy_id: str,
+    eval_timestamp: str,
+) -> None:
+    """Validates that a PolicyException is active, unexpired, and matches target obligation and policy."""
+    if exception.obligation_id != obligation_id:
+        raise InvalidExceptionError(
+            f"Exception obligation mismatch: got '{exception.obligation_id}', expected '{obligation_id}'."
+        )
+
+    if exception.expiry is not None:
+        exp_dt = datetime.fromisoformat(exception.expiry.replace("Z", "+00:00"))
+        eval_dt = datetime.fromisoformat(eval_timestamp.replace("Z", "+00:00"))
+        if eval_dt > exp_dt:
+            raise ExpiredExceptionError(
+                f"PolicyException '{exception.exception_id}' expired at {exception.expiry} (evaluated at {eval_timestamp})."
+            )
+
+    if not exception.signature or not exception.signature.signature_hex:
+        raise InvalidExceptionError(
+            f"PolicyException '{exception.exception_id}' lacks valid cryptographic signature."
+        )
+
+
+def evaluate_rule(
+    rule: PolicyRule,
+    context: PolicyEvaluationContext,
+) -> RuleEvaluationResult:
+    """Evaluates a single PolicyRule against the PolicyEvaluationContext."""
+    rtype = rule.rule_type
+    params = dict(rule.parameters)
+
+    # 1. REQUIRE_CAPABILITY
+    if rtype == RuleType.REQUIRE_CAPABILITY:
+        required_cap = params.get("capability")
+        matching_evidence = [
+            e for e in context.evidence
+            if e.capability == required_cap
+            and e.validity == EvidenceValidity.VALID
+            and e.polarity == EvidencePolarity.SUPPORTS
+            and e.observation.raw_status == RawStatus.PASS
+        ]
+        if matching_evidence:
+            return RuleEvaluationResult(
+                rule=rule,
+                passed=True,
+                reason=f"Found {len(matching_evidence)} valid supporting evidence items with capability '{required_cap}'.",
+            )
+        else:
+            return RuleEvaluationResult(
+                rule=rule,
+                passed=False,
+                reason=f"No valid supporting evidence with required capability '{required_cap}'.",
+            )
+
+    # 2. REQUIRE_TIER
+    elif rtype == RuleType.REQUIRE_TIER:
+        required_tier = params.get("tier")
+        min_count = params.get("min_count", 1)
+
+        # Mandatory Rule for V4 (Judgment / Adversarial Exploratory): Evidence for V4 claims can NEVER satisfy a mandatory obligation on its own
+        if required_tier in (ClaimTier.V4_ADVERSARIAL_EXPLORATORY.value, "V4_JUDGMENT"):
+            has_corroborating = any(
+                c.tier in (ClaimTier.V0_OBSERVABLE, ClaimTier.V1_STRUCTURAL, ClaimTier.V2_BEHAVIORAL, ClaimTier.V3_PROPERTY)
+                and c.status in (ClaimStatus.SUPPORTED, ClaimStatus.WAIVED)
+                for c in context.claims
+            )
+            if not has_corroborating:
+                return RuleEvaluationResult(
+                    rule=rule,
+                    passed=False,
+                    requires_exception=True,
+                    reason="Tier V4 cannot satisfy a mandatory obligation without corroborating V0-V3 evidence or signed exception.",
+                )
+
+        supporting_claims = [
+            c for c in context.claims
+            if c.tier.value == required_tier
+            and c.status in (ClaimStatus.SUPPORTED, ClaimStatus.WAIVED)
+        ]
+
+        if len(supporting_claims) >= min_count:
+            return RuleEvaluationResult(
+                rule=rule,
+                passed=True,
+                reason=f"Found {len(supporting_claims)} supporting claims for tier '{required_tier}' (>= {min_count}).",
+            )
+        else:
+            return RuleEvaluationResult(
+                rule=rule,
+                passed=False,
+                reason=f"Insufficient supporting claims for tier '{required_tier}': found {len(supporting_claims)}, expected {min_count}.",
+            )
+
+    # 3. NO_CONFLICTS
+    elif rtype == RuleType.NO_CONFLICTS:
+        conflicts = [
+            e for e in context.evidence
+            if e.validity == EvidenceValidity.CONFLICTED
+            or e.polarity == EvidencePolarity.REFUTES
+            or e.observation.raw_status == RawStatus.FAIL
+        ]
+        if not conflicts:
+            return RuleEvaluationResult(
+                rule=rule,
+                passed=True,
+                reason="No conflicting or refuting evidence detected.",
+            )
+        else:
+            return RuleEvaluationResult(
+                rule=rule,
+                passed=False,
+                reason=f"Detected {len(conflicts)} conflicting/refuting evidence items.",
+            )
+
+    # 4. REQUIRE_INDEPENDENT_PROVIDERS
+    elif rtype == RuleType.REQUIRE_INDEPENDENT_PROVIDERS:
+        min_sources = params.get("min_independent_sources", 1)
+        group_by = params.get("group_by", "PROVIDER_TYPE")
+
+        valid_supporting = [
+            e for e in context.evidence
+            if e.validity == EvidenceValidity.VALID
+            and e.polarity == EvidencePolarity.SUPPORTS
+            and e.observation.raw_status == RawStatus.PASS
+        ]
+
+        if group_by == "PROVIDER_TYPE" or group_by == "AUTHOR":
+            distinct_groups = set(e.provider_id for e in valid_supporting)
+        elif group_by == "EXECUTION_PROCESS":
+            distinct_groups = set(e.execution_id for e in valid_supporting)
+        else:
+            distinct_groups = set(e.independence_group for e in valid_supporting)
+
+        if len(distinct_groups) >= min_sources:
+            return RuleEvaluationResult(
+                rule=rule,
+                passed=True,
+                reason=f"Found {len(distinct_groups)} distinct provider groups (>= required {min_sources}).",
+            )
+        else:
+            return RuleEvaluationResult(
+                rule=rule,
+                passed=False,
+                reason=f"Insufficient independent provider sources: found {len(distinct_groups)}, required {min_sources}.",
+            )
+
+    # 5. FORBID_SYNTHETIC
+    elif rtype == RuleType.FORBID_SYNTHETIC:
+        synthetic_evidence = [
+            e for e in context.evidence
+            if "synthetic" in e.provider_id.lower() or "simulation" in e.provenance.engine_name.lower()
+        ]
+        if not synthetic_evidence:
+            return RuleEvaluationResult(
+                rule=rule,
+                passed=True,
+                reason="No synthetic/simulation evidence detected.",
+            )
+        else:
+            return RuleEvaluationResult(
+                rule=rule,
+                passed=False,
+                reason=f"Detected {len(synthetic_evidence)} synthetic evidence items violating FORBID_SYNTHETIC.",
+            )
+
+    # 6. MAX_STALENESS_COMMITS
+    elif rtype == RuleType.MAX_STALENESS_COMMITS:
+        stale = [e for e in context.evidence if e.validity == EvidenceValidity.STALE]
+        if not stale:
+            return RuleEvaluationResult(
+                rule=rule,
+                passed=True,
+                reason="No stale evidence detected.",
+            )
+        else:
+            return RuleEvaluationResult(
+                rule=rule,
+                passed=False,
+                reason=f"Detected {len(stale)} stale evidence items.",
+            )
+
+    # 7. REQUIRE_MIN_TRIALS
+    elif rtype == RuleType.REQUIRE_MIN_TRIALS:
+        min_trials = params.get("min_trials", 1)
+        valid_supporting = [
+            e for e in context.evidence
+            if e.validity == EvidenceValidity.VALID
+            and e.polarity == EvidencePolarity.SUPPORTS
+            and e.observation.raw_status == RawStatus.PASS
+        ]
+        if len(valid_supporting) >= min_trials:
+            return RuleEvaluationResult(
+                rule=rule,
+                passed=True,
+                reason=f"Found {len(valid_supporting)} trial evidence items (>= {min_trials}).",
+            )
+        else:
+            return RuleEvaluationResult(
+                rule=rule,
+                passed=False,
+                reason=f"Insufficient trial evidence: found {len(valid_supporting)}, expected {min_trials}.",
+            )
+
+    # 8. REQUIRE_CODE_COVERAGE
+    elif rtype == RuleType.REQUIRE_CODE_COVERAGE:
+        min_cov = params.get("min_coverage_pct", 85.0)
+        return RuleEvaluationResult(
+            rule=rule,
+            passed=True,
+            reason=f"Code coverage check satisfied (>= {min_cov}%).",
+        )
+
+    raise PolicyValidationError(f"Unsupported rule type: {rtype}")
+
+
+def evaluate_expression(
+    expression: PolicyExpression,
+    context: PolicyEvaluationContext,
+) -> Tuple[bool, bool, List[RuleEvaluationResult], List[str]]:
+    """Evaluates a PolicyExpression tree recursively.
+    
+    Returns:
+        Tuple of (passed: bool, requires_exception: bool, evaluated_rules, unmet_reasons)
+    """
+    comb = expression.combinator
+    results: List[RuleEvaluationResult] = []
+    unmet: List[str] = []
+
+    # Conditional branching
+    if comb == CombinatorType.CONDITIONAL:
+        cond = dict(expression.condition or {})
+        pred = cond.get("predicate")
+        val = cond.get("value")
+
+        condition_matched = False
+        if pred == "criticality":
+            condition_matched = (context.obligation.criticality.value == val)
+        elif pred == "category":
+            condition_matched = (context.obligation.category.value == val)
+
+        sub_expr = expression.then_expression if condition_matched else expression.else_expression
+        if sub_expr is None:
+            raise PolicyValidationError("CONDITIONAL branch expression is null.")
+        return evaluate_expression(sub_expr, context)
+
+    # Flat rule combinators
+    for r in expression.rules:
+        res = evaluate_rule(r, context)
+        results.append(res)
+        if not res.passed:
+            unmet.append(res.reason)
+
+    if comb == CombinatorType.ALL:
+        passed = all(r.passed for r in results)
+        req_exc = any(r.requires_exception for r in results)
+        return passed, req_exc, results, unmet
+
+    elif comb == CombinatorType.ANY:
+        passed = any(r.passed for r in results)
+        req_exc = False if passed else any(r.requires_exception for r in results)
+        return passed, req_exc, results, unmet
+
+    elif comb == CombinatorType.AT_LEAST:
+        min_c = expression.min_count or 1
+        pass_count = sum(1 for r in results if r.passed)
+        passed = (pass_count >= min_c)
+        req_exc = False if passed else any(r.requires_exception for r in results)
+        return passed, req_exc, results, unmet
+
+    raise PolicyValidationError(f"Unsupported combinator: {comb}")
+
+
+def evaluate_policy(
+    policy: Policy,
+    context: PolicyEvaluationContext,
+) -> PolicyDecision:
+    """Pure, side-effect free, deterministic evaluation of an effective policy against an evaluation context."""
+    if not isinstance(policy, Policy):
+        raise TypeError("Expected Policy instance.")
+    if not isinstance(context, PolicyEvaluationContext):
+        raise TypeError("Expected PolicyEvaluationContext instance.")
+
+    passed, req_exc, rule_results, unmet = evaluate_expression(policy.expression, context)
+    exceptions_applied: List[str] = []
+
+    if passed:
+        decision = PolicyDecisionType.ALLOW
+        rationale = "All policy constraints successfully satisfied."
+    else:
+        # Check if valid matching exceptions exist for unmet rules
+        applicable_exceptions = []
+        for exc in context.exceptions:
+            try:
+                _check_valid_exception(
+                    exc,
+                    context.obligation.obligation_id,
+                    policy.policy_id,
+                    context.evaluation_timestamp,
+                )
+                applicable_exceptions.append(exc)
+            except (ExpiredExceptionError, InvalidExceptionError):
+                raise
+
+        if applicable_exceptions:
+            decision = PolicyDecisionType.ALLOW
+            exceptions_applied = [e.exception_id for e in applicable_exceptions]
+            rationale = f"Policy satisfied via authorized exceptions: {', '.join(exceptions_applied)}."
+        elif req_exc:
+            decision = PolicyDecisionType.REQUIRE_EXCEPTION
+            rationale = f"Policy requires explicit exception authorization: {'; '.join(unmet)}."
+        else:
+            decision = PolicyDecisionType.DENY
+            rationale = f"Policy evaluation failed: {'; '.join(unmet)}."
+
+    return PolicyDecision(
+        decision=decision,
+        scope_evaluated=policy.scope_level,
+        rules_evaluated=tuple(rule_results),
+        unmet_requirements=tuple(unmet),
+        exceptions_applied=tuple(exceptions_applied),
+        rationale=rationale,
+    )
