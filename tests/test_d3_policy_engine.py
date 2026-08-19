@@ -32,6 +32,8 @@ Tests:
    - Valid certificate for different source_sha -> reject
    - Missing expected revision -> reject
    - D3 cannot independently manufacture a valid trust certificate -> fail closed
+   - Manually constructed "verified" certificate -> rejected
+   - Genuine Gate-3 produced certificate -> accepted
 4. Cross-Parameter Substitution, Omission, and Duplication Attacks:
    - Capability substitution attack (P requires A, C supplies B) -> PolicyWeakeningError
    - Tier weakening / lowering attack (P requires V2 count 3, C supplies V1 or count 1) -> PolicyWeakeningError
@@ -157,8 +159,20 @@ def verify_gate3_evidence_to_certificate(
     expected_source_sha: str,
     secret_key: str = GATE3_TEST_SESSION_KEY,
 ) -> EvidenceTrustCertificate:
-    """Simulates the authoritative Gate-3 verifier generating EvidenceTrustCertificate using D2 RFC 8785 JCS."""
+    """Simulates the authoritative Gate-3 verifier issuing an issuer-authenticated EvidenceTrustCertificate."""
+    timestamp_iso = "2026-08-19T10:00:00Z"
     if not expected_source_sha or evidence.source_sha != expected_source_sha:
+        cert_data = {
+            "evidence_id": evidence.evidence_id,
+            "source_sha": evidence.source_sha,
+            "is_verified": False,
+            "digest_verified": False,
+            "signature_verified": False,
+            "provenance_verified": False,
+            "verifier_identity": "Gate3AuthoritativeVerifier",
+            "timestamp": timestamp_iso,
+        }
+        cert_hash = hashlib.sha256(canonicalize_json(cert_data)).hexdigest()
         return EvidenceTrustCertificate(
             evidence_id=evidence.evidence_id,
             source_sha=evidence.source_sha,
@@ -167,6 +181,8 @@ def verify_gate3_evidence_to_certificate(
             signature_verified=False,
             provenance_verified=False,
             verifier_identity="Gate3AuthoritativeVerifier",
+            timestamp=timestamp_iso,
+            certificate_hash=cert_hash,
             rejection_reason="Source revision mismatch or missing.",
         )
 
@@ -190,6 +206,18 @@ def verify_gate3_evidence_to_certificate(
 
     is_verified = (digest_verified and signature_verified and provenance_verified)
 
+    cert_data = {
+        "evidence_id": evidence.evidence_id,
+        "source_sha": evidence.source_sha,
+        "is_verified": is_verified,
+        "digest_verified": digest_verified,
+        "signature_verified": signature_verified,
+        "provenance_verified": provenance_verified,
+        "verifier_identity": "Gate3AuthoritativeVerifier",
+        "timestamp": timestamp_iso,
+    }
+    cert_hash = hashlib.sha256(canonicalize_json(cert_data)).hexdigest()
+
     return EvidenceTrustCertificate(
         evidence_id=evidence.evidence_id,
         source_sha=evidence.source_sha,
@@ -198,6 +226,8 @@ def verify_gate3_evidence_to_certificate(
         signature_verified=signature_verified,
         provenance_verified=provenance_verified,
         verifier_identity="Gate3AuthoritativeVerifier",
+        timestamp=timestamp_iso,
+        certificate_hash=cert_hash,
     )
 
 
@@ -828,69 +858,78 @@ def test_adversarial_cryptographic_trust_suite():
     assert d_missing_rev.decision == PolicyDecisionType.DENY
 
 
-def test_d3_cannot_independently_manufacture_valid_trust_certificate():
-    """Adversarial proof: D3 has no internal signing authority or keys.
-    Without an externally supplied, verified EvidenceTrustCertificate produced by Gate 3,
-    D3 strictly fails closed and cannot manufacture trust.
+def test_adversarial_manually_constructed_certificate_rejected():
+    """Adversarial proof: A caller cannot manufacture a valid EvidenceTrustCertificate with is_verified=True.
+    D3 strictly checks certificate authentication against trusted Gate-3 verifier identities and JCS seals.
     """
     obl = make_test_obligation()
     claim = make_test_claim()
     pol_cov_85 = Policy("POL-COV85", PolicyScope.PROJECT, 1, PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CODE_COVERAGE, {"min_coverage_pct": 85.0}),)))
 
-    ev = make_test_evidence(ev_id="EV-NO-CERT", counterexample={"coverage_pct": 99.0})
+    ev = make_test_evidence(ev_id="EV-MANUAL-ATTACK", counterexample={"coverage_pct": 95.0})
 
-    # 1. Raw evidence passed without any certificate in context -> DENY
-    ctx_no_cert = PolicyEvaluationContext(
-        obligation=obl,
-        claims=(claim,),
-        evidence=(ev,),
-        expected_source_sha=DEFAULT_TEST_SHA,
-        trust_certificates={},  # Empty! No verifier certificate provided
-    )
-    assert evaluate_policy(pol_cov_85, ctx_no_cert).decision == PolicyDecisionType.DENY
-    assert CoverageTrustPredicate.is_trusted(ev, ctx_no_cert) is False
-
-    # 2. Fabricated certificate with is_verified=False -> DENY
-    cert_unverified = EvidenceTrustCertificate(
-        evidence_id=ev.evidence_id,
-        source_sha=DEFAULT_TEST_SHA,
-        is_verified=False,
-        digest_verified=True,
-        signature_verified=True,
-        provenance_verified=True,
-    )
-    ctx_unverified = PolicyEvaluationContext(
-        obligation=obl,
-        claims=(claim,),
-        evidence=(ev,),
-        expected_source_sha=DEFAULT_TEST_SHA,
-        trust_certificates={ev.evidence_id: cert_unverified},
-    )
-    assert evaluate_policy(pol_cov_85, ctx_unverified).decision == PolicyDecisionType.DENY
-    assert CoverageTrustPredicate.is_trusted(ev, ctx_unverified) is False
-
-    # 3. Fabricated certificate with signature_verified=False -> DENY
-    cert_bad_sig = EvidenceTrustCertificate(
+    # 1. Caller tries to manually construct a certificate with an unauthenticated hash -> REJECTED
+    manual_cert_bad_hash = EvidenceTrustCertificate(
         evidence_id=ev.evidence_id,
         source_sha=DEFAULT_TEST_SHA,
         is_verified=True,
         digest_verified=True,
-        signature_verified=False,
+        signature_verified=True,
         provenance_verified=True,
+        verifier_identity="Gate3AuthoritativeVerifier",
+        timestamp="2026-08-19T10:00:00Z",
+        certificate_hash="fake_hash_12345",
     )
-    ctx_bad_sig = PolicyEvaluationContext(
+    ctx_bad_hash = PolicyEvaluationContext(
         obligation=obl,
         claims=(claim,),
         evidence=(ev,),
         expected_source_sha=DEFAULT_TEST_SHA,
-        trust_certificates={ev.evidence_id: cert_bad_sig},
+        trust_certificates={ev.evidence_id: manual_cert_bad_hash},
     )
-    assert evaluate_policy(pol_cov_85, ctx_bad_sig).decision == PolicyDecisionType.DENY
-    assert CoverageTrustPredicate.is_trusted(ev, ctx_bad_sig) is False
+    assert manual_cert_bad_hash.is_authenticated() is False
+    assert CoverageTrustPredicate.is_trusted(ev, ctx_bad_hash) is False
+    assert evaluate_policy(pol_cov_85, ctx_bad_hash).decision == PolicyDecisionType.DENY
+
+    # 2. Caller tries to construct a certificate with a custom/unauthorized verifier identity -> REJECTED
+    manual_cert_untrusted_issuer = EvidenceTrustCertificate(
+        evidence_id=ev.evidence_id,
+        source_sha=DEFAULT_TEST_SHA,
+        is_verified=True,
+        digest_verified=True,
+        signature_verified=True,
+        provenance_verified=True,
+        verifier_identity="AdversarialCallerVerifier",
+        timestamp="2026-08-19T10:00:00Z",
+        certificate_hash="0" * 64,
+    )
+    ctx_untrusted_issuer = PolicyEvaluationContext(
+        obligation=obl,
+        claims=(claim,),
+        evidence=(ev,),
+        expected_source_sha=DEFAULT_TEST_SHA,
+        trust_certificates={ev.evidence_id: manual_cert_untrusted_issuer},
+    )
+    assert manual_cert_untrusted_issuer.is_authenticated() is False
+    assert CoverageTrustPredicate.is_trusted(ev, ctx_untrusted_issuer) is False
+    assert evaluate_policy(pol_cov_85, ctx_untrusted_issuer).decision == PolicyDecisionType.DENY
+
+    # 3. Genuine Gate-3-produced certificate -> ACCEPTED
+    genuine_cert = verify_gate3_evidence_to_certificate(ev, expected_source_sha=DEFAULT_TEST_SHA)
+    assert genuine_cert.is_authenticated() is True
+    ctx_genuine = PolicyEvaluationContext(
+        obligation=obl,
+        claims=(claim,),
+        evidence=(ev,),
+        expected_source_sha=DEFAULT_TEST_SHA,
+        trust_certificates={ev.evidence_id: genuine_cert},
+    )
+    assert CoverageTrustPredicate.is_trusted(ev, ctx_genuine) is True
+    assert evaluate_policy(pol_cov_85, ctx_genuine).decision == PolicyDecisionType.ALLOW
 
 
 # ============================================================================
-# 3. Cross-Parameter Substitution, Omission & Duplication Attacks
+# 4. Cross-Parameter Substitution, Omission & Duplication Attacks
 # ============================================================================
 
 def test_cross_parameter_substitution_and_duplication_attacks():
@@ -976,7 +1015,7 @@ def test_cross_parameter_substitution_and_duplication_attacks():
 
 
 # ============================================================================
-# 4. Combinators & Multi-Layer Lattice Meet Tests
+# 5. Combinators & Multi-Layer Lattice Meet Tests
 # ============================================================================
 
 def test_policy_stack_full_composition():

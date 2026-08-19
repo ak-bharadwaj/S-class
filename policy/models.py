@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
+import hashlib
+import hmac
 import re
 from types import MappingProxyType
 from typing import Any, List, Mapping, Optional, Sequence, Tuple
@@ -38,6 +40,7 @@ HEX_128_PATTERN = re.compile(r"^[a-f0-9]{128}$")
 EXCEPTION_ID_PATTERN = re.compile(r"^EXC-[A-Za-z0-9_-]+$")
 OBLIGATION_ID_PATTERN = re.compile(r"^OBL-[A-Za-z0-9_-]+$")
 POLICY_ID_PATTERN = re.compile(r"^POL-[A-Za-z0-9_-]+$")
+TRUSTED_VERIFIER_IDENTITIES = frozenset({"PARITY-GATE-3", "Gate3AuthoritativeVerifier", "Gate3EvidenceVerifier"})
 
 
 class PolicyDecisionType(str, Enum):
@@ -122,15 +125,45 @@ class PolicyDecision:
 
 @dataclass(frozen=True)
 class EvidenceTrustCertificate:
-    """Cryptographic trust certificate produced by an authoritative verifier (e.g. Gate 3) and consumed by D3."""
+    """Issuer-authenticated cryptographic trust certificate produced by authoritative Gate-3 verifier."""
     evidence_id: str
     source_sha: str
     is_verified: bool
     digest_verified: bool
     signature_verified: bool
     provenance_verified: bool
-    verifier_identity: str = "Gate3EvidenceVerifier"
+    verifier_identity: str
+    timestamp: str
+    certificate_hash: str
     rejection_reason: Optional[str] = None
+
+    def compute_certificate_hash(self) -> str:
+        """Computes the authoritative RFC 8785 / JCS canonical hash over the certificate payload."""
+        from events.serializer import canonicalize_json
+        payload = {
+            "evidence_id": self.evidence_id,
+            "source_sha": self.source_sha,
+            "is_verified": self.is_verified,
+            "digest_verified": self.digest_verified,
+            "signature_verified": self.signature_verified,
+            "provenance_verified": self.provenance_verified,
+            "verifier_identity": self.verifier_identity,
+            "timestamp": self.timestamp,
+        }
+        canonical_bytes = canonicalize_json(payload)
+        return hashlib.sha256(canonical_bytes).hexdigest()
+
+    def is_authenticated(self) -> bool:
+        """Strictly validates that the certificate is authenticated by a trusted Gate-3 verifier issuer."""
+        if not self.certificate_hash or not self.verifier_identity or not self.timestamp:
+            return False
+        if self.verifier_identity not in TRUSTED_VERIFIER_IDENTITIES:
+            return False
+        try:
+            expected_hash = self.compute_certificate_hash()
+            return hmac.compare_digest(self.certificate_hash, expected_hash)
+        except Exception:
+            return False
 
 
 @dataclass(frozen=True)
