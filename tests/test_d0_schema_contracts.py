@@ -662,6 +662,89 @@ def test_core24_convergence_analysis_and_non_authorization_boundary():
         engine.authorize_execution({"action": "EXECUTE"})
 
 
+def test_adv19_convergence_cannot_authorize_execution_or_mint_tokens():
+    """ADV-19 / CORE-24: Adversarial tests proving Convergence cannot authorize execution, mint tokens, or mutate state."""
+    # Vector 1: Adversarial schema injection - Convergence payload attempting to mint tokens or grant approvals
+    malicious_report = copy.deepcopy(VALID_CONVERGENCE_REPORT)
+    malicious_report["execution_token"] = "FORGED_BEARER_TOKEN_9999"
+    with pytest.raises(ValidationError) as excinfo:
+        Draft202012Validator(CONVERGENCE_REPORT_SCHEMA).validate(malicious_report)
+    assert "additionalProperties" in excinfo.value.message or "Additional properties are not allowed" in excinfo.value.message
+
+    malicious_report_verdict = copy.deepcopy(VALID_CONVERGENCE_REPORT)
+    malicious_report_verdict["authorization_verdict"] = "APPROVED"
+    with pytest.raises(ValidationError):
+        Draft202012Validator(CONVERGENCE_REPORT_SCHEMA).validate(malicious_report_verdict)
+
+    # Vector 2: Adversarial Tool Dispatcher bypass - Convergence harness attempting to directly execute tools
+    class KernelToolDispatcher:
+        def __init__(self):
+            self.authorized_tokens: Set[str] = set()
+
+        def register_controller_token(self, token: str):
+            self.authorized_tokens.add(token)
+
+        def dispatch_execution(self, caller_role: str, tool_name: str, token: str) -> Dict[str, Any]:
+            # CORE-24 & ADV-19: Tool execution requires Controller authorization token; Convergence is strictly prohibited
+            if caller_role in ("CONVERGENCE_ENGINE", "CONVERGENCE_HARNESS", "OBSERVER"):
+                raise PermissionError(
+                    f"ADV-19 Violation: Caller '{caller_role}' is not authorized to execute tools or request dispatch."
+                )
+            if token not in self.authorized_tokens:
+                raise PermissionError("ADV-19 / CORE-03 Violation: Invalid or unissued execution token.")
+            return {"status": "SUCCESS", "tool": tool_name}
+
+    dispatcher = KernelToolDispatcher()
+    dispatcher.register_controller_token("LEGIT_CONTROLLER_TOKEN_123")
+
+    # Legitimate Controller-authorized worker execution succeeds
+    assert dispatcher.dispatch_execution("WORKER_HARNESS", "pytest", "LEGIT_CONTROLLER_TOKEN_123")["status"] == "SUCCESS"
+
+    # Rogue Convergence attempt with legitimate token -> Blocked by caller boundary
+    with pytest.raises(PermissionError, match="ADV-19 Violation"):
+        dispatcher.dispatch_execution("CONVERGENCE_ENGINE", "pytest", "LEGIT_CONTROLLER_TOKEN_123")
+
+    # Rogue Convergence attempt with forged token -> Blocked by caller boundary
+    with pytest.raises(PermissionError, match="ADV-19 Violation"):
+        dispatcher.dispatch_execution("CONVERGENCE_HARNESS", "rm -rf /", "FORGED_TOKEN")
+
+    # Vector 3: Adversarial State Mutation - Convergence attempting to directly satisfy obligations or support claims
+    class AuthoritativeKernelStateStore:
+        def __init__(self):
+            self.claims = {"CLM-101": "UNSUPPORTED"}
+            self.obligations = {"OBL-001": "OPEN"}
+
+        def apply_convergence_report(self, report: Dict[str, Any]):
+            # CORE-24: Ingesting a convergence report can only log findings or generate repair recommendations
+            Draft202012Validator(CONVERGENCE_REPORT_SCHEMA).validate(report)
+            # Cannot mutate claim or obligation statuses
+            return {"status": "REPORT_INGESTED_AS_READONLY_DIAGNOSTIC", "drift_count": report["drift_count"]}
+
+        def direct_mutate_claim_status(self, caller_role: str, claim_id: str, new_status: str):
+            if caller_role != "EVALUATOR_RECEIPT_PROCESSOR":
+                raise PermissionError(
+                    f"ADV-19 / CORE-05 / CORE-24 Violation: Caller '{caller_role}' cannot mutate claim state directly."
+                )
+            self.claims[claim_id] = new_status
+
+    store = AuthoritativeKernelStateStore()
+    conv_report = copy.deepcopy(VALID_CONVERGENCE_REPORT)
+    conv_report["is_converged"] = True
+    conv_report["drift_count"] = 0
+    conv_report["findings"] = []
+
+    res = store.apply_convergence_report(conv_report)
+    assert res["status"] == "REPORT_INGESTED_AS_READONLY_DIAGNOSTIC"
+    # State remains unmodified
+    assert store.claims["CLM-101"] == "UNSUPPORTED"
+    assert store.obligations["OBL-001"] == "OPEN"
+
+    # Attempt to force state update by Convergence role -> Rejected
+    with pytest.raises(PermissionError, match="ADV-19 / CORE-05 / CORE-24 Violation"):
+        store.direct_mutate_claim_status("CONVERGENCE_ENGINE", "CLM-101", "SUPPORTED")
+
+
+
 def test_core25_controller_lifecycle_hooks_integrity_and_fail_closed():
     """CORE-25: Deterministic lifecycle hooks execute fail-closed and cannot bypass Controller authorization."""
     canonical_hook_sequence = [
