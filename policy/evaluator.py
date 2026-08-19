@@ -53,14 +53,8 @@ class CoverageTrustPredicate:
     3. Provider capability matches coverage authorization
     4. Provider identity non-synthetic
     5. Provenance engine non-synthetic
-    6. Verified issuer-authenticated cryptographic trust certificate:
-       - cert.is_authenticated() == True (valid Gate-3 verifier seal and issuer hash)
-       - cert.is_verified == True
-       - cert.digest_verified == True
-       - cert.signature_verified == True
-       - cert.provenance_verified == True
-       - cert.source_sha == context.expected_source_sha
-       - cert.evidence_id == evidence.evidence_id
+    6. Verified issuer-authenticated cryptographic trust certificate via Gate-3 verifier:
+       verify_gate_3_evidence_trust_certificate(cert, expected_source_sha=context.expected_source_sha)
     """
 
     TRUSTED_COVERAGE_CAPABILITIES: Set[str] = {
@@ -116,25 +110,16 @@ class CoverageTrustPredicate:
         if not engine_name or any(f in engine_name for f in cls.FORBIDDEN_ENGINES):
             return False
 
-        # 6. Consume issuer-authenticated cryptographic trust certificate produced by Gate 3 verifier
+        # 6. Consume issuer-authenticated cryptographic trust certificate via Gate-3 verifier interface
         cert = context.trust_certificates.get(evidence.evidence_id)
         if cert is None:
             return False
 
-        if not isinstance(cert, EvidenceTrustCertificate):
+        from benchmark.parity.verify_gate_3_certificate import verify_gate_3_evidence_trust_certificate
+
+        if not verify_gate_3_evidence_trust_certificate(cert, expected_source_sha=context.expected_source_sha):
             return False
-        if not cert.is_authenticated():
-            return False
-        if not cert.is_verified:
-            return False
-        if not cert.digest_verified:
-            return False
-        if not cert.signature_verified:
-            return False
-        if not cert.provenance_verified:
-            return False
-        if cert.source_sha != context.expected_source_sha:
-            return False
+
         if cert.evidence_id != evidence.evidence_id:
             return False
 
@@ -184,7 +169,7 @@ def _extract_coverage_pct(
     - Provider capability matches coverage
     - Provenance present & valid
     - Target/revision binding valid
-    - Consumes verified issuer-authenticated trust certificate from Gate 3 verifier
+    - Consumes verified issuer-authenticated trust certificate via Gate 3 verifier interface
     
     Free-form text in observation.diagnostics is strictly rejected as unauthoritative.
     """
