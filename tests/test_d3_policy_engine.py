@@ -45,13 +45,14 @@ Tests:
    - Monotonicity: Strictness(P ⊓ Q) >= Strictness(P).
 """
 
+from __future__ import annotations
 from copy import deepcopy
 import hashlib
 import hmac
 import json
 import os
 import re
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Set, Tuple, Mapping
 from hypothesis import given, strategies as st, settings
 import jsonschema
 from jsonschema import Draft202012Validator

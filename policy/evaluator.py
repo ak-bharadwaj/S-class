@@ -1,5 +1,6 @@
 """Pure Deterministic Policy Evaluator for S-Class D3."""
 
+from __future__ import annotations
 from datetime import datetime, timezone
 import math
 import re

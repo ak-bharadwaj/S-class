@@ -1,5 +1,6 @@
 """D3 Policy Engine for S-Class EOS."""
 
+from __future__ import annotations
 from domain.models import Policy, PolicyRule, PolicyExpression
 from domain.types import PolicyScope, RuleType, CombinatorType
 from policy.models import (
