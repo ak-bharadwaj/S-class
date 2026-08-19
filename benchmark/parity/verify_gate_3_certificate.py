@@ -24,6 +24,10 @@ class Gate3PublicKeystore:
 
     @classmethod
     def set_public_key(cls, public_key: Any) -> None:
+        """Injects public key into verifier keystore with strict type validation."""
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+        if not isinstance(public_key, ed25519.Ed25519PublicKey):
+            raise TypeError(f"Expected Ed25519PublicKey instance, got {type(public_key).__name__}")
         cls._public_key = public_key
 
     @classmethod
@@ -36,11 +40,8 @@ class Gate3PublicKeystore:
             return cls._public_key
         env_pub_hex = os.environ.get("GATE3_AUTHORITY_PUBLIC_KEY")
         if env_pub_hex and len(env_pub_hex) == 64:
-            try:
-                from cryptography.hazmat.primitives.asymmetric import ed25519
-                return ed25519.Ed25519PublicKey.from_public_bytes(bytes.fromhex(env_pub_hex))
-            except ImportError:
-                return None
+            from cryptography.hazmat.primitives.asymmetric import ed25519
+            return ed25519.Ed25519PublicKey.from_public_bytes(bytes.fromhex(env_pub_hex))
         return None
 
 
@@ -51,6 +52,8 @@ def verify_gate_3_evidence_trust_certificate(
 ) -> bool:
     """Strictly validates an EvidenceTrustCertificate against the Gate 3 Asymmetric Authority."""
     from policy.models import EvidenceTrustCertificate
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+    from cryptography.exceptions import InvalidSignature
 
     if not isinstance(cert, EvidenceTrustCertificate):
         return False
@@ -79,11 +82,13 @@ def verify_gate_3_evidence_trust_certificate(
     if expected_source_sha is not None and cert.source_sha != expected_source_sha:
         return False
 
-    # 1. Obtain public verification key (verifier possesses ONLY public key)
+    # 1. Obtain and strictly typecheck public verification key
     pub_key = public_key or Gate3PublicKeystore.get_public_key()
     if pub_key is None:
         # Fails closed if public verification key is absent from the trust boundary
         return False
+    if not isinstance(pub_key, ed25519.Ed25519PublicKey):
+        raise TypeError(f"Expected Ed25519PublicKey instance, got {type(pub_key).__name__}")
 
     # 2. Check public key fingerprint match
     pub_bytes = pub_key.public_bytes_raw()
@@ -102,10 +107,7 @@ def verify_gate_3_evidence_trust_certificate(
         "verifier_identity": cert.verifier_identity,
         "timestamp": cert.timestamp,
     }
-    try:
-        canonical_bytes = canonicalize_json(cert_data)
-    except Exception:
-        return False
+    canonical_bytes = canonicalize_json(cert_data)
 
     # 4. Verify canonical payload digest match
     expected_digest = hashlib.sha256(canonical_bytes).hexdigest()
@@ -114,12 +116,11 @@ def verify_gate_3_evidence_trust_certificate(
     if not hmac.compare_digest(cert.authority_signature.payload_digest, expected_digest):
         return False
 
-    # 5. Cryptographic Ed25519 signature verification using public key
+    # 5. Cryptographic Ed25519 signature verification (narrowed exceptions only)
     try:
-        from cryptography.exceptions import InvalidSignature
         sig_bytes = bytes.fromhex(cert.authority_signature.signature_hex)
         pub_key.verify(sig_bytes, canonical_bytes)
-    except Exception:
+    except (InvalidSignature, ValueError):
         return False
 
     return True

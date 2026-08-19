@@ -33,6 +33,9 @@ Tests:
    - Missing expected revision -> reject
 4. Gate 3 Asymmetric Authority & Key Boundary Verification:
    - arbitrary caller cannot choose issuer key -> TypeError / protected keystore
+   - wrong key object -> TypeError
+   - malformed signature -> reject (returns False)
+   - invalid signature -> reject (returns False via InvalidSignature)
    - genuine authority signature -> ACCEPT
    - certificate signed by wrong key -> REJECT
    - modified certificate -> REJECT
@@ -782,6 +785,66 @@ def test_adversarial_caller_cannot_choose_issuer_key():
     ev = make_test_evidence(ev_id="EV-KEY-PARAM", counterexample={"coverage_pct": 95.0})
     with pytest.raises(TypeError):
         issue_gate_3_evidence_certificate(ev, expected_source_sha=DEFAULT_TEST_SHA, authority_key="UNAUTHORIZED_KEY")  # type: ignore
+
+
+def test_adversarial_wrong_key_object_type_errors():
+    """Adversarial check: Keystores strictly reject non-Ed25519 key types with TypeError."""
+    with pytest.raises(TypeError, match="Expected Ed25519PublicKey"):
+        Gate3PublicKeystore.set_public_key("invalid_string_key")  # type: ignore
+
+    with pytest.raises(TypeError, match="Expected Ed25519PublicKey"):
+        Gate3PublicKeystore.set_public_key(12345)  # type: ignore
+
+    with pytest.raises(TypeError, match="Expected Ed25519PrivateKey"):
+        Gate3AuthorityKeyStore.set_private_key("invalid_private_key")  # type: ignore
+
+    ev = make_test_evidence(ev_id="EV-KEY-OBJ", counterexample={"coverage_pct": 95.0})
+    cert = issue_gate_3_evidence_certificate(ev, expected_source_sha=DEFAULT_TEST_SHA)
+
+    with pytest.raises(TypeError, match="Expected Ed25519PublicKey"):
+        verify_gate_3_evidence_trust_certificate(cert, expected_source_sha=DEFAULT_TEST_SHA, public_key="invalid_key_obj")  # type: ignore
+
+
+def test_adversarial_malformed_and_invalid_ed25519_signatures():
+    """Adversarial check: Verifier handles malformed and invalid Ed25519 signatures without swallowing arbitrary exceptions."""
+    obl = make_test_obligation()
+    claim = make_test_claim()
+    ev = make_test_evidence(ev_id="EV-SIG-ERRS", counterexample={"coverage_pct": 95.0})
+    genuine_cert = issue_gate_3_evidence_certificate(ev, expected_source_sha=DEFAULT_TEST_SHA)
+
+    # 1. Non-hex characters in signature construction fails schema validation
+    with pytest.raises(DomainValidationError):
+        AsymmetricAuthoritySignature(
+            algorithm="ED25519",
+            signer_identity=genuine_cert.authority_signature.signer_identity,
+            public_key_fingerprint=genuine_cert.authority_signature.public_key_fingerprint,
+            payload_digest=genuine_cert.authority_signature.payload_digest,
+            signature_hex="zz" * 64,  # Non-hex characters
+            timestamp=genuine_cert.authority_signature.timestamp,
+        )
+
+    # 2. Invalid cryptographic signature (valid 128-hex chars, but wrong signature bytes) -> returns False via InvalidSignature
+    invalid_crypto_sig = AsymmetricAuthoritySignature(
+        algorithm="ED25519",
+        signer_identity=genuine_cert.authority_signature.signer_identity,
+        public_key_fingerprint=genuine_cert.authority_signature.public_key_fingerprint,
+        payload_digest=genuine_cert.authority_signature.payload_digest,
+        signature_hex="aa" * 64,  # Cryptographically invalid signature (128 hex chars)
+        timestamp=genuine_cert.authority_signature.timestamp,
+    )
+    invalid_sig_cert = EvidenceTrustCertificate(
+        evidence_id=genuine_cert.evidence_id,
+        source_sha=DEFAULT_TEST_SHA,
+        is_verified=True,
+        digest_verified=True,
+        signature_verified=True,
+        provenance_verified=True,
+        verifier_identity=genuine_cert.verifier_identity,
+        timestamp=genuine_cert.timestamp,
+        certificate_hash=genuine_cert.certificate_hash,
+        authority_signature=invalid_crypto_sig,
+    )
+    assert verify_gate_3_evidence_trust_certificate(invalid_sig_cert, expected_source_sha=DEFAULT_TEST_SHA, public_key=TEST_AUTHORITY_PUBLIC_KEY) is False
 
 
 def test_adversarial_gate3_asymmetric_authority_matrix():

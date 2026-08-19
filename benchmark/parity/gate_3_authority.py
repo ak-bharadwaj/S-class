@@ -9,7 +9,6 @@ import os
 import hashlib
 from datetime import datetime, timezone
 from typing import Any, Optional
-from cryptography.hazmat.primitives.asymmetric import ed25519
 from domain.models import AsymmetricAuthoritySignature
 from events.serializer import canonicalize_json
 
@@ -18,13 +17,14 @@ GATE3_AUTHORITY_IDENTITY = "Gate3AuthoritativeVerifier"
 
 class Gate3AuthorityKeyStore:
     """Protected keystore boundary for Gate 3 Certificate Authority."""
-    _private_key: Optional[ed25519.Ed25519PrivateKey] = None
+    _private_key: Optional[Any] = None
 
     @classmethod
-    def set_private_key(cls, private_key: ed25519.Ed25519PrivateKey) -> None:
-        """Injects private key into protected keystore boundary."""
+    def set_private_key(cls, private_key: Any) -> None:
+        """Injects private key into protected keystore boundary with strict type validation."""
+        from cryptography.hazmat.primitives.asymmetric import ed25519
         if not isinstance(private_key, ed25519.Ed25519PrivateKey):
-            raise TypeError("Expected Ed25519PrivateKey.")
+            raise TypeError(f"Expected Ed25519PrivateKey instance, got {type(private_key).__name__}")
         cls._private_key = private_key
 
     @classmethod
@@ -32,17 +32,18 @@ class Gate3AuthorityKeyStore:
         cls._private_key = None
 
     @classmethod
-    def get_private_key(cls) -> ed25519.Ed25519PrivateKey:
+    def get_private_key(cls) -> Any:
         """Retrieves private key from keystore or environment trust boundary."""
         if cls._private_key is not None:
             return cls._private_key
         env_key_hex = os.environ.get("GATE3_AUTHORITY_PRIVATE_KEY")
         if env_key_hex and len(env_key_hex) == 64:
+            from cryptography.hazmat.primitives.asymmetric import ed25519
             return ed25519.Ed25519PrivateKey.from_private_bytes(bytes.fromhex(env_key_hex))
         raise RuntimeError("Gate 3 Authority private key is not configured in protected keystore boundary.")
 
     @classmethod
-    def get_public_key(cls) -> ed25519.Ed25519PublicKey:
+    def get_public_key(cls) -> Any:
         """Derives public key from current authority private key."""
         return cls.get_private_key().public_key()
 
