@@ -120,13 +120,28 @@ class PolicyDecision:
 
 
 @dataclass(frozen=True)
+class EvidenceTrustCertificate:
+    """Cryptographic trust certificate produced by an authoritative verifier and consumed by D3."""
+    evidence_id: str
+    source_sha: str
+    is_verified: bool
+    digest_verified: bool
+    signature_verified: bool
+    provenance_verified: bool
+    verifier_identity: str = "Gate3EvidenceVerifier"
+    rejection_reason: Optional[str] = None
+
+
+@dataclass(frozen=True)
 class PolicyEvaluationContext:
-    """Immutable evaluation context capturing the target obligation, claims, evidence, and active exceptions."""
+    """Immutable evaluation context capturing target obligation, claims, evidence, and exact revision binding."""
     obligation: Obligation
     claims: Tuple[Claim, ...]
     evidence: Tuple[Evidence, ...]
     exceptions: Tuple[PolicyException, ...] = field(default_factory=tuple)
     evaluation_timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    expected_source_sha: Optional[str] = None
+    trust_certificates: Mapping[str, EvidenceTrustCertificate] = field(default_factory=dict)
 
     def __post_init__(self):
         if not isinstance(self.obligation, Obligation):
@@ -135,3 +150,7 @@ class PolicyEvaluationContext:
         object.__setattr__(self, "evidence", tuple(self.evidence))
         object.__setattr__(self, "exceptions", tuple(self.exceptions))
         _validate_iso8601(self.evaluation_timestamp, "evaluation_timestamp")
+        if self.expected_source_sha is not None:
+            if not isinstance(self.expected_source_sha, str) or len(self.expected_source_sha) not in (40, 64):
+                raise PolicyValidationError(f"Invalid expected_source_sha: '{self.expected_source_sha}'")
+        object.__setattr__(self, "trust_certificates", MappingProxyType(dict(self.trust_certificates)))

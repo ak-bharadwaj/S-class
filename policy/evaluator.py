@@ -33,6 +33,7 @@ from policy.models import (
     PolicyEvaluationContext,
     PolicyException,
     RuleEvaluationResult,
+    EvidenceTrustCertificate,
 )
 from policy.exceptions import (
     PolicyEngineError,
@@ -40,19 +41,19 @@ from policy.exceptions import (
     InvalidExceptionError,
     ExpiredExceptionError,
 )
+from policy.verifier import verify_evidence_authenticity
 
 
 class CoverageTrustPredicate:
-    """Narrow interface consumed by D3 Policy Engine to verify structured coverage trust before evaluation.
+    """Narrow trust consumer interface for S-Class D3 Policy Engine.
     
-    Validates:
-    - Valid schema & lifecycle state (VALID + SUPPORTS + PASS)
-    - Trusted provider identity (no untrusted/synthetic/simulation identifiers)
-    - Provider capability matches coverage authorization
-    - Provenance present, typed, and non-empty
-    - Target / revision binding valid (source_sha)
-    - Observation not stale or conflicted
-    - Cryptographic session signature present
+    Verifies:
+    1. Exact expected revision binding (expected_source_sha is mandatory for policy decisions)
+    2. Valid schema and lifecycle state (VALID + SUPPORTS + PASS)
+    3. Provider capability matches coverage authorization
+    4. Provider identity non-synthetic
+    5. Provenance engine non-synthetic
+    6. Verified cryptographic trust certificate (digest, signature, revision, and provenance verified by verifier)
     """
 
     TRUSTED_COVERAGE_CAPABILITIES: Set[str] = {
@@ -77,56 +78,47 @@ class CoverageTrustPredicate:
     def is_trusted(
         cls,
         evidence: Evidence,
-        expected_source_sha: Optional[str] = None,
+        context: PolicyEvaluationContext,
     ) -> bool:
-        # 1. Schema and lifecycle verification
-        if not isinstance(evidence, Evidence):
-            return False
-        if evidence.validity != EvidenceValidity.VALID:
-            return False
-        if evidence.polarity != EvidencePolarity.SUPPORTS:
-            return False
-        if not isinstance(evidence.observation, EvidenceObservation):
-            return False
-        if evidence.observation.raw_status != RawStatus.PASS:
+        # 1. Exact revision binding is MANDATORY for policy decisions (missing revision fails closed)
+        if not context.expected_source_sha:
             return False
 
-        # 2. Capability matches coverage authorization
+        # 2. Schema and lifecycle verification
+        if not isinstance(evidence, Evidence):
+            return False
+        if evidence.validity != EvidenceValidity.VALID or evidence.polarity != EvidencePolarity.SUPPORTS:
+            return False
+        if not isinstance(evidence.observation, EvidenceObservation) or evidence.observation.raw_status != RawStatus.PASS:
+            return False
+
+        # 3. Capability matches coverage authorization
         if evidence.capability not in cls.TRUSTED_COVERAGE_CAPABILITIES:
             return False
 
-        # 3. Trusted provider identity
+        # 4. Provider identity non-synthetic
         prov_id = (evidence.provider_id or "").lower()
         if not prov_id or any(f in prov_id for f in cls.FORBIDDEN_ENGINES):
             return False
 
-        # 4. Provenance present & valid
+        # 5. Provenance non-synthetic
         prov = evidence.provenance
         if not isinstance(prov, Provenance):
             return False
         engine_name = (prov.engine_name or "").lower()
         if not engine_name or any(f in engine_name for f in cls.FORBIDDEN_ENGINES):
             return False
-        if not prov.engine_version or not prov.environment_hash or len(prov.environment_hash) != 64:
-            return False
-        if not prov.timestamp:
-            return False
 
-        # 5. Target / revision binding valid
-        if not evidence.source_sha or len(evidence.source_sha) not in (40, 64):
-            return False
-        if expected_source_sha and evidence.source_sha != expected_source_sha:
-            return False
-        if not isinstance(evidence.scope, EvidenceScope):
-            return False
+        # 6. Consume cryptographic trust certificate (from context or standard verifier)
+        cert = context.trust_certificates.get(evidence.evidence_id)
+        if cert is None:
+            cert = verify_evidence_authenticity(evidence, expected_source_sha=context.expected_source_sha)
 
-        # 6. Session signature present
-        sig = evidence.signature
-        if not isinstance(sig, HmacSessionSignature):
+        if not isinstance(cert, EvidenceTrustCertificate) or not cert.is_verified:
             return False
-        if not sig.signature_hex or len(sig.signature_hex) != 64:
+        if not cert.digest_verified or not cert.signature_verified or not cert.provenance_verified:
             return False
-        if not sig.raw_stdout_digest or len(sig.raw_stdout_digest) != 64:
+        if cert.source_sha != context.expected_source_sha:
             return False
 
         return True
@@ -165,7 +157,7 @@ def _check_valid_exception(
 
 def _extract_coverage_pct(
     evidence_item: Evidence,
-    expected_source_sha: Optional[str] = None,
+    context: PolicyEvaluationContext,
 ) -> Optional[float]:
     """Extracts trusted structured code coverage percentage from an Evidence item.
     
@@ -175,11 +167,11 @@ def _extract_coverage_pct(
     - Provider capability matches coverage
     - Provenance present & valid
     - Target/revision binding valid
-    - Observation not stale or conflicted
+    - Cryptographic certificate verified
     
     Free-form text in observation.diagnostics is strictly rejected as unauthoritative.
     """
-    if not CoverageTrustPredicate.is_trusted(evidence_item, expected_source_sha):
+    if not CoverageTrustPredicate.is_trusted(evidence_item, context):
         return None
 
     obs = evidence_item.observation
@@ -402,7 +394,7 @@ def evaluate_rule(
         extracted_coverages: List[float] = []
 
         for e in context.evidence:
-            cov = _extract_coverage_pct(e)
+            cov = _extract_coverage_pct(e, context)
             if cov is not None:
                 extracted_coverages.append(cov)
 
