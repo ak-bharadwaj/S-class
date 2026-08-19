@@ -2,6 +2,7 @@
 
 from datetime import datetime, timezone
 import math
+import re
 from typing import Dict, List, Optional, Set, Tuple
 
 from domain.models import (
@@ -61,6 +62,56 @@ def _check_valid_exception(
         raise InvalidExceptionError(
             f"PolicyException '{exception.exception_id}' lacks valid cryptographic signature."
         )
+
+
+def _extract_coverage_pct(evidence_item: Evidence) -> Optional[float]:
+    """Extracts and validates code coverage percentage from an Evidence item."""
+    if evidence_item.validity != EvidenceValidity.VALID:
+        return None
+    if evidence_item.polarity != EvidencePolarity.SUPPORTS:
+        return None
+    if evidence_item.observation.raw_status != RawStatus.PASS:
+        return None
+
+    obs = evidence_item.observation
+
+    # 1. Check structured counterexample / observation mapping
+    if obs.counterexample:
+        for k in ("coverage_pct", "line_coverage", "coverage", "pct", "statement_coverage", "branch_coverage"):
+            if k in obs.counterexample:
+                val = obs.counterexample[k]
+                try:
+                    if isinstance(val, (int, float)):
+                        cov = float(val)
+                        if math.isnan(cov) or math.isinf(cov) or cov < 0.0 or cov > 100.0:
+                            raise PolicyValidationError(f"Invalid coverage range: {cov}")
+                        return cov
+                    elif isinstance(val, str):
+                        m = re.search(r"^([0-9]+(?:\.[0-9]+)?)\s*%?$", val.strip())
+                        if m:
+                            cov = float(m.group(1))
+                            if cov < 0.0 or cov > 100.0:
+                                raise PolicyValidationError(f"Invalid coverage range: {cov}")
+                            return cov
+                        else:
+                            raise PolicyValidationError(f"Malformed coverage string: '{val}'")
+                    else:
+                        raise PolicyValidationError(f"Malformed coverage type: '{type(val).__name__}'")
+                except Exception as exc:
+                    if isinstance(exc, PolicyValidationError):
+                        raise
+                    raise PolicyValidationError(f"Malformed code coverage value: {val}") from exc
+
+    # 2. Check diagnostics strings
+    for diag in obs.diagnostics:
+        m = re.search(r"(?:coverage|cov|line_coverage)[\s:=]+([0-9]+(?:\.[0-9]+)?)\s*%", diag, re.IGNORECASE)
+        if m:
+            cov = float(m.group(1))
+            if cov < 0.0 or cov > 100.0:
+                raise PolicyValidationError(f"Invalid coverage range in diagnostics: {cov}")
+            return cov
+
+    return None
 
 
 def evaluate_rule(
@@ -245,12 +296,34 @@ def evaluate_rule(
 
     # 8. REQUIRE_CODE_COVERAGE
     elif rtype == RuleType.REQUIRE_CODE_COVERAGE:
-        min_cov = params.get("min_coverage_pct", 85.0)
-        return RuleEvaluationResult(
-            rule=rule,
-            passed=True,
-            reason=f"Code coverage check satisfied (>= {min_cov}%).",
-        )
+        min_cov = float(params.get("min_coverage_pct", 85.0))
+        extracted_coverages: List[float] = []
+
+        for e in context.evidence:
+            cov = _extract_coverage_pct(e)
+            if cov is not None:
+                extracted_coverages.append(cov)
+
+        if not extracted_coverages:
+            return RuleEvaluationResult(
+                rule=rule,
+                passed=False,
+                reason="Missing code coverage evidence in evaluation context.",
+            )
+
+        max_actual_coverage = max(extracted_coverages)
+        if max_actual_coverage >= min_cov:
+            return RuleEvaluationResult(
+                rule=rule,
+                passed=True,
+                reason=f"Actual code coverage {max_actual_coverage:.2f}% satisfies required threshold {min_cov:.2f}%.",
+            )
+        else:
+            return RuleEvaluationResult(
+                rule=rule,
+                passed=False,
+                reason=f"Actual code coverage {max_actual_coverage:.2f}% < required threshold {min_cov:.2f}%.",
+            )
 
     raise PolicyValidationError(f"Unsupported rule type: {rtype}")
 

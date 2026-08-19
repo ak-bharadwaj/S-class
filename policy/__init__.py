@@ -20,6 +20,7 @@ from policy.exceptions import (
 from policy.lattice import (
     meet_policies,
     compose_policies,
+    verify_and_merge_rules,
     verify_non_weakening_rule,
 )
 from policy.evaluator import (
@@ -48,6 +49,7 @@ __all__ = [
     "ExpiredExceptionError",
     "meet_policies",
     "compose_policies",
+    "verify_and_merge_rules",
     "verify_non_weakening_rule",
     "evaluate_rule",
     "evaluate_expression",

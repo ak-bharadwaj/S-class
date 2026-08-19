@@ -1,4 +1,4 @@
-"""Non-Weakening Policy Lattice Algebra (⊓).
+"""Non-Weakening Policy Lattice Algebra (⊓) with Semantic Rule Matching.
 
 Core Rule:
 Global Organization Policy (Tier 1)
@@ -10,6 +10,7 @@ Task Policy (Tier 2.5)
 Obligation Policy (Tier 3)
 
 Lower layers may ONLY tighten (increase strictness), NEVER weaken a higher-level constraint.
+Semantic matching ensures cross-parameter substitution, omission, and duplication attacks fail closed.
 """
 
 from typing import Dict, List, Sequence, Set, Tuple
@@ -45,56 +46,177 @@ def _extract_rules(expression: PolicyExpression) -> List[PolicyRule]:
     return rules
 
 
+def verify_and_merge_rules(parent_rules: Sequence[PolicyRule], child_rules: Sequence[PolicyRule]) -> List[PolicyRule]:
+    """Semantically validates that child_rules do not weaken, omit, substitute, or dilute parent_rules, and computes the strict meet."""
+    # 1. Semantic verification of every parent rule against child rules
+    for p_rule in parent_rules:
+        rtype = p_rule.rule_type
+        p_params = dict(p_rule.parameters)
+
+        if rtype == RuleType.REQUIRE_CAPABILITY:
+            p_cap = p_params.get("capability")
+            matching = [
+                c for c in child_rules
+                if c.rule_type == RuleType.REQUIRE_CAPABILITY
+                and c.parameters.get("capability") == p_cap
+            ]
+            if not matching:
+                raise PolicyWeakeningError(
+                    f"Cross-parameter substitution / omission attack: parent requires capability '{p_cap}', but child omitted it or substituted it."
+                )
+
+        elif rtype == RuleType.REQUIRE_TIER:
+            p_tier = p_params.get("tier")
+            p_rank = TIER_RANK.get(p_tier, -1)
+            p_count = p_params.get("min_count", 1)
+
+            matching = [
+                c for c in child_rules
+                if c.rule_type == RuleType.REQUIRE_TIER
+                and TIER_RANK.get(c.parameters.get("tier"), -1) >= p_rank
+                and c.parameters.get("min_count", 1) >= p_count
+            ]
+            if not matching:
+                raise PolicyWeakeningError(
+                    f"Weakening / substitution attack on tier '{p_tier}' (required count {p_count})."
+                )
+
+            # Detect duplication attacks with weaker count for same tier
+            for c in child_rules:
+                if c.rule_type == RuleType.REQUIRE_TIER and c.parameters.get("tier") == p_tier:
+                    if c.parameters.get("min_count", 1) < p_count:
+                        raise PolicyWeakeningError(
+                            f"Duplication weakening attack: child has conflicting tier rule with count {c.parameters.get('min_count', 1)} < {p_count}."
+                        )
+
+        elif rtype == RuleType.REQUIRE_INDEPENDENT_PROVIDERS:
+            p_grp = p_params.get("group_by", "PROVIDER_TYPE")
+            p_src = p_params.get("min_independent_sources", 1)
+            matching = [
+                c for c in child_rules
+                if c.rule_type == RuleType.REQUIRE_INDEPENDENT_PROVIDERS
+                and c.parameters.get("group_by", "PROVIDER_TYPE") == p_grp
+                and c.parameters.get("min_independent_sources", 1) >= p_src
+            ]
+            if not matching:
+                raise PolicyWeakeningError(
+                    f"Weakening / omission attack on independent providers (group_by={p_grp}, required min={p_src})."
+                )
+
+        elif rtype == RuleType.REQUIRE_MIN_TRIALS:
+            p_trials = p_params.get("min_trials", 1)
+            matching = [
+                c for c in child_rules
+                if c.rule_type == RuleType.REQUIRE_MIN_TRIALS
+                and c.parameters.get("min_trials", 1) >= p_trials
+            ]
+            if not matching:
+                raise PolicyWeakeningError(
+                    f"Weakening / omission attack on min_trials (required {p_trials})."
+                )
+
+        elif rtype == RuleType.REQUIRE_CODE_COVERAGE:
+            p_cov = float(p_params.get("min_coverage_pct", 85.0))
+            matching = [
+                c for c in child_rules
+                if c.rule_type == RuleType.REQUIRE_CODE_COVERAGE
+                and float(c.parameters.get("min_coverage_pct", 85.0)) >= p_cov
+            ]
+            if not matching:
+                raise PolicyWeakeningError(
+                    f"Weakening / omission attack on code coverage (required {p_cov}%)."
+                )
+
+        elif rtype == RuleType.MAX_STALENESS_COMMITS:
+            p_comm = p_params.get("max_commits", 10)
+            matching = [
+                c for c in child_rules
+                if c.rule_type == RuleType.MAX_STALENESS_COMMITS
+                and c.parameters.get("max_commits", 10) <= p_comm
+            ]
+            if not matching:
+                raise PolicyWeakeningError(
+                    f"Weakening / omission attack on max staleness commits (max allowed {p_comm})."
+                )
+
+        elif rtype in (RuleType.NO_CONFLICTS, RuleType.FORBID_SYNTHETIC):
+            matching = [c for c in child_rules if c.rule_type == rtype]
+            if not matching:
+                raise PolicyWeakeningError(
+                    f"Omission attack: parent requires '{rtype.value}', but child omitted it."
+                )
+
+    # 2. Merge rules into canonical meet representation
+    merged: List[PolicyRule] = []
+
+    # Capabilities (union)
+    all_caps: Set[str] = set()
+    for r in list(parent_rules) + list(child_rules):
+        if r.rule_type == RuleType.REQUIRE_CAPABILITY:
+            cap = r.parameters.get("capability")
+            if cap and cap not in all_caps:
+                all_caps.add(cap)
+                merged.append(PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": cap}))
+
+    # Tiers (max count per tier)
+    tier_counts: Dict[str, int] = {}
+    for r in list(parent_rules) + list(child_rules):
+        if r.rule_type == RuleType.REQUIRE_TIER:
+            t = r.parameters.get("tier")
+            cnt = r.parameters.get("min_count", 1)
+            tier_counts[t] = max(tier_counts.get(t, 0), cnt)
+    for t, cnt in tier_counts.items():
+        merged.append(PolicyRule(RuleType.REQUIRE_TIER, {"tier": t, "min_count": cnt}))
+
+    # Independent providers (max sources per group_by)
+    provider_groups: Dict[str, int] = {}
+    for r in list(parent_rules) + list(child_rules):
+        if r.rule_type == RuleType.REQUIRE_INDEPENDENT_PROVIDERS:
+            grp = r.parameters.get("group_by", "PROVIDER_TYPE")
+            src = r.parameters.get("min_independent_sources", 1)
+            provider_groups[grp] = max(provider_groups.get(grp, 0), src)
+    for grp, src in provider_groups.items():
+        merged.append(PolicyRule(RuleType.REQUIRE_INDEPENDENT_PROVIDERS, {"group_by": grp, "min_independent_sources": src}))
+
+    # Trials (max)
+    max_trials = None
+    for r in list(parent_rules) + list(child_rules):
+        if r.rule_type == RuleType.REQUIRE_MIN_TRIALS:
+            t = r.parameters.get("min_trials", 1)
+            max_trials = max(max_trials or 0, t)
+    if max_trials is not None:
+        merged.append(PolicyRule(RuleType.REQUIRE_MIN_TRIALS, {"min_trials": max_trials}))
+
+    # Coverage (max)
+    max_cov = None
+    for r in list(parent_rules) + list(child_rules):
+        if r.rule_type == RuleType.REQUIRE_CODE_COVERAGE:
+            c = float(r.parameters.get("min_coverage_pct", 85.0))
+            max_cov = max(max_cov or 0.0, c)
+    if max_cov is not None:
+        merged.append(PolicyRule(RuleType.REQUIRE_CODE_COVERAGE, {"min_coverage_pct": max_cov}))
+
+    # Staleness commits (min allowed)
+    min_commits = None
+    for r in list(parent_rules) + list(child_rules):
+        if r.rule_type == RuleType.MAX_STALENESS_COMMITS:
+            m = r.parameters.get("max_commits", 10)
+            min_commits = min(min_commits if min_commits is not None else 999999, m)
+    if min_commits is not None:
+        merged.append(PolicyRule(RuleType.MAX_STALENESS_COMMITS, {"max_commits": min_commits}))
+
+    # Invariants
+    if any(r.rule_type == RuleType.NO_CONFLICTS for r in list(parent_rules) + list(child_rules)):
+        merged.append(PolicyRule(RuleType.NO_CONFLICTS, {}))
+    if any(r.rule_type == RuleType.FORBID_SYNTHETIC for r in list(parent_rules) + list(child_rules)):
+        merged.append(PolicyRule(RuleType.FORBID_SYNTHETIC, {}))
+
+    return merged
+
+
 def verify_non_weakening_rule(parent_rule: PolicyRule, child_rule: PolicyRule) -> None:
     """Verifies that child_rule tightens or equals parent_rule without weakening it."""
-    if parent_rule.rule_type != child_rule.rule_type:
-        return
-
-    rtype = parent_rule.rule_type
-    p_params = dict(parent_rule.parameters)
-    c_params = dict(child_rule.parameters)
-
-    if rtype == RuleType.REQUIRE_CAPABILITY:
-        p_cap = p_params.get("capability")
-        c_cap = c_params.get("capability")
-        if p_cap != c_cap:
-            raise PolicyWeakeningError(
-                f"Child policy attempts to substitute required capability '{p_cap}' with '{c_cap}'."
-            )
-
-    elif rtype == RuleType.REQUIRE_TIER:
-        p_tier = p_params.get("tier")
-        c_tier = c_params.get("tier")
-        p_count = p_params.get("min_count", 1)
-        c_count = c_params.get("min_count", 1)
-
-        p_tier_rank = TIER_RANK.get(p_tier, -1)
-        c_tier_rank = TIER_RANK.get(c_tier, -1)
-
-        if c_tier_rank < p_tier_rank:
-            raise PolicyWeakeningError(
-                f"Child policy attempts to lower tier requirement from '{p_tier}' to '{c_tier}'."
-            )
-        if c_count < p_count:
-            raise PolicyWeakeningError(
-                f"Child policy attempts to lower tier min_count from {p_count} to {c_count}."
-            )
-
-    elif rtype == RuleType.REQUIRE_INDEPENDENT_PROVIDERS:
-        p_src = p_params.get("min_independent_sources", 1)
-        c_src = c_params.get("min_independent_sources", 1)
-        if c_src < p_src:
-            raise PolicyWeakeningError(
-                f"Child policy attempts to lower min_independent_sources from {p_src} to {c_src}."
-            )
-
-    elif rtype == RuleType.REQUIRE_MIN_TRIALS:
-        p_trials = p_params.get("min_trials", 1)
-        c_trials = c_params.get("min_trials", 1)
-        if c_trials < p_trials:
-            raise PolicyWeakeningError(
-                f"Child policy attempts to lower min_trials from {p_trials} to {c_trials}."
-            )
+    verify_and_merge_rules([parent_rule], [child_rule])
 
 
 def meet_policies(parent: Policy, child: Policy) -> Policy:
@@ -114,26 +236,11 @@ def meet_policies(parent: Policy, child: Policy) -> Policy:
     parent_rules = _extract_rules(parent.expression)
     child_rules = _extract_rules(child.expression)
 
-    # 1. Verify every parent rule is present and non-weakened in child
-    for p_rule in parent_rules:
-        matching_child_rules = [c for c in child_rules if c.rule_type == p_rule.rule_type]
-        if not matching_child_rules:
-            # If child omitted the mandatory parent rule, it is a weakening violation unless child expression is ALL combined
-            raise PolicyWeakeningError(
-                f"Child policy at scope '{child.scope_level}' omitted parent rule '{p_rule.rule_type.value}'."
-            )
-        for c_rule in matching_child_rules:
-            verify_non_weakening_rule(p_rule, c_rule)
-
-    # Combined rules: unique union of parent and child rules
-    combined_rules: List[PolicyRule] = list(parent_rules)
-    for c_rule in child_rules:
-        if c_rule not in combined_rules:
-            combined_rules.append(c_rule)
+    merged_rules = verify_and_merge_rules(parent_rules, child_rules)
 
     combined_expression = PolicyExpression(
         combinator=CombinatorType.ALL,
-        rules=tuple(combined_rules),
+        rules=tuple(merged_rules),
     )
 
     p_clean = parent.policy_id.replace("POL-", "").replace("+", "_").replace("-", "_")
