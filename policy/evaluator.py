@@ -12,6 +12,10 @@ from domain.models import (
     Obligation,
     Claim,
     Evidence,
+    EvidenceScope,
+    EvidenceObservation,
+    Provenance,
+    HmacSessionSignature,
 )
 from domain.types import (
     PolicyScope,
@@ -36,6 +40,96 @@ from policy.exceptions import (
     InvalidExceptionError,
     ExpiredExceptionError,
 )
+
+
+class CoverageTrustPredicate:
+    """Narrow interface consumed by D3 Policy Engine to verify structured coverage trust before evaluation.
+    
+    Validates:
+    - Valid schema & lifecycle state (VALID + SUPPORTS + PASS)
+    - Trusted provider identity (no untrusted/synthetic/simulation identifiers)
+    - Provider capability matches coverage authorization
+    - Provenance present, typed, and non-empty
+    - Target / revision binding valid (source_sha)
+    - Observation not stale or conflicted
+    - Cryptographic session signature present
+    """
+
+    TRUSTED_COVERAGE_CAPABILITIES: Set[str] = {
+        "CODE_COVERAGE",
+        "COVERAGE_ANALYSIS",
+        "STATIC_AST_ANALYSIS",
+        "PROPERTY_TESTING",
+        "API_CONTRACT_FUZZING",
+        "TEST_EXECUTION",
+    }
+
+    FORBIDDEN_ENGINES: Set[str] = {
+        "synthetic",
+        "simulation",
+        "untrusted",
+        "fake",
+        "mock",
+        "dummy",
+    }
+
+    @classmethod
+    def is_trusted(
+        cls,
+        evidence: Evidence,
+        expected_source_sha: Optional[str] = None,
+    ) -> bool:
+        # 1. Schema and lifecycle verification
+        if not isinstance(evidence, Evidence):
+            return False
+        if evidence.validity != EvidenceValidity.VALID:
+            return False
+        if evidence.polarity != EvidencePolarity.SUPPORTS:
+            return False
+        if not isinstance(evidence.observation, EvidenceObservation):
+            return False
+        if evidence.observation.raw_status != RawStatus.PASS:
+            return False
+
+        # 2. Capability matches coverage authorization
+        if evidence.capability not in cls.TRUSTED_COVERAGE_CAPABILITIES:
+            return False
+
+        # 3. Trusted provider identity
+        prov_id = (evidence.provider_id or "").lower()
+        if not prov_id or any(f in prov_id for f in cls.FORBIDDEN_ENGINES):
+            return False
+
+        # 4. Provenance present & valid
+        prov = evidence.provenance
+        if not isinstance(prov, Provenance):
+            return False
+        engine_name = (prov.engine_name or "").lower()
+        if not engine_name or any(f in engine_name for f in cls.FORBIDDEN_ENGINES):
+            return False
+        if not prov.engine_version or not prov.environment_hash or len(prov.environment_hash) != 64:
+            return False
+        if not prov.timestamp:
+            return False
+
+        # 5. Target / revision binding valid
+        if not evidence.source_sha or len(evidence.source_sha) not in (40, 64):
+            return False
+        if expected_source_sha and evidence.source_sha != expected_source_sha:
+            return False
+        if not isinstance(evidence.scope, EvidenceScope):
+            return False
+
+        # 6. Session signature present
+        sig = evidence.signature
+        if not isinstance(sig, HmacSessionSignature):
+            return False
+        if not sig.signature_hex or len(sig.signature_hex) != 64:
+            return False
+        if not sig.raw_stdout_digest or len(sig.raw_stdout_digest) != 64:
+            return False
+
+        return True
 
 
 def _check_valid_exception(
@@ -69,17 +163,23 @@ def _check_valid_exception(
         )
 
 
-def _extract_coverage_pct(evidence_item: Evidence) -> Optional[float]:
+def _extract_coverage_pct(
+    evidence_item: Evidence,
+    expected_source_sha: Optional[str] = None,
+) -> Optional[float]:
     """Extracts trusted structured code coverage percentage from an Evidence item.
     
+    Enforces strict trust predicate before accepting coverage payload:
+    - Valid schema & lifecycle state
+    - Trusted provider identity
+    - Provider capability matches coverage
+    - Provenance present & valid
+    - Target/revision binding valid
+    - Observation not stale or conflicted
+    
     Free-form text in observation.diagnostics is strictly rejected as unauthoritative.
-    Coverage metrics must be provided in trusted structured observation payloads.
     """
-    if evidence_item.validity != EvidenceValidity.VALID:
-        return None
-    if evidence_item.polarity != EvidencePolarity.SUPPORTS:
-        return None
-    if evidence_item.observation.raw_status != RawStatus.PASS:
+    if not CoverageTrustPredicate.is_trusted(evidence_item, expected_source_sha):
         return None
 
     obs = evidence_item.observation
@@ -310,7 +410,7 @@ def evaluate_rule(
             return RuleEvaluationResult(
                 rule=rule,
                 passed=False,
-                reason="Missing structured code coverage evidence in evaluation context.",
+                reason="Missing trusted structured code coverage evidence in evaluation context.",
             )
 
         max_actual_coverage = max(extracted_coverages)

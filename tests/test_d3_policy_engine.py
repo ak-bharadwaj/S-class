@@ -26,6 +26,7 @@ Tests:
    - Missing structured coverage evidence -> DENY
    - Malformed coverage evidence (non-numeric, NaN, out of range) -> fail closed
    - Forged / misleading diagnostic text rejected as unauthoritative evidence
+   - Forged structured coverage with VALID + SUPPORTS + PASS but invalid/missing provenance / capability mismatch -> DENY
 4. Cross-Parameter Substitution, Omission, and Duplication Attacks:
    - Capability substitution attack (P requires A, C supplies B) -> PolicyWeakeningError
    - Tier weakening / lowering attack (P requires V2 count 3, C supplies V1 or count 1) -> PolicyWeakeningError
@@ -93,6 +94,7 @@ from policy import (
     PolicyWeakeningError,
     InvalidExceptionError,
     ExpiredExceptionError,
+    CoverageTrustPredicate,
     meet_policies,
     compose_policies,
     verify_and_merge_rules,
@@ -153,15 +155,16 @@ def make_test_claim(
 def make_test_evidence(
     ev_id: str = "EV-001",
     claim_id: str = "CLM-OBL-001",
-    capability: str = "API_CONTRACT_FUZZING",
+    capability: str = "CODE_COVERAGE",
     polarity: EvidencePolarity = EvidencePolarity.SUPPORTS,
     validity: EvidenceValidity = EvidenceValidity.VALID,
     raw_status: RawStatus = RawStatus.PASS,
-    provider_id: str = "schemathesis-runner",
+    provider_id: str = "coverage_py_runner",
     execution_id: str = "EXEC-001",
     independence_group: str = "INDEP-GROUP-1",
     counterexample: dict = None,
-    diagnostics: tuple = ("50 test cases passed",),
+    diagnostics: tuple = ("Coverage test run completed",),
+    engine_name: str = "coverage.py",
 ) -> Evidence:
     return Evidence(
         evidence_id=ev_id,
@@ -183,8 +186,8 @@ def make_test_evidence(
         validity=validity,
         independence_group=independence_group,
         provenance=Provenance(
-            engine_name="schemathesis",
-            engine_version="3.39.0",
+            engine_name=engine_name,
+            engine_version="7.4.0",
             environment_hash="b" * 64,
             timestamp="2026-08-19T10:00:00Z",
         ),
@@ -275,9 +278,10 @@ def test_adversarial_conflicting_allow_deny():
     """Adversarial vector: Conflicting/refuting evidence strictly forces DENY decision under NO_CONFLICTS."""
     obl = make_test_obligation()
     claim = make_test_claim()
-    ev_pass = make_test_evidence(ev_id="EV-001", polarity=EvidencePolarity.SUPPORTS, raw_status=RawStatus.PASS)
+    ev_pass = make_test_evidence(ev_id="EV-001", capability="API_CONTRACT_FUZZING", polarity=EvidencePolarity.SUPPORTS, raw_status=RawStatus.PASS)
     ev_fail = make_test_evidence(
         ev_id="EV-002",
+        capability="API_CONTRACT_FUZZING",
         polarity=EvidencePolarity.REFUTES,
         raw_status=RawStatus.FAIL,
         validity=EvidenceValidity.CONFLICTED,
@@ -433,7 +437,7 @@ def test_adversarial_nondeterministic_evaluation_context():
     """Adversarial vector: 1,000 evaluation executions with identical input produce identical byte-for-byte decisions."""
     obl = make_test_obligation()
     claim = make_test_claim()
-    ev = make_test_evidence()
+    ev = make_test_evidence(capability="API_CONTRACT_FUZZING")
 
     ctx = PolicyEvaluationContext(
         obligation=obl,
@@ -589,7 +593,7 @@ def test_coverage_evaluation_adversarial_suite():
     ctx_missing = PolicyEvaluationContext(obl, (claim,), (ev_other,))
     d_missing = evaluate_policy(pol_cov_85, ctx_missing)
     assert d_missing.decision == PolicyDecisionType.DENY
-    assert "Missing structured code coverage evidence" in d_missing.rationale
+    assert "Missing trusted structured code coverage evidence" in d_missing.rationale
 
     # 6. Malformed coverage evidence (non-numeric string) -> fails closed with PolicyValidationError
     ev_malformed = make_test_evidence(ev_id="EV-MALFORMED", counterexample={"coverage_pct": "not_a_number"})
@@ -635,7 +639,56 @@ def test_adversarial_forged_diagnostic_strings_rejected():
 
     decision = evaluate_policy(pol_cov_85, ctx_forged)
     assert decision.decision == PolicyDecisionType.DENY
-    assert "Missing structured code coverage evidence" in decision.rationale
+    assert "Missing trusted structured code coverage evidence" in decision.rationale
+
+
+def test_adversarial_forged_structured_coverage_with_invalid_provenance_rejected():
+    """Adversarial vector: Structured coverage crafted with VALID + SUPPORTS + PASS but invalid/missing/synthetic provenance or unverified capability must FAIL CLOSED (DENY)."""
+    obl = make_test_obligation()
+    claim = make_test_claim()
+
+    pol_cov_85 = Policy(
+        "POL-COV85", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CODE_COVERAGE, {"min_coverage_pct": 85.0}),))
+    )
+
+    # 1. Forged evidence with synthetic/simulation provenance engine
+    ev_synthetic_prov = make_test_evidence(
+        ev_id="EV-SYNTH-PROV",
+        counterexample={"coverage_pct": 99.0},
+        engine_name="synthetic-generator-engine",
+    )
+    ctx_synth = PolicyEvaluationContext(obl, (claim,), (ev_synthetic_prov,))
+    decision_synth = evaluate_policy(pol_cov_85, ctx_synth)
+    assert decision_synth.decision == PolicyDecisionType.DENY
+    assert "Missing trusted structured code coverage evidence" in decision_synth.rationale
+
+    # 2. Forged evidence with untrusted provider identity
+    ev_untrusted_prov = make_test_evidence(
+        ev_id="EV-UNTRUSTED-PROV",
+        provider_id="untrusted_agent_override",
+        counterexample={"coverage_pct": 99.0},
+    )
+    ctx_untrusted = PolicyEvaluationContext(obl, (claim,), (ev_untrusted_prov,))
+    decision_untrusted = evaluate_policy(pol_cov_85, ctx_untrusted)
+    assert decision_untrusted.decision == PolicyDecisionType.DENY
+
+    # 3. Forged evidence with capability mismatch (e.g. STATIC_LINTING trying to assert code coverage)
+    ev_cap_mismatch = make_test_evidence(
+        ev_id="EV-CAP-MISMATCH",
+        capability="UNAUTHORIZED_REPORTING_CAPABILITY",
+        counterexample={"coverage_pct": 99.0},
+    )
+    ctx_cap = PolicyEvaluationContext(obl, (claim,), (ev_cap_mismatch,))
+    decision_cap = evaluate_policy(pol_cov_85, ctx_cap)
+    assert decision_cap.decision == PolicyDecisionType.DENY
+
+    # 4. CoverageTrustPredicate API directly verifies all trust criteria
+    assert CoverageTrustPredicate.is_trusted(ev_synthetic_prov) is False
+    assert CoverageTrustPredicate.is_trusted(ev_untrusted_prov) is False
+    assert CoverageTrustPredicate.is_trusted(ev_cap_mismatch) is False
+    valid_ev = make_test_evidence(ev_id="EV-VALID-TRUST", counterexample={"coverage_pct": 90.0})
+    assert CoverageTrustPredicate.is_trusted(valid_ev) is True
 
 
 # ============================================================================
@@ -943,7 +996,7 @@ def test_evaluator_max_staleness_and_min_trials():
     """Verify MAX_STALENESS_COMMITS, REQUIRE_MIN_TRIALS rules."""
     obl = make_test_obligation()
     claim = make_test_claim()
-    ev_valid = make_test_evidence()
+    ev_valid = make_test_evidence(capability="CODE_COVERAGE")
     ev_stale = make_test_evidence(ev_id="EV-STALE", validity=EvidenceValidity.STALE)
 
     ctx_fresh = PolicyEvaluationContext(obl, (claim,), (ev_valid,))

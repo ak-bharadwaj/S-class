@@ -24,6 +24,7 @@ from policy.lattice import (
     verify_non_weakening_rule,
 )
 from policy.evaluator import (
+    CoverageTrustPredicate,
     evaluate_rule,
     evaluate_expression,
     evaluate_policy,
@@ -51,6 +52,7 @@ __all__ = [
     "compose_policies",
     "verify_and_merge_rules",
     "verify_non_weakening_rule",
+    "CoverageTrustPredicate",
     "evaluate_rule",
     "evaluate_expression",
     "evaluate_policy",
