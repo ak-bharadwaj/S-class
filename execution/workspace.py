@@ -7,7 +7,7 @@ from __future__ import annotations
 import os
 import shutil
 import uuid
-from typing import Optional
+from typing import Optional, Tuple
 
 
 class IsolatedWorkspace:
@@ -69,14 +69,16 @@ class IsolatedWorkspace:
             raise ValueError(f"Path escape detected: '{relative_path}' resolves to '{real_target}' outside workspace '{real_ws}'")
         return real_target
 
-    def cleanup(self) -> None:
-        """Cleans up the temporary workspace directory."""
+    def cleanup(self) -> Optional[str]:
+        """Cleans up the temporary workspace directory. Returns error message if cleanup fails."""
+        cleanup_error = None
         if os.path.exists(self._workspace_path):
             try:
-                shutil.rmtree(self._workspace_path, ignore_errors=True)
-            except Exception:
-                pass
+                shutil.rmtree(self._workspace_path)
+            except Exception as e:
+                cleanup_error = f"Failed to cleanup workspace '{self._workspace_path}': {str(e)}"
         self._is_active = False
+        return cleanup_error
 
     def __enter__(self) -> IsolatedWorkspace:
         self.setup()

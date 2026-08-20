@@ -31,17 +31,19 @@ class D6ExecutionGateway:
     def __init__(
         self,
         authority_signer: AuthoritySignerProtocol,
+        nonce_store: D2NonceStore,
         registry: Optional[D6ProviderRegistry] = None,
         backend: Optional[ExecutionBackend] = None,
-        nonce_store: Optional[D2NonceStore] = None,
         workspace_base_dir: Optional[str] = None,
     ):
         if not isinstance(authority_signer, AuthoritySignerProtocol):
             raise TypeError("authority_signer must implement AuthoritySignerProtocol.")
+        if not isinstance(nonce_store, D2NonceStore):
+            raise TypeError("nonce_store must be an explicit, valid D2NonceStore instance (authoritative dependency required).")
         self._authority_signer = authority_signer
+        self._nonce_store = nonce_store
         self._registry = registry or D6ProviderRegistry()
         self._backend = backend or LocalProcessBackend()
-        self._nonce_store = nonce_store or D2NonceStore()
         self._workspace_base_dir = workspace_base_dir
 
         # Auto-register default pytest provider if not present
@@ -68,7 +70,7 @@ class D6ExecutionGateway:
         6. Build argv command from provider (with workspace containment check).
         7. Execute command on ExecutionBackend.
         8. Compute stdout/stderr SHA-256 digests and construct immutable ExecutionObservation.
-        9. Cleanup workspace deterministically on all exit paths.
+        9. Cleanup workspace deterministically on all exit paths, capturing cleanup status.
         """
         exec_id = f"EXEC-{uuid.uuid4().hex[:12].upper()}"
         started_at = datetime.now(timezone.utc).isoformat()
@@ -155,6 +157,7 @@ class D6ExecutionGateway:
 
         # Step 5: Isolated Workspace Setup & Process Execution
         workspace = IsolatedWorkspace(workspace_id=ctx.workspace_id, base_dir=self._workspace_base_dir)
+        cleanup_warning = None
         try:
             workspace.setup()
 
@@ -196,6 +199,11 @@ class D6ExecutionGateway:
             if res.stderr_truncated:
                 diag.append({"warning": f"stderr truncated at {max_output_bytes} bytes"})
 
+            # Clean workspace before final observation assembly to include cleanup issues if any
+            cleanup_err = workspace.cleanup()
+            if cleanup_err:
+                diag.append({"cleanup_warning": cleanup_err})
+
             return ExecutionObservation(
                 execution_id=exec_id,
                 token_id=token.token_id,
@@ -230,7 +238,8 @@ class D6ExecutionGateway:
             )
         finally:
             # Step 9: Workspace cleanup on all exit paths
-            workspace.cleanup()
+            if workspace.is_active:
+                workspace.cleanup()
 
     def _make_rejected_observation(
         self,

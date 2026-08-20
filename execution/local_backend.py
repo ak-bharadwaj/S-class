@@ -22,15 +22,10 @@ from execution.models import TerminationReason, ResourceUsage, MeasurementStatus
 from execution.backend import BackendProcessResult, ExecutionBackend
 
 
-# Safe whitelist of standard system environment variables
+# Safe whitelist of standard system environment variables inherited from host
 SAFE_SYSTEM_VARS = {
     "SYSTEMROOT",
     "WINDIR",
-    "TMP",
-    "TEMP",
-    "USERPROFILE",
-    "HOME",
-    "USER",
     "LANG",
     "LC_ALL",
     "TZ",
@@ -38,7 +33,7 @@ SAFE_SYSTEM_VARS = {
     "COMSPEC",
 }
 
-# Dangerous variables that caller custom environment is strictly forbidden to override
+# Sensitive variables that caller custom environment is strictly forbidden to override
 BLOCKED_ENV_PREFIXES = (
     "LD_",
     "DYLD_",
@@ -53,12 +48,18 @@ BLOCKED_ENV_PREFIXES = (
     "PS1",
     "SHLVL",
     "PROMPT_COMMAND",
+    "TEMP",
+    "TMP",
 )
 
 BLOCKED_ENV_EXACT = {
     "PATH",
     "PYTHONPATH",
     "PYTHONHOME",
+    "TEMP",
+    "TMP",
+    "USERPROFILE",
+    "HOME",
     "LD_PRELOAD",
     "NODE_OPTIONS",
     "BASH_ENV",
@@ -77,9 +78,10 @@ def sanitize_environment(custom_env: Optional[Mapping[str, str]] = None) -> dict
         if key in os.environ:
             clean_env[key] = os.environ[key]
 
-    # 2. Inherit system PATH from host (caller is strictly forbidden to override PATH)
-    if "PATH" in os.environ:
-        clean_env["PATH"] = os.environ["PATH"]
+    # 2. Inherit system PATH and standard temp directories from host (caller cannot override)
+    for key in ("PATH", "TEMP", "TMP", "USERPROFILE", "HOME"):
+        if key in os.environ:
+            clean_env[key] = os.environ[key]
 
     # 3. Apply validated custom variables from caller (subject to strict policy filtering)
     if custom_env:

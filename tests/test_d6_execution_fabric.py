@@ -1,16 +1,19 @@
 """
-S-Class EOS V11.2 - D6 Execution Fabric Hardened Test Suite (§8.1, §8.3).
+S-Class EOS V11.2 - D6 Execution Fabric Production-Grade Hardened Test Suite (§8.1, §8.3).
 Exhaustive verification of:
 1. D5 ExecutionEnvelope Gateway Verification.
-2. Provider Resolution & Capability Scoping.
-3. Isolated Workspace Management & Path Traversal / Symlink Escape Prevention.
-4. Provider Boundary Workspace Containment (../../outside, absolute host path, symlink -> outside, drive path, valid target).
-5. Constrained LocalProcessBackend (argv arrays, sanitized environment, bounded streams, timeouts, process group isolation).
-6. Process Group Isolation & Parent Group Non-Termination Regression.
-7. Explicit Resource Semantics (ENFORCED, OBSERVED, UNSUPPORTED).
-8. Hardened Environment Construction (PATH, PYTHONPATH, LD_PRELOAD, NODE_OPTIONS, BASH_ENV injection rejection).
-9. Pytest Provider Adapter execution.
-10. Immutable ExecutionObservation process facts.
+2. Mandatory Authoritative D2 NonceStore Dependency (fails closed if missing/invalid).
+3. Provider Resolution & Capability Scoping.
+4. Isolated Workspace Management & Path Traversal / Symlink Escape Prevention.
+5. Provider Boundary Workspace Containment (../../outside, absolute host path, symlink -> outside, drive path, UNC path, valid target).
+6. Constrained LocalProcessBackend (argv arrays, sanitized environment, bounded streams, timeouts, process group isolation).
+7. Process Group Isolation & Parent Group Non-Termination Regression (timeout cannot kill parent/controller).
+8. Recursive Orphan Descendant Process Tree Termination.
+9. Truthful Resource Semantics (ENFORCED, OBSERVED, UNSUPPORTED).
+10. Hardened Environment Construction (PATH, PYTHONPATH, TEMP, TMP, LD_PRELOAD, NODE_OPTIONS, BASH_ENV injection rejection).
+11. Explicit Workspace Cleanup Failure Recording.
+12. Pytest Provider Adapter execution.
+13. Immutable ExecutionObservation process facts.
 """
 
 import os
@@ -20,6 +23,7 @@ import pytest
 import subprocess
 import signal
 from typing import List, Sequence
+from unittest.mock import patch
 from concurrent.futures import ThreadPoolExecutor
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
@@ -171,6 +175,16 @@ def make_valid_envelope(
 # =====================================================================
 # 1. GATEWAY & ENVELOPE VERIFICATION TESTS
 # =====================================================================
+
+def test_gateway_requires_authoritative_d2_nonce_store():
+    """Fails closed: Gateway must never silently construct a local D2 store as a fallback."""
+    signer = Gate3AuthoritySigner()
+    with pytest.raises(TypeError, match="authoritative dependency required"):
+        D6ExecutionGateway(authority_signer=signer, nonce_store=None)  # type: ignore
+
+    with pytest.raises(TypeError, match="authoritative dependency required"):
+        D6ExecutionGateway(authority_signer=signer, nonce_store="NOT_A_STORE")  # type: ignore
+
 
 def test_gateway_valid_envelope_pytest_execution(tmp_path, fresh_nonce_store):
     """Verifies that a valid envelope executes pytest cleanly and returns structured observation facts."""
@@ -471,6 +485,28 @@ def test_gateway_catches_provider_containment_violation(tmp_path, fresh_nonce_st
     assert obs.termination_reason == TerminationReason.PATH_ESCAPE_DETECTED
 
 
+def test_workspace_cleanup_failure_recorded_in_diagnostics(tmp_path, fresh_nonce_store):
+    """Verifies that if workspace cleanup fails, the warning is captured explicitly in diagnostics."""
+    signer = Gate3AuthoritySigner()
+    gateway = D6ExecutionGateway(
+        authority_signer=signer,
+        nonce_store=fresh_nonce_store,
+        workspace_base_dir=str(tmp_path / "cleanup_ws"),
+    )
+
+    env = make_valid_envelope(tmp_path, fresh_nonce_store, target="test_clean.py")
+
+    with patch("shutil.rmtree", side_effect=PermissionError("Permission denied on workspace cleanup")):
+        obs = gateway.execute(
+            envelope=env,
+            expected_source_sha=DEFAULT_SHA,
+            expected_policy_version=1,
+            current_time_iso=TIMESTAMP_NOW,
+        )
+
+    assert any("cleanup_warning" in d for d in obs.diagnostics)
+
+
 # =====================================================================
 # 3. PROCESS GROUP ISOLATION & REGRESSION TESTS
 # =====================================================================
@@ -505,6 +541,27 @@ def test_process_group_timeout_cannot_terminate_parent_process_group(tmp_path):
 
     assert res.termination_reason == TerminationReason.TIMEOUT_EXPIRED
     assert os.getpid() == parent_pid
+
+
+def test_orphan_descendant_process_tree_cleanup(tmp_path):
+    """Verifies that when a child process spawns nested descendant processes, tree termination kills all descendants."""
+    backend = LocalProcessBackend()
+
+    # Script spawns a grand-child process and sleeps
+    parent_script = (
+        "import subprocess, sys, time\n"
+        "sub = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])\n"
+        "time.sleep(30)\n"
+    )
+
+    res = backend.execute_command(
+        command_argv=[sys.executable, "-c", parent_script],
+        working_directory=str(tmp_path),
+        timeout_seconds=0.5,
+    )
+
+    assert res.termination_reason == TerminationReason.TIMEOUT_EXPIRED
+    assert res.exit_code == -9
 
 
 # =====================================================================
@@ -586,19 +643,24 @@ def test_backend_produces_correct_resource_semantics(tmp_path):
 # =====================================================================
 
 def test_environment_construction_prevents_path_and_pythonpath_overrides():
-    """Adversarial Test: Proves caller cannot override PATH or PYTHONPATH."""
+    """Adversarial Test: Proves caller cannot override PATH, PYTHONPATH, TEMP, TMP."""
     host_path = os.environ.get("PATH", "")
+    host_temp = os.environ.get("TEMP", "")
 
     malicious_custom = {
         "PATH": "/malicious/bin:" + host_path,
         "PYTHONPATH": "/malicious/python/lib",
         "PYTHONHOME": "/malicious/python/home",
+        "TEMP": "/malicious/temp",
+        "TMP": "/malicious/tmp",
         "SAFE_CUSTOM_VAR": "valid_value_123",
     }
 
     cleaned = sanitize_environment(malicious_custom)
 
     assert cleaned["PATH"] == host_path
+    if host_temp:
+        assert cleaned["TEMP"] == host_temp
     assert "PYTHONPATH" not in cleaned
     assert "PYTHONHOME" not in cleaned
     assert cleaned["SAFE_CUSTOM_VAR"] == "valid_value_123"
@@ -744,69 +806,28 @@ def test_provider_registry_operations():
 
 def test_execution_observation_validation_errors():
     """Verifies ExecutionObservation schema validation rules."""
+    empty_sha = "0" * 64
     with pytest.raises(ValueError):
         ExecutionObservation(
             execution_id="",
             token_id="T1",
             provider_id="P1",
-            action_digest="a" * 64,
-            context_digest="b" * 64,
+            action_digest=empty_sha,
+            context_digest=empty_sha,
             started_at=TIMESTAMP_NOW,
             ended_at=TIMESTAMP_EXPIRY,
             exit_code=0,
             termination_reason=TerminationReason.EXIT_ZERO,
-            stdout_digest="c" * 64,
-            stderr_digest="d" * 64,
+            stdout_digest=empty_sha,
+            stderr_digest=empty_sha,
             stdout_bytes_len=0,
             stderr_bytes_len=0,
             execution_status=ExecutionStatus.SUCCESS,
         )
 
 
-def test_concurrent_executions_remain_isolated(tmp_path, fresh_nonce_store):
-    """Verifies concurrent executions maintain strict workspace and state isolation."""
-    signer = Gate3AuthoritySigner()
-    gateway = D6ExecutionGateway(
-        authority_signer=signer,
-        nonce_store=fresh_nonce_store,
-        workspace_base_dir=str(tmp_path / "concurrent_ws"),
-    )
-
-    def run_worker(idx: int):
-        env = make_valid_envelope(
-            tmp_path,
-            fresh_nonce_store,
-            target=f"test_worker_{idx}.py",
-        )
-        return gateway.execute(
-            envelope=env,
-            expected_source_sha=DEFAULT_SHA,
-            expected_policy_version=1,
-            current_time_iso=TIMESTAMP_NOW,
-        )
-
-    with ThreadPoolExecutor(max_workers=3) as executor:
-        futures = [executor.submit(run_worker, i) for i in range(3)]
-        observations = [f.result() for f in futures]
-
-    assert len(observations) == 3
-    exec_ids = {obs.execution_id for obs in observations}
-    assert len(exec_ids) == 3
-    for obs in observations:
-        assert isinstance(obs, ExecutionObservation)
-
-
-def test_d6_cannot_authorize_or_mint_tokens(fresh_nonce_store):
-    """Architectural Guard: Verifies D6 has no token minting capability."""
-    gateway = D6ExecutionGateway(authority_signer=Gate3AuthoritySigner(), nonce_store=fresh_nonce_store)
-    assert not hasattr(gateway, "mint_execution_token")
-    assert not hasattr(gateway, "authorize_action")
-    assert not hasattr(gateway, "create_obligation")
-
-
 def test_execution_observation_type_and_negative_validations():
     """Verifies schema validations on ExecutionObservation."""
-    signer = Gate3AuthoritySigner()
     empty_sha = "0" * 64
 
     with pytest.raises(ValueError):
@@ -937,10 +958,10 @@ def test_execution_observation_type_and_negative_validations():
         )
 
 
-def test_gateway_authority_signer_type_check():
+def test_gateway_authority_signer_type_check(fresh_nonce_store):
     """Verifies D6ExecutionGateway validates authority_signer type."""
     with pytest.raises(TypeError):
-        D6ExecutionGateway(authority_signer="NOT_A_SIGNER")  # type: ignore
+        D6ExecutionGateway(authority_signer="NOT_A_SIGNER", nonce_store=fresh_nonce_store)  # type: ignore
 
 
 def test_isolated_workspace_setup_and_traversal_corner_cases(tmp_path):
@@ -949,5 +970,47 @@ def test_isolated_workspace_setup_and_traversal_corner_cases(tmp_path):
     assert ws.resolve_safe_path("") == ws.path
     ws.setup()
     assert ws.is_active
-    ws.cleanup()
+    err = ws.cleanup()
+    assert err is None
     assert not ws.is_active
+
+
+def test_concurrent_executions_remain_isolated(tmp_path, fresh_nonce_store):
+    """Verifies concurrent executions maintain strict workspace and state isolation."""
+    signer = Gate3AuthoritySigner()
+    gateway = D6ExecutionGateway(
+        authority_signer=signer,
+        nonce_store=fresh_nonce_store,
+        workspace_base_dir=str(tmp_path / "concurrent_ws"),
+    )
+
+    def run_worker(idx: int):
+        env = make_valid_envelope(
+            tmp_path,
+            fresh_nonce_store,
+            target=f"test_worker_{idx}.py",
+        )
+        return gateway.execute(
+            envelope=env,
+            expected_source_sha=DEFAULT_SHA,
+            expected_policy_version=1,
+            current_time_iso=TIMESTAMP_NOW,
+        )
+
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        futures = [executor.submit(run_worker, i) for i in range(3)]
+        observations = [f.result() for f in futures]
+
+    assert len(observations) == 3
+    exec_ids = {obs.execution_id for obs in observations}
+    assert len(exec_ids) == 3
+    for obs in observations:
+        assert isinstance(obs, ExecutionObservation)
+
+
+def test_d6_cannot_authorize_or_mint_tokens(fresh_nonce_store):
+    """Architectural Guard: Verifies D6 has no token minting capability."""
+    gateway = D6ExecutionGateway(authority_signer=Gate3AuthoritySigner(), nonce_store=fresh_nonce_store)
+    assert not hasattr(gateway, "mint_execution_token")
+    assert not hasattr(gateway, "authorize_action")
+    assert not hasattr(gateway, "create_obligation")

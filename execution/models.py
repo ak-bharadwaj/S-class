@@ -1,6 +1,6 @@
 """
 S-Class EOS V11.2 - D6 Execution Models & Process Observation (§8.1, §8.3).
-Immutable process observations capturing execution facts (not epistemic correctness).
+Immutable process observations capturing raw execution facts (not epistemic correctness).
 """
 
 from __future__ import annotations
