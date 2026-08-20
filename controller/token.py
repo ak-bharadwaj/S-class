@@ -451,7 +451,7 @@ def verify_admission_signature(
         return False
 
 
-def verify_and_consume_execution_token(
+def verify_execution_token(
     token: ExecutionToken,
     expected_obligation_id: str,
     expected_source_sha: str,
@@ -460,15 +460,25 @@ def verify_and_consume_execution_token(
     expected_context_digest: str,
     current_time_iso: str,
     authority_signer: AuthoritySignerProtocol,
-    nonce_store: Optional[D2NonceStore] = None,
 ) -> bool:
-    """Cryptographically verifies token, checks mandatory bindings & time validity, and atomically reserves nonce in D2 store."""
+    """PURE verification of ExecutionToken. NO D2 MUTATION.
+    
+    Verifies:
+    1. Structural field types.
+    2. Obligation ID binding.
+    3. Source SHA binding.
+    4. Policy version binding.
+    5. Action digest binding.
+    6. Context digest binding.
+    7. Time validity (issued_at <= current_time <= expires_at).
+    8. Ed25519 cryptographic signature.
+    """
     if not isinstance(token, ExecutionToken):
         return False
     if not isinstance(authority_signer, AuthoritySignerProtocol):
         return False
 
-    # 1. Structural Mandatory Binding Verification
+    # 1. Mandatory Exact Field Bindings
     if token.obligation_id != expected_obligation_id:
         return False
     if token.source_sha != expected_source_sha:
@@ -480,7 +490,7 @@ def verify_and_consume_execution_token(
     if token.context_digest != expected_context_digest:
         return False
 
-    # 2. Time Boundary Verification (current_time >= issued_at and current_time <= expires_at)
+    # 2. Time Boundary Verification (issued_at <= current_time <= expires_at)
     try:
         t_current = datetime.fromisoformat(current_time_iso.replace("Z", "+00:00"))
         t_issued = datetime.fromisoformat(token.issued_at.replace("Z", "+00:00"))
@@ -490,15 +500,22 @@ def verify_and_consume_execution_token(
     except Exception:
         return False
 
-    # 3. Cryptographic Signature Verification with Domain Separator
+    # 3. Cryptographic Signature Verification
     if not verify_execution_token_signature(token, authority_signer):
         return False
 
-    # 4. Atomic D2 Single-Use Nonce Reservation (BEFORE D6 execution)
-    store = nonce_store or D2NonceStore()
+    return True
+
+
+def commit_admission(
+    execution_nonce: str,
+    nonce_store: D2NonceStore,
+) -> bool:
+    """The ONLY operation allowed to reserve ADMIT:<nonce> in D2 store."""
+    if not execution_nonce or not isinstance(nonce_store, D2NonceStore):
+        return False
     try:
-        reserved = store.reserve_nonce(f"ADMIT:{token.execution_nonce}")
-        return reserved
+        return nonce_store.reserve_nonce(f"ADMIT:{execution_nonce}")
     except Exception:
         return False
 
@@ -511,7 +528,7 @@ def verify_execution_envelope(
     authority_signer: AuthoritySignerProtocol,
     nonce_store: Optional[D2NonceStore] = None,
 ) -> bool:
-    """D5 -> D6 Gateway Gate: Verifies that an ExecutionEnvelope is authentic, unexpired, and duly admitted in D2 store."""
+    """D5 -> D6 Gateway Gate: Verifies that an ExecutionEnvelope is authentic, unexpired, and duly committed in D2 store."""
     if not isinstance(envelope, ExecutionEnvelope):
         return False
 
@@ -519,6 +536,9 @@ def verify_execution_envelope(
     admission = envelope.admission
     action_binding = envelope.action_binding
     ctx = envelope.execution_context
+
+    if not admission.is_admitted:
+        return False
 
     # 1. Exact Binding Equality Invariants
     if not (token.action_digest == admission.action_digest == action_binding.action_digest):

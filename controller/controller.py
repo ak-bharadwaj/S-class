@@ -1,13 +1,13 @@
 """
 S-Class EOS V11.2 - D5 Main Controller Orchestrator (§8.1, §8.3, CORE-05, CORE-25).
 Orchestrates the 5-stage lifecycle:
-PRE_VALIDATE -> PRE_AUTHORIZE -> (IMMUTABLE DECISION) -> PRE_EXECUTE -> (ADMISSION & D2 NONCE CONSUMPTION -> ENVELOPE) -> (D6 EXECUTION) -> POST_EXECUTE -> POST_OBSERVE -> COMPLETION_FINALIZED.
+PRE_VALIDATE -> PRE_AUTHORIZE -> (IMMUTABLE DECISION) -> PRE_EXECUTE -> (ADMISSION TRANSACTION -> ENVELOPE) -> (D6 EXECUTION) -> POST_EXECUTE -> POST_OBSERVE -> COMPLETION_FINALIZED.
 "Planner proposes. Controller disposes."
 Enforces:
-1. Mandatory ExecutionEnvelope delivery to D6 containing (Token, Admission, ActionBinding, ExecutionContext).
-2. Exact Action & Context Binding (token.action_digest == admission.action_digest == action_binding.action_digest).
-3. Controller holds the ONLY token minting and admission signing paths.
-4. Transactional Admission: generates and verifies signed admission artifact before atomic reservation.
+1. Pure Verification -> Signing -> Admission Verification -> Atomic D2 Commit ordering (prepare -> sign -> verify -> commit).
+2. Mandatory ExecutionEnvelope delivery to D6 containing (Token, Admission, ActionBinding, ExecutionContext).
+3. Exact Action & Context Binding (token.action_digest == admission.action_digest == action_binding.action_digest).
+4. Controller holds the ONLY token minting and admission signing paths.
 5. Explicit Durable Completion Lifecycle in D2:
    COMPLETION_STARTED -> POST_EXECUTE -> POST_OBSERVE -> COMPLETION_FINALIZED (or COMPLETION_FAILED).
 """
@@ -31,7 +31,8 @@ from controller.token import (
     _mint_execution_token,
     _build_admission_payload,
     _compute_admission_canonical_bytes,
-    verify_and_consume_execution_token,
+    verify_execution_token,
+    commit_admission,
     verify_execution_token_signature,
     verify_admission_signature,
     verify_execution_envelope,
@@ -216,7 +217,26 @@ class SClassController:
         current_time_iso: str,
         signer_identity: str = "Gate3AuthoritativeVerifier",
     ) -> ExecutionAdmissionResult:
-        """Admits an ExecutionToken BEFORE D6 execution and returns signed ExecutionAdmissionResult."""
+        """Admits an ExecutionToken strictly enforcing the transaction order:
+        validate token
+             ↓
+        validate expected ActionBinding
+             ↓
+        validate expected ExecutionContext
+             ↓
+        create admission payload
+             ↓
+        sign ExecutionAdmissionResult
+             ↓
+        verify generated admission signature
+             ↓
+        atomically reserve ADMIT:<nonce> in D2
+             ↓
+        return admitted ExecutionAdmissionResult
+        
+        Zero D2 mutation occurs if any step before commit fails.
+        """
+        # Step 1: Input Type Validation (PURE - NO D2 MUTATION)
         if not isinstance(token, ExecutionToken):
             return ExecutionAdmissionResult(
                 token_id="UNKNOWN",
@@ -262,8 +282,8 @@ class SClassController:
                 error_message="Invalid expected_execution_context provided.",
             )
 
-        # 1. Verify token bindings and signature
-        is_token_valid = verify_and_consume_execution_token(
+        # Step 2: Pure Token Verification (PURE - NO D2 MUTATION)
+        is_token_valid = verify_execution_token(
             token=token,
             expected_obligation_id=expected_obligation_id,
             expected_source_sha=expected_source_sha,
@@ -272,9 +292,7 @@ class SClassController:
             expected_context_digest=expected_execution_context.context_digest,
             current_time_iso=current_time_iso,
             authority_signer=self._authority_signer,
-            nonce_store=self._nonce_store,
         )
-
         if not is_token_valid:
             return ExecutionAdmissionResult(
                 token_id=token.token_id,
@@ -287,10 +305,10 @@ class SClassController:
                 decision_id=token.decision_id,
                 admitted_at=current_time_iso,
                 is_admitted=False,
-                error_message="Execution token verification or single-use nonce reservation failed.",
+                error_message="ExecutionToken verification failed.",
             )
 
-        # 2. Transactional Admission: Mint authentic Ed25519-signed ExecutionAdmissionResult via D3 Authority
+        # Step 3: Create Admission Payload & Sign (PURE except authority signing - NO D2 MUTATION)
         admission_payload = _build_admission_payload(
             token_id=token.token_id,
             execution_nonce=token.execution_nonce,
@@ -302,14 +320,30 @@ class SClassController:
             decision_id=token.decision_id,
             admitted_at=current_time_iso,
         )
-        canonical_bytes = _compute_admission_canonical_bytes(admission_payload)
-        authority_sig = self._authority_signer.sign_payload(
-            canonical_bytes=canonical_bytes,
-            verifier_identity=signer_identity,
-            timestamp_iso=current_time_iso,
-        )
+        try:
+            canonical_bytes = _compute_admission_canonical_bytes(admission_payload)
+            authority_sig = self._authority_signer.sign_payload(
+                canonical_bytes=canonical_bytes,
+                verifier_identity=signer_identity,
+                timestamp_iso=current_time_iso,
+            )
+        except Exception as e:
+            # Signing failure: D2 is completely untouched
+            return ExecutionAdmissionResult(
+                token_id=token.token_id,
+                execution_nonce=token.execution_nonce,
+                obligation_id=token.obligation_id,
+                action_digest=token.action_digest,
+                context_digest=token.context_digest,
+                source_sha=token.source_sha,
+                policy_version=token.policy_version,
+                decision_id=token.decision_id,
+                admitted_at=current_time_iso,
+                is_admitted=False,
+                error_message=f"Authority signing failed: {str(e)}",
+            )
 
-        return ExecutionAdmissionResult(
+        provisional_admission = ExecutionAdmissionResult(
             token_id=token.token_id,
             execution_nonce=token.execution_nonce,
             obligation_id=token.obligation_id,
@@ -322,6 +356,41 @@ class SClassController:
             is_admitted=True,
             signature=authority_sig,
         )
+
+        # Step 4: Verify Generated Admission Signature (PURE - NO D2 MUTATION)
+        if not verify_admission_signature(provisional_admission, self._authority_signer):
+            return ExecutionAdmissionResult(
+                token_id=token.token_id,
+                execution_nonce=token.execution_nonce,
+                obligation_id=token.obligation_id,
+                action_digest=token.action_digest,
+                context_digest=token.context_digest,
+                source_sha=token.source_sha,
+                policy_version=token.policy_version,
+                decision_id=token.decision_id,
+                admitted_at=current_time_iso,
+                is_admitted=False,
+                error_message="Generated admission signature verification failed.",
+            )
+
+        # Step 5: Atomically Commit Admission Nonce in D2 Store (ONLY D2 MUTATING OPERATION)
+        committed = commit_admission(token.execution_nonce, self._nonce_store)
+        if not committed:
+            return ExecutionAdmissionResult(
+                token_id=token.token_id,
+                execution_nonce=token.execution_nonce,
+                obligation_id=token.obligation_id,
+                action_digest=token.action_digest,
+                context_digest=token.context_digest,
+                source_sha=token.source_sha,
+                policy_version=token.policy_version,
+                decision_id=token.decision_id,
+                admitted_at=current_time_iso,
+                is_admitted=False,
+                error_message="D2 single-use admission reservation failed or was already consumed.",
+            )
+
+        return provisional_admission
 
     def create_execution_envelope(
         self,

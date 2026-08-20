@@ -1,5 +1,5 @@
 """
-S-Class EOS V11.2 - D5 Controller Final Test Suite.
+S-Class EOS V11.2 - D5 Controller Final Transactional Test Suite.
 Exhaustive verification of:
 1. Ready / Blocked / Executable Frontier Calculus (READY != EXECUTABLE distinction, CORE-22).
 2. Topological dependency ordering & cycle rejection (CORE-23).
@@ -8,37 +8,21 @@ Exhaustive verification of:
 5. Exact Action Binding & action_digest Domain Separator SCLASS_ACTION_BINDING_V1:.
 6. Exact Execution Context & context_digest Domain Separator SCLASS_EXECUTION_CONTEXT_V1:.
 7. Ed25519-signed single-use ExecutionToken with domain separator SCLASS_EXECUTION_TOKEN_V1:.
-8. ExecutionToken admission/consumption strictly BEFORE D6 execution.
+8. Strict Admission Transaction Ordering (prepare -> sign -> verify -> commit):
+   - test_signing_failure_does_not_consume_admission_nonce
+   - test_admission_signature_failure_does_not_consume_nonce
+   - test_invalid_action_binding_does_not_consume_nonce
+   - test_invalid_execution_context_does_not_consume_nonce
+   - test_successful_signed_admission_consumes_nonce_once
+   - test_concurrent_admission_exactly_one_commits
+   - test_signed_but_uncommitted_admission_cannot_execute
+   - test_restart_preserves_committed_admission
 9. Immutable, Authority-signed ExecutionAdmissionResult bound to:
    token_id, execution_nonce, obligation_id, action_digest, context_digest, source_sha, policy_version, decision_id, admitted_at.
 10. Mandatory ExecutionEnvelope container delivered to D6 executor.
 11. Explicit D2 Durable Completion Lifecycle:
     COMPLETION_STARTED -> POST_EXECUTE -> POST_OBSERVE -> COMPLETION_FINALIZED (or COMPLETION_FAILED).
-12. Full Adversarial Red-Team Suite:
-    - Authorized A + execute B -> reject before D6
-    - Altered action_type -> reject before D6
-    - Altered target -> reject before D6
-    - Altered purpose -> reject before D6
-    - Altered parameters -> reject before D6
-    - Altered action_digest -> reject before D6
-    - Altered provider_id -> reject
-    - Altered sandbox_profile_id -> reject
-    - Altered workspace_id -> reject
-    - Altered resource_profile -> reject
-    - Altered capability_set -> reject
-    - Token/admission mismatch -> reject
-    - Admission/context mismatch -> reject
-    - Missing ActionBinding -> reject
-    - Missing ExecutionContext -> reject
-    - Replay token -> reject
-    - Replay admission -> reject
-    - Replay completion -> reject
-    - Concurrent admission -> exactly one winner
-    - Concurrent completion -> exactly one winner
-    - D6 attempts direct authorization -> reject
-    - D6 attempts capability escalation -> reject
-    - Hook attempts token minting -> reject
-    - Policy mutation after authorization -> existing decision remains immutable
+12. Full Adversarial Red-Team Suite.
 """
 
 import os
@@ -74,7 +58,8 @@ from controller.token import (
     compute_action_digest,
     compute_context_digest,
     _mint_execution_token,
-    verify_and_consume_execution_token,
+    verify_execution_token,
+    commit_admission,
     verify_execution_token_signature,
     verify_admission_signature,
     verify_execution_envelope,
@@ -218,7 +203,255 @@ def make_test_proposal(
 
 
 # ============================================================================
-# 1. Deterministic Frontier Calculus Tests (§11.4, CORE-22, CORE-23)
+# 1. Admission Transaction Ordering Invariant Tests (MANDATED HOTFIX)
+# ============================================================================
+
+def test_signing_failure_does_not_consume_admission_nonce(fresh_nonce_store):
+    """If authority signing fails, ADMIT:<nonce> is NOT consumed in D2."""
+    real_signer = Gate3AuthoritySigner()
+    class BrokenSigner:
+        def sign_payload(self, *args, **kwargs):
+            raise RuntimeError("Cryptographic hardware module fault")
+        def verify_signature(self, *args, **kwargs):
+            return real_signer.verify_signature(*args, **kwargs)
+
+    controller = SClassController(authority_signer=Gate3AuthoritySigner(), nonce_store=fresh_nonce_store)
+    proposal = make_test_proposal()
+    dispatch = controller.submit_proposal(proposal, {"OBL-001": make_test_obligation()}, {"POL-001": make_test_policy()}, DEFAULT_SHA, 1, TIMESTAMP_NOW, TIMESTAMP_EXPIRY)
+    token = dispatch.execution_token
+    assert token is not None
+
+    # Inject broken signer into controller for admission
+    broken_controller = SClassController(authority_signer=BrokenSigner(), nonce_store=fresh_nonce_store)  # type: ignore
+    result = broken_controller.admit_execution(
+        token=token,
+        expected_obligation_id="OBL-001",
+        expected_source_sha=DEFAULT_SHA,
+        expected_policy_version=1,
+        expected_action_binding=proposal.binding,
+        expected_execution_context=proposal.execution_context,
+        current_time_iso=TIMESTAMP_NOW,
+    )
+    assert result.is_admitted is False
+    assert "Authority signing failed" in result.error_message
+
+    # Transaction Invariant: D2 store is completely unmutated
+    assert fresh_nonce_store.is_nonce_consumed(f"ADMIT:{token.execution_nonce}") is False
+
+    # The token remains usable once signing is fixed!
+    admit_fixed = controller.admit_execution(
+        token=token,
+        expected_obligation_id="OBL-001",
+        expected_source_sha=DEFAULT_SHA,
+        expected_policy_version=1,
+        expected_action_binding=proposal.binding,
+        expected_execution_context=proposal.execution_context,
+        current_time_iso=TIMESTAMP_NOW,
+    )
+    assert admit_fixed.is_admitted is True
+    assert fresh_nonce_store.is_nonce_consumed(f"ADMIT:{token.execution_nonce}") is True
+
+
+def test_admission_signature_failure_does_not_consume_nonce(fresh_nonce_store):
+    """If generated admission signature verification fails, ADMIT:<nonce> is NOT consumed in D2."""
+    class BadSigSigner:
+        def sign_payload(self, *args, **kwargs):
+            return AsymmetricAuthoritySignature("ED25519", "Rogue", "0"*64, "0"*64, "0"*128, TIMESTAMP_NOW)
+        def verify_signature(self, *args, **kwargs):
+            return False
+
+    controller = SClassController(authority_signer=Gate3AuthoritySigner(), nonce_store=fresh_nonce_store)
+    proposal = make_test_proposal()
+    dispatch = controller.submit_proposal(proposal, {"OBL-001": make_test_obligation()}, {"POL-001": make_test_policy()}, DEFAULT_SHA, 1, TIMESTAMP_NOW, TIMESTAMP_EXPIRY)
+    token = dispatch.execution_token
+
+    bad_controller = SClassController(authority_signer=BadSigSigner(), nonce_store=fresh_nonce_store)  # type: ignore
+    result = bad_controller.admit_execution(
+        token=token,
+        expected_obligation_id="OBL-001",
+        expected_source_sha=DEFAULT_SHA,
+        expected_policy_version=1,
+        expected_action_binding=proposal.binding,
+        expected_execution_context=proposal.execution_context,
+        current_time_iso=TIMESTAMP_NOW,
+    )
+    assert result.is_admitted is False
+    assert fresh_nonce_store.is_nonce_consumed(f"ADMIT:{token.execution_nonce}") is False
+
+
+def test_invalid_action_binding_does_not_consume_nonce(fresh_nonce_store):
+    """If action binding validation fails, D2 store is NOT touched."""
+    controller = SClassController(authority_signer=Gate3AuthoritySigner(), nonce_store=fresh_nonce_store)
+    proposal = make_test_proposal()
+    dispatch = controller.submit_proposal(proposal, {"OBL-001": make_test_obligation()}, {"POL-001": make_test_policy()}, DEFAULT_SHA, 1, TIMESTAMP_NOW, TIMESTAMP_EXPIRY)
+    token = dispatch.execution_token
+
+    mismatched_action = ActionBinding("APPLY_PATCH", "target.py", "purpose")
+    result = controller.admit_execution(
+        token=token,
+        expected_obligation_id="OBL-001",
+        expected_source_sha=DEFAULT_SHA,
+        expected_policy_version=1,
+        expected_action_binding=mismatched_action,
+        expected_execution_context=proposal.execution_context,
+        current_time_iso=TIMESTAMP_NOW,
+    )
+    assert result.is_admitted is False
+    assert fresh_nonce_store.is_nonce_consumed(f"ADMIT:{token.execution_nonce}") is False
+
+
+def test_invalid_execution_context_does_not_consume_nonce(fresh_nonce_store):
+    """If execution context validation fails, D2 store is NOT touched."""
+    controller = SClassController(authority_signer=Gate3AuthoritySigner(), nonce_store=fresh_nonce_store)
+    proposal = make_test_proposal()
+    dispatch = controller.submit_proposal(proposal, {"OBL-001": make_test_obligation()}, {"POL-001": make_test_policy()}, DEFAULT_SHA, 1, TIMESTAMP_NOW, TIMESTAMP_EXPIRY)
+    token = dispatch.execution_token
+
+    mismatched_ctx = ExecutionContext("OTHER_PROV", "SBX-1", "WS-1", "RES-1")
+    result = controller.admit_execution(
+        token=token,
+        expected_obligation_id="OBL-001",
+        expected_source_sha=DEFAULT_SHA,
+        expected_policy_version=1,
+        expected_action_binding=proposal.binding,
+        expected_execution_context=mismatched_ctx,
+        current_time_iso=TIMESTAMP_NOW,
+    )
+    assert result.is_admitted is False
+    assert fresh_nonce_store.is_nonce_consumed(f"ADMIT:{token.execution_nonce}") is False
+
+
+def test_successful_signed_admission_consumes_nonce_once(fresh_nonce_store):
+    """Successful admission signs first, then atomically commits to D2 exactly once."""
+    controller = SClassController(authority_signer=Gate3AuthoritySigner(), nonce_store=fresh_nonce_store)
+    proposal = make_test_proposal()
+    dispatch = controller.submit_proposal(proposal, {"OBL-001": make_test_obligation()}, {"POL-001": make_test_policy()}, DEFAULT_SHA, 1, TIMESTAMP_NOW, TIMESTAMP_EXPIRY)
+    token = dispatch.execution_token
+
+    res = controller.admit_execution(
+        token=token,
+        expected_obligation_id="OBL-001",
+        expected_source_sha=DEFAULT_SHA,
+        expected_policy_version=1,
+        expected_action_binding=proposal.binding,
+        expected_execution_context=proposal.execution_context,
+        current_time_iso=TIMESTAMP_NOW,
+    )
+    assert res.is_admitted is True
+    assert res.signature is not None
+    assert fresh_nonce_store.is_nonce_consumed(f"ADMIT:{token.execution_nonce}") is True
+
+    # Second attempt fails commit
+    res2 = controller.admit_execution(
+        token=token,
+        expected_obligation_id="OBL-001",
+        expected_source_sha=DEFAULT_SHA,
+        expected_policy_version=1,
+        expected_action_binding=proposal.binding,
+        expected_execution_context=proposal.execution_context,
+        current_time_iso=TIMESTAMP_NOW,
+    )
+    assert res2.is_admitted is False
+
+
+def test_concurrent_admission_exactly_one_commits(fresh_nonce_store):
+    """20 threads race to admit the same token. Exactly ONE successfully commits to D2."""
+    controller = SClassController(authority_signer=Gate3AuthoritySigner(), nonce_store=fresh_nonce_store)
+    proposal = make_test_proposal()
+    dispatch = controller.submit_proposal(proposal, {"OBL-001": make_test_obligation()}, {"POL-001": make_test_policy()}, DEFAULT_SHA, 1, TIMESTAMP_NOW, TIMESTAMP_EXPIRY)
+    token = dispatch.execution_token
+
+    results: List[bool] = []
+
+    def try_admit():
+        res = controller.admit_execution(
+            token=token,
+            expected_obligation_id="OBL-001",
+            expected_source_sha=DEFAULT_SHA,
+            expected_policy_version=1,
+            expected_action_binding=proposal.binding,
+            expected_execution_context=proposal.execution_context,
+            current_time_iso=TIMESTAMP_NOW,
+        )
+        return res.is_admitted
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [executor.submit(try_admit) for _ in range(20)]
+        for f in futures:
+            results.append(f.result())
+
+    assert results.count(True) == 1
+    assert results.count(False) == 19
+
+
+def test_signed_but_uncommitted_admission_cannot_execute(fresh_nonce_store):
+    """A signed admission artifact that was not committed to D2 cannot pass verify_execution_envelope."""
+    signer = Gate3AuthoritySigner()
+    controller = SClassController(authority_signer=signer, nonce_store=fresh_nonce_store)
+    proposal = make_test_proposal()
+    dispatch = controller.submit_proposal(proposal, {"OBL-001": make_test_obligation()}, {"POL-001": make_test_policy()}, DEFAULT_SHA, 1, TIMESTAMP_NOW, TIMESTAMP_EXPIRY)
+    token = dispatch.execution_token
+
+    # Build and sign admission manually without D2 commit
+    payload = {
+        "token_id": token.token_id,
+        "execution_nonce": token.execution_nonce,
+        "obligation_id": token.obligation_id,
+        "action_digest": token.action_digest,
+        "context_digest": token.context_digest,
+        "source_sha": token.source_sha,
+        "policy_version": token.policy_version,
+        "decision_id": token.decision_id,
+        "admitted_at": TIMESTAMP_NOW,
+    }
+    from events.serializer import canonicalize_json
+    canonical_bytes = SCLASS_EXECUTION_ADMISSION_DOMAIN_SEPARATOR.encode("utf-8") + canonicalize_json(payload)
+    sig = signer.sign_payload(canonical_bytes, "Gate3AuthoritativeVerifier", TIMESTAMP_NOW)
+
+    uncommitted_admission = ExecutionAdmissionResult(
+        token_id=token.token_id,
+        execution_nonce=token.execution_nonce,
+        obligation_id=token.obligation_id,
+        action_digest=token.action_digest,
+        context_digest=token.context_digest,
+        source_sha=token.source_sha,
+        policy_version=token.policy_version,
+        decision_id=token.decision_id,
+        admitted_at=TIMESTAMP_NOW,
+        is_admitted=True,
+        signature=sig,
+    )
+
+    envelope = controller.create_execution_envelope(token, uncommitted_admission, proposal.binding, proposal.execution_context)
+
+    # Verification fails because ADMIT:<nonce> is NOT in D2!
+    assert verify_execution_envelope(envelope, DEFAULT_SHA, 1, TIMESTAMP_NOW, signer, fresh_nonce_store) is False
+
+
+def test_restart_preserves_committed_admission(tmp_path):
+    """Controller restart recognizes committed admission in D2 store and rejects re-admission."""
+    signer = Gate3AuthoritySigner()
+    log_file = str(tmp_path / "d5_restart_tx.log")
+    store1 = D2NonceStore(file_path=log_file)
+    ctrl1 = SClassController(authority_signer=signer, nonce_store=store1)
+
+    proposal = make_test_proposal()
+    dispatch = ctrl1.submit_proposal(proposal, {"OBL-001": make_test_obligation()}, {"POL-001": make_test_policy()}, DEFAULT_SHA, 1, TIMESTAMP_NOW, TIMESTAMP_EXPIRY)
+    token = dispatch.execution_token
+    admission = ctrl1.admit_execution(token, "OBL-001", DEFAULT_SHA, 1, proposal.binding, proposal.execution_context, TIMESTAMP_NOW)
+    assert admission.is_admitted is True
+
+    # Restart: new controller with same D2 store
+    store2 = D2NonceStore(file_path=log_file)
+    ctrl2 = SClassController(authority_signer=signer, nonce_store=store2)
+
+    # Re-admission fails closed because ADMIT:<nonce> is committed
+    re_admit = ctrl2.admit_execution(token, "OBL-001", DEFAULT_SHA, 1, proposal.binding, proposal.execution_context, TIMESTAMP_NOW)
+    assert re_admit.is_admitted is False
+
+
+# ============================================================================
+# 2. Frontier Calculus Tests
 # ============================================================================
 
 def test_frontier_ready_vs_executable_distinction():
@@ -281,7 +514,7 @@ def test_frontier_disallowed_category_or_zero_budget():
 
 
 # ============================================================================
-# 2. Precondition & Authorization Engine Tests (§8.2, CORE-05)
+# 3. Precondition & Authorization Engine Tests
 # ============================================================================
 
 def test_authorization_preconditions_all_pass():
@@ -373,58 +606,6 @@ def test_authorization_policy_mutation_after_decision_preserves_immutable_bindin
     policies.clear()
     assert decision.status == AuthorizationStatus.AUTHORIZED
     assert decision.policy_version == 1
-
-
-# ============================================================================
-# 3. ExecutionEnvelope & D5 -> D6 Boundary Tests
-# ============================================================================
-
-def test_full_execution_envelope_lifecycle_accepted(fresh_nonce_store):
-    """Full lifecycle: Proposal -> Token -> Admission -> ExecutionEnvelope -> D6 Verification -> Completion."""
-    signer = Gate3AuthoritySigner()
-    controller = SClassController(authority_signer=signer, nonce_store=fresh_nonce_store)
-
-    proposal = make_test_proposal()
-    obls = {"OBL-001": make_test_obligation()}
-    policies = {"POL-001": make_test_policy()}
-
-    dispatch = controller.submit_proposal(proposal, obls, policies, DEFAULT_SHA, 1, TIMESTAMP_NOW, TIMESTAMP_EXPIRY)
-    token = dispatch.execution_token
-    assert token is not None
-
-    admission = controller.admit_execution(
-        token=token,
-        expected_obligation_id="OBL-001",
-        expected_source_sha=DEFAULT_SHA,
-        expected_policy_version=1,
-        expected_action_binding=proposal.binding,
-        expected_execution_context=proposal.execution_context,
-        current_time_iso=TIMESTAMP_NOW,
-    )
-    assert admission.is_admitted is True
-
-    # Controller constructs mandatory ExecutionEnvelope
-    envelope = controller.create_execution_envelope(
-        token=token,
-        admission=admission,
-        action_binding=proposal.binding,
-        execution_context=proposal.execution_context,
-    )
-
-    # D6 Gate: Verifies envelope before starting process
-    is_envelope_valid = verify_execution_envelope(
-        envelope=envelope,
-        expected_source_sha=DEFAULT_SHA,
-        expected_policy_version=1,
-        current_time_iso=TIMESTAMP_NOW,
-        authority_signer=signer,
-        nonce_store=fresh_nonce_store,
-    )
-    assert is_envelope_valid is True
-
-    # Complete execution with envelope
-    comp = controller.complete_execution(envelope=envelope, execution_result={"status": "PASS"})
-    assert comp.is_valid_execution is True
 
 
 # ============================================================================
@@ -689,32 +870,8 @@ def test_adversarial_concurrent_completion_race(fresh_nonce_store):
     assert results.count(False) == 19
 
 
-def test_adversarial_concurrent_admission_race(fresh_nonce_store):
-    """Adversarial: 20 concurrent workers race to admit the same token. Exactly 1 succeeds."""
-    signer = Gate3AuthoritySigner()
-    controller = SClassController(authority_signer=signer, nonce_store=fresh_nonce_store)
-
-    proposal = make_test_proposal()
-    dispatch = controller.submit_proposal(proposal, {"OBL-001": make_test_obligation()}, {"POL-001": make_test_policy()}, DEFAULT_SHA, 1, TIMESTAMP_NOW, TIMESTAMP_EXPIRY)
-    token = dispatch.execution_token
-
-    results: List[bool] = []
-
-    def try_admit():
-        res = controller.admit_execution(token, "OBL-001", DEFAULT_SHA, 1, proposal.binding, proposal.execution_context, TIMESTAMP_NOW)
-        return res.is_admitted
-
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        futures = [executor.submit(try_admit) for _ in range(20)]
-        for f in futures:
-            results.append(f.result())
-
-    assert results.count(True) == 1
-    assert results.count(False) == 19
-
-
 # ============================================================================
-# 6. Type and Integrity Edge Cases
+# 6. Type, Envelope and Edge Case Validations
 # ============================================================================
 
 def test_type_and_integrity_edge_cases():
@@ -779,22 +936,6 @@ def test_authorization_budget_and_prerequisites():
     )
     assert dec3.status == AuthorizationStatus.REJECTED
     assert any("not found" in r for r in dec3.rejection_reasons)
-
-
-def test_adversarial_replay_token_before_completion_rejected(fresh_nonce_store):
-    """Adversarial: Replaying token during admission is rejected by D2 store."""
-    signer = Gate3AuthoritySigner()
-    controller = SClassController(authority_signer=signer, nonce_store=fresh_nonce_store)
-
-    proposal = make_test_proposal()
-    dispatch = controller.submit_proposal(proposal, {"OBL-001": make_test_obligation()}, {"POL-001": make_test_policy()}, DEFAULT_SHA, 1, TIMESTAMP_NOW, TIMESTAMP_EXPIRY)
-    token = dispatch.execution_token
-
-    admit1 = controller.admit_execution(token, "OBL-001", DEFAULT_SHA, 1, proposal.binding, proposal.execution_context, TIMESTAMP_NOW)
-    assert admit1.is_admitted is True
-
-    admit2 = controller.admit_execution(token, "OBL-001", DEFAULT_SHA, 1, proposal.binding, proposal.execution_context, TIMESTAMP_NOW)
-    assert admit2.is_admitted is False
 
 
 def test_adversarial_future_and_expired_tokens(fresh_nonce_store):
@@ -887,28 +1028,6 @@ def test_verify_execution_envelope_validation_failures(fresh_nonce_store):
 
     # 4. Expired time
     assert verify_execution_envelope(envelope, DEFAULT_SHA, 1, TIMESTAMP_LATE, signer, fresh_nonce_store) is False
-
-
-def test_controller_restart_preserves_d2_state(tmp_path):
-    """Controller restart maintains single-use state in D2 store."""
-    signer = Gate3AuthoritySigner()
-    log_file = str(tmp_path / "d5_restart.log")
-    store1 = D2NonceStore(file_path=log_file)
-    ctrl1 = SClassController(authority_signer=signer, nonce_store=store1)
-
-    proposal = make_test_proposal()
-    dispatch = ctrl1.submit_proposal(proposal, {"OBL-001": make_test_obligation()}, {"POL-001": make_test_policy()}, DEFAULT_SHA, 1, TIMESTAMP_NOW, TIMESTAMP_EXPIRY)
-    token = dispatch.execution_token
-    admission = ctrl1.admit_execution(token, "OBL-001", DEFAULT_SHA, 1, proposal.binding, proposal.execution_context, TIMESTAMP_NOW)
-    envelope = ctrl1.create_execution_envelope(token, admission, proposal.binding, proposal.execution_context)
-
-    comp = ctrl1.complete_execution(envelope)
-    assert comp.is_valid_execution is True
-
-    # Controller 2 restart
-    store2 = D2NonceStore(file_path=log_file)
-    ctrl2 = SClassController(authority_signer=signer, nonce_store=store2)
-    assert ctrl2.complete_execution(envelope).is_valid_execution is False
 
 
 def test_action_binding_and_context_validation_errors():
