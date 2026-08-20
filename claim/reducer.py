@@ -1,8 +1,9 @@
 """
 S-Class EOS V11.2 - D4 Deterministic Claim Epistemic Reducer (§4.2, §5.3, §5.4).
 Pure mathematical fold over evidence and events.
-Strict Discrete Epistemics: UNSUPPORTED, SUPPORTED, CONTRADICTED, CONFLICTED, STALE, WAIVED.
+Strict Discrete Epistemic States: UNSUPPORTED, SUPPORTED, CONTRADICTED, CONFLICTED, STALE.
 Universal Ban on Majority Voting (CORE-20): 1 refuting evidence item strictly forces CONFLICTED against N supporting items.
+Preserves CONFLICTED state throughout claim assessment without mapping CONFLICTED -> CONTRADICTED.
 """
 
 from __future__ import annotations
@@ -16,21 +17,25 @@ from claim.coverage import evaluate_coverage, CoverageStatus
 
 
 class ClaimEpistemicState(str, Enum):
+    """Frozen D0 §4.2 Claim Epistemic State Machine."""
     UNSUPPORTED = "UNSUPPORTED"
     SUPPORTED = "SUPPORTED"
     CONTRADICTED = "CONTRADICTED"
     CONFLICTED = "CONFLICTED"
     STALE = "STALE"
-    WAIVED = "WAIVED"
 
     def to_domain_status(self) -> ClaimStatus:
-        """Maps epistemic state to canonical D0/D1 ClaimStatus enum."""
+        """Maps epistemic state to canonical D0/D1 ClaimStatus enum.
+        Preserves CONFLICTED directly without lossy downgrade.
+        """
         if self == ClaimEpistemicState.SUPPORTED:
             return ClaimStatus.SUPPORTED
-        elif self in (ClaimEpistemicState.CONTRADICTED, ClaimEpistemicState.CONFLICTED):
+        elif self == ClaimEpistemicState.CONTRADICTED:
             return ClaimStatus.CONTRADICTED
-        elif self == ClaimEpistemicState.WAIVED:
-            return ClaimStatus.WAIVED
+        elif self == ClaimEpistemicState.CONFLICTED:
+            return ClaimStatus.CONFLICTED
+        elif self == ClaimEpistemicState.STALE:
+            return ClaimStatus.STALE
         return ClaimStatus.UNSUPPORTED
 
 

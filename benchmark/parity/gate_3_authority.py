@@ -518,3 +518,50 @@ def issue_gate_3_evidence_certificate(
         certificate_hash=payload_digest,
         authority_signature=authority_sig,
     )
+
+
+class Gate3AuthoritySigner:
+    """Narrow D3 Authority interface for signing arbitrary payloads and verifying signatures.
+    D4 Receipt Engine consumes this interface and NEVER retrieves or holds private-key material.
+    """
+    @classmethod
+    def sign_payload(
+        cls,
+        canonical_bytes: bytes,
+        verifier_identity: str = GATE3_AUTHORITY_IDENTITY,
+        timestamp_iso: str = "",
+    ) -> AsymmetricAuthoritySignature:
+        """Signs payload using protected Gate3 authority private key without exposing key material."""
+        if not timestamp_iso:
+            raise ValueError("timestamp_iso is required.")
+        private_key = Gate3AuthorityKeyStore.get_private_key()
+        pub_fingerprint = Gate3AuthorityKeyStore.get_public_key_fingerprint()
+        payload_digest = hashlib.sha256(canonical_bytes).hexdigest()
+        sig_bytes = private_key.sign(canonical_bytes)
+        return AsymmetricAuthoritySignature(
+            algorithm="ED25519",
+            signer_identity=verifier_identity,
+            public_key_fingerprint=pub_fingerprint,
+            payload_digest=payload_digest,
+            signature_hex=sig_bytes.hex(),
+            timestamp=timestamp_iso,
+        )
+
+    @classmethod
+    def verify_signature(
+        cls,
+        canonical_bytes: bytes,
+        signature: AsymmetricAuthoritySignature,
+    ) -> bool:
+        """Verifies Ed25519 signature authenticity against public key in keystore."""
+        if not signature or signature.algorithm != "ED25519":
+            return False
+        expected_digest = hashlib.sha256(canonical_bytes).hexdigest()
+        if signature.payload_digest != expected_digest:
+            return False
+        try:
+            pub_key = Gate3AuthorityKeyStore.get_public_key()
+            pub_key.verify(bytes.fromhex(signature.signature_hex), canonical_bytes)
+            return True
+        except Exception:
+            return False

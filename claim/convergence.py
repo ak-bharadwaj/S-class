@@ -3,6 +3,7 @@ S-Class EOS V11.2 - D4 Convergence Analysis Engine & Drift Calculus (§7.6, CORE
 Computes Delta_conv = Convergence(IntendedState, ObservedState).
 Taxonomy: MISSING | PARTIAL | CONTRADICTORY | UNREQUESTED | STALE.
 CORE-24 Invariant: Strictly diagnostic. Cannot issue tokens, mutate controller state, or authorize actions.
+Requires explicit evaluation timestamp (no hidden defaults).
 """
 
 from __future__ import annotations
@@ -45,18 +46,16 @@ class ConvergenceEngine:
         intended_claims: Mapping[str, Claim],
         claim_states: Mapping[str, ClaimReductionState],
         evidence_catalog: Mapping[str, Evidence],
+        evaluated_at: str,
         report_id: Optional[str] = None,
-        timestamp_iso: str = "1970-01-01T00:00:00Z",
     ) -> ConvergenceReport:
         """Pure diagnostic convergence analysis (§7.6, CORE-24).
         
-        Evaluates drift delta:
-        - MISSING: Intended claim has no valid supporting evidence
-        - PARTIAL: Intended claim has partial aspect coverage
-        - CONTRADICTORY: Intended claim is CONTRADICTED or CONFLICTED
-        - UNREQUESTED: Evidence exists for un-tracked / un-requested claims
-        - STALE: Evidence was collected against an older repository commit SHA
+        Requires explicit evaluated_at timestamp (no hidden defaults).
         """
+        if not evaluated_at or not isinstance(evaluated_at, str):
+            raise ValueError("evaluated_at timestamp is required and must be a non-empty ISO-8601 string.")
+
         if not report_id:
             report_id = f"CNV-{task_id}-{repository_sha[:8]}"
 
@@ -147,5 +146,5 @@ class ConvergenceEngine:
             findings=tuple(findings),
             drift_count=drift_count,
             is_converged=is_converged,
-            evaluated_at=timestamp_iso,
+            evaluated_at=evaluated_at,
         )

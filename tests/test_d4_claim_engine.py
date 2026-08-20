@@ -5,9 +5,12 @@ Exhaustive verification of:
 2. Multi-Dimensional Aspect Coverage Calculus (§7.3, CORE-21).
 3. Pure Deterministic Claim Epistemic Reducer (§4.2, §5.3, §5.4).
 4. Universal Ban on Majority Voting (CORE-20): N support vs 1 refute -> CONFLICTED.
-5. Convergence & Drift Analysis Engine (§7.6, CORE-24 Non-Authorization Invariant).
-6. Assessment Receipt Minting & Ed25519 Cryptographic Verification (§3.10, §7.5).
-7. Property-based testing and deterministic reducer replay.
+5. CONFLICTED Claim Preservation in ClaimAssessment and AssessmentReceipt.
+6. D4 Authority Isolation: D4 consumes narrow authority interface; cannot access private keys directly.
+7. Convergence & Drift Analysis Engine (§7.6, CORE-24 Non-Authorization Invariant).
+8. Explicit Required Timestamps (missing timestamps fail closed).
+9. Assessment Receipt Minting & Ed25519 Cryptographic Verification (§3.10, §7.5).
+10. Property-based testing and deterministic reducer replay.
 """
 
 import pytest
@@ -25,6 +28,8 @@ from domain.models import (
     EvidenceObservation,
     Provenance,
     HmacSessionSignature,
+    AsymmetricAuthoritySignature,
+    AssessmentReceipt,
 )
 from domain.types import (
     ClaimTier,
@@ -38,7 +43,7 @@ from domain.types import (
     DriftType,
 )
 from policy.models import EvidenceTrustCertificate
-from benchmark.parity.gate_3_authority import Gate3AuthorityKeyStore
+from benchmark.parity.gate_3_authority import Gate3AuthorityKeyStore, Gate3AuthoritySigner
 from claim.relevance import evaluate_relevance, is_capability_compatible, is_scope_compatible, RelevanceResult
 from claim.coverage import evaluate_coverage, CoverageStatus, extract_claim_aspects, extract_evidence_aspects
 from claim.reducer import (
@@ -54,6 +59,7 @@ from claim.receipts import mint_assessment_receipt, verify_assessment_receipt_si
 
 DEFAULT_TEST_SHA = "a" * 40
 ALT_TEST_SHA = "b" * 40
+EVAL_TIMESTAMP = "2026-08-20T00:00:00Z"
 
 
 @pytest.fixture(autouse=True)
@@ -144,11 +150,10 @@ def test_relevance_all_indicators_pass():
     """All 4 indicators (capability, scope, commit, trust) pass -> is_relevant is True."""
     claim = make_test_claim()
     ev = make_test_evidence()
-    from domain.models import AsymmetricAuthoritySignature
     dummy_sig = AsymmetricAuthoritySignature(
         algorithm="ED25519",
         signer_identity="Gate3AuthoritativeVerifier",
-        public_key_fingerprint="f" * 64,
+        public_key_fingerprint="0" * 64,
         payload_digest="0" * 64,
         signature_hex="0" * 128,
         timestamp="2026-08-20T00:00:00Z",
@@ -162,7 +167,7 @@ def test_relevance_all_indicators_pass():
         provenance_verified=True,
         verifier_identity="Gate3AuthoritativeVerifier",
         timestamp="2026-08-20T00:00:00Z",
-        certificate_hash="c" * 64,
+        certificate_hash="0" * 64,
         authority_signature=dummy_sig,
     )
     res = evaluate_relevance(claim, ev, expected_source_sha=DEFAULT_TEST_SHA, trust_certificate=cert)
@@ -224,11 +229,10 @@ def test_relevance_unverified_trust_fails():
     """Unverified D3 trust certificate -> is_relevant is False."""
     claim = make_test_claim()
     ev = make_test_evidence()
-    from domain.models import AsymmetricAuthoritySignature
     dummy_sig = AsymmetricAuthoritySignature(
         algorithm="ED25519",
         signer_identity="Gate3AuthoritativeVerifier",
-        public_key_fingerprint="f" * 64,
+        public_key_fingerprint="0" * 64,
         payload_digest="0" * 64,
         signature_hex="0" * 128,
         timestamp="2026-08-20T00:00:00Z",
@@ -242,7 +246,7 @@ def test_relevance_unverified_trust_fails():
         provenance_verified=False,
         verifier_identity="Gate3AuthoritativeVerifier",
         timestamp="2026-08-20T00:00:00Z",
-        certificate_hash="c" * 64,
+        certificate_hash="0" * 64,
         authority_signature=dummy_sig,
     )
     res = evaluate_relevance(claim, ev, expected_source_sha=DEFAULT_TEST_SHA, trust_certificate=unverified_cert)
@@ -380,14 +384,13 @@ def test_reducer_pure_replay_identity():
     assert state1.claims["CLM-2"].epistemic_state == ClaimEpistemicState.CONTRADICTED
 
 
-def test_reducer_claim_status_mapping():
-    """Maps ClaimEpistemicState to canonical D0/D1 ClaimStatus enum."""
+def test_reducer_conflicted_preserved_in_claim_status():
+    """CONFLICTED epistemic state maps to ClaimStatus.CONFLICTED without lossy down-mapping."""
     assert ClaimEpistemicState.SUPPORTED.to_domain_status() == ClaimStatus.SUPPORTED
     assert ClaimEpistemicState.CONTRADICTED.to_domain_status() == ClaimStatus.CONTRADICTED
-    assert ClaimEpistemicState.CONFLICTED.to_domain_status() == ClaimStatus.CONTRADICTED
-    assert ClaimEpistemicState.WAIVED.to_domain_status() == ClaimStatus.WAIVED
+    assert ClaimEpistemicState.CONFLICTED.to_domain_status() == ClaimStatus.CONFLICTED
+    assert ClaimEpistemicState.STALE.to_domain_status() == ClaimStatus.STALE
     assert ClaimEpistemicState.UNSUPPORTED.to_domain_status() == ClaimStatus.UNSUPPORTED
-    assert ClaimEpistemicState.STALE.to_domain_status() == ClaimStatus.UNSUPPORTED
 
 
 # ============================================================================
@@ -406,6 +409,7 @@ def test_convergence_converged_state():
         intended_claims=claims,
         claim_states=state.claims,
         evidence_catalog=catalog,
+        evaluated_at=EVAL_TIMESTAMP,
     )
     assert report.is_converged is True
     assert report.drift_count == 0
@@ -434,6 +438,7 @@ def test_convergence_detects_all_drift_types():
         intended_claims=claims,
         claim_states=state.claims,
         evidence_catalog=catalog,
+        evaluated_at=EVAL_TIMESTAMP,
     )
     assert report.is_converged is False
     drift_types = {f.finding_type for f in report.findings}
@@ -442,6 +447,20 @@ def test_convergence_detects_all_drift_types():
     assert DriftType.CONTRADICTORY in drift_types
     assert DriftType.UNREQUESTED in drift_types
     assert DriftType.STALE in drift_types
+
+
+def test_convergence_missing_timestamp_rejected():
+    """Missing or empty evaluated_at timestamp raises ValueError."""
+    claims = {"CLM-1": make_test_claim()}
+    with pytest.raises(ValueError, match="evaluated_at timestamp is required"):
+        ConvergenceEngine.analyze_convergence(
+            task_id="TASK-001",
+            repository_sha=DEFAULT_TEST_SHA,
+            intended_claims=claims,
+            claim_states={},
+            evidence_catalog={},
+            evaluated_at="",
+        )
 
 
 def test_convergence_non_authorization_invariant():
@@ -455,6 +474,7 @@ def test_convergence_non_authorization_invariant():
         intended_claims=claims,
         claim_states=state.claims,
         evidence_catalog=catalog,
+        evaluated_at=EVAL_TIMESTAMP,
     )
     assert not hasattr(report, "authorize")
     assert not hasattr(report, "issue_token")
@@ -484,10 +504,53 @@ def test_mint_assessment_receipt_and_verify_signature():
         repository_sha=DEFAULT_TEST_SHA,
         claim_states=state.claims,
         intended_claims=claims,
+        evaluated_at=EVAL_TIMESTAMP,
     )
     assert receipt.verdict == AssessmentVerdict.SATISFIED
     assert len(receipt.claim_assessments) == 2
     assert verify_assessment_receipt_signature(receipt) is True
+
+
+def test_conflicted_claim_in_assessment_receipt():
+    """CONFLICTED claim is recorded with ClaimStatus.CONFLICTED and preserved in AssessmentReceipt."""
+    claims = {"CLM-1": make_test_claim(claim_id="CLM-1")}
+    catalog = {
+        "EV-1": make_test_evidence(ev_id="EV-1", claim_id="CLM-1", polarity=EvidencePolarity.SUPPORTS),
+        "EV-2": make_test_evidence(ev_id="EV-2", claim_id="CLM-1", polarity=EvidencePolarity.REFUTES),
+    }
+    state = fold_claim_evidence_state(claims, catalog, DEFAULT_TEST_SHA)
+    assert state.claims["CLM-1"].epistemic_state == ClaimEpistemicState.CONFLICTED
+
+    receipt = mint_assessment_receipt(
+        receipt_id="RCPT-OBL-003-001",
+        obligation_id="OBL-003",
+        policy_version=1,
+        repository_sha=DEFAULT_TEST_SHA,
+        claim_states=state.claims,
+        intended_claims=claims,
+        evaluated_at=EVAL_TIMESTAMP,
+    )
+    assert receipt.verdict == AssessmentVerdict.REJECTED
+    assert len(receipt.claim_assessments) == 1
+    # Check that status is strictly CONFLICTED, not CONTRADICTED
+    assert receipt.claim_assessments[0].status == ClaimStatus.CONFLICTED
+    assert len(receipt.conflicts) == 1
+    assert verify_assessment_receipt_signature(receipt) is True
+
+
+def test_missing_evaluation_timestamp_rejected():
+    """Minting receipt with empty evaluated_at raises ValueError."""
+    claims = {"CLM-1": make_test_claim(claim_id="CLM-1")}
+    with pytest.raises(ValueError, match="evaluated_at timestamp is required"):
+        mint_assessment_receipt(
+            receipt_id="RCPT-OBL-001-001",
+            obligation_id="OBL-001",
+            policy_version=1,
+            repository_sha=DEFAULT_TEST_SHA,
+            claim_states={},
+            intended_claims=claims,
+            evaluated_at="",
+        )
 
 
 def test_tampered_assessment_receipt_signature_rejected():
@@ -503,12 +566,12 @@ def test_tampered_assessment_receipt_signature_rejected():
         repository_sha=DEFAULT_TEST_SHA,
         claim_states=state.claims,
         intended_claims=claims,
+        evaluated_at=EVAL_TIMESTAMP,
     )
     assert receipt.verdict == AssessmentVerdict.REJECTED
     assert verify_assessment_receipt_signature(receipt) is True
 
     # Tamper with receipt verdict (forging SATISFIED)
-    from domain.models import AssessmentReceipt
     tampered_receipt = AssessmentReceipt(
         receipt_id=receipt.receipt_id,
         obligation_id=receipt.obligation_id,
@@ -524,9 +587,51 @@ def test_tampered_assessment_receipt_signature_rejected():
     assert verify_assessment_receipt_signature(tampered_receipt) is False
 
 
-def test_verify_assessment_receipt_none_or_bad_algorithm():
-    """Verification returns False on None receipt or non-ED25519 algorithm."""
-    assert verify_assessment_receipt_signature(None) is False
+def test_fabricated_d4_authority_object_rejected():
+    """Fabricated / untrusted authority signer produces invalid signatures that fail verification."""
+    class UntrustedAuthoritySigner:
+        def sign_payload(self, canonical_bytes: bytes, verifier_identity: str, timestamp_iso: str):
+            priv = ed25519.Ed25519PrivateKey.generate()
+            sig_bytes = priv.sign(canonical_bytes)
+            return AsymmetricAuthoritySignature(
+                algorithm="ED25519",
+                signer_identity="UntrustedActor",
+                public_key_fingerprint="0" * 64,
+                payload_digest=hashlib.sha256(canonical_bytes).hexdigest(),
+                signature_hex=sig_bytes.hex(),
+                timestamp=timestamp_iso,
+            )
+
+    claims = {"CLM-1": make_test_claim(claim_id="CLM-1")}
+    state = fold_claim_evidence_state(claims, {}, DEFAULT_TEST_SHA)
+
+    receipt = mint_assessment_receipt(
+        receipt_id="RCPT-OBL-UNTRUSTED-001",
+        obligation_id="OBL-001",
+        policy_version=1,
+        repository_sha=DEFAULT_TEST_SHA,
+        claim_states=state.claims,
+        intended_claims=claims,
+        evaluated_at=EVAL_TIMESTAMP,
+        authority_signer=UntrustedAuthoritySigner(),
+    )
+    # Verification against genuine authority fails closed
+    assert verify_assessment_receipt_signature(receipt) is False
+
+
+def test_d4_cannot_access_private_key_directly():
+    """D4 claim modules do not expose or contain direct access to Gate3AuthorityKeyStore private keys."""
+    import claim.receipts as cr
+    import claim.reducer as cred
+    import claim.convergence as cconv
+    import claim.relevance as crel
+    import claim.coverage as ccov
+
+    # Check that none of the claim modules import Gate3AuthorityKeyStore
+    for mod in (cr, cred, cconv, crel, ccov):
+        assert not hasattr(mod, "Gate3AuthorityKeyStore")
+        assert not hasattr(mod, "_private_key")
+        assert not hasattr(mod, "get_private_key")
 
 
 # ============================================================================
