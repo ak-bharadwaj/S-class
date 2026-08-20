@@ -1,25 +1,26 @@
 """
 S-Class EOS V11.2 - D5 Main Controller Orchestrator (§8.1, §8.3, CORE-05, CORE-25).
 Orchestrates the 5-stage lifecycle:
-PRE_VALIDATE -> PRE_AUTHORIZE -> (IMMUTABLE DECISION) -> PRE_EXECUTE -> (TOKEN) -> EXECUTION -> POST_EXECUTE -> POST_OBSERVE.
+PRE_VALIDATE -> PRE_AUTHORIZE -> (IMMUTABLE DECISION) -> PRE_EXECUTE -> (ADMISSION & D2 NONCE CONSUMPTION) -> (D6 EXECUTION) -> POST_EXECUTE -> POST_OBSERVE.
 "Planner proposes. Controller disposes."
 Enforces that:
-1. PRE_AUTHORIZE failure never mints execution tokens.
-2. AuthorizationDecision is immutable after PRE_AUTHORIZE.
-3. Later hooks (POST_EXECUTE / POST_OBSERVE) cannot grant authorization retroactively.
+1. Controller holds the ONLY token minting path.
+2. PRE_AUTHORIZE failure never mints execution tokens.
+3. ExecutionToken admission/consumption occurs BEFORE D6 execution.
+4. Later hooks (POST_EXECUTE / POST_OBSERVE) cannot grant authorization retroactively.
 """
 
 from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Mapping, Optional, Sequence, Any
+from typing import Mapping, Optional, Sequence, Any, Set
 from domain.models import Obligation, Policy
 from events.store import D2NonceStore
 from policy.models import AuthoritySignerProtocol
 from controller.authorization import ActionProposal, AuthorizationDecision, AuthorizationStatus, AuthorizationEngine
 from controller.hooks import LifecycleStage, HookContext, HookResult, LifecyclePipeline
-from controller.token import ExecutionToken, mint_execution_token, verify_and_consume_execution_token
+from controller.token import ExecutionToken, _mint_execution_token, verify_and_consume_execution_token
 
 
 @dataclass(frozen=True)
@@ -28,6 +29,15 @@ class ControllerDispatchResult:
     proposal_id: str
     decision: AuthorizationDecision
     execution_token: Optional[ExecutionToken] = None
+    error_message: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class ExecutionAdmissionResult:
+    """Result of admitting an ExecutionToken BEFORE D6 execution."""
+    token_id: str
+    is_admitted: bool
+    admission_nonce: str = ""
     error_message: Optional[str] = None
 
 
@@ -54,6 +64,7 @@ class SClassController:
         self._authority_signer = authority_signer
         self._pipeline = pipeline or LifecyclePipeline()
         self._nonce_store = nonce_store or D2NonceStore()
+        self._admitted_nonces: Set[str] = set()
 
     def submit_proposal(
         self,
@@ -127,7 +138,7 @@ class SClassController:
                 error_message=pre_auth_res.error_message,
             )
 
-        # Precondition Evaluation -> Creates IMMUTABLE AuthorizationDecision
+        # Precondition Evaluation -> Creates IMMUTABLE AuthorizationDecision (evaluating active D3 policy)
         decision = AuthorizationEngine.evaluate_proposal(
             proposal=proposal,
             obligations=obligations,
@@ -158,15 +169,14 @@ class SClassController:
         )
         pre_exec_res = self._pipeline.run_stage(LifecycleStage.PRE_EXECUTE, pre_exec_ctx)
         if not pre_exec_res.proceed:
-            # Fail closed: token is NOT issued
             return ControllerDispatchResult(
                 proposal_id=proposal.proposal_id,
                 decision=decision,
                 error_message=pre_exec_res.error_message or "PRE_EXECUTE hook aborted execution",
             )
 
-        # Mint authentic Ed25519-signed ExecutionToken with unique D2 nonce
-        token = mint_execution_token(
+        # Controller holds the ONLY issuance path
+        token = _mint_execution_token(
             token_id=f"TOK-{uuid.uuid4().hex[:12].upper()}",
             obligation_id=proposal.obligation_id,
             proposal_id=proposal.proposal_id,
@@ -183,19 +193,22 @@ class SClassController:
             execution_token=token,
         )
 
-    def complete_execution(
+    def admit_execution(
         self,
         token: ExecutionToken,
         expected_obligation_id: str,
         expected_source_sha: str,
         expected_policy_version: int,
         current_time_iso: str,
-        execution_result: Optional[Mapping[str, Any]] = None,
-    ) -> ExecutionCompletionResult:
-        """Processes execution completion through verification & POST_EXECUTE -> POST_OBSERVE hooks.
-        
-        Enforces atomic single-use nonce reservation. Later hooks cannot grant authorization.
-        """
+    ) -> ExecutionAdmissionResult:
+        """Admits an ExecutionToken BEFORE D6 execution by verifying bindings, time bounds, and reserving nonce in D2 store."""
+        if not isinstance(token, ExecutionToken):
+            return ExecutionAdmissionResult(
+                token_id="UNKNOWN",
+                is_admitted=False,
+                error_message="Invalid ExecutionToken provided.",
+            )
+
         is_token_valid = verify_and_consume_execution_token(
             token=token,
             expected_obligation_id=expected_obligation_id,
@@ -207,10 +220,41 @@ class SClassController:
         )
 
         if not is_token_valid:
-            return ExecutionCompletionResult(
-                token_id=token.token_id if token else "UNKNOWN",
-                is_valid_execution=False,
+            return ExecutionAdmissionResult(
+                token_id=token.token_id,
+                is_admitted=False,
                 error_message="Execution token verification or single-use nonce reservation failed.",
+            )
+
+        self._admitted_nonces.add(token.execution_nonce)
+        return ExecutionAdmissionResult(
+            token_id=token.token_id,
+            is_admitted=True,
+            admission_nonce=token.execution_nonce,
+        )
+
+    def complete_execution(
+        self,
+        token: ExecutionToken,
+        admission: ExecutionAdmissionResult,
+        execution_result: Optional[Mapping[str, Any]] = None,
+    ) -> ExecutionCompletionResult:
+        """Processes execution completion AFTER D6 execution through POST_EXECUTE -> POST_OBSERVE hooks.
+        
+        Requires a prior successful ExecutionAdmissionResult. Later hooks cannot grant authorization retroactively.
+        """
+        if not token or not isinstance(token, ExecutionToken):
+            return ExecutionCompletionResult(
+                token_id="UNKNOWN",
+                is_valid_execution=False,
+                error_message="Invalid ExecutionToken.",
+            )
+
+        if not admission or not admission.is_admitted or admission.admission_nonce not in self._admitted_nonces:
+            return ExecutionCompletionResult(
+                token_id=token.token_id,
+                is_valid_execution=False,
+                error_message="Execution was not admitted prior to completion.",
             )
 
         # Stage 4: POST_EXECUTE Hook

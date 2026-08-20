@@ -4,7 +4,6 @@ S-Class EOS V11.2 - D5 Controller / Action Authorization Layer (§8.1, §8.3, §
 
 from controller.token import (
     ExecutionToken,
-    mint_execution_token,
     verify_and_consume_execution_token,
 )
 from controller.hooks import (
@@ -31,12 +30,12 @@ from controller.authorization import (
 from controller.controller import (
     SClassController,
     ControllerDispatchResult,
+    ExecutionAdmissionResult,
     ExecutionCompletionResult,
 )
 
 __all__ = [
     "ExecutionToken",
-    "mint_execution_token",
     "verify_and_consume_execution_token",
     "LifecycleStage",
     "HookResult",
@@ -55,5 +54,6 @@ __all__ = [
     "AuthorizationEngine",
     "SClassController",
     "ControllerDispatchResult",
+    "ExecutionAdmissionResult",
     "ExecutionCompletionResult",
 ]

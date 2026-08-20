@@ -3,12 +3,14 @@ S-Class EOS V11.2 - D5 Cryptographic Execution Token (§8.1, §8.3).
 Immutable, Ed25519-signed single-use execution tokens.
 Reuses D2 durable storage for atomic single-use nonce reservation.
 Binds token_id, obligation_id, proposal_id, source_sha, policy_version, execution_nonce, timestamps, and signature.
+Domain Separator: SCLASS_EXECUTION_TOKEN_V1:
+Controller holds the ONLY issuance path.
 """
 
 from __future__ import annotations
 import uuid
 import hashlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional, Any
 from domain.models import AsymmetricAuthoritySignature, _validate_pattern, _validate_iso8601
@@ -19,6 +21,7 @@ from policy.models import AuthoritySignerProtocol
 
 
 TOKEN_ID_PREFIX = "TOK-"
+SCLASS_EXECUTION_TOKEN_DOMAIN_SEPARATOR = "SCLASS_EXECUTION_TOKEN_V1:"
 
 
 @dataclass(frozen=True)
@@ -74,7 +77,12 @@ def _build_token_payload(
     }
 
 
-def mint_execution_token(
+def _compute_token_canonical_bytes(payload: dict) -> bytes:
+    """Computes canonical RFC 8785 JSON bytes prefixed with the frozen domain separator."""
+    return SCLASS_EXECUTION_TOKEN_DOMAIN_SEPARATOR.encode("utf-8") + canonicalize_json(payload)
+
+
+def _mint_execution_token(
     token_id: str,
     obligation_id: str,
     proposal_id: str,
@@ -86,7 +94,7 @@ def mint_execution_token(
     execution_nonce: Optional[str] = None,
     signer_identity: str = "Gate3AuthoritativeVerifier",
 ) -> ExecutionToken:
-    """Mints an authentic, Ed25519-signed ExecutionToken via D3 Authority interface."""
+    """Internal Controller token issuance function with domain separator binding."""
     if not isinstance(authority_signer, AuthoritySignerProtocol):
         raise TypeError("authority_signer must implement AuthoritySignerProtocol.")
     if not issued_at or not expires_at:
@@ -105,7 +113,7 @@ def mint_execution_token(
         expires_at=expires_at,
     )
 
-    canonical_bytes = canonicalize_json(payload)
+    canonical_bytes = _compute_token_canonical_bytes(payload)
     authority_sig = authority_signer.sign_payload(
         canonical_bytes=canonical_bytes,
         verifier_identity=signer_identity,
@@ -134,7 +142,10 @@ def verify_and_consume_execution_token(
     authority_signer: AuthoritySignerProtocol,
     nonce_store: Optional[D2NonceStore] = None,
 ) -> bool:
-    """Cryptographically verifies token, checks bindings & expiry, and atomically reserves nonce in D2 store."""
+    """Cryptographically verifies token, checks bindings & time validity, and atomically reserves nonce in D2 store.
+    
+    Validates current_time >= issued_at and current_time <= expires_at.
+    """
     if not isinstance(token, ExecutionToken):
         return False
     if not isinstance(authority_signer, AuthoritySignerProtocol):
@@ -148,16 +159,21 @@ def verify_and_consume_execution_token(
     if token.policy_version != expected_policy_version:
         return False
 
-    # 2. Expiry Verification (ISO-8601 comparison)
+    # 2. Time Boundary Verification (current_time >= issued_at and current_time <= expires_at)
     try:
         t_current = datetime.fromisoformat(current_time_iso.replace("Z", "+00:00"))
+        t_issued = datetime.fromisoformat(token.issued_at.replace("Z", "+00:00"))
         t_expiry = datetime.fromisoformat(token.expires_at.replace("Z", "+00:00"))
+        if t_current < t_issued:
+            # Future-issued token rejected
+            return False
         if t_current > t_expiry:
+            # Expired token rejected
             return False
     except Exception:
         return False
 
-    # 3. Cryptographic Signature Verification
+    # 3. Cryptographic Signature Verification with Domain Separator
     payload = _build_token_payload(
         token_id=token.token_id,
         obligation_id=token.obligation_id,
@@ -169,14 +185,14 @@ def verify_and_consume_execution_token(
         expires_at=token.expires_at,
     )
     try:
-        canonical_bytes = canonicalize_json(payload)
+        canonical_bytes = _compute_token_canonical_bytes(payload)
         is_sig_valid = authority_signer.verify_signature(canonical_bytes, token.signature)
         if not is_sig_valid:
             return False
     except (ValueError, TypeError, KeyError):
         return False
 
-    # 4. Atomic D2 Single-Use Nonce Reservation
+    # 4. Atomic D2 Single-Use Nonce Reservation (BEFORE D6 execution)
     store = nonce_store or D2NonceStore()
     try:
         reserved = store.reserve_nonce(token.execution_nonce)

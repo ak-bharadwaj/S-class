@@ -1,11 +1,13 @@
 """
 S-Class EOS V11.2 - D5 Action Authorization Engine (§8.1, §8.2, CORE-05).
 Precondition evaluation and immutable AuthorizationDecision creation.
+Actually evaluates active D3 Policy using PolicyEvaluationContext.
 Enforces:
 1. Target obligation must be registered and in Executable Frontier (READY != EXECUTABLE).
 2. All prerequisites listed in proposal must be SATISFIED or CONDITIONAL.
 3. Action type must be permitted under active security profile.
-4. Estimated cost and timeout must not exceed budget bounds.
+4. Active D3 Policy evaluated and satisfied (ALLOW).
+5. Estimated cost and timeout must not exceed budget bounds.
 """
 
 from __future__ import annotations
@@ -14,7 +16,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Mapping, Optional, Sequence, Tuple, Any
 from domain.models import Obligation, Policy, _validate_iso8601
-from domain.types import ObligationStatus
+from domain.types import ObligationStatus, PolicyScope
+from policy.evaluator import evaluate_policy
+from policy.models import PolicyEvaluationContext, PolicyDecisionType
 from controller.frontier import compute_frontier, ExecutionFrontier
 
 
@@ -145,6 +149,23 @@ class AuthorizationEngine:
         # 5. Resource Budget Bounds
         if proposal.estimated_cost_usd > budget_remaining:
             reasons.append(f"Estimated cost ${proposal.estimated_cost_usd:.2f} exceeds remaining budget ${budget_remaining:.2f}.")
+
+        # 6. Active D3 Policy Evaluation
+        if target_obl.policy_id:
+            pol = policies.get(target_obl.policy_id)
+            if not pol:
+                reasons.append(f"Active policy '{target_obl.policy_id}' not found in registered policies.")
+            else:
+                pol_ctx = PolicyEvaluationContext(
+                    obligation=target_obl,
+                    claims=(),
+                    evidence=(),
+                    evaluation_timestamp=evaluated_at,
+                    expected_source_sha=source_sha,
+                )
+                pol_decision = evaluate_policy(pol, pol_ctx)
+                if pol_decision.decision != PolicyDecisionType.ALLOW:
+                    reasons.append(f"D3 Policy '{pol.policy_id}' evaluation denied ({pol_decision.decision.value}): {pol_decision.rationale}")
 
         decision_status = AuthorizationStatus.AUTHORIZED if not reasons else AuthorizationStatus.REJECTED
 
