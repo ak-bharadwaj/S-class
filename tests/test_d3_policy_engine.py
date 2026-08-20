@@ -103,7 +103,10 @@ from domain.exceptions import DomainValidationError
 from events.serializer import canonicalize_json
 from benchmark.parity.gate_3_authority import (
     Gate3AuthorityKeyStore,
+    Gate3ProviderKeyStore,
     compute_gate3_evidence_digest,
+    sign_provider_evidence,
+    verify_provider_evidence_signature,
     issue_gate_3_evidence_certificate,
 )
 from benchmark.parity.verify_gate_3_certificate import (
@@ -143,11 +146,15 @@ TEST_AUTHORITY_PUBLIC_KEY = TEST_AUTHORITY_PRIVATE_KEY.public_key()
 @pytest.fixture(autouse=True)
 def setup_test_authority_keystore():
     """Initializes the protected authority keystore and verifier public keystore for tests."""
+    Gate3AuthorityKeyStore.clear()
     Gate3AuthorityKeyStore.set_private_key(TEST_AUTHORITY_PRIVATE_KEY)
+    Gate3PublicKeystore.clear()
     Gate3PublicKeystore.set_public_key(TEST_AUTHORITY_PUBLIC_KEY)
+    Gate3ProviderKeyStore.clear()
     yield
-    Gate3AuthorityKeyStore.set_private_key(TEST_AUTHORITY_PRIVATE_KEY)
-    Gate3PublicKeystore.set_public_key(TEST_AUTHORITY_PUBLIC_KEY)
+    Gate3AuthorityKeyStore.clear()
+    Gate3PublicKeystore.clear()
+    Gate3ProviderKeyStore.clear()
 
 
 def make_test_obligation(
@@ -229,15 +236,7 @@ def make_test_evidence(
     if custom_signature is not None:
         sig = custom_signature
     else:
-        dummy_sig = HmacSessionSignature(
-            algorithm="HMAC-SHA256",
-            key_id="KEY-001",
-            nonce="NONCE-001",
-            raw_stdout_digest="0" * 64,
-            signature_hex="0" * 64,
-            timestamp=timestamp,
-        )
-        temp_ev = Evidence(
+        sig = sign_provider_evidence(
             evidence_id=ev_id,
             claim_id=claim_id,
             provider_id=provider_id,
@@ -246,20 +245,9 @@ def make_test_evidence(
             source_sha=source_sha,
             scope=scope,
             observation=obs,
-            polarity=polarity,
-            validity=validity,
-            independence_group=independence_group,
             provenance=prov,
-            signature=dummy_sig,
-        )
-        real_digest = compute_gate3_evidence_digest(temp_ev)
-        sig = HmacSessionSignature(
-            algorithm="HMAC-SHA256",
             key_id="KEY-001",
             nonce="NONCE-001",
-            raw_stdout_digest=real_digest,
-            signature_hex="f" * 64,
-            timestamp=timestamp,
         )
 
     return Evidence(
