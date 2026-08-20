@@ -23,6 +23,9 @@ from policy.models import AuthoritySignerProtocol
 from controller.authorization import ActionProposal, AuthorizationDecision, AuthorizationStatus, AuthorizationEngine
 from controller.hooks import LifecycleStage, HookContext, HookResult, LifecyclePipeline
 from controller.token import (
+    AuthorizedSessionExecutionBinding,
+    _issue_authorized_session_binding,
+    verify_authorized_session_binding,
     ActionBinding,
     ExecutionContext,
     ExecutionToken,
@@ -71,6 +74,32 @@ class SClassController:
         self._authority_signer = authority_signer
         self._pipeline = pipeline or LifecyclePipeline()
         self._nonce_store = nonce_store or D2NonceStore()
+
+
+    def issue_session_binding(
+        self,
+        session_id: str,
+        repository_id: str,
+        source_sha: str,
+        task_id: str,
+        execution_context: ExecutionContext,
+    ) -> AuthorizedSessionExecutionBinding:
+        """The authoritative Controller issuance path for AuthorizedSessionExecutionBinding."""
+        return _issue_authorized_session_binding(
+            session_id=session_id,
+            repository_id=repository_id,
+            source_sha=source_sha,
+            task_id=task_id,
+            execution_context=execution_context,
+            authority_signer=self._authority_signer,
+        )
+
+    def verify_session_binding(
+        self,
+        binding: AuthorizedSessionExecutionBinding,
+    ) -> bool:
+        """Cryptographically verifies AuthorizedSessionExecutionBinding against controller's trusted authority root."""
+        return verify_authorized_session_binding(binding, self._authority_signer)
 
     def submit_proposal(
         self,

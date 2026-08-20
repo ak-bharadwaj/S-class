@@ -638,7 +638,7 @@ def _compute_session_binding_canonical_bytes(payload: Mapping[str, Any]) -> byte
     return SCLASS_SESSION_BINDING_DOMAIN_SEPARATOR.encode("utf-8") + canonicalize_json(payload)
 
 
-def issue_authorized_session_binding(
+def _issue_authorized_session_binding(
     session_id: str,
     repository_id: str,
     source_sha: str,

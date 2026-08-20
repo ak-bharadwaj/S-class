@@ -1,19 +1,19 @@
 """
-S-Class EOS V11.2 - D7A Hardened Agent Integration & Authority Provenance Test Suite (§8.1, §8.3).
+S-Class EOS V11.2 - D7A Hardened Agent Integration & Authority Root Test Suite (§8.1, §8.3).
 Exhaustively verifies:
-1. Cryptographically Signed AuthorizedSessionExecutionBinding Authority Provenance:
-   - Forged binding object / invalid signature -> REJECT
-   - Binding signed by wrong authority (untrusted key) -> REJECT
-   - Modified signed payload (tampered field after signing) -> REJECT
-   - Context from another session -> REJECT
-   - Context from another repository -> REJECT
-   - Context from another SHA -> REJECT
-   - Context from another task -> REJECT
-   - Capability mismatch between signed binding and context -> REJECT
-   - Context digest mismatch -> REJECT
-   - Provider / profile / resource / workspace substitution -> REJECT
-   - Missing binding fail-closed -> REJECT
-   - Architectural guard: D7 has zero token minting or binding issuance authority.
+1. SClassController Authority Root & Cryptographic Trust Boundary:
+   - Genuine Controller issuance -> Genuine binding -> ACCEPT
+   - Rogue signer + rogue binding evaluated against Controller root -> REJECT
+   - Forged signature on binding -> REJECT
+   - Genuine binding payload altered after signing -> REJECT
+   - Genuine signature paired with wrong payload -> REJECT
+   - Controller authority key rotation mismatch -> REJECT
+   - Binding from different session -> REJECT
+   - Binding from different repo / SHA / task -> REJECT
+   - Capability alteration / mismatch -> REJECT
+   - Context digest alteration / substitution -> REJECT
+   - Missing binding -> fail-closed REJECT (zero proposals dispatched)
+   - Architectural Guard: D7 modules have zero token minting or binding issuance APIs.
 2. Inbound External AgentMessage Ingress Validation (tamper, replay, reorder, wrong-worker, wrong-session).
 3. Memory-Bounded read_file_chunk (streaming line-by-line, line cap, byte cap, fail closed on oversized files).
 4. Authoritative ExecutionContext Propagation (Session workspace W1 -> Proposal workspace W1; no topology manufacture).
@@ -27,6 +27,7 @@ Exhaustively verifies:
 import os
 import sys
 import pytest
+import hashlib
 import time
 from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor
@@ -46,12 +47,7 @@ from events.store import D2NonceStore
 from execution.workspace import IsolatedWorkspace
 from benchmark.parity.gate_3_authority import Gate3AuthorityKeyStore, Gate3AuthoritySigner
 from controller.authorization import ActionProposal, AuthorizationStatus
-from controller.token import (
-    ExecutionContext,
-    AuthorizedSessionExecutionBinding,
-    issue_authorized_session_binding,
-    verify_authorized_session_binding,
-)
+from controller.token import ExecutionContext, AuthorizedSessionExecutionBinding
 from controller.controller import SClassController
 from agent.models import (
     AgentTurnStatus,
@@ -124,14 +120,13 @@ def default_exec_ctx():
 
 
 @pytest.fixture
-def default_signed_binding(default_exec_ctx, default_authority_signer):
-    return issue_authorized_session_binding(
+def default_signed_binding(fresh_controller, default_exec_ctx):
+    return fresh_controller.issue_session_binding(
         session_id=DEFAULT_SESSION_ID,
         repository_id=DEFAULT_REPO_ID,
         source_sha=DEFAULT_SHA,
         task_id=DEFAULT_TASK_ID,
         execution_context=default_exec_ctx,
-        authority_signer=default_authority_signer,
     )
 
 
@@ -175,10 +170,86 @@ def standard_domain_state():
 
 
 # =====================================================================
-# 1. ADVERSARIAL CRYPTOGRAPHIC AUTHORITY SIGNATURE & BINDING TESTS
+# 1. CONTROLLER AUTHORITY ROOT & TRUST-ROOT TEST MATRIX
 # =====================================================================
 
-def test_synthesizer_rejects_forged_binding_signature(default_exec_ctx, default_authority_signer):
+def test_genuine_controller_issuance_and_verification(fresh_controller, default_exec_ctx):
+    """Proves that genuine Controller authority issuance produces a valid binding accepted by D7."""
+    call = AgentToolCall("C1", "propose_test_run", {"obligation_id": "OBL-001", "target_test": "t.py", "purpose": "P"})
+    binding = fresh_controller.issue_session_binding(
+        session_id=DEFAULT_SESSION_ID,
+        repository_id=DEFAULT_REPO_ID,
+        source_sha=DEFAULT_SHA,
+        task_id=DEFAULT_TASK_ID,
+        execution_context=default_exec_ctx,
+    )
+    assert fresh_controller.verify_session_binding(binding) is True
+
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(
+        tool_call=call,
+        session_execution_context=default_exec_ctx,
+        session_binding=binding,
+        controller=fresh_controller,
+        active_session_id=DEFAULT_SESSION_ID,
+        authoritative_repo_id=DEFAULT_REPO_ID,
+        authoritative_source_sha=DEFAULT_SHA,
+        active_task_id=DEFAULT_TASK_ID,
+    )
+    assert err is None
+    assert prop is not None
+    assert prop.execution_context.workspace_id == "ws_default_test"
+
+
+def test_synthesizer_rejects_rogue_signer_and_rogue_binding(fresh_controller, default_exec_ctx, tmp_path):
+    """Proves that a binding signed by an unauthorized/rogue signer is rejected by the Controller trust root."""
+    call = AgentToolCall("C1", "propose_test_run", {"obligation_id": "OBL-001", "target_test": "t.py", "purpose": "P"})
+
+    # Rogue controller with untrusted authority key
+    rogue_priv = ed25519.Ed25519PrivateKey.generate()
+    class RogueSigner(Gate3AuthoritySigner):
+        def sign_payload(self, canonical_bytes: bytes, verifier_identity: str, timestamp_iso: str):
+            payload_digest = hashlib.sha256(canonical_bytes).hexdigest()
+            sig_bytes = rogue_priv.sign(canonical_bytes)
+            pub_bytes = rogue_priv.public_key().public_bytes_raw()
+            pub_fingerprint = hashlib.sha256(pub_bytes).hexdigest()
+            return AsymmetricAuthoritySignature(
+                algorithm="ED25519",
+                signer_identity=verifier_identity,
+                public_key_fingerprint=pub_fingerprint,
+                payload_digest=payload_digest,
+                signature_hex=sig_bytes.hex(),
+                timestamp=timestamp_iso,
+            )
+
+    rogue_controller = SClassController(
+        authority_signer=RogueSigner(),
+        nonce_store=D2NonceStore(file_path=str(tmp_path / "rogue_nonces.log")),
+    )
+    binding_signed_by_rogue = rogue_controller.issue_session_binding(
+        session_id=DEFAULT_SESSION_ID,
+        repository_id=DEFAULT_REPO_ID,
+        source_sha=DEFAULT_SHA,
+        task_id=DEFAULT_TASK_ID,
+        execution_context=default_exec_ctx,
+    )
+
+    # Verification against genuine SClassController trust root fails closed
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(
+        tool_call=call,
+        session_execution_context=default_exec_ctx,
+        session_binding=binding_signed_by_rogue,
+        controller=fresh_controller,
+        active_session_id=DEFAULT_SESSION_ID,
+        authoritative_repo_id=DEFAULT_REPO_ID,
+        authoritative_source_sha=DEFAULT_SHA,
+        active_task_id=DEFAULT_TASK_ID,
+    )
+    assert prop is None
+    assert "AUTHORITY_SIGNATURE_INVALID" in (err or "")
+
+
+def test_synthesizer_rejects_forged_binding_signature(fresh_controller, default_exec_ctx):
+    """Proves that a forged signature object is rejected fail-closed."""
     call = AgentToolCall("C1", "propose_test_run", {"obligation_id": "OBL-001", "target_test": "t.py", "purpose": "P"})
     forged_sig = AsymmetricAuthoritySignature(
         algorithm="ED25519",
@@ -202,7 +273,7 @@ def test_synthesizer_rejects_forged_binding_signature(default_exec_ctx, default_
         tool_call=call,
         session_execution_context=default_exec_ctx,
         session_binding=forged_binding,
-        authority_signer=default_authority_signer,
+        controller=fresh_controller,
         active_session_id=DEFAULT_SESSION_ID,
         authoritative_repo_id=DEFAULT_REPO_ID,
         authoritative_source_sha=DEFAULT_SHA,
@@ -212,62 +283,15 @@ def test_synthesizer_rejects_forged_binding_signature(default_exec_ctx, default_
     assert "AUTHORITY_SIGNATURE_INVALID" in (err or "")
 
 
-def test_synthesizer_rejects_binding_signed_by_wrong_authority(default_exec_ctx):
+def test_synthesizer_rejects_tampered_payload_in_signed_binding(fresh_controller, default_exec_ctx):
+    """Proves that altering a signed binding's fields invalidates the cryptographic signature."""
     call = AgentToolCall("C1", "propose_test_run", {"obligation_id": "OBL-001", "target_test": "t.py", "purpose": "P"})
-    
-    # Untrusted / rogue signer
-    rogue_priv = ed25519.Ed25519PrivateKey.generate()
-    class RogueSigner(Gate3AuthoritySigner):
-        def sign_payload(self, canonical_bytes: bytes, verifier_identity: str, timestamp_iso: str):
-            import hashlib
-            payload_digest = hashlib.sha256(canonical_bytes).hexdigest()
-            sig_bytes = rogue_priv.sign(canonical_bytes)
-            pub_bytes = rogue_priv.public_key().public_bytes_raw()
-            pub_fingerprint = hashlib.sha256(pub_bytes).hexdigest()
-            return AsymmetricAuthoritySignature(
-                algorithm="ED25519",
-                signer_identity=verifier_identity,
-                public_key_fingerprint=pub_fingerprint,
-                payload_digest=payload_digest,
-                signature_hex=sig_bytes.hex(),
-                timestamp=timestamp_iso,
-            )
-
-    rogue_signer = RogueSigner()
-    binding_signed_by_rogue = issue_authorized_session_binding(
+    valid_binding = fresh_controller.issue_session_binding(
         session_id=DEFAULT_SESSION_ID,
         repository_id=DEFAULT_REPO_ID,
         source_sha=DEFAULT_SHA,
         task_id=DEFAULT_TASK_ID,
         execution_context=default_exec_ctx,
-        authority_signer=rogue_signer,
-    )
-
-    # Verifying against official Gate3 authority signer -> REJECT
-    official_signer = Gate3AuthoritySigner()
-    prop, err = ActionProposalSynthesizer.synthesize_proposal(
-        tool_call=call,
-        session_execution_context=default_exec_ctx,
-        session_binding=binding_signed_by_rogue,
-        authority_signer=official_signer,
-        active_session_id=DEFAULT_SESSION_ID,
-        authoritative_repo_id=DEFAULT_REPO_ID,
-        authoritative_source_sha=DEFAULT_SHA,
-        active_task_id=DEFAULT_TASK_ID,
-    )
-    assert prop is None
-    assert "AUTHORITY_SIGNATURE_INVALID" in (err or "")
-
-
-def test_synthesizer_rejects_tampered_payload_in_signed_binding(default_exec_ctx, default_authority_signer):
-    call = AgentToolCall("C1", "propose_test_run", {"obligation_id": "OBL-001", "target_test": "t.py", "purpose": "P"})
-    valid_binding = issue_authorized_session_binding(
-        session_id=DEFAULT_SESSION_ID,
-        repository_id=DEFAULT_REPO_ID,
-        source_sha=DEFAULT_SHA,
-        task_id=DEFAULT_TASK_ID,
-        execution_context=default_exec_ctx,
-        authority_signer=default_authority_signer,
     )
 
     # Tamper with session_id while keeping the original signature
@@ -285,7 +309,7 @@ def test_synthesizer_rejects_tampered_payload_in_signed_binding(default_exec_ctx
         tool_call=call,
         session_execution_context=default_exec_ctx,
         session_binding=tampered_binding,
-        authority_signer=default_authority_signer,
+        controller=fresh_controller,
         active_session_id="SESS-TAMPERED",
         authoritative_repo_id=DEFAULT_REPO_ID,
         authoritative_source_sha=DEFAULT_SHA,
@@ -295,15 +319,46 @@ def test_synthesizer_rejects_tampered_payload_in_signed_binding(default_exec_ctx
     assert "AUTHORITY_SIGNATURE_INVALID" in (err or "")
 
 
-def test_synthesizer_rejects_context_from_another_session(default_exec_ctx, default_authority_signer):
+def test_synthesizer_rejects_authority_key_rotation_mismatch(default_exec_ctx, tmp_path):
+    """Proves that a binding signed with a retired/different key is rejected upon key rotation."""
     call = AgentToolCall("C1", "propose_test_run", {"obligation_id": "OBL-001", "target_test": "t.py", "purpose": "P"})
-    binding = issue_authorized_session_binding(
+
+    # Controller 1 with Key 1
+    Gate3AuthorityKeyStore.clear()
+    key1 = ed25519.Ed25519PrivateKey.generate()
+    Gate3AuthorityKeyStore.set_private_key(key1)
+    ctrl1 = SClassController(Gate3AuthoritySigner(), nonce_store=D2NonceStore(str(tmp_path / "k1.log")))
+    binding1 = ctrl1.issue_session_binding(DEFAULT_SESSION_ID, DEFAULT_REPO_ID, DEFAULT_SHA, DEFAULT_TASK_ID, default_exec_ctx)
+
+    # Controller 2 with Key 2 (rotated)
+    Gate3AuthorityKeyStore.clear()
+    key2 = ed25519.Ed25519PrivateKey.generate()
+    Gate3AuthorityKeyStore.set_private_key(key2)
+    ctrl2 = SClassController(Gate3AuthoritySigner(), nonce_store=D2NonceStore(str(tmp_path / "k2.log")))
+
+    # Binding 1 verified against Controller 2 trust root -> REJECT
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(
+        tool_call=call,
+        session_execution_context=default_exec_ctx,
+        session_binding=binding1,
+        controller=ctrl2,
+        active_session_id=DEFAULT_SESSION_ID,
+        authoritative_repo_id=DEFAULT_REPO_ID,
+        authoritative_source_sha=DEFAULT_SHA,
+        active_task_id=DEFAULT_TASK_ID,
+    )
+    assert prop is None
+    assert "AUTHORITY_SIGNATURE_INVALID" in (err or "")
+
+
+def test_synthesizer_rejects_context_from_another_session(fresh_controller, default_exec_ctx):
+    call = AgentToolCall("C1", "propose_test_run", {"obligation_id": "OBL-001", "target_test": "t.py", "purpose": "P"})
+    binding = fresh_controller.issue_session_binding(
         session_id="SESS-ALICE",
         repository_id=DEFAULT_REPO_ID,
         source_sha=DEFAULT_SHA,
         task_id=DEFAULT_TASK_ID,
         execution_context=default_exec_ctx,
-        authority_signer=default_authority_signer,
     )
 
     # Invoked under Bob's active session -> REJECT
@@ -311,7 +366,7 @@ def test_synthesizer_rejects_context_from_another_session(default_exec_ctx, defa
         tool_call=call,
         session_execution_context=default_exec_ctx,
         session_binding=binding,
-        authority_signer=default_authority_signer,
+        controller=fresh_controller,
         active_session_id="SESS-BOB",
         authoritative_repo_id=DEFAULT_REPO_ID,
         authoritative_source_sha=DEFAULT_SHA,
@@ -321,22 +376,21 @@ def test_synthesizer_rejects_context_from_another_session(default_exec_ctx, defa
     assert "BINDING_MISMATCH: session_id mismatch" in (err or "")
 
 
-def test_synthesizer_rejects_context_from_another_repository(default_exec_ctx, default_authority_signer):
+def test_synthesizer_rejects_context_from_another_repository(fresh_controller, default_exec_ctx):
     call = AgentToolCall("C1", "propose_test_run", {"obligation_id": "OBL-001", "target_test": "t.py", "purpose": "P"})
-    binding = issue_authorized_session_binding(
+    binding = fresh_controller.issue_session_binding(
         session_id=DEFAULT_SESSION_ID,
         repository_id=FAKE_REPO_ID,
         source_sha=DEFAULT_SHA,
         task_id=DEFAULT_TASK_ID,
         execution_context=default_exec_ctx,
-        authority_signer=default_authority_signer,
     )
 
     prop, err = ActionProposalSynthesizer.synthesize_proposal(
         tool_call=call,
         session_execution_context=default_exec_ctx,
         session_binding=binding,
-        authority_signer=default_authority_signer,
+        controller=fresh_controller,
         active_session_id=DEFAULT_SESSION_ID,
         authoritative_repo_id=DEFAULT_REPO_ID,
         authoritative_source_sha=DEFAULT_SHA,
@@ -346,22 +400,21 @@ def test_synthesizer_rejects_context_from_another_repository(default_exec_ctx, d
     assert "BINDING_MISMATCH: repository_id mismatch" in (err or "")
 
 
-def test_synthesizer_rejects_context_from_another_sha(default_exec_ctx, default_authority_signer):
+def test_synthesizer_rejects_context_from_another_sha(fresh_controller, default_exec_ctx):
     call = AgentToolCall("C1", "propose_test_run", {"obligation_id": "OBL-001", "target_test": "t.py", "purpose": "P"})
-    binding = issue_authorized_session_binding(
+    binding = fresh_controller.issue_session_binding(
         session_id=DEFAULT_SESSION_ID,
         repository_id=DEFAULT_REPO_ID,
         source_sha=STALE_SHA,
         task_id=DEFAULT_TASK_ID,
         execution_context=default_exec_ctx,
-        authority_signer=default_authority_signer,
     )
 
     prop, err = ActionProposalSynthesizer.synthesize_proposal(
         tool_call=call,
         session_execution_context=default_exec_ctx,
         session_binding=binding,
-        authority_signer=default_authority_signer,
+        controller=fresh_controller,
         active_session_id=DEFAULT_SESSION_ID,
         authoritative_repo_id=DEFAULT_REPO_ID,
         authoritative_source_sha=DEFAULT_SHA,
@@ -371,22 +424,21 @@ def test_synthesizer_rejects_context_from_another_sha(default_exec_ctx, default_
     assert "BINDING_MISMATCH: source_sha mismatch" in (err or "")
 
 
-def test_synthesizer_rejects_context_from_another_task(default_exec_ctx, default_authority_signer):
+def test_synthesizer_rejects_context_from_another_task(fresh_controller, default_exec_ctx):
     call = AgentToolCall("C1", "propose_test_run", {"obligation_id": "OBL-001", "target_test": "t.py", "purpose": "P"})
-    binding = issue_authorized_session_binding(
+    binding = fresh_controller.issue_session_binding(
         session_id=DEFAULT_SESSION_ID,
         repository_id=DEFAULT_REPO_ID,
         source_sha=DEFAULT_SHA,
         task_id="TASK-OTHER-99",
         execution_context=default_exec_ctx,
-        authority_signer=default_authority_signer,
     )
 
     prop, err = ActionProposalSynthesizer.synthesize_proposal(
         tool_call=call,
         session_execution_context=default_exec_ctx,
         session_binding=binding,
-        authority_signer=default_authority_signer,
+        controller=fresh_controller,
         active_session_id=DEFAULT_SESSION_ID,
         authoritative_repo_id=DEFAULT_REPO_ID,
         authoritative_source_sha=DEFAULT_SHA,
@@ -396,20 +448,19 @@ def test_synthesizer_rejects_context_from_another_task(default_exec_ctx, default
     assert "BINDING_MISMATCH: task_id mismatch" in (err or "")
 
 
-def test_synthesizer_rejects_capability_authority_mismatch(default_authority_signer):
+def test_synthesizer_rejects_capability_authority_mismatch(fresh_controller):
     call = AgentToolCall("C1", "propose_test_run", {"obligation_id": "OBL-001", "target_test": "t.py", "purpose": "P"})
     
     ctx_narrow = ExecutionContext("p", "s", "w", "r", ("CAP_READ_CODE",))
     ctx_wide = ExecutionContext("p", "s", "w", "r", ("CAP_READ_CODE", "CAP_PROPOSE_ACTION", "CAP_EXEC_TEST"))
     
     # Binding signed for narrow capabilities
-    binding = issue_authorized_session_binding(
+    binding = fresh_controller.issue_session_binding(
         session_id=DEFAULT_SESSION_ID,
         repository_id=DEFAULT_REPO_ID,
         source_sha=DEFAULT_SHA,
         task_id=DEFAULT_TASK_ID,
         execution_context=ctx_narrow,
-        authority_signer=default_authority_signer,
     )
 
     # Attempting synthesis with wide context -> REJECT
@@ -417,7 +468,7 @@ def test_synthesizer_rejects_capability_authority_mismatch(default_authority_sig
         tool_call=call,
         session_execution_context=ctx_wide,
         session_binding=binding,
-        authority_signer=default_authority_signer,
+        controller=fresh_controller,
         active_session_id=DEFAULT_SESSION_ID,
         authoritative_repo_id=DEFAULT_REPO_ID,
         authoritative_source_sha=DEFAULT_SHA,
@@ -427,14 +478,14 @@ def test_synthesizer_rejects_capability_authority_mismatch(default_authority_sig
     assert ("CAPABILITY_AUTHORITY_MISMATCH" in (err or "") or "BINDING_MISMATCH" in (err or ""))
 
 
-def test_synthesizer_rejects_context_topology_substitution(default_exec_ctx, default_authority_signer, default_signed_binding):
+def test_synthesizer_rejects_context_topology_substitution(fresh_controller, default_exec_ctx, default_signed_binding):
     call = AgentToolCall("C1", "propose_test_run", {"obligation_id": "OBL-001", "target_test": "t.py", "purpose": "P"})
 
-    # Substituted workspace_id / provider_id in execution_context -> changes context_digest
+    # Substituted workspace_id in execution_context -> changes context_digest
     tampered_ctx = ExecutionContext(
-        provider_id="substituted_provider",
+        provider_id=default_exec_ctx.provider_id,
         sandbox_profile_id=default_exec_ctx.sandbox_profile_id,
-        workspace_id=default_exec_ctx.workspace_id,
+        workspace_id="ws_tampered_substitution",
         resource_profile_id=default_exec_ctx.resource_profile_id,
         capability_set=default_exec_ctx.capability_set,
     )
@@ -443,7 +494,7 @@ def test_synthesizer_rejects_context_topology_substitution(default_exec_ctx, def
         tool_call=call,
         session_execution_context=tampered_ctx,
         session_binding=default_signed_binding,
-        authority_signer=default_authority_signer,
+        controller=fresh_controller,
         active_session_id=DEFAULT_SESSION_ID,
         authoritative_repo_id=DEFAULT_REPO_ID,
         authoritative_source_sha=DEFAULT_SHA,
@@ -454,11 +505,11 @@ def test_synthesizer_rejects_context_topology_substitution(default_exec_ctx, def
 
 
 # =====================================================================
-# 2. PRESERVED FAIL-CLOSED MISSING CONTEXT / BINDING & TOPOLOGY IMMUTABILITY
+# 2. PRESERVED FAIL-CLOSED MISSING BINDING & TOPOLOGY IMMUTABILITY
 # =====================================================================
 
 def test_session_manager_fails_closed_when_signed_binding_is_missing(
-    fresh_controller, standard_domain_state, default_repo_provider, default_authority_signer, default_exec_ctx
+    fresh_controller, standard_domain_state, default_repo_provider, default_exec_ctx
 ):
     """Proves that missing signed binding fails closed and rejects ActionProposal dispatch."""
     obls, policies = standard_domain_state
@@ -470,9 +521,8 @@ def test_session_manager_fails_closed_when_signed_binding_is_missing(
         worker=worker,
         controller=fresh_controller,
         authoritative_repo_state_provider=default_repo_provider,
-        authority_signer=default_authority_signer,
         session_execution_context=default_exec_ctx,
-        session_binding=None,  # Missing binding
+        session_binding=None,
     )
 
     rec, dispatches = mgr.run_session(
@@ -494,7 +544,7 @@ def test_session_manager_fails_closed_when_signed_binding_is_missing(
 
 
 def test_execution_topology_immutability_across_d7_boundary(
-    fresh_controller, standard_domain_state, default_repo_provider, default_authority_signer
+    fresh_controller, standard_domain_state, default_repo_provider
 ):
     """Proves that provider_id, sandbox_profile_id, resource_profile_id, workspace_id, and capability_set cannot be mutated by D7."""
     obls, policies = standard_domain_state
@@ -505,13 +555,12 @@ def test_execution_topology_immutability_across_d7_boundary(
         resource_profile_id="res_immutable_pinned",
         capability_set=("CAP_READ_CODE", "CAP_PROPOSE_ACTION", "CAP_EXEC_TEST"),
     )
-    signed_binding = issue_authorized_session_binding(
+    signed_binding = fresh_controller.issue_session_binding(
         session_id="SESS-PINNED",
         repository_id=DEFAULT_REPO_ID,
         source_sha=DEFAULT_SHA,
         task_id=DEFAULT_TASK_ID,
         execution_context=pinned_ctx,
-        authority_signer=default_authority_signer,
     )
 
     worker = MockAgentWorker("worker")
@@ -522,7 +571,6 @@ def test_execution_topology_immutability_across_d7_boundary(
         worker=worker,
         controller=fresh_controller,
         authoritative_repo_state_provider=default_repo_provider,
-        authority_signer=default_authority_signer,
         session_execution_context=pinned_ctx,
         session_binding=signed_binding,
     )
@@ -548,7 +596,7 @@ def test_execution_topology_immutability_across_d7_boundary(
         tool_call=call,
         session_execution_context=pinned_ctx,
         session_binding=signed_binding,
-        authority_signer=default_authority_signer,
+        controller=fresh_controller,
         active_session_id="SESS-PINNED",
         authoritative_repo_id=DEFAULT_REPO_ID,
         authoritative_source_sha=DEFAULT_SHA,
@@ -652,7 +700,7 @@ def test_ingress_validator_accepts_valid_message_sequence():
 
 
 def test_session_manager_rejects_injected_replayed_inbound_message(
-    fresh_controller, standard_domain_state, default_repo_provider, default_exec_ctx, default_signed_binding, default_authority_signer
+    fresh_controller, standard_domain_state, default_repo_provider, default_exec_ctx, default_signed_binding
 ):
     obls, policies = standard_domain_state
     worker = MockAgentWorker("worker")
@@ -664,7 +712,6 @@ def test_session_manager_rejects_injected_replayed_inbound_message(
         worker=worker,
         controller=fresh_controller,
         authoritative_repo_state_provider=default_repo_provider,
-        authority_signer=default_authority_signer,
         session_execution_context=default_exec_ctx,
         session_binding=default_signed_binding,
     )
@@ -682,7 +729,7 @@ def test_session_manager_rejects_injected_replayed_inbound_message(
 
 
 def test_session_manager_rejects_injected_wrong_worker_inbound_message(
-    fresh_controller, standard_domain_state, default_repo_provider, default_exec_ctx, default_signed_binding, default_authority_signer
+    fresh_controller, standard_domain_state, default_repo_provider, default_exec_ctx, default_signed_binding
 ):
     obls, policies = standard_domain_state
 
@@ -704,7 +751,6 @@ def test_session_manager_rejects_injected_wrong_worker_inbound_message(
         worker=ImpostorWorker(),
         controller=fresh_controller,
         authoritative_repo_state_provider=default_repo_provider,
-        authority_signer=default_authority_signer,
         session_execution_context=default_exec_ctx,
         session_binding=default_signed_binding,
     )
@@ -801,18 +847,17 @@ def test_search_codebase_enforces_resource_bounds(tmp_path):
 # 6. MANDATORY REPOSITORY STATE VERIFICATION
 # =====================================================================
 
-def test_session_manager_requires_mandatory_repo_provider(fresh_controller, default_authority_signer):
+def test_session_manager_requires_mandatory_repo_provider(fresh_controller):
     worker = MockAgentWorker("worker")
     with pytest.raises(TypeError, match="authoritative_repo_state_provider is mandatory"):
         AgentSessionManager(
             worker=worker,
             controller=fresh_controller,
             authoritative_repo_state_provider=None,  # type: ignore
-            authority_signer=default_authority_signer,
         )
 
 
-def test_session_manager_rejects_stale_repository_before_turn(fresh_controller, standard_domain_state, default_authority_signer):
+def test_session_manager_rejects_stale_repository_before_turn(fresh_controller, standard_domain_state):
     obls, policies = standard_domain_state
     worker = MockAgentWorker("worker")
     stale_provider = lambda: (DEFAULT_REPO_ID, STALE_SHA)
@@ -821,7 +866,6 @@ def test_session_manager_rejects_stale_repository_before_turn(fresh_controller, 
         worker=worker,
         controller=fresh_controller,
         authoritative_repo_state_provider=stale_provider,
-        authority_signer=default_authority_signer,
     )
     rec, dispatches = session_mgr.run_session(
         repository_id=DEFAULT_REPO_ID,
@@ -836,7 +880,7 @@ def test_session_manager_rejects_stale_repository_before_turn(fresh_controller, 
     assert len(dispatches) == 0
 
 
-def test_session_manager_rejects_fake_repository_identity(fresh_controller, standard_domain_state, default_authority_signer):
+def test_session_manager_rejects_fake_repository_identity(fresh_controller, standard_domain_state):
     obls, policies = standard_domain_state
     worker = MockAgentWorker("worker")
     fake_repo_provider = lambda: (FAKE_REPO_ID, DEFAULT_SHA)
@@ -845,7 +889,6 @@ def test_session_manager_rejects_fake_repository_identity(fresh_controller, stan
         worker=worker,
         controller=fresh_controller,
         authoritative_repo_state_provider=fake_repo_provider,
-        authority_signer=default_authority_signer,
     )
     rec, dispatches = session_mgr.run_session(
         repository_id=DEFAULT_REPO_ID,
@@ -861,7 +904,7 @@ def test_session_manager_rejects_fake_repository_identity(fresh_controller, stan
 
 
 def test_session_manager_rejects_repository_drift_before_proposal_synthesis(
-    fresh_controller, standard_domain_state, default_exec_ctx, default_signed_binding, default_authority_signer
+    fresh_controller, standard_domain_state, default_exec_ctx, default_signed_binding
 ):
     obls, policies = standard_domain_state
     worker = MockAgentWorker("worker")
@@ -876,7 +919,6 @@ def test_session_manager_rejects_repository_drift_before_proposal_synthesis(
         worker=worker,
         controller=fresh_controller,
         authoritative_repo_state_provider=dynamic_provider,
-        authority_signer=default_authority_signer,
         session_execution_context=default_exec_ctx,
         session_binding=default_signed_binding,
     )
@@ -940,7 +982,7 @@ def test_validate_tool_call_full_json_schema_validation():
 # =====================================================================
 
 def test_concurrent_agent_sessions_remain_isolated(
-    fresh_controller, standard_domain_state, default_repo_provider, default_authority_signer
+    fresh_controller, standard_domain_state, default_repo_provider
 ):
     obls, policies = standard_domain_state
 
@@ -967,19 +1009,17 @@ def test_concurrent_agent_sessions_remain_isolated(
             capability_set=("CAP_READ_CODE", "CAP_PROPOSE_ACTION", "CAP_EXEC_TEST"),
         )
         worker_session_id = f"SESS-CONCURRENT-{worker_idx}"
-        worker_binding = issue_authorized_session_binding(
+        worker_binding = fresh_controller.issue_session_binding(
             session_id=worker_session_id,
             repository_id=DEFAULT_REPO_ID,
             source_sha=DEFAULT_SHA,
             task_id=f"TASK-AGENT-{worker_idx}",
             execution_context=worker_exec_ctx,
-            authority_signer=default_authority_signer,
         )
         mgr = AgentSessionManager(
             worker=worker,
             controller=fresh_controller,
             authoritative_repo_state_provider=default_repo_provider,
-            authority_signer=default_authority_signer,
             session_execution_context=worker_exec_ctx,
             session_binding=worker_binding,
         )
@@ -1018,14 +1058,14 @@ def test_d7_has_no_token_minting_or_binding_issuance_authority():
     """Architectural Guard: D7 modules must not have token minting or binding issuance APIs."""
     import agent
     assert not hasattr(agent, "mint_execution_token")
-    assert not hasattr(agent, "issue_authorized_session_binding")
+    assert not hasattr(agent, "issue_session_binding")
     assert not hasattr(agent, "admit_execution")
     assert not hasattr(agent, "execute_action")
     assert not hasattr(agent, "evaluate_policy")
     assert not hasattr(AgentSessionManager, "mint_execution_token")
-    assert not hasattr(AgentSessionManager, "issue_authorized_session_binding")
+    assert not hasattr(AgentSessionManager, "issue_session_binding")
     assert not hasattr(ActionProposalSynthesizer, "mint_execution_token")
-    assert not hasattr(ActionProposalSynthesizer, "issue_authorized_session_binding")
+    assert not hasattr(ActionProposalSynthesizer, "issue_session_binding")
 
 
 def test_tool_definition_and_agent_model_validations():
@@ -1064,7 +1104,7 @@ def test_authorized_session_execution_binding_validations(default_authority_sign
 
 
 def test_session_manager_tracks_internal_accounting_units(
-    fresh_controller, standard_domain_state, default_repo_provider, default_exec_ctx, default_signed_binding, default_authority_signer
+    fresh_controller, standard_domain_state, default_repo_provider, default_exec_ctx, default_signed_binding
 ):
     obls, policies = standard_domain_state
     worker = MockAgentWorker("worker")
@@ -1087,7 +1127,6 @@ def test_session_manager_tracks_internal_accounting_units(
         worker=worker,
         controller=fresh_controller,
         authoritative_repo_state_provider=default_repo_provider,
-        authority_signer=default_authority_signer,
         session_execution_context=default_exec_ctx,
         session_binding=default_signed_binding,
     )
@@ -1122,7 +1161,7 @@ class CrashingWorker(AgentWorkerProtocol):
 
 
 def test_session_manager_handles_worker_timeout_and_disconnect(
-    fresh_controller, standard_domain_state, default_repo_provider, default_exec_ctx, default_signed_binding, default_authority_signer
+    fresh_controller, standard_domain_state, default_repo_provider, default_exec_ctx, default_signed_binding
 ):
     obls, policies = standard_domain_state
 
@@ -1132,7 +1171,6 @@ def test_session_manager_handles_worker_timeout_and_disconnect(
         worker=w_to,
         controller=fresh_controller,
         authoritative_repo_state_provider=default_repo_provider,
-        authority_signer=default_authority_signer,
         session_execution_context=default_exec_ctx,
         session_binding=default_signed_binding,
     )
@@ -1145,7 +1183,6 @@ def test_session_manager_handles_worker_timeout_and_disconnect(
         worker=w_disc,
         controller=fresh_controller,
         authoritative_repo_state_provider=default_repo_provider,
-        authority_signer=default_authority_signer,
         session_execution_context=default_exec_ctx,
         session_binding=default_signed_binding,
     )
@@ -1153,15 +1190,14 @@ def test_session_manager_handles_worker_timeout_and_disconnect(
     assert rec_disc.final_status == AgentTurnStatus.WORKER_DISCONNECT
 
 
-def test_synthesizer_code_patch_and_error_branches(default_authority_signer):
+def test_synthesizer_code_patch_and_error_branches(fresh_controller):
     exec_ctx = ExecutionContext("p", "s", "w", "r", ("CAP_APPLY_PATCH", "CAP_PROPOSE_ACTION"))
-    binding = issue_authorized_session_binding(
+    binding = fresh_controller.issue_session_binding(
         session_id="S1",
         repository_id=DEFAULT_REPO_ID,
         source_sha=DEFAULT_SHA,
         task_id=DEFAULT_TASK_ID,
         execution_context=exec_ctx,
-        authority_signer=default_authority_signer,
     )
 
     # Valid code patch proposal
@@ -1179,7 +1215,7 @@ def test_synthesizer_code_patch_and_error_branches(default_authority_signer):
         tool_call=c_patch,
         session_execution_context=exec_ctx,
         session_binding=binding,
-        authority_signer=default_authority_signer,
+        controller=fresh_controller,
         active_session_id="S1",
         authoritative_repo_id=DEFAULT_REPO_ID,
         authoritative_source_sha=DEFAULT_SHA,
@@ -1193,7 +1229,7 @@ def test_synthesizer_code_patch_and_error_branches(default_authority_signer):
     # Missing obligation_id in propose_test_run
     c_no_obl = AgentToolCall("C2", "propose_test_run", {"target_test": "t.py", "purpose": "P"})
     prop, err = ActionProposalSynthesizer.synthesize_proposal(
-        c_no_obl, exec_ctx, binding, default_authority_signer, "S1", DEFAULT_REPO_ID, DEFAULT_SHA, DEFAULT_TASK_ID
+        c_no_obl, exec_ctx, binding, fresh_controller, "S1", DEFAULT_REPO_ID, DEFAULT_SHA, DEFAULT_TASK_ID
     )
     assert prop is None
     assert "Missing or invalid 'obligation_id'" in (err or "")
@@ -1201,7 +1237,7 @@ def test_synthesizer_code_patch_and_error_branches(default_authority_signer):
     # Missing target_test in propose_test_run
     c_no_tgt = AgentToolCall("C3", "propose_test_run", {"obligation_id": "OBL-001", "purpose": "P"})
     prop, err = ActionProposalSynthesizer.synthesize_proposal(
-        c_no_tgt, exec_ctx, binding, default_authority_signer, "S1", DEFAULT_REPO_ID, DEFAULT_SHA, DEFAULT_TASK_ID
+        c_no_tgt, exec_ctx, binding, fresh_controller, "S1", DEFAULT_REPO_ID, DEFAULT_SHA, DEFAULT_TASK_ID
     )
     assert prop is None
     assert "Missing or invalid 'target_test'" in (err or "")
@@ -1209,7 +1245,7 @@ def test_synthesizer_code_patch_and_error_branches(default_authority_signer):
     # Missing target_file in propose_code_patch
     c_no_tf = AgentToolCall("C4", "propose_code_patch", {"obligation_id": "OBL-001", "patch_content": "p", "purpose": "P"})
     prop, err = ActionProposalSynthesizer.synthesize_proposal(
-        c_no_tf, exec_ctx, binding, default_authority_signer, "S1", DEFAULT_REPO_ID, DEFAULT_SHA, DEFAULT_TASK_ID
+        c_no_tf, exec_ctx, binding, fresh_controller, "S1", DEFAULT_REPO_ID, DEFAULT_SHA, DEFAULT_TASK_ID
     )
     assert prop is None
     assert "Missing or invalid 'target_file'" in (err or "")
@@ -1217,7 +1253,7 @@ def test_synthesizer_code_patch_and_error_branches(default_authority_signer):
     # Missing patch_content in propose_code_patch
     c_no_pc = AgentToolCall("C5", "propose_code_patch", {"obligation_id": "OBL-001", "target_file": "f.py", "purpose": "P"})
     prop, err = ActionProposalSynthesizer.synthesize_proposal(
-        c_no_pc, exec_ctx, binding, default_authority_signer, "S1", DEFAULT_REPO_ID, DEFAULT_SHA, DEFAULT_TASK_ID
+        c_no_pc, exec_ctx, binding, fresh_controller, "S1", DEFAULT_REPO_ID, DEFAULT_SHA, DEFAULT_TASK_ID
     )
     assert prop is None
     assert "Missing or invalid 'patch_content'" in (err or "")
@@ -1225,7 +1261,7 @@ def test_synthesizer_code_patch_and_error_branches(default_authority_signer):
     # Missing obligation_id in propose_code_patch
     c_patch_no_obl = AgentToolCall("C6", "propose_code_patch", {"target_file": "f.py", "patch_content": "p", "purpose": "P"})
     prop, err = ActionProposalSynthesizer.synthesize_proposal(
-        c_patch_no_obl, exec_ctx, binding, default_authority_signer, "S1", DEFAULT_REPO_ID, DEFAULT_SHA, DEFAULT_TASK_ID
+        c_patch_no_obl, exec_ctx, binding, fresh_controller, "S1", DEFAULT_REPO_ID, DEFAULT_SHA, DEFAULT_TASK_ID
     )
     assert prop is None
     assert "Missing or invalid 'obligation_id'" in (err or "")
@@ -1233,14 +1269,14 @@ def test_synthesizer_code_patch_and_error_branches(default_authority_signer):
     # Unrecognized tool
     c_unknown = AgentToolCall("C7", "unrecognized_proposal_tool", {})
     prop, err = ActionProposalSynthesizer.synthesize_proposal(
-        c_unknown, exec_ctx, binding, default_authority_signer, "S1", DEFAULT_REPO_ID, DEFAULT_SHA, DEFAULT_TASK_ID
+        c_unknown, exec_ctx, binding, fresh_controller, "S1", DEFAULT_REPO_ID, DEFAULT_SHA, DEFAULT_TASK_ID
     )
     assert prop is None
     assert "not a recognized proposal tool" in (err or "")
 
 
 def test_session_manager_handles_turn_limit_and_budget_exhaustion(
-    fresh_controller, standard_domain_state, default_repo_provider, default_exec_ctx, default_signed_binding, default_authority_signer
+    fresh_controller, standard_domain_state, default_repo_provider, default_exec_ctx, default_signed_binding
 ):
     obls, policies = standard_domain_state
 
@@ -1251,7 +1287,6 @@ def test_session_manager_handles_turn_limit_and_budget_exhaustion(
         worker=worker_loop,
         controller=fresh_controller,
         authoritative_repo_state_provider=default_repo_provider,
-        authority_signer=default_authority_signer,
         session_execution_context=default_exec_ctx,
         session_binding=default_signed_binding,
     )
@@ -1266,7 +1301,6 @@ def test_session_manager_handles_turn_limit_and_budget_exhaustion(
         worker=worker_exp,
         controller=fresh_controller,
         authoritative_repo_state_provider=default_repo_provider,
-        authority_signer=default_authority_signer,
         session_execution_context=default_exec_ctx,
         session_binding=default_signed_binding,
     )
@@ -1287,7 +1321,7 @@ def test_session_manager_handles_turn_limit_and_budget_exhaustion(
 
 
 def test_session_manager_handles_invalid_tool_calls_in_turn(
-    fresh_controller, standard_domain_state, default_repo_provider, default_exec_ctx, default_signed_binding, default_authority_signer
+    fresh_controller, standard_domain_state, default_repo_provider, default_exec_ctx, default_signed_binding
 ):
     obls, policies = standard_domain_state
     worker = MockAgentWorker("worker")
@@ -1299,7 +1333,6 @@ def test_session_manager_handles_invalid_tool_calls_in_turn(
         worker=worker,
         controller=fresh_controller,
         authoritative_repo_state_provider=default_repo_provider,
-        authority_signer=default_authority_signer,
         session_execution_context=default_exec_ctx,
         session_binding=default_signed_binding,
     )

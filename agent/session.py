@@ -3,7 +3,7 @@ S-Class EOS V11.2 - D7 Agent Session Manager & Ingress Lifecycle (§8.1, §8.3).
 Orchestrates ephemeral multi-turn agent conversations with:
 1. Inbound AgentMessage ingress validation (validates external worker message envelope before unpacking).
 2. Mandatory authoritative repository state verification before every turn and proposal.
-3. Cryptographic AuthorizedSessionExecutionBinding authority verification (Ed25519).
+3. Cryptographic AuthorizedSessionExecutionBinding authority verification anchored to SClassController trust root.
 4. Single-source capability authority from signed binding (zero dual authority drift).
 5. Streaming memory-bounded inspection tools and non-authoritative internal accounting units.
 """
@@ -14,12 +14,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Mapping, Optional, Sequence, List, Tuple, Any, Callable
 from domain.models import Obligation, Policy
 from controller.controller import SClassController, ControllerDispatchResult
-from controller.token import (
-    ExecutionContext,
-    AuthorizedSessionExecutionBinding,
-    verify_authorized_session_binding,
-)
-from policy.models import AuthoritySignerProtocol
+from controller.token import ExecutionContext, AuthorizedSessionExecutionBinding
 from execution.workspace import IsolatedWorkspace
 from agent.models import (
     AgentSessionContext,
@@ -46,7 +41,6 @@ class AgentSessionManager:
         worker: AgentWorkerProtocol,
         controller: SClassController,
         authoritative_repo_state_provider: Callable[[], Tuple[str, str]],
-        authority_signer: AuthoritySignerProtocol,
         session_execution_context: Optional[ExecutionContext] = None,
         session_binding: Optional[AuthorizedSessionExecutionBinding] = None,
         tool_registry: Optional[AgentToolRegistry] = None,
@@ -59,12 +53,9 @@ class AgentSessionManager:
             raise TypeError("controller must be an instance of SClassController.")
         if not callable(authoritative_repo_state_provider):
             raise TypeError("authoritative_repo_state_provider is mandatory and must be callable returning (repo_id, repo_sha).")
-        if not isinstance(authority_signer, AuthoritySignerProtocol):
-            raise TypeError("authority_signer must implement AuthoritySignerProtocol.")
         self._worker = worker
         self._controller = controller
         self._authoritative_repo_state_provider = authoritative_repo_state_provider
-        self._authority_signer = authority_signer
         self._session_execution_context = session_execution_context
         self._session_binding = session_binding
         self._tool_registry = tool_registry or AgentToolRegistry()
@@ -87,7 +78,6 @@ class AgentSessionManager:
         budget_units: float = 10.0,
     ) -> Tuple[AgentSessionRecord, List[ControllerDispatchResult]]:
         """Executes an ephemeral bounded conversational session with the cognitive agent."""
-        # Active session credentials
         binding = session_binding or self._session_binding
         exec_ctx = execution_context or self._session_execution_context
 
@@ -231,7 +221,7 @@ class AgentSessionManager:
                         tool_call=tc,
                         session_execution_context=exec_ctx,
                         session_binding=binding,
-                        authority_signer=self._authority_signer,
+                        controller=self._controller,
                         active_session_id=session_id,
                         authoritative_repo_id=curr_rep,
                         authoritative_source_sha=curr_sha,

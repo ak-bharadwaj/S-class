@@ -1,7 +1,7 @@
 """
 S-Class EOS V11.2 - D7 Action Proposal Synthesizer & Cryptographic Authority Verification (§8.1, §8.3).
 Normalizes agent tool calls into canonical D0 ActionProposal objects for D5 Controller submission.
-Verifies cryptographically signed AuthorizedSessionExecutionBinding against authority signer,
+Verifies cryptographically signed AuthorizedSessionExecutionBinding against controller trust root,
 active session, repository, commit SHA, task, context digest, and capability set.
 D7 receives and verifies authority credentials; D7 never manufactures or self-attests authority.
 """
@@ -10,12 +10,8 @@ from __future__ import annotations
 import uuid
 from typing import Tuple, Optional, Any, Mapping, Sequence
 from controller.authorization import ActionProposal
-from controller.token import (
-    ExecutionContext,
-    AuthorizedSessionExecutionBinding,
-    verify_authorized_session_binding,
-)
-from policy.models import AuthoritySignerProtocol
+from controller.token import ExecutionContext, AuthorizedSessionExecutionBinding
+from controller.controller import SClassController
 from agent.models import AgentToolCall
 
 
@@ -27,7 +23,7 @@ class ActionProposalSynthesizer:
         tool_call: AgentToolCall,
         session_execution_context: ExecutionContext,
         session_binding: AuthorizedSessionExecutionBinding,
-        authority_signer: AuthoritySignerProtocol,
+        controller: SClassController,
         active_session_id: str,
         authoritative_repo_id: str,
         authoritative_source_sha: str,
@@ -36,7 +32,7 @@ class ActionProposalSynthesizer:
     ) -> Tuple[Optional[ActionProposal], Optional[str]]:
         """
         Transforms a proposal tool call into an ActionProposal after cryptographically verifying
-        authority provenance against the immutable, signed AuthorizedSessionExecutionBinding.
+        authority provenance against the Controller's immutable authority trust root.
         """
         # 1. Type and instance integrity checks
         if not isinstance(tool_call, AgentToolCall):
@@ -48,12 +44,12 @@ class ActionProposalSynthesizer:
         if not isinstance(session_binding, AuthorizedSessionExecutionBinding):
             return None, "session_binding must be an authoritative AuthorizedSessionExecutionBinding instance."
 
-        if not isinstance(authority_signer, AuthoritySignerProtocol):
-            return None, "authority_signer must implement AuthoritySignerProtocol."
+        if not isinstance(controller, SClassController):
+            return None, "controller must be an authoritative SClassController instance."
 
-        # 2. Cryptographic Authority Signature Verification (Ed25519)
-        if not verify_authorized_session_binding(session_binding, authority_signer):
-            return None, "AUTHORITY_SIGNATURE_INVALID: AuthorizedSessionExecutionBinding cryptographic signature is invalid or untrusted."
+        # 2. Cryptographic Authority Signature Verification against Controller Trust Root
+        if not controller.verify_session_binding(session_binding):
+            return None, "AUTHORITY_SIGNATURE_INVALID: AuthorizedSessionExecutionBinding cryptographic signature is invalid or not signed by Controller trust root."
 
         # 3. Exact Authority Field Bindings
         if session_binding.session_id != active_session_id:
