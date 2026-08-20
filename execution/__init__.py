@@ -1,10 +1,12 @@
 """
-S-Class EOS V11.2 - D6 Execution Fabric Vertical Slice (§8.1, §8.3).
+S-Class EOS V11.2 - D6 Execution Fabric (§8.1, §8.3).
+Provides isolated workspaces, constrained process execution, provider interfaces, and immutable process observations.
 """
 
 from execution.models import (
     ExecutionStatus,
     TerminationReason,
+    MeasurementStatus,
     ResourceUsage,
     ExecutionObservation,
 )
@@ -18,6 +20,7 @@ from execution.gateway import D6ExecutionGateway
 __all__ = [
     "ExecutionStatus",
     "TerminationReason",
+    "MeasurementStatus",
     "ResourceUsage",
     "ExecutionObservation",
     "IsolatedWorkspace",

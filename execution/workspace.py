@@ -1,6 +1,6 @@
 """
 S-Class EOS V11.2 - D6 Isolated Execution Workspace Management.
-Provides isolated directory management with path traversal / path escape prevention.
+Provides isolated directory management with path traversal / symlink escape prevention.
 """
 
 from __future__ import annotations
@@ -33,10 +33,9 @@ class IsolatedWorkspace:
 
     def setup(self) -> str:
         """Initializes the isolated directory ensuring no path traversal."""
-        # Prevent path escape: resolved path MUST be strictly inside base_dir
-        real_ws = os.path.abspath(self._workspace_path)
-        real_base = os.path.abspath(self._base_dir)
-        if not real_ws.startswith(real_base + os.sep) and real_ws != real_base:
+        real_ws = os.path.realpath(self._workspace_path)
+        real_base = os.path.realpath(self._base_dir)
+        if not (real_ws == real_base or real_ws.startswith(real_base + os.sep)):
             raise ValueError(f"Path escape detected: '{real_ws}' is outside base directory '{real_base}'")
 
         os.makedirs(self._workspace_path, exist_ok=True)
@@ -44,19 +43,31 @@ class IsolatedWorkspace:
         return self._workspace_path
 
     def resolve_safe_path(self, relative_path: str) -> str:
-        """Resolves a relative path within the workspace, preventing directory traversal."""
+        """Resolves a path within the workspace, preventing directory traversal, absolute paths, and symlink escapes."""
         if not relative_path:
             return self._workspace_path
         
-        # Disallow absolute paths or Windows drive letters
-        if os.path.isabs(relative_path) or (len(relative_path) > 1 and relative_path[1] == ":"):
-            raise ValueError(f"Path traversal rejected: absolute paths not allowed '{relative_path}'")
+        if not isinstance(relative_path, str):
+            raise TypeError(f"relative_path must be a string, got {type(relative_path)}")
 
-        resolved = os.path.abspath(os.path.join(self._workspace_path, relative_path))
-        real_ws = os.path.abspath(self._workspace_path)
-        if not resolved.startswith(real_ws + os.sep) and resolved != real_ws:
-            raise ValueError(f"Path escape detected: '{relative_path}' resolves outside workspace '{real_ws}'")
-        return resolved
+        # 1. Disallow absolute paths, UNC network shares, or Windows drive letters
+        if os.path.isabs(relative_path) or (len(relative_path) > 1 and relative_path[1] == ":") or relative_path.startswith("\\\\"):
+            raise ValueError(f"Path traversal rejected: absolute or drive paths not allowed '{relative_path}'")
+
+        # 2. Prevent explicit '..' traversal
+        normalized = os.path.normpath(relative_path)
+        parts = normalized.replace("\\", "/").split("/")
+        if ".." in parts:
+            raise ValueError(f"Path traversal rejected: parent directory references '..' not allowed in '{relative_path}'")
+
+        # 3. Canonicalize symlinks and check containment
+        combined = os.path.join(self._workspace_path, relative_path)
+        real_target = os.path.realpath(combined)
+        real_ws = os.path.realpath(self._workspace_path)
+
+        if not (real_target == real_ws or real_target.startswith(real_ws + os.sep)):
+            raise ValueError(f"Path escape detected: '{relative_path}' resolves to '{real_target}' outside workspace '{real_ws}'")
+        return real_target
 
     def cleanup(self) -> None:
         """Cleans up the temporary workspace directory."""

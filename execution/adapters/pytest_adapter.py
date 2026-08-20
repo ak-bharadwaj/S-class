@@ -1,6 +1,6 @@
 """
 S-Class EOS V11.2 - D6 Pytest Execution Provider Adapter.
-Executes pytest test runs inside isolated workspaces.
+Executes pytest test runs inside isolated workspaces with strict workspace containment.
 """
 
 from __future__ import annotations
@@ -33,6 +33,8 @@ class PytestExecutionProvider(D6ExecutionProvider):
         context: ExecutionContext,
     ) -> Sequence[str]:
         target = action_binding.target
+        # Enforce workspace containment at provider boundary
+        safe_target = workspace.resolve_safe_path(target)
         params = action_binding.parameters or {}
 
         # Construct argv array: [sys.executable, "-m", "pytest", "-o", "addopts=", "-p", "no:cov", ...]
@@ -44,5 +46,5 @@ class PytestExecutionProvider(D6ExecutionProvider):
         if "quiet" in params and params["quiet"]:
             cmd.append("-q")
 
-        cmd.append(target)
+        cmd.append(safe_target)
         return cmd

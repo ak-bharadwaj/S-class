@@ -65,7 +65,7 @@ class D6ExecutionGateway:
         3. Verify provider supports action_type.
         4. Verify authorized capability_set satisfies provider required_capabilities.
         5. Setup IsolatedWorkspace under workspace_id.
-        6. Build argv command from provider.
+        6. Build argv command from provider (with workspace containment check).
         7. Execute command on ExecutionBackend.
         8. Compute stdout/stderr SHA-256 digests and construct immutable ExecutionObservation.
         9. Cleanup workspace deterministically on all exit paths.
@@ -158,8 +158,20 @@ class D6ExecutionGateway:
         try:
             workspace.setup()
 
-            # Build argv command
-            cmd_argv = provider.build_command(action_binding, workspace, ctx)
+            # Step 6: Build argv command with workspace containment verification
+            try:
+                cmd_argv = provider.build_command(action_binding, workspace, ctx)
+            except ValueError as ve:
+                return self._make_rejected_observation(
+                    exec_id=exec_id,
+                    token_id=token.token_id,
+                    provider_id=ctx.provider_id,
+                    action_digest=token.action_digest,
+                    context_digest=token.context_digest,
+                    started_at=started_at,
+                    reason=TerminationReason.PATH_ESCAPE_DETECTED,
+                    diag_msg=f"Provider build_command rejected path: {str(ve)}",
+                )
 
             # Step 7: Execute via Backend
             res = self._backend.execute_command(

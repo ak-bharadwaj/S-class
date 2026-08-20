@@ -5,8 +5,8 @@ Enforces:
 1. Strict argv arrays (never shell=True).
 2. Restricted inherited environment (sanitized host environment).
 3. Bounded stdout/stderr byte capture.
-4. Robust timeout enforcement with recursive process-tree termination.
-5. Structured process facts metrics.
+4. Robust timeout enforcement with POSIX process group isolation and recursive process-tree termination.
+5. Structured process facts metrics with explicit MeasurementStatus.
 """
 
 from __future__ import annotations
@@ -15,52 +15,92 @@ import sys
 import time
 import subprocess
 import signal
+import re
 from datetime import datetime, timezone
 from typing import Mapping, Optional, Sequence
-from execution.models import TerminationReason, ResourceUsage
+from execution.models import TerminationReason, ResourceUsage, MeasurementStatus
 from execution.backend import BackendProcessResult, ExecutionBackend
 
 
-# Safe whitelist of environment variables permitted to child processes
-SAFE_ENV_WHITELIST = {
-    "PATH",
+# Safe whitelist of standard system environment variables
+SAFE_SYSTEM_VARS = {
     "SYSTEMROOT",
     "WINDIR",
-    "PYTHONPATH",
-    "PYTHONHOME",
-    "TEMP",
     "TMP",
+    "TEMP",
     "USERPROFILE",
     "HOME",
+    "USER",
     "LANG",
     "LC_ALL",
-    "COMSPEC",
+    "TZ",
     "PATHEXT",
+    "COMSPEC",
 }
+
+# Dangerous variables that caller custom environment is strictly forbidden to override
+BLOCKED_ENV_PREFIXES = (
+    "LD_",
+    "DYLD_",
+    "PYTHON",
+    "NODE_",
+    "BASH_",
+    "PERL",
+    "RUBY",
+    "SHELL",
+    "IFS",
+    "ENV",
+    "PS1",
+    "SHLVL",
+    "PROMPT_COMMAND",
+)
+
+BLOCKED_ENV_EXACT = {
+    "PATH",
+    "PYTHONPATH",
+    "PYTHONHOME",
+    "LD_PRELOAD",
+    "NODE_OPTIONS",
+    "BASH_ENV",
+    "PYTHONSTARTUP",
+}
+
+VAR_NAME_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 
 def sanitize_environment(custom_env: Optional[Mapping[str, str]] = None) -> dict[str, str]:
-    """Builds a clean, restricted environment dict containing only safe whitelisted variables."""
+    """Constructs child environment strictly from an explicit approved policy."""
     clean_env = {}
-    for key in SAFE_ENV_WHITELIST:
+
+    # 1. Inherit safe system runtime variables from host
+    for key in SAFE_SYSTEM_VARS:
         if key in os.environ:
             clean_env[key] = os.environ[key]
 
+    # 2. Inherit system PATH from host (caller is strictly forbidden to override PATH)
+    if "PATH" in os.environ:
+        clean_env["PATH"] = os.environ["PATH"]
+
+    # 3. Apply validated custom variables from caller (subject to strict policy filtering)
     if custom_env:
         for k, v in custom_env.items():
             if not isinstance(k, str) or not isinstance(v, str):
                 continue
-            # Block shell injection or dangerous environment variables
-            if k.upper() in {"LD_PRELOAD", "PYTHONSTARTUP", "NODE_OPTIONS", "BASH_ENV"}:
+            if not VAR_NAME_RE.match(k):
+                continue
+            k_upper = k.upper()
+            if k_upper in BLOCKED_ENV_EXACT or any(k_upper.startswith(p) for p in BLOCKED_ENV_PREFIXES):
                 continue
             clean_env[k] = v
 
+    # 4. Enforce strict deterministic Python execution flags
     clean_env["PYTHONUNBUFFERED"] = "1"
+    clean_env["PYTHONDONTWRITEBYTECODE"] = "1"
     return clean_env
 
 
 def terminate_process_tree(proc: subprocess.Popen) -> None:
-    """Terminates child process and all recursive descendant processes."""
+    """Terminates child process and its dedicated process session/tree."""
     if proc.poll() is not None:
         return
 
@@ -79,8 +119,14 @@ def terminate_process_tree(proc: subprocess.Popen) -> None:
             except Exception:
                 pass
     else:
+        # On POSIX, child was spawned with start_new_session=True, so pgid == proc.pid
         try:
-            os.killpg(os.getpgid(pid), signal.SIGKILL)
+            os.killpg(pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            try:
+                proc.kill()
+            except Exception:
+                pass
         except Exception:
             try:
                 proc.kill()
@@ -91,7 +137,7 @@ def terminate_process_tree(proc: subprocess.Popen) -> None:
 class LocalProcessBackend(ExecutionBackend):
     """Constrained local process execution backend (§8.1, §8.3).
     
-    Security Classification: Constrained Local Execution (argv arrays, restricted environment, bounded streams, timeouts).
+    Security Classification: Constrained Local Execution (argv arrays, restricted environment, bounded streams, timeouts, process group isolation).
     """
 
     def execute_command(
@@ -126,16 +172,22 @@ class LocalProcessBackend(ExecutionBackend):
         exit_code = -1
         err_msg = None
 
+        popen_kwargs = {
+            "cwd": working_directory,
+            "env": cleaned_env,
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.PIPE,
+            "shell": False,
+        }
+
+        # POSIX Process-Group / Session Isolation
+        if sys.platform != "win32":
+            popen_kwargs["start_new_session"] = True
+        else:
+            popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+
         try:
-            # argv arrays strictly without shell=True
-            proc = subprocess.Popen(
-                list(command_argv),
-                cwd=working_directory,
-                env=cleaned_env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                shell=False,
-            )
+            proc = subprocess.Popen(list(command_argv), **popen_kwargs)
 
             try:
                 raw_stdout, raw_stderr = proc.communicate(timeout=max(0.1, timeout_seconds))
@@ -181,9 +233,14 @@ class LocalProcessBackend(ExecutionBackend):
 
         usage = ResourceUsage(
             wall_clock_seconds=wall_clock,
-            cpu_user_seconds=wall_clock,
-            cpu_system_seconds=0.0,
-            memory_peak_bytes=len(stdout_bytes) + len(stderr_bytes),
+            wall_clock_status=MeasurementStatus.OBSERVED,
+            output_bytes_status=MeasurementStatus.ENFORCED,
+            process_tree_termination_status=MeasurementStatus.ENFORCED,
+            cpu_user_seconds=None,
+            cpu_system_seconds=None,
+            cpu_status=MeasurementStatus.UNSUPPORTED,
+            memory_peak_bytes=None,
+            memory_status=MeasurementStatus.UNSUPPORTED,
         )
 
         return BackendProcessResult(

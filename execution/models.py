@@ -39,22 +39,45 @@ class TerminationReason(str, enum.Enum):
     UNAUTHORIZED_WORKSPACE = "UNAUTHORIZED_WORKSPACE"
 
 
+class MeasurementStatus(str, enum.Enum):
+    """Explicit status indicating whether a resource metric is enforced, observed, or unsupported."""
+    ENFORCED = "ENFORCED"
+    OBSERVED = "OBSERVED"
+    UNSUPPORTED = "UNSUPPORTED"
+
+
 @dataclass(frozen=True)
 class ResourceUsage:
-    """Immutable resource consumption metrics recorded during process execution."""
+    """Immutable resource consumption metrics with explicit measurement status."""
     wall_clock_seconds: float = 0.0
-    cpu_user_seconds: float = 0.0
-    cpu_system_seconds: float = 0.0
-    memory_peak_bytes: int = 0
+    wall_clock_status: MeasurementStatus = MeasurementStatus.OBSERVED
+    output_bytes_status: MeasurementStatus = MeasurementStatus.ENFORCED
+    process_tree_termination_status: MeasurementStatus = MeasurementStatus.ENFORCED
+    cpu_user_seconds: Optional[float] = None
+    cpu_system_seconds: Optional[float] = None
+    cpu_status: MeasurementStatus = MeasurementStatus.UNSUPPORTED
+    memory_peak_bytes: Optional[int] = None
+    memory_status: MeasurementStatus = MeasurementStatus.UNSUPPORTED
 
     def __post_init__(self):
+        if not isinstance(self.wall_clock_status, MeasurementStatus):
+            raise TypeError("wall_clock_status must be an instance of MeasurementStatus.")
+        if not isinstance(self.output_bytes_status, MeasurementStatus):
+            raise TypeError("output_bytes_status must be an instance of MeasurementStatus.")
+        if not isinstance(self.process_tree_termination_status, MeasurementStatus):
+            raise TypeError("process_tree_termination_status must be an instance of MeasurementStatus.")
+        if not isinstance(self.cpu_status, MeasurementStatus):
+            raise TypeError("cpu_status must be an instance of MeasurementStatus.")
+        if not isinstance(self.memory_status, MeasurementStatus):
+            raise TypeError("memory_status must be an instance of MeasurementStatus.")
+
         if self.wall_clock_seconds < 0:
             raise ValueError("wall_clock_seconds cannot be negative.")
-        if self.cpu_user_seconds < 0:
+        if self.cpu_user_seconds is not None and self.cpu_user_seconds < 0:
             raise ValueError("cpu_user_seconds cannot be negative.")
-        if self.cpu_system_seconds < 0:
+        if self.cpu_system_seconds is not None and self.cpu_system_seconds < 0:
             raise ValueError("cpu_system_seconds cannot be negative.")
-        if self.memory_peak_bytes < 0:
+        if self.memory_peak_bytes is not None and self.memory_peak_bytes < 0:
             raise ValueError("memory_peak_bytes cannot be negative.")
 
 
