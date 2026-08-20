@@ -1,7 +1,7 @@
 """
 S-Class EOS V11.2 - D7 Agent Integration Models & Data Structures (§8.1, §8.3).
 Defines immutable data classes for agent session context, turn responses, tool definitions,
-canonical AgentMessage envelopes, and audit records with strict RFC/ISO-8601 validation.
+canonical AgentMessage ingress envelopes with RFC 8785 digest chaining, and session audit records.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from domain.types import HEX_40_PATTERN, HEX_64_PATTERN
 from events.serializer import canonicalize_json
 
 GENESIS_DIGEST = "0" * 64
+D7_INTERNAL_ACCOUNTING_UNIT = 0.05  # Non-authoritative internal accounting unit per proposal action
 
 
 class AgentTurnStatus(str, enum.Enum):
@@ -27,13 +28,18 @@ class AgentTurnStatus(str, enum.Enum):
     WORKER_TIMEOUT = "WORKER_TIMEOUT"
     WORKER_DISCONNECT = "WORKER_DISCONNECT"
     STALE_CONTEXT = "STALE_CONTEXT"
+    REPOSITORY_MISMATCH = "REPOSITORY_MISMATCH"
     CAPABILITY_VIOLATION = "CAPABILITY_VIOLATION"
+    INGRESS_VALIDATION_FAILED = "INGRESS_VALIDATION_FAILED"
     TAMPER_DETECTED = "TAMPER_DETECTED"
     REPLAY_DETECTED = "REPLAY_DETECTED"
+    REORDER_DETECTED = "REORDER_DETECTED"
+    WORKER_IDENTITY_MISMATCH = "WORKER_IDENTITY_MISMATCH"
 
 
 def compute_agent_message_preimage(
     session_id: str,
+    worker_id: str,
     sequence: int,
     message_type: str,
     payload: Mapping[str, Any],
@@ -42,6 +48,7 @@ def compute_agent_message_preimage(
     """Produces the exact RFC 8785 canonical preimage bytes for an AgentMessage envelope."""
     msg_dict = {
         "session_id": session_id,
+        "worker_id": worker_id,
         "sequence": sequence,
         "message_type": message_type,
         "payload": payload,
@@ -52,6 +59,7 @@ def compute_agent_message_preimage(
 
 def compute_agent_message_digest(
     session_id: str,
+    worker_id: str,
     sequence: int,
     message_type: str,
     payload: Mapping[str, Any],
@@ -60,6 +68,7 @@ def compute_agent_message_digest(
     """Computes SHA-256 digest hex string from canonical RFC 8785 AgentMessage preimage."""
     preimage = compute_agent_message_preimage(
         session_id=session_id,
+        worker_id=worker_id,
         sequence=sequence,
         message_type=message_type,
         payload=payload,
@@ -70,8 +79,12 @@ def compute_agent_message_digest(
 
 @dataclass(frozen=True)
 class AgentMessage:
-    """Canonical, cryptographically authenticated message envelope in an agent turn sequence."""
+    """
+    Canonical, cryptographically chained message envelope for ingress and egress turn traffic.
+    Provides transcript integrity and hash-chain sequencing (note: does not provide asymmetric identity signatures).
+    """
     session_id: str
+    worker_id: str
     sequence: int
     message_type: str
     payload: Mapping[str, Any]
@@ -81,6 +94,8 @@ class AgentMessage:
     def __post_init__(self):
         if not self.session_id or not isinstance(self.session_id, str):
             raise ValueError("session_id must be a non-empty string.")
+        if not self.worker_id or not isinstance(self.worker_id, str):
+            raise ValueError("worker_id must be a non-empty string.")
         if self.sequence < 0:
             raise ValueError("sequence cannot be negative.")
         if not self.message_type or not isinstance(self.message_type, str):
@@ -89,9 +104,10 @@ class AgentMessage:
         _validate_pattern(self.message_digest, HEX_64_PATTERN, "message_digest")
         object.__setattr__(self, "payload", _freeze_nested(self.payload))
 
-        # Verify cryptographic integrity against RFC 8785 preimage
+        # Verify integrity against canonical RFC 8785 preimage
         expected_digest = compute_agent_message_digest(
             session_id=self.session_id,
+            worker_id=self.worker_id,
             sequence=self.sequence,
             message_type=self.message_type,
             payload=self.payload,
@@ -105,6 +121,7 @@ class AgentMessage:
 
 def create_agent_message(
     session_id: str,
+    worker_id: str,
     sequence: int,
     message_type: str,
     payload: Mapping[str, Any],
@@ -113,6 +130,7 @@ def create_agent_message(
     """Helper to construct an AgentMessage with automatically computed RFC 8785 digest."""
     digest = compute_agent_message_digest(
         session_id=session_id,
+        worker_id=worker_id,
         sequence=sequence,
         message_type=message_type,
         payload=payload,
@@ -120,6 +138,7 @@ def create_agent_message(
     )
     return AgentMessage(
         session_id=session_id,
+        worker_id=worker_id,
         sequence=sequence,
         message_type=message_type,
         payload=payload,
@@ -196,7 +215,7 @@ class AgentSessionContext:
     granted_capabilities: Tuple[str, ...]
     turn_index: int = 0
     max_turns: int = 10
-    remaining_budget_usd: float = 10.0
+    remaining_budget_units: float = 10.0
 
     def __post_init__(self):
         if not self.session_id:
@@ -212,8 +231,8 @@ class AgentSessionContext:
             raise ValueError("turn_index cannot be negative.")
         if self.max_turns <= 0:
             raise ValueError("max_turns must be positive.")
-        if self.remaining_budget_usd < 0.0:
-            raise ValueError("remaining_budget_usd cannot be negative.")
+        if self.remaining_budget_units < 0.0:
+            raise ValueError("remaining_budget_units cannot be negative.")
         object.__setattr__(self, "frontier_obligation_ids", tuple(self.frontier_obligation_ids))
         object.__setattr__(self, "frontier_details", tuple(_freeze_nested(d) for d in self.frontier_details))
         object.__setattr__(self, "policy_constraints", tuple(self.policy_constraints))
@@ -242,14 +261,17 @@ class AgentTurnResponse:
 
 @dataclass(frozen=True)
 class AgentSessionRecord:
-    """Immutable audit record of a completed or terminated agent session."""
+    """
+    Immutable audit record of a completed or terminated agent session.
+    Note: D7A session state is ephemeral in-memory; durable persistence is governed by D2.
+    """
     session_id: str
     repository_id: str
     source_sha: str
     task_id: str
     total_turns: int
     advisory_total_cost_usd: float
-    authoritative_usage_cost_usd: float
+    internal_accounting_units: float
     final_status: AgentTurnStatus
     started_at: str
     ended_at: str
@@ -269,8 +291,8 @@ class AgentSessionRecord:
             raise ValueError("total_turns cannot be negative.")
         if self.advisory_total_cost_usd < 0.0:
             raise ValueError("advisory_total_cost_usd cannot be negative.")
-        if self.authoritative_usage_cost_usd < 0.0:
-            raise ValueError("authoritative_usage_cost_usd cannot be negative.")
+        if self.internal_accounting_units < 0.0:
+            raise ValueError("internal_accounting_units cannot be negative.")
         _validate_iso8601(self.started_at, "started_at")
         _validate_iso8601(self.ended_at, "ended_at")
         if not isinstance(self.final_status, AgentTurnStatus):

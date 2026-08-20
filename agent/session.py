@@ -1,8 +1,11 @@
 """
-S-Class EOS V11.2 - D7 Agent Session Manager & Turn Lifecycle (§8.1, §8.3).
-Orchestrates bounded multi-turn agent conversations, enforces cost budgets, max turns,
-cryptographic AgentMessage chaining (detecting replay/reorder/tamper), stale repository SHA checks,
-and coordinates action proposals with the D5 Controller.
+S-Class EOS V11.2 - D7 Agent Session Manager & Ingress Lifecycle (§8.1, §8.3).
+Orchestrates ephemeral multi-turn agent conversations with:
+1. Mandatory authoritative repository state verification before every turn and proposal.
+2. Ingress AgentMessage chain validation (detecting reorder, replay, duplicate, tamper, wrong worker/session).
+3. Capability enforcement at validation time.
+4. Non-authoritative internal accounting units (D7_INTERNAL_ACCOUNTING_UNIT).
+5. Safe tool execution for inspection tools and proposal synthesis for action tools.
 """
 
 from __future__ import annotations
@@ -11,6 +14,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Mapping, Optional, Sequence, List, Tuple, Any, Callable
 from domain.models import Obligation, Policy
 from controller.controller import SClassController, ControllerDispatchResult
+from execution.workspace import IsolatedWorkspace
 from agent.models import (
     AgentSessionContext,
     AgentTurnResponse,
@@ -20,8 +24,9 @@ from agent.models import (
     AgentMessage,
     create_agent_message,
     GENESIS_DIGEST,
+    D7_INTERNAL_ACCOUNTING_UNIT,
 )
-from agent.protocol import AgentWorkerProtocol
+from agent.protocol import AgentWorkerProtocol, AgentMessageChainValidator
 from agent.tools import AgentToolRegistry
 from agent.context import AgentContextBuilder
 from agent.synthesizer import ActionProposalSynthesizer
@@ -34,19 +39,23 @@ class AgentSessionManager:
         self,
         worker: AgentWorkerProtocol,
         controller: SClassController,
+        authoritative_repo_state_provider: Callable[[], Tuple[str, str]],
         tool_registry: Optional[AgentToolRegistry] = None,
         context_builder: Optional[AgentContextBuilder] = None,
-        current_repo_sha_provider: Optional[Callable[[], str]] = None,
+        workspace: Optional[IsolatedWorkspace] = None,
     ):
         if not isinstance(worker, AgentWorkerProtocol):
             raise TypeError("worker must implement AgentWorkerProtocol.")
         if not isinstance(controller, SClassController):
             raise TypeError("controller must be an instance of SClassController.")
+        if not callable(authoritative_repo_state_provider):
+            raise TypeError("authoritative_repo_state_provider is mandatory and must be callable returning (repo_id, repo_sha).")
         self._worker = worker
         self._controller = controller
+        self._authoritative_repo_state_provider = authoritative_repo_state_provider
         self._tool_registry = tool_registry or AgentToolRegistry()
         self._context_builder = context_builder or AgentContextBuilder(self._tool_registry)
-        self._current_repo_sha_provider = current_repo_sha_provider
+        self._workspace = workspace
 
     def run_session(
         self,
@@ -59,9 +68,9 @@ class AgentSessionManager:
         policy_version: int,
         granted_capabilities: Sequence[str] = ("CAP_READ_CODE", "CAP_PROPOSE_ACTION"),
         max_turns: int = 10,
-        cost_budget_usd: float = 10.0,
+        budget_units: float = 10.0,
     ) -> Tuple[AgentSessionRecord, List[ControllerDispatchResult]]:
-        """Executes a bounded conversational session with the cognitive agent."""
+        """Executes an ephemeral bounded conversational session with the cognitive agent."""
         session_id = f"SESS-{uuid.uuid4().hex[:8].upper()}"
         started_at = datetime.now(timezone.utc).isoformat()
 
@@ -70,9 +79,9 @@ class AgentSessionManager:
         dispatches: List[ControllerDispatchResult] = []
 
         turn_index = 0
-        budget_remaining = cost_budget_usd
+        budget_remaining = budget_units
         advisory_total_cost = 0.0
-        authoritative_usage_cost = 0.0
+        internal_accounting_units = 0.0
         final_status = AgentTurnStatus.CONTINUE
 
         # Inbound Message Chain Tracker
@@ -83,12 +92,14 @@ class AgentSessionManager:
         session_capabilities = tuple(granted_capabilities)
 
         while turn_index < max_turns and budget_remaining > 0.0:
-            # 1. Repository State Invariant: check for stale context
-            if self._current_repo_sha_provider is not None:
-                current_sha = self._current_repo_sha_provider()
-                if current_sha != source_sha:
-                    final_status = AgentTurnStatus.STALE_CONTEXT
-                    break
+            # 1. Mandatory Authoritative Repository State Verification
+            current_repo_id, current_sha = self._authoritative_repo_state_provider()
+            if current_repo_id != repository_id:
+                final_status = AgentTurnStatus.REPOSITORY_MISMATCH
+                break
+            if current_sha != source_sha:
+                final_status = AgentTurnStatus.STALE_CONTEXT
+                break
 
             # 2. Build immutable turn context
             ctx = self._context_builder.build_context(
@@ -102,12 +113,13 @@ class AgentSessionManager:
                 granted_capabilities=session_capabilities,
                 turn_index=turn_index,
                 max_turns=max_turns,
-                remaining_budget_usd=budget_remaining,
+                remaining_budget_units=budget_remaining,
             )
 
-            # 3. Create canonical USER_CONTEXT AgentMessage
+            # 3. Create canonical USER_CONTEXT AgentMessage (Egress to Worker)
             context_msg = create_agent_message(
                 session_id=session_id,
+                worker_id="S_CLASS_SYSTEM",
                 sequence=current_sequence,
                 message_type="USER_CONTEXT",
                 payload={"turn_index": turn_index, "task_id": task_id, "frontier": ctx.frontier_obligation_ids},
@@ -132,9 +144,10 @@ class AgentSessionManager:
             history.append(turn_resp)
             advisory_total_cost += turn_resp.advisory_estimated_cost_usd
 
-            # 5. Create canonical AGENT_TURN AgentMessage
+            # 5. Construct Ingress AGENT_TURN AgentMessage & Validate Ingress Contract
             turn_msg = create_agent_message(
                 session_id=session_id,
+                worker_id=self._worker.worker_id,
                 sequence=current_sequence,
                 message_type="AGENT_TURN",
                 payload={
@@ -148,6 +161,18 @@ class AgentSessionManager:
                 },
                 previous_digest=last_digest,
             )
+
+            is_valid_msg, err_msg, failure_status = AgentMessageChainValidator.validate_inbound_message(
+                message=turn_msg,
+                expected_session_id=session_id,
+                expected_worker_id=self._worker.worker_id,
+                expected_sequence=current_sequence,
+                expected_previous_digest=last_digest,
+            )
+            if not is_valid_msg:
+                final_status = failure_status or AgentTurnStatus.INGRESS_VALIDATION_FAILED
+                break
+
             current_sequence += 1
             last_digest = turn_msg.message_digest
 
@@ -173,26 +198,24 @@ class AgentSessionManager:
 
                 tool_def = self._tool_registry.get_tool(tc.tool_name)
                 if tool_def and tool_def.is_proposal_tool:
-                    # Enforce repository state invariant before proposal synthesis
-                    if self._current_repo_sha_provider is not None:
-                        current_sha = self._current_repo_sha_provider()
-                        if current_sha != source_sha:
-                            final_status = AgentTurnStatus.STALE_CONTEXT
-                            break
+                    # Mandatory Re-Verification of Repository State immediately before proposal synthesis
+                    curr_rep, curr_sha = self._authoritative_repo_state_provider()
+                    if curr_rep != repository_id or curr_sha != source_sha:
+                        final_status = AgentTurnStatus.STALE_CONTEXT
+                        break
 
                     proposal, synth_err = ActionProposalSynthesizer.synthesize_proposal(
                         tool_call=tc,
-                        granted_capabilities=session_capabilities,
+                        session_granted_capabilities=session_capabilities,
                     )
                     if proposal:
                         now_dt = datetime.now(timezone.utc)
                         eval_iso = now_dt.isoformat()
                         exp_iso = (now_dt + timedelta(hours=1)).isoformat()
                         
-                        # Authoritative accounting for proposal submission
-                        authoritative_cost_step = 0.05
-                        authoritative_usage_cost += authoritative_cost_step
-                        budget_remaining = max(0.0, budget_remaining - authoritative_cost_step)
+                        # Internal non-authoritative accounting deduction
+                        internal_accounting_units += D7_INTERNAL_ACCOUNTING_UNIT
+                        budget_remaining = max(0.0, budget_remaining - D7_INTERNAL_ACCOUNTING_UNIT)
 
                         # Submit proposal to D5 Controller authorization gate
                         dispatch = self._controller.submit_proposal(
@@ -206,9 +229,18 @@ class AgentSessionManager:
                             allowed_action_types=[proposal.action_type],
                         )
                         dispatches.append(dispatch)
+                elif tool_def and not tool_def.is_proposal_tool:
+                    # Execute inspection tool safely within workspace containment
+                    tool_res = self._tool_registry.execute_inspection_tool(tc, self._workspace)
+                    turn_entry["inspection_result"] = {
+                        "call_id": tool_res.call_id,
+                        "success": tool_res.success,
+                        "result_data": dict(tool_res.result_data),
+                        "error_message": tool_res.error_message,
+                    }
 
             # 7. Check terminal statuses
-            if final_status == AgentTurnStatus.STALE_CONTEXT:
+            if final_status in (AgentTurnStatus.STALE_CONTEXT, AgentTurnStatus.REPOSITORY_MISMATCH):
                 break
 
             if turn_resp.turn_status in (AgentTurnStatus.COMPLETED, AgentTurnStatus.FAILED):
@@ -232,7 +264,7 @@ class AgentSessionManager:
             task_id=task_id,
             total_turns=len(history),
             advisory_total_cost_usd=advisory_total_cost,
-            authoritative_usage_cost_usd=authoritative_usage_cost,
+            internal_accounting_units=internal_accounting_units,
             final_status=final_status,
             started_at=started_at,
             ended_at=ended_at,

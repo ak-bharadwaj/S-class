@@ -1,7 +1,7 @@
 """
 S-Class EOS V11.2 - D7 Action Proposal Synthesizer & Output Normalizer (§8.1, §8.3).
 Normalizes agent tool calls into canonical D0 ActionProposal objects for D5 Controller submission.
-Enforces zero capability escalation: the synthesizer only propagates granted session capabilities.
+Enforces capability provenance: the synthesizer only propagates verified session capabilities.
 """
 
 from __future__ import annotations
@@ -18,19 +18,19 @@ class ActionProposalSynthesizer:
     @staticmethod
     def synthesize_proposal(
         tool_call: AgentToolCall,
-        granted_capabilities: Sequence[str],
+        session_granted_capabilities: Sequence[str],
         provider_id: str = "pytest_runner_engine",
         sandbox_profile_id: str = "sbx_std",
         resource_profile_id: str = "res_std",
         workspace_id: Optional[str] = None,
         estimated_cost_usd: float = 0.05,
     ) -> Tuple[Optional[ActionProposal], Optional[str]]:
-        """Transforms a proposal tool call into an ActionProposal with explicitly propagated session capabilities."""
+        """Transforms a proposal tool call into an ActionProposal with strictly propagated session capabilities."""
         if not isinstance(tool_call, AgentToolCall):
             return None, "tool_call must be an instance of AgentToolCall."
 
-        # Verify capability propagation
-        caps_tuple = tuple(granted_capabilities)
+        # Verify capability provenance: session capabilities cannot be empty
+        caps_tuple = tuple(session_granted_capabilities)
         if not caps_tuple:
             return None, "Cannot synthesize proposal with empty capability set."
 

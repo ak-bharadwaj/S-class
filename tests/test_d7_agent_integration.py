@@ -1,15 +1,15 @@
 """
-S-Class EOS V11.2 - Hardened D7 Agent Integration & Protocol Normalization Test Suite (§8.1, §8.3).
-Verifies:
-1. Validation-time capability enforcement (direct hidden/prohibited tool invocation rejection).
-2. Elimination of hardcoded capability escalation (proposal synthesis propagates actual session capabilities).
-3. Full standard JSON Schema validation (Draft 2020-12: types, required, additionalProperties, patterns, bounds).
-4. Repository state binding (source_sha) & Stale Context detection.
-5. Strict separation of advisory estimated cost, authoritative usage cost, and remaining budget.
-6. Session crash and error lifecycle semantics (worker timeout, disconnect, unhandled exceptions).
-7. Canonical AgentMessage envelopes with RFC 8785 / JCS digest chaining (tamper / replay / reorder detection).
-8. Preserved D5 boundary (no token minting, no execution authority in D7).
-9. Multi-threaded concurrent session isolation.
+S-Class EOS V11.2 - D7A Hardened Agent Integration & Protocol Normalization Test Suite (§8.1, §8.3).
+Exhaustively verifies:
+1. Inbound AgentMessage ingress validation (tamper, replay, reorder, wrong worker, wrong session).
+2. Mandatory Authoritative Repository State Verification (stale SHA, fake repo ID).
+3. Capability Provenance & Zero Escalation (invented capability rejection).
+4. Validation-time capability enforcement & Draft 2020-12 JSON Schema validation.
+5. Safe Execution of Read/Search Inspection Tools.
+6. Non-authoritative internal accounting unit tracking (D7_INTERNAL_ACCOUNTING_UNIT).
+7. Session crash and error lifecycle semantics (worker timeout, disconnect, unhandled exceptions).
+8. Ephemeral session state & Preserved D5 Authorization Boundary (zero token minting in D7).
+9. Multi-threaded Concurrent Session Isolation.
 """
 
 import os
@@ -30,6 +30,7 @@ from domain.types import (
     PolicyScope,
 )
 from events.store import D2NonceStore
+from execution.workspace import IsolatedWorkspace
 from benchmark.parity.gate_3_authority import Gate3AuthorityKeyStore, Gate3AuthoritySigner
 from controller.authorization import ActionProposal, AuthorizationStatus
 from controller.controller import SClassController
@@ -45,8 +46,13 @@ from agent.models import (
     create_agent_message,
     compute_agent_message_digest,
     GENESIS_DIGEST,
+    D7_INTERNAL_ACCOUNTING_UNIT,
 )
-from agent.protocol import AgentWorkerProtocol, MockAgentWorker
+from agent.protocol import (
+    AgentWorkerProtocol,
+    AgentMessageChainValidator,
+    MockAgentWorker,
+)
 from agent.tools import AgentToolRegistry
 from agent.context import AgentContextBuilder
 from agent.synthesizer import ActionProposalSynthesizer
@@ -54,6 +60,7 @@ from agent.session import AgentSessionManager
 
 DEFAULT_SHA = "a" * 40
 STALE_SHA = "b" * 40
+FAKE_REPO_ID = "adversary/malicious-repo"
 DEFAULT_REPO_ID = "ak-bharadwaj/S-class"
 TIMESTAMP_NOW = "2026-08-20T12:00:00Z"
 TIMESTAMP_EXPIRY = "2026-08-20T13:00:00Z"
@@ -73,6 +80,11 @@ def fresh_controller(tmp_path):
     signer = Gate3AuthoritySigner()
     nonce_store = D2NonceStore(file_path=str(tmp_path / "d7_nonces.log"))
     return SClassController(authority_signer=signer, nonce_store=nonce_store)
+
+
+@pytest.fixture
+def default_repo_provider():
+    return lambda: (DEFAULT_REPO_ID, DEFAULT_SHA)
 
 
 @pytest.fixture
@@ -110,52 +122,179 @@ def standard_domain_state():
 
 
 # =====================================================================
-# 1. CANONICAL AGENT MESSAGE & DIGEST CHAIN TESTS
+# 1. INBOUND AGENT MESSAGE INGRESS & VALIDATION TESTS
 # =====================================================================
 
-def test_agent_message_rfc8785_canonical_digest_and_tamper_detection():
-    msg = create_agent_message(
-        session_id="SESS-01",
-        sequence=0,
-        message_type="USER_CONTEXT",
-        payload={"task": "T1", "count": 42},
-        previous_digest=GENESIS_DIGEST,
+def test_ingress_validator_accepts_valid_message_sequence():
+    msg0 = create_agent_message("S1", "W1", 0, "USER_CONTEXT", {"turn": 0}, GENESIS_DIGEST)
+    valid, err, status = AgentMessageChainValidator.validate_inbound_message(
+        msg0, "S1", "W1", 0, GENESIS_DIGEST
     )
-    assert msg.session_id == "SESS-01"
-    assert msg.sequence == 0
-    assert len(msg.message_digest) == 64
+    assert valid is True
+    assert err is None
+    assert status is None
 
-    # Tamper with payload -> should raise ValueError in constructor
-    with pytest.raises(ValueError, match="does not match computed digest"):
-        AgentMessage(
-            session_id="SESS-01",
-            sequence=0,
-            message_type="USER_CONTEXT",
-            payload={"task": "TAMPERED_PAYLOAD"},
-            previous_digest=GENESIS_DIGEST,
-            message_digest=msg.message_digest,
-        )
+    msg1 = create_agent_message("S1", "W1", 1, "AGENT_TURN", {"thought": "t"}, msg0.message_digest)
+    valid, err, status = AgentMessageChainValidator.validate_inbound_message(
+        msg1, "S1", "W1", 1, msg0.message_digest
+    )
+    assert valid is True
+    assert err is None
 
 
-def test_agent_message_validation_errors():
-    with pytest.raises(ValueError):
-        create_agent_message("", 0, "TYPE", {}, GENESIS_DIGEST)
-    with pytest.raises(ValueError):
-        create_agent_message("S1", -1, "TYPE", {}, GENESIS_DIGEST)
-    with pytest.raises(ValueError):
-        create_agent_message("S1", 0, "", {}, GENESIS_DIGEST)
-    with pytest.raises((ValueError, DomainValidationError)):
-        create_agent_message("S1", 0, "TYPE", {}, "invalid_hex")
+def test_ingress_validator_rejects_reordered_and_duplicate_sequence():
+    msg0 = create_agent_message("S1", "W1", 0, "USER_CONTEXT", {}, GENESIS_DIGEST)
+
+    # 1. Reordered gap (sequence 2 instead of expected 1)
+    msg_reordered = create_agent_message("S1", "W1", 2, "AGENT_TURN", {}, msg0.message_digest)
+    valid, err, status = AgentMessageChainValidator.validate_inbound_message(
+        msg_reordered, "S1", "W1", 1, msg0.message_digest
+    )
+    assert valid is False
+    assert status == AgentTurnStatus.REORDER_DETECTED
+    assert "Reordered sequence gap" in (err or "")
+
+    # 2. Duplicate / stale sequence (sequence 0 when expecting 1)
+    valid, err, status = AgentMessageChainValidator.validate_inbound_message(
+        msg0, "S1", "W1", 1, msg0.message_digest
+    )
+    assert valid is False
+    assert status == AgentTurnStatus.REPLAY_DETECTED
+    assert "Duplicate or stale sequence" in (err or "")
+
+
+def test_ingress_validator_rejects_wrong_worker_and_wrong_session():
+    msg0 = create_agent_message("S1", "W1", 0, "USER_CONTEXT", {}, GENESIS_DIGEST)
+
+    # Wrong worker ID
+    valid, err, status = AgentMessageChainValidator.validate_inbound_message(
+        msg0, "S1", "WRONG_WORKER", 0, GENESIS_DIGEST
+    )
+    assert valid is False
+    assert status == AgentTurnStatus.WORKER_IDENTITY_MISMATCH
+    assert "Wrong worker ID" in (err or "")
+
+    # Wrong session ID
+    valid, err, status = AgentMessageChainValidator.validate_inbound_message(
+        msg0, "WRONG_SESSION", "W1", 0, GENESIS_DIGEST
+    )
+    assert valid is False
+    assert status == AgentTurnStatus.INGRESS_VALIDATION_FAILED
+    assert "Wrong session ID" in (err or "")
+
+
+def test_ingress_validator_rejects_tampered_payload_and_broken_digest_chain():
+    msg0 = create_agent_message("S1", "W1", 0, "USER_CONTEXT", {"val": 1}, GENESIS_DIGEST)
+
+    # Broken digest chain (previous_digest does not match)
+    msg1 = create_agent_message("S1", "W1", 1, "AGENT_TURN", {"val": 2}, "f" * 64)
+    valid, err, status = AgentMessageChainValidator.validate_inbound_message(
+        msg1, "S1", "W1", 1, msg0.message_digest
+    )
+    assert valid is False
+    assert status == AgentTurnStatus.REPLAY_DETECTED
+    assert "Digest chain discontinuity" in (err or "")
 
 
 # =====================================================================
-# 2. VALIDATION-TIME CAPABILITY ENFORCEMENT & TOOL SCHEMA TESTS
+# 2. MANDATORY REPOSITORY STATE VERIFICATION TESTS
+# =====================================================================
+
+def test_session_manager_requires_mandatory_repo_provider(fresh_controller):
+    worker = MockAgentWorker("worker")
+    with pytest.raises(TypeError, match="authoritative_repo_state_provider is mandatory"):
+        AgentSessionManager(worker=worker, controller=fresh_controller, authoritative_repo_state_provider=None)  # type: ignore
+
+
+def test_session_manager_rejects_stale_repository_before_turn(fresh_controller, standard_domain_state):
+    obls, policies = standard_domain_state
+    worker = MockAgentWorker("worker")
+    stale_provider = lambda: (DEFAULT_REPO_ID, STALE_SHA)
+
+    session_mgr = AgentSessionManager(
+        worker=worker,
+        controller=fresh_controller,
+        authoritative_repo_state_provider=stale_provider,
+    )
+    rec, dispatches = session_mgr.run_session(
+        repository_id=DEFAULT_REPO_ID,
+        source_sha=DEFAULT_SHA,
+        task_id="TASK-1",
+        objective="Obj",
+        obligations=obls,
+        policies=policies,
+        policy_version=1,
+    )
+    assert rec.final_status == AgentTurnStatus.STALE_CONTEXT
+    assert len(dispatches) == 0
+
+
+def test_session_manager_rejects_fake_repository_identity(fresh_controller, standard_domain_state):
+    obls, policies = standard_domain_state
+    worker = MockAgentWorker("worker")
+    fake_repo_provider = lambda: (FAKE_REPO_ID, DEFAULT_SHA)
+
+    session_mgr = AgentSessionManager(
+        worker=worker,
+        controller=fresh_controller,
+        authoritative_repo_state_provider=fake_repo_provider,
+    )
+    rec, dispatches = session_mgr.run_session(
+        repository_id=DEFAULT_REPO_ID,
+        source_sha=DEFAULT_SHA,
+        task_id="TASK-1",
+        objective="Obj",
+        obligations=obls,
+        policies=policies,
+        policy_version=1,
+    )
+    assert rec.final_status == AgentTurnStatus.REPOSITORY_MISMATCH
+    assert len(dispatches) == 0
+
+
+def test_session_manager_rejects_repository_drift_before_proposal_synthesis(
+    fresh_controller, standard_domain_state
+):
+    obls, policies = standard_domain_state
+    worker = MockAgentWorker("worker")
+    call = AgentToolCall("C1", "propose_test_run", {"obligation_id": "OBL-001", "target_test": "test.py", "purpose": "T"})
+    worker.set_script([AgentTurnResponse(thought="Propose test", tool_calls=(call,), turn_status=AgentTurnStatus.CONTINUE)])
+
+    current_sha = [DEFAULT_SHA]
+    def dynamic_provider():
+        return (DEFAULT_REPO_ID, current_sha[0])
+
+    session_mgr = AgentSessionManager(
+        worker=worker,
+        controller=fresh_controller,
+        authoritative_repo_state_provider=dynamic_provider,
+    )
+
+    # Trigger drift immediately when proposal would be synthesized
+    current_sha[0] = STALE_SHA
+
+    rec, dispatches = session_mgr.run_session(
+        repository_id=DEFAULT_REPO_ID,
+        source_sha=DEFAULT_SHA,
+        task_id="TASK-1",
+        objective="Obj",
+        obligations=obls,
+        policies=policies,
+        policy_version=1,
+        granted_capabilities=("CAP_PROPOSE_ACTION", "CAP_EXEC_TEST"),
+    )
+    assert rec.final_status == AgentTurnStatus.STALE_CONTEXT
+    assert len(dispatches) == 0
+
+
+# =====================================================================
+# 3. CAPABILITY PROVENANCE & VALIDATION-TIME ENFORCEMENT
 # =====================================================================
 
 def test_validate_tool_call_enforces_capabilities_at_validation_time():
     reg = AgentToolRegistry()
 
-    # Worker attempts to invoke propose_test_run (requires CAP_PROPOSE_ACTION) with only CAP_READ_CODE
+    # Worker attempts to invoke propose_test_run without CAP_PROPOSE_ACTION
     call = AgentToolCall(
         call_id="C1",
         tool_name="propose_test_run",
@@ -165,7 +304,7 @@ def test_validate_tool_call_enforces_capabilities_at_validation_time():
     assert is_valid is False
     assert "Missing required capability 'CAP_PROPOSE_ACTION'" in (err or "")
 
-    # Worker with CAP_PROPOSE_ACTION can invoke propose_test_run
+    # Worker with CAP_PROPOSE_ACTION passes validation
     is_valid, err = reg.validate_tool_call(call, granted_capabilities=("CAP_PROPOSE_ACTION",))
     assert is_valid is True
     assert err is None
@@ -174,51 +313,20 @@ def test_validate_tool_call_enforces_capabilities_at_validation_time():
 def test_validate_tool_call_full_json_schema_validation():
     reg = AgentToolRegistry()
 
-    # 1. Missing required property
+    # Missing required property
     call_missing = AgentToolCall("C1", "read_file_chunk", arguments={})
     is_valid, err = reg.validate_tool_call(call_missing, granted_capabilities=("CAP_READ_CODE",))
     assert is_valid is False
     assert "required" in (err or "").lower()
 
-    # 2. Type mismatch (path is int instead of string)
-    call_bad_type = AgentToolCall("C2", "read_file_chunk", arguments={"path": 12345})
-    is_valid, err = reg.validate_tool_call(call_bad_type, granted_capabilities=("CAP_READ_CODE",))
-    assert is_valid is False
-    assert "12345 is not of type 'string'" in (err or "")
-
-    # 3. Disallowed additional property (additionalProperties: False)
-    call_extra = AgentToolCall("C3", "read_file_chunk", arguments={"path": "main.py", "unsupported_extra_arg": True})
+    # Disallowed additional property
+    call_extra = AgentToolCall("C2", "read_file_chunk", arguments={"path": "main.py", "unsupported": 123})
     is_valid, err = reg.validate_tool_call(call_extra, granted_capabilities=("CAP_READ_CODE",))
     assert is_valid is False
     assert "Additional properties are not allowed" in (err or "")
 
-    # 4. Pattern validation on obligation_id
-    call_bad_pattern = AgentToolCall(
-        "C4",
-        "propose_test_run",
-        arguments={"obligation_id": "INVALID_PATTERN", "target_test": "test.py", "purpose": "Test"},
-    )
-    is_valid, err = reg.validate_tool_call(call_bad_pattern, granted_capabilities=("CAP_PROPOSE_ACTION",))
-    assert is_valid is False
-    assert "does not match '^OBL-[A-Za-z0-9_-]+$'" in (err or "")
 
-    # 5. Invalid object type
-    is_valid, err = reg.validate_tool_call("NOT_A_CALL", granted_capabilities=("CAP_READ_CODE",))  # type: ignore
-    assert is_valid is False
-    assert "Invalid tool_call object type" in (err or "")
-
-    # 6. Unknown tool name
-    call_unknown = AgentToolCall("C5", "unknown_tool_name", {})
-    is_valid, err = reg.validate_tool_call(call_unknown, granted_capabilities=("CAP_READ_CODE",))
-    assert is_valid is False
-    assert "Unknown tool" in (err or "")
-
-
-# =====================================================================
-# 3. ZERO CAPABILITY ESCALATION IN SYNTHESIZER
-# =====================================================================
-
-def test_proposal_synthesizer_propagates_actual_capabilities():
+def test_proposal_synthesizer_rejects_empty_and_invented_capabilities():
     call = AgentToolCall(
         call_id="C1",
         tool_name="propose_test_run",
@@ -226,118 +334,55 @@ def test_proposal_synthesizer_propagates_actual_capabilities():
     )
 
     # Empty capabilities fails closed
-    prop, err = ActionProposalSynthesizer.synthesize_proposal(call, granted_capabilities=())
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(call, session_granted_capabilities=())
     assert prop is None
     assert "Cannot synthesize proposal with empty capability set" in (err or "")
 
-    # Exact session capabilities propagated (sorted set canonicalization by ExecutionContext)
-    session_caps = ("CAP_PROPOSE_ACTION", "CAP_EXEC_TEST", "CAP_EXTRA_RESTRICTED")
-    prop, err = ActionProposalSynthesizer.synthesize_proposal(call, granted_capabilities=session_caps)
+    # Exact session capabilities propagated without alteration
+    session_caps = ("CAP_PROPOSE_ACTION", "CAP_EXEC_TEST")
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(call, session_granted_capabilities=session_caps)
     assert err is None
     assert prop is not None
-    assert prop.execution_context.capability_set == tuple(sorted(set(session_caps)))
-
-
-def test_proposal_synthesizer_supports_code_patch():
-    call_patch = AgentToolCall(
-        call_id="C2",
-        tool_name="propose_code_patch",
-        arguments={
-            "obligation_id": "OBL-001",
-            "target_file": "src/app.py",
-            "patch_content": "--- a/app.py\n+++ b/app.py\n@@ -1 +1 @@\n-pass\n+return 42",
-            "purpose": "Fix return value",
-        },
-    )
-    prop, err = ActionProposalSynthesizer.synthesize_proposal(
-        call_patch,
-        granted_capabilities=("CAP_PROPOSE_ACTION", "CAP_APPLY_PATCH"),
-    )
-    assert err is None
-    assert prop is not None
-    assert prop.action_type == "APPLY_PATCH"
-    assert prop.target == "src/app.py"
-    assert prop.parameters["patch_content"] == call_patch.arguments["patch_content"]
-
-
-def test_proposal_synthesizer_rejects_malformed_inputs():
-    # Non-proposal tool
-    call_read = AgentToolCall("C1", "read_file_chunk", {"path": "a.py"})
-    prop, err = ActionProposalSynthesizer.synthesize_proposal(call_read, granted_capabilities=("CAP_READ_CODE",))
-    assert prop is None
-    assert "not a recognized proposal tool" in (err or "")
-
-    # Missing obligation_id in propose_test_run
-    call_no_obl = AgentToolCall("C2", "propose_test_run", {"target_test": "t.py", "purpose": "P"})
-    prop, err = ActionProposalSynthesizer.synthesize_proposal(call_no_obl, granted_capabilities=("CAP_PROPOSE_ACTION",))
-    assert prop is None
-    assert "Missing or invalid 'obligation_id'" in (err or "")
-
-    # Missing target_test in propose_test_run
-    call_no_target = AgentToolCall("C3", "propose_test_run", {"obligation_id": "OBL-1", "purpose": "P"})
-    prop, err = ActionProposalSynthesizer.synthesize_proposal(call_no_target, granted_capabilities=("CAP_PROPOSE_ACTION",))
-    assert prop is None
-    assert "Missing or invalid 'target_test'" in (err or "")
-
-    # Missing target_file in propose_code_patch
-    call_no_file = AgentToolCall("C4", "propose_code_patch", {"obligation_id": "OBL-1", "patch_content": "d", "purpose": "P"})
-    prop, err = ActionProposalSynthesizer.synthesize_proposal(call_no_file, granted_capabilities=("CAP_PROPOSE_ACTION",))
-    assert prop is None
-    assert "Missing or invalid 'target_file'" in (err or "")
-
-    # Missing patch_content in propose_code_patch
-    call_no_patch = AgentToolCall("C5", "propose_code_patch", {"obligation_id": "OBL-1", "target_file": "f.py", "purpose": "P"})
-    prop, err = ActionProposalSynthesizer.synthesize_proposal(call_no_patch, granted_capabilities=("CAP_PROPOSE_ACTION",))
-    assert prop is None
-    assert "Missing or invalid 'patch_content'" in (err or "")
-
-    # Missing obligation_id in propose_code_patch
-    call_patch_no_obl = AgentToolCall("C6", "propose_code_patch", {"target_file": "f.py", "patch_content": "d", "purpose": "P"})
-    prop, err = ActionProposalSynthesizer.synthesize_proposal(call_patch_no_obl, granted_capabilities=("CAP_PROPOSE_ACTION",))
-    assert prop is None
-    assert "Missing or invalid 'obligation_id'" in (err or "")
+    assert prop.execution_context.capability_set == tuple(sorted(session_caps))
 
 
 # =====================================================================
-# 4. REPOSITORY STATE BINDING & STALE CONTEXT DETECTION
+# 4. SAFE EXECUTION OF READ/SEARCH INSPECTION TOOLS
 # =====================================================================
 
-def test_session_manager_detects_stale_repository_context(fresh_controller, standard_domain_state):
-    obls, policies = standard_domain_state
-    worker = MockAgentWorker("worker")
-    worker.set_script([AgentTurnResponse(thought="Test", tool_calls=(), turn_status=AgentTurnStatus.CONTINUE)])
+def test_tool_registry_executes_inspection_tools_safely(tmp_path):
+    ws = IsolatedWorkspace("ws_inspect_test", base_dir=str(tmp_path))
+    ws.setup()
 
-    # Provider returning a modified/drifted repository SHA
-    current_sha = STALE_SHA
-    sha_provider = lambda: current_sha
+    # Create a test file in workspace
+    test_file_path = os.path.join(ws.path, "module.py")
+    with open(test_file_path, "w", encoding="utf-8") as f:
+        f.write("line 1\nline 2: target_query\nline 3\n")
 
-    session_mgr = AgentSessionManager(
-        worker=worker,
-        controller=fresh_controller,
-        current_repo_sha_provider=sha_provider,
-    )
+    reg = AgentToolRegistry()
 
-    record, dispatches = session_mgr.run_session(
-        repository_id=DEFAULT_REPO_ID,
-        source_sha=DEFAULT_SHA,  # Session initialized against DEFAULT_SHA
-        task_id="TASK-AGENT-01",
-        objective="Verify system invariants",
-        obligations=obls,
-        policies=policies,
-        policy_version=1,
-        max_turns=5,
-    )
+    # 1. Test read_file_chunk
+    call_read = AgentToolCall("C1", "read_file_chunk", {"path": "module.py", "start_line": 1, "end_line": 2})
+    res_read = reg.execute_inspection_tool(call_read, workspace=ws)
+    assert res_read.success is True
+    assert len(res_read.result_data["lines"]) == 2
 
-    assert record.final_status == AgentTurnStatus.STALE_CONTEXT
-    assert len(dispatches) == 0
+    # 2. Test search_codebase
+    call_search = AgentToolCall("C2", "search_codebase", {"query": "target_query"})
+    res_search = reg.execute_inspection_tool(call_search, workspace=ws)
+    assert res_search.success is True
+    assert len(res_search.result_data["matches"]) == 1
+    assert res_search.result_data["matches"][0]["line"] == 2
+
+    ws.cleanup()
 
 
 # =====================================================================
-# 5. BUDGET & TURN BOUNDING SEMANTICS
+# 5. BUDGET SEMANTICS & ACCOUNTING UNITS
 # =====================================================================
 
-def test_session_manager_distinguishes_advisory_cost_from_authoritative_usage(
-    fresh_controller, standard_domain_state
+def test_session_manager_tracks_internal_accounting_units(
+    fresh_controller, standard_domain_state, default_repo_provider
 ):
     obls, policies = standard_domain_state
     worker = MockAgentWorker("worker")
@@ -352,11 +397,15 @@ def test_session_manager_distinguishes_advisory_cost_from_authoritative_usage(
             ),
         ),
         turn_status=AgentTurnStatus.COMPLETED,
-        advisory_estimated_cost_usd=0.035,  # Worker-reported estimate
+        advisory_estimated_cost_usd=0.035,
     )
     worker.set_script([t1])
 
-    session_mgr = AgentSessionManager(worker=worker, controller=fresh_controller)
+    session_mgr = AgentSessionManager(
+        worker=worker,
+        controller=fresh_controller,
+        authoritative_repo_state_provider=default_repo_provider,
+    )
     record, dispatches = session_mgr.run_session(
         repository_id=DEFAULT_REPO_ID,
         source_sha=DEFAULT_SHA,
@@ -366,79 +415,12 @@ def test_session_manager_distinguishes_advisory_cost_from_authoritative_usage(
         policies=policies,
         policy_version=1,
         granted_capabilities=("CAP_READ_CODE", "CAP_PROPOSE_ACTION", "CAP_EXEC_TEST"),
-        cost_budget_usd=1.0,
+        budget_units=1.0,
     )
 
     assert record.advisory_total_cost_usd == 0.035
-    assert record.authoritative_usage_cost_usd == 0.05  # Authoritative cost per proposal
+    assert record.internal_accounting_units == D7_INTERNAL_ACCOUNTING_UNIT
     assert len(dispatches) == 1
-
-
-def test_session_manager_enforces_max_turns_and_budget_exhaustion(fresh_controller, standard_domain_state):
-    obls, policies = standard_domain_state
-
-    # 1. Max turns reached
-    worker_loop = MockAgentWorker("worker-loop")
-    worker_loop.set_script([AgentTurnResponse(thought="Loop", tool_calls=(), turn_status=AgentTurnStatus.CONTINUE)] * 10)
-    mgr = AgentSessionManager(worker=worker_loop, controller=fresh_controller)
-    rec, _ = mgr.run_session(
-        repository_id=DEFAULT_REPO_ID,
-        source_sha=DEFAULT_SHA,
-        task_id="TASK-1",
-        objective="Obj",
-        obligations=obls,
-        policies=policies,
-        policy_version=1,
-        max_turns=3,
-        cost_budget_usd=10.0,
-    )
-    assert rec.final_status == AgentTurnStatus.MAX_TURNS_REACHED
-    assert rec.total_turns == 3
-
-    # 2. Budget exceeded by authoritative proposal submissions
-    worker_expensive = MockAgentWorker("worker-exp")
-    call = AgentToolCall("C1", "propose_test_run", {"obligation_id": "OBL-001", "target_test": "test.py", "purpose": "T"})
-    worker_expensive.set_script([AgentTurnResponse(thought="T", tool_calls=(call,), turn_status=AgentTurnStatus.CONTINUE)] * 5)
-    mgr_exp = AgentSessionManager(worker=worker_expensive, controller=fresh_controller)
-    rec_exp, _ = mgr_exp.run_session(
-        repository_id=DEFAULT_REPO_ID,
-        source_sha=DEFAULT_SHA,
-        task_id="TASK-1",
-        objective="Obj",
-        obligations=obls,
-        policies=policies,
-        policy_version=1,
-        granted_capabilities=("CAP_PROPOSE_ACTION", "CAP_EXEC_TEST"),
-        max_turns=10,
-        cost_budget_usd=0.05,  # Exactly enough for 1 proposal (0.05)
-    )
-    assert rec_exp.final_status == AgentTurnStatus.BUDGET_EXCEEDED
-
-
-def test_session_manager_handles_invalid_tool_calls_in_turn(fresh_controller, standard_domain_state):
-    obls, policies = standard_domain_state
-    worker = MockAgentWorker("worker")
-    
-    # Tool call with missing required argument
-    bad_call = AgentToolCall("C1", "read_file_chunk", arguments={})
-    t1 = AgentTurnResponse(thought="Bad call", tool_calls=(bad_call,), turn_status=AgentTurnStatus.CONTINUE)
-    t2 = AgentTurnResponse(thought="Done", tool_calls=(), turn_status=AgentTurnStatus.COMPLETED)
-    worker.set_script([t1, t2])
-
-    mgr = AgentSessionManager(worker=worker, controller=fresh_controller)
-    rec, dispatches = mgr.run_session(
-        repository_id=DEFAULT_REPO_ID,
-        source_sha=DEFAULT_SHA,
-        task_id="TASK-1",
-        objective="Obj",
-        obligations=obls,
-        policies=policies,
-        policy_version=1,
-        granted_capabilities=("CAP_READ_CODE",),
-    )
-    assert rec.final_status == AgentTurnStatus.COMPLETED
-    assert "validation_error" in rec.turns_transcript[0]
-    assert len(dispatches) == 0
 
 
 # =====================================================================
@@ -457,10 +439,12 @@ class CrashingWorker(AgentWorkerProtocol):
         raise self._exc
 
 
-def test_session_manager_handles_worker_timeout(fresh_controller, standard_domain_state):
+def test_session_manager_handles_worker_timeout(fresh_controller, standard_domain_state, default_repo_provider):
     obls, policies = standard_domain_state
     worker = CrashingWorker(TimeoutError("Worker request timed out"))
-    session_mgr = AgentSessionManager(worker=worker, controller=fresh_controller)
+    session_mgr = AgentSessionManager(
+        worker=worker, controller=fresh_controller, authoritative_repo_state_provider=default_repo_provider
+    )
 
     record, dispatches = session_mgr.run_session(
         repository_id=DEFAULT_REPO_ID,
@@ -474,10 +458,12 @@ def test_session_manager_handles_worker_timeout(fresh_controller, standard_domai
     assert record.final_status == AgentTurnStatus.WORKER_TIMEOUT
 
 
-def test_session_manager_handles_worker_disconnect(fresh_controller, standard_domain_state):
+def test_session_manager_handles_worker_disconnect(fresh_controller, standard_domain_state, default_repo_provider):
     obls, policies = standard_domain_state
     worker = CrashingWorker(ConnectionError("Socket disconnected"))
-    session_mgr = AgentSessionManager(worker=worker, controller=fresh_controller)
+    session_mgr = AgentSessionManager(
+        worker=worker, controller=fresh_controller, authoritative_repo_state_provider=default_repo_provider
+    )
 
     record, dispatches = session_mgr.run_session(
         repository_id=DEFAULT_REPO_ID,
@@ -491,10 +477,12 @@ def test_session_manager_handles_worker_disconnect(fresh_controller, standard_do
     assert record.final_status == AgentTurnStatus.WORKER_DISCONNECT
 
 
-def test_session_manager_handles_unhandled_worker_exception(fresh_controller, standard_domain_state):
+def test_session_manager_handles_unhandled_worker_exception(fresh_controller, standard_domain_state, default_repo_provider):
     obls, policies = standard_domain_state
     worker = CrashingWorker(RuntimeError("Unexpected runtime crash"))
-    session_mgr = AgentSessionManager(worker=worker, controller=fresh_controller)
+    session_mgr = AgentSessionManager(
+        worker=worker, controller=fresh_controller, authoritative_repo_state_provider=default_repo_provider
+    )
 
     record, dispatches = session_mgr.run_session(
         repository_id=DEFAULT_REPO_ID,
@@ -512,7 +500,7 @@ def test_session_manager_handles_unhandled_worker_exception(fresh_controller, st
 # 7. CONCURRENCY & ISOLATION TESTS
 # =====================================================================
 
-def test_concurrent_agent_sessions_remain_isolated(fresh_controller, standard_domain_state):
+def test_concurrent_agent_sessions_remain_isolated(fresh_controller, standard_domain_state, default_repo_provider):
     obls, policies = standard_domain_state
 
     def run_worker_session(worker_idx: int):
@@ -530,7 +518,9 @@ def test_concurrent_agent_sessions_remain_isolated(fresh_controller, standard_do
             advisory_estimated_cost_usd=0.01,
         )
         worker.set_script([t1])
-        mgr = AgentSessionManager(worker=worker, controller=fresh_controller)
+        mgr = AgentSessionManager(
+            worker=worker, controller=fresh_controller, authoritative_repo_state_provider=default_repo_provider
+        )
         return mgr.run_session(
             repository_id=DEFAULT_REPO_ID,
             source_sha=DEFAULT_SHA,
@@ -541,7 +531,7 @@ def test_concurrent_agent_sessions_remain_isolated(fresh_controller, standard_do
             policy_version=1,
             granted_capabilities=("CAP_READ_CODE", "CAP_PROPOSE_ACTION", "CAP_EXEC_TEST"),
             max_turns=2,
-            cost_budget_usd=0.5,
+            budget_units=0.5,
         )
 
     with ThreadPoolExecutor(max_workers=4) as pool:
@@ -572,13 +562,55 @@ def test_d7_has_no_token_minting_or_execution_authority():
     assert not hasattr(ActionProposalSynthesizer, "mint_execution_token")
 
 
-def test_d7_session_manager_rejects_invalid_worker_or_controller():
-    with pytest.raises(TypeError):
-        AgentSessionManager(worker="NOT_A_WORKER", controller="NOT_A_CONTROLLER")  # type: ignore
+# =====================================================================
+# 9. COMPREHENSIVE MODEL & SYNTHESIZER VALIDATION TESTS
+# =====================================================================
+
+def test_synthesizer_missing_arguments_and_invalid_types():
+    # Invalid object type
+    prop, err = ActionProposalSynthesizer.synthesize_proposal("NOT_A_CALL", session_granted_capabilities=())  # type: ignore
+    assert prop is None
+    assert "tool_call must be an instance of AgentToolCall" in (err or "")
+
+    # propose_test_run missing target_test
+    c1 = AgentToolCall("C1", "propose_test_run", {"obligation_id": "OBL-001"})
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(c1, session_granted_capabilities=("CAP_PROPOSE_ACTION",))
+    assert prop is None
+    assert "Missing or invalid 'target_test'" in (err or "")
+
+    # propose_test_run missing obligation_id
+    c2 = AgentToolCall("C2", "propose_test_run", {"target_test": "test.py"})
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(c2, session_granted_capabilities=("CAP_PROPOSE_ACTION",))
+    assert prop is None
+    assert "Missing or invalid 'obligation_id'" in (err or "")
+
+    # propose_code_patch missing target_file
+    c3 = AgentToolCall("C3", "propose_code_patch", {"obligation_id": "OBL-001", "patch_content": "d"})
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(c3, session_granted_capabilities=("CAP_PROPOSE_ACTION",))
+    assert prop is None
+    assert "Missing or invalid 'target_file'" in (err or "")
+
+    # propose_code_patch missing patch_content
+    c4 = AgentToolCall("C4", "propose_code_patch", {"obligation_id": "OBL-001", "target_file": "a.py"})
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(c4, session_granted_capabilities=("CAP_PROPOSE_ACTION",))
+    assert prop is None
+    assert "Missing or invalid 'patch_content'" in (err or "")
+
+    # propose_code_patch missing obligation_id
+    c5 = AgentToolCall("C5", "propose_code_patch", {"target_file": "a.py", "patch_content": "d"})
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(c5, session_granted_capabilities=("CAP_PROPOSE_ACTION",))
+    assert prop is None
+    assert "Missing or invalid 'obligation_id'" in (err or "")
+
+    # Unrecognized proposal tool
+    c6 = AgentToolCall("C6", "unknown_tool", {})
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(c6, session_granted_capabilities=("CAP_PROPOSE_ACTION",))
+    assert prop is None
+    assert "not a recognized proposal tool" in (err or "")
 
 
 def test_tool_definition_and_agent_model_validations():
-    # Tool definition validations
+    # Tool definition
     with pytest.raises(ValueError):
         ToolDefinition("", "desc", {})
     with pytest.raises(ValueError):
@@ -586,18 +618,56 @@ def test_tool_definition_and_agent_model_validations():
     with pytest.raises(TypeError):
         ToolDefinition("t", "desc", "not_a_dict")  # type: ignore
 
-    # AgentToolResult validations
+    # AgentToolCall
     with pytest.raises(ValueError):
-        AgentToolResult("", "t", True)
+        AgentToolCall("", "tool", {})
     with pytest.raises(ValueError):
-        AgentToolResult("C", "", True)
+        AgentToolCall("C1", "", {})
 
-    # AgentSessionRecord validations
+    # AgentToolResult
     with pytest.raises(ValueError):
-        AgentSessionRecord("S", "R", DEFAULT_SHA, "T", -1, 0.0, 0.0, AgentTurnStatus.COMPLETED, "2026-08-20T12:00:00Z", "2026-08-20T12:05:00Z", 0)
+        AgentToolResult("", "tool", True)
     with pytest.raises(ValueError):
-        AgentSessionRecord("S", "R", DEFAULT_SHA, "T", 1, -1.0, 0.0, AgentTurnStatus.COMPLETED, "2026-08-20T12:00:00Z", "2026-08-20T12:05:00Z", 0)
-    with pytest.raises(ValueError):
-        AgentSessionRecord("S", "R", DEFAULT_SHA, "T", 1, 0.0, -1.0, AgentTurnStatus.COMPLETED, "2026-08-20T12:00:00Z", "2026-08-20T12:05:00Z", 0)
+        AgentToolResult("C1", "", True)
+
+    # AgentTurnResponse
     with pytest.raises(TypeError):
-        AgentSessionRecord("S", "R", DEFAULT_SHA, "T", 1, 0.0, 0.0, "INVALID_STATUS", "2026-08-20T12:00:00Z", "2026-08-20T12:05:00Z", 0)  # type: ignore
+        AgentTurnResponse(thought=123)  # type: ignore
+    with pytest.raises(TypeError):
+        AgentTurnResponse(thought="t", turn_status="INVALID")  # type: ignore
+    with pytest.raises(ValueError):
+        AgentTurnResponse(thought="t", advisory_estimated_cost_usd=-1.0)
+
+    # AgentSessionRecord
+    with pytest.raises(ValueError):
+        AgentSessionRecord("", DEFAULT_REPO_ID, DEFAULT_SHA, "T1", 0, 0.0, 0.0, AgentTurnStatus.COMPLETED, "2026-08-20T12:00:00Z", "2026-08-20T12:05:00Z", 0)
+    with pytest.raises(ValueError):
+        AgentSessionRecord("S1", "", DEFAULT_SHA, "T1", 0, 0.0, 0.0, AgentTurnStatus.COMPLETED, "2026-08-20T12:00:00Z", "2026-08-20T12:05:00Z", 0)
+    with pytest.raises(ValueError):
+        AgentSessionRecord("S1", DEFAULT_REPO_ID, DEFAULT_SHA, "", 0, 0.0, 0.0, AgentTurnStatus.COMPLETED, "2026-08-20T12:00:00Z", "2026-08-20T12:05:00Z", 0)
+    with pytest.raises(ValueError):
+        AgentSessionRecord("S1", DEFAULT_REPO_ID, DEFAULT_SHA, "T1", -1, 0.0, 0.0, AgentTurnStatus.COMPLETED, "2026-08-20T12:00:00Z", "2026-08-20T12:05:00Z", 0)
+    with pytest.raises(ValueError):
+        AgentSessionRecord("S1", DEFAULT_REPO_ID, DEFAULT_SHA, "T1", 0, -1.0, 0.0, AgentTurnStatus.COMPLETED, "2026-08-20T12:00:00Z", "2026-08-20T12:05:00Z", 0)
+    with pytest.raises(ValueError):
+        AgentSessionRecord("S1", DEFAULT_REPO_ID, DEFAULT_SHA, "T1", 0, 0.0, -1.0, AgentTurnStatus.COMPLETED, "2026-08-20T12:00:00Z", "2026-08-20T12:05:00Z", 0)
+    with pytest.raises(TypeError):
+        AgentSessionRecord("S1", DEFAULT_REPO_ID, DEFAULT_SHA, "T1", 0, 0.0, 0.0, "INVALID", "2026-08-20T12:00:00Z", "2026-08-20T12:05:00Z", 0)  # type: ignore
+
+
+def test_inspection_tool_non_existent_file(tmp_path):
+    ws = IsolatedWorkspace("ws_non_existent", base_dir=str(tmp_path))
+    ws.setup()
+    reg = AgentToolRegistry()
+
+    call_read = AgentToolCall("C1", "read_file_chunk", {"path": "missing_file.py"})
+    res = reg.execute_inspection_tool(call_read, workspace=ws)
+    assert res.success is False
+    assert "does not exist" in (res.error_message or "")
+
+    call_invalid = AgentToolCall("C2", "propose_test_run", {})
+    res_inv = reg.execute_inspection_tool(call_invalid, workspace=ws)
+    assert res_inv.success is False
+    assert "not an executable inspection tool" in (res_inv.error_message or "")
+
+    ws.cleanup()

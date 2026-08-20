@@ -31,14 +31,14 @@ class AgentContextBuilder:
         verification_feedback: Optional[Sequence[Mapping[str, Any]]] = None,
         turn_index: int = 0,
         max_turns: int = 10,
-        remaining_budget_usd: float = 10.0,
+        remaining_budget_units: float = 10.0,
     ) -> AgentSessionContext:
         """Constructs an immutable AgentSessionContext from verified domain state."""
         # 1. Compute current executable frontier from D1 DAG
         frontier_ids = compute_executable_frontier(
             obligations=obligations,
             policies=policies,
-            budget_remaining=remaining_budget_usd,
+            budget_remaining=remaining_budget_units,
         )
         frontier_details = []
         for oid in frontier_ids:
@@ -78,5 +78,5 @@ class AgentContextBuilder:
             granted_capabilities=tuple(granted_capabilities),
             turn_index=turn_index,
             max_turns=max_turns,
-            remaining_budget_usd=remaining_budget_usd,
+            remaining_budget_units=remaining_budget_units,
         )
