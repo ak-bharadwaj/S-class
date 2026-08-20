@@ -1,22 +1,22 @@
 """
 S-Class EOS V11.2 - Gate 3 Certificate Authority & Provider Keystore (D0 Asymmetric Specification).
-Protected authority / keystore boundary for issuing Ed25519-signed EvidenceTrustCertificates and
-cryptographically verifying provider HMAC signatures.
-The authority private key is strictly isolated within this boundary and cannot be replaced at runtime.
+Protected authority / keystore boundary for issuing Ed25519-signed EvidenceTrustCertificates,
+cryptographically verifying provider HMAC signatures, enforcing non-overwritable provider keys with
+explicit rotation semantics, and enforcing D0 single-use anti-replay rules.
 """
 
 from __future__ import annotations
 import os
 import hmac
+import uuid
 import hashlib
 from datetime import datetime, timezone
-from typing import Any, Optional, Dict
+from typing import Any, Optional, Dict, Set
 from domain.models import AsymmetricAuthoritySignature, HmacSessionSignature, Evidence, EvidenceScope, EvidenceObservation, Provenance
 from domain.types import EvidencePolarity, EvidenceValidity, RawStatus
 from events.serializer import canonicalize_json
 
 GATE3_AUTHORITY_IDENTITY = "Gate3AuthoritativeVerifier"
-DEFAULT_GATE3_PROVIDER_SECRET = b"GATE3_D0_PROVIDER_HMAC_SECRET_2026_KEYSTORE_BOUNDARY"
 
 
 class Gate3AuthorityKeyStore:
@@ -64,29 +64,94 @@ class Gate3AuthorityKeyStore:
 
 
 class Gate3ProviderKeyStore:
-    """Certified provider keystore boundary managing provider signing and verification keys."""
+    """Certified provider keystore boundary managing provider signing and verification keys.
+    Non-overwritable registration with explicit rotation semantics.
+    """
     _provider_keys: Dict[str, bytes] = {}
+    _retired_keys: Set[str] = set()
 
     @classmethod
     def register_provider_key(cls, key_id: str, key_bytes: bytes) -> None:
+        """Registers a new provider key. Overwriting an existing key fails closed."""
         if not key_id or not isinstance(key_id, str):
             raise TypeError("key_id must be a non-empty string.")
         if not isinstance(key_bytes, bytes) or len(key_bytes) < 16:
             raise ValueError("key_bytes must be bytes of at least 16 bytes.")
+        if key_id in cls._provider_keys or key_id in cls._retired_keys:
+            raise RuntimeError(f"Provider key '{key_id}' is already registered and cannot be overwritten. Use rotate_provider_key() for key rotation.")
         cls._provider_keys[key_id] = key_bytes
 
     @classmethod
-    def clear(cls) -> None:
-        cls._provider_keys.clear()
+    def rotate_provider_key(cls, old_key_id: str, new_key_id: str, new_key_bytes: bytes) -> None:
+        """Rotates provider key: retires the old key ID and registers the new key ID."""
+        if not old_key_id or not isinstance(old_key_id, str):
+            raise TypeError("old_key_id must be a non-empty string.")
+        if old_key_id not in cls._provider_keys:
+            raise KeyError(f"Cannot rotate non-existent provider key '{old_key_id}'.")
+        if not new_key_id or not isinstance(new_key_id, str):
+            raise TypeError("new_key_id must be a non-empty string.")
+        if new_key_id in cls._provider_keys or new_key_id in cls._retired_keys:
+            raise RuntimeError(f"New provider key '{new_key_id}' is already registered.")
+        if not isinstance(new_key_bytes, bytes) or len(new_key_bytes) < 16:
+            raise ValueError("new_key_bytes must be bytes of at least 16 bytes.")
+
+        cls._provider_keys.pop(old_key_id)
+        cls._retired_keys.add(old_key_id)
+        cls._provider_keys[new_key_id] = new_key_bytes
 
     @classmethod
-    def get_provider_key(cls, key_id: str = "KEY-001") -> bytes:
+    def is_retired(cls, key_id: str) -> bool:
+        return key_id in cls._retired_keys
+
+    @classmethod
+    def clear(cls) -> None:
+        """Controlled teardown of provider keystore for test fixtures."""
+        cls._provider_keys.clear()
+        cls._retired_keys.clear()
+
+    @classmethod
+    def get_provider_key(cls, key_id: str) -> bytes:
+        """Retrieves provider key exclusively from certified keystore or protected environment boundary."""
+        if not key_id or not isinstance(key_id, str):
+            raise TypeError("key_id must be a non-empty string.")
+        if key_id in cls._retired_keys:
+            raise RuntimeError(f"Provider key '{key_id}' has been retired and cannot be used.")
         if key_id in cls._provider_keys:
             return cls._provider_keys[key_id]
-        env_secret = os.environ.get("GATE3_PROVIDER_KEY")
-        if env_secret:
-            return env_secret.encode("utf-8")
-        return DEFAULT_GATE3_PROVIDER_SECRET
+
+        env_specific = os.environ.get(f"GATE3_PROVIDER_KEY_{key_id.upper().replace('-', '_')}")
+        if env_specific:
+            return env_specific.encode("utf-8")
+
+        env_general = os.environ.get("GATE3_PROVIDER_KEY")
+        if env_general and key_id == "KEY-001":
+            return env_general.encode("utf-8")
+
+        raise KeyError(f"Provider key '{key_id}' is not registered in certified keystore.")
+
+
+class Gate3NonceTracker:
+    """Enforces D0 single-use anti-replay rules for evidence nonces."""
+    _consumed_nonces: Set[str] = set()
+
+    @classmethod
+    def consume_nonce(cls, nonce: str) -> bool:
+        """Attempts to consume a single-use nonce. Returns False if already consumed (replay detected)."""
+        if not nonce or not isinstance(nonce, str):
+            return False
+        if nonce in cls._consumed_nonces:
+            return False
+        cls._consumed_nonces.add(nonce)
+        return True
+
+    @classmethod
+    def is_consumed(cls, nonce: str) -> bool:
+        return nonce in cls._consumed_nonces
+
+    @classmethod
+    def clear(cls) -> None:
+        """Controlled teardown for test fixtures."""
+        cls._consumed_nonces.clear()
 
 
 def compute_gate3_evidence_digest(evidence: Any) -> str:
@@ -129,10 +194,14 @@ def sign_provider_evidence(
     observation: Any,
     provenance: Any,
     key_id: str = "KEY-001",
-    nonce: str = "NONCE-001",
-    signing_key: Optional[bytes] = None,
+    nonce: Optional[str] = None,
 ) -> HmacSessionSignature:
-    """Generates an authentic provider HmacSessionSignature for an evidence item."""
+    """Generates an authentic provider HmacSessionSignature for an evidence item.
+    Signing key is acquired exclusively from the certified Gate3ProviderKeyStore boundary.
+    """
+    if nonce is None:
+        nonce = f"NONCE-{evidence_id}-{uuid.uuid4().hex[:12].upper()}"
+
     dummy_sig = HmacSessionSignature(
         algorithm="HMAC-SHA256",
         key_id=key_id,
@@ -165,7 +234,7 @@ def sign_provider_evidence(
         "timestamp": provenance.timestamp,
     }
     canonical_sig_bytes = canonicalize_json(sig_payload)
-    key_bytes = signing_key or Gate3ProviderKeyStore.get_provider_key(key_id)
+    key_bytes = Gate3ProviderKeyStore.get_provider_key(key_id)
     sig_hex = hmac.new(key_bytes, canonical_sig_bytes, hashlib.sha256).hexdigest()
 
     return HmacSessionSignature(
@@ -178,14 +247,14 @@ def sign_provider_evidence(
     )
 
 
-def verify_provider_evidence_signature(evidence: Any, provider_key: Optional[bytes] = None) -> bool:
+def verify_provider_evidence_signature(evidence: Any) -> bool:
     """Cryptographically verifies provider evidence signature (HmacSessionSignature).
     
     Checks:
     1. Valid HmacSessionSignature dataclass instance with algorithm HMAC-SHA256.
     2. Actual evidence payload digest matches evidence.signature.raw_stdout_digest.
     3. Cryptographic HMAC-SHA256 signature verification over canonical signature payload
-       using provider key from Gate3ProviderKeyStore or caller boundary.
+       using provider key exclusively from Gate3ProviderKeyStore.
     """
     if not hasattr(evidence, "signature") or not evidence.signature:
         return False
@@ -214,9 +283,9 @@ def verify_provider_evidence_signature(evidence: Any, provider_key: Optional[byt
     except Exception:
         return False
 
-    # 3. Key Retrieval & Cryptographic HMAC Comparison
+    # 3. Key Retrieval & Cryptographic HMAC Comparison (exclusively from Gate3ProviderKeyStore)
     try:
-        key_bytes = provider_key or Gate3ProviderKeyStore.get_provider_key(sig.key_id)
+        key_bytes = Gate3ProviderKeyStore.get_provider_key(sig.key_id)
     except Exception:
         return False
 
@@ -228,13 +297,13 @@ def issue_gate_3_evidence_certificate(
     evidence: Any,
     expected_source_sha: str,
     verifier_identity: str = GATE3_AUTHORITY_IDENTITY,
-    provider_key: Optional[bytes] = None,
 ) -> Any:
     """Gate 3 Authority: Produces an authentic, Ed25519-signed EvidenceTrustCertificate.
     
     Private key is acquired exclusively from the protected Gate3AuthorityKeyStore boundary.
+    Provider keys are acquired exclusively from Gate3ProviderKeyStore.
+    Nonces are enforced as single-use under D0 anti-replay rules.
     Timestamp is bound to authoritative execution time.
-    Evidence provider signature is verified via actual cryptographic HMAC-SHA256 verification.
     """
     from policy.models import EvidenceTrustCertificate
 
@@ -246,6 +315,7 @@ def issue_gate_3_evidence_certificate(
     # Authoritative execution timestamp from evidence provenance or current UTC
     timestamp_iso = getattr(getattr(evidence, "provenance", None), "timestamp", None) or datetime.now(timezone.utc).isoformat()
 
+    # 1. Source SHA verification
     if not expected_source_sha or evidence.source_sha != expected_source_sha:
         cert_data = {
             "evidence_id": evidence.evidence_id,
@@ -282,12 +352,50 @@ def issue_gate_3_evidence_certificate(
             rejection_reason="Source revision mismatch or missing.",
         )
 
+    # 2. D0 Single-Use Nonce Anti-Replay Verification
+    evidence_nonce = getattr(getattr(evidence, "signature", None), "nonce", None)
+    if not evidence_nonce or not Gate3NonceTracker.consume_nonce(evidence_nonce):
+        cert_data = {
+            "evidence_id": evidence.evidence_id,
+            "source_sha": evidence.source_sha,
+            "is_verified": False,
+            "digest_verified": False,
+            "signature_verified": False,
+            "provenance_verified": False,
+            "verifier_identity": verifier_identity,
+            "timestamp": timestamp_iso,
+        }
+        canonical_bytes = canonicalize_json(cert_data)
+        payload_digest = hashlib.sha256(canonical_bytes).hexdigest()
+        sig_bytes = private_key.sign(canonical_bytes)
+        authority_sig = AsymmetricAuthoritySignature(
+            algorithm="ED25519",
+            signer_identity=verifier_identity,
+            public_key_fingerprint=pub_fingerprint,
+            payload_digest=payload_digest,
+            signature_hex=sig_bytes.hex(),
+            timestamp=timestamp_iso,
+        )
+        return EvidenceTrustCertificate(
+            evidence_id=evidence.evidence_id,
+            source_sha=evidence.source_sha,
+            is_verified=False,
+            digest_verified=False,
+            signature_verified=False,
+            provenance_verified=False,
+            verifier_identity=verifier_identity,
+            timestamp=timestamp_iso,
+            certificate_hash=payload_digest,
+            authority_signature=authority_sig,
+            rejection_reason="Replay detected: evidence nonce has already been consumed under D0 single-use rule.",
+        )
+
+    # 3. Digest and Signature Verification
     computed_digest = compute_gate3_evidence_digest(evidence)
     claimed_digest = getattr(evidence.signature, "raw_stdout_digest", None)
     digest_verified = bool(claimed_digest and hmac.compare_digest(claimed_digest, computed_digest))
 
-    # ACTUAL CRYPTOGRAPHIC VERIFICATION OF PROVIDER EVIDENCE SIGNATURE
-    signature_verified = verify_provider_evidence_signature(evidence, provider_key=provider_key)
+    signature_verified = verify_provider_evidence_signature(evidence)
 
     prov = evidence.provenance
     provenance_verified = bool(

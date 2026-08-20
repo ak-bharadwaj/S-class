@@ -104,6 +104,7 @@ from events.serializer import canonicalize_json
 from benchmark.parity.gate_3_authority import (
     Gate3AuthorityKeyStore,
     Gate3ProviderKeyStore,
+    Gate3NonceTracker,
     compute_gate3_evidence_digest,
     sign_provider_evidence,
     verify_provider_evidence_signature,
@@ -138,9 +139,10 @@ from policy import (
 
 DEFAULT_TEST_SHA = "a" * 40
 
-# Test Authority Ed25519 Key Pair
+# Test Authority Ed25519 Key Pair & Provider Key
 TEST_AUTHORITY_PRIVATE_KEY = ed25519.Ed25519PrivateKey.generate()
 TEST_AUTHORITY_PUBLIC_KEY = TEST_AUTHORITY_PRIVATE_KEY.public_key()
+TEST_PROVIDER_SECRET = b"TEST_GATE3_PROVIDER_KEYSTORE_SECRET_32B"
 
 
 @pytest.fixture(autouse=True)
@@ -151,10 +153,13 @@ def setup_test_authority_keystore():
     Gate3PublicKeystore.clear()
     Gate3PublicKeystore.set_public_key(TEST_AUTHORITY_PUBLIC_KEY)
     Gate3ProviderKeyStore.clear()
+    Gate3ProviderKeyStore.register_provider_key("KEY-001", TEST_PROVIDER_SECRET)
+    Gate3NonceTracker.clear()
     yield
     Gate3AuthorityKeyStore.clear()
     Gate3PublicKeystore.clear()
     Gate3ProviderKeyStore.clear()
+    Gate3NonceTracker.clear()
 
 
 def make_test_obligation(
@@ -215,6 +220,8 @@ def make_test_evidence(
     engine_name: str = "coverage.py",
     source_sha: str = DEFAULT_TEST_SHA,
     timestamp: str = "2026-08-19T10:00:00Z",
+    key_id: str = "KEY-001",
+    nonce: Optional[str] = None,
     custom_signature: HmacSessionSignature = None,
 ) -> Evidence:
     scope = EvidenceScope(
@@ -246,8 +253,8 @@ def make_test_evidence(
             scope=scope,
             observation=obs,
             provenance=prov,
-            key_id="KEY-001",
-            nonce="NONCE-001",
+            key_id=key_id,
+            nonce=nonce,
         )
 
     return Evidence(
@@ -1328,3 +1335,80 @@ def test_hypothesis_meet_monotonicity(parent_count: int, child_increment: int):
         )
         with pytest.raises(PolicyWeakeningError):
             meet_policies(p_parent, p_child_weak)
+
+
+def test_adversarial_provider_keystore_overwrite_rejected():
+    """Adversarial vector: Overwriting an already-registered provider key fails closed with RuntimeError."""
+    with pytest.raises(RuntimeError, match="already registered and cannot be overwritten"):
+        Gate3ProviderKeyStore.register_provider_key("KEY-001", b"ATTEMPTED_OVERWRITE_SECRET_KEY_123")
+
+
+def test_adversarial_provider_keystore_rotation_lifecycle():
+    """Test controlled key rotation lifecycle: old key retired, new key activated, retired key fails closed."""
+    new_key_secret = b"NEW_ROTATED_PROVIDER_SECRET_KEY_2026"
+    Gate3ProviderKeyStore.rotate_provider_key("KEY-001", "KEY-002", new_key_secret)
+
+    # 1. Old key is marked retired and cannot be retrieved
+    assert Gate3ProviderKeyStore.is_retired("KEY-001") is True
+    with pytest.raises(RuntimeError, match="retired and cannot be used"):
+        Gate3ProviderKeyStore.get_provider_key("KEY-001")
+
+    # 2. New key is active and accessible
+    assert Gate3ProviderKeyStore.get_provider_key("KEY-002") == new_key_secret
+
+    # 3. Evidence signed with retired key KEY-001 fails closed
+    with pytest.raises(RuntimeError, match="retired and cannot be used"):
+        sign_provider_evidence(
+            evidence_id="EV-RETIRED-TEST",
+            claim_id="CLM-1",
+            provider_id="prov1",
+            capability="CODE_COVERAGE",
+            execution_id="EXEC-1",
+            source_sha=DEFAULT_TEST_SHA,
+            scope=EvidenceScope(targets_evaluated=("TARGET-1",), aspects_covered=("AUTH",)),
+            observation=EvidenceObservation(raw_status=RawStatus.PASS),
+            provenance=Provenance(engine_name="test", engine_version="1.0", environment_hash="0"*64, timestamp="2026-08-19T10:00:00Z"),
+            key_id="KEY-001",
+        )
+
+    # 4. New evidence signed with active rotated key KEY-002 verifies successfully
+    ev_rotated = make_test_evidence(ev_id="EV-ROTATED", key_id="KEY-002", counterexample={"coverage_pct": 92.0})
+    assert verify_provider_evidence_signature(ev_rotated) is True
+    cert = issue_gate_3_evidence_certificate(ev_rotated, expected_source_sha=DEFAULT_TEST_SHA)
+    assert cert.is_verified is True
+    assert cert.signature_verified is True
+
+
+def test_adversarial_evidence_nonce_replay_rejected():
+    """Adversarial vector: Reusing an already-consumed evidence nonce fails under D0 single-use anti-replay rule."""
+    ev1 = make_test_evidence(ev_id="EV-FIRST-USE", nonce="SINGLE-USE-NONCE-12345", counterexample={"coverage_pct": 90.0})
+    cert1 = issue_gate_3_evidence_certificate(ev1, expected_source_sha=DEFAULT_TEST_SHA)
+    assert cert1.is_verified is True
+    assert cert1.signature_verified is True
+    assert Gate3NonceTracker.is_consumed("SINGLE-USE-NONCE-12345") is True
+
+    # Replay attack: submitting evidence with the exact same consumed nonce
+    ev2_replay = make_test_evidence(ev_id="EV-REPLAY-ATTACK", nonce="SINGLE-USE-NONCE-12345", counterexample={"coverage_pct": 90.0})
+    cert2_replay = issue_gate_3_evidence_certificate(ev2_replay, expected_source_sha=DEFAULT_TEST_SHA)
+    assert cert2_replay.is_verified is False
+    assert cert2_replay.signature_verified is False
+    assert "Replay detected" in cert2_replay.rejection_reason
+
+
+def test_adversarial_replayed_evidence_rejected_in_policy_evaluation():
+    """Adversarial vector: Replayed evidence rejected during certificate issuance causes policy denial."""
+    obl = make_test_obligation()
+    claim = make_test_claim()
+    pol_cov_85 = Policy("POL-COV85", PolicyScope.PROJECT, 1, PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CODE_COVERAGE, {"min_coverage_pct": 85.0}),)))
+
+    # First issuance succeeds
+    ev = make_test_evidence(ev_id="EV-ORIG-COV", nonce="NONCE-FOR-POLICY-REPLAY", counterexample={"coverage_pct": 90.0})
+    cert_valid = issue_gate_3_evidence_certificate(ev, expected_source_sha=DEFAULT_TEST_SHA)
+    ctx1 = PolicyEvaluationContext(obl, (claim,), (ev,), expected_source_sha=DEFAULT_TEST_SHA, trust_certificates={ev.evidence_id: cert_valid})
+    assert evaluate_policy(pol_cov_85, ctx1).decision == PolicyDecisionType.ALLOW
+
+    # Second issuance with same nonce is rejected by Gate 3 Authority
+    cert_replayed = issue_gate_3_evidence_certificate(ev, expected_source_sha=DEFAULT_TEST_SHA)
+    assert cert_replayed.is_verified is False
+    ctx2 = PolicyEvaluationContext(obl, (claim,), (ev,), expected_source_sha=DEFAULT_TEST_SHA, trust_certificates={ev.evidence_id: cert_replayed})
+    assert evaluate_policy(pol_cov_85, ctx2).decision == PolicyDecisionType.DENY
