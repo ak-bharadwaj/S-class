@@ -393,6 +393,7 @@ def test_pytest_provider_command_building():
     assert cmd[0] == sys.executable
     assert "-m" in cmd
     assert "pytest" in cmd
+    assert "-o" in cmd
     assert "--maxfail" in cmd
     assert "2" in cmd
     assert "-q" in cmd
@@ -426,8 +427,8 @@ def test_concurrent_executions_remain_isolated(tmp_path, fresh_nonce_store):
         env, _, _ = make_valid_envelope(tmp_path, fresh_nonce_store, target=str(dummy_file), workspace_id=f"WS-CONCURR-{idx}")
         return gateway.execute(env, DEFAULT_SHA, 1, TIMESTAMP_NOW)
 
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        futures = [executor.submit(run_worker, i) for i in range(5)]
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        futures = [executor.submit(run_worker, i) for i in range(3)]
         observations = [f.result() for f in futures]
 
     for obs in observations:

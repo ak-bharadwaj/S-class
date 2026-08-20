@@ -35,8 +35,8 @@ class PytestExecutionProvider(D6ExecutionProvider):
         target = action_binding.target
         params = action_binding.parameters or {}
 
-        # Construct argv array: [sys.executable, "-m", "pytest", ...]
-        cmd = [sys.executable, "-m", "pytest", "-v"]
+        # Construct argv array: [sys.executable, "-m", "pytest", "-o", "addopts=", "-p", "no:cov", ...]
+        cmd = [sys.executable, "-m", "pytest", "-o", "addopts=", "-p", "no:cov", "-v"]
 
         # Add optional pytest parameters safely as argv elements
         if "maxfail" in params:
