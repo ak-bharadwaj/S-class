@@ -1,8 +1,8 @@
 """
 S-Class EOS V11.2 - D7 Coding Agent Integration Layer (§8.1, §8.3).
 Provides cognitive worker protocols, session management, capability-scoped tool registries,
-RFC 8785 AgentMessage ingress validation, SessionExecutionBinding authority provenance,
-and normalized action proposal synthesis for D5.
+RFC 8785 AgentMessage ingress validation, and normalized action proposal synthesis for D5.
+D7 verifies cryptographic authority artifacts issued by D3/D5.
 """
 
 from agent.models import (
@@ -14,8 +14,6 @@ from agent.models import (
     AgentTurnResponse,
     AgentSessionRecord,
     AgentMessage,
-    SessionExecutionBinding,
-    create_session_execution_binding,
     create_agent_message,
     compute_agent_message_preimage,
     compute_agent_message_digest,
@@ -46,8 +44,6 @@ __all__ = [
     "AgentTurnResponse",
     "AgentSessionRecord",
     "AgentMessage",
-    "SessionExecutionBinding",
-    "create_session_execution_binding",
     "create_agent_message",
     "compute_agent_message_preimage",
     "compute_agent_message_digest",

@@ -3,8 +3,8 @@ S-Class EOS V11.2 - D7 Agent Session Manager & Ingress Lifecycle (§8.1, §8.3).
 Orchestrates ephemeral multi-turn agent conversations with:
 1. Inbound AgentMessage ingress validation (validates external worker message envelope before unpacking).
 2. Mandatory authoritative repository state verification before every turn and proposal.
-3. Cryptographic SessionExecutionBinding authority provenance verification before proposal synthesis.
-4. Single-source capability authority (zero dual authority drift).
+3. Cryptographic AuthorizedSessionExecutionBinding authority verification (Ed25519).
+4. Single-source capability authority from signed binding (zero dual authority drift).
 5. Streaming memory-bounded inspection tools and non-authoritative internal accounting units.
 """
 
@@ -14,7 +14,12 @@ from datetime import datetime, timezone, timedelta
 from typing import Mapping, Optional, Sequence, List, Tuple, Any, Callable
 from domain.models import Obligation, Policy
 from controller.controller import SClassController, ControllerDispatchResult
-from controller.token import ExecutionContext
+from controller.token import (
+    ExecutionContext,
+    AuthorizedSessionExecutionBinding,
+    verify_authorized_session_binding,
+)
+from policy.models import AuthoritySignerProtocol
 from execution.workspace import IsolatedWorkspace
 from agent.models import (
     AgentSessionContext,
@@ -23,8 +28,6 @@ from agent.models import (
     AgentSessionRecord,
     AgentToolCall,
     AgentMessage,
-    SessionExecutionBinding,
-    create_session_execution_binding,
     create_agent_message,
     GENESIS_DIGEST,
     D7_INTERNAL_ACCOUNTING_UNIT,
@@ -43,7 +46,9 @@ class AgentSessionManager:
         worker: AgentWorkerProtocol,
         controller: SClassController,
         authoritative_repo_state_provider: Callable[[], Tuple[str, str]],
+        authority_signer: AuthoritySignerProtocol,
         session_execution_context: Optional[ExecutionContext] = None,
+        session_binding: Optional[AuthorizedSessionExecutionBinding] = None,
         tool_registry: Optional[AgentToolRegistry] = None,
         context_builder: Optional[AgentContextBuilder] = None,
         workspace: Optional[IsolatedWorkspace] = None,
@@ -54,10 +59,14 @@ class AgentSessionManager:
             raise TypeError("controller must be an instance of SClassController.")
         if not callable(authoritative_repo_state_provider):
             raise TypeError("authoritative_repo_state_provider is mandatory and must be callable returning (repo_id, repo_sha).")
+        if not isinstance(authority_signer, AuthoritySignerProtocol):
+            raise TypeError("authority_signer must implement AuthoritySignerProtocol.")
         self._worker = worker
         self._controller = controller
         self._authoritative_repo_state_provider = authoritative_repo_state_provider
+        self._authority_signer = authority_signer
         self._session_execution_context = session_execution_context
+        self._session_binding = session_binding
         self._tool_registry = tool_registry or AgentToolRegistry()
         self._context_builder = context_builder or AgentContextBuilder(self._tool_registry)
         self._workspace = workspace
@@ -73,12 +82,16 @@ class AgentSessionManager:
         policy_version: int,
         granted_capabilities: Sequence[str] = ("CAP_READ_CODE", "CAP_PROPOSE_ACTION"),
         execution_context: Optional[ExecutionContext] = None,
-        session_binding: Optional[SessionExecutionBinding] = None,
+        session_binding: Optional[AuthorizedSessionExecutionBinding] = None,
         max_turns: int = 10,
         budget_units: float = 10.0,
     ) -> Tuple[AgentSessionRecord, List[ControllerDispatchResult]]:
         """Executes an ephemeral bounded conversational session with the cognitive agent."""
-        session_id = f"SESS-{uuid.uuid4().hex[:8].upper()}"
+        # Active session credentials
+        binding = session_binding or self._session_binding
+        exec_ctx = execution_context or self._session_execution_context
+
+        session_id = binding.session_id if binding else f"SESS-{uuid.uuid4().hex[:8].upper()}"
         started_at = datetime.now(timezone.utc).isoformat()
 
         message_history: List[AgentMessage] = []
@@ -95,25 +108,13 @@ class AgentSessionManager:
         current_sequence = 0
         last_digest = GENESIS_DIGEST
 
-        # Frozen capability tuple for this session
-        session_capabilities = tuple(granted_capabilities)
+        # Authoritative capability source is the signed binding when provided
+        if binding is not None:
+            session_capabilities = binding.granted_capabilities
+        else:
+            session_capabilities = tuple(granted_capabilities)
+
         has_ws = self._workspace is not None and self._workspace.is_active
-
-        # Authoritative ExecutionContext: strictly passed, zero manufactured fallback
-        exec_ctx = execution_context or self._session_execution_context
-
-        # Authoritative SessionExecutionBinding
-        binding = session_binding
-        if binding is None and exec_ctx is not None:
-            # Construct authoritative binding bound to this active session
-            binding = create_session_execution_binding(
-                session_id=session_id,
-                repository_id=repository_id,
-                source_sha=source_sha,
-                task_id=task_id,
-                execution_context_digest=exec_ctx.context_digest,
-                granted_capabilities=session_capabilities,
-            )
 
         while turn_index < max_turns and budget_remaining > 0.0:
             # 1. Mandatory Authoritative Repository State Verification
@@ -213,10 +214,10 @@ class AgentSessionManager:
 
                 tool_def = self._tool_registry.get_tool(tc.tool_name)
                 if tool_def and tool_def.is_proposal_tool:
-                    # Fail closed if no authoritative execution context or binding is present
-                    if exec_ctx is None or binding is None:
+                    # Fail closed if no signed binding or execution context is present
+                    if binding is None or exec_ctx is None:
                         turn_entry["validation_error"] = (
-                            "EXECUTION_CONTEXT_MISSING: Authoritative execution context and binding are required for proposal dispatch."
+                            "AUTHORIZED_BINDING_MISSING: Cryptographically signed AuthorizedSessionExecutionBinding is required for action proposal dispatch."
                         )
                         continue
 
@@ -230,6 +231,7 @@ class AgentSessionManager:
                         tool_call=tc,
                         session_execution_context=exec_ctx,
                         session_binding=binding,
+                        authority_signer=self._authority_signer,
                         active_session_id=session_id,
                         authoritative_repo_id=curr_rep,
                         authoritative_source_sha=curr_sha,

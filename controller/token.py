@@ -28,6 +28,7 @@ SCLASS_ACTION_BINDING_DOMAIN_SEPARATOR = "SCLASS_ACTION_BINDING_V1:"
 SCLASS_EXECUTION_CONTEXT_DOMAIN_SEPARATOR = "SCLASS_EXECUTION_CONTEXT_V1:"
 SCLASS_EXECUTION_TOKEN_DOMAIN_SEPARATOR = "SCLASS_EXECUTION_TOKEN_V1:"
 SCLASS_EXECUTION_ADMISSION_DOMAIN_SEPARATOR = "SCLASS_EXECUTION_ADMISSION_V1:"
+SCLASS_SESSION_BINDING_DOMAIN_SEPARATOR = "SCLASS_SESSION_BINDING_V1:"
 
 
 def compute_action_digest(
@@ -583,3 +584,122 @@ def verify_execution_envelope(
         return False
 
     return True
+
+
+@dataclass(frozen=True)
+class AuthorizedSessionExecutionBinding:
+    """
+    Cryptographically signed authority artifact issued by D3/D5 authority boundary (§8.1, §8.3).
+    Binds an ExecutionContext to a specific session, repository, commit SHA, task, and capability set.
+    """
+    session_id: str
+    repository_id: str
+    source_sha: str
+    task_id: str
+    execution_context_digest: str
+    granted_capabilities: Tuple[str, ...]
+    signature: AsymmetricAuthoritySignature
+    binding_id: str = ""
+
+    def __post_init__(self):
+        if not self.session_id or not isinstance(self.session_id, str):
+            raise ValueError("session_id must be a non-empty string.")
+        if not self.repository_id or not isinstance(self.repository_id, str):
+            raise ValueError("repository_id must be a non-empty string.")
+        _validate_pattern(self.source_sha, HEX_40_PATTERN, "source_sha")
+        if not self.task_id or not isinstance(self.task_id, str):
+            raise ValueError("task_id must be a non-empty string.")
+        _validate_pattern(self.execution_context_digest, HEX_64_PATTERN, "execution_context_digest")
+        if not isinstance(self.signature, AsymmetricAuthoritySignature):
+            raise TypeError("signature must be an instance of AsymmetricAuthoritySignature.")
+        sorted_caps = tuple(sorted(set(self.granted_capabilities)))
+        object.__setattr__(self, "granted_capabilities", sorted_caps)
+
+
+def _build_session_binding_payload(
+    session_id: str,
+    repository_id: str,
+    source_sha: str,
+    task_id: str,
+    execution_context_digest: str,
+    granted_capabilities: Sequence[str],
+) -> Mapping[str, Any]:
+    return {
+        "session_id": session_id,
+        "repository_id": repository_id,
+        "source_sha": source_sha,
+        "task_id": task_id,
+        "execution_context_digest": execution_context_digest,
+        "granted_capabilities": sorted(list(granted_capabilities)),
+    }
+
+
+def _compute_session_binding_canonical_bytes(payload: Mapping[str, Any]) -> bytes:
+    return SCLASS_SESSION_BINDING_DOMAIN_SEPARATOR.encode("utf-8") + canonicalize_json(payload)
+
+
+def issue_authorized_session_binding(
+    session_id: str,
+    repository_id: str,
+    source_sha: str,
+    task_id: str,
+    execution_context: ExecutionContext,
+    authority_signer: AuthoritySignerProtocol,
+) -> AuthorizedSessionExecutionBinding:
+    """
+    Issues a cryptographically signed AuthorizedSessionExecutionBinding.
+    Controller / Authority boundary holds the ONLY issuance path.
+    """
+    if not isinstance(execution_context, ExecutionContext):
+        raise TypeError("execution_context must be an instance of ExecutionContext.")
+    if not isinstance(authority_signer, AuthoritySignerProtocol):
+        raise TypeError("authority_signer must implement AuthoritySignerProtocol.")
+
+    payload = _build_session_binding_payload(
+        session_id=session_id,
+        repository_id=repository_id,
+        source_sha=source_sha,
+        task_id=task_id,
+        execution_context_digest=execution_context.context_digest,
+        granted_capabilities=execution_context.capability_set,
+    )
+    canonical_bytes = _compute_session_binding_canonical_bytes(payload)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    sig = authority_signer.sign_payload(
+        canonical_bytes=canonical_bytes,
+        verifier_identity="Gate3AuthoritativeVerifier",
+        timestamp_iso=now_iso,
+    )
+
+    return AuthorizedSessionExecutionBinding(
+        session_id=session_id,
+        repository_id=repository_id,
+        source_sha=source_sha,
+        task_id=task_id,
+        execution_context_digest=execution_context.context_digest,
+        granted_capabilities=execution_context.capability_set,
+        signature=sig,
+        binding_id=f"BIND-{uuid.uuid4().hex[:8].upper()}",
+    )
+
+
+def verify_authorized_session_binding(
+    binding: AuthorizedSessionExecutionBinding,
+    authority_signer: AuthoritySignerProtocol,
+) -> bool:
+    """Cryptographically verifies Ed25519 signature of AuthorizedSessionExecutionBinding."""
+    if not isinstance(binding, AuthorizedSessionExecutionBinding) or not isinstance(authority_signer, AuthoritySignerProtocol):
+        return False
+    payload = _build_session_binding_payload(
+        session_id=binding.session_id,
+        repository_id=binding.repository_id,
+        source_sha=binding.source_sha,
+        task_id=binding.task_id,
+        execution_context_digest=binding.execution_context_digest,
+        granted_capabilities=binding.granted_capabilities,
+    )
+    try:
+        canonical_bytes = _compute_session_binding_canonical_bytes(payload)
+        return authority_signer.verify_signature(canonical_bytes, binding.signature)
+    except Exception:
+        return False

@@ -1,16 +1,22 @@
 """
-S-Class EOS V11.2 - D7 Action Proposal Synthesizer & Authority Provenance Verification (§8.1, §8.3).
+S-Class EOS V11.2 - D7 Action Proposal Synthesizer & Cryptographic Authority Verification (§8.1, §8.3).
 Normalizes agent tool calls into canonical D0 ActionProposal objects for D5 Controller submission.
-Verifies authoritative SessionExecutionBinding against active session, repo, SHA, task, and execution context.
-Eliminates dual capability authority and prevents execution context substitution across sessions.
+Verifies cryptographically signed AuthorizedSessionExecutionBinding against authority signer,
+active session, repository, commit SHA, task, context digest, and capability set.
+D7 receives and verifies authority credentials; D7 never manufactures or self-attests authority.
 """
 
 from __future__ import annotations
 import uuid
 from typing import Tuple, Optional, Any, Mapping, Sequence
 from controller.authorization import ActionProposal
-from controller.token import ExecutionContext
-from agent.models import AgentToolCall, SessionExecutionBinding
+from controller.token import (
+    ExecutionContext,
+    AuthorizedSessionExecutionBinding,
+    verify_authorized_session_binding,
+)
+from policy.models import AuthoritySignerProtocol
+from agent.models import AgentToolCall
 
 
 class ActionProposalSynthesizer:
@@ -20,7 +26,8 @@ class ActionProposalSynthesizer:
     def synthesize_proposal(
         tool_call: AgentToolCall,
         session_execution_context: ExecutionContext,
-        session_binding: SessionExecutionBinding,
+        session_binding: AuthorizedSessionExecutionBinding,
+        authority_signer: AuthoritySignerProtocol,
         active_session_id: str,
         authoritative_repo_id: str,
         authoritative_source_sha: str,
@@ -29,7 +36,7 @@ class ActionProposalSynthesizer:
     ) -> Tuple[Optional[ActionProposal], Optional[str]]:
         """
         Transforms a proposal tool call into an ActionProposal after cryptographically verifying
-        authority provenance against the immutable SessionExecutionBinding.
+        authority provenance against the immutable, signed AuthorizedSessionExecutionBinding.
         """
         # 1. Type and instance integrity checks
         if not isinstance(tool_call, AgentToolCall):
@@ -38,10 +45,17 @@ class ActionProposalSynthesizer:
         if not isinstance(session_execution_context, ExecutionContext):
             return None, "session_execution_context must be an authoritative ExecutionContext instance."
 
-        if not isinstance(session_binding, SessionExecutionBinding):
-            return None, "session_binding must be an authoritative SessionExecutionBinding instance."
+        if not isinstance(session_binding, AuthorizedSessionExecutionBinding):
+            return None, "session_binding must be an authoritative AuthorizedSessionExecutionBinding instance."
 
-        # 2. Cryptographic Authority Provenance Verification
+        if not isinstance(authority_signer, AuthoritySignerProtocol):
+            return None, "authority_signer must implement AuthoritySignerProtocol."
+
+        # 2. Cryptographic Authority Signature Verification (Ed25519)
+        if not verify_authorized_session_binding(session_binding, authority_signer):
+            return None, "AUTHORITY_SIGNATURE_INVALID: AuthorizedSessionExecutionBinding cryptographic signature is invalid or untrusted."
+
+        # 3. Exact Authority Field Bindings
         if session_binding.session_id != active_session_id:
             return None, (
                 f"BINDING_MISMATCH: session_id mismatch: binding has '{session_binding.session_id}', "
@@ -72,11 +86,11 @@ class ActionProposalSynthesizer:
                 f"context has '{session_execution_context.context_digest}'."
             )
 
-        # 3. Single-Source Capability Authority Verification
+        # 4. Single-Source Capability Authority (The signed binding is the authoritative capability source)
         sorted_caps = tuple(sorted(set(session_execution_context.capability_set)))
         if session_binding.granted_capabilities != sorted_caps:
             return None, (
-                f"CAPABILITY_AUTHORITY_MISMATCH: binding granted capabilities {session_binding.granted_capabilities} "
+                f"CAPABILITY_AUTHORITY_MISMATCH: signed binding granted capabilities {session_binding.granted_capabilities} "
                 f"do not match execution context capability set {sorted_caps}."
             )
 

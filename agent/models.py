@@ -1,8 +1,7 @@
 """
 S-Class EOS V11.2 - D7 Agent Integration Models & Data Structures (§8.1, §8.3).
 Defines immutable data classes for agent session context, turn responses, tool definitions,
-canonical AgentMessage ingress envelopes with RFC 8785 digest chaining, SessionExecutionBinding,
-and session audit records.
+canonical AgentMessage ingress envelopes with RFC 8785 digest chaining, and session audit records.
 """
 
 from __future__ import annotations
@@ -37,51 +36,6 @@ class AgentTurnStatus(str, enum.Enum):
     REORDER_DETECTED = "REORDER_DETECTED"
     WORKER_IDENTITY_MISMATCH = "WORKER_IDENTITY_MISMATCH"
     AUTHORITY_BINDING_VIOLATION = "AUTHORITY_BINDING_VIOLATION"
-
-
-@dataclass(frozen=True)
-class SessionExecutionBinding:
-    """
-    Authoritative, immutable binding proving that an ExecutionContext is cryptographically
-    bound to a specific session, repository, commit SHA, task, and granted capability set.
-    Prevents execution context replay or substitution across sessions, repos, SHAs, or tasks.
-    """
-    session_id: str
-    repository_id: str
-    source_sha: str
-    task_id: str
-    execution_context_digest: str
-    granted_capabilities: Tuple[str, ...]
-
-    def __post_init__(self):
-        if not self.session_id or not isinstance(self.session_id, str):
-            raise ValueError("session_id must be a non-empty string.")
-        if not self.repository_id or not isinstance(self.repository_id, str):
-            raise ValueError("repository_id must be a non-empty string.")
-        _validate_pattern(self.source_sha, HEX_40_PATTERN, "source_sha")
-        if not self.task_id or not isinstance(self.task_id, str):
-            raise ValueError("task_id must be a non-empty string.")
-        _validate_pattern(self.execution_context_digest, HEX_64_PATTERN, "execution_context_digest")
-        object.__setattr__(self, "granted_capabilities", tuple(sorted(set(self.granted_capabilities))))
-
-
-def create_session_execution_binding(
-    session_id: str,
-    repository_id: str,
-    source_sha: str,
-    task_id: str,
-    execution_context_digest: str,
-    granted_capabilities: Sequence[str],
-) -> SessionExecutionBinding:
-    """Constructs an authoritative SessionExecutionBinding."""
-    return SessionExecutionBinding(
-        session_id=session_id,
-        repository_id=repository_id,
-        source_sha=source_sha,
-        task_id=task_id,
-        execution_context_digest=execution_context_digest,
-        granted_capabilities=tuple(granted_capabilities),
-    )
 
 
 def compute_agent_message_preimage(
