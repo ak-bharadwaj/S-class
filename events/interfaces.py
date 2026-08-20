@@ -46,3 +46,28 @@ class EventStoreInterface(ABC):
     def __len__(self) -> int:
         """Returns total number of events in the log."""
         pass
+
+
+class NonceReservationInterface(ABC):
+    """Abstract interface for atomic single-use nonce reservation."""
+
+    @abstractmethod
+    def reserve_nonce(self, nonce: str) -> bool:
+        """Atomically reserves a single-use nonce (INSERT-if-absent).
+        Returns True if reservation succeeded, False if already present.
+        Raises CorruptEventLogError or StorageUnavailableError on failure.
+        """
+        pass
+
+    @abstractmethod
+    def is_nonce_consumed(self, nonce: str) -> bool:
+        """Queries whether a nonce has been consumed.
+        Returns True if consumed, False if not found.
+        Raises CorruptEventLogError or StorageUnavailableError on failure.
+        """
+        pass
+
+    @abstractmethod
+    def clear(self) -> None:
+        """Clears the nonce store for test fixtures."""
+        pass

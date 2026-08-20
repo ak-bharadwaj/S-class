@@ -9,15 +9,16 @@ Provides:
 import json
 import os
 import threading
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Set
 
 from domain.models import EventEnvelope
 from domain.types import EventType
-from events.interfaces import EventStoreInterface
+from events.interfaces import EventStoreInterface, NonceReservationInterface
 from events.state import MaterializedState, GENESIS_PARENT_DIGEST
 from events.reducer import reduce_event, replay_events
 from events.serializer import verify_event_digest, canonicalize_json
 from events.exceptions import (
+    StorageUnavailableError,
     ConcurrencyConflictError,
     CorruptEventLogError,
     DuplicateSequenceError,
@@ -268,3 +269,177 @@ class FileAppendEventStore(EventStoreInterface):
     def __len__(self) -> int:
         with self._lock:
             return len(self._events)
+
+
+class D2NonceStore(NonceReservationInterface):
+    """D2 Durable, cross-process atomic single-use nonce reservation engine with kernel advisory locking."""
+
+    def __init__(self, file_path: Optional[str] = None):
+        if file_path is None:
+            file_path = os.environ.get("GATE3_NONCE_STORE_PATH") or os.path.join(
+                os.path.dirname(os.path.dirname(__file__)), "benchmark", "parity", ".gate3_nonces.log"
+            )
+        self._file_path = os.path.abspath(file_path)
+        self._lock_path = self._file_path + ".lock"
+        self._process_cache: Set[str] = set()
+        self._local_lock = threading.Lock()
+
+    @property
+    def file_path(self) -> str:
+        return self._file_path
+
+    def reserve_nonce(self, nonce: str) -> bool:
+        """Atomically reserves a single-use nonce (INSERT-if-absent).
+        
+        Returns:
+            True: If nonce was absent and successfully reserved.
+            False: If nonce is already present (duplicate/replayed).
+            
+        Raises:
+            TypeError: If nonce is malformed.
+            CorruptEventLogError: If storage file contains corrupted or invalid records.
+            StorageUnavailableError: If storage, locking, or I/O is unavailable (fail closed).
+        """
+        if not nonce or not isinstance(nonce, str):
+            raise TypeError("Nonce must be a non-empty string.")
+
+        import hashlib
+        from datetime import datetime, timezone
+        from file_lock import FileLock
+        from events.exceptions import StorageUnavailableError, CorruptEventLogError
+
+        with self._local_lock:
+            if nonce in self._process_cache:
+                return False
+
+            parent_dir = os.path.dirname(self._file_path)
+            if parent_dir and not os.path.exists(parent_dir):
+                try:
+                    os.makedirs(parent_dir, exist_ok=True)
+                except OSError as e:
+                    raise StorageUnavailableError(f"Cannot create directory for nonce store: {e}") from e
+
+            try:
+                with FileLock(self._lock_path, timeout=10.0):
+                    consumed: Set[str] = set()
+                    if os.path.exists(self._file_path):
+                        try:
+                            with open(self._file_path, "r", encoding="utf-8") as f:
+                                for line_idx, line in enumerate(f, 1):
+                                    line_str = line.strip()
+                                    if not line_str:
+                                        continue
+                                    try:
+                                        record = json.loads(line_str)
+                                        rec_nonce = record.get("nonce")
+                                        if not rec_nonce or not isinstance(rec_nonce, str):
+                                            raise CorruptEventLogError(f"Corrupt nonce record at line {line_idx}: missing 'nonce'")
+                                        consumed.add(rec_nonce)
+                                    except json.JSONDecodeError as json_err:
+                                        raise CorruptEventLogError(f"Corrupt JSON at line {line_idx}: {json_err}") from json_err
+                        except CorruptEventLogError:
+                            raise
+                        except (OSError, IOError) as io_err:
+                            raise StorageUnavailableError(f"I/O failure reading nonce store: {io_err}") from io_err
+
+                    if nonce in consumed:
+                        self._process_cache.add(nonce)
+                        return False
+
+                    rec_payload = {
+                        "nonce": nonce,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "digest": hashlib.sha256(nonce.encode("utf-8")).hexdigest(),
+                    }
+                    line_bytes = canonicalize_json(rec_payload) + b"\n"
+
+                    try:
+                        with open(self._file_path, "ab") as f:
+                            f.write(line_bytes)
+                            f.flush()
+                            os.fsync(f.fileno())
+                    except (OSError, IOError) as io_err:
+                        raise StorageUnavailableError(f"I/O failure writing to nonce store: {io_err}") from io_err
+
+                    consumed.add(nonce)
+                    self._process_cache.add(nonce)
+                    return True
+            except (CorruptEventLogError, StorageUnavailableError):
+                raise
+            except Exception as lock_err:
+                raise StorageUnavailableError(f"Locking or storage operational failure: {lock_err}") from lock_err
+
+    def is_nonce_consumed(self, nonce: str) -> bool:
+        """Queries whether a nonce is consumed.
+        
+        Returns:
+            True: If nonce is present in the committed store.
+            False: If nonce is absent (not found).
+            
+        Raises:
+            CorruptEventLogError: If storage file contains corrupted or invalid records.
+            StorageUnavailableError: If storage, locking, or I/O is unavailable (fail closed).
+        """
+        if not nonce or not isinstance(nonce, str):
+            return False
+
+        from file_lock import FileLock
+        from events.exceptions import StorageUnavailableError, CorruptEventLogError
+
+        with self._local_lock:
+            if nonce in self._process_cache:
+                return True
+
+            if not os.path.exists(self._file_path):
+                return False
+
+            try:
+                with FileLock(self._lock_path, timeout=5.0):
+                    if not os.path.exists(self._file_path):
+                        return False
+                    try:
+                        with open(self._file_path, "r", encoding="utf-8") as f:
+                            for line_idx, line in enumerate(f, 1):
+                                line_str = line.strip()
+                                if not line_str:
+                                    continue
+                                try:
+                                    record = json.loads(line_str)
+                                    rec_nonce = record.get("nonce")
+                                    if not rec_nonce or not isinstance(rec_nonce, str):
+                                        raise CorruptEventLogError(f"Corrupt nonce record at line {line_idx}: missing 'nonce'")
+                                    if rec_nonce == nonce:
+                                        self._process_cache.add(nonce)
+                                        return True
+                                except json.JSONDecodeError as json_err:
+                                    raise CorruptEventLogError(f"Corrupt JSON at line {line_idx}: {json_err}") from json_err
+                    except CorruptEventLogError:
+                        raise
+                    except (OSError, IOError) as io_err:
+                        raise StorageUnavailableError(f"I/O failure reading nonce store: {io_err}") from io_err
+                    return False
+            except (CorruptEventLogError, StorageUnavailableError):
+                raise
+            except Exception as lock_err:
+                raise StorageUnavailableError(f"Locking or storage uncertainty during query: {lock_err}") from lock_err
+
+    def clear(self) -> None:
+        """Controlled teardown of nonce store for test fixtures."""
+        from file_lock import FileLock
+        with self._local_lock:
+            self._process_cache.clear()
+            if os.path.exists(self._file_path):
+                try:
+                    with FileLock(self._lock_path, timeout=5.0):
+                        if os.path.exists(self._file_path):
+                            try:
+                                os.remove(self._file_path)
+                            except OSError:
+                                with open(self._file_path, "w", encoding="utf-8") as f:
+                                    pass
+                except Exception:
+                    if os.path.exists(self._file_path):
+                        try:
+                            os.remove(self._file_path)
+                        except OSError:
+                            pass

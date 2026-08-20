@@ -2,7 +2,7 @@
 S-Class EOS V11.2 - Gate 3 Certificate Authority & Provider Keystore (D0 Asymmetric Specification).
 Protected authority / keystore boundary for issuing Ed25519-signed EvidenceTrustCertificates,
 cryptographically verifying provider HMAC signatures, enforcing non-overwritable provider keys with
-explicit rotation semantics, and enforcing D0 cross-process atomic single-use anti-replay rules.
+explicit rotation semantics, and reusing D2 durable storage for atomic single-use nonce reservation.
 """
 
 from __future__ import annotations
@@ -10,12 +10,13 @@ import os
 import hmac
 import uuid
 import hashlib
-import threading
 from datetime import datetime, timezone
 from typing import Any, Optional, Dict, Set
 from domain.models import AsymmetricAuthoritySignature, HmacSessionSignature, Evidence, EvidenceScope, EvidenceObservation, Provenance
 from domain.types import EvidencePolarity, EvidenceValidity, RawStatus
 from events.serializer import canonicalize_json
+from events.store import D2NonceStore
+from events.exceptions import StorageUnavailableError, CorruptEventLogError
 
 GATE3_AUTHORITY_IDENTITY = "Gate3AuthoritativeVerifier"
 
@@ -141,116 +142,31 @@ class Gate3ProviderKeyStore:
 
 
 class Gate3NonceTracker:
-    """Enforces D0 cross-process atomic single-use anti-replay rules for evidence nonces
-    backed by kernel advisory file locking.
-    """
-    _default_store_path: str = os.path.join(os.path.dirname(__file__), ".gate3_nonces.log")
-    _store_path: str = _default_store_path
-    _process_local_cache: Set[str] = set()
-    _thread_lock = threading.Lock()
+    """Thin adapter delegating single-use nonce reservation directly to D2 durable storage interface."""
+    _store: D2NonceStore = D2NonceStore()
 
     @classmethod
     def set_store_path(cls, path: str) -> None:
-        with cls._thread_lock:
-            cls._store_path = path
-            cls._process_local_cache.clear()
+        cls._store = D2NonceStore(file_path=path)
 
     @classmethod
-    def get_store_path(cls) -> str:
-        return cls._store_path
-
-    @classmethod
-    def clear(cls) -> None:
-        """Controlled teardown for test fixtures across processes."""
-        from file_lock import FileLock
-        with cls._thread_lock:
-            cls._process_local_cache.clear()
-            lock_path = cls._store_path + ".lock"
-            try:
-                parent_dir = os.path.dirname(cls._store_path)
-                if parent_dir and not os.path.exists(parent_dir):
-                    os.makedirs(parent_dir, exist_ok=True)
-                with FileLock(lock_path, timeout=5.0):
-                    if os.path.exists(cls._store_path):
-                        try:
-                            os.remove(cls._store_path)
-                        except OSError:
-                            with open(cls._store_path, "w", encoding="utf-8") as f:
-                                pass
-            except Exception:
-                if os.path.exists(cls._store_path):
-                    try:
-                        with open(cls._store_path, "w", encoding="utf-8") as f:
-                            pass
-                    except OSError:
-                        pass
+    def get_store(cls) -> D2NonceStore:
+        return cls._store
 
     @classmethod
     def consume_nonce(cls, nonce: str) -> bool:
-        """Atomically reserves a single-use nonce across processes.
-        Returns True if reservation succeeded.
-        Returns False if nonce was already consumed (replay detected).
-        """
-        if not nonce or not isinstance(nonce, str):
-            return False
-
-        from file_lock import FileLock
-        lock_path = cls._store_path + ".lock"
-
-        with cls._thread_lock:
-            if nonce in cls._process_local_cache:
-                return False
-
-            parent_dir = os.path.dirname(cls._store_path)
-            if parent_dir and not os.path.exists(parent_dir):
-                os.makedirs(parent_dir, exist_ok=True)
-
-            with FileLock(lock_path, timeout=10.0):
-                # Read committed nonces from persistent store
-                consumed = set()
-                if os.path.exists(cls._store_path):
-                    with open(cls._store_path, "r", encoding="utf-8") as f:
-                        for line in f:
-                            line_str = line.strip()
-                            if line_str:
-                                consumed.add(line_str)
-
-                if nonce in consumed:
-                    cls._process_local_cache.add(nonce)
-                    return False
-
-                # Atomically append nonce and fsync
-                with open(cls._store_path, "a", encoding="utf-8") as f:
-                    f.write(nonce + "\n")
-                    f.flush()
-                    os.fsync(f.fileno())
-
-                consumed.add(nonce)
-                cls._process_local_cache.add(nonce)
-                return True
+        """Atomically reserves a single-use nonce via D2 durable storage."""
+        return cls._store.reserve_nonce(nonce)
 
     @classmethod
     def is_consumed(cls, nonce: str) -> bool:
-        if not nonce:
-            return False
-        from file_lock import FileLock
-        with cls._thread_lock:
-            if nonce in cls._process_local_cache:
-                return True
-            if not os.path.exists(cls._store_path):
-                return False
-            lock_path = cls._store_path + ".lock"
-            try:
-                with FileLock(lock_path, timeout=5.0):
-                    if os.path.exists(cls._store_path):
-                        with open(cls._store_path, "r", encoding="utf-8") as f:
-                            for line in f:
-                                if line.strip() == nonce:
-                                    cls._process_local_cache.add(nonce)
-                                    return True
-            except Exception:
-                pass
-            return False
+        """Queries whether a nonce has been consumed via D2 durable storage."""
+        return cls._store.is_nonce_consumed(nonce)
+
+    @classmethod
+    def clear(cls) -> None:
+        """Controlled teardown for test fixtures."""
+        cls._store.clear()
 
 
 def compute_gate3_evidence_digest(evidence: Any) -> str:
@@ -401,8 +317,8 @@ def issue_gate_3_evidence_certificate(
     
     Private key is acquired exclusively from the protected Gate3AuthorityKeyStore boundary.
     Provider keys are acquired exclusively from Gate3ProviderKeyStore.
-    Nonces are reserved atomically across processes AFTER provider signature + digest + provenance validation.
-    Timestamp is bound to authoritative execution time.
+    Nonces are reserved atomically via D2 durable storage AFTER provider validation.
+    Any storage/lock/I/O uncertainty fails closed immediately.
     """
     from policy.models import EvidenceTrustCertificate
 
@@ -513,9 +429,25 @@ def issue_gate_3_evidence_certificate(
             rejection_reason=rejection_reason,
         )
 
-    # 3. D0 Single-Use Nonce Anti-Replay Reservation (AFTER successful validation, immediately before issuance)
+    # 3. D0 Single-Use Nonce Anti-Replay Reservation via D2 Durable Storage (AFTER successful validation)
     evidence_nonce = getattr(getattr(evidence, "signature", None), "nonce", None)
-    if not evidence_nonce or not Gate3NonceTracker.consume_nonce(evidence_nonce):
+    if not evidence_nonce:
+        nonce_valid = False
+        rejection_reason = "Missing evidence nonce."
+    else:
+        try:
+            reserved = Gate3NonceTracker.consume_nonce(evidence_nonce)
+            if reserved:
+                nonce_valid = True
+                rejection_reason = None
+            else:
+                nonce_valid = False
+                rejection_reason = "Replay detected: evidence nonce has already been consumed under D0 single-use rule."
+        except (StorageUnavailableError, CorruptEventLogError, Exception) as storage_err:
+            nonce_valid = False
+            rejection_reason = f"D2 storage failure during nonce reservation: {storage_err}"
+
+    if not nonce_valid:
         cert_data = {
             "evidence_id": evidence.evidence_id,
             "source_sha": evidence.source_sha,
@@ -548,7 +480,7 @@ def issue_gate_3_evidence_certificate(
             timestamp=timestamp_iso,
             certificate_hash=payload_digest,
             authority_signature=authority_sig,
-            rejection_reason="Replay detected: evidence nonce has already been consumed under D0 single-use rule.",
+            rejection_reason=rejection_reason,
         )
 
     # 4. Valid Certificate Issuance

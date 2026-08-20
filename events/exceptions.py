@@ -38,3 +38,8 @@ class ConcurrencyConflictError(EventEngineError):
 class CorruptEventLogError(EventEngineError):
     """Raised when an event log file contains unparseable or corrupted data."""
     pass
+
+
+class StorageUnavailableError(EventEngineError):
+    """Raised when storage subsystem, lock, or I/O is unavailable or operational error occurs."""
+    pass

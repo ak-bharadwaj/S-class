@@ -1524,7 +1524,8 @@ def test_restart_process_boundary_replay_still_rejected(tmp_path):
     assert cert1.is_verified is True
 
     # Simulate fresh process restart by wiping in-memory process-local cache
-    Gate3NonceTracker._process_local_cache.clear()
+    Gate3NonceTracker.set_store_path(store_file)
+    Gate3NonceTracker.get_store()._process_cache.clear()
 
     # Process 2 attempts replay -> rejected from persistent disk store
     ev_replay = make_test_evidence(ev_id="EV-PROC2-REPLAY", nonce=nonce, counterexample={"coverage_pct": 90.0})
@@ -1544,3 +1545,95 @@ def test_environment_provider_keys_explicit_bootstrap():
     os.environ["GATE3_PROVIDER_KEY"] = "EXPLICIT_BOOTSTRAP_SECRET_KEY_32BYTES"
     Gate3ProviderKeyStore.bootstrap_from_environment()
     assert Gate3ProviderKeyStore.get_provider_key("KEY-001") == b"EXPLICIT_BOOTSTRAP_SECRET_KEY_32BYTES"
+
+def test_storage_unavailable_fails_closed(tmp_path):
+    """Test: storage unavailable -> fail closed (raises StorageUnavailableError, certificate rejected)."""
+    from events.exceptions import StorageUnavailableError
+    from events.store import D2NonceStore
+
+    # Point store to an invalid/illegal path
+    invalid_path = str(tmp_path / "non_existent_dir_1" / "non_existent_dir_2" / "nonce.log")
+    store = D2NonceStore(file_path=invalid_path)
+
+    # Force error by making parent directory creation fail or making path a directory
+    dir_as_file = tmp_path / "dir_blocked"
+    dir_as_file.mkdir()
+    blocked_store = D2NonceStore(file_path=str(dir_as_file))
+
+    with pytest.raises(StorageUnavailableError):
+        blocked_store.reserve_nonce("NONCE-TEST-BLOCKED")
+
+    # When used in authority issuance, certificate is rejected fail closed
+    Gate3NonceTracker.set_store_path(str(dir_as_file))
+    ev = make_test_evidence(ev_id="EV-FAIL-CLOSED", nonce="NONCE-STORE-UNAVAILABLE", counterexample={"coverage_pct": 90.0})
+    cert = issue_gate_3_evidence_certificate(ev, expected_source_sha=DEFAULT_TEST_SHA)
+    assert cert.is_verified is False
+    assert cert.signature_verified is False
+    assert "storage failure" in cert.rejection_reason.lower() or "operational failure" in cert.rejection_reason.lower()
+
+
+def test_corrupted_nonce_store_fails_closed(tmp_path):
+    """Test: corrupted nonce store -> fail closed (raises CorruptEventLogError, certificate rejected)."""
+    from events.exceptions import CorruptEventLogError
+    from events.store import D2NonceStore
+
+    corrupt_log = tmp_path / "corrupt_nonces.log"
+    # Write invalid corrupted JSON records
+    with open(corrupt_log, "w", encoding="utf-8") as f:
+        f.write("CORRUPT_NOT_JSON_DATA\n")
+
+    store = D2NonceStore(file_path=str(corrupt_log))
+    with pytest.raises(CorruptEventLogError):
+        store.reserve_nonce("NONCE-TEST-CORRUPT")
+
+    # In certificate issuance -> fail closed
+    Gate3NonceTracker.set_store_path(str(corrupt_log))
+    ev = make_test_evidence(ev_id="EV-CORRUPT-FAIL", nonce="NONCE-CORRUPT", counterexample={"coverage_pct": 90.0})
+    cert = issue_gate_3_evidence_certificate(ev, expected_source_sha=DEFAULT_TEST_SHA)
+    assert cert.is_verified is False
+    assert "D2 storage failure" in cert.rejection_reason or "Corrupt" in cert.rejection_reason
+
+
+def test_duplicate_nonce_rejected_atomic_insert_if_absent(tmp_path):
+    """Test: duplicate nonce -> rejected under atomic INSERT-if-absent semantics."""
+    from events.store import D2NonceStore
+    store_file = str(tmp_path / "insert_if_absent.log")
+    store = D2NonceStore(file_path=store_file)
+    nonce = f"INSERT-ABSENT-NONCE-{uuid.uuid4().hex[:8]}"
+
+    # First reservation succeeds (absent)
+    assert store.reserve_nonce(nonce) is True
+    # Second reservation fails (duplicate)
+    assert store.reserve_nonce(nonce) is False
+
+
+def test_deployment_with_fresh_process_replay_rejected(tmp_path):
+    """Test: deployment with fresh process -> replay still rejected from persistent D2 store."""
+    import subprocess
+    import sys
+    store_file = str(tmp_path / "deployment_process_nonce.log")
+    nonce = f"DEPLOYMENT-NONCE-{uuid.uuid4().hex[:8]}"
+
+    # Process 1 (initial deployment worker) consumes nonce
+    script_p1 = f"""
+import sys
+from benchmark.parity.gate_3_authority import Gate3NonceTracker
+Gate3NonceTracker.set_store_path({repr(store_file)})
+res = Gate3NonceTracker.consume_nonce({repr(nonce)})
+print("SUCCESS" if res else "FAIL")
+"""
+    p1 = subprocess.Popen([sys.executable, "-c", script_p1], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    out1, _ = p1.communicate(timeout=10)
+    assert out1.strip() == "SUCCESS"
+
+    # Process 2 (newly deployed fresh container/process) attempts to reuse nonce
+    script_p2 = f"""
+import sys
+from benchmark.parity.gate_3_authority import Gate3NonceTracker
+Gate3NonceTracker.set_store_path({repr(store_file)})
+res = Gate3NonceTracker.consume_nonce({repr(nonce)})
+print("SUCCESS" if res else "REJECT")
+"""
+    p2 = subprocess.Popen([sys.executable, "-c", script_p2], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    out2, _ = p2.communicate(timeout=10)
+    assert out2.strip() == "REJECT"
