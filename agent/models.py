@@ -81,7 +81,8 @@ def compute_agent_message_digest(
 class AgentMessage:
     """
     Canonical, cryptographically chained message envelope for ingress and egress turn traffic.
-    Provides transcript integrity and hash-chain sequencing (note: does not provide asymmetric identity signatures).
+    Provides transcript integrity and hash-chain sequencing.
+    Note: D7A scopes this as trusted local worker identity; D7B will introduce authenticated remote identity.
     """
     session_id: str
     worker_id: str
@@ -155,6 +156,7 @@ class ToolDefinition:
     parameters_schema: Mapping[str, Any]
     required_capabilities: Tuple[str, ...] = field(default_factory=tuple)
     is_proposal_tool: bool = False
+    requires_workspace: bool = False
 
     def __post_init__(self):
         if not self.name or not isinstance(self.name, str):
@@ -213,6 +215,7 @@ class AgentSessionContext:
     verification_feedback: Tuple[Mapping[str, Any], ...]
     available_tools: Tuple[ToolDefinition, ...]
     granted_capabilities: Tuple[str, ...]
+    has_workspace_authority: bool = False
     turn_index: int = 0
     max_turns: int = 10
     remaining_budget_units: float = 10.0

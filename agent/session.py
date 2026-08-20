@@ -1,8 +1,8 @@
 """
 S-Class EOS V11.2 - D7 Agent Session Manager & Ingress Lifecycle (§8.1, §8.3).
 Orchestrates ephemeral multi-turn agent conversations with:
-1. Mandatory authoritative repository state verification before every turn and proposal.
-2. Ingress AgentMessage chain validation (detecting reorder, replay, duplicate, tamper, wrong worker/session).
+1. Inbound AgentMessage ingress validation (validates external worker message envelope before unpacking).
+2. Mandatory authoritative repository state verification before every turn and proposal.
 3. Capability enforcement at validation time.
 4. Non-authoritative internal accounting units (D7_INTERNAL_ACCOUNTING_UNIT).
 5. Safe tool execution for inspection tools and proposal synthesis for action tools.
@@ -33,7 +33,7 @@ from agent.synthesizer import ActionProposalSynthesizer
 
 
 class AgentSessionManager:
-    """Manages multi-turn cognitive agent sessions with strict resource, repository, and capability bounding."""
+    """Manages multi-turn cognitive agent sessions with strict ingress validation and repository bounding."""
 
     def __init__(
         self,
@@ -74,7 +74,7 @@ class AgentSessionManager:
         session_id = f"SESS-{uuid.uuid4().hex[:8].upper()}"
         started_at = datetime.now(timezone.utc).isoformat()
 
-        history: List[AgentTurnResponse] = []
+        message_history: List[AgentMessage] = []
         transcript: List[Mapping[str, Any]] = []
         dispatches: List[ControllerDispatchResult] = []
 
@@ -90,6 +90,7 @@ class AgentSessionManager:
 
         # Frozen capability tuple for this session
         session_capabilities = tuple(granted_capabilities)
+        has_ws = self._workspace is not None and self._workspace.is_active
 
         while turn_index < max_turns and budget_remaining > 0.0:
             # 1. Mandatory Authoritative Repository State Verification
@@ -111,6 +112,7 @@ class AgentSessionManager:
                 obligations=obligations,
                 policies=policies,
                 granted_capabilities=session_capabilities,
+                has_workspace_authority=has_ws,
                 turn_index=turn_index,
                 max_turns=max_turns,
                 remaining_budget_units=budget_remaining,
@@ -125,12 +127,18 @@ class AgentSessionManager:
                 payload={"turn_index": turn_index, "task_id": task_id, "frontier": ctx.frontier_obligation_ids},
                 previous_digest=last_digest,
             )
+            message_history.append(context_msg)
             current_sequence += 1
             last_digest = context_msg.message_digest
 
-            # 4. Invoke cognitive worker
+            # 4. Invoke cognitive worker for external Inbound AgentMessage
             try:
-                turn_resp = self._worker.generate_turn(ctx, tuple(history))
+                inbound_msg = self._worker.generate_inbound_message(
+                    context=ctx,
+                    sequence=current_sequence,
+                    previous_digest=last_digest,
+                    history=tuple(message_history),
+                )
             except TimeoutError:
                 final_status = AgentTurnStatus.WORKER_TIMEOUT
                 break
@@ -141,47 +149,31 @@ class AgentSessionManager:
                 final_status = AgentTurnStatus.FAILED
                 break
 
-            history.append(turn_resp)
-            advisory_total_cost += turn_resp.advisory_estimated_cost_usd
-
-            # 5. Construct Ingress AGENT_TURN AgentMessage & Validate Ingress Contract
-            turn_msg = create_agent_message(
-                session_id=session_id,
-                worker_id=self._worker.worker_id,
-                sequence=current_sequence,
-                message_type="AGENT_TURN",
-                payload={
-                    "thought": turn_resp.thought,
-                    "status": turn_resp.turn_status.value,
-                    "advisory_cost_usd": turn_resp.advisory_estimated_cost_usd,
-                    "tool_calls": [
-                        {"call_id": tc.call_id, "tool": tc.tool_name, "args": dict(tc.arguments)}
-                        for tc in turn_resp.tool_calls
-                    ],
-                },
-                previous_digest=last_digest,
-            )
-
-            is_valid_msg, err_msg, failure_status = AgentMessageChainValidator.validate_inbound_message(
-                message=turn_msg,
+            # 5. Validate External Inbound AgentMessage through Ingress Validator
+            is_valid_msg, err_msg, fail_status, turn_resp = AgentMessageChainValidator.validate_inbound_message(
+                message=inbound_msg,
                 expected_session_id=session_id,
                 expected_worker_id=self._worker.worker_id,
                 expected_sequence=current_sequence,
                 expected_previous_digest=last_digest,
             )
-            if not is_valid_msg:
-                final_status = failure_status or AgentTurnStatus.INGRESS_VALIDATION_FAILED
+
+            if not is_valid_msg or turn_resp is None:
+                final_status = fail_status or AgentTurnStatus.INGRESS_VALIDATION_FAILED
                 break
 
+            message_history.append(inbound_msg)
             current_sequence += 1
-            last_digest = turn_msg.message_digest
+            last_digest = inbound_msg.message_digest
+
+            advisory_total_cost += turn_resp.advisory_estimated_cost_usd
 
             turn_entry = {
                 "turn_index": turn_index,
                 "thought": turn_resp.thought,
                 "status": turn_resp.turn_status.value,
                 "advisory_cost_usd": turn_resp.advisory_estimated_cost_usd,
-                "message_digest": turn_msg.message_digest,
+                "message_digest": inbound_msg.message_digest,
                 "tool_calls": [
                     {"call_id": tc.call_id, "tool": tc.tool_name, "args": dict(tc.arguments)}
                     for tc in turn_resp.tool_calls
@@ -262,7 +254,7 @@ class AgentSessionManager:
             repository_id=repository_id,
             source_sha=source_sha,
             task_id=task_id,
-            total_turns=len(history),
+            total_turns=turn_index if final_status in (AgentTurnStatus.COMPLETED, AgentTurnStatus.FAILED, AgentTurnStatus.MAX_TURNS_REACHED) else turn_index + 1,
             advisory_total_cost_usd=advisory_total_cost,
             internal_accounting_units=internal_accounting_units,
             final_status=final_status,

@@ -2,14 +2,23 @@
 S-Class EOS V11.2 - D7 Capability-Scoped Agent Tool Registry & Execution Seam (§8.1, §8.3).
 Provides strictly schema-validated inspection and action proposal tools using jsonschema Draft 2020-12.
 Safely executes read/search tools against workspace paths and validates proposal actions for D5 submission.
+Enforces explicit resource bounds on search tools and workspace authority.
 """
 
 from __future__ import annotations
 import os
+import time
 import jsonschema
 from typing import Dict, Optional, Sequence, Any, Tuple
 from agent.models import ToolDefinition, AgentToolCall, AgentToolResult
 from execution.workspace import IsolatedWorkspace
+
+# Explicit Inspection Tool Resource Limits
+SEARCH_MAX_FILES = 500
+SEARCH_MAX_BYTES_SCANNED = 10 * 1024 * 1024  # 10 MB limit
+SEARCH_MAX_MATCHES = 50
+SEARCH_MAX_WALL_TIME_SECONDS = 2.0
+SEARCH_MAX_RESULT_BYTES = 64 * 1024  # 64 KB result cap
 
 
 class AgentToolRegistry:
@@ -33,11 +42,20 @@ class AgentToolRegistry:
     def list_tools(self) -> Sequence[ToolDefinition]:
         return tuple(self._tools.values())
 
-    def get_available_tools_for_capabilities(self, granted_capabilities: Sequence[str]) -> Tuple[ToolDefinition, ...]:
-        """Returns only tools whose required capabilities are a subset of granted_capabilities."""
+    def get_available_tools_for_capabilities(
+        self,
+        granted_capabilities: Sequence[str],
+        has_workspace_authority: bool = False,
+    ) -> Tuple[ToolDefinition, ...]:
+        """
+        Returns only tools whose required capabilities are a subset of granted_capabilities,
+        and excludes workspace-dependent tools if has_workspace_authority is False.
+        """
         granted_set = set(granted_capabilities)
         available = []
         for tool in self._tools.values():
+            if tool.requires_workspace and not has_workspace_authority:
+                continue
             if all(cap in granted_set for cap in tool.required_capabilities):
                 available.append(tool)
         return tuple(available)
@@ -86,54 +104,92 @@ class AgentToolRegistry:
         tool_call: AgentToolCall,
         workspace: Optional[IsolatedWorkspace] = None,
     ) -> AgentToolResult:
-        """Safely executes read/search inspection tools within workspace containment."""
+        """
+        Safely executes read/search inspection tools within workspace containment and resource limits.
+        Never returns synthetic data when workspace is missing or inactive.
+        """
+        if workspace is None or not workspace.is_active or not os.path.exists(workspace.path):
+            return AgentToolResult(
+                call_id=tool_call.call_id,
+                tool_name=tool_call.tool_name,
+                success=False,
+                error_message="TOOL_UNAVAILABLE: Active isolated workspace authority is required for inspection.",
+            )
+
         if tool_call.tool_name == "read_file_chunk":
             path = tool_call.arguments.get("path", "")
             start_line = tool_call.arguments.get("start_line", 1)
             end_line = tool_call.arguments.get("end_line", 100)
 
-            if workspace is not None:
-                try:
-                    safe_path = workspace.resolve_safe_path(path)
-                    if not os.path.exists(safe_path):
-                        return AgentToolResult(tool_call.call_id, tool_call.tool_name, False, {}, f"File '{path}' does not exist.")
-                    with open(safe_path, "r", encoding="utf-8", errors="replace") as f:
-                        lines = f.readlines()
-                    slice_lines = lines[max(0, start_line - 1):end_line]
-                    return AgentToolResult(
-                        call_id=tool_call.call_id,
-                        tool_name=tool_call.tool_name,
-                        success=True,
-                        result_data={"lines": slice_lines, "total_lines": len(lines)},
-                    )
-                except Exception as ex:
-                    return AgentToolResult(tool_call.call_id, tool_call.tool_name, False, {}, str(ex))
-            return AgentToolResult(tool_call.call_id, tool_call.tool_name, True, {"lines": [f"[Mock read of {path}]"]})
+            try:
+                safe_path = workspace.resolve_safe_path(path)
+                if not os.path.exists(safe_path):
+                    return AgentToolResult(tool_call.call_id, tool_call.tool_name, False, {}, f"File '{path}' does not exist.")
+                with open(safe_path, "r", encoding="utf-8", errors="replace") as f:
+                    lines = f.readlines()
+                slice_lines = lines[max(0, start_line - 1):end_line]
+                return AgentToolResult(
+                    call_id=tool_call.call_id,
+                    tool_name=tool_call.tool_name,
+                    success=True,
+                    result_data={"lines": tuple(slice_lines), "total_lines": len(lines)},
+                )
+            except Exception as ex:
+                return AgentToolResult(tool_call.call_id, tool_call.tool_name, False, {}, str(ex))
 
         elif tool_call.tool_name == "search_codebase":
             query = tool_call.arguments.get("query", "")
-            if workspace is not None and os.path.exists(workspace.path):
-                matches = []
+            matches = []
+            files_scanned = 0
+            bytes_scanned = 0
+            start_time = time.perf_counter()
+
+            try:
                 for root, _, files in os.walk(workspace.path):
+                    if len(matches) >= SEARCH_MAX_MATCHES:
+                        break
                     for fname in files:
+                        if len(matches) >= SEARCH_MAX_MATCHES:
+                            break
+                        files_scanned += 1
+                        if files_scanned > SEARCH_MAX_FILES:
+                            break
+                        if time.perf_counter() - start_time > SEARCH_MAX_WALL_TIME_SECONDS:
+                            break
+
                         fpath = os.path.join(root, fname)
                         try:
+                            fsize = os.path.getsize(fpath)
+                            bytes_scanned += fsize
+                            if bytes_scanned > SEARCH_MAX_BYTES_SCANNED:
+                                break
+
                             with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
                                 for lno, line in enumerate(f, 1):
                                     if query in line:
                                         rel_p = os.path.relpath(fpath, workspace.path)
                                         matches.append({"file": rel_p, "line": lno, "content": line.strip()})
-                                        if len(matches) >= 50:
+                                        if len(matches) >= SEARCH_MAX_MATCHES:
                                             break
                         except Exception:
                             continue
-                return AgentToolResult(tool_call.call_id, tool_call.tool_name, True, {"matches": matches})
-            return AgentToolResult(tool_call.call_id, tool_call.tool_name, True, {"matches": [{"file": "sample.py", "line": 1, "content": query}]})
+                return AgentToolResult(
+                    call_id=tool_call.call_id,
+                    tool_name=tool_call.tool_name,
+                    success=True,
+                    result_data={
+                        "matches": tuple(matches),
+                        "files_scanned": files_scanned,
+                        "bytes_scanned": bytes_scanned,
+                    },
+                )
+            except Exception as ex:
+                return AgentToolResult(tool_call.call_id, tool_call.tool_name, False, {}, str(ex))
 
         return AgentToolResult(tool_call.call_id, tool_call.tool_name, False, {}, f"Tool '{tool_call.tool_name}' is not an executable inspection tool.")
 
     def _register_default_tools(self) -> None:
-        # 1. read_file_chunk
+        # 1. read_file_chunk (Requires workspace)
         self.register(
             ToolDefinition(
                 name="read_file_chunk",
@@ -150,14 +206,15 @@ class AgentToolRegistry:
                 },
                 required_capabilities=("CAP_READ_CODE",),
                 is_proposal_tool=False,
+                requires_workspace=True,
             )
         )
 
-        # 2. search_codebase
+        # 2. search_codebase (Requires workspace)
         self.register(
             ToolDefinition(
                 name="search_codebase",
-                description="Performs keyword search across workspace files.",
+                description="Performs bounded keyword search across workspace files.",
                 parameters_schema={
                     "type": "object",
                     "properties": {
@@ -169,6 +226,7 @@ class AgentToolRegistry:
                 },
                 required_capabilities=("CAP_READ_CODE",),
                 is_proposal_tool=False,
+                requires_workspace=True,
             )
         )
 
@@ -190,6 +248,7 @@ class AgentToolRegistry:
                 },
                 required_capabilities=("CAP_PROPOSE_ACTION",),
                 is_proposal_tool=True,
+                requires_workspace=False,
             )
         )
 
@@ -211,5 +270,6 @@ class AgentToolRegistry:
                 },
                 required_capabilities=("CAP_PROPOSE_ACTION",),
                 is_proposal_tool=True,
+                requires_workspace=False,
             )
         )

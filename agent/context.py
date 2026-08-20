@@ -28,6 +28,7 @@ class AgentContextBuilder:
         obligations: Mapping[str, Obligation],
         policies: Mapping[str, Policy],
         granted_capabilities: Sequence[str],
+        has_workspace_authority: bool = False,
         verification_feedback: Optional[Sequence[Mapping[str, Any]]] = None,
         turn_index: int = 0,
         max_turns: int = 10,
@@ -61,8 +62,11 @@ class AgentContextBuilder:
             for rule in pol.expression.rules:
                 policy_rules.append(f"[{pol.policy_id}] Rule: {rule.rule_type.value} - Params: {dict(rule.parameters)}")
 
-        # 3. Filter available tools strictly to granted capabilities
-        available_tools = self._tool_registry.get_available_tools_for_capabilities(granted_capabilities)
+        # 3. Filter available tools strictly to granted capabilities and workspace authority
+        available_tools = self._tool_registry.get_available_tools_for_capabilities(
+            granted_capabilities=granted_capabilities,
+            has_workspace_authority=has_workspace_authority,
+        )
 
         return AgentSessionContext(
             session_id=session_id,
@@ -76,6 +80,7 @@ class AgentContextBuilder:
             verification_feedback=tuple(verification_feedback or ()),
             available_tools=available_tools,
             granted_capabilities=tuple(granted_capabilities),
+            has_workspace_authority=has_workspace_authority,
             turn_index=turn_index,
             max_turns=max_turns,
             remaining_budget_units=remaining_budget_units,
