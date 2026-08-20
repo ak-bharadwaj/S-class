@@ -4,12 +4,16 @@ S-Class EOS V11.2 - D5 Controller / Action Authorization Layer (§8.1, §8.3, §
 
 from controller.token import (
     ActionBinding,
+    ExecutionContext,
     ExecutionToken,
     ExecutionAdmissionResult,
+    ExecutionEnvelope,
     compute_action_digest,
+    compute_context_digest,
     verify_and_consume_execution_token,
     verify_execution_token_signature,
     verify_admission_signature,
+    verify_execution_envelope,
 )
 from controller.hooks import (
     LifecycleStage,
@@ -40,12 +44,16 @@ from controller.controller import (
 
 __all__ = [
     "ActionBinding",
+    "ExecutionContext",
     "ExecutionToken",
     "ExecutionAdmissionResult",
+    "ExecutionEnvelope",
     "compute_action_digest",
+    "compute_context_digest",
     "verify_and_consume_execution_token",
     "verify_execution_token_signature",
     "verify_admission_signature",
+    "verify_execution_envelope",
     "LifecycleStage",
     "HookResult",
     "HookContext",

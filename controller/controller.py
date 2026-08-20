@@ -1,15 +1,15 @@
 """
 S-Class EOS V11.2 - D5 Main Controller Orchestrator (§8.1, §8.3, CORE-05, CORE-25).
 Orchestrates the 5-stage lifecycle:
-PRE_VALIDATE -> PRE_AUTHORIZE -> (IMMUTABLE DECISION) -> PRE_EXECUTE -> (ADMISSION & D2 NONCE CONSUMPTION) -> (D6 EXECUTION) -> POST_EXECUTE -> POST_OBSERVE -> COMPLETION_FINALIZED.
+PRE_VALIDATE -> PRE_AUTHORIZE -> (IMMUTABLE DECISION) -> PRE_EXECUTE -> (ADMISSION & D2 NONCE CONSUMPTION -> ENVELOPE) -> (D6 EXECUTION) -> POST_EXECUTE -> POST_OBSERVE -> COMPLETION_FINALIZED.
 "Planner proposes. Controller disposes."
 Enforces:
-1. Exact Action Binding: binds canonical action_digest across Decision, Token, and Admission.
-2. Controller holds the ONLY token minting and admission signing paths.
-3. Transactional Admission: generates and verifies signed admission artifact before atomic reservation.
-4. Explicit Durable Completion Lifecycle in D2:
+1. Mandatory ExecutionEnvelope delivery to D6 containing (Token, Admission, ActionBinding, ExecutionContext).
+2. Exact Action & Context Binding (token.action_digest == admission.action_digest == action_binding.action_digest).
+3. Controller holds the ONLY token minting and admission signing paths.
+4. Transactional Admission: generates and verifies signed admission artifact before atomic reservation.
+5. Explicit Durable Completion Lifecycle in D2:
    COMPLETION_STARTED -> POST_EXECUTE -> POST_OBSERVE -> COMPLETION_FINALIZED (or COMPLETION_FAILED).
-5. complete_execution() strictly verifies action_digest and every token binding.
 """
 
 from __future__ import annotations
@@ -24,14 +24,17 @@ from controller.authorization import ActionProposal, AuthorizationDecision, Auth
 from controller.hooks import LifecycleStage, HookContext, HookResult, LifecyclePipeline
 from controller.token import (
     ActionBinding,
+    ExecutionContext,
     ExecutionToken,
     ExecutionAdmissionResult,
+    ExecutionEnvelope,
     _mint_execution_token,
     _build_admission_payload,
     _compute_admission_canonical_bytes,
     verify_and_consume_execution_token,
     verify_execution_token_signature,
     verify_admission_signature,
+    verify_execution_envelope,
 )
 
 
@@ -102,6 +105,7 @@ class SClassController:
                 proposal_id=proposal.proposal_id,
                 obligation_id=proposal.obligation_id,
                 action_digest=proposal.action_digest,
+                context_digest=proposal.context_digest,
                 status=AuthorizationStatus.REJECTED,
                 rejection_reasons=(pre_val_res.error_message or "PRE_VALIDATE hook failed closed",),
                 evaluated_at=evaluated_at,
@@ -130,6 +134,7 @@ class SClassController:
                 proposal_id=proposal.proposal_id,
                 obligation_id=proposal.obligation_id,
                 action_digest=proposal.action_digest,
+                context_digest=proposal.context_digest,
                 status=AuthorizationStatus.REJECTED,
                 rejection_reasons=(pre_auth_res.error_message or "PRE_AUTHORIZE hook failed closed",),
                 evaluated_at=evaluated_at,
@@ -142,7 +147,7 @@ class SClassController:
                 error_message=pre_auth_res.error_message,
             )
 
-        # Precondition Evaluation -> Creates IMMUTABLE AuthorizationDecision (evaluating active D3 policy & action_digest)
+        # Precondition Evaluation -> Creates IMMUTABLE AuthorizationDecision
         decision = AuthorizationEngine.evaluate_proposal(
             proposal=proposal,
             obligations=obligations,
@@ -179,13 +184,14 @@ class SClassController:
                 error_message=pre_exec_res.error_message or "PRE_EXECUTE hook aborted execution",
             )
 
-        # Controller holds the ONLY issuance path, strictly binding decision_id & action_digest
+        # Controller holds the ONLY issuance path, strictly binding decision_id, action_digest, context_digest
         token = _mint_execution_token(
             token_id=f"TOK-{uuid.uuid4().hex[:12].upper()}",
             decision_id=decision.decision_id,
             obligation_id=proposal.obligation_id,
             proposal_id=proposal.proposal_id,
             action_digest=decision.action_digest,
+            context_digest=decision.context_digest,
             source_sha=source_sha,
             policy_version=policy_version,
             issued_at=evaluated_at,
@@ -205,24 +211,19 @@ class SClassController:
         expected_obligation_id: str,
         expected_source_sha: str,
         expected_policy_version: int,
+        expected_action_binding: ActionBinding,
+        expected_execution_context: ExecutionContext,
         current_time_iso: str,
-        expected_action_digest: Optional[str] = None,
         signer_identity: str = "Gate3AuthoritativeVerifier",
     ) -> ExecutionAdmissionResult:
-        """Admits an ExecutionToken BEFORE D6 execution.
-        
-        Transactional admission process:
-        1. Pre-validates token fields, action_digest, and authority signature.
-        2. Mints and signs ExecutionAdmissionResult.
-        3. Atomically reserves ADMIT:<nonce> in D2 store.
-        If signing fails, D2 store is untouched. If reservation fails, returns unadmitted result.
-        """
+        """Admits an ExecutionToken BEFORE D6 execution and returns signed ExecutionAdmissionResult."""
         if not isinstance(token, ExecutionToken):
             return ExecutionAdmissionResult(
                 token_id="UNKNOWN",
                 execution_nonce="UNKNOWN",
                 obligation_id="UNKNOWN",
                 action_digest="0" * 64,
+                context_digest="0" * 64,
                 source_sha="0" * 40,
                 policy_version=1,
                 decision_id="UNKNOWN",
@@ -231,16 +232,47 @@ class SClassController:
                 error_message="Invalid ExecutionToken provided.",
             )
 
+        if not isinstance(expected_action_binding, ActionBinding):
+            return ExecutionAdmissionResult(
+                token_id=token.token_id,
+                execution_nonce=token.execution_nonce,
+                obligation_id=token.obligation_id,
+                action_digest=token.action_digest,
+                context_digest=token.context_digest,
+                source_sha=token.source_sha,
+                policy_version=token.policy_version,
+                decision_id=token.decision_id,
+                admitted_at=current_time_iso,
+                is_admitted=False,
+                error_message="Invalid expected_action_binding provided.",
+            )
+
+        if not isinstance(expected_execution_context, ExecutionContext):
+            return ExecutionAdmissionResult(
+                token_id=token.token_id,
+                execution_nonce=token.execution_nonce,
+                obligation_id=token.obligation_id,
+                action_digest=token.action_digest,
+                context_digest=token.context_digest,
+                source_sha=token.source_sha,
+                policy_version=token.policy_version,
+                decision_id=token.decision_id,
+                admitted_at=current_time_iso,
+                is_admitted=False,
+                error_message="Invalid expected_execution_context provided.",
+            )
+
         # 1. Verify token bindings and signature
         is_token_valid = verify_and_consume_execution_token(
             token=token,
             expected_obligation_id=expected_obligation_id,
             expected_source_sha=expected_source_sha,
             expected_policy_version=expected_policy_version,
+            expected_action_digest=expected_action_binding.action_digest,
+            expected_context_digest=expected_execution_context.context_digest,
             current_time_iso=current_time_iso,
             authority_signer=self._authority_signer,
             nonce_store=self._nonce_store,
-            expected_action_digest=expected_action_digest,
         )
 
         if not is_token_valid:
@@ -249,6 +281,7 @@ class SClassController:
                 execution_nonce=token.execution_nonce,
                 obligation_id=token.obligation_id,
                 action_digest=token.action_digest,
+                context_digest=token.context_digest,
                 source_sha=token.source_sha,
                 policy_version=token.policy_version,
                 decision_id=token.decision_id,
@@ -263,6 +296,7 @@ class SClassController:
             execution_nonce=token.execution_nonce,
             obligation_id=token.obligation_id,
             action_digest=token.action_digest,
+            context_digest=token.context_digest,
             source_sha=token.source_sha,
             policy_version=token.policy_version,
             decision_id=token.decision_id,
@@ -280,6 +314,7 @@ class SClassController:
             execution_nonce=token.execution_nonce,
             obligation_id=token.obligation_id,
             action_digest=token.action_digest,
+            context_digest=token.context_digest,
             source_sha=token.source_sha,
             policy_version=token.policy_version,
             decision_id=token.decision_id,
@@ -288,61 +323,67 @@ class SClassController:
             signature=authority_sig,
         )
 
-    def complete_execution(
+    def create_execution_envelope(
         self,
         token: ExecutionToken,
         admission: ExecutionAdmissionResult,
+        action_binding: ActionBinding,
+        execution_context: ExecutionContext,
+    ) -> ExecutionEnvelope:
+        """Constructs the mandatory ExecutionEnvelope delivered to D6 executor."""
+        return ExecutionEnvelope(
+            token=token,
+            admission=admission,
+            action_binding=action_binding,
+            execution_context=execution_context,
+        )
+
+    def complete_execution(
+        self,
+        envelope: ExecutionEnvelope,
         execution_result: Optional[Mapping[str, Any]] = None,
-        action_binding: Optional[ActionBinding] = None,
     ) -> ExecutionCompletionResult:
-        """Processes execution completion AFTER D6 execution with explicit D2 durable lifecycle:
-        COMPLETION_STARTED -> POST_EXECUTE -> POST_OBSERVE -> COMPLETION_FINALIZED (or COMPLETION_FAILED).
+        """Processes execution completion AFTER D6 execution consuming mandatory ExecutionEnvelope.
         
-        Strictly verifies:
-        1. Valid ExecutionToken and ExecutionAdmissionResult instances.
-        2. Admission was granted (is_admitted is True).
-        3. ALL binding fields in admission match the supplied token:
-           token_id, execution_nonce, obligation_id, action_digest, source_sha, policy_version, decision_id.
-        4. If action_binding is supplied, action_binding.action_digest must strictly match token.action_digest.
-        5. Cryptographic signatures of both token and admission are valid.
-        6. Durable D2 lifecycle: atomically reserves COMPLETION_STARTED, executes hooks, then transitions to COMPLETION_FINALIZED or COMPLETION_FAILED.
+        Explicit D2 durable lifecycle:
+        COMPLETION_STARTED -> POST_EXECUTE -> POST_OBSERVE -> COMPLETION_FINALIZED (or COMPLETION_FAILED).
         """
-        if not token or not isinstance(token, ExecutionToken):
+        if not isinstance(envelope, ExecutionEnvelope):
             return ExecutionCompletionResult(
                 token_id="UNKNOWN",
                 is_valid_execution=False,
-                error_message="Invalid ExecutionToken.",
+                error_message="Invalid ExecutionEnvelope supplied to complete_execution.",
             )
 
-        if not admission or not isinstance(admission, ExecutionAdmissionResult) or not admission.is_admitted:
+        token = envelope.token
+        admission = envelope.admission
+        action_binding = envelope.action_binding
+        ctx = envelope.execution_context
+
+        if not admission.is_admitted:
             return ExecutionCompletionResult(
                 token_id=token.token_id,
                 is_valid_execution=False,
                 error_message="Execution was not admitted prior to completion.",
             )
 
-        # Complete Binding Verification: Every field in admission MUST match token
+        # Complete Binding Verification: Every field in admission MUST match token and action_binding/context
+        if not (token.action_digest == admission.action_digest == action_binding.action_digest):
+            return ExecutionCompletionResult(token_id=token.token_id, is_valid_execution=False, error_message="action_digest mismatch")
+        if not (token.context_digest == admission.context_digest == ctx.context_digest):
+            return ExecutionCompletionResult(token_id=token.token_id, is_valid_execution=False, error_message="context_digest mismatch")
         if admission.token_id != token.token_id:
             return ExecutionCompletionResult(token_id=token.token_id, is_valid_execution=False, error_message="token_id mismatch")
         if admission.execution_nonce != token.execution_nonce:
             return ExecutionCompletionResult(token_id=token.token_id, is_valid_execution=False, error_message="execution_nonce mismatch")
         if admission.obligation_id != token.obligation_id:
             return ExecutionCompletionResult(token_id=token.token_id, is_valid_execution=False, error_message="obligation_id mismatch")
-        if admission.action_digest != token.action_digest:
-            return ExecutionCompletionResult(token_id=token.token_id, is_valid_execution=False, error_message="action_digest mismatch")
         if admission.source_sha != token.source_sha:
             return ExecutionCompletionResult(token_id=token.token_id, is_valid_execution=False, error_message="source_sha mismatch")
         if admission.policy_version != token.policy_version:
             return ExecutionCompletionResult(token_id=token.token_id, is_valid_execution=False, error_message="policy_version mismatch")
         if admission.decision_id != token.decision_id:
             return ExecutionCompletionResult(token_id=token.token_id, is_valid_execution=False, error_message="decision_id mismatch")
-
-        # Action Binding Exactness Verification
-        if action_binding is not None:
-            if not isinstance(action_binding, ActionBinding):
-                return ExecutionCompletionResult(token_id=token.token_id, is_valid_execution=False, error_message="Invalid ActionBinding.")
-            if action_binding.action_digest != token.action_digest:
-                return ExecutionCompletionResult(token_id=token.token_id, is_valid_execution=False, error_message="Supplied action_binding digest does not match authorized token.")
 
         # Cryptographic verification of both Token and Admission signatures
         if not verify_execution_token_signature(token, self._authority_signer):
@@ -379,7 +420,6 @@ class SClassController:
         )
         post_exec_res = self._pipeline.run_stage(LifecycleStage.POST_EXECUTE, post_exec_ctx)
         if not post_exec_res.proceed:
-            # Authoritative terminal failed state recorded in D2
             self._nonce_store.reserve_nonce(f"COMPLETION_FAILED:{token.execution_nonce}")
             return ExecutionCompletionResult(
                 token_id=token.token_id,
@@ -400,7 +440,6 @@ class SClassController:
         )
         post_obs_res = self._pipeline.run_stage(LifecycleStage.POST_OBSERVE, post_obs_ctx)
         if not post_obs_res.proceed:
-            # Authoritative terminal failed state recorded in D2
             self._nonce_store.reserve_nonce(f"COMPLETION_FAILED:{token.execution_nonce}")
             return ExecutionCompletionResult(
                 token_id=token.token_id,

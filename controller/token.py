@@ -1,10 +1,10 @@
 """
-S-Class EOS V11.2 - D5 Cryptographic Execution Token, Admission & Action Binding Models (§8.1, §8.3).
-Immutable, Ed25519-signed single-use execution tokens, admission records, and action bindings.
-Reuses D2 durable storage for atomic single-use nonce reservation and lifecycle tracking.
-Binds token_id, decision_id, obligation_id, proposal_id, action_digest, source_sha, policy_version, execution_nonce, timestamps, and signature.
+S-Class EOS V11.2 - D5 Cryptographic Execution Token, Admission, ActionBinding & ExecutionContext (§8.1, §8.3).
+Mandatory ExecutionEnvelope model for D5 -> D6 boundary.
+Reuses D2 durable storage for atomic single-use nonce reservation and lifecycle state tracking.
 Domain Separators:
 - SCLASS_ACTION_BINDING_V1:
+- SCLASS_EXECUTION_CONTEXT_V1:
 - SCLASS_EXECUTION_TOKEN_V1:
 - SCLASS_EXECUTION_ADMISSION_V1:
 Controller holds the ONLY issuance path.
@@ -15,7 +15,7 @@ import uuid
 import hashlib
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Mapping, Optional, Any
+from typing import Mapping, Optional, Sequence, Tuple, Any
 from domain.models import AsymmetricAuthoritySignature, _validate_pattern, _validate_iso8601, _freeze_nested
 from domain.types import HEX_40_PATTERN, HEX_64_PATTERN
 from events.serializer import canonicalize_json
@@ -25,6 +25,7 @@ from policy.models import AuthoritySignerProtocol
 
 TOKEN_ID_PREFIX = "TOK-"
 SCLASS_ACTION_BINDING_DOMAIN_SEPARATOR = "SCLASS_ACTION_BINDING_V1:"
+SCLASS_EXECUTION_CONTEXT_DOMAIN_SEPARATOR = "SCLASS_EXECUTION_CONTEXT_V1:"
 SCLASS_EXECUTION_TOKEN_DOMAIN_SEPARATOR = "SCLASS_EXECUTION_TOKEN_V1:"
 SCLASS_EXECUTION_ADMISSION_DOMAIN_SEPARATOR = "SCLASS_EXECUTION_ADMISSION_V1:"
 
@@ -84,6 +85,82 @@ class ActionBinding:
         _validate_pattern(self.action_digest, HEX_64_PATTERN, "action_digest")
 
 
+def compute_context_digest(
+    provider_id: str,
+    sandbox_profile_id: str,
+    workspace_id: str,
+    resource_profile_id: str,
+    capability_set: Sequence[str],
+) -> tuple[str, str]:
+    """Computes (capability_set_digest, context_digest) with domain separator SCLASS_EXECUTION_CONTEXT_V1:."""
+    if not provider_id:
+        raise ValueError("provider_id cannot be empty.")
+    if not sandbox_profile_id:
+        raise ValueError("sandbox_profile_id cannot be empty.")
+    if not workspace_id:
+        raise ValueError("workspace_id cannot be empty.")
+    if not resource_profile_id:
+        raise ValueError("resource_profile_id cannot be empty.")
+
+    sorted_caps = sorted(list(capability_set))
+    cap_bytes = canonicalize_json({"capabilities": sorted_caps})
+    cap_digest = hashlib.sha256(cap_bytes).hexdigest()
+
+    payload = {
+        "provider_id": provider_id,
+        "sandbox_profile_id": sandbox_profile_id,
+        "workspace_id": workspace_id,
+        "resource_profile_id": resource_profile_id,
+        "capability_set_digest": cap_digest,
+    }
+    canonical_bytes = SCLASS_EXECUTION_CONTEXT_DOMAIN_SEPARATOR.encode("utf-8") + canonicalize_json(payload)
+    ctx_digest = hashlib.sha256(canonical_bytes).hexdigest()
+    return cap_digest, ctx_digest
+
+
+@dataclass(frozen=True)
+class ExecutionContext:
+    """Immutable, authority-relevant execution environment properties (§8.1)."""
+    provider_id: str
+    sandbox_profile_id: str
+    workspace_id: str
+    resource_profile_id: str
+    capability_set: Tuple[str, ...] = field(default_factory=tuple)
+    capability_set_digest: str = ""
+    context_digest: str = ""
+
+    def __post_init__(self):
+        if not self.provider_id:
+            raise ValueError("provider_id cannot be empty.")
+        if not self.sandbox_profile_id:
+            raise ValueError("sandbox_profile_id cannot be empty.")
+        if not self.workspace_id:
+            raise ValueError("workspace_id cannot be empty.")
+        if not self.resource_profile_id:
+            raise ValueError("resource_profile_id cannot be empty.")
+        object.__setattr__(self, "capability_set", tuple(sorted(self.capability_set)))
+
+        cap_digest, expected_ctx_digest = compute_context_digest(
+            provider_id=self.provider_id,
+            sandbox_profile_id=self.sandbox_profile_id,
+            workspace_id=self.workspace_id,
+            resource_profile_id=self.resource_profile_id,
+            capability_set=self.capability_set,
+        )
+        if not self.capability_set_digest:
+            object.__setattr__(self, "capability_set_digest", cap_digest)
+        elif self.capability_set_digest != cap_digest:
+            raise ValueError(f"capability_set_digest mismatch: '{self.capability_set_digest}' != '{cap_digest}'")
+
+        if not self.context_digest:
+            object.__setattr__(self, "context_digest", expected_ctx_digest)
+        elif self.context_digest != expected_ctx_digest:
+            raise ValueError(f"context_digest mismatch: '{self.context_digest}' != '{expected_ctx_digest}'")
+
+        _validate_pattern(self.capability_set_digest, HEX_64_PATTERN, "capability_set_digest")
+        _validate_pattern(self.context_digest, HEX_64_PATTERN, "context_digest")
+
+
 @dataclass(frozen=True)
 class ExecutionToken:
     """Immutable single-use execution token issued exclusively by D5 Controller upon authorization."""
@@ -92,6 +169,7 @@ class ExecutionToken:
     obligation_id: str
     proposal_id: str
     action_digest: str
+    context_digest: str
     source_sha: str
     policy_version: int
     execution_nonce: str
@@ -109,6 +187,7 @@ class ExecutionToken:
         if not self.proposal_id:
             raise ValueError("proposal_id cannot be empty.")
         _validate_pattern(self.action_digest, HEX_64_PATTERN, "action_digest")
+        _validate_pattern(self.context_digest, HEX_64_PATTERN, "context_digest")
         _validate_pattern(self.source_sha, HEX_40_PATTERN, "source_sha")
         if not isinstance(self.policy_version, int) or self.policy_version < 1:
             raise ValueError("policy_version must be an integer >= 1.")
@@ -127,6 +206,7 @@ class ExecutionAdmissionResult:
     execution_nonce: str
     obligation_id: str
     action_digest: str
+    context_digest: str
     source_sha: str
     policy_version: int
     decision_id: str
@@ -144,6 +224,7 @@ class ExecutionAdmissionResult:
             if not self.obligation_id:
                 raise ValueError("obligation_id cannot be empty for admitted result.")
             _validate_pattern(self.action_digest, HEX_64_PATTERN, "action_digest")
+            _validate_pattern(self.context_digest, HEX_64_PATTERN, "context_digest")
             _validate_pattern(self.source_sha, HEX_40_PATTERN, "source_sha")
             if not isinstance(self.policy_version, int) or self.policy_version < 1:
                 raise ValueError("policy_version must be an integer >= 1.")
@@ -154,12 +235,53 @@ class ExecutionAdmissionResult:
                 raise TypeError("signature must be an AsymmetricAuthoritySignature instance for admitted result.")
 
 
+@dataclass(frozen=True)
+class ExecutionEnvelope:
+    """Mandatory immutable container delivered to D6 executor (§8.1, §8.3).
+    
+    Contains: ExecutionToken, ExecutionAdmissionResult, ActionBinding, ExecutionContext.
+    """
+    token: ExecutionToken
+    admission: ExecutionAdmissionResult
+    action_binding: ActionBinding
+    execution_context: ExecutionContext
+
+    def __post_init__(self):
+        if not isinstance(self.token, ExecutionToken):
+            raise TypeError("token must be an ExecutionToken instance.")
+        if not isinstance(self.admission, ExecutionAdmissionResult):
+            raise TypeError("admission must be an ExecutionAdmissionResult instance.")
+        if not isinstance(self.action_binding, ActionBinding):
+            raise TypeError("action_binding must be an ActionBinding instance.")
+        if not isinstance(self.execution_context, ExecutionContext):
+            raise TypeError("execution_context must be an ExecutionContext instance.")
+
+        # Mandatory exact binding invariants
+        if not (self.token.action_digest == self.admission.action_digest == self.action_binding.action_digest):
+            raise ValueError("Action digest mismatch across token, admission, and action_binding.")
+        if not (self.token.context_digest == self.admission.context_digest == self.execution_context.context_digest):
+            raise ValueError("Context digest mismatch across token, admission, and execution_context.")
+        if self.token.token_id != self.admission.token_id:
+            raise ValueError("Token ID mismatch between token and admission.")
+        if self.token.execution_nonce != self.admission.execution_nonce:
+            raise ValueError("Execution nonce mismatch between token and admission.")
+        if self.token.obligation_id != self.admission.obligation_id:
+            raise ValueError("Obligation ID mismatch between token and admission.")
+        if self.token.source_sha != self.admission.source_sha:
+            raise ValueError("Source SHA mismatch between token and admission.")
+        if self.token.policy_version != self.admission.policy_version:
+            raise ValueError("Policy version mismatch between token and admission.")
+        if self.token.decision_id != self.admission.decision_id:
+            raise ValueError("Decision ID mismatch between token and admission.")
+
+
 def _build_token_payload(
     token_id: str,
     decision_id: str,
     obligation_id: str,
     proposal_id: str,
     action_digest: str,
+    context_digest: str,
     source_sha: str,
     policy_version: int,
     execution_nonce: str,
@@ -172,6 +294,7 @@ def _build_token_payload(
         "obligation_id": obligation_id,
         "proposal_id": proposal_id,
         "action_digest": action_digest,
+        "context_digest": context_digest,
         "source_sha": source_sha,
         "policy_version": policy_version,
         "execution_nonce": execution_nonce,
@@ -185,6 +308,7 @@ def _build_admission_payload(
     execution_nonce: str,
     obligation_id: str,
     action_digest: str,
+    context_digest: str,
     source_sha: str,
     policy_version: int,
     decision_id: str,
@@ -195,6 +319,7 @@ def _build_admission_payload(
         "execution_nonce": execution_nonce,
         "obligation_id": obligation_id,
         "action_digest": action_digest,
+        "context_digest": context_digest,
         "source_sha": source_sha,
         "policy_version": policy_version,
         "decision_id": decision_id,
@@ -218,6 +343,7 @@ def _mint_execution_token(
     obligation_id: str,
     proposal_id: str,
     action_digest: str,
+    context_digest: str,
     source_sha: str,
     policy_version: int,
     issued_at: str,
@@ -240,6 +366,7 @@ def _mint_execution_token(
         obligation_id=obligation_id,
         proposal_id=proposal_id,
         action_digest=action_digest,
+        context_digest=context_digest,
         source_sha=source_sha,
         policy_version=policy_version,
         execution_nonce=nonce,
@@ -260,6 +387,7 @@ def _mint_execution_token(
         obligation_id=obligation_id,
         proposal_id=proposal_id,
         action_digest=action_digest,
+        context_digest=context_digest,
         source_sha=source_sha,
         policy_version=policy_version,
         execution_nonce=nonce,
@@ -282,6 +410,7 @@ def verify_execution_token_signature(
         obligation_id=token.obligation_id,
         proposal_id=token.proposal_id,
         action_digest=token.action_digest,
+        context_digest=token.context_digest,
         source_sha=token.source_sha,
         policy_version=token.policy_version,
         execution_nonce=token.execution_nonce,
@@ -309,6 +438,7 @@ def verify_admission_signature(
         execution_nonce=admission.execution_nonce,
         obligation_id=admission.obligation_id,
         action_digest=admission.action_digest,
+        context_digest=admission.context_digest,
         source_sha=admission.source_sha,
         policy_version=admission.policy_version,
         decision_id=admission.decision_id,
@@ -326,25 +456,28 @@ def verify_and_consume_execution_token(
     expected_obligation_id: str,
     expected_source_sha: str,
     expected_policy_version: int,
+    expected_action_digest: str,
+    expected_context_digest: str,
     current_time_iso: str,
     authority_signer: AuthoritySignerProtocol,
     nonce_store: Optional[D2NonceStore] = None,
-    expected_action_digest: Optional[str] = None,
 ) -> bool:
-    """Cryptographically verifies token, checks bindings & time validity, and atomically reserves nonce in D2 store."""
+    """Cryptographically verifies token, checks mandatory bindings & time validity, and atomically reserves nonce in D2 store."""
     if not isinstance(token, ExecutionToken):
         return False
     if not isinstance(authority_signer, AuthoritySignerProtocol):
         return False
 
-    # 1. Structural Binding Verification
+    # 1. Structural Mandatory Binding Verification
     if token.obligation_id != expected_obligation_id:
         return False
     if token.source_sha != expected_source_sha:
         return False
     if token.policy_version != expected_policy_version:
         return False
-    if expected_action_digest is not None and token.action_digest != expected_action_digest:
+    if token.action_digest != expected_action_digest:
+        return False
+    if token.context_digest != expected_context_digest:
         return False
 
     # 2. Time Boundary Verification (current_time >= issued_at and current_time <= expires_at)
@@ -368,3 +501,65 @@ def verify_and_consume_execution_token(
         return reserved
     except Exception:
         return False
+
+
+def verify_execution_envelope(
+    envelope: ExecutionEnvelope,
+    expected_source_sha: str,
+    expected_policy_version: int,
+    current_time_iso: str,
+    authority_signer: AuthoritySignerProtocol,
+    nonce_store: Optional[D2NonceStore] = None,
+) -> bool:
+    """D5 -> D6 Gateway Gate: Verifies that an ExecutionEnvelope is authentic, unexpired, and duly admitted in D2 store."""
+    if not isinstance(envelope, ExecutionEnvelope):
+        return False
+
+    token = envelope.token
+    admission = envelope.admission
+    action_binding = envelope.action_binding
+    ctx = envelope.execution_context
+
+    # 1. Exact Binding Equality Invariants
+    if not (token.action_digest == admission.action_digest == action_binding.action_digest):
+        return False
+    if not (token.context_digest == admission.context_digest == ctx.context_digest):
+        return False
+    if token.token_id != admission.token_id:
+        return False
+    if token.execution_nonce != admission.execution_nonce:
+        return False
+    if token.obligation_id != admission.obligation_id:
+        return False
+    if token.source_sha != expected_source_sha or admission.source_sha != expected_source_sha:
+        return False
+    if token.policy_version != expected_policy_version or admission.policy_version != expected_policy_version:
+        return False
+    if token.decision_id != admission.decision_id:
+        return False
+
+    # 2. Time Validation
+    try:
+        t_current = datetime.fromisoformat(current_time_iso.replace("Z", "+00:00"))
+        t_issued = datetime.fromisoformat(token.issued_at.replace("Z", "+00:00"))
+        t_expiry = datetime.fromisoformat(token.expires_at.replace("Z", "+00:00"))
+        if t_current < t_issued or t_current > t_expiry:
+            return False
+    except Exception:
+        return False
+
+    # 3. Cryptographic Signatures
+    if not verify_execution_token_signature(token, authority_signer):
+        return False
+    if not verify_admission_signature(admission, authority_signer):
+        return False
+
+    # 4. Durable Admission Exists in D2 Store
+    store = nonce_store or D2NonceStore()
+    try:
+        if not store.is_nonce_consumed(f"ADMIT:{token.execution_nonce}"):
+            return False
+    except Exception:
+        return False
+
+    return True

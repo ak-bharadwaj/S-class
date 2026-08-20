@@ -5,10 +5,11 @@ Actually evaluates active D3 Policy using PolicyEvaluationContext.
 Enforces:
 1. Target obligation must be registered and in Executable Frontier (READY != EXECUTABLE).
 2. ActionBinding strictly bound: action_digest computed from action_type, target, purpose, parameters.
-3. All prerequisites listed in proposal must be SATISFIED or CONDITIONAL.
-4. Action type must be permitted under active security profile.
-5. Active D3 Policy evaluated and satisfied (ALLOW).
-6. Estimated cost and timeout must not exceed budget bounds.
+3. ExecutionContext strictly bound: context_digest computed from provider_id, sandbox_profile_id, workspace_id, resource_profile_id, capability_set.
+4. All prerequisites listed in proposal must be SATISFIED or CONDITIONAL.
+5. Action type must be permitted under active security profile.
+6. Active D3 Policy evaluated and satisfied (ALLOW).
+7. Estimated cost and timeout must not exceed budget bounds.
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ from domain.types import ObligationStatus, PolicyScope, HEX_64_PATTERN
 from policy.evaluator import evaluate_policy
 from policy.models import PolicyEvaluationContext, PolicyDecisionType
 from controller.frontier import compute_frontier, ExecutionFrontier
-from controller.token import ActionBinding, compute_action_digest
+from controller.token import ActionBinding, ExecutionContext, compute_action_digest
 
 
 class AuthorizationStatus(str, Enum):
@@ -39,6 +40,7 @@ class ActionProposal:
     action_type: str
     target: str
     purpose: str
+    execution_context: ExecutionContext
     estimated_cost_usd: float = 0.0
     timeout_seconds: int = 60
     prerequisites: Tuple[str, ...] = field(default_factory=tuple)
@@ -56,6 +58,8 @@ class ActionProposal:
             raise ValueError("target cannot be empty.")
         if not self.purpose:
             raise ValueError("purpose cannot be empty.")
+        if not isinstance(self.execution_context, ExecutionContext):
+            raise TypeError("execution_context must be an ExecutionContext instance.")
         if self.estimated_cost_usd < 0.0:
             raise ValueError("estimated_cost_usd cannot be negative.")
         if self.timeout_seconds < 1:
@@ -85,6 +89,10 @@ class ActionProposal:
             action_digest=self.action_digest,
         )
 
+    @property
+    def context_digest(self) -> str:
+        return self.execution_context.context_digest
+
 
 @dataclass(frozen=True)
 class AuthorizationDecision:
@@ -93,6 +101,7 @@ class AuthorizationDecision:
     proposal_id: str
     obligation_id: str
     action_digest: str
+    context_digest: str
     status: AuthorizationStatus
     rejection_reasons: Tuple[str, ...] = field(default_factory=tuple)
     evaluated_at: str = ""
@@ -107,6 +116,7 @@ class AuthorizationDecision:
         if not self.obligation_id:
             raise ValueError("obligation_id cannot be empty.")
         _validate_pattern(self.action_digest, HEX_64_PATTERN, "action_digest")
+        _validate_pattern(self.context_digest, HEX_64_PATTERN, "context_digest")
         if not isinstance(self.status, AuthorizationStatus):
             raise TypeError(f"Invalid status: {self.status}")
         _validate_iso8601(self.evaluated_at, "evaluated_at")
@@ -142,6 +152,7 @@ class AuthorizationEngine:
                 proposal_id=proposal.proposal_id,
                 obligation_id=proposal.obligation_id,
                 action_digest=proposal.action_digest,
+                context_digest=proposal.context_digest,
                 status=AuthorizationStatus.REJECTED,
                 rejection_reasons=(f"Target obligation '{proposal.obligation_id}' not found.",),
                 evaluated_at=evaluated_at,
@@ -205,6 +216,7 @@ class AuthorizationEngine:
             proposal_id=proposal.proposal_id,
             obligation_id=proposal.obligation_id,
             action_digest=proposal.action_digest,
+            context_digest=proposal.context_digest,
             status=decision_status,
             rejection_reasons=tuple(reasons),
             evaluated_at=evaluated_at,
