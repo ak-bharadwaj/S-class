@@ -157,7 +157,6 @@ class D6ExecutionGateway:
 
         # Step 5: Isolated Workspace Setup & Process Execution
         workspace = IsolatedWorkspace(workspace_id=ctx.workspace_id, base_dir=self._workspace_base_dir)
-        cleanup_warning = None
         try:
             workspace.setup()
 
@@ -199,10 +198,10 @@ class D6ExecutionGateway:
             if res.stderr_truncated:
                 diag.append({"warning": f"stderr truncated at {max_output_bytes} bytes"})
 
-            # Clean workspace before final observation assembly to include cleanup issues if any
-            cleanup_err = workspace.cleanup()
+            # Clean workspace before final observation assembly with bounded retries
+            cleanup_err = workspace.cleanup(max_retries=3, retry_delay_seconds=0.05)
             if cleanup_err:
-                diag.append({"cleanup_warning": cleanup_err})
+                diag.append({"cleanup_warning": cleanup_err, "workspace_dirty": True})
 
             return ExecutionObservation(
                 execution_id=exec_id,
@@ -237,9 +236,9 @@ class D6ExecutionGateway:
                 diag_msg=f"Execution failed during workspace setup or command execution: {str(e)}",
             )
         finally:
-            # Step 9: Workspace cleanup on all exit paths
+            # Step 9: Final fallback cleanup on any unhandled exception paths
             if workspace.is_active:
-                workspace.cleanup()
+                workspace.cleanup(max_retries=2, retry_delay_seconds=0.05)
 
     def _make_rejected_observation(
         self,

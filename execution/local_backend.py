@@ -3,10 +3,10 @@ S-Class EOS V11.2 - D6 Constrained Local Process Execution Backend.
 Implements bounded child-process execution without shell=True.
 Enforces:
 1. Strict argv arrays (never shell=True).
-2. Restricted inherited environment (sanitized host environment).
+2. Deterministic, host-decoupled execution environment (no default inheritance of host HOME, USERPROFILE, TEMP, TMP, PATH).
 3. Bounded stdout/stderr byte capture.
 4. Robust timeout enforcement with POSIX process group isolation and recursive process-tree termination.
-5. Structured process facts metrics with explicit MeasurementStatus.
+5. Truthful process facts metrics with explicit MeasurementStatus.
 """
 
 from __future__ import annotations
@@ -22,13 +22,10 @@ from execution.models import TerminationReason, ResourceUsage, MeasurementStatus
 from execution.backend import BackendProcessResult, ExecutionBackend
 
 
-# Safe whitelist of standard system environment variables inherited from host
+# Safe whitelist of standard system runtime variables inherited only if present
 SAFE_SYSTEM_VARS = {
     "SYSTEMROOT",
     "WINDIR",
-    "LANG",
-    "LC_ALL",
-    "TZ",
     "PATHEXT",
     "COMSPEC",
 }
@@ -69,21 +66,64 @@ BLOCKED_ENV_EXACT = {
 VAR_NAME_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 
-def sanitize_environment(custom_env: Optional[Mapping[str, str]] = None) -> dict[str, str]:
-    """Constructs child environment strictly from an explicit approved policy."""
+def get_deterministic_runtime_path() -> str:
+    """Builds a minimal, deterministic PATH from authorized system binaries and python runtime."""
+    python_dir = os.path.dirname(os.path.abspath(sys.executable))
+    if sys.platform == "win32":
+        sys_root = os.environ.get("SYSTEMROOT", r"C:\Windows")
+        candidates = [
+            python_dir,
+            os.path.join(python_dir, "Scripts"),
+            sys_root,
+            os.path.join(sys_root, "System32"),
+        ]
+        sep = ";"
+    else:
+        candidates = [
+            "/usr/local/bin",
+            "/usr/bin",
+            "/bin",
+            python_dir,
+        ]
+        sep = ":"
+
+    valid = [p for p in candidates if os.path.exists(p)]
+    return sep.join(valid)
+
+
+def sanitize_environment(
+    custom_env: Optional[Mapping[str, str]] = None,
+    workspace_dir: Optional[str] = None,
+    authorized_path: Optional[str] = None,
+) -> dict[str, str]:
+    """Constructs a minimal deterministic execution environment decoupled from arbitrary host state.
+    
+    Does NOT inherit host HOME, USERPROFILE, TEMP, TMP, or PATH by default.
+    """
     clean_env = {}
 
-    # 1. Inherit safe system runtime variables from host
+    # 1. Inherit minimal safe platform essentials
     for key in SAFE_SYSTEM_VARS:
         if key in os.environ:
             clean_env[key] = os.environ[key]
 
-    # 2. Inherit system PATH and standard temp directories from host (caller cannot override)
-    for key in ("PATH", "TEMP", "TMP", "USERPROFILE", "HOME"):
-        if key in os.environ:
-            clean_env[key] = os.environ[key]
+    # 2. Set deterministic standard locale / timezone
+    clean_env["LANG"] = "C.UTF-8"
+    clean_env["LC_ALL"] = "C.UTF-8"
+    clean_env["TZ"] = "UTC"
 
-    # 3. Apply validated custom variables from caller (subject to strict policy filtering)
+    # 3. Deterministic authorized runtime PATH
+    clean_env["PATH"] = authorized_path or get_deterministic_runtime_path()
+
+    # 4. Workspace-contained temporary directories and profile roots
+    if workspace_dir:
+        tmp_dir = os.path.join(workspace_dir, ".tmp")
+        clean_env["TEMP"] = tmp_dir
+        clean_env["TMP"] = tmp_dir
+        clean_env["HOME"] = workspace_dir
+        clean_env["USERPROFILE"] = workspace_dir
+
+    # 5. Apply validated custom variables from caller (subject to strict policy filtering)
     if custom_env:
         for k, v in custom_env.items():
             if not isinstance(k, str) or not isinstance(v, str):
@@ -95,7 +135,7 @@ def sanitize_environment(custom_env: Optional[Mapping[str, str]] = None) -> dict
                 continue
             clean_env[k] = v
 
-    # 4. Enforce strict deterministic Python execution flags
+    # 6. Enforce strict deterministic Python execution flags
     clean_env["PYTHONUNBUFFERED"] = "1"
     clean_env["PYTHONDONTWRITEBYTECODE"] = "1"
     return clean_env
@@ -142,6 +182,9 @@ class LocalProcessBackend(ExecutionBackend):
     Security Classification: Constrained Local Execution (argv arrays, restricted environment, bounded streams, timeouts, process group isolation).
     """
 
+    def __init__(self, authorized_path: Optional[str] = None):
+        self._authorized_path = authorized_path
+
     def execute_command(
         self,
         command_argv: Sequence[str],
@@ -161,7 +204,14 @@ class LocalProcessBackend(ExecutionBackend):
         if not os.path.exists(working_directory):
             raise ValueError(f"working_directory does not exist: '{working_directory}'")
 
-        cleaned_env = sanitize_environment(environment)
+        # Ensure workspace-contained tmp directory exists
+        os.makedirs(os.path.join(working_directory, ".tmp"), exist_ok=True)
+
+        cleaned_env = sanitize_environment(
+            custom_env=environment,
+            workspace_dir=working_directory,
+            authorized_path=self._authorized_path,
+        )
         started_at = datetime.now(timezone.utc).isoformat()
         t0 = time.perf_counter()
 

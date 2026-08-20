@@ -1,19 +1,20 @@
 """
-S-Class EOS V11.2 - D6 Execution Fabric Production-Grade Hardened Test Suite (§8.1, §8.3).
+S-Class EOS V11.2 - D6 Execution Fabric Hardened Test Suite (§8.1, §8.3).
 Exhaustive verification of:
 1. D5 ExecutionEnvelope Gateway Verification.
 2. Mandatory Authoritative D2 NonceStore Dependency (fails closed if missing/invalid).
-3. Provider Resolution & Capability Scoping.
-4. Isolated Workspace Management & Path Traversal / Symlink Escape Prevention.
-5. Provider Boundary Workspace Containment (../../outside, absolute host path, symlink -> outside, drive path, UNC path, valid target).
-6. Constrained LocalProcessBackend (argv arrays, sanitized environment, bounded streams, timeouts, process group isolation).
-7. Process Group Isolation & Parent Group Non-Termination Regression (timeout cannot kill parent/controller).
-8. Recursive Orphan Descendant Process Tree Termination.
-9. Truthful Resource Semantics (ENFORCED, OBSERVED, UNSUPPORTED).
-10. Hardened Environment Construction (PATH, PYTHONPATH, TEMP, TMP, LD_PRELOAD, NODE_OPTIONS, BASH_ENV injection rejection).
-11. Explicit Workspace Cleanup Failure Recording.
-12. Pytest Provider Adapter execution.
-13. Immutable ExecutionObservation process facts.
+3. Provider Resolution & Capability Scoping (no capability escalation, cannot expand capability set).
+4. Invariant Guards: D6 cannot mint tokens, cannot modify authorization decisions.
+5. Concurrent Executions: Multiple threads remain strictly isolated in separate workspaces.
+6. Workspace Lifecycle: Success (inactive/clean), Failure (active/dirty), Retry behavior, Persistent failure recording.
+7. Provider Boundary Workspace Containment (../../outside, absolute host path, symlink -> outside, drive path, UNC path, valid target).
+8. Constrained LocalProcessBackend (argv arrays, deterministic environment, bounded streams, timeouts, process group isolation).
+9. Process Group Isolation & Parent Group Non-Termination Regression (timeout cannot kill parent/controller).
+10. Recursive Orphan Descendant Process Tree Termination.
+11. Truthful Resource Semantics (ENFORCED, OBSERVED, UNSUPPORTED).
+12. Hardened Environment Construction & Host Immunity (host PATH/TEMP/HOME mutations cannot alter child execution).
+13. Pytest Provider Adapter execution facts.
+14. Immutable ExecutionObservation process facts.
 """
 
 import os
@@ -57,7 +58,7 @@ from execution.models import (
 )
 from execution.workspace import IsolatedWorkspace
 from execution.backend import ExecutionBackend, BackendProcessResult
-from execution.local_backend import LocalProcessBackend, sanitize_environment, terminate_process_tree
+from execution.local_backend import LocalProcessBackend, sanitize_environment, terminate_process_tree, get_deterministic_runtime_path
 from execution.provider import D6ExecutionProvider, D6ProviderRegistry
 from execution.adapters.pytest_adapter import PytestExecutionProvider
 from execution.gateway import D6ExecutionGateway
@@ -120,7 +121,7 @@ def make_valid_envelope(
     context = ExecutionContext(
         provider_id=provider_id,
         sandbox_profile_id="sbx_std",
-        workspace_id="ws_verified_1",
+        workspace_id=f"ws_verified_{os.urandom(4).hex()}",
         resource_profile_id="res_std",
         capability_set=tuple(capabilities),
     )
@@ -173,7 +174,7 @@ def make_valid_envelope(
 
 
 # =====================================================================
-# 1. GATEWAY & ENVELOPE VERIFICATION TESTS
+# 1. GATEWAY & D2 AUTHORITY DEPENDENCY TESTS
 # =====================================================================
 
 def test_gateway_requires_authoritative_d2_nonce_store():
@@ -276,7 +277,6 @@ def test_gateway_rejected_on_unadmitted_or_tampered_token(tmp_path, fresh_nonce_
         parameters={},
     )
 
-    # Unadmitted dummy admission (valid schema matching token, but nonce never registered in D2)
     admission = ExecutionAdmissionResult(
         token_id=token.token_id,
         execution_nonce=token.execution_nonce,
@@ -297,6 +297,52 @@ def test_gateway_rejected_on_unadmitted_or_tampered_token(tmp_path, fresh_nonce_
     assert obs.termination_reason == TerminationReason.ENVELOPE_INVALID
 
 
+# =====================================================================
+# 2. ARCHITECTURAL INVARIANT GUARDS
+# =====================================================================
+
+def test_d6_cannot_authorize_or_mint_tokens(fresh_nonce_store):
+    """Architectural Guard: Verifies D6 has no token minting or authorization capability."""
+    gateway = D6ExecutionGateway(authority_signer=Gate3AuthoritySigner(), nonce_store=fresh_nonce_store)
+    assert not hasattr(gateway, "mint_execution_token")
+    assert not hasattr(gateway, "authorize_action")
+    assert not hasattr(gateway, "create_obligation")
+    assert not hasattr(gateway, "evaluate_proposal")
+
+
+def test_d6_cannot_modify_authorization_decision(tmp_path, fresh_nonce_store):
+    """Architectural Guard: Gateway cannot alter or bypass decision commitments."""
+    gateway = D6ExecutionGateway(authority_signer=Gate3AuthoritySigner(), nonce_store=fresh_nonce_store)
+    env = make_valid_envelope(tmp_path, fresh_nonce_store)
+    
+    # Attempting to tamper with the envelope's admitted binding is rejected fail-closed
+    tampered_binding = ActionBinding(
+        action_type="EXECUTE_TEST",
+        target="tests/tampered.py",
+        purpose="tampered",
+        parameters={},
+    )
+    with pytest.raises(ValueError, match="Action digest mismatch"):
+        ExecutionEnvelope(
+            token=env.token,
+            admission=env.admission,
+            action_binding=tampered_binding,
+            execution_context=env.execution_context,
+        )
+
+
+def test_d6_cannot_expand_capability_set(tmp_path, fresh_nonce_store):
+    """Architectural Guard: Gateway strictly enforces authorized capability set and rejects escalation."""
+    signer = Gate3AuthoritySigner()
+    gateway = D6ExecutionGateway(authority_signer=signer, nonce_store=fresh_nonce_store)
+
+    # PytestExecutionProvider requires CAP_EXEC_TEST, but envelope only grants CAP_READ_LOGS
+    env = make_valid_envelope(tmp_path, fresh_nonce_store, capabilities=("CAP_READ_LOGS",))
+    obs = gateway.execute(env, DEFAULT_SHA, 1, TIMESTAMP_NOW)
+    assert obs.execution_status == ExecutionStatus.GATEWAY_REJECTED
+    assert obs.termination_reason == TerminationReason.CAPABILITY_VIOLATION
+
+
 def test_gateway_rejected_on_unauthorized_provider(tmp_path, fresh_nonce_store):
     """Verifies gateway rejection when provider_id in context is not registered."""
     signer = Gate3AuthoritySigner()
@@ -306,18 +352,6 @@ def test_gateway_rejected_on_unauthorized_provider(tmp_path, fresh_nonce_store):
     obs = gateway.execute(env, DEFAULT_SHA, 1, TIMESTAMP_NOW)
     assert obs.execution_status == ExecutionStatus.GATEWAY_REJECTED
     assert obs.termination_reason == TerminationReason.UNAUTHORIZED_PROVIDER
-
-
-def test_gateway_rejected_on_capability_escalation_or_missing_capability(tmp_path, fresh_nonce_store):
-    """Verifies gateway rejection when authorized capability_set does not satisfy provider requirements."""
-    signer = Gate3AuthoritySigner()
-    gateway = D6ExecutionGateway(authority_signer=signer, nonce_store=fresh_nonce_store)
-
-    # PytestExecutionProvider requires CAP_EXEC_TEST, but envelope only grants CAP_READ_LOGS
-    env = make_valid_envelope(tmp_path, fresh_nonce_store, capabilities=("CAP_READ_LOGS",))
-    obs = gateway.execute(env, DEFAULT_SHA, 1, TIMESTAMP_NOW)
-    assert obs.execution_status == ExecutionStatus.GATEWAY_REJECTED
-    assert obs.termination_reason == TerminationReason.CAPABILITY_VIOLATION
 
 
 def test_gateway_rejected_on_action_type_unsupported_by_provider(tmp_path, fresh_nonce_store):
@@ -348,7 +382,249 @@ def test_gateway_rejected_on_action_type_unsupported_by_provider(tmp_path, fresh
 
 
 # =====================================================================
-# 2. WORKSPACE CONTAINMENT & PROVIDER BOUNDARY TESTS
+# 3. CONCURRENCY & ISOLATION RESTORATION TESTS
+# =====================================================================
+
+def test_concurrent_executions_remain_isolated(tmp_path, fresh_nonce_store):
+    """Verifies concurrent executions maintain strict workspace and state isolation across threads."""
+    signer = Gate3AuthoritySigner()
+    gateway = D6ExecutionGateway(
+        authority_signer=signer,
+        nonce_store=fresh_nonce_store,
+        workspace_base_dir=str(tmp_path / "concurrent_ws"),
+    )
+
+    def run_worker(idx: int):
+        env = make_valid_envelope(
+            tmp_path,
+            fresh_nonce_store,
+            target=f"test_worker_{idx}.py",
+        )
+        return gateway.execute(
+            envelope=env,
+            expected_source_sha=DEFAULT_SHA,
+            expected_policy_version=1,
+            current_time_iso=TIMESTAMP_NOW,
+        )
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = [executor.submit(run_worker, i) for i in range(4)]
+        observations = [f.result() for f in futures]
+
+    assert len(observations) == 4
+    exec_ids = {obs.execution_id for obs in observations}
+    assert len(exec_ids) == 4
+    token_ids = {obs.token_id for obs in observations}
+    assert len(token_ids) == 4
+    for obs in observations:
+        assert isinstance(obs, ExecutionObservation)
+        assert obs.execution_status in (ExecutionStatus.SUCCESS, ExecutionStatus.FAILURE)
+
+
+# =====================================================================
+# 4. WORKSPACE CLEANUP LIFECYCLE TESTS
+# =====================================================================
+
+def test_workspace_cleanup_lifecycle_success(tmp_path):
+    """Verifies cleanup success transitions workspace to inactive and not dirty."""
+    ws = IsolatedWorkspace(workspace_id="ws_clean_ok", base_dir=str(tmp_path))
+    ws.setup()
+    assert ws.is_active is True
+    assert ws.is_dirty is True
+    assert os.path.exists(ws.path)
+
+    err = ws.cleanup()
+    assert err is None
+    assert ws.is_active is False
+    assert ws.is_dirty is False
+    assert not os.path.exists(ws.path)
+    assert ws.last_cleanup_error is None
+
+
+def test_workspace_cleanup_lifecycle_failure_remains_active_and_dirty(tmp_path):
+    """Verifies cleanup failure leaves workspace active and marked dirty with explicit error."""
+    ws = IsolatedWorkspace(workspace_id="ws_clean_fail", base_dir=str(tmp_path))
+    ws.setup()
+
+    with patch("shutil.rmtree", side_effect=PermissionError("Directory locked by test")):
+        err = ws.cleanup(max_retries=1)
+
+    assert err is not None
+    assert "Directory locked by test" in err
+    assert ws.is_active is True
+    assert ws.is_dirty is True
+    assert ws.last_cleanup_error == err
+
+    # Normal cleanup can now finish
+    err_retry = ws.cleanup()
+    assert err_retry is None
+    assert ws.is_active is False
+    assert ws.is_dirty is False
+
+
+def test_workspace_cleanup_retry_behavior(tmp_path):
+    """Verifies cleanup performs bounded retries on transient errors."""
+    ws = IsolatedWorkspace(workspace_id="ws_clean_retry", base_dir=str(tmp_path))
+    ws.setup()
+
+    # First attempt fails, second succeeds
+    side_effects = [PermissionError("Transient lock"), None]
+
+    def mock_rmtree(path):
+        action = side_effects.pop(0)
+        if isinstance(action, Exception):
+            raise action
+        if os.path.exists(path):
+            os.rmdir(path)
+
+    with patch("shutil.rmtree", side_effect=mock_rmtree):
+        err = ws.cleanup(max_retries=2, retry_delay_seconds=0.01)
+
+    assert err is None
+    assert ws.is_active is False
+    assert ws.is_dirty is False
+
+
+def test_workspace_persistent_cleanup_failure_recorded_in_gateway(tmp_path, fresh_nonce_store):
+    """Verifies that persistent cleanup failure is explicitly recorded in Gateway diagnostics."""
+    signer = Gate3AuthoritySigner()
+    gateway = D6ExecutionGateway(
+        authority_signer=signer,
+        nonce_store=fresh_nonce_store,
+        workspace_base_dir=str(tmp_path / "cleanup_ws"),
+    )
+
+    env = make_valid_envelope(tmp_path, fresh_nonce_store, target="test_clean.py")
+
+    with patch("shutil.rmtree", side_effect=PermissionError("Persistent lock on workspace")):
+        obs = gateway.execute(
+            envelope=env,
+            expected_source_sha=DEFAULT_SHA,
+            expected_policy_version=1,
+            current_time_iso=TIMESTAMP_NOW,
+        )
+
+    assert any("cleanup_warning" in d for d in obs.diagnostics)
+    assert any(d.get("workspace_dirty") is True for d in obs.diagnostics)
+
+
+# =====================================================================
+# 5. ENVIRONMENT ISOLATION & HOST DECOUPLING TESTS
+# =====================================================================
+
+def test_environment_isolation_host_env_mutations_ignored(tmp_path):
+    """Proves host environment mutations (PATH, TEMP, HOME) cannot alter or pollute execution environment."""
+    orig_env = dict(os.environ)
+    try:
+        # Poison host environment
+        os.environ["PATH"] = "/poisoned/host/bin"
+        os.environ["TEMP"] = "/poisoned/host/temp"
+        os.environ["TMP"] = "/poisoned/host/tmp"
+        os.environ["HOME"] = "/poisoned/host/home"
+        os.environ["USERPROFILE"] = "/poisoned/host/userprofile"
+
+        workspace_dir = str(tmp_path / "env_ws")
+        os.makedirs(workspace_dir, exist_ok=True)
+
+        cleaned = sanitize_environment(workspace_dir=workspace_dir)
+
+        # Assert host values were NOT inherited
+        assert "/poisoned/host/bin" not in cleaned["PATH"]
+        assert cleaned["TEMP"] != "/poisoned/host/temp"
+        assert cleaned["TMP"] != "/poisoned/host/tmp"
+        assert cleaned["HOME"] != "/poisoned/host/home"
+        assert cleaned["USERPROFILE"] != "/poisoned/host/userprofile"
+
+        # Assert contained in workspace
+        assert cleaned["TEMP"].startswith(workspace_dir)
+        assert cleaned["TMP"].startswith(workspace_dir)
+        assert cleaned["HOME"] == workspace_dir
+        assert cleaned["USERPROFILE"] == workspace_dir
+
+        # Assert deterministic PATH
+        assert len(cleaned["PATH"]) > 0
+        assert cleaned["LANG"] == "C.UTF-8"
+        assert cleaned["TZ"] == "UTC"
+
+    finally:
+        os.environ.clear()
+        os.environ.update(orig_env)
+
+
+def test_environment_construction_prevents_path_and_pythonpath_overrides(tmp_path):
+    """Adversarial Test: Proves caller custom env cannot override PATH, PYTHONPATH, TEMP, TMP."""
+    workspace_dir = str(tmp_path / "caller_ws")
+    os.makedirs(workspace_dir, exist_ok=True)
+
+    malicious_custom = {
+        "PATH": "/malicious/bin",
+        "PYTHONPATH": "/malicious/python/lib",
+        "PYTHONHOME": "/malicious/python/home",
+        "TEMP": "/malicious/temp",
+        "TMP": "/malicious/tmp",
+        "SAFE_CUSTOM_VAR": "valid_value_123",
+    }
+
+    cleaned = sanitize_environment(custom_env=malicious_custom, workspace_dir=workspace_dir)
+
+    assert "/malicious/bin" not in cleaned["PATH"]
+    assert "PYTHONPATH" not in cleaned
+    assert "PYTHONHOME" not in cleaned
+    assert cleaned["TEMP"] != "/malicious/temp"
+    assert cleaned["TMP"] != "/malicious/tmp"
+    assert cleaned["SAFE_CUSTOM_VAR"] == "valid_value_123"
+    assert cleaned["PYTHONUNBUFFERED"] == "1"
+    assert cleaned["PYTHONDONTWRITEBYTECODE"] == "1"
+
+
+def test_environment_construction_blocks_dynamic_linker_and_shell_injections(tmp_path):
+    """Adversarial Test: Proves caller cannot inject LD_PRELOAD, NODE_OPTIONS, BASH_ENV, etc."""
+    hostile_injections = {
+        "LD_PRELOAD": "/tmp/libhack.so",
+        "DYLD_INSERT_LIBRARIES": "/tmp/libhack.dylib",
+        "NODE_OPTIONS": "--require /tmp/hack.js",
+        "BASH_ENV": "/tmp/evil_bashrc",
+        "PERL5OPT": "-Mevil",
+        "RUBYOPT": "-revid",
+        "PYTHONSTARTUP": "/tmp/evil_startup.py",
+        "IFS": ":",
+        "PROMPT_COMMAND": "curl evil.com",
+    }
+
+    cleaned = sanitize_environment(custom_env=hostile_injections, workspace_dir=str(tmp_path))
+
+    for hostile_key in hostile_injections:
+        assert hostile_key not in cleaned
+
+
+def test_local_backend_executes_with_sanitized_environment(tmp_path):
+    """Verifies that child process observes the sanitized environment policy."""
+    backend = LocalProcessBackend()
+    
+    script = (
+        "import os\n"
+        "assert 'LD_PRELOAD' not in os.environ\n"
+        "assert 'PYTHONPATH' not in os.environ\n"
+        "assert os.environ.get('MY_APP_FLAG') == 'active'\n"
+        "print('ENV_VERIFIED_CLEAN')\n"
+    )
+
+    res = backend.execute_command(
+        command_argv=[sys.executable, "-c", script],
+        working_directory=str(tmp_path),
+        environment={
+            "LD_PRELOAD": "/tmp/bad.so",
+            "PYTHONPATH": "/tmp/bad_py",
+            "MY_APP_FLAG": "active",
+        },
+    )
+
+    assert res.exit_code == 0
+    assert b"ENV_VERIFIED_CLEAN" in res.stdout_bytes
+
+
+# =====================================================================
+# 6. WORKSPACE CONTAINMENT & PROVIDER BOUNDARY TESTS
 # =====================================================================
 
 def test_workspace_isolation_and_path_traversal_rejection(tmp_path):
@@ -485,30 +761,8 @@ def test_gateway_catches_provider_containment_violation(tmp_path, fresh_nonce_st
     assert obs.termination_reason == TerminationReason.PATH_ESCAPE_DETECTED
 
 
-def test_workspace_cleanup_failure_recorded_in_diagnostics(tmp_path, fresh_nonce_store):
-    """Verifies that if workspace cleanup fails, the warning is captured explicitly in diagnostics."""
-    signer = Gate3AuthoritySigner()
-    gateway = D6ExecutionGateway(
-        authority_signer=signer,
-        nonce_store=fresh_nonce_store,
-        workspace_base_dir=str(tmp_path / "cleanup_ws"),
-    )
-
-    env = make_valid_envelope(tmp_path, fresh_nonce_store, target="test_clean.py")
-
-    with patch("shutil.rmtree", side_effect=PermissionError("Permission denied on workspace cleanup")):
-        obs = gateway.execute(
-            envelope=env,
-            expected_source_sha=DEFAULT_SHA,
-            expected_policy_version=1,
-            current_time_iso=TIMESTAMP_NOW,
-        )
-
-    assert any("cleanup_warning" in d for d in obs.diagnostics)
-
-
 # =====================================================================
-# 3. PROCESS GROUP ISOLATION & REGRESSION TESTS
+# 7. PROCESS GROUP ISOLATION & REGRESSION TESTS
 # =====================================================================
 
 def test_local_backend_process_group_isolation_and_timeout(tmp_path):
@@ -547,7 +801,6 @@ def test_orphan_descendant_process_tree_cleanup(tmp_path):
     """Verifies that when a child process spawns nested descendant processes, tree termination kills all descendants."""
     backend = LocalProcessBackend()
 
-    # Script spawns a grand-child process and sleeps
     parent_script = (
         "import subprocess, sys, time\n"
         "sub = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])\n"
@@ -565,7 +818,7 @@ def test_orphan_descendant_process_tree_cleanup(tmp_path):
 
 
 # =====================================================================
-# 4. RESOURCE SEMANTICS (ENFORCED, OBSERVED, UNSUPPORTED)
+# 8. RESOURCE SEMANTICS (ENFORCED, OBSERVED, UNSUPPORTED)
 # =====================================================================
 
 def test_resource_usage_semantics_and_immutability():
@@ -639,83 +892,7 @@ def test_backend_produces_correct_resource_semantics(tmp_path):
 
 
 # =====================================================================
-# 5. HARDENED ENVIRONMENT CONSTRUCTION TESTS
-# =====================================================================
-
-def test_environment_construction_prevents_path_and_pythonpath_overrides():
-    """Adversarial Test: Proves caller cannot override PATH, PYTHONPATH, TEMP, TMP."""
-    host_path = os.environ.get("PATH", "")
-    host_temp = os.environ.get("TEMP", "")
-
-    malicious_custom = {
-        "PATH": "/malicious/bin:" + host_path,
-        "PYTHONPATH": "/malicious/python/lib",
-        "PYTHONHOME": "/malicious/python/home",
-        "TEMP": "/malicious/temp",
-        "TMP": "/malicious/tmp",
-        "SAFE_CUSTOM_VAR": "valid_value_123",
-    }
-
-    cleaned = sanitize_environment(malicious_custom)
-
-    assert cleaned["PATH"] == host_path
-    if host_temp:
-        assert cleaned["TEMP"] == host_temp
-    assert "PYTHONPATH" not in cleaned
-    assert "PYTHONHOME" not in cleaned
-    assert cleaned["SAFE_CUSTOM_VAR"] == "valid_value_123"
-    assert cleaned["PYTHONUNBUFFERED"] == "1"
-    assert cleaned["PYTHONDONTWRITEBYTECODE"] == "1"
-
-
-def test_environment_construction_blocks_dynamic_linker_and_shell_injections():
-    """Adversarial Test: Proves caller cannot inject LD_PRELOAD, NODE_OPTIONS, BASH_ENV, etc."""
-    hostile_injections = {
-        "LD_PRELOAD": "/tmp/libhack.so",
-        "DYLD_INSERT_LIBRARIES": "/tmp/libhack.dylib",
-        "NODE_OPTIONS": "--require /tmp/hack.js",
-        "BASH_ENV": "/tmp/evil_bashrc",
-        "PERL5OPT": "-Mevil",
-        "RUBYOPT": "-revid",
-        "PYTHONSTARTUP": "/tmp/evil_startup.py",
-        "IFS": ":",
-        "PROMPT_COMMAND": "curl evil.com",
-    }
-
-    cleaned = sanitize_environment(hostile_injections)
-
-    for hostile_key in hostile_injections:
-        assert hostile_key not in cleaned
-
-
-def test_local_backend_executes_with_sanitized_environment(tmp_path):
-    """Verifies that child process observes the sanitized environment policy."""
-    backend = LocalProcessBackend()
-    
-    script = (
-        "import os\n"
-        "assert 'LD_PRELOAD' not in os.environ\n"
-        "assert 'PYTHONPATH' not in os.environ\n"
-        "assert os.environ.get('MY_APP_FLAG') == 'active'\n"
-        "print('ENV_VERIFIED_CLEAN')\n"
-    )
-
-    res = backend.execute_command(
-        command_argv=[sys.executable, "-c", script],
-        working_directory=str(tmp_path),
-        environment={
-            "LD_PRELOAD": "/tmp/bad.so",
-            "PYTHONPATH": "/tmp/bad_py",
-            "MY_APP_FLAG": "active",
-        },
-    )
-
-    assert res.exit_code == 0
-    assert b"ENV_VERIFIED_CLEAN" in res.stdout_bytes
-
-
-# =====================================================================
-# 6. CONSTRAINED EXECUTION & METRICS TESTS
+# 9. CONSTRAINED EXECUTION & METRICS TESTS
 # =====================================================================
 
 def test_local_backend_shell_metacharacters_treated_as_arguments(tmp_path):
@@ -973,44 +1150,3 @@ def test_isolated_workspace_setup_and_traversal_corner_cases(tmp_path):
     err = ws.cleanup()
     assert err is None
     assert not ws.is_active
-
-
-def test_concurrent_executions_remain_isolated(tmp_path, fresh_nonce_store):
-    """Verifies concurrent executions maintain strict workspace and state isolation."""
-    signer = Gate3AuthoritySigner()
-    gateway = D6ExecutionGateway(
-        authority_signer=signer,
-        nonce_store=fresh_nonce_store,
-        workspace_base_dir=str(tmp_path / "concurrent_ws"),
-    )
-
-    def run_worker(idx: int):
-        env = make_valid_envelope(
-            tmp_path,
-            fresh_nonce_store,
-            target=f"test_worker_{idx}.py",
-        )
-        return gateway.execute(
-            envelope=env,
-            expected_source_sha=DEFAULT_SHA,
-            expected_policy_version=1,
-            current_time_iso=TIMESTAMP_NOW,
-        )
-
-    with ThreadPoolExecutor(max_workers=3) as executor:
-        futures = [executor.submit(run_worker, i) for i in range(3)]
-        observations = [f.result() for f in futures]
-
-    assert len(observations) == 3
-    exec_ids = {obs.execution_id for obs in observations}
-    assert len(exec_ids) == 3
-    for obs in observations:
-        assert isinstance(obs, ExecutionObservation)
-
-
-def test_d6_cannot_authorize_or_mint_tokens(fresh_nonce_store):
-    """Architectural Guard: Verifies D6 has no token minting capability."""
-    gateway = D6ExecutionGateway(authority_signer=Gate3AuthoritySigner(), nonce_store=fresh_nonce_store)
-    assert not hasattr(gateway, "mint_execution_token")
-    assert not hasattr(gateway, "authorize_action")
-    assert not hasattr(gateway, "create_obligation")

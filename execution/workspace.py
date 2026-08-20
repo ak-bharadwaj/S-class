@@ -1,13 +1,23 @@
 """
 S-Class EOS V11.2 - D6 Isolated Execution Workspace Management.
-Provides isolated directory management with path traversal / symlink escape prevention.
+Provides isolated directory management with path traversal / symlink escape prevention,
+explicit cleanup state tracking, and bounded cleanup retries.
 """
 
 from __future__ import annotations
 import os
+import time
 import shutil
 import uuid
-from typing import Optional, Tuple
+from typing import Optional
+
+
+def _normalize_canonical_path(p: str) -> str:
+    """Canonicalizes a path and strips OS-specific extended prefixes (e.g. \\\\?\\ on Windows)."""
+    rp = os.path.realpath(os.path.abspath(p))
+    if rp.startswith("\\\\?\\"):
+        rp = rp[4:]
+    return os.path.normpath(rp)
 
 
 class IsolatedWorkspace:
@@ -22,6 +32,8 @@ class IsolatedWorkspace:
         self._unique_id = uuid.uuid4().hex[:12]
         self._workspace_path = os.path.join(self._base_dir, f"{self.workspace_id}_{self._unique_id}")
         self._is_active = False
+        self._is_dirty = False
+        self._last_cleanup_error: Optional[str] = None
 
     @property
     def path(self) -> str:
@@ -31,15 +43,25 @@ class IsolatedWorkspace:
     def is_active(self) -> bool:
         return self._is_active
 
+    @property
+    def is_dirty(self) -> bool:
+        return self._is_dirty
+
+    @property
+    def last_cleanup_error(self) -> Optional[str]:
+        return self._last_cleanup_error
+
     def setup(self) -> str:
         """Initializes the isolated directory ensuring no path traversal."""
-        real_ws = os.path.realpath(self._workspace_path)
-        real_base = os.path.realpath(self._base_dir)
+        real_ws = _normalize_canonical_path(self._workspace_path)
+        real_base = _normalize_canonical_path(self._base_dir)
         if not (real_ws == real_base or real_ws.startswith(real_base + os.sep)):
             raise ValueError(f"Path escape detected: '{real_ws}' is outside base directory '{real_base}'")
 
         os.makedirs(self._workspace_path, exist_ok=True)
         self._is_active = True
+        self._is_dirty = True
+        self._last_cleanup_error = None
         return self._workspace_path
 
     def resolve_safe_path(self, relative_path: str) -> str:
@@ -62,23 +84,46 @@ class IsolatedWorkspace:
 
         # 3. Canonicalize symlinks and check containment
         combined = os.path.join(self._workspace_path, relative_path)
-        real_target = os.path.realpath(combined)
-        real_ws = os.path.realpath(self._workspace_path)
+        real_target = _normalize_canonical_path(combined)
+        real_ws = _normalize_canonical_path(self._workspace_path)
 
         if not (real_target == real_ws or real_target.startswith(real_ws + os.sep)):
             raise ValueError(f"Path escape detected: '{relative_path}' resolves to '{real_target}' outside workspace '{real_ws}'")
         return real_target
 
-    def cleanup(self) -> Optional[str]:
-        """Cleans up the temporary workspace directory. Returns error message if cleanup fails."""
-        cleanup_error = None
-        if os.path.exists(self._workspace_path):
+    def cleanup(self, max_retries: int = 1, retry_delay_seconds: float = 0.05) -> Optional[str]:
+        """Cleans up the temporary workspace directory with bounded retries.
+        
+        Semantics:
+        - cleanup success -> is_active = False, is_dirty = False, returns None
+        - cleanup failure -> is_active = True, is_dirty = True, returns error message
+        """
+        if not os.path.exists(self._workspace_path):
+            self._is_active = False
+            self._is_dirty = False
+            self._last_cleanup_error = None
+            return None
+
+        attempts = max(1, max_retries)
+        last_err = None
+
+        for attempt in range(attempts):
             try:
                 shutil.rmtree(self._workspace_path)
+                self._is_active = False
+                self._is_dirty = False
+                self._last_cleanup_error = None
+                return None
             except Exception as e:
-                cleanup_error = f"Failed to cleanup workspace '{self._workspace_path}': {str(e)}"
-        self._is_active = False
-        return cleanup_error
+                last_err = f"Failed to cleanup workspace '{self._workspace_path}': {str(e)}"
+                self._last_cleanup_error = last_err
+                if attempt < attempts - 1:
+                    time.sleep(retry_delay_seconds)
+
+        # Cleanup failed across all attempts: workspace remains active and dirty
+        self._is_active = True
+        self._is_dirty = True
+        return last_err
 
     def __enter__(self) -> IsolatedWorkspace:
         self.setup()
