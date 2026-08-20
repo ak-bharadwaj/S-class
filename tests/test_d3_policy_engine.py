@@ -1637,3 +1637,103 @@ print("SUCCESS" if res else "REJECT")
     p2 = subprocess.Popen([sys.executable, "-c", script_p2], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     out2, _ = p2.communicate(timeout=10)
     assert out2.strip() == "REJECT"
+
+def test_adversarial_modified_nonce_record_fails_closed(tmp_path):
+    """Adversarial vector: Modifying nonce value in record -> CorruptEventLogError (fail closed)."""
+    from events.store import D2NonceStore
+    from events.exceptions import CorruptEventLogError
+
+    store_file = str(tmp_path / "mod_nonce.log")
+    store = D2NonceStore(file_path=store_file)
+    store.reserve_nonce("VALID-NONCE-1")
+
+    # Tamper with the nonce value in the JSON line without recomputing hash
+    with open(store_file, "r", encoding="utf-8") as f:
+        data = f.read()
+    tampered_data = data.replace("VALID-NONCE-1", "TAMPERED-NONCE-1")
+    with open(store_file, "w", encoding="utf-8") as f:
+        f.write(tampered_data)
+
+    tampered_store = D2NonceStore(file_path=store_file)
+    with pytest.raises(CorruptEventLogError, match="Cryptographic digest forgery/corruption"):
+        tampered_store.reserve_nonce("ANOTHER-NONCE")
+
+
+def test_adversarial_modified_timestamp_record_fails_closed(tmp_path):
+    """Adversarial vector: Modifying timestamp in record -> CorruptEventLogError (fail closed)."""
+    import json
+    from events.store import D2NonceStore
+    from events.exceptions import CorruptEventLogError
+
+    store_file = str(tmp_path / "mod_ts.log")
+    store = D2NonceStore(file_path=store_file)
+    store.reserve_nonce("VALID-NONCE-TS")
+
+    with open(store_file, "r", encoding="utf-8") as f:
+        line = f.readline().strip()
+    record = json.loads(line)
+    record["timestamp"] = "1970-01-01T00:00:00Z"
+    with open(store_file, "w", encoding="utf-8") as f:
+        f.write(json.dumps(record) + "\n")
+
+    tampered_store = D2NonceStore(file_path=store_file)
+    with pytest.raises(CorruptEventLogError, match="Cryptographic digest forgery/corruption"):
+        tampered_store.is_nonce_consumed("VALID-NONCE-TS")
+
+
+def test_adversarial_modified_digest_record_fails_closed(tmp_path):
+    """Adversarial vector: Modifying digest hash in record -> CorruptEventLogError (fail closed)."""
+    import json
+    from events.store import D2NonceStore
+    from events.exceptions import CorruptEventLogError
+
+    store_file = str(tmp_path / "mod_digest.log")
+    store = D2NonceStore(file_path=store_file)
+    store.reserve_nonce("VALID-NONCE-DIGEST")
+
+    with open(store_file, "r", encoding="utf-8") as f:
+        line = f.readline().strip()
+    record = json.loads(line)
+    record["digest"] = "f" * 64
+    with open(store_file, "w", encoding="utf-8") as f:
+        f.write(json.dumps(record) + "\n")
+
+    tampered_store = D2NonceStore(file_path=store_file)
+    with pytest.raises(CorruptEventLogError, match="Cryptographic digest forgery/corruption"):
+        tampered_store.reserve_nonce("ANOTHER-NONCE")
+
+
+def test_adversarial_deleted_or_partial_record_fails_closed(tmp_path):
+    """Adversarial vector: Deleted record breaking sequence/chain or torn record -> fail closed."""
+    from events.store import D2NonceStore
+    from events.exceptions import CorruptEventLogError
+
+    store_file = str(tmp_path / "partial_record.log")
+    store = D2NonceStore(file_path=store_file)
+    store.reserve_nonce("NONCE-1")
+    store.reserve_nonce("NONCE-2")
+
+    # 1. Truncate / corrupt last line
+    with open(store_file, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+    with open(store_file, "w", encoding="utf-8") as f:
+        f.write(lines[0] + '{"nonce": "INCOMPLETE')
+
+    tampered_store = D2NonceStore(file_path=store_file)
+    with pytest.raises(CorruptEventLogError, match="Corrupt JSON"):
+        tampered_store.reserve_nonce("NONCE-3")
+
+    # 2. Sequence / Chain discontinuity (deleting record 1)
+    store_file_discontinuity = str(tmp_path / "discontinuity.log")
+    store2 = D2NonceStore(file_path=store_file_discontinuity)
+    store2.reserve_nonce("NONCE-A")
+    store2.reserve_nonce("NONCE-B")
+    with open(store_file_discontinuity, "r", encoding="utf-8") as f:
+        lines2 = f.readlines()
+    # keep only line 2 (which has sequence_number=2, expected=1)
+    with open(store_file_discontinuity, "w", encoding="utf-8") as f:
+        f.write(lines2[1])
+
+    tampered_store2 = D2NonceStore(file_path=store_file_discontinuity)
+    with pytest.raises(CorruptEventLogError, match="Sequence discontinuity"):
+        tampered_store2.reserve_nonce("NONCE-C")

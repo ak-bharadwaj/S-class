@@ -171,3 +171,35 @@ def create_event(
         parent_digest=parent_digest,
         digest=digest,
     )
+
+
+def compute_nonce_preimage(
+    nonce: str,
+    timestamp: str,
+    sequence_number: int,
+    parent_digest: str,
+) -> bytes:
+    """Produces the exact RFC 8785 canonical preimage bytes for a single-use nonce record."""
+    payload = {
+        "nonce": nonce,
+        "parent_digest": parent_digest,
+        "sequence_number": sequence_number,
+        "timestamp": timestamp,
+    }
+    return canonicalize_json(payload)
+
+
+def compute_nonce_digest(
+    nonce: str,
+    timestamp: str,
+    sequence_number: int,
+    parent_digest: str,
+) -> str:
+    """Computes SHA-256 digest hex string from canonical RFC 8785 nonce record preimage."""
+    preimage = compute_nonce_preimage(
+        nonce=nonce,
+        timestamp=timestamp,
+        sequence_number=sequence_number,
+        parent_digest=parent_digest,
+    )
+    return hashlib.sha256(preimage).hexdigest()

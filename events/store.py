@@ -16,7 +16,7 @@ from domain.types import EventType
 from events.interfaces import EventStoreInterface, NonceReservationInterface
 from events.state import MaterializedState, GENESIS_PARENT_DIGEST
 from events.reducer import reduce_event, replay_events
-from events.serializer import verify_event_digest, canonicalize_json
+from events.serializer import verify_event_digest, canonicalize_json, compute_nonce_digest
 from events.exceptions import (
     StorageUnavailableError,
     ConcurrencyConflictError,
@@ -272,13 +272,15 @@ class FileAppendEventStore(EventStoreInterface):
 
 
 class D2NonceStore(NonceReservationInterface):
-    """D2 Durable, cross-process atomic single-use nonce reservation engine with kernel advisory locking."""
+    """D2 Durable, cross-process atomic single-use nonce reservation engine with cryptographic integrity."""
 
     def __init__(self, file_path: Optional[str] = None):
         if file_path is None:
-            file_path = os.environ.get("GATE3_NONCE_STORE_PATH") or os.path.join(
-                os.path.dirname(os.path.dirname(__file__)), "benchmark", "parity", ".gate3_nonces.log"
-            )
+            file_path = os.environ.get("GATE3_NONCE_STORE_PATH")
+            if not file_path:
+                file_path = os.path.join(
+                    os.path.dirname(__file__), ".d2_gate3_nonce_store.jsonl"
+                )
         self._file_path = os.path.abspath(file_path)
         self._lock_path = self._file_path + ".lock"
         self._process_cache: Set[str] = set()
@@ -288,22 +290,84 @@ class D2NonceStore(NonceReservationInterface):
     def file_path(self) -> str:
         return self._file_path
 
-    def reserve_nonce(self, nonce: str) -> bool:
-        """Atomically reserves a single-use nonce (INSERT-if-absent).
+    def _read_and_verify_log(self) -> Tuple[Set[str], int, str]:
+        """Reads the nonce log from disk, verifying sequence continuity, parent chaining, and SHA-256 digest integrity on every record.
         
         Returns:
-            True: If nonce was absent and successfully reserved.
-            False: If nonce is already present (duplicate/replayed).
+            Tuple[Set[str], int, str]: (set_of_consumed_nonces, head_sequence_number, head_digest)
             
         Raises:
-            TypeError: If nonce is malformed.
-            CorruptEventLogError: If storage file contains corrupted or invalid records.
-            StorageUnavailableError: If storage, locking, or I/O is unavailable (fail closed).
+            CorruptEventLogError: If any record is malformed, missing fields, or has invalid cryptographic digest/chaining.
+            StorageUnavailableError: If I/O read failure occurs.
         """
+        import hmac
+        if not os.path.exists(self._file_path):
+            return set(), 0, GENESIS_PARENT_DIGEST
+
+        consumed: Set[str] = set()
+        expected_parent = GENESIS_PARENT_DIGEST
+        head_seq = 0
+
+        try:
+            with open(self._file_path, "r", encoding="utf-8") as f:
+                for line_idx, line in enumerate(f, 1):
+                    line_str = line.strip()
+                    if not line_str:
+                        continue
+                    try:
+                        record = json.loads(line_str)
+                    except json.JSONDecodeError as json_err:
+                        raise CorruptEventLogError(f"Corrupt JSON at line {line_idx} in nonce store: {json_err}") from json_err
+
+                    if not isinstance(record, dict):
+                        raise CorruptEventLogError(f"Corrupt nonce record at line {line_idx}: record is not a JSON object")
+
+                    for req_key in ("nonce", "timestamp", "sequence_number", "parent_digest", "digest"):
+                        if req_key not in record:
+                            raise CorruptEventLogError(f"Corrupt nonce record at line {line_idx}: missing mandatory field '{req_key}'")
+
+                    rec_nonce = record["nonce"]
+                    rec_timestamp = record["timestamp"]
+                    rec_seq = record["sequence_number"]
+                    rec_parent = record["parent_digest"]
+                    rec_digest = record["digest"]
+
+                    if not isinstance(rec_nonce, str) or not rec_nonce:
+                        raise CorruptEventLogError(f"Corrupt nonce record at line {line_idx}: invalid 'nonce' value")
+                    if not isinstance(rec_timestamp, str) or not rec_timestamp:
+                        raise CorruptEventLogError(f"Corrupt nonce record at line {line_idx}: invalid 'timestamp' value")
+                    if not isinstance(rec_seq, int) or rec_seq != head_seq + 1:
+                        raise CorruptEventLogError(
+                            f"Sequence discontinuity in nonce store at line {line_idx}: got {rec_seq}, expected {head_seq + 1}"
+                        )
+                    if rec_parent != expected_parent:
+                        raise CorruptEventLogError(
+                            f"Cryptographic chain broken in nonce store at line {line_idx}: got parent '{rec_parent}', expected '{expected_parent}'"
+                        )
+
+                    # Cryptographically verify the record's RFC 8785 digest
+                    expected_digest = compute_nonce_digest(rec_nonce, rec_timestamp, rec_seq, rec_parent)
+                    if not hmac.compare_digest(rec_digest, expected_digest):
+                        raise CorruptEventLogError(
+                            f"Cryptographic digest forgery/corruption in nonce store at line {line_idx} for nonce '{rec_nonce}'"
+                        )
+
+                    consumed.add(rec_nonce)
+                    expected_parent = rec_digest
+                    head_seq = rec_seq
+
+        except CorruptEventLogError:
+            raise
+        except (OSError, IOError) as io_err:
+            raise StorageUnavailableError(f"I/O failure reading nonce store: {io_err}") from io_err
+
+        return consumed, head_seq, expected_parent
+
+    def reserve_nonce(self, nonce: str) -> bool:
+        """Atomically reserves a single-use nonce (INSERT-if-absent) with verified cryptographic log integrity."""
         if not nonce or not isinstance(nonce, str):
             raise TypeError("Nonce must be a non-empty string.")
 
-        import hashlib
         from datetime import datetime, timezone
         from file_lock import FileLock
         from events.exceptions import StorageUnavailableError, CorruptEventLogError
@@ -321,35 +385,22 @@ class D2NonceStore(NonceReservationInterface):
 
             try:
                 with FileLock(self._lock_path, timeout=10.0):
-                    consumed: Set[str] = set()
-                    if os.path.exists(self._file_path):
-                        try:
-                            with open(self._file_path, "r", encoding="utf-8") as f:
-                                for line_idx, line in enumerate(f, 1):
-                                    line_str = line.strip()
-                                    if not line_str:
-                                        continue
-                                    try:
-                                        record = json.loads(line_str)
-                                        rec_nonce = record.get("nonce")
-                                        if not rec_nonce or not isinstance(rec_nonce, str):
-                                            raise CorruptEventLogError(f"Corrupt nonce record at line {line_idx}: missing 'nonce'")
-                                        consumed.add(rec_nonce)
-                                    except json.JSONDecodeError as json_err:
-                                        raise CorruptEventLogError(f"Corrupt JSON at line {line_idx}: {json_err}") from json_err
-                        except CorruptEventLogError:
-                            raise
-                        except (OSError, IOError) as io_err:
-                            raise StorageUnavailableError(f"I/O failure reading nonce store: {io_err}") from io_err
+                    consumed, head_seq, expected_parent = self._read_and_verify_log()
 
                     if nonce in consumed:
                         self._process_cache.add(nonce)
                         return False
 
+                    new_seq = head_seq + 1
+                    timestamp = datetime.now(timezone.utc).isoformat()
+                    digest = compute_nonce_digest(nonce, timestamp, new_seq, expected_parent)
+
                     rec_payload = {
                         "nonce": nonce,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                        "digest": hashlib.sha256(nonce.encode("utf-8")).hexdigest(),
+                        "timestamp": timestamp,
+                        "sequence_number": new_seq,
+                        "parent_digest": expected_parent,
+                        "digest": digest,
                     }
                     line_bytes = canonicalize_json(rec_payload) + b"\n"
 
@@ -361,25 +412,16 @@ class D2NonceStore(NonceReservationInterface):
                     except (OSError, IOError) as io_err:
                         raise StorageUnavailableError(f"I/O failure writing to nonce store: {io_err}") from io_err
 
-                    consumed.add(nonce)
                     self._process_cache.add(nonce)
                     return True
+
             except (CorruptEventLogError, StorageUnavailableError):
                 raise
             except Exception as lock_err:
                 raise StorageUnavailableError(f"Locking or storage operational failure: {lock_err}") from lock_err
 
     def is_nonce_consumed(self, nonce: str) -> bool:
-        """Queries whether a nonce is consumed.
-        
-        Returns:
-            True: If nonce is present in the committed store.
-            False: If nonce is absent (not found).
-            
-        Raises:
-            CorruptEventLogError: If storage file contains corrupted or invalid records.
-            StorageUnavailableError: If storage, locking, or I/O is unavailable (fail closed).
-        """
+        """Queries whether a nonce is consumed, verifying integrity of the store."""
         if not nonce or not isinstance(nonce, str):
             return False
 
@@ -395,33 +437,15 @@ class D2NonceStore(NonceReservationInterface):
 
             try:
                 with FileLock(self._lock_path, timeout=5.0):
-                    if not os.path.exists(self._file_path):
-                        return False
-                    try:
-                        with open(self._file_path, "r", encoding="utf-8") as f:
-                            for line_idx, line in enumerate(f, 1):
-                                line_str = line.strip()
-                                if not line_str:
-                                    continue
-                                try:
-                                    record = json.loads(line_str)
-                                    rec_nonce = record.get("nonce")
-                                    if not rec_nonce or not isinstance(rec_nonce, str):
-                                        raise CorruptEventLogError(f"Corrupt nonce record at line {line_idx}: missing 'nonce'")
-                                    if rec_nonce == nonce:
-                                        self._process_cache.add(nonce)
-                                        return True
-                                except json.JSONDecodeError as json_err:
-                                    raise CorruptEventLogError(f"Corrupt JSON at line {line_idx}: {json_err}") from json_err
-                    except CorruptEventLogError:
-                        raise
-                    except (OSError, IOError) as io_err:
-                        raise StorageUnavailableError(f"I/O failure reading nonce store: {io_err}") from io_err
+                    consumed, _, _ = self._read_and_verify_log()
+                    if nonce in consumed:
+                        self._process_cache.add(nonce)
+                        return True
                     return False
             except (CorruptEventLogError, StorageUnavailableError):
                 raise
             except Exception as lock_err:
-                raise StorageUnavailableError(f"Locking or storage uncertainty during query: {lock_err}") from lock_err
+                raise StorageUnavailableError(f"Locking or storage operational failure during query: {lock_err}") from lock_err
 
     def clear(self) -> None:
         """Controlled teardown of nonce store for test fixtures."""
