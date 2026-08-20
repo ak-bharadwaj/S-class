@@ -173,14 +173,18 @@ def create_event(
     )
 
 
+NONCE_RECORD_DOMAIN_SEPARATOR: str = "SCLASS_NONCE_V1:"
+
+
 def compute_nonce_preimage(
     nonce: str,
     timestamp: str,
     sequence_number: int,
     parent_digest: str,
 ) -> bytes:
-    """Produces the exact RFC 8785 canonical preimage bytes for a single-use nonce record."""
+    """Produces the exact RFC 8785 canonical preimage bytes for a single-use nonce record with frozen domain separator."""
     payload = {
+        "domain": NONCE_RECORD_DOMAIN_SEPARATOR,
         "nonce": nonce,
         "parent_digest": parent_digest,
         "sequence_number": sequence_number,
@@ -195,7 +199,7 @@ def compute_nonce_digest(
     sequence_number: int,
     parent_digest: str,
 ) -> str:
-    """Computes SHA-256 digest hex string from canonical RFC 8785 nonce record preimage."""
+    """Computes SHA-256 digest hex string from canonical RFC 8785 nonce record preimage with domain separator."""
     preimage = compute_nonce_preimage(
         nonce=nonce,
         timestamp=timestamp,

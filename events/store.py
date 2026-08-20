@@ -16,7 +16,7 @@ from domain.types import EventType
 from events.interfaces import EventStoreInterface, NonceReservationInterface
 from events.state import MaterializedState, GENESIS_PARENT_DIGEST
 from events.reducer import reduce_event, replay_events
-from events.serializer import verify_event_digest, canonicalize_json, compute_nonce_digest
+from events.serializer import verify_event_digest, canonicalize_json, compute_nonce_digest, NONCE_RECORD_DOMAIN_SEPARATOR
 from events.exceptions import (
     StorageUnavailableError,
     ConcurrencyConflictError,
@@ -272,7 +272,9 @@ class FileAppendEventStore(EventStoreInterface):
 
 
 class D2NonceStore(NonceReservationInterface):
-    """D2 Durable, cross-process atomic single-use nonce reservation engine with cryptographic integrity."""
+    """D2 Durable, cross-process atomic single-use nonce reservation engine.
+    Authoritative D2 store verification on every query; no unverified cache bypass.
+    """
 
     def __init__(self, file_path: Optional[str] = None):
         if file_path is None:
@@ -283,7 +285,6 @@ class D2NonceStore(NonceReservationInterface):
                 )
         self._file_path = os.path.abspath(file_path)
         self._lock_path = self._file_path + ".lock"
-        self._process_cache: Set[str] = set()
         self._local_lock = threading.Lock()
 
     @property
@@ -291,13 +292,13 @@ class D2NonceStore(NonceReservationInterface):
         return self._file_path
 
     def _read_and_verify_log(self) -> Tuple[Set[str], int, str]:
-        """Reads the nonce log from disk, verifying sequence continuity, parent chaining, and SHA-256 digest integrity on every record.
+        """Reads the nonce log from disk, verifying sequence continuity, parent chaining, domain separator, and SHA-256 digest integrity on every record.
         
         Returns:
             Tuple[Set[str], int, str]: (set_of_consumed_nonces, head_sequence_number, head_digest)
             
         Raises:
-            CorruptEventLogError: If any record is malformed, missing fields, or has invalid cryptographic digest/chaining.
+            CorruptEventLogError: If any record is malformed, missing fields, has wrong domain separator, or invalid cryptographic digest/chaining.
             StorageUnavailableError: If I/O read failure occurs.
         """
         import hmac
@@ -322,9 +323,14 @@ class D2NonceStore(NonceReservationInterface):
                     if not isinstance(record, dict):
                         raise CorruptEventLogError(f"Corrupt nonce record at line {line_idx}: record is not a JSON object")
 
-                    for req_key in ("nonce", "timestamp", "sequence_number", "parent_digest", "digest"):
+                    for req_key in ("domain", "nonce", "timestamp", "sequence_number", "parent_digest", "digest"):
                         if req_key not in record:
                             raise CorruptEventLogError(f"Corrupt nonce record at line {line_idx}: missing mandatory field '{req_key}'")
+
+                    if record["domain"] != NONCE_RECORD_DOMAIN_SEPARATOR:
+                        raise CorruptEventLogError(
+                            f"Domain separator mismatch in nonce store at line {line_idx}: got '{record['domain']}', expected '{NONCE_RECORD_DOMAIN_SEPARATOR}'"
+                        )
 
                     rec_nonce = record["nonce"]
                     rec_timestamp = record["timestamp"]
@@ -345,7 +351,7 @@ class D2NonceStore(NonceReservationInterface):
                             f"Cryptographic chain broken in nonce store at line {line_idx}: got parent '{rec_parent}', expected '{expected_parent}'"
                         )
 
-                    # Cryptographically verify the record's RFC 8785 digest
+                    # Cryptographically verify the record's RFC 8785 digest with domain separator
                     expected_digest = compute_nonce_digest(rec_nonce, rec_timestamp, rec_seq, rec_parent)
                     if not hmac.compare_digest(rec_digest, expected_digest):
                         raise CorruptEventLogError(
@@ -364,7 +370,7 @@ class D2NonceStore(NonceReservationInterface):
         return consumed, head_seq, expected_parent
 
     def reserve_nonce(self, nonce: str) -> bool:
-        """Atomically reserves a single-use nonce (INSERT-if-absent) with verified cryptographic log integrity."""
+        """Atomically reserves a single-use nonce (INSERT-if-absent) with authoritative D2 store verification on every reservation."""
         if not nonce or not isinstance(nonce, str):
             raise TypeError("Nonce must be a non-empty string.")
 
@@ -373,9 +379,6 @@ class D2NonceStore(NonceReservationInterface):
         from events.exceptions import StorageUnavailableError, CorruptEventLogError
 
         with self._local_lock:
-            if nonce in self._process_cache:
-                return False
-
             parent_dir = os.path.dirname(self._file_path)
             if parent_dir and not os.path.exists(parent_dir):
                 try:
@@ -385,10 +388,10 @@ class D2NonceStore(NonceReservationInterface):
 
             try:
                 with FileLock(self._lock_path, timeout=10.0):
+                    # Authoritative D2 store read and verification
                     consumed, head_seq, expected_parent = self._read_and_verify_log()
 
                     if nonce in consumed:
-                        self._process_cache.add(nonce)
                         return False
 
                     new_seq = head_seq + 1
@@ -396,6 +399,7 @@ class D2NonceStore(NonceReservationInterface):
                     digest = compute_nonce_digest(nonce, timestamp, new_seq, expected_parent)
 
                     rec_payload = {
+                        "domain": NONCE_RECORD_DOMAIN_SEPARATOR,
                         "nonce": nonce,
                         "timestamp": timestamp,
                         "sequence_number": new_seq,
@@ -412,7 +416,6 @@ class D2NonceStore(NonceReservationInterface):
                     except (OSError, IOError) as io_err:
                         raise StorageUnavailableError(f"I/O failure writing to nonce store: {io_err}") from io_err
 
-                    self._process_cache.add(nonce)
                     return True
 
             except (CorruptEventLogError, StorageUnavailableError):
@@ -421,7 +424,7 @@ class D2NonceStore(NonceReservationInterface):
                 raise StorageUnavailableError(f"Locking or storage operational failure: {lock_err}") from lock_err
 
     def is_nonce_consumed(self, nonce: str) -> bool:
-        """Queries whether a nonce is consumed, verifying integrity of the store."""
+        """Queries whether a nonce is consumed by directly verifying the authoritative D2 store."""
         if not nonce or not isinstance(nonce, str):
             return False
 
@@ -429,19 +432,14 @@ class D2NonceStore(NonceReservationInterface):
         from events.exceptions import StorageUnavailableError, CorruptEventLogError
 
         with self._local_lock:
-            if nonce in self._process_cache:
-                return True
-
             if not os.path.exists(self._file_path):
                 return False
 
             try:
                 with FileLock(self._lock_path, timeout=5.0):
+                    # Authoritative D2 store read and verification
                     consumed, _, _ = self._read_and_verify_log()
-                    if nonce in consumed:
-                        self._process_cache.add(nonce)
-                        return True
-                    return False
+                    return nonce in consumed
             except (CorruptEventLogError, StorageUnavailableError):
                 raise
             except Exception as lock_err:
@@ -451,7 +449,6 @@ class D2NonceStore(NonceReservationInterface):
         """Controlled teardown of nonce store for test fixtures."""
         from file_lock import FileLock
         with self._local_lock:
-            self._process_cache.clear()
             if os.path.exists(self._file_path):
                 try:
                     with FileLock(self._lock_path, timeout=5.0):

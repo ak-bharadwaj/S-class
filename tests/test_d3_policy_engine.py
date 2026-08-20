@@ -1525,8 +1525,7 @@ def test_restart_process_boundary_replay_still_rejected(tmp_path):
 
     # Simulate fresh process restart by wiping in-memory process-local cache
     Gate3NonceTracker.set_store_path(store_file)
-    Gate3NonceTracker.get_store()._process_cache.clear()
-
+    
     # Process 2 attempts replay -> rejected from persistent disk store
     ev_replay = make_test_evidence(ev_id="EV-PROC2-REPLAY", nonce=nonce, counterexample={"coverage_pct": 90.0})
     cert2 = issue_gate_3_evidence_certificate(ev_replay, expected_source_sha=DEFAULT_TEST_SHA)
@@ -1737,3 +1736,80 @@ def test_adversarial_deleted_or_partial_record_fails_closed(tmp_path):
     tampered_store2 = D2NonceStore(file_path=store_file_discontinuity)
     with pytest.raises(CorruptEventLogError, match="Sequence discontinuity"):
         tampered_store2.reserve_nonce("NONCE-C")
+
+def test_adversarial_valid_nonce_cached_then_tamper_durable_record_fails_closed(tmp_path):
+    """Adversarial vector: Valid nonce queried -> durable record tampered -> same-process query fails closed with CorruptEventLogError."""
+    from events.store import D2NonceStore
+    from events.exceptions import CorruptEventLogError
+
+    store_file = str(tmp_path / "cache_tamper.log")
+    store = D2NonceStore(file_path=store_file)
+    nonce = f"CACHE-TAMPER-NONCE-{uuid.uuid4().hex[:8]}"
+
+    # 1. Valid reservation
+    assert store.reserve_nonce(nonce) is True
+    assert store.is_nonce_consumed(nonce) is True
+
+    # 2. Adversary tampers with durable record on disk
+    with open(store_file, "r", encoding="utf-8") as f:
+        data = f.read()
+    tampered_data = data.replace(nonce, "FORGED_NONCE_VALUE")
+    with open(store_file, "w", encoding="utf-8") as f:
+        f.write(tampered_data)
+
+    # 3. Same-process query on the SAME store instance MUST NOT return cached truth; MUST verify durable store and fail closed
+    with pytest.raises(CorruptEventLogError, match="Cryptographic digest forgery/corruption"):
+        store.is_nonce_consumed(nonce)
+
+    with pytest.raises(CorruptEventLogError, match="Cryptographic digest forgery/corruption"):
+        store.reserve_nonce(f"ANOTHER-NONCE-{uuid.uuid4().hex[:8]}")
+
+
+def test_adversarial_cached_nonce_corrupt_parent_chain_replay_check_fails_closed(tmp_path):
+    """Adversarial vector: Cached nonce -> corrupt parent chain on disk -> replay check fails closed with CorruptEventLogError."""
+    import json
+    from events.store import D2NonceStore
+    from events.exceptions import CorruptEventLogError
+
+    store_file = str(tmp_path / "chain_tamper.log")
+    store = D2NonceStore(file_path=store_file)
+    nonce1 = f"CHAIN-NONCE-1-{uuid.uuid4().hex[:8]}"
+    nonce2 = f"CHAIN-NONCE-2-{uuid.uuid4().hex[:8]}"
+
+    assert store.reserve_nonce(nonce1) is True
+    assert store.reserve_nonce(nonce2) is True
+
+    # Tamper with the parent digest of record 2 in the durable log
+    with open(store_file, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+    rec2 = json.loads(lines[1])
+    rec2["parent_digest"] = "e" * 64
+    lines[1] = json.dumps(rec2) + "\n"
+    with open(store_file, "w", encoding="utf-8") as f:
+        f.writelines(lines)
+
+    # Replay query on the SAME store instance MUST fail closed
+    with pytest.raises(CorruptEventLogError, match="Cryptographic chain broken"):
+        store.is_nonce_consumed(nonce2)
+
+
+def test_adversarial_wrong_domain_separator_fails_closed(tmp_path):
+    """Adversarial vector: Record with forged/missing domain separator -> CorruptEventLogError."""
+    import json
+    from events.store import D2NonceStore
+    from events.exceptions import CorruptEventLogError
+
+    store_file = str(tmp_path / "wrong_domain.log")
+    store = D2NonceStore(file_path=store_file)
+    nonce = f"DOMAIN-NONCE-{uuid.uuid4().hex[:8]}"
+    store.reserve_nonce(nonce)
+
+    with open(store_file, "r", encoding="utf-8") as f:
+        line = f.readline().strip()
+    record = json.loads(line)
+    record["domain"] = "FORGED_DOMAIN_V0:"
+    with open(store_file, "w", encoding="utf-8") as f:
+        f.write(json.dumps(record) + "\n")
+
+    with pytest.raises(CorruptEventLogError, match="Domain separator mismatch"):
+        store.is_nonce_consumed(nonce)
