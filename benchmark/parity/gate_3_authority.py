@@ -560,8 +560,9 @@ class Gate3AuthoritySigner:
         if signature.payload_digest != expected_digest:
             return False
         try:
+            from cryptography.exceptions import InvalidSignature
             pub_key = Gate3AuthorityKeyStore.get_public_key()
             pub_key.verify(bytes.fromhex(signature.signature_hex), canonical_bytes)
             return True
-        except Exception:
+        except (InvalidSignature, ValueError, TypeError):
             return False

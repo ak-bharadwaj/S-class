@@ -158,3 +158,25 @@ class PolicyEvaluationContext:
             if not isinstance(self.expected_source_sha, str) or len(self.expected_source_sha) not in (40, 64):
                 raise PolicyValidationError(f"Invalid expected_source_sha: '{self.expected_source_sha}'")
         object.__setattr__(self, "trust_certificates", MappingProxyType(dict(self.trust_certificates)))
+
+
+from typing import Protocol, runtime_checkable
+
+
+@runtime_checkable
+class AuthoritySignerProtocol(Protocol):
+    """Narrow core interface for D3 Authority signing and signature verification."""
+    def sign_payload(
+        self,
+        canonical_bytes: bytes,
+        verifier_identity: str,
+        timestamp_iso: str,
+    ) -> AsymmetricAuthoritySignature:
+        ...
+
+    def verify_signature(
+        self,
+        canonical_bytes: bytes,
+        signature: AsymmetricAuthoritySignature,
+    ) -> bool:
+        ...

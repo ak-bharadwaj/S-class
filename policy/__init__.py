@@ -11,6 +11,7 @@ from policy.models import (
     RuleEvaluationResult,
     PolicyEvaluationContext,
     EvidenceTrustCertificate,
+    AuthoritySignerProtocol,
 )
 from policy.exceptions import (
     PolicyEngineError,
@@ -46,6 +47,7 @@ __all__ = [
     "RuleEvaluationResult",
     "PolicyEvaluationContext",
     "EvidenceTrustCertificate",
+    "AuthoritySignerProtocol",
     "PolicyEngineError",
     "PolicyValidationError",
     "PolicyWeakeningError",

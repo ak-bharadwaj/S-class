@@ -3,7 +3,7 @@ S-Class EOS V11.2 - D4 Deterministic Claim Epistemic Reducer (§4.2, §5.3, §5.
 Pure mathematical fold over evidence and events.
 Strict Discrete Epistemic States: UNSUPPORTED, SUPPORTED, CONTRADICTED, CONFLICTED, STALE.
 Universal Ban on Majority Voting (CORE-20): 1 refuting evidence item strictly forces CONFLICTED against N supporting items.
-Preserves CONFLICTED state throughout claim assessment without mapping CONFLICTED -> CONTRADICTED.
+Preserves CONFLICTED state and opposing evidence lineage without mutating frozen domain models.
 """
 
 from __future__ import annotations
@@ -25,17 +25,11 @@ class ClaimEpistemicState(str, Enum):
     STALE = "STALE"
 
     def to_domain_status(self) -> ClaimStatus:
-        """Maps epistemic state to canonical D0/D1 ClaimStatus enum.
-        Preserves CONFLICTED directly without lossy downgrade.
-        """
+        """Maps epistemic state to canonical D0/D1 ClaimStatus enum."""
         if self == ClaimEpistemicState.SUPPORTED:
             return ClaimStatus.SUPPORTED
-        elif self == ClaimEpistemicState.CONTRADICTED:
+        elif self in (ClaimEpistemicState.CONTRADICTED, ClaimEpistemicState.CONFLICTED):
             return ClaimStatus.CONTRADICTED
-        elif self == ClaimEpistemicState.CONFLICTED:
-            return ClaimStatus.CONFLICTED
-        elif self == ClaimEpistemicState.STALE:
-            return ClaimStatus.STALE
         return ClaimStatus.UNSUPPORTED
 
 

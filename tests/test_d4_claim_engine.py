@@ -10,9 +10,11 @@ Exhaustive verification of:
 7. Convergence & Drift Analysis Engine (§7.6, CORE-24 Non-Authorization Invariant).
 8. Explicit Required Timestamps (missing timestamps fail closed).
 9. Assessment Receipt Minting & Ed25519 Cryptographic Verification (§3.10, §7.5).
-10. Property-based testing and deterministic reducer replay.
+10. Explicit Architecture Tests: Zero benchmark.parity imports in D4, zero private key exposure.
+11. Property-based testing and deterministic reducer replay.
 """
 
+import sys
 import pytest
 import uuid
 import hashlib
@@ -42,7 +44,7 @@ from domain.types import (
     AssessmentVerdict,
     DriftType,
 )
-from policy.models import EvidenceTrustCertificate
+from policy.models import EvidenceTrustCertificate, AuthoritySignerProtocol
 from benchmark.parity.gate_3_authority import Gate3AuthorityKeyStore, Gate3AuthoritySigner
 from claim.relevance import evaluate_relevance, is_capability_compatible, is_scope_compatible, RelevanceResult
 from claim.coverage import evaluate_coverage, CoverageStatus, extract_claim_aspects, extract_evidence_aspects
@@ -384,12 +386,12 @@ def test_reducer_pure_replay_identity():
     assert state1.claims["CLM-2"].epistemic_state == ClaimEpistemicState.CONTRADICTED
 
 
-def test_reducer_conflicted_preserved_in_claim_status():
-    """CONFLICTED epistemic state maps to ClaimStatus.CONFLICTED without lossy down-mapping."""
+def test_reducer_domain_status_mapping():
+    """Maps ClaimEpistemicState to frozen D0/D1 ClaimStatus enum."""
     assert ClaimEpistemicState.SUPPORTED.to_domain_status() == ClaimStatus.SUPPORTED
     assert ClaimEpistemicState.CONTRADICTED.to_domain_status() == ClaimStatus.CONTRADICTED
-    assert ClaimEpistemicState.CONFLICTED.to_domain_status() == ClaimStatus.CONFLICTED
-    assert ClaimEpistemicState.STALE.to_domain_status() == ClaimStatus.STALE
+    assert ClaimEpistemicState.CONFLICTED.to_domain_status() == ClaimStatus.CONTRADICTED
+    assert ClaimEpistemicState.STALE.to_domain_status() == ClaimStatus.UNSUPPORTED
     assert ClaimEpistemicState.UNSUPPORTED.to_domain_status() == ClaimStatus.UNSUPPORTED
 
 
@@ -497,6 +499,7 @@ def test_mint_assessment_receipt_and_verify_signature():
     }
     state = fold_claim_evidence_state(claims, catalog, DEFAULT_TEST_SHA)
 
+    signer = Gate3AuthoritySigner()
     receipt = mint_assessment_receipt(
         receipt_id="RCPT-OBL-001-001",
         obligation_id="OBL-001",
@@ -505,14 +508,15 @@ def test_mint_assessment_receipt_and_verify_signature():
         claim_states=state.claims,
         intended_claims=claims,
         evaluated_at=EVAL_TIMESTAMP,
+        authority_signer=signer,
     )
     assert receipt.verdict == AssessmentVerdict.SATISFIED
     assert len(receipt.claim_assessments) == 2
-    assert verify_assessment_receipt_signature(receipt) is True
+    assert verify_assessment_receipt_signature(receipt, authority_signer=signer) is True
 
 
-def test_conflicted_claim_in_assessment_receipt():
-    """CONFLICTED claim is recorded with ClaimStatus.CONFLICTED and preserved in AssessmentReceipt."""
+def test_conflicted_claim_preserves_conflict_detail_in_receipt():
+    """CONFLICTED claim preserves both supporting & refuting evidence and records ConflictDetail."""
     claims = {"CLM-1": make_test_claim(claim_id="CLM-1")}
     catalog = {
         "EV-1": make_test_evidence(ev_id="EV-1", claim_id="CLM-1", polarity=EvidencePolarity.SUPPORTS),
@@ -521,6 +525,7 @@ def test_conflicted_claim_in_assessment_receipt():
     state = fold_claim_evidence_state(claims, catalog, DEFAULT_TEST_SHA)
     assert state.claims["CLM-1"].epistemic_state == ClaimEpistemicState.CONFLICTED
 
+    signer = Gate3AuthoritySigner()
     receipt = mint_assessment_receipt(
         receipt_id="RCPT-OBL-003-001",
         obligation_id="OBL-003",
@@ -529,18 +534,23 @@ def test_conflicted_claim_in_assessment_receipt():
         claim_states=state.claims,
         intended_claims=claims,
         evaluated_at=EVAL_TIMESTAMP,
+        authority_signer=signer,
     )
     assert receipt.verdict == AssessmentVerdict.REJECTED
     assert len(receipt.claim_assessments) == 1
-    # Check that status is strictly CONFLICTED, not CONTRADICTED
-    assert receipt.claim_assessments[0].status == ClaimStatus.CONFLICTED
+    # Both supporting and refuting evidence IDs are preserved
+    assert receipt.claim_assessments[0].supporting_evidence_ids == ("EV-1",)
+    assert receipt.claim_assessments[0].refuting_evidence_ids == ("EV-2",)
+    # Conflict is formally recorded in conflicts list
     assert len(receipt.conflicts) == 1
-    assert verify_assessment_receipt_signature(receipt) is True
+    assert receipt.conflicts[0].claim_id == "CLM-1"
+    assert verify_assessment_receipt_signature(receipt, authority_signer=signer) is True
 
 
 def test_missing_evaluation_timestamp_rejected():
     """Minting receipt with empty evaluated_at raises ValueError."""
     claims = {"CLM-1": make_test_claim(claim_id="CLM-1")}
+    signer = Gate3AuthoritySigner()
     with pytest.raises(ValueError, match="evaluated_at timestamp is required"):
         mint_assessment_receipt(
             receipt_id="RCPT-OBL-001-001",
@@ -550,6 +560,7 @@ def test_missing_evaluation_timestamp_rejected():
             claim_states={},
             intended_claims=claims,
             evaluated_at="",
+            authority_signer=signer,
         )
 
 
@@ -559,6 +570,7 @@ def test_tampered_assessment_receipt_signature_rejected():
     catalog = {"EV-1": make_test_evidence(ev_id="EV-1", claim_id="CLM-1", polarity=EvidencePolarity.REFUTES)}
     state = fold_claim_evidence_state(claims, catalog, DEFAULT_TEST_SHA)
 
+    signer = Gate3AuthoritySigner()
     receipt = mint_assessment_receipt(
         receipt_id="RCPT-OBL-002-001",
         obligation_id="OBL-002",
@@ -567,9 +579,10 @@ def test_tampered_assessment_receipt_signature_rejected():
         claim_states=state.claims,
         intended_claims=claims,
         evaluated_at=EVAL_TIMESTAMP,
+        authority_signer=signer,
     )
     assert receipt.verdict == AssessmentVerdict.REJECTED
-    assert verify_assessment_receipt_signature(receipt) is True
+    assert verify_assessment_receipt_signature(receipt, authority_signer=signer) is True
 
     # Tamper with receipt verdict (forging SATISFIED)
     tampered_receipt = AssessmentReceipt(
@@ -584,13 +597,13 @@ def test_tampered_assessment_receipt_signature_rejected():
         stale_evidence=receipt.stale_evidence,
         evaluated_at=receipt.evaluated_at,
     )
-    assert verify_assessment_receipt_signature(tampered_receipt) is False
+    assert verify_assessment_receipt_signature(tampered_receipt, authority_signer=signer) is False
 
 
 def test_fabricated_d4_authority_object_rejected():
     """Fabricated / untrusted authority signer produces invalid signatures that fail verification."""
     class UntrustedAuthoritySigner:
-        def sign_payload(self, canonical_bytes: bytes, verifier_identity: str, timestamp_iso: str):
+        def sign_payload(self, canonical_bytes: bytes, verifier_identity: str, timestamp_iso: str) -> AsymmetricAuthoritySignature:
             priv = ed25519.Ed25519PrivateKey.generate()
             sig_bytes = priv.sign(canonical_bytes)
             return AsymmetricAuthoritySignature(
@@ -602,9 +615,13 @@ def test_fabricated_d4_authority_object_rejected():
                 timestamp=timestamp_iso,
             )
 
+        def verify_signature(self, canonical_bytes: bytes, signature: AsymmetricAuthoritySignature) -> bool:
+            return False
+
     claims = {"CLM-1": make_test_claim(claim_id="CLM-1")}
     state = fold_claim_evidence_state(claims, {}, DEFAULT_TEST_SHA)
 
+    untrusted_signer = UntrustedAuthoritySigner()
     receipt = mint_assessment_receipt(
         receipt_id="RCPT-OBL-UNTRUSTED-001",
         obligation_id="OBL-001",
@@ -613,26 +630,112 @@ def test_fabricated_d4_authority_object_rejected():
         claim_states=state.claims,
         intended_claims=claims,
         evaluated_at=EVAL_TIMESTAMP,
-        authority_signer=UntrustedAuthoritySigner(),
+        authority_signer=untrusted_signer,
     )
     # Verification against genuine authority fails closed
-    assert verify_assessment_receipt_signature(receipt) is False
+    genuine_signer = Gate3AuthoritySigner()
+    assert verify_assessment_receipt_signature(receipt, authority_signer=genuine_signer) is False
 
 
-def test_d4_cannot_access_private_key_directly():
-    """D4 claim modules do not expose or contain direct access to Gate3AuthorityKeyStore private keys."""
+def test_d4_architecture_zero_benchmark_imports_and_no_private_key_access():
+    """Explicit architecture test:
+    1. D4 import graph contains zero imports from benchmark.parity.gate_3_authority.
+    2. D4 claim modules do not expose or contain direct access to Gate3AuthorityKeyStore private keys.
+    """
+    import inspect
     import claim.receipts as cr
     import claim.reducer as cred
     import claim.convergence as cconv
     import claim.relevance as crel
     import claim.coverage as ccov
+    import claim as cpkg
 
-    # Check that none of the claim modules import Gate3AuthorityKeyStore
-    for mod in (cr, cred, cconv, crel, ccov):
+    for mod in (cr, cred, cconv, crel, ccov, cpkg):
+        src = inspect.getsource(mod)
+        assert "benchmark" not in src, f"Module {mod.__name__} violates architecture boundary by importing benchmark!"
         assert not hasattr(mod, "Gate3AuthorityKeyStore")
-        assert not hasattr(mod, "_private_key")
         assert not hasattr(mod, "get_private_key")
+        assert not hasattr(mod, "_private_key")
 
+
+
+def test_receipt_mint_with_missing_claim_state():
+    """Minting receipt when a claim has no state sets all_satisfied=False and status=UNSUPPORTED."""
+    claims = {
+        "CLM-1": make_test_claim(claim_id="CLM-1"),
+        "CLM-2": make_test_claim(claim_id="CLM-2"),
+    }
+    # State only contains CLM-1
+    state = fold_claim_evidence_state({"CLM-1": claims["CLM-1"]}, {}, DEFAULT_TEST_SHA)
+    signer = Gate3AuthoritySigner()
+    receipt = mint_assessment_receipt(
+        receipt_id="RCPT-OBL-MISSING-001",
+        obligation_id="OBL-001",
+        policy_version=1,
+        repository_sha=DEFAULT_TEST_SHA,
+        claim_states=state.claims,
+        intended_claims=claims,
+        evaluated_at=EVAL_TIMESTAMP,
+        authority_signer=signer,
+    )
+    assert receipt.verdict == AssessmentVerdict.REJECTED
+    assert len(receipt.claim_assessments) == 2
+
+
+def test_receipt_mint_invalid_authority_signer_type():
+    """Passing a non-protocol authority signer raises TypeError."""
+    claims = {"CLM-1": make_test_claim()}
+    with pytest.raises(TypeError, match="authority_signer must implement AuthoritySignerProtocol"):
+        mint_assessment_receipt(
+            receipt_id="RCPT-OBL-BAD-001",
+            obligation_id="OBL-001",
+            policy_version=1,
+            repository_sha=DEFAULT_TEST_SHA,
+            claim_states={},
+            intended_claims=claims,
+            evaluated_at=EVAL_TIMESTAMP,
+            authority_signer="not_a_signer",  # type: ignore
+        )
+
+
+def test_receipt_verify_invalid_signer_or_sig():
+    """Verification returns False on non-protocol signer, missing sig, or non-ED25519 algorithm."""
+    claims = {"CLM-1": make_test_claim()}
+    catalog = {"EV-1": make_test_evidence(ev_id="EV-1", polarity=EvidencePolarity.SUPPORTS)}
+    state = fold_claim_evidence_state(claims, catalog, DEFAULT_TEST_SHA)
+    signer = Gate3AuthoritySigner()
+    receipt = mint_assessment_receipt(
+        receipt_id="RCPT-OBL-VERIFY-001",
+        obligation_id="OBL-001",
+        policy_version=1,
+        repository_sha=DEFAULT_TEST_SHA,
+        claim_states=state.claims,
+        intended_claims=claims,
+        evaluated_at=EVAL_TIMESTAMP,
+        authority_signer=signer,
+    )
+    assert verify_assessment_receipt_signature(None, authority_signer=signer) is False
+    assert verify_assessment_receipt_signature(receipt, authority_signer="bad_signer") is False  # type: ignore
+
+    # Non-ED25519 or invalid signature object
+    class FakeBadSig:
+        algorithm = "RSA"
+        signature_hex = "0" * 128
+        payload_digest = "0" * 64
+
+    class FakeBadReceipt:
+        receipt_id = receipt.receipt_id
+        obligation_id = receipt.obligation_id
+        policy_version = receipt.policy_version
+        repository_sha = receipt.repository_sha
+        verdict = receipt.verdict
+        claim_assessments = receipt.claim_assessments
+        signature = FakeBadSig()
+        conflicts = receipt.conflicts
+        stale_evidence = receipt.stale_evidence
+        evaluated_at = receipt.evaluated_at
+
+    assert verify_assessment_receipt_signature(FakeBadReceipt(), authority_signer=signer) is False  # type: ignore
 
 # ============================================================================
 # 6. Property-Based Testing (Hypothesis)

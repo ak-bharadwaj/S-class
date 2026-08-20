@@ -1,13 +1,13 @@
 """
 S-Class EOS V11.2 - D4 Assessment Receipt Minting (§3.10, §7.5).
 Generates immutable, Ed25519-signed AssessmentReceipt records.
-Consumes narrow D3 Authority interface without direct access to private key material.
+Consumes narrow D3 Authority interface (AuthoritySignerProtocol) without direct access to private key material.
 Requires explicit evaluated_at timestamp (no hidden defaults).
-Preserves ClaimStatus.CONFLICTED directly in ClaimAssessment without down-mapping.
+Preserves conflict lineage and dual evidence in ClaimAssessment and AssessmentReceipt.
 """
 
 from __future__ import annotations
-from typing import Mapping, Sequence, Optional, Protocol, Any
+from typing import Mapping, Sequence
 from domain.models import (
     AssessmentReceipt,
     ClaimAssessment,
@@ -17,26 +17,8 @@ from domain.models import (
 )
 from domain.types import AssessmentVerdict, ClaimStatus
 from events.serializer import canonicalize_json
-from benchmark.parity.gate_3_authority import Gate3AuthoritySigner
+from policy.models import AuthoritySignerProtocol
 from claim.reducer import ClaimReductionState, ClaimEpistemicState
-
-
-class AuthoritySignerProtocol(Protocol):
-    """Narrow interface for D3 Authority signing and verification."""
-    def sign_payload(
-        self,
-        canonical_bytes: bytes,
-        verifier_identity: str,
-        timestamp_iso: str,
-    ) -> AsymmetricAuthoritySignature:
-        ...
-
-    def verify_signature(
-        self,
-        canonical_bytes: bytes,
-        signature: AsymmetricAuthoritySignature,
-    ) -> bool:
-        ...
 
 
 def _build_receipt_payload(
@@ -86,18 +68,18 @@ def mint_assessment_receipt(
     claim_states: Mapping[str, ClaimReductionState],
     intended_claims: Mapping[str, Claim],
     evaluated_at: str,
+    authority_signer: AuthoritySignerProtocol,
     signer_identity: str = "Gate3AuthoritativeVerifier",
-    authority_signer: Optional[Any] = None,
 ) -> AssessmentReceipt:
     """Mints an authentic, Ed25519-signed AssessmentReceipt (§3.10, §7.5).
     
-    Consumes narrow authority interface (Gate3AuthoritySigner) without direct private key access.
+    Consumes narrow authority interface (AuthoritySignerProtocol) without direct private key access.
     Requires explicit evaluated_at timestamp.
     """
     if not evaluated_at or not isinstance(evaluated_at, str):
         raise ValueError("evaluated_at timestamp is required and must be a non-empty ISO-8601 string.")
-
-    signer = authority_signer or Gate3AuthoritySigner
+    if not isinstance(authority_signer, AuthoritySignerProtocol):
+        raise TypeError("authority_signer must implement AuthoritySignerProtocol.")
 
     claim_assessments: list[ClaimAssessment] = []
     conflicts: list[ConflictDetail] = []
@@ -120,7 +102,6 @@ def mint_assessment_receipt(
             )
             continue
 
-        # Preserve CONFLICTED directly in ClaimAssessment
         domain_status = state.epistemic_state.to_domain_status()
         if state.epistemic_state != ClaimEpistemicState.SUPPORTED:
             all_satisfied = False
@@ -160,7 +141,7 @@ def mint_assessment_receipt(
     )
 
     canonical_bytes = canonicalize_json(payload)
-    authority_sig = signer.sign_payload(
+    authority_sig = authority_signer.sign_payload(
         canonical_bytes=canonical_bytes,
         verifier_identity=signer_identity,
         timestamp_iso=evaluated_at,
@@ -182,16 +163,16 @@ def mint_assessment_receipt(
 
 def verify_assessment_receipt_signature(
     receipt: AssessmentReceipt,
-    authority_signer: Optional[Any] = None,
+    authority_signer: AuthoritySignerProtocol,
 ) -> bool:
     """Cryptographically verifies the authenticity of an AssessmentReceipt via D3 Authority interface."""
     if not receipt or not receipt.signature:
         return False
+    if not isinstance(authority_signer, AuthoritySignerProtocol):
+        return False
     sig = receipt.signature
     if sig.algorithm != "ED25519":
         return False
-
-    signer = authority_signer or Gate3AuthoritySigner
 
     payload = _build_receipt_payload(
         receipt_id=receipt.receipt_id,
@@ -207,6 +188,6 @@ def verify_assessment_receipt_signature(
 
     try:
         canonical_bytes = canonicalize_json(payload)
-        return signer.verify_signature(canonical_bytes, sig)
-    except Exception:
+        return authority_signer.verify_signature(canonical_bytes, sig)
+    except (ValueError, TypeError, KeyError):
         return False
