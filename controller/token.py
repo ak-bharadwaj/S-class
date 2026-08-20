@@ -1,9 +1,11 @@
 """
-S-Class EOS V11.2 - D5 Cryptographic Execution Token (§8.1, §8.3).
-Immutable, Ed25519-signed single-use execution tokens.
+S-Class EOS V11.2 - D5 Cryptographic Execution Token & Admission Models (§8.1, §8.3).
+Immutable, Ed25519-signed single-use execution tokens and admission records.
 Reuses D2 durable storage for atomic single-use nonce reservation.
-Binds token_id, obligation_id, proposal_id, source_sha, policy_version, execution_nonce, timestamps, and signature.
-Domain Separator: SCLASS_EXECUTION_TOKEN_V1:
+Binds token_id, decision_id, obligation_id, proposal_id, source_sha, policy_version, execution_nonce, timestamps, and signature.
+Domain Separators:
+- SCLASS_EXECUTION_TOKEN_V1:
+- SCLASS_EXECUTION_ADMISSION_V1:
 Controller holds the ONLY issuance path.
 """
 
@@ -22,12 +24,14 @@ from policy.models import AuthoritySignerProtocol
 
 TOKEN_ID_PREFIX = "TOK-"
 SCLASS_EXECUTION_TOKEN_DOMAIN_SEPARATOR = "SCLASS_EXECUTION_TOKEN_V1:"
+SCLASS_EXECUTION_ADMISSION_DOMAIN_SEPARATOR = "SCLASS_EXECUTION_ADMISSION_V1:"
 
 
 @dataclass(frozen=True)
 class ExecutionToken:
     """Immutable single-use execution token issued exclusively by D5 Controller upon authorization."""
     token_id: str
+    decision_id: str
     obligation_id: str
     proposal_id: str
     source_sha: str
@@ -40,6 +44,8 @@ class ExecutionToken:
     def __post_init__(self):
         if not self.token_id or not self.token_id.startswith(TOKEN_ID_PREFIX):
             raise ValueError(f"Invalid token_id: '{self.token_id}' must start with '{TOKEN_ID_PREFIX}'")
+        if not self.decision_id:
+            raise ValueError("decision_id cannot be empty.")
         if not self.obligation_id:
             raise ValueError("obligation_id cannot be empty.")
         if not self.proposal_id:
@@ -55,8 +61,41 @@ class ExecutionToken:
             raise TypeError("signature must be an AsymmetricAuthoritySignature instance.")
 
 
+@dataclass(frozen=True)
+class ExecutionAdmissionResult:
+    """Immutable, signed result of admitting an ExecutionToken BEFORE D6 execution."""
+    token_id: str
+    execution_nonce: str
+    obligation_id: str
+    source_sha: str
+    policy_version: int
+    decision_id: str
+    admitted_at: str
+    is_admitted: bool
+    signature: Optional[AsymmetricAuthoritySignature] = None
+    error_message: Optional[str] = None
+
+    def __post_init__(self):
+        if self.is_admitted:
+            if not self.token_id:
+                raise ValueError("token_id cannot be empty for admitted result.")
+            if not self.execution_nonce:
+                raise ValueError("execution_nonce cannot be empty for admitted result.")
+            if not self.obligation_id:
+                raise ValueError("obligation_id cannot be empty for admitted result.")
+            _validate_pattern(self.source_sha, HEX_40_PATTERN, "source_sha")
+            if not isinstance(self.policy_version, int) or self.policy_version < 1:
+                raise ValueError("policy_version must be an integer >= 1.")
+            if not self.decision_id:
+                raise ValueError("decision_id cannot be empty for admitted result.")
+            _validate_iso8601(self.admitted_at, "admitted_at")
+            if not isinstance(self.signature, AsymmetricAuthoritySignature):
+                raise TypeError("signature must be an AsymmetricAuthoritySignature instance for admitted result.")
+
+
 def _build_token_payload(
     token_id: str,
+    decision_id: str,
     obligation_id: str,
     proposal_id: str,
     source_sha: str,
@@ -67,6 +106,7 @@ def _build_token_payload(
 ) -> dict:
     return {
         "token_id": token_id,
+        "decision_id": decision_id,
         "obligation_id": obligation_id,
         "proposal_id": proposal_id,
         "source_sha": source_sha,
@@ -77,13 +117,39 @@ def _build_token_payload(
     }
 
 
+def _build_admission_payload(
+    token_id: str,
+    execution_nonce: str,
+    obligation_id: str,
+    source_sha: str,
+    policy_version: int,
+    decision_id: str,
+    admitted_at: str,
+) -> dict:
+    return {
+        "token_id": token_id,
+        "execution_nonce": execution_nonce,
+        "obligation_id": obligation_id,
+        "source_sha": source_sha,
+        "policy_version": policy_version,
+        "decision_id": decision_id,
+        "admitted_at": admitted_at,
+    }
+
+
 def _compute_token_canonical_bytes(payload: dict) -> bytes:
     """Computes canonical RFC 8785 JSON bytes prefixed with the frozen domain separator."""
     return SCLASS_EXECUTION_TOKEN_DOMAIN_SEPARATOR.encode("utf-8") + canonicalize_json(payload)
 
 
+def _compute_admission_canonical_bytes(payload: dict) -> bytes:
+    """Computes canonical RFC 8785 JSON bytes prefixed with the frozen admission domain separator."""
+    return SCLASS_EXECUTION_ADMISSION_DOMAIN_SEPARATOR.encode("utf-8") + canonicalize_json(payload)
+
+
 def _mint_execution_token(
     token_id: str,
+    decision_id: str,
     obligation_id: str,
     proposal_id: str,
     source_sha: str,
@@ -104,6 +170,7 @@ def _mint_execution_token(
 
     payload = _build_token_payload(
         token_id=token_id,
+        decision_id=decision_id,
         obligation_id=obligation_id,
         proposal_id=proposal_id,
         source_sha=source_sha,
@@ -122,6 +189,7 @@ def _mint_execution_token(
 
     return ExecutionToken(
         token_id=token_id,
+        decision_id=decision_id,
         obligation_id=obligation_id,
         proposal_id=proposal_id,
         source_sha=source_sha,
@@ -133,6 +201,56 @@ def _mint_execution_token(
     )
 
 
+def verify_execution_token_signature(
+    token: ExecutionToken,
+    authority_signer: AuthoritySignerProtocol,
+) -> bool:
+    """Cryptographically verifies Ed25519 signature of ExecutionToken."""
+    if not isinstance(token, ExecutionToken) or not isinstance(authority_signer, AuthoritySignerProtocol):
+        return False
+    payload = _build_token_payload(
+        token_id=token.token_id,
+        decision_id=token.decision_id,
+        obligation_id=token.obligation_id,
+        proposal_id=token.proposal_id,
+        source_sha=token.source_sha,
+        policy_version=token.policy_version,
+        execution_nonce=token.execution_nonce,
+        issued_at=token.issued_at,
+        expires_at=token.expires_at,
+    )
+    try:
+        canonical_bytes = _compute_token_canonical_bytes(payload)
+        return authority_signer.verify_signature(canonical_bytes, token.signature)
+    except (ValueError, TypeError, KeyError):
+        return False
+
+
+def verify_admission_signature(
+    admission: ExecutionAdmissionResult,
+    authority_signer: AuthoritySignerProtocol,
+) -> bool:
+    """Cryptographically verifies Ed25519 signature of ExecutionAdmissionResult."""
+    if not isinstance(admission, ExecutionAdmissionResult) or not admission.is_admitted:
+        return False
+    if not admission.signature or not isinstance(authority_signer, AuthoritySignerProtocol):
+        return False
+    payload = _build_admission_payload(
+        token_id=admission.token_id,
+        execution_nonce=admission.execution_nonce,
+        obligation_id=admission.obligation_id,
+        source_sha=admission.source_sha,
+        policy_version=admission.policy_version,
+        decision_id=admission.decision_id,
+        admitted_at=admission.admitted_at,
+    )
+    try:
+        canonical_bytes = _compute_admission_canonical_bytes(payload)
+        return authority_signer.verify_signature(canonical_bytes, admission.signature)
+    except (ValueError, TypeError, KeyError):
+        return False
+
+
 def verify_and_consume_execution_token(
     token: ExecutionToken,
     expected_obligation_id: str,
@@ -142,10 +260,7 @@ def verify_and_consume_execution_token(
     authority_signer: AuthoritySignerProtocol,
     nonce_store: Optional[D2NonceStore] = None,
 ) -> bool:
-    """Cryptographically verifies token, checks bindings & time validity, and atomically reserves nonce in D2 store.
-    
-    Validates current_time >= issued_at and current_time <= expires_at.
-    """
+    """Cryptographically verifies token, checks bindings & time validity, and atomically reserves nonce in D2 store."""
     if not isinstance(token, ExecutionToken):
         return False
     if not isinstance(authority_signer, AuthoritySignerProtocol):
@@ -164,38 +279,20 @@ def verify_and_consume_execution_token(
         t_current = datetime.fromisoformat(current_time_iso.replace("Z", "+00:00"))
         t_issued = datetime.fromisoformat(token.issued_at.replace("Z", "+00:00"))
         t_expiry = datetime.fromisoformat(token.expires_at.replace("Z", "+00:00"))
-        if t_current < t_issued:
-            # Future-issued token rejected
-            return False
-        if t_current > t_expiry:
-            # Expired token rejected
+        if t_current < t_issued or t_current > t_expiry:
             return False
     except Exception:
         return False
 
     # 3. Cryptographic Signature Verification with Domain Separator
-    payload = _build_token_payload(
-        token_id=token.token_id,
-        obligation_id=token.obligation_id,
-        proposal_id=token.proposal_id,
-        source_sha=token.source_sha,
-        policy_version=token.policy_version,
-        execution_nonce=token.execution_nonce,
-        issued_at=token.issued_at,
-        expires_at=token.expires_at,
-    )
-    try:
-        canonical_bytes = _compute_token_canonical_bytes(payload)
-        is_sig_valid = authority_signer.verify_signature(canonical_bytes, token.signature)
-        if not is_sig_valid:
-            return False
-    except (ValueError, TypeError, KeyError):
+    if not verify_execution_token_signature(token, authority_signer):
         return False
 
     # 4. Atomic D2 Single-Use Nonce Reservation (BEFORE D6 execution)
     store = nonce_store or D2NonceStore()
     try:
-        reserved = store.reserve_nonce(token.execution_nonce)
+        # Atomic reservation of admission nonce in D2 durable store
+        reserved = store.reserve_nonce(f"ADMIT:{token.execution_nonce}")
         return reserved
     except Exception:
         return False
