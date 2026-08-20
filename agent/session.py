@@ -96,17 +96,8 @@ class AgentSessionManager:
         session_capabilities = tuple(granted_capabilities)
         has_ws = self._workspace is not None and self._workspace.is_active
 
-        # Resolve authoritative ExecutionContext without manufacturing topology
+        # Authoritative ExecutionContext: strictly passed, zero manufactured fallback
         exec_ctx = execution_context or self._session_execution_context
-        if exec_ctx is None:
-            ws_id = self._workspace.workspace_id if self._workspace else "ws_session_default"
-            exec_ctx = ExecutionContext(
-                provider_id="pytest_runner_engine",
-                sandbox_profile_id="sbx_std",
-                workspace_id=ws_id,
-                resource_profile_id="res_std",
-                capability_set=session_capabilities,
-            )
 
         while turn_index < max_turns and budget_remaining > 0.0:
             # 1. Mandatory Authoritative Repository State Verification
@@ -206,6 +197,13 @@ class AgentSessionManager:
 
                 tool_def = self._tool_registry.get_tool(tc.tool_name)
                 if tool_def and tool_def.is_proposal_tool:
+                    # Fail closed if no authoritative execution context is supplied
+                    if exec_ctx is None:
+                        turn_entry["validation_error"] = (
+                            "EXECUTION_CONTEXT_MISSING: Authoritative execution context is required for proposal dispatch."
+                        )
+                        continue
+
                     # Mandatory Re-Verification of Repository State immediately before proposal synthesis
                     curr_rep, curr_sha = self._authoritative_repo_state_provider()
                     if curr_rep != repository_id or curr_sha != source_sha:

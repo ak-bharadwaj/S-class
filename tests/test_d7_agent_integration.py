@@ -87,6 +87,17 @@ def fresh_controller(tmp_path):
     return SClassController(authority_signer=signer, nonce_store=nonce_store)
 
 
+
+@pytest.fixture
+def default_exec_ctx():
+    return ExecutionContext(
+        provider_id="pytest_runner_engine",
+        sandbox_profile_id="sbx_std",
+        workspace_id="ws_default_test",
+        resource_profile_id="res_std",
+        capability_set=("CAP_READ_CODE", "CAP_PROPOSE_ACTION", "CAP_EXEC_TEST"),
+    )
+
 @pytest.fixture
 def default_repo_provider():
     return lambda: (DEFAULT_REPO_ID, DEFAULT_SHA)
@@ -163,6 +174,7 @@ def test_session_manager_rejects_injected_replayed_inbound_message(
         worker=worker,
         controller=fresh_controller,
         authoritative_repo_state_provider=default_repo_provider,
+        session_execution_context=default_exec_ctx,
     )
     rec, dispatches = session_mgr.run_session(
         repository_id=DEFAULT_REPO_ID,
@@ -484,7 +496,7 @@ def test_proposal_synthesizer_rejects_empty_and_invented_capabilities():
 # =====================================================================
 
 def test_session_manager_tracks_internal_accounting_units(
-    fresh_controller, standard_domain_state, default_repo_provider
+    fresh_controller, standard_domain_state, default_repo_provider, default_exec_ctx
 ):
     obls, policies = standard_domain_state
     worker = MockAgentWorker("worker")
@@ -507,6 +519,7 @@ def test_session_manager_tracks_internal_accounting_units(
         worker=worker,
         controller=fresh_controller,
         authoritative_repo_state_provider=default_repo_provider,
+        session_execution_context=default_exec_ctx,
     )
     record, dispatches = session_mgr.run_session(
         repository_id=DEFAULT_REPO_ID,
@@ -577,8 +590,18 @@ def test_concurrent_agent_sessions_remain_isolated(fresh_controller, standard_do
             advisory_estimated_cost_usd=0.01,
         )
         worker.set_script([t1])
+        worker_exec_ctx = ExecutionContext(
+            provider_id="pytest_runner_engine",
+            sandbox_profile_id="sbx_std",
+            workspace_id=f"ws_worker_{worker_idx}",
+            resource_profile_id="res_std",
+            capability_set=("CAP_READ_CODE", "CAP_PROPOSE_ACTION", "CAP_EXEC_TEST"),
+        )
         mgr = AgentSessionManager(
-            worker=worker, controller=fresh_controller, authoritative_repo_state_provider=default_repo_provider
+            worker=worker,
+            controller=fresh_controller,
+            authoritative_repo_state_provider=default_repo_provider,
+            session_execution_context=worker_exec_ctx,
         )
         return mgr.run_session(
             repository_id=DEFAULT_REPO_ID,
@@ -728,7 +751,7 @@ def test_synthesizer_code_patch_and_error_branches():
 
 
 def test_session_manager_handles_turn_limit_and_budget_exhaustion(
-    fresh_controller, standard_domain_state, default_repo_provider
+    fresh_controller, standard_domain_state, default_repo_provider, default_exec_ctx
 ):
     obls, policies = standard_domain_state
 
@@ -746,7 +769,10 @@ def test_session_manager_handles_turn_limit_and_budget_exhaustion(
     call = AgentToolCall("C1", "propose_test_run", {"obligation_id": "OBL-001", "target_test": "test.py", "purpose": "T"})
     worker_exp.set_script([AgentTurnResponse(thought="T", tool_calls=(call,), turn_status=AgentTurnStatus.CONTINUE)] * 5)
     mgr_exp = AgentSessionManager(
-        worker=worker_exp, controller=fresh_controller, authoritative_repo_state_provider=default_repo_provider
+        worker=worker_exp,
+        controller=fresh_controller,
+        authoritative_repo_state_provider=default_repo_provider,
+        session_execution_context=default_exec_ctx,
     )
     rec_exp, _ = mgr_exp.run_session(
         DEFAULT_REPO_ID,
@@ -814,7 +840,7 @@ def test_model_validations_and_unhandled_worker_exception(
 # =====================================================================
 
 def test_session_manager_tracks_internal_accounting_units(
-    fresh_controller, standard_domain_state, default_repo_provider
+    fresh_controller, standard_domain_state, default_repo_provider, default_exec_ctx
 ):
     obls, policies = standard_domain_state
     worker = MockAgentWorker("worker")
@@ -837,6 +863,7 @@ def test_session_manager_tracks_internal_accounting_units(
         worker=worker,
         controller=fresh_controller,
         authoritative_repo_state_provider=default_repo_provider,
+        session_execution_context=default_exec_ctx,
     )
     record, dispatches = session_mgr.run_session(
         repository_id=DEFAULT_REPO_ID,
@@ -959,3 +986,92 @@ def test_tool_definition_and_agent_model_validations():
         AgentToolResult("", "tool", True)
     with pytest.raises(ValueError):
         AgentToolResult("C1", "", True)
+
+
+# =====================================================================
+# 10. EXECUTION TOPOLOGY IMMUTABILITY & FAIL-CLOSED BOUNDARY
+# =====================================================================
+
+def test_session_manager_fails_closed_when_execution_context_is_missing(
+    fresh_controller, standard_domain_state, default_repo_provider
+):
+    """Proves that missing ExecutionContext fails closed and rejects ActionProposal dispatch."""
+    obls, policies = standard_domain_state
+    worker = MockAgentWorker("worker")
+    call = AgentToolCall("C1", "propose_test_run", {"obligation_id": "OBL-001", "target_test": "test.py", "purpose": "T"})
+    worker.set_script([AgentTurnResponse(thought="Propose test", tool_calls=(call,), turn_status=AgentTurnStatus.COMPLETED)])
+
+    # No session_execution_context provided in constructor or run_session
+    mgr = AgentSessionManager(
+        worker=worker,
+        controller=fresh_controller,
+        authoritative_repo_state_provider=default_repo_provider,
+        session_execution_context=None,
+    )
+
+    rec, dispatches = mgr.run_session(
+        repository_id=DEFAULT_REPO_ID,
+        source_sha=DEFAULT_SHA,
+        task_id="TASK-1",
+        objective="Obj",
+        obligations=obls,
+        policies=policies,
+        policy_version=1,
+        granted_capabilities=("CAP_PROPOSE_ACTION", "CAP_EXEC_TEST"),
+        execution_context=None,
+    )
+
+    assert rec.final_status == AgentTurnStatus.COMPLETED
+    assert len(dispatches) == 0  # Zero proposals dispatched
+    assert "EXECUTION_CONTEXT_MISSING" in rec.turns_transcript[0].get("validation_error", "")
+
+
+def test_execution_topology_immutability_across_d7_boundary(
+    fresh_controller, standard_domain_state, default_repo_provider
+):
+    """Proves that provider_id, sandbox_profile_id, resource_profile_id, workspace_id, and capability_set cannot be mutated by D7."""
+    obls, policies = standard_domain_state
+    pinned_ctx = ExecutionContext(
+        provider_id="prov_immutable_100",
+        sandbox_profile_id="sbx_immutable_strict",
+        workspace_id="ws_immutable_exact",
+        resource_profile_id="res_immutable_pinned",
+        capability_set=("CAP_READ_CODE", "CAP_PROPOSE_ACTION", "CAP_EXEC_TEST"),
+    )
+
+    worker = MockAgentWorker("worker")
+    call = AgentToolCall("C1", "propose_test_run", {"obligation_id": "OBL-001", "target_test": "test.py", "purpose": "T"})
+    worker.set_script([AgentTurnResponse(thought="Propose test", tool_calls=(call,), turn_status=AgentTurnStatus.COMPLETED)])
+
+    mgr = AgentSessionManager(
+        worker=worker,
+        controller=fresh_controller,
+        authoritative_repo_state_provider=default_repo_provider,
+        session_execution_context=pinned_ctx,
+    )
+
+    rec, dispatches = mgr.run_session(
+        repository_id=DEFAULT_REPO_ID,
+        source_sha=DEFAULT_SHA,
+        task_id="TASK-1",
+        objective="Obj",
+        obligations=obls,
+        policies=policies,
+        policy_version=1,
+        granted_capabilities=("CAP_READ_CODE", "CAP_PROPOSE_ACTION", "CAP_EXEC_TEST"),
+    )
+
+    assert len(dispatches) == 1
+    tok = dispatches[0].execution_token
+    assert tok is not None
+    assert tok.context_digest == pinned_ctx.context_digest
+
+    # Direct synthesizer propagation verification
+    prop, synth_err = ActionProposalSynthesizer.synthesize_proposal(call, session_execution_context=pinned_ctx)
+    assert synth_err is None
+    assert prop is not None
+    assert prop.execution_context.provider_id == "prov_immutable_100"
+    assert prop.execution_context.sandbox_profile_id == "sbx_immutable_strict"
+    assert prop.execution_context.workspace_id == "ws_immutable_exact"
+    assert prop.execution_context.resource_profile_id == "res_immutable_pinned"
+    assert prop.execution_context.capability_set == tuple(sorted(pinned_ctx.capability_set))
