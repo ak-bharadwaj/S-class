@@ -1,7 +1,8 @@
 """
 S-Class EOS V11.2 - D7 Coding Agent Integration Layer (§8.1, §8.3).
 Provides cognitive worker protocols, session management, capability-scoped tool registries,
-RFC 8785 AgentMessage ingress validation, and normalized action proposal synthesis for D5.
+RFC 8785 AgentMessage ingress validation, SessionExecutionBinding authority provenance,
+and normalized action proposal synthesis for D5.
 """
 
 from agent.models import (
@@ -13,6 +14,8 @@ from agent.models import (
     AgentTurnResponse,
     AgentSessionRecord,
     AgentMessage,
+    SessionExecutionBinding,
+    create_session_execution_binding,
     create_agent_message,
     compute_agent_message_preimage,
     compute_agent_message_digest,
@@ -24,7 +27,12 @@ from agent.protocol import (
     AgentMessageChainValidator,
     MockAgentWorker,
 )
-from agent.tools import AgentToolRegistry
+from agent.tools import (
+    AgentToolRegistry,
+    READ_CHUNK_MAX_FILE_BYTES,
+    READ_CHUNK_MAX_RETURNED_BYTES,
+    READ_CHUNK_MAX_RETURNED_LINES,
+)
 from agent.context import AgentContextBuilder
 from agent.synthesizer import ActionProposalSynthesizer
 from agent.session import AgentSessionManager
@@ -38,6 +46,8 @@ __all__ = [
     "AgentTurnResponse",
     "AgentSessionRecord",
     "AgentMessage",
+    "SessionExecutionBinding",
+    "create_session_execution_binding",
     "create_agent_message",
     "compute_agent_message_preimage",
     "compute_agent_message_digest",
@@ -47,6 +57,9 @@ __all__ = [
     "AgentMessageChainValidator",
     "MockAgentWorker",
     "AgentToolRegistry",
+    "READ_CHUNK_MAX_FILE_BYTES",
+    "READ_CHUNK_MAX_RETURNED_BYTES",
+    "READ_CHUNK_MAX_RETURNED_LINES",
     "AgentContextBuilder",
     "ActionProposalSynthesizer",
     "AgentSessionManager",

@@ -3,9 +3,9 @@ S-Class EOS V11.2 - D7 Agent Session Manager & Ingress Lifecycle (§8.1, §8.3).
 Orchestrates ephemeral multi-turn agent conversations with:
 1. Inbound AgentMessage ingress validation (validates external worker message envelope before unpacking).
 2. Mandatory authoritative repository state verification before every turn and proposal.
-3. Explicit execution context propagation (no manufactured topology in D7).
-4. Streaming memory-bounded inspection tools.
-5. Non-authoritative internal accounting units (D7_INTERNAL_ACCOUNTING_UNIT).
+3. Cryptographic SessionExecutionBinding authority provenance verification before proposal synthesis.
+4. Single-source capability authority (zero dual authority drift).
+5. Streaming memory-bounded inspection tools and non-authoritative internal accounting units.
 """
 
 from __future__ import annotations
@@ -23,6 +23,8 @@ from agent.models import (
     AgentSessionRecord,
     AgentToolCall,
     AgentMessage,
+    SessionExecutionBinding,
+    create_session_execution_binding,
     create_agent_message,
     GENESIS_DIGEST,
     D7_INTERNAL_ACCOUNTING_UNIT,
@@ -34,7 +36,7 @@ from agent.synthesizer import ActionProposalSynthesizer
 
 
 class AgentSessionManager:
-    """Manages multi-turn cognitive agent sessions with strict ingress validation and repository bounding."""
+    """Manages multi-turn cognitive agent sessions with strict ingress validation and authority provenance."""
 
     def __init__(
         self,
@@ -71,6 +73,7 @@ class AgentSessionManager:
         policy_version: int,
         granted_capabilities: Sequence[str] = ("CAP_READ_CODE", "CAP_PROPOSE_ACTION"),
         execution_context: Optional[ExecutionContext] = None,
+        session_binding: Optional[SessionExecutionBinding] = None,
         max_turns: int = 10,
         budget_units: float = 10.0,
     ) -> Tuple[AgentSessionRecord, List[ControllerDispatchResult]]:
@@ -98,6 +101,19 @@ class AgentSessionManager:
 
         # Authoritative ExecutionContext: strictly passed, zero manufactured fallback
         exec_ctx = execution_context or self._session_execution_context
+
+        # Authoritative SessionExecutionBinding
+        binding = session_binding
+        if binding is None and exec_ctx is not None:
+            # Construct authoritative binding bound to this active session
+            binding = create_session_execution_binding(
+                session_id=session_id,
+                repository_id=repository_id,
+                source_sha=source_sha,
+                task_id=task_id,
+                execution_context_digest=exec_ctx.context_digest,
+                granted_capabilities=session_capabilities,
+            )
 
         while turn_index < max_turns and budget_remaining > 0.0:
             # 1. Mandatory Authoritative Repository State Verification
@@ -197,10 +213,10 @@ class AgentSessionManager:
 
                 tool_def = self._tool_registry.get_tool(tc.tool_name)
                 if tool_def and tool_def.is_proposal_tool:
-                    # Fail closed if no authoritative execution context is supplied
-                    if exec_ctx is None:
+                    # Fail closed if no authoritative execution context or binding is present
+                    if exec_ctx is None or binding is None:
                         turn_entry["validation_error"] = (
-                            "EXECUTION_CONTEXT_MISSING: Authoritative execution context is required for proposal dispatch."
+                            "EXECUTION_CONTEXT_MISSING: Authoritative execution context and binding are required for proposal dispatch."
                         )
                         continue
 
@@ -213,7 +229,17 @@ class AgentSessionManager:
                     proposal, synth_err = ActionProposalSynthesizer.synthesize_proposal(
                         tool_call=tc,
                         session_execution_context=exec_ctx,
+                        session_binding=binding,
+                        active_session_id=session_id,
+                        authoritative_repo_id=curr_rep,
+                        authoritative_source_sha=curr_sha,
+                        active_task_id=task_id,
                     )
+                    if synth_err:
+                        turn_entry["validation_error"] = synth_err
+                        final_status = AgentTurnStatus.AUTHORITY_BINDING_VIOLATION
+                        continue
+
                     if proposal:
                         now_dt = datetime.now(timezone.utc)
                         eval_iso = now_dt.isoformat()
@@ -246,7 +272,11 @@ class AgentSessionManager:
                     }
 
             # 7. Check terminal statuses
-            if final_status in (AgentTurnStatus.STALE_CONTEXT, AgentTurnStatus.REPOSITORY_MISMATCH):
+            if final_status in (
+                AgentTurnStatus.STALE_CONTEXT,
+                AgentTurnStatus.REPOSITORY_MISMATCH,
+                AgentTurnStatus.AUTHORITY_BINDING_VIOLATION,
+            ):
                 break
 
             if turn_resp.turn_status in (AgentTurnStatus.COMPLETED, AgentTurnStatus.FAILED):

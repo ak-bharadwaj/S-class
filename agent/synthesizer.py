@@ -1,7 +1,8 @@
 """
-S-Class EOS V11.2 - D7 Action Proposal Synthesizer & Output Normalizer (§8.1, §8.3).
+S-Class EOS V11.2 - D7 Action Proposal Synthesizer & Authority Provenance Verification (§8.1, §8.3).
 Normalizes agent tool calls into canonical D0 ActionProposal objects for D5 Controller submission.
-Propagates authoritative session execution context unchanged; never manufactures or defaults topology.
+Verifies authoritative SessionExecutionBinding against active session, repo, SHA, task, and execution context.
+Eliminates dual capability authority and prevents execution context substitution across sessions.
 """
 
 from __future__ import annotations
@@ -9,7 +10,7 @@ import uuid
 from typing import Tuple, Optional, Any, Mapping, Sequence
 from controller.authorization import ActionProposal
 from controller.token import ExecutionContext
-from agent.models import AgentToolCall
+from agent.models import AgentToolCall, SessionExecutionBinding
 
 
 class ActionProposalSynthesizer:
@@ -19,19 +20,67 @@ class ActionProposalSynthesizer:
     def synthesize_proposal(
         tool_call: AgentToolCall,
         session_execution_context: ExecutionContext,
+        session_binding: SessionExecutionBinding,
+        active_session_id: str,
+        authoritative_repo_id: str,
+        authoritative_source_sha: str,
+        active_task_id: str,
         estimated_cost_usd: float = 0.05,
     ) -> Tuple[Optional[ActionProposal], Optional[str]]:
         """
-        Transforms a proposal tool call into an ActionProposal with strictly propagated session execution context.
-        Zero manufacture of provider_id, sandbox_profile_id, resource_profile_id, or random workspace_ids.
+        Transforms a proposal tool call into an ActionProposal after cryptographically verifying
+        authority provenance against the immutable SessionExecutionBinding.
         """
+        # 1. Type and instance integrity checks
         if not isinstance(tool_call, AgentToolCall):
             return None, "tool_call must be an instance of AgentToolCall."
 
         if not isinstance(session_execution_context, ExecutionContext):
             return None, "session_execution_context must be an authoritative ExecutionContext instance."
 
-        if not session_execution_context.capability_set:
+        if not isinstance(session_binding, SessionExecutionBinding):
+            return None, "session_binding must be an authoritative SessionExecutionBinding instance."
+
+        # 2. Cryptographic Authority Provenance Verification
+        if session_binding.session_id != active_session_id:
+            return None, (
+                f"BINDING_MISMATCH: session_id mismatch: binding has '{session_binding.session_id}', "
+                f"active session is '{active_session_id}'."
+            )
+
+        if session_binding.repository_id != authoritative_repo_id:
+            return None, (
+                f"BINDING_MISMATCH: repository_id mismatch: binding has '{session_binding.repository_id}', "
+                f"authoritative repo is '{authoritative_repo_id}'."
+            )
+
+        if session_binding.source_sha != authoritative_source_sha:
+            return None, (
+                f"BINDING_MISMATCH: source_sha mismatch: binding has '{session_binding.source_sha}', "
+                f"authoritative SHA is '{authoritative_source_sha}'."
+            )
+
+        if session_binding.task_id != active_task_id:
+            return None, (
+                f"BINDING_MISMATCH: task_id mismatch: binding has '{session_binding.task_id}', "
+                f"active task is '{active_task_id}'."
+            )
+
+        if session_binding.execution_context_digest != session_execution_context.context_digest:
+            return None, (
+                f"BINDING_MISMATCH: context_digest mismatch: binding expected '{session_binding.execution_context_digest}', "
+                f"context has '{session_execution_context.context_digest}'."
+            )
+
+        # 3. Single-Source Capability Authority Verification
+        sorted_caps = tuple(sorted(set(session_execution_context.capability_set)))
+        if session_binding.granted_capabilities != sorted_caps:
+            return None, (
+                f"CAPABILITY_AUTHORITY_MISMATCH: binding granted capabilities {session_binding.granted_capabilities} "
+                f"do not match execution context capability set {sorted_caps}."
+            )
+
+        if not sorted_caps:
             return None, "Cannot synthesize proposal with empty capability set in execution context."
 
         args = tool_call.arguments
