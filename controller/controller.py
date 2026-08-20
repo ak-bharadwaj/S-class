@@ -112,6 +112,11 @@ class SClassController:
         expires_at: str,
         budget_remaining: float = 100.0,
         allowed_action_types: Optional[Sequence[str]] = None,
+        active_fencing_token: Optional[int] = None,
+        active_lease_epoch: Optional[int] = None,
+        active_owner_id: Optional[str] = None,
+        expected_state_version: Optional[int] = None,
+        expected_state_digest: Optional[str] = None,
     ) -> ControllerDispatchResult:
         """Processes an ActionProposal through PRE_VALIDATE -> PRE_AUTHORIZE -> PRE_EXECUTE."""
         if not isinstance(proposal, ActionProposal):
@@ -187,6 +192,11 @@ class SClassController:
             evaluated_at=evaluated_at,
             budget_remaining=budget_remaining,
             allowed_action_types=allowed_action_types,
+            active_fencing_token=active_fencing_token,
+            active_lease_epoch=active_lease_epoch,
+            active_owner_id=active_owner_id,
+            expected_state_version=expected_state_version,
+            expected_state_digest=expected_state_digest,
         )
 
         # If not authorized, halt immediately: no token minted
@@ -227,6 +237,10 @@ class SClassController:
             issued_at=evaluated_at,
             expires_at=expires_at,
             authority_signer=self._authority_signer,
+            fencing_token=proposal.fencing_token,
+            lease_epoch=proposal.lease_epoch,
+            state_version=proposal.state_version,
+            state_digest=proposal.state_digest,
         )
 
         return ControllerDispatchResult(
@@ -348,6 +362,10 @@ class SClassController:
             policy_version=token.policy_version,
             decision_id=token.decision_id,
             admitted_at=current_time_iso,
+            fencing_token=token.fencing_token,
+            lease_epoch=token.lease_epoch,
+            state_version=token.state_version,
+            state_digest=token.state_digest,
         )
         try:
             canonical_bytes = _compute_admission_canonical_bytes(admission_payload)
@@ -370,6 +388,10 @@ class SClassController:
                 admitted_at=current_time_iso,
                 is_admitted=False,
                 error_message=f"Authority signing failed: {str(e)}",
+                fencing_token=token.fencing_token,
+                lease_epoch=token.lease_epoch,
+                state_version=token.state_version,
+                state_digest=token.state_digest,
             )
 
         provisional_admission = ExecutionAdmissionResult(
@@ -384,6 +406,10 @@ class SClassController:
             admitted_at=current_time_iso,
             is_admitted=True,
             signature=authority_sig,
+            fencing_token=token.fencing_token,
+            lease_epoch=token.lease_epoch,
+            state_version=token.state_version,
+            state_digest=token.state_digest,
         )
 
         # Step 4: Verify Generated Admission Signature (PURE - NO D2 MUTATION)
@@ -400,6 +426,10 @@ class SClassController:
                 admitted_at=current_time_iso,
                 is_admitted=False,
                 error_message="Generated admission signature verification failed.",
+                fencing_token=token.fencing_token,
+                lease_epoch=token.lease_epoch,
+                state_version=token.state_version,
+                state_digest=token.state_digest,
             )
 
         # Step 5: Atomically Commit Admission Nonce in D2 Store (ONLY D2 MUTATING OPERATION)
@@ -417,6 +447,10 @@ class SClassController:
                 admitted_at=current_time_iso,
                 is_admitted=False,
                 error_message="D2 single-use admission reservation failed or was already consumed.",
+                fencing_token=token.fencing_token,
+                lease_epoch=token.lease_epoch,
+                state_version=token.state_version,
+                state_digest=token.state_digest,
             )
 
         return provisional_admission
@@ -482,6 +516,14 @@ class SClassController:
             return ExecutionCompletionResult(token_id=token.token_id, is_valid_execution=False, error_message="policy_version mismatch")
         if admission.decision_id != token.decision_id:
             return ExecutionCompletionResult(token_id=token.token_id, is_valid_execution=False, error_message="decision_id mismatch")
+        if admission.fencing_token != token.fencing_token:
+            return ExecutionCompletionResult(token_id=token.token_id, is_valid_execution=False, error_message="fencing_token mismatch")
+        if admission.lease_epoch != token.lease_epoch:
+            return ExecutionCompletionResult(token_id=token.token_id, is_valid_execution=False, error_message="lease_epoch mismatch")
+        if admission.state_version != token.state_version:
+            return ExecutionCompletionResult(token_id=token.token_id, is_valid_execution=False, error_message="state_version mismatch")
+        if admission.state_digest != token.state_digest:
+            return ExecutionCompletionResult(token_id=token.token_id, is_valid_execution=False, error_message="state_digest mismatch")
 
         # Cryptographic verification of both Token and Admission signatures
         if not verify_execution_token_signature(token, self._authority_signer):

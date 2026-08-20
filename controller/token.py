@@ -177,6 +177,10 @@ class ExecutionToken:
     issued_at: str
     expires_at: str
     signature: AsymmetricAuthoritySignature
+    fencing_token: int = 0
+    lease_epoch: int = 0
+    state_version: int = 0
+    state_digest: str = ""
 
     def __post_init__(self):
         if not self.token_id or not self.token_id.startswith(TOKEN_ID_PREFIX):
@@ -198,6 +202,14 @@ class ExecutionToken:
         _validate_iso8601(self.expires_at, "expires_at")
         if not isinstance(self.signature, AsymmetricAuthoritySignature):
             raise TypeError("signature must be an AsymmetricAuthoritySignature instance.")
+        if not isinstance(self.fencing_token, int) or self.fencing_token < 0:
+            raise ValueError("fencing_token must be an integer >= 0.")
+        if not isinstance(self.lease_epoch, int) or self.lease_epoch < 0:
+            raise ValueError("lease_epoch must be an integer >= 0.")
+        if not isinstance(self.state_version, int) or self.state_version < 0:
+            raise ValueError("state_version must be an integer >= 0.")
+        if self.state_digest:
+            _validate_pattern(self.state_digest, HEX_64_PATTERN, "state_digest")
 
 
 @dataclass(frozen=True)
@@ -215,6 +227,10 @@ class ExecutionAdmissionResult:
     is_admitted: bool
     signature: Optional[AsymmetricAuthoritySignature] = None
     error_message: Optional[str] = None
+    fencing_token: int = 0
+    lease_epoch: int = 0
+    state_version: int = 0
+    state_digest: str = ""
 
     def __post_init__(self):
         if self.is_admitted:
@@ -234,6 +250,14 @@ class ExecutionAdmissionResult:
             _validate_iso8601(self.admitted_at, "admitted_at")
             if not isinstance(self.signature, AsymmetricAuthoritySignature):
                 raise TypeError("signature must be an AsymmetricAuthoritySignature instance for admitted result.")
+            if not isinstance(self.fencing_token, int) or self.fencing_token < 0:
+                raise ValueError("fencing_token must be an integer >= 0.")
+            if not isinstance(self.lease_epoch, int) or self.lease_epoch < 0:
+                raise ValueError("lease_epoch must be an integer >= 0.")
+            if not isinstance(self.state_version, int) or self.state_version < 0:
+                raise ValueError("state_version must be an integer >= 0.")
+            if self.state_digest:
+                _validate_pattern(self.state_digest, HEX_64_PATTERN, "state_digest")
 
 
 @dataclass(frozen=True)
@@ -274,6 +298,14 @@ class ExecutionEnvelope:
             raise ValueError("Policy version mismatch between token and admission.")
         if self.token.decision_id != self.admission.decision_id:
             raise ValueError("Decision ID mismatch between token and admission.")
+        if self.token.fencing_token != self.admission.fencing_token:
+            raise ValueError("Fencing token mismatch between token and admission.")
+        if self.token.lease_epoch != self.admission.lease_epoch:
+            raise ValueError("Lease epoch mismatch between token and admission.")
+        if self.token.state_version != self.admission.state_version:
+            raise ValueError("State version mismatch between token and admission.")
+        if self.token.state_digest != self.admission.state_digest:
+            raise ValueError("State digest mismatch between token and admission.")
 
 
 def _build_token_payload(
@@ -288,6 +320,10 @@ def _build_token_payload(
     execution_nonce: str,
     issued_at: str,
     expires_at: str,
+    fencing_token: int = 0,
+    lease_epoch: int = 0,
+    state_version: int = 0,
+    state_digest: str = "",
 ) -> dict:
     return {
         "token_id": token_id,
@@ -301,6 +337,10 @@ def _build_token_payload(
         "execution_nonce": execution_nonce,
         "issued_at": issued_at,
         "expires_at": expires_at,
+        "fencing_token": fencing_token,
+        "lease_epoch": lease_epoch,
+        "state_version": state_version,
+        "state_digest": state_digest,
     }
 
 
@@ -314,6 +354,10 @@ def _build_admission_payload(
     policy_version: int,
     decision_id: str,
     admitted_at: str,
+    fencing_token: int = 0,
+    lease_epoch: int = 0,
+    state_version: int = 0,
+    state_digest: str = "",
 ) -> dict:
     return {
         "token_id": token_id,
@@ -325,6 +369,10 @@ def _build_admission_payload(
         "policy_version": policy_version,
         "decision_id": decision_id,
         "admitted_at": admitted_at,
+        "fencing_token": fencing_token,
+        "lease_epoch": lease_epoch,
+        "state_version": state_version,
+        "state_digest": state_digest,
     }
 
 
@@ -352,6 +400,10 @@ def _mint_execution_token(
     authority_signer: AuthoritySignerProtocol,
     execution_nonce: Optional[str] = None,
     signer_identity: str = "Gate3AuthoritativeVerifier",
+    fencing_token: int = 0,
+    lease_epoch: int = 0,
+    state_version: int = 0,
+    state_digest: str = "",
 ) -> ExecutionToken:
     """Internal Controller token issuance function with domain separator binding."""
     if not isinstance(authority_signer, AuthoritySignerProtocol):
@@ -373,6 +425,10 @@ def _mint_execution_token(
         execution_nonce=nonce,
         issued_at=issued_at,
         expires_at=expires_at,
+        fencing_token=fencing_token,
+        lease_epoch=lease_epoch,
+        state_version=state_version,
+        state_digest=state_digest,
     )
 
     canonical_bytes = _compute_token_canonical_bytes(payload)
@@ -395,6 +451,10 @@ def _mint_execution_token(
         issued_at=issued_at,
         expires_at=expires_at,
         signature=authority_sig,
+        fencing_token=fencing_token,
+        lease_epoch=lease_epoch,
+        state_version=state_version,
+        state_digest=state_digest,
     )
 
 
@@ -417,6 +477,10 @@ def verify_execution_token_signature(
         execution_nonce=token.execution_nonce,
         issued_at=token.issued_at,
         expires_at=token.expires_at,
+        fencing_token=token.fencing_token,
+        lease_epoch=token.lease_epoch,
+        state_version=token.state_version,
+        state_digest=token.state_digest,
     )
     try:
         canonical_bytes = _compute_token_canonical_bytes(payload)
@@ -444,6 +508,10 @@ def verify_admission_signature(
         policy_version=admission.policy_version,
         decision_id=admission.decision_id,
         admitted_at=admission.admitted_at,
+        fencing_token=admission.fencing_token,
+        lease_epoch=admission.lease_epoch,
+        state_version=admission.state_version,
+        state_digest=admission.state_digest,
     )
     try:
         canonical_bytes = _compute_admission_canonical_bytes(payload)
@@ -461,19 +529,12 @@ def verify_execution_token(
     expected_context_digest: str,
     current_time_iso: str,
     authority_signer: AuthoritySignerProtocol,
+    expected_fencing_token: Optional[int] = None,
+    expected_lease_epoch: Optional[int] = None,
+    expected_state_version: Optional[int] = None,
+    expected_state_digest: Optional[str] = None,
 ) -> bool:
-    """PURE verification of ExecutionToken. NO D2 MUTATION.
-    
-    Verifies:
-    1. Structural field types.
-    2. Obligation ID binding.
-    3. Source SHA binding.
-    4. Policy version binding.
-    5. Action digest binding.
-    6. Context digest binding.
-    7. Time validity (issued_at <= current_time <= expires_at).
-    8. Ed25519 cryptographic signature.
-    """
+    """PURE verification of ExecutionToken. NO D2 MUTATION."""
     if not isinstance(token, ExecutionToken):
         return False
     if not isinstance(authority_signer, AuthoritySignerProtocol):
@@ -489,6 +550,14 @@ def verify_execution_token(
     if token.action_digest != expected_action_digest:
         return False
     if token.context_digest != expected_context_digest:
+        return False
+    if expected_fencing_token is not None and token.fencing_token != expected_fencing_token:
+        return False
+    if expected_lease_epoch is not None and token.lease_epoch != expected_lease_epoch:
+        return False
+    if expected_state_version is not None and token.state_version != expected_state_version:
+        return False
+    if expected_state_digest is not None and token.state_digest != expected_state_digest:
         return False
 
     # 2. Time Boundary Verification (issued_at <= current_time <= expires_at)
