@@ -37,6 +37,7 @@ from events.store import D2NonceStore
 from execution.workspace import IsolatedWorkspace
 from benchmark.parity.gate_3_authority import Gate3AuthorityKeyStore, Gate3AuthoritySigner
 from controller.authorization import ActionProposal, AuthorizationStatus
+from controller.token import ExecutionContext
 from controller.controller import SClassController
 from agent.models import (
     AgentTurnStatus,
@@ -453,17 +454,29 @@ def test_proposal_synthesizer_rejects_empty_and_invented_capabilities():
         arguments={"obligation_id": "OBL-001", "target_test": "test.py", "purpose": "Test"},
     )
 
+    # Invalid object type
+    prop, err = ActionProposalSynthesizer.synthesize_proposal("NOT_A_CALL", ExecutionContext("p", "s", "w", "r", ("C1",)))  # type: ignore
+    assert prop is None
+    assert "tool_call must be an instance of AgentToolCall" in (err or "")
+
+    # Invalid execution context type
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(call, "NOT_A_CONTEXT")  # type: ignore
+    assert prop is None
+    assert "session_execution_context must be an authoritative ExecutionContext" in (err or "")
+
     # Empty capabilities fails closed
-    prop, err = ActionProposalSynthesizer.synthesize_proposal(call, session_granted_capabilities=())
+    empty_ctx = ExecutionContext("p", "s", "w", "r", ())
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(call, session_execution_context=empty_ctx)
     assert prop is None
     assert "Cannot synthesize proposal with empty capability set" in (err or "")
 
-    # Exact session capabilities propagated without alteration
+    # Exact session capabilities and workspace propagated without alteration
     session_caps = ("CAP_PROPOSE_ACTION", "CAP_EXEC_TEST")
-    prop, err = ActionProposalSynthesizer.synthesize_proposal(call, session_granted_capabilities=session_caps)
+    valid_ctx = ExecutionContext("prov_x", "sbx_y", "ws_z", "res_w", session_caps)
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(call, session_execution_context=valid_ctx)
     assert err is None
     assert prop is not None
-    assert prop.execution_context.capability_set == tuple(sorted(session_caps))
+    assert prop.execution_context == valid_ctx
 
 
 # =====================================================================
@@ -794,3 +807,155 @@ def test_model_validations_and_unhandled_worker_exception(
     )
     rec_crash, _ = mgr_crash.run_session(DEFAULT_REPO_ID, DEFAULT_SHA, "T1", "Obj", obls, policies, 1)
     assert rec_crash.final_status == AgentTurnStatus.FAILED
+
+
+# =====================================================================
+# 9. REMAINING CRASH, MODEL, ACCOUNTING & PROPOSAL INVARIANTS
+# =====================================================================
+
+def test_session_manager_tracks_internal_accounting_units(
+    fresh_controller, standard_domain_state, default_repo_provider
+):
+    obls, policies = standard_domain_state
+    worker = MockAgentWorker("worker")
+
+    t1 = AgentTurnResponse(
+        thought="Advisory cost turn",
+        tool_calls=(
+            AgentToolCall(
+                "C1",
+                "propose_test_run",
+                {"obligation_id": "OBL-001", "target_test": "test.py", "purpose": "Test"},
+            ),
+        ),
+        turn_status=AgentTurnStatus.COMPLETED,
+        advisory_estimated_cost_usd=0.035,
+    )
+    worker.set_script([t1])
+
+    session_mgr = AgentSessionManager(
+        worker=worker,
+        controller=fresh_controller,
+        authoritative_repo_state_provider=default_repo_provider,
+    )
+    record, dispatches = session_mgr.run_session(
+        repository_id=DEFAULT_REPO_ID,
+        source_sha=DEFAULT_SHA,
+        task_id="TASK-AGENT-01",
+        objective="Verify budget tracking",
+        obligations=obls,
+        policies=policies,
+        policy_version=1,
+        granted_capabilities=("CAP_READ_CODE", "CAP_PROPOSE_ACTION", "CAP_EXEC_TEST"),
+        budget_units=1.0,
+    )
+
+    assert record.advisory_total_cost_usd == 0.035
+    assert record.internal_accounting_units == D7_INTERNAL_ACCOUNTING_UNIT
+    assert len(dispatches) == 1
+
+
+class CrashingWorker(AgentWorkerProtocol):
+    def __init__(self, exception_to_raise):
+        self._exc = exception_to_raise
+
+    @property
+    def worker_id(self) -> str:
+        return "crashing-worker"
+
+    def generate_inbound_message(self, context, sequence, previous_digest, history):
+        raise self._exc
+
+
+def test_session_manager_handles_worker_timeout_and_disconnect(
+    fresh_controller, standard_domain_state, default_repo_provider
+):
+    obls, policies = standard_domain_state
+
+    # Timeout
+    w_to = CrashingWorker(TimeoutError("Timeout"))
+    mgr_to = AgentSessionManager(worker=w_to, controller=fresh_controller, authoritative_repo_state_provider=default_repo_provider)
+    rec_to, _ = mgr_to.run_session(DEFAULT_REPO_ID, DEFAULT_SHA, "T1", "Obj", obls, policies, 1)
+    assert rec_to.final_status == AgentTurnStatus.WORKER_TIMEOUT
+
+    # Disconnect
+    w_disc = CrashingWorker(ConnectionError("Disconnect"))
+    mgr_disc = AgentSessionManager(worker=w_disc, controller=fresh_controller, authoritative_repo_state_provider=default_repo_provider)
+    rec_disc, _ = mgr_disc.run_session(DEFAULT_REPO_ID, DEFAULT_SHA, "T1", "Obj", obls, policies, 1)
+    assert rec_disc.final_status == AgentTurnStatus.WORKER_DISCONNECT
+
+
+def test_synthesizer_code_patch_and_error_branches():
+    exec_ctx = ExecutionContext("p", "s", "w", "r", ("CAP_PROPOSE_ACTION", "CAP_APPLY_PATCH"))
+
+    # Valid code patch proposal
+    c_patch = AgentToolCall(
+        "C1",
+        "propose_code_patch",
+        {
+            "obligation_id": "OBL-001",
+            "target_file": "src/app.py",
+            "patch_content": "patch text",
+            "purpose": "Patch description",
+        },
+    )
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(c_patch, session_execution_context=exec_ctx)
+    assert err is None
+    assert prop is not None
+    assert prop.action_type == "APPLY_PATCH"
+    assert prop.parameters["patch_content"] == "patch text"
+
+    # Missing obligation_id in propose_test_run
+    c_no_obl = AgentToolCall("C2", "propose_test_run", {"target_test": "t.py", "purpose": "P"})
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(c_no_obl, exec_ctx)
+    assert prop is None
+    assert "Missing or invalid 'obligation_id'" in (err or "")
+
+    # Missing target_test in propose_test_run
+    c_no_tgt = AgentToolCall("C3", "propose_test_run", {"obligation_id": "OBL-001", "purpose": "P"})
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(c_no_tgt, exec_ctx)
+    assert prop is None
+    assert "Missing or invalid 'target_test'" in (err or "")
+
+    # Missing target_file in propose_code_patch
+    c_no_tf = AgentToolCall("C4", "propose_code_patch", {"obligation_id": "OBL-001", "patch_content": "p", "purpose": "P"})
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(c_no_tf, exec_ctx)
+    assert prop is None
+    assert "Missing or invalid 'target_file'" in (err or "")
+
+    # Missing patch_content in propose_code_patch
+    c_no_pc = AgentToolCall("C5", "propose_code_patch", {"obligation_id": "OBL-001", "target_file": "f.py", "purpose": "P"})
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(c_no_pc, exec_ctx)
+    assert prop is None
+    assert "Missing or invalid 'patch_content'" in (err or "")
+
+    # Missing obligation_id in propose_code_patch
+    c_patch_no_obl = AgentToolCall("C6", "propose_code_patch", {"target_file": "f.py", "patch_content": "p", "purpose": "P"})
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(c_patch_no_obl, exec_ctx)
+    assert prop is None
+    assert "Missing or invalid 'obligation_id'" in (err or "")
+
+    # Unrecognized tool
+    c_unknown = AgentToolCall("C7", "unrecognized_proposal_tool", {})
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(c_unknown, exec_ctx)
+    assert prop is None
+    assert "not a recognized proposal tool" in (err or "")
+
+
+def test_tool_definition_and_agent_model_validations():
+    with pytest.raises(ValueError):
+        ToolDefinition("", "desc", {})
+    with pytest.raises(ValueError):
+        ToolDefinition("t", "", {})
+    with pytest.raises(TypeError):
+        ToolDefinition("t", "desc", "not_a_dict")  # type: ignore
+
+    with pytest.raises(ValueError):
+        AgentToolCall("", "tool", {})
+    with pytest.raises(ValueError):
+        AgentToolCall("C1", "", {})
+
+    with pytest.raises(ValueError):
+        AgentToolResult("", "tool", True)
+    with pytest.raises(ValueError):
+        AgentToolResult("C1", "", True)

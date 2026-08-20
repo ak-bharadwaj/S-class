@@ -1,8 +1,8 @@
 """
 S-Class EOS V11.2 - D7 Capability-Scoped Agent Tool Registry & Execution Seam (§8.1, §8.3).
 Provides strictly schema-validated inspection and action proposal tools using jsonschema Draft 2020-12.
-Safely executes read/search tools against workspace paths and validates proposal actions for D5 submission.
-Enforces explicit resource bounds on search tools and workspace authority.
+Safely executes read/search tools against workspace paths with explicit streaming memory limits.
+Enforces resource bounds and fails closed on oversized files.
 """
 
 from __future__ import annotations
@@ -14,11 +14,15 @@ from agent.models import ToolDefinition, AgentToolCall, AgentToolResult
 from execution.workspace import IsolatedWorkspace
 
 # Explicit Inspection Tool Resource Limits
+READ_CHUNK_MAX_FILE_BYTES = 5 * 1024 * 1024  # 5 MB maximum file size for inspection
+READ_CHUNK_MAX_RETURNED_BYTES = 64 * 1024    # 64 KB maximum returned content per chunk
+READ_CHUNK_MAX_RETURNED_LINES = 500          # 500 lines maximum returned per chunk
+
 SEARCH_MAX_FILES = 500
 SEARCH_MAX_BYTES_SCANNED = 10 * 1024 * 1024  # 10 MB limit
 SEARCH_MAX_MATCHES = 50
 SEARCH_MAX_WALL_TIME_SECONDS = 2.0
-SEARCH_MAX_RESULT_BYTES = 64 * 1024  # 64 KB result cap
+SEARCH_MAX_RESULT_BYTES = 64 * 1024          # 64 KB result cap
 
 
 class AgentToolRegistry:
@@ -106,7 +110,8 @@ class AgentToolRegistry:
     ) -> AgentToolResult:
         """
         Safely executes read/search inspection tools within workspace containment and resource limits.
-        Never returns synthetic data when workspace is missing or inactive.
+        Enforces streaming line-by-line bounded reads, never calling unbounded f.readlines().
+        Fails closed on oversized files. Never returns synthetic data when workspace is missing or inactive.
         """
         if workspace is None or not workspace.is_active or not os.path.exists(workspace.path):
             return AgentToolResult(
@@ -125,14 +130,53 @@ class AgentToolRegistry:
                 safe_path = workspace.resolve_safe_path(path)
                 if not os.path.exists(safe_path):
                     return AgentToolResult(tool_call.call_id, tool_call.tool_name, False, {}, f"File '{path}' does not exist.")
+                
+                file_size = os.path.getsize(safe_path)
+                if file_size > READ_CHUNK_MAX_FILE_BYTES:
+                    return AgentToolResult(
+                        call_id=tool_call.call_id,
+                        tool_name=tool_call.tool_name,
+                        success=False,
+                        error_message=f"FILE_SIZE_EXCEEDED: File size {file_size} bytes exceeds maximum allowed {READ_CHUNK_MAX_FILE_BYTES} bytes.",
+                    )
+
+                lines = []
+                total_returned_bytes = 0
+                current_line_no = 0
+                truncated_due_to_bytes = False
+                truncated_due_to_lines = False
+
+                # Bounded streaming read: line-by-line without loading entire file into memory
                 with open(safe_path, "r", encoding="utf-8", errors="replace") as f:
-                    lines = f.readlines()
-                slice_lines = lines[max(0, start_line - 1):end_line]
+                    for line in f:
+                        current_line_no += 1
+                        if current_line_no < start_line:
+                            continue
+                        if current_line_no > end_line:
+                            break
+                        if len(lines) >= READ_CHUNK_MAX_RETURNED_LINES:
+                            truncated_due_to_lines = True
+                            break
+                        line_bytes = len(line.encode("utf-8"))
+                        if total_returned_bytes + line_bytes > READ_CHUNK_MAX_RETURNED_BYTES:
+                            truncated_due_to_bytes = True
+                            break
+                        lines.append(line)
+                        total_returned_bytes += line_bytes
+
                 return AgentToolResult(
                     call_id=tool_call.call_id,
                     tool_name=tool_call.tool_name,
                     success=True,
-                    result_data={"lines": tuple(slice_lines), "total_lines": len(lines)},
+                    result_data={
+                        "lines": tuple(lines),
+                        "start_line": start_line,
+                        "end_line": min(end_line, current_line_no),
+                        "returned_lines": len(lines),
+                        "returned_bytes": total_returned_bytes,
+                        "truncated_due_to_bytes": truncated_due_to_bytes,
+                        "truncated_due_to_lines": truncated_due_to_lines,
+                    },
                 )
             except Exception as ex:
                 return AgentToolResult(tool_call.call_id, tool_call.tool_name, False, {}, str(ex))
@@ -193,7 +237,7 @@ class AgentToolRegistry:
         self.register(
             ToolDefinition(
                 name="read_file_chunk",
-                description="Reads a slice of lines from a workspace-contained file.",
+                description="Reads a bounded slice of lines from a workspace-contained file.",
                 parameters_schema={
                     "type": "object",
                     "properties": {

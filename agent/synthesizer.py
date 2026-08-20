@@ -1,7 +1,7 @@
 """
 S-Class EOS V11.2 - D7 Action Proposal Synthesizer & Output Normalizer (§8.1, §8.3).
 Normalizes agent tool calls into canonical D0 ActionProposal objects for D5 Controller submission.
-Enforces capability provenance: the synthesizer only propagates verified session capabilities.
+Propagates authoritative session execution context unchanged; never manufactures or defaults topology.
 """
 
 from __future__ import annotations
@@ -18,33 +18,23 @@ class ActionProposalSynthesizer:
     @staticmethod
     def synthesize_proposal(
         tool_call: AgentToolCall,
-        session_granted_capabilities: Sequence[str],
-        provider_id: str = "pytest_runner_engine",
-        sandbox_profile_id: str = "sbx_std",
-        resource_profile_id: str = "res_std",
-        workspace_id: Optional[str] = None,
+        session_execution_context: ExecutionContext,
         estimated_cost_usd: float = 0.05,
     ) -> Tuple[Optional[ActionProposal], Optional[str]]:
-        """Transforms a proposal tool call into an ActionProposal with strictly propagated session capabilities."""
+        """
+        Transforms a proposal tool call into an ActionProposal with strictly propagated session execution context.
+        Zero manufacture of provider_id, sandbox_profile_id, resource_profile_id, or random workspace_ids.
+        """
         if not isinstance(tool_call, AgentToolCall):
             return None, "tool_call must be an instance of AgentToolCall."
 
-        # Verify capability provenance: session capabilities cannot be empty
-        caps_tuple = tuple(session_granted_capabilities)
-        if not caps_tuple:
-            return None, "Cannot synthesize proposal with empty capability set."
+        if not isinstance(session_execution_context, ExecutionContext):
+            return None, "session_execution_context must be an authoritative ExecutionContext instance."
+
+        if not session_execution_context.capability_set:
+            return None, "Cannot synthesize proposal with empty capability set in execution context."
 
         args = tool_call.arguments
-        ws_id = workspace_id or f"ws_{uuid.uuid4().hex[:8]}"
-
-        context = ExecutionContext(
-            provider_id=provider_id,
-            sandbox_profile_id=sandbox_profile_id,
-            workspace_id=ws_id,
-            resource_profile_id=resource_profile_id,
-            capability_set=caps_tuple,
-        )
-
         proposal_id = f"PROP-{uuid.uuid4().hex[:8].upper()}"
 
         if tool_call.tool_name == "propose_test_run":
@@ -64,7 +54,7 @@ class ActionProposalSynthesizer:
                 action_type="EXECUTE_TEST",
                 target=target_test,
                 purpose=purpose,
-                execution_context=context,
+                execution_context=session_execution_context,
                 estimated_cost_usd=estimated_cost_usd,
                 parameters=params,
             )
@@ -89,7 +79,7 @@ class ActionProposalSynthesizer:
                 action_type="APPLY_PATCH",
                 target=target_file,
                 purpose=purpose,
-                execution_context=context,
+                execution_context=session_execution_context,
                 estimated_cost_usd=estimated_cost_usd,
                 parameters={"patch_content": patch_content},
             )

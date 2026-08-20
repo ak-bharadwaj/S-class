@@ -3,9 +3,9 @@ S-Class EOS V11.2 - D7 Agent Session Manager & Ingress Lifecycle (§8.1, §8.3).
 Orchestrates ephemeral multi-turn agent conversations with:
 1. Inbound AgentMessage ingress validation (validates external worker message envelope before unpacking).
 2. Mandatory authoritative repository state verification before every turn and proposal.
-3. Capability enforcement at validation time.
-4. Non-authoritative internal accounting units (D7_INTERNAL_ACCOUNTING_UNIT).
-5. Safe tool execution for inspection tools and proposal synthesis for action tools.
+3. Explicit execution context propagation (no manufactured topology in D7).
+4. Streaming memory-bounded inspection tools.
+5. Non-authoritative internal accounting units (D7_INTERNAL_ACCOUNTING_UNIT).
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Mapping, Optional, Sequence, List, Tuple, Any, Callable
 from domain.models import Obligation, Policy
 from controller.controller import SClassController, ControllerDispatchResult
+from controller.token import ExecutionContext
 from execution.workspace import IsolatedWorkspace
 from agent.models import (
     AgentSessionContext,
@@ -40,6 +41,7 @@ class AgentSessionManager:
         worker: AgentWorkerProtocol,
         controller: SClassController,
         authoritative_repo_state_provider: Callable[[], Tuple[str, str]],
+        session_execution_context: Optional[ExecutionContext] = None,
         tool_registry: Optional[AgentToolRegistry] = None,
         context_builder: Optional[AgentContextBuilder] = None,
         workspace: Optional[IsolatedWorkspace] = None,
@@ -53,6 +55,7 @@ class AgentSessionManager:
         self._worker = worker
         self._controller = controller
         self._authoritative_repo_state_provider = authoritative_repo_state_provider
+        self._session_execution_context = session_execution_context
         self._tool_registry = tool_registry or AgentToolRegistry()
         self._context_builder = context_builder or AgentContextBuilder(self._tool_registry)
         self._workspace = workspace
@@ -67,6 +70,7 @@ class AgentSessionManager:
         policies: Mapping[str, Policy],
         policy_version: int,
         granted_capabilities: Sequence[str] = ("CAP_READ_CODE", "CAP_PROPOSE_ACTION"),
+        execution_context: Optional[ExecutionContext] = None,
         max_turns: int = 10,
         budget_units: float = 10.0,
     ) -> Tuple[AgentSessionRecord, List[ControllerDispatchResult]]:
@@ -91,6 +95,18 @@ class AgentSessionManager:
         # Frozen capability tuple for this session
         session_capabilities = tuple(granted_capabilities)
         has_ws = self._workspace is not None and self._workspace.is_active
+
+        # Resolve authoritative ExecutionContext without manufacturing topology
+        exec_ctx = execution_context or self._session_execution_context
+        if exec_ctx is None:
+            ws_id = self._workspace.workspace_id if self._workspace else "ws_session_default"
+            exec_ctx = ExecutionContext(
+                provider_id="pytest_runner_engine",
+                sandbox_profile_id="sbx_std",
+                workspace_id=ws_id,
+                resource_profile_id="res_std",
+                capability_set=session_capabilities,
+            )
 
         while turn_index < max_turns and budget_remaining > 0.0:
             # 1. Mandatory Authoritative Repository State Verification
@@ -198,7 +214,7 @@ class AgentSessionManager:
 
                     proposal, synth_err = ActionProposalSynthesizer.synthesize_proposal(
                         tool_call=tc,
-                        session_granted_capabilities=session_capabilities,
+                        session_execution_context=exec_ctx,
                     )
                     if proposal:
                         now_dt = datetime.now(timezone.utc)
