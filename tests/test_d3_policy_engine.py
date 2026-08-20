@@ -1,3 +1,5 @@
+
+
 """Tier 1 Adversarial, Determinism, Non-Weakening Lattice, and Property Tests for S-Class D3 Policy Engine.
 
 Tests:
@@ -60,6 +62,7 @@ from copy import deepcopy
 import hashlib
 import json
 import os
+import uuid
 import re
 from typing import Dict, List, Optional, Set, Tuple, Mapping
 from hypothesis import given, strategies as st, settings
@@ -155,6 +158,8 @@ def setup_test_authority_keystore():
     Gate3ProviderKeyStore.clear()
     Gate3ProviderKeyStore.register_provider_key("KEY-001", TEST_PROVIDER_SECRET)
     Gate3NonceTracker.clear()
+
+
     yield
     Gate3AuthorityKeyStore.clear()
     Gate3PublicKeystore.clear()
@@ -1412,3 +1417,130 @@ def test_adversarial_replayed_evidence_rejected_in_policy_evaluation():
     assert cert_replayed.is_verified is False
     ctx2 = PolicyEvaluationContext(obl, (claim,), (ev,), expected_source_sha=DEFAULT_TEST_SHA, trust_certificates={ev.evidence_id: cert_replayed})
     assert evaluate_policy(pol_cov_85, ctx2).decision == PolicyDecisionType.DENY
+
+def test_cross_process_single_use_same_nonce_two_processes(tmp_path):
+    """Test: same nonce, two processes -> exactly one succeeds."""
+    import subprocess
+    import sys
+    store_file = str(tmp_path / "cross_proc_nonce.log")
+    nonce = f"CROSS-PROC-NONCE-{uuid.uuid4().hex[:8]}"
+
+    script = f"""
+import sys
+from benchmark.parity.gate_3_authority import Gate3NonceTracker
+Gate3NonceTracker.set_store_path({repr(store_file)})
+res = Gate3NonceTracker.consume_nonce({repr(nonce)})
+print("SUCCESS" if res else "REJECT")
+"""
+    p1 = subprocess.Popen([sys.executable, "-c", script], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    p2 = subprocess.Popen([sys.executable, "-c", script], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+    out1, _ = p1.communicate(timeout=10)
+    out2, _ = p2.communicate(timeout=10)
+
+    results = [out1.strip(), out2.strip()]
+    assert results.count("SUCCESS") == 1, f"Expected exactly one SUCCESS, got {results}"
+    assert results.count("REJECT") == 1, f"Expected exactly one REJECT, got {results}"
+
+
+def test_concurrent_same_nonce_race_exactly_one_succeeds(tmp_path):
+    """Test: concurrent same-nonce race -> exactly one succeeds."""
+    import concurrent.futures
+    store_file = str(tmp_path / "concurrent_race_nonce.log")
+    nonce = f"RACE-NONCE-{uuid.uuid4().hex[:8]}"
+
+    def _attempt_consume(i):
+        from benchmark.parity.gate_3_authority import Gate3NonceTracker
+        Gate3NonceTracker.set_store_path(store_file)
+        return Gate3NonceTracker.consume_nonce(nonce)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(_attempt_consume, i) for i in range(8)]
+        results = [f.result() for f in concurrent.futures.as_completed(futures)]
+
+    assert results.count(True) == 1, f"Expected exactly one successful reservation, got {results.count(True)}"
+    assert results.count(False) == 7, f"Expected 7 failed reservations, got {results.count(False)}"
+
+
+def test_invalid_signature_nonce_remains_reusable():
+    """Test: invalid signature -> nonce remains reusable."""
+    nonce = f"REUSABLE-NONCE-{uuid.uuid4().hex[:8]}"
+    ev_bad = make_test_evidence(
+        ev_id="EV-BAD-SIG",
+        nonce=nonce,
+        counterexample={"coverage_pct": 90.0},
+        custom_signature=HmacSessionSignature(
+            algorithm="HMAC-SHA256",
+            key_id="KEY-001",
+            nonce=nonce,
+            raw_stdout_digest="0" * 64,
+            signature_hex="f" * 64,
+            timestamp="2026-08-19T10:00:00Z",
+        ),
+    )
+    # Verification fails closed due to invalid signature
+    cert_bad = issue_gate_3_evidence_certificate(ev_bad, expected_source_sha=DEFAULT_TEST_SHA)
+    assert cert_bad.is_verified is False
+    assert cert_bad.signature_verified is False
+
+    # Nonce MUST NOT have been consumed
+    assert Gate3NonceTracker.is_consumed(nonce) is False
+
+    # Now issue valid evidence with the same nonce -> MUST SUCCEED
+    ev_good = make_test_evidence(ev_id="EV-GOOD-SIG", nonce=nonce, counterexample={"coverage_pct": 90.0})
+    cert_good = issue_gate_3_evidence_certificate(ev_good, expected_source_sha=DEFAULT_TEST_SHA)
+    assert cert_good.is_verified is True
+    assert cert_good.signature_verified is True
+    assert Gate3NonceTracker.is_consumed(nonce) is True
+
+
+def test_valid_verification_nonce_consumed_and_replay_rejected():
+    """Test: valid verification -> nonce consumed, replay after successful verification -> reject."""
+    nonce = f"VALID-CONSUMED-NONCE-{uuid.uuid4().hex[:8]}"
+    ev = make_test_evidence(ev_id="EV-VALID-ONCE", nonce=nonce, counterexample={"coverage_pct": 90.0})
+
+    # 1. Valid verification -> nonce consumed
+    cert1 = issue_gate_3_evidence_certificate(ev, expected_source_sha=DEFAULT_TEST_SHA)
+    assert cert1.is_verified is True
+    assert cert1.signature_verified is True
+    assert Gate3NonceTracker.is_consumed(nonce) is True
+
+    # 2. Replay after successful verification -> rejected
+    cert2 = issue_gate_3_evidence_certificate(ev, expected_source_sha=DEFAULT_TEST_SHA)
+    assert cert2.is_verified is False
+    assert cert2.signature_verified is False
+    assert "Replay detected" in cert2.rejection_reason
+
+
+def test_restart_process_boundary_replay_still_rejected(tmp_path):
+    """Test: restart/process boundary -> replay still rejected via persistent store."""
+    store_file = str(tmp_path / "persist_restart_nonce.log")
+    Gate3NonceTracker.set_store_path(store_file)
+    nonce = f"PERSIST-RESTART-NONCE-{uuid.uuid4().hex[:8]}"
+
+    # Process 1 consumes nonce
+    ev = make_test_evidence(ev_id="EV-PROC1", nonce=nonce, counterexample={"coverage_pct": 90.0})
+    cert1 = issue_gate_3_evidence_certificate(ev, expected_source_sha=DEFAULT_TEST_SHA)
+    assert cert1.is_verified is True
+
+    # Simulate fresh process restart by wiping in-memory process-local cache
+    Gate3NonceTracker._process_local_cache.clear()
+
+    # Process 2 attempts replay -> rejected from persistent disk store
+    ev_replay = make_test_evidence(ev_id="EV-PROC2-REPLAY", nonce=nonce, counterexample={"coverage_pct": 90.0})
+    cert2 = issue_gate_3_evidence_certificate(ev_replay, expected_source_sha=DEFAULT_TEST_SHA)
+    assert cert2.is_verified is False
+    assert "Replay detected" in cert2.rejection_reason
+
+
+def test_environment_provider_keys_explicit_bootstrap():
+    """Test: Environment provider keys must be explicitly bootstrapped or registered."""
+    Gate3ProviderKeyStore.clear()
+    # Unregistered key fails closed
+    with pytest.raises(KeyError, match="not registered in certified keystore"):
+        Gate3ProviderKeyStore.get_provider_key("KEY-001")
+
+    # Explicit bootstrap from environment
+    os.environ["GATE3_PROVIDER_KEY"] = "EXPLICIT_BOOTSTRAP_SECRET_KEY_32BYTES"
+    Gate3ProviderKeyStore.bootstrap_from_environment()
+    assert Gate3ProviderKeyStore.get_provider_key("KEY-001") == b"EXPLICIT_BOOTSTRAP_SECRET_KEY_32BYTES"

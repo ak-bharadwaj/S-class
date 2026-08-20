@@ -2,7 +2,7 @@
 S-Class EOS V11.2 - Gate 3 Certificate Authority & Provider Keystore (D0 Asymmetric Specification).
 Protected authority / keystore boundary for issuing Ed25519-signed EvidenceTrustCertificates,
 cryptographically verifying provider HMAC signatures, enforcing non-overwritable provider keys with
-explicit rotation semantics, and enforcing D0 single-use anti-replay rules.
+explicit rotation semantics, and enforcing D0 cross-process atomic single-use anti-replay rules.
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ import os
 import hmac
 import uuid
 import hashlib
+import threading
 from datetime import datetime, timezone
 from typing import Any, Optional, Dict, Set
 from domain.models import AsymmetricAuthoritySignature, HmacSessionSignature, Evidence, EvidenceScope, EvidenceObservation, Provenance
@@ -66,9 +67,26 @@ class Gate3AuthorityKeyStore:
 class Gate3ProviderKeyStore:
     """Certified provider keystore boundary managing provider signing and verification keys.
     Non-overwritable registration with explicit rotation semantics.
+    Environment provider keys must be explicitly bootstrapped or registered.
     """
     _provider_keys: Dict[str, bytes] = {}
     _retired_keys: Set[str] = set()
+
+    @classmethod
+    def bootstrap_from_environment(cls, allowed_key_ids: Optional[Dict[str, str]] = None) -> None:
+        """Explicit bootstrap configuration binding authorized environment provider identities.
+        Does not silently accept arbitrary environment variables at runtime.
+        """
+        if allowed_key_ids is not None:
+            for key_id, env_var_name in allowed_key_ids.items():
+                secret = os.environ.get(env_var_name)
+                if secret and len(secret.encode("utf-8")) >= 16:
+                    cls.register_provider_key(key_id, secret.encode("utf-8"))
+        else:
+            default_env = os.environ.get("GATE3_PROVIDER_KEY")
+            if default_env and len(default_env.encode("utf-8")) >= 16:
+                if "KEY-001" not in cls._provider_keys:
+                    cls.register_provider_key("KEY-001", default_env.encode("utf-8"))
 
     @classmethod
     def register_provider_key(cls, key_id: str, key_bytes: bytes) -> None:
@@ -111,7 +129,7 @@ class Gate3ProviderKeyStore:
 
     @classmethod
     def get_provider_key(cls, key_id: str) -> bytes:
-        """Retrieves provider key exclusively from certified keystore or protected environment boundary."""
+        """Retrieves provider key exclusively from explicitly registered keys in the certified keystore."""
         if not key_id or not isinstance(key_id, str):
             raise TypeError("key_id must be a non-empty string.")
         if key_id in cls._retired_keys:
@@ -119,39 +137,120 @@ class Gate3ProviderKeyStore:
         if key_id in cls._provider_keys:
             return cls._provider_keys[key_id]
 
-        env_specific = os.environ.get(f"GATE3_PROVIDER_KEY_{key_id.upper().replace('-', '_')}")
-        if env_specific:
-            return env_specific.encode("utf-8")
-
-        env_general = os.environ.get("GATE3_PROVIDER_KEY")
-        if env_general and key_id == "KEY-001":
-            return env_general.encode("utf-8")
-
         raise KeyError(f"Provider key '{key_id}' is not registered in certified keystore.")
 
 
 class Gate3NonceTracker:
-    """Enforces D0 single-use anti-replay rules for evidence nonces."""
-    _consumed_nonces: Set[str] = set()
+    """Enforces D0 cross-process atomic single-use anti-replay rules for evidence nonces
+    backed by kernel advisory file locking.
+    """
+    _default_store_path: str = os.path.join(os.path.dirname(__file__), ".gate3_nonces.log")
+    _store_path: str = _default_store_path
+    _process_local_cache: Set[str] = set()
+    _thread_lock = threading.Lock()
 
     @classmethod
-    def consume_nonce(cls, nonce: str) -> bool:
-        """Attempts to consume a single-use nonce. Returns False if already consumed (replay detected)."""
-        if not nonce or not isinstance(nonce, str):
-            return False
-        if nonce in cls._consumed_nonces:
-            return False
-        cls._consumed_nonces.add(nonce)
-        return True
+    def set_store_path(cls, path: str) -> None:
+        with cls._thread_lock:
+            cls._store_path = path
+            cls._process_local_cache.clear()
 
     @classmethod
-    def is_consumed(cls, nonce: str) -> bool:
-        return nonce in cls._consumed_nonces
+    def get_store_path(cls) -> str:
+        return cls._store_path
 
     @classmethod
     def clear(cls) -> None:
-        """Controlled teardown for test fixtures."""
-        cls._consumed_nonces.clear()
+        """Controlled teardown for test fixtures across processes."""
+        from file_lock import FileLock
+        with cls._thread_lock:
+            cls._process_local_cache.clear()
+            lock_path = cls._store_path + ".lock"
+            try:
+                parent_dir = os.path.dirname(cls._store_path)
+                if parent_dir and not os.path.exists(parent_dir):
+                    os.makedirs(parent_dir, exist_ok=True)
+                with FileLock(lock_path, timeout=5.0):
+                    if os.path.exists(cls._store_path):
+                        try:
+                            os.remove(cls._store_path)
+                        except OSError:
+                            with open(cls._store_path, "w", encoding="utf-8") as f:
+                                pass
+            except Exception:
+                if os.path.exists(cls._store_path):
+                    try:
+                        with open(cls._store_path, "w", encoding="utf-8") as f:
+                            pass
+                    except OSError:
+                        pass
+
+    @classmethod
+    def consume_nonce(cls, nonce: str) -> bool:
+        """Atomically reserves a single-use nonce across processes.
+        Returns True if reservation succeeded.
+        Returns False if nonce was already consumed (replay detected).
+        """
+        if not nonce or not isinstance(nonce, str):
+            return False
+
+        from file_lock import FileLock
+        lock_path = cls._store_path + ".lock"
+
+        with cls._thread_lock:
+            if nonce in cls._process_local_cache:
+                return False
+
+            parent_dir = os.path.dirname(cls._store_path)
+            if parent_dir and not os.path.exists(parent_dir):
+                os.makedirs(parent_dir, exist_ok=True)
+
+            with FileLock(lock_path, timeout=10.0):
+                # Read committed nonces from persistent store
+                consumed = set()
+                if os.path.exists(cls._store_path):
+                    with open(cls._store_path, "r", encoding="utf-8") as f:
+                        for line in f:
+                            line_str = line.strip()
+                            if line_str:
+                                consumed.add(line_str)
+
+                if nonce in consumed:
+                    cls._process_local_cache.add(nonce)
+                    return False
+
+                # Atomically append nonce and fsync
+                with open(cls._store_path, "a", encoding="utf-8") as f:
+                    f.write(nonce + "\n")
+                    f.flush()
+                    os.fsync(f.fileno())
+
+                consumed.add(nonce)
+                cls._process_local_cache.add(nonce)
+                return True
+
+    @classmethod
+    def is_consumed(cls, nonce: str) -> bool:
+        if not nonce:
+            return False
+        from file_lock import FileLock
+        with cls._thread_lock:
+            if nonce in cls._process_local_cache:
+                return True
+            if not os.path.exists(cls._store_path):
+                return False
+            lock_path = cls._store_path + ".lock"
+            try:
+                with FileLock(lock_path, timeout=5.0):
+                    if os.path.exists(cls._store_path):
+                        with open(cls._store_path, "r", encoding="utf-8") as f:
+                            for line in f:
+                                if line.strip() == nonce:
+                                    cls._process_local_cache.add(nonce)
+                                    return True
+            except Exception:
+                pass
+            return False
 
 
 def compute_gate3_evidence_digest(evidence: Any) -> str:
@@ -302,7 +401,7 @@ def issue_gate_3_evidence_certificate(
     
     Private key is acquired exclusively from the protected Gate3AuthorityKeyStore boundary.
     Provider keys are acquired exclusively from Gate3ProviderKeyStore.
-    Nonces are enforced as single-use under D0 anti-replay rules.
+    Nonces are reserved atomically across processes AFTER provider signature + digest + provenance validation.
     Timestamp is bound to authoritative execution time.
     """
     from policy.models import EvidenceTrustCertificate
@@ -352,16 +451,40 @@ def issue_gate_3_evidence_certificate(
             rejection_reason="Source revision mismatch or missing.",
         )
 
-    # 2. D0 Single-Use Nonce Anti-Replay Verification
-    evidence_nonce = getattr(getattr(evidence, "signature", None), "nonce", None)
-    if not evidence_nonce or not Gate3NonceTracker.consume_nonce(evidence_nonce):
+    # 2. Cryptographic Digest, Provider Signature, and Provenance Verification (BEFORE nonce reservation)
+    computed_digest = compute_gate3_evidence_digest(evidence)
+    claimed_digest = getattr(evidence.signature, "raw_stdout_digest", None)
+    digest_verified = bool(claimed_digest and hmac.compare_digest(claimed_digest, computed_digest))
+
+    signature_verified = verify_provider_evidence_signature(evidence)
+
+    prov = evidence.provenance
+    provenance_verified = bool(
+        prov
+        and prov.engine_name
+        and not any(f in prov.engine_name.lower() for f in ["synthetic", "simulation", "untrusted"])
+        and prov.environment_hash
+        and len(prov.environment_hash) == 64
+        and prov.timestamp
+    )
+
+    # If verification failed (invalid signature, bad digest, corrupt provenance), DO NOT reserve nonce; fail closed
+    if not (digest_verified and signature_verified and provenance_verified):
+        rejection_reason = "Evidence verification failed."
+        if not digest_verified:
+            rejection_reason = "Evidence digest mismatch."
+        elif not signature_verified:
+            rejection_reason = "Invalid provider signature."
+        elif not provenance_verified:
+            rejection_reason = "Untrusted or invalid provenance."
+
         cert_data = {
             "evidence_id": evidence.evidence_id,
             "source_sha": evidence.source_sha,
             "is_verified": False,
-            "digest_verified": False,
-            "signature_verified": False,
-            "provenance_verified": False,
+            "digest_verified": digest_verified,
+            "signature_verified": signature_verified,
+            "provenance_verified": provenance_verified,
             "verifier_identity": verifier_identity,
             "timestamp": timestamp_iso,
         }
@@ -380,9 +503,47 @@ def issue_gate_3_evidence_certificate(
             evidence_id=evidence.evidence_id,
             source_sha=evidence.source_sha,
             is_verified=False,
-            digest_verified=False,
+            digest_verified=digest_verified,
+            signature_verified=signature_verified,
+            provenance_verified=provenance_verified,
+            verifier_identity=verifier_identity,
+            timestamp=timestamp_iso,
+            certificate_hash=payload_digest,
+            authority_signature=authority_sig,
+            rejection_reason=rejection_reason,
+        )
+
+    # 3. D0 Single-Use Nonce Anti-Replay Reservation (AFTER successful validation, immediately before issuance)
+    evidence_nonce = getattr(getattr(evidence, "signature", None), "nonce", None)
+    if not evidence_nonce or not Gate3NonceTracker.consume_nonce(evidence_nonce):
+        cert_data = {
+            "evidence_id": evidence.evidence_id,
+            "source_sha": evidence.source_sha,
+            "is_verified": False,
+            "digest_verified": digest_verified,
+            "signature_verified": False,
+            "provenance_verified": provenance_verified,
+            "verifier_identity": verifier_identity,
+            "timestamp": timestamp_iso,
+        }
+        canonical_bytes = canonicalize_json(cert_data)
+        payload_digest = hashlib.sha256(canonical_bytes).hexdigest()
+        sig_bytes = private_key.sign(canonical_bytes)
+        authority_sig = AsymmetricAuthoritySignature(
+            algorithm="ED25519",
+            signer_identity=verifier_identity,
+            public_key_fingerprint=pub_fingerprint,
+            payload_digest=payload_digest,
+            signature_hex=sig_bytes.hex(),
+            timestamp=timestamp_iso,
+        )
+        return EvidenceTrustCertificate(
+            evidence_id=evidence.evidence_id,
+            source_sha=evidence.source_sha,
+            is_verified=False,
+            digest_verified=digest_verified,
             signature_verified=False,
-            provenance_verified=False,
+            provenance_verified=provenance_verified,
             verifier_identity=verifier_identity,
             timestamp=timestamp_iso,
             certificate_hash=payload_digest,
@@ -390,32 +551,14 @@ def issue_gate_3_evidence_certificate(
             rejection_reason="Replay detected: evidence nonce has already been consumed under D0 single-use rule.",
         )
 
-    # 3. Digest and Signature Verification
-    computed_digest = compute_gate3_evidence_digest(evidence)
-    claimed_digest = getattr(evidence.signature, "raw_stdout_digest", None)
-    digest_verified = bool(claimed_digest and hmac.compare_digest(claimed_digest, computed_digest))
-
-    signature_verified = verify_provider_evidence_signature(evidence)
-
-    prov = evidence.provenance
-    provenance_verified = bool(
-        prov
-        and prov.engine_name
-        and not any(f in prov.engine_name.lower() for f in ["synthetic", "simulation", "untrusted"])
-        and prov.environment_hash
-        and len(prov.environment_hash) == 64
-        and prov.timestamp
-    )
-
-    is_verified = bool(digest_verified and signature_verified and provenance_verified)
-
+    # 4. Valid Certificate Issuance
     cert_data = {
         "evidence_id": evidence.evidence_id,
         "source_sha": evidence.source_sha,
-        "is_verified": is_verified,
-        "digest_verified": digest_verified,
-        "signature_verified": signature_verified,
-        "provenance_verified": provenance_verified,
+        "is_verified": True,
+        "digest_verified": True,
+        "signature_verified": True,
+        "provenance_verified": True,
         "verifier_identity": verifier_identity,
         "timestamp": timestamp_iso,
     }
@@ -434,10 +577,10 @@ def issue_gate_3_evidence_certificate(
     return EvidenceTrustCertificate(
         evidence_id=evidence.evidence_id,
         source_sha=evidence.source_sha,
-        is_verified=is_verified,
-        digest_verified=digest_verified,
-        signature_verified=signature_verified,
-        provenance_verified=provenance_verified,
+        is_verified=True,
+        digest_verified=True,
+        signature_verified=True,
+        provenance_verified=True,
         verifier_identity=verifier_identity,
         timestamp=timestamp_iso,
         certificate_hash=payload_digest,
