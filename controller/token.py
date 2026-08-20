@@ -1,9 +1,10 @@
 """
-S-Class EOS V11.2 - D5 Cryptographic Execution Token & Admission Models (§8.1, §8.3).
-Immutable, Ed25519-signed single-use execution tokens and admission records.
-Reuses D2 durable storage for atomic single-use nonce reservation.
-Binds token_id, decision_id, obligation_id, proposal_id, source_sha, policy_version, execution_nonce, timestamps, and signature.
+S-Class EOS V11.2 - D5 Cryptographic Execution Token, Admission & Action Binding Models (§8.1, §8.3).
+Immutable, Ed25519-signed single-use execution tokens, admission records, and action bindings.
+Reuses D2 durable storage for atomic single-use nonce reservation and lifecycle tracking.
+Binds token_id, decision_id, obligation_id, proposal_id, action_digest, source_sha, policy_version, execution_nonce, timestamps, and signature.
 Domain Separators:
+- SCLASS_ACTION_BINDING_V1:
 - SCLASS_EXECUTION_TOKEN_V1:
 - SCLASS_EXECUTION_ADMISSION_V1:
 Controller holds the ONLY issuance path.
@@ -12,10 +13,10 @@ Controller holds the ONLY issuance path.
 from __future__ import annotations
 import uuid
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Optional, Any
-from domain.models import AsymmetricAuthoritySignature, _validate_pattern, _validate_iso8601
+from typing import Mapping, Optional, Any
+from domain.models import AsymmetricAuthoritySignature, _validate_pattern, _validate_iso8601, _freeze_nested
 from domain.types import HEX_40_PATTERN, HEX_64_PATTERN
 from events.serializer import canonicalize_json
 from events.store import D2NonceStore
@@ -23,8 +24,64 @@ from policy.models import AuthoritySignerProtocol
 
 
 TOKEN_ID_PREFIX = "TOK-"
+SCLASS_ACTION_BINDING_DOMAIN_SEPARATOR = "SCLASS_ACTION_BINDING_V1:"
 SCLASS_EXECUTION_TOKEN_DOMAIN_SEPARATOR = "SCLASS_EXECUTION_TOKEN_V1:"
 SCLASS_EXECUTION_ADMISSION_DOMAIN_SEPARATOR = "SCLASS_EXECUTION_ADMISSION_V1:"
+
+
+def compute_action_digest(
+    action_type: str,
+    target: str,
+    purpose: str,
+    parameters: Optional[Mapping[str, Any]] = None,
+) -> str:
+    """Computes the canonical SHA-256 action digest using domain separator SCLASS_ACTION_BINDING_V1:."""
+    if not action_type:
+        raise ValueError("action_type cannot be empty.")
+    if not target:
+        raise ValueError("target cannot be empty.")
+    if not purpose:
+        raise ValueError("purpose cannot be empty.")
+
+    payload = {
+        "action_type": action_type,
+        "target": target,
+        "purpose": purpose,
+        "parameters": dict(parameters or {}),
+    }
+    canonical_bytes = SCLASS_ACTION_BINDING_DOMAIN_SEPARATOR.encode("utf-8") + canonicalize_json(payload)
+    return hashlib.sha256(canonical_bytes).hexdigest()
+
+
+@dataclass(frozen=True)
+class ActionBinding:
+    """Immutable exact action specification and cryptographic digest (§8.1)."""
+    action_type: str
+    target: str
+    purpose: str
+    parameters: Mapping[str, Any] = field(default_factory=dict)
+    action_digest: str = ""
+
+    def __post_init__(self):
+        if not self.action_type:
+            raise ValueError("action_type cannot be empty.")
+        if not self.target:
+            raise ValueError("target cannot be empty.")
+        if not self.purpose:
+            raise ValueError("purpose cannot be empty.")
+        object.__setattr__(self, "parameters", _freeze_nested(self.parameters))
+
+        expected_digest = compute_action_digest(
+            action_type=self.action_type,
+            target=self.target,
+            purpose=self.purpose,
+            parameters=self.parameters,
+        )
+        if not self.action_digest:
+            object.__setattr__(self, "action_digest", expected_digest)
+        elif self.action_digest != expected_digest:
+            raise ValueError(f"action_digest mismatch: '{self.action_digest}' != '{expected_digest}'")
+        _validate_pattern(self.action_digest, HEX_64_PATTERN, "action_digest")
 
 
 @dataclass(frozen=True)
@@ -34,6 +91,7 @@ class ExecutionToken:
     decision_id: str
     obligation_id: str
     proposal_id: str
+    action_digest: str
     source_sha: str
     policy_version: int
     execution_nonce: str
@@ -50,6 +108,7 @@ class ExecutionToken:
             raise ValueError("obligation_id cannot be empty.")
         if not self.proposal_id:
             raise ValueError("proposal_id cannot be empty.")
+        _validate_pattern(self.action_digest, HEX_64_PATTERN, "action_digest")
         _validate_pattern(self.source_sha, HEX_40_PATTERN, "source_sha")
         if not isinstance(self.policy_version, int) or self.policy_version < 1:
             raise ValueError("policy_version must be an integer >= 1.")
@@ -67,6 +126,7 @@ class ExecutionAdmissionResult:
     token_id: str
     execution_nonce: str
     obligation_id: str
+    action_digest: str
     source_sha: str
     policy_version: int
     decision_id: str
@@ -83,6 +143,7 @@ class ExecutionAdmissionResult:
                 raise ValueError("execution_nonce cannot be empty for admitted result.")
             if not self.obligation_id:
                 raise ValueError("obligation_id cannot be empty for admitted result.")
+            _validate_pattern(self.action_digest, HEX_64_PATTERN, "action_digest")
             _validate_pattern(self.source_sha, HEX_40_PATTERN, "source_sha")
             if not isinstance(self.policy_version, int) or self.policy_version < 1:
                 raise ValueError("policy_version must be an integer >= 1.")
@@ -98,6 +159,7 @@ def _build_token_payload(
     decision_id: str,
     obligation_id: str,
     proposal_id: str,
+    action_digest: str,
     source_sha: str,
     policy_version: int,
     execution_nonce: str,
@@ -109,6 +171,7 @@ def _build_token_payload(
         "decision_id": decision_id,
         "obligation_id": obligation_id,
         "proposal_id": proposal_id,
+        "action_digest": action_digest,
         "source_sha": source_sha,
         "policy_version": policy_version,
         "execution_nonce": execution_nonce,
@@ -121,6 +184,7 @@ def _build_admission_payload(
     token_id: str,
     execution_nonce: str,
     obligation_id: str,
+    action_digest: str,
     source_sha: str,
     policy_version: int,
     decision_id: str,
@@ -130,6 +194,7 @@ def _build_admission_payload(
         "token_id": token_id,
         "execution_nonce": execution_nonce,
         "obligation_id": obligation_id,
+        "action_digest": action_digest,
         "source_sha": source_sha,
         "policy_version": policy_version,
         "decision_id": decision_id,
@@ -152,6 +217,7 @@ def _mint_execution_token(
     decision_id: str,
     obligation_id: str,
     proposal_id: str,
+    action_digest: str,
     source_sha: str,
     policy_version: int,
     issued_at: str,
@@ -173,6 +239,7 @@ def _mint_execution_token(
         decision_id=decision_id,
         obligation_id=obligation_id,
         proposal_id=proposal_id,
+        action_digest=action_digest,
         source_sha=source_sha,
         policy_version=policy_version,
         execution_nonce=nonce,
@@ -192,6 +259,7 @@ def _mint_execution_token(
         decision_id=decision_id,
         obligation_id=obligation_id,
         proposal_id=proposal_id,
+        action_digest=action_digest,
         source_sha=source_sha,
         policy_version=policy_version,
         execution_nonce=nonce,
@@ -213,6 +281,7 @@ def verify_execution_token_signature(
         decision_id=token.decision_id,
         obligation_id=token.obligation_id,
         proposal_id=token.proposal_id,
+        action_digest=token.action_digest,
         source_sha=token.source_sha,
         policy_version=token.policy_version,
         execution_nonce=token.execution_nonce,
@@ -239,6 +308,7 @@ def verify_admission_signature(
         token_id=admission.token_id,
         execution_nonce=admission.execution_nonce,
         obligation_id=admission.obligation_id,
+        action_digest=admission.action_digest,
         source_sha=admission.source_sha,
         policy_version=admission.policy_version,
         decision_id=admission.decision_id,
@@ -259,6 +329,7 @@ def verify_and_consume_execution_token(
     current_time_iso: str,
     authority_signer: AuthoritySignerProtocol,
     nonce_store: Optional[D2NonceStore] = None,
+    expected_action_digest: Optional[str] = None,
 ) -> bool:
     """Cryptographically verifies token, checks bindings & time validity, and atomically reserves nonce in D2 store."""
     if not isinstance(token, ExecutionToken):
@@ -272,6 +343,8 @@ def verify_and_consume_execution_token(
     if token.source_sha != expected_source_sha:
         return False
     if token.policy_version != expected_policy_version:
+        return False
+    if expected_action_digest is not None and token.action_digest != expected_action_digest:
         return False
 
     # 2. Time Boundary Verification (current_time >= issued_at and current_time <= expires_at)
@@ -291,7 +364,6 @@ def verify_and_consume_execution_token(
     # 4. Atomic D2 Single-Use Nonce Reservation (BEFORE D6 execution)
     store = nonce_store or D2NonceStore()
     try:
-        # Atomic reservation of admission nonce in D2 durable store
         reserved = store.reserve_nonce(f"ADMIT:{token.execution_nonce}")
         return reserved
     except Exception:

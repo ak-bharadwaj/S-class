@@ -4,10 +4,11 @@ Precondition evaluation and immutable AuthorizationDecision creation.
 Actually evaluates active D3 Policy using PolicyEvaluationContext.
 Enforces:
 1. Target obligation must be registered and in Executable Frontier (READY != EXECUTABLE).
-2. All prerequisites listed in proposal must be SATISFIED or CONDITIONAL.
-3. Action type must be permitted under active security profile.
-4. Active D3 Policy evaluated and satisfied (ALLOW).
-5. Estimated cost and timeout must not exceed budget bounds.
+2. ActionBinding strictly bound: action_digest computed from action_type, target, purpose, parameters.
+3. All prerequisites listed in proposal must be SATISFIED or CONDITIONAL.
+4. Action type must be permitted under active security profile.
+5. Active D3 Policy evaluated and satisfied (ALLOW).
+6. Estimated cost and timeout must not exceed budget bounds.
 """
 
 from __future__ import annotations
@@ -15,11 +16,12 @@ import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Mapping, Optional, Sequence, Tuple, Any
-from domain.models import Obligation, Policy, _validate_iso8601
-from domain.types import ObligationStatus, PolicyScope
+from domain.models import Obligation, Policy, _validate_iso8601, _validate_pattern, _freeze_nested
+from domain.types import ObligationStatus, PolicyScope, HEX_64_PATTERN
 from policy.evaluator import evaluate_policy
 from policy.models import PolicyEvaluationContext, PolicyDecisionType
 from controller.frontier import compute_frontier, ExecutionFrontier
+from controller.token import ActionBinding, compute_action_digest
 
 
 class AuthorizationStatus(str, Enum):
@@ -41,6 +43,7 @@ class ActionProposal:
     timeout_seconds: int = 60
     prerequisites: Tuple[str, ...] = field(default_factory=tuple)
     parameters: Mapping[str, Any] = field(default_factory=dict)
+    action_digest: str = ""
 
     def __post_init__(self):
         if not self.proposal_id:
@@ -51,11 +54,36 @@ class ActionProposal:
             raise ValueError("action_type cannot be empty.")
         if not self.target:
             raise ValueError("target cannot be empty.")
+        if not self.purpose:
+            raise ValueError("purpose cannot be empty.")
         if self.estimated_cost_usd < 0.0:
             raise ValueError("estimated_cost_usd cannot be negative.")
         if self.timeout_seconds < 1:
             raise ValueError("timeout_seconds must be >= 1.")
         object.__setattr__(self, "prerequisites", tuple(self.prerequisites))
+        object.__setattr__(self, "parameters", _freeze_nested(self.parameters))
+
+        expected_digest = compute_action_digest(
+            action_type=self.action_type,
+            target=self.target,
+            purpose=self.purpose,
+            parameters=self.parameters,
+        )
+        if not self.action_digest:
+            object.__setattr__(self, "action_digest", expected_digest)
+        elif self.action_digest != expected_digest:
+            raise ValueError(f"action_digest mismatch: '{self.action_digest}' != '{expected_digest}'")
+        _validate_pattern(self.action_digest, HEX_64_PATTERN, "action_digest")
+
+    @property
+    def binding(self) -> ActionBinding:
+        return ActionBinding(
+            action_type=self.action_type,
+            target=self.target,
+            purpose=self.purpose,
+            parameters=self.parameters,
+            action_digest=self.action_digest,
+        )
 
 
 @dataclass(frozen=True)
@@ -64,6 +92,7 @@ class AuthorizationDecision:
     decision_id: str
     proposal_id: str
     obligation_id: str
+    action_digest: str
     status: AuthorizationStatus
     rejection_reasons: Tuple[str, ...] = field(default_factory=tuple)
     evaluated_at: str = ""
@@ -77,6 +106,7 @@ class AuthorizationDecision:
             raise ValueError("proposal_id cannot be empty.")
         if not self.obligation_id:
             raise ValueError("obligation_id cannot be empty.")
+        _validate_pattern(self.action_digest, HEX_64_PATTERN, "action_digest")
         if not isinstance(self.status, AuthorizationStatus):
             raise TypeError(f"Invalid status: {self.status}")
         _validate_iso8601(self.evaluated_at, "evaluated_at")
@@ -111,6 +141,7 @@ class AuthorizationEngine:
                 decision_id=f"DEC-{uuid.uuid4().hex[:8]}",
                 proposal_id=proposal.proposal_id,
                 obligation_id=proposal.obligation_id,
+                action_digest=proposal.action_digest,
                 status=AuthorizationStatus.REJECTED,
                 rejection_reasons=(f"Target obligation '{proposal.obligation_id}' not found.",),
                 evaluated_at=evaluated_at,
@@ -173,6 +204,7 @@ class AuthorizationEngine:
             decision_id=f"DEC-{uuid.uuid4().hex[:8]}",
             proposal_id=proposal.proposal_id,
             obligation_id=proposal.obligation_id,
+            action_digest=proposal.action_digest,
             status=decision_status,
             rejection_reasons=tuple(reasons),
             evaluated_at=evaluated_at,

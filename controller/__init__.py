@@ -3,8 +3,10 @@ S-Class EOS V11.2 - D5 Controller / Action Authorization Layer (§8.1, §8.3, §
 """
 
 from controller.token import (
+    ActionBinding,
     ExecutionToken,
     ExecutionAdmissionResult,
+    compute_action_digest,
     verify_and_consume_execution_token,
     verify_execution_token_signature,
     verify_admission_signature,
@@ -37,8 +39,10 @@ from controller.controller import (
 )
 
 __all__ = [
+    "ActionBinding",
     "ExecutionToken",
     "ExecutionAdmissionResult",
+    "compute_action_digest",
     "verify_and_consume_execution_token",
     "verify_execution_token_signature",
     "verify_admission_signature",
