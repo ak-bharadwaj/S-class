@@ -66,5 +66,5 @@ class MockAgentWorker(AgentWorkerProtocol):
             thought=f"Default mock thought for turn {context.turn_index}",
             tool_calls=(),
             turn_status=AgentTurnStatus.COMPLETED,
-            estimated_cost_usd=0.01,
+            advisory_estimated_cost_usd=0.01,
         )

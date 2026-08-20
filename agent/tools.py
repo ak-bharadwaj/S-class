@@ -1,26 +1,31 @@
 """
 S-Class EOS V11.2 - D7 Capability-Scoped Agent Tool Registry (§8.1, §8.3).
-Provides strictly schema-validated inspection and action proposal tools.
+Provides strictly schema-validated inspection and action proposal tools using jsonschema Draft 2020-12.
+Enforces capability verification at tool execution / validation time: tools cannot be invoked
+without the required capabilities in the granted session capability set.
 """
 
 from __future__ import annotations
-import os
+import jsonschema
 from typing import Dict, Optional, Sequence, Any, Tuple
 from agent.models import ToolDefinition, AgentToolCall, AgentToolResult
-from execution.workspace import IsolatedWorkspace
 
 
 class AgentToolRegistry:
-    """Registry of capability-scoped tools exposed to AI workers."""
+    """Registry of capability-scoped tools exposed to AI workers with Draft 2020-12 schema validation."""
 
     def __init__(self):
         self._tools: Dict[str, ToolDefinition] = {}
+        self._validators: Dict[str, jsonschema.Draft202012Validator] = {}
         self._register_default_tools()
 
     def register(self, tool: ToolDefinition) -> None:
         if not isinstance(tool, ToolDefinition):
             raise TypeError("tool must be an instance of ToolDefinition.")
         self._tools[tool.name] = tool
+        # Compile full Draft 2020-12 JSON Schema validator
+        validator = jsonschema.Draft202012Validator(dict(tool.parameters_schema))
+        self._validators[tool.name] = validator
 
     def get_tool(self, name: str) -> Optional[ToolDefinition]:
         return self._tools.get(name)
@@ -37,8 +42,17 @@ class AgentToolRegistry:
                 available.append(tool)
         return tuple(available)
 
-    def validate_tool_call(self, tool_call: AgentToolCall) -> Tuple[bool, Optional[str]]:
-        """Validates that a tool call matches a registered tool and required argument types."""
+    def validate_tool_call(
+        self,
+        tool_call: AgentToolCall,
+        granted_capabilities: Sequence[str],
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Validates tool call against:
+        1. Tool existence in registry.
+        2. Session capability enforcement: every tool.required_capability must be in granted_capabilities.
+        3. Full standard JSON Schema validation (Draft 2020-12).
+        """
         if not isinstance(tool_call, AgentToolCall):
             return False, "Invalid tool_call object type."
         
@@ -46,25 +60,24 @@ class AgentToolRegistry:
         if not tool_def:
             return False, f"Unknown tool '{tool_call.tool_name}'."
 
-        schema = tool_def.parameters_schema
-        required_props = schema.get("required", [])
-        props = schema.get("properties", {})
+        # 1. Enforce capability authorization at validation time
+        granted_set = set(granted_capabilities)
+        for req_cap in tool_def.required_capabilities:
+            if req_cap not in granted_set:
+                return False, f"Missing required capability '{req_cap}' for tool '{tool_call.tool_name}'."
 
-        for req in required_props:
-            if req not in tool_call.arguments:
-                return False, f"Missing required argument '{req}' for tool '{tool_call.tool_name}'."
+        # 2. Full JSON Schema validation against registered parameters_schema
+        validator = self._validators.get(tool_call.tool_name)
+        if validator is None:
+            validator = jsonschema.Draft202012Validator(dict(tool_def.parameters_schema))
+            self._validators[tool_call.tool_name] = validator
 
-        for arg_name, arg_val in tool_call.arguments.items():
-            if arg_name in props:
-                expected_type = props[arg_name].get("type")
-                if expected_type == "string" and not isinstance(arg_val, str):
-                    return False, f"Argument '{arg_name}' must be a string, got {type(arg_val).__name__}."
-                elif expected_type == "integer" and not isinstance(arg_val, int):
-                    return False, f"Argument '{arg_name}' must be an integer, got {type(arg_val).__name__}."
-                elif expected_type == "number" and not isinstance(arg_val, (int, float)):
-                    return False, f"Argument '{arg_name}' must be a number, got {type(arg_val).__name__}."
-                elif expected_type == "object" and not isinstance(arg_val, dict):
-                    return False, f"Argument '{arg_name}' must be an object/dict, got {type(arg_val).__name__}."
+        args_dict = dict(tool_call.arguments)
+        errors = list(validator.iter_errors(args_dict))
+        if errors:
+            first_err = errors[0]
+            field_name = ".".join(str(p) for p in first_err.path) or "arguments"
+            return False, f"Schema validation error on {field_name}: {first_err.message}"
 
         return True, None
 
@@ -77,11 +90,12 @@ class AgentToolRegistry:
                 parameters_schema={
                     "type": "object",
                     "properties": {
-                        "path": {"type": "string", "description": "Relative path to file inside workspace."},
-                        "start_line": {"type": "integer", "description": "1-indexed starting line."},
-                        "end_line": {"type": "integer", "description": "1-indexed ending line."},
+                        "path": {"type": "string", "minLength": 1, "description": "Relative path to file inside workspace."},
+                        "start_line": {"type": "integer", "minimum": 1, "description": "1-indexed starting line."},
+                        "end_line": {"type": "integer", "minimum": 1, "description": "1-indexed ending line."},
                     },
                     "required": ["path"],
+                    "additionalProperties": False,
                 },
                 required_capabilities=("CAP_READ_CODE",),
                 is_proposal_tool=False,
@@ -96,10 +110,11 @@ class AgentToolRegistry:
                 parameters_schema={
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string", "description": "Keyword search query."},
+                        "query": {"type": "string", "minLength": 1, "description": "Keyword search query."},
                         "glob_filter": {"type": "string", "description": "Optional file glob filter."},
                     },
                     "required": ["query"],
+                    "additionalProperties": False,
                 },
                 required_capabilities=("CAP_READ_CODE",),
                 is_proposal_tool=False,
@@ -114,12 +129,13 @@ class AgentToolRegistry:
                 parameters_schema={
                     "type": "object",
                     "properties": {
-                        "obligation_id": {"type": "string", "description": "Obligation ID targeted by patch."},
-                        "target_file": {"type": "string", "description": "Target file relative path."},
-                        "patch_content": {"type": "string", "description": "Unified diff or replacement content."},
-                        "purpose": {"type": "string", "description": "Purpose of the patch modification."},
+                        "obligation_id": {"type": "string", "pattern": "^OBL-[A-Za-z0-9_-]+$", "description": "Obligation ID."},
+                        "target_file": {"type": "string", "minLength": 1, "description": "Target file relative path."},
+                        "patch_content": {"type": "string", "minLength": 1, "description": "Unified diff or replacement content."},
+                        "purpose": {"type": "string", "minLength": 1, "description": "Purpose of the patch modification."},
                     },
                     "required": ["obligation_id", "target_file", "patch_content", "purpose"],
+                    "additionalProperties": False,
                 },
                 required_capabilities=("CAP_PROPOSE_ACTION",),
                 is_proposal_tool=True,
@@ -134,12 +150,13 @@ class AgentToolRegistry:
                 parameters_schema={
                     "type": "object",
                     "properties": {
-                        "obligation_id": {"type": "string", "description": "Obligation ID targeted by test."},
-                        "target_test": {"type": "string", "description": "Target test file relative path."},
-                        "purpose": {"type": "string", "description": "Purpose of test execution."},
-                        "parameters": {"type": "object", "description": "Optional execution parameters (e.g. quiet, maxfail)."},
+                        "obligation_id": {"type": "string", "pattern": "^OBL-[A-Za-z0-9_-]+$", "description": "Obligation ID."},
+                        "target_test": {"type": "string", "minLength": 1, "description": "Target test file relative path."},
+                        "purpose": {"type": "string", "minLength": 1, "description": "Purpose of test execution."},
+                        "parameters": {"type": "object", "description": "Optional execution parameters."},
                     },
                     "required": ["obligation_id", "target_test", "purpose"],
+                    "additionalProperties": False,
                 },
                 required_capabilities=("CAP_PROPOSE_ACTION",),
                 is_proposal_tool=True,

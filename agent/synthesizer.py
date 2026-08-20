@@ -1,13 +1,12 @@
 """
 S-Class EOS V11.2 - D7 Action Proposal Synthesizer & Output Normalizer (§8.1, §8.3).
 Normalizes agent tool calls into canonical D0 ActionProposal objects for D5 Controller submission.
-Enforces zero ambient authority: proposals must pass full D5 authorization gates.
+Enforces zero capability escalation: the synthesizer only propagates granted session capabilities.
 """
 
 from __future__ import annotations
-import os
 import uuid
-from typing import Tuple, Optional, Any, Mapping
+from typing import Tuple, Optional, Any, Mapping, Sequence
 from controller.authorization import ActionProposal
 from controller.token import ExecutionContext
 from agent.models import AgentToolCall
@@ -19,16 +18,21 @@ class ActionProposalSynthesizer:
     @staticmethod
     def synthesize_proposal(
         tool_call: AgentToolCall,
+        granted_capabilities: Sequence[str],
         provider_id: str = "pytest_runner_engine",
         sandbox_profile_id: str = "sbx_std",
         resource_profile_id: str = "res_std",
-        granted_capabilities: Tuple[str, ...] = ("CAP_EXEC_TEST",),
         workspace_id: Optional[str] = None,
         estimated_cost_usd: float = 0.05,
     ) -> Tuple[Optional[ActionProposal], Optional[str]]:
-        """Transforms a proposal tool call (e.g. propose_code_patch, propose_test_run) into an ActionProposal."""
+        """Transforms a proposal tool call into an ActionProposal with explicitly propagated session capabilities."""
         if not isinstance(tool_call, AgentToolCall):
             return None, "tool_call must be an instance of AgentToolCall."
+
+        # Verify capability propagation
+        caps_tuple = tuple(granted_capabilities)
+        if not caps_tuple:
+            return None, "Cannot synthesize proposal with empty capability set."
 
         args = tool_call.arguments
         ws_id = workspace_id or f"ws_{uuid.uuid4().hex[:8]}"
@@ -38,7 +42,7 @@ class ActionProposalSynthesizer:
             sandbox_profile_id=sandbox_profile_id,
             workspace_id=ws_id,
             resource_profile_id=resource_profile_id,
-            capability_set=granted_capabilities,
+            capability_set=caps_tuple,
         )
 
         proposal_id = f"PROP-{uuid.uuid4().hex[:8].upper()}"
