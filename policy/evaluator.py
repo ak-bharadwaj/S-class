@@ -514,8 +514,9 @@ class SignedAuthorityManifestLoader:
             if status == DeploymentStatus.PROVISIONED:
                 raise RuntimeError("Genesis bootstrap rejected: system has already been provisioned/installed. Authority reset prohibited.")
 
-            # Authorize initial provisioning with external deployment authority
-            provisioner.authorize_initial_provisioning()
+            # Authorize initial provisioning with external deployment authority if not already recovery-authorized
+            if status != DeploymentStatus.RECOVERY_AUTHORIZED:
+                provisioner.authorize_initial_provisioning()
 
             if not isinstance(data, dict):
                 raise CorruptManifestError("Authority manifest data must be a dictionary.")

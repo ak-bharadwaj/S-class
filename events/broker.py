@@ -1,18 +1,26 @@
 """Trusted Deployment Authority Broker (Trust Domain A).
 Independent authority service maintaining durable deployment identity, provisioning lifecycle,
-reprovisioning authorization, replay prevention, and root association outside S-Class.
+reprovisioning authorization, replay prevention, and canonical root association outside S-Class.
 """
 import os
+import sys
 import json
+import hashlib
 import threading
 import tempfile
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Set
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric import ed25519
 from events.ipc import OSIPCServer
 from events.store import DeploymentStatus
+from events.serializer import canonicalize_json
 
 
 class TrustedDeploymentAuthorityBroker:
-    """Out-of-process / isolated deployment authority broker."""
+    """Out-of-process / isolated deployment authority broker.
+    Owns deployment identity, provisioning state machine, canonical root public key,
+    and durable replay prevention ledger.
+    """
     def __init__(
         self,
         deployment_id: str,
@@ -20,11 +28,11 @@ class TrustedDeploymentAuthorityBroker:
         ipc_endpoint: Optional[str] = None,
         allowed_uid: Optional[int] = None,
         auth_secret: Optional[str] = None,
+        root_public_key: Optional[ed25519.Ed25519PublicKey] = None,
         initial_status: DeploymentStatus = DeploymentStatus.UNPROVISIONED,
     ):
         self.deployment_id = deployment_id
         if state_file_path is None:
-            # Isolated directory outside S-Class working directory
             self._temp_dir = tempfile.mkdtemp(prefix="sclass_broker_")
             self.state_file_path = os.path.join(self._temp_dir, "broker_state.json")
         else:
@@ -39,9 +47,26 @@ class TrustedDeploymentAuthorityBroker:
 
         self.allowed_uid = allowed_uid
         self.auth_secret = auth_secret
+
+        # Canonical root key binding
+        if root_public_key is not None:
+            if not isinstance(root_public_key, ed25519.Ed25519PublicKey):
+                raise TypeError("root_public_key must be an Ed25519PublicKey instance.")
+            self._root_public_key = root_public_key
+        else:
+            from benchmark.parity.verify_gate_3_certificate import Gate3PublicKeystore
+            canonical_root = Gate3PublicKeystore.get_public_key()
+            if canonical_root is None:
+                raise RuntimeError("Canonical Gate 3 Root Authority Public Key is not configured.")
+            self._root_public_key = canonical_root
+
         self._lock = threading.RLock()
         self._server: Optional[OSIPCServer] = None
         self._load_or_initialize_state(initial_status)
+
+    @property
+    def root_public_key(self) -> ed25519.Ed25519PublicKey:
+        return self._root_public_key
 
     def _load_or_initialize_state(self, default_status: DeploymentStatus) -> None:
         with self._lock:
@@ -49,13 +74,26 @@ class TrustedDeploymentAuthorityBroker:
                 try:
                     with open(self.state_file_path, "r", encoding="utf-8") as f:
                         data = json.load(f)
-                    self.deployment_id = data.get("deployment_id", self.deployment_id)
-                    self.status = DeploymentStatus(data.get("status", default_status.value))
-                    self.consumed_authorizations = set(data.get("consumed_authorizations", []))
-                    self.current_installation = data.get("current_installation")
-                    return
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                    raise RuntimeError(f"Broker state file corrupted or unreadable: {e}. Failing closed.")
+
+                if not isinstance(data, dict) or "payload" not in data or "integrity_seal" not in data:
+                    self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                    raise RuntimeError("Broker state file tampering detected: missing integrity seal. Failing closed.")
+
+                payload = data["payload"]
+                seal = data["integrity_seal"]
+                computed_digest = hashlib.sha256(canonicalize_json(payload)).hexdigest()
+                if computed_digest != seal:
+                    self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                    raise RuntimeError("Broker state file tampering detected: integrity seal digest mismatch. Failing closed.")
+
+                self.deployment_id = payload.get("deployment_id", self.deployment_id)
+                self.status = DeploymentStatus(payload.get("status", default_status.value))
+                self.consumed_authorizations: Set[str] = set(payload.get("consumed_authorizations", []))
+                self.current_installation = payload.get("current_installation")
+                return
 
             self.status = default_status
             self.consumed_authorizations = set()
@@ -65,15 +103,20 @@ class TrustedDeploymentAuthorityBroker:
     def _persist_state(self) -> None:
         with self._lock:
             os.makedirs(os.path.dirname(os.path.abspath(self.state_file_path)), exist_ok=True)
-            data = {
+            state_payload = {
                 "deployment_id": self.deployment_id,
                 "status": self.status.value,
-                "consumed_authorizations": list(self.consumed_authorizations),
+                "consumed_authorizations": sorted(list(self.consumed_authorizations)),
                 "current_installation": self.current_installation,
+            }
+            seal = hashlib.sha256(canonicalize_json(state_payload)).hexdigest()
+            record = {
+                "payload": state_payload,
+                "integrity_seal": seal,
             }
             tmp = self.state_file_path + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2)
+                json.dump(record, f, indent=2)
             if os.path.exists(self.state_file_path):
                 os.replace(tmp, self.state_file_path)
             else:
@@ -83,6 +126,13 @@ class TrustedDeploymentAuthorityBroker:
         with self._lock:
             if self._server is not None:
                 return
+
+            # Mandatory authentication enforcement
+            # If no auth_secret and transport is not a secured POSIX domain socket with UID check -> refuse startup
+            if self.auth_secret is None:
+                if sys.platform == "win32" or self.allowed_uid is None:
+                    raise RuntimeError("Broker startup rejected: mandatory authentication secret required for unauthenticated or Windows transport.")
+
             self._server = OSIPCServer(
                 endpoint_path=self.ipc_endpoint,
                 handler=self._dispatch_rpc,
@@ -113,17 +163,15 @@ class TrustedDeploymentAuthorityBroker:
                 return {"success": True, "status": self.status.value}
 
             elif method == "authorize_initial_provisioning":
-                if self.status == DeploymentStatus.PROVISIONED:
-                    return {"success": False, "error": "System has already been provisioned; authority reset is prohibited."}
-                if self.status == DeploymentStatus.RECOVERY_REQUIRED:
-                    return {"success": False, "error": "System is in RECOVERY_REQUIRED state; explicit root-signed reprovisioning required."}
+                if self.status != DeploymentStatus.UNPROVISIONED:
+                    return {"success": False, "error": f"Cannot authorize initial provisioning from state '{self.status.value}'."}
                 self.status = DeploymentStatus.PROVISIONING_AUTHORIZED
                 self._persist_state()
                 return {"success": True, "status": self.status.value}
 
             elif method == "record_provisioned":
-                if self.status not in (DeploymentStatus.PROVISIONING_AUTHORIZED, DeploymentStatus.UNPROVISIONED):
-                    return {"success": False, "error": f"Cannot transition to PROVISIONED from state '{self.status.value}'."}
+                if self.status != DeploymentStatus.PROVISIONING_AUTHORIZED:
+                    return {"success": False, "error": f"Cannot transition to PROVISIONED from state '{self.status.value}' without prior PROVISIONING_AUTHORIZED."}
                 self.status = DeploymentStatus.PROVISIONED
                 self.current_installation = {
                     "installation_id": params.get("installation_id"),
@@ -140,6 +188,13 @@ class TrustedDeploymentAuthorityBroker:
                 return {"success": True, "status": self.status.value}
 
             elif method == "authorize_reprovisioning":
+                if self.status != DeploymentStatus.RECOVERY_REQUIRED:
+                    return {"success": False, "error": f"Cannot authorize reprovisioning from state '{self.status.value}' (RECOVERY_REQUIRED required)."}
+
+                # Strict rejection of caller-supplied root keys
+                if "root_public_key" in params and params["root_public_key"] is not None:
+                    return {"success": False, "error": "Caller-supplied root public key is rejected; broker uses canonical authority root."}
+
                 auth_data = params.get("reprovisioning_authorization", {})
                 auth_dep_id = auth_data.get("deployment_id")
                 if auth_dep_id != self.deployment_id:
@@ -149,21 +204,10 @@ class TrustedDeploymentAuthorityBroker:
                 if auth_id in self.consumed_authorizations:
                     return {"success": False, "error": f"Reprovisioning authorization '{auth_id}' has already been consumed."}
 
-                import hashlib
-                from cryptography.exceptions import InvalidSignature
-                from cryptography.hazmat.primitives.asymmetric import ed25519
-                from events.serializer import canonicalize_json
-
                 sig_obj = auth_data.get("signature", {})
                 sig_hex = sig_obj.get("signature_hex")
-                root_pub_hex = params.get("root_public_key")
-                if root_pub_hex:
-                    root_public_key = ed25519.Ed25519PublicKey.from_public_bytes(bytes.fromhex(root_pub_hex))
-                else:
-                    from benchmark.parity.verify_gate_3_certificate import Gate3PublicKeystore
-                    root_public_key = Gate3PublicKeystore.get_public_key()
-                    if root_public_key is None:
-                        return {"success": False, "error": "Canonical Gate 3 Root Authority Public Key is not configured."}
+                if not sig_hex:
+                    return {"success": False, "error": "Missing signature in reprovisioning authorization."}
 
                 preimage_dict = {
                     "authorization_id": auth_id,
@@ -176,9 +220,9 @@ class TrustedDeploymentAuthorityBroker:
                 }
                 preimage_bytes = canonicalize_json(preimage_dict)
                 try:
-                    root_public_key.verify(bytes.fromhex(sig_hex), preimage_bytes)
+                    self._root_public_key.verify(bytes.fromhex(sig_hex), preimage_bytes)
                 except InvalidSignature:
-                    return {"success": False, "error": "Invalid reprovisioning authorization signature"}
+                    return {"success": False, "error": "Invalid reprovisioning authorization signature against canonical broker root."}
                 except Exception as e:
                     return {"success": False, "error": f"Signature verification error: {e}"}
 

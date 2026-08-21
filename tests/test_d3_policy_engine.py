@@ -5146,11 +5146,15 @@ def test_d3_install_e111_same_process_caller_cannot_mutate_broker_authority():
     from events.broker import TrustedDeploymentAuthorityBroker
     from events.store import IPCDeploymentProvisioner, SClassApplication, DeploymentProvisionerRegistry, DeploymentStatus
 
-    broker = TrustedDeploymentAuthorityBroker(deployment_id="DEP-E111")
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E111",
+        auth_secret="SECRET-E111",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
     broker.start_ipc_server()
     try:
         DeploymentProvisionerRegistry.reset_for_testing()
-        client_prov = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint)
+        client_prov = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SECRET-E111")
         SClassApplication(provisioner=client_prov)
 
         # 1. Broker is initially UNPROVISIONED
@@ -5186,6 +5190,7 @@ def test_d3_install_e112_untrusted_process_cannot_connect_to_broker():
     broker = TrustedDeploymentAuthorityBroker(
         deployment_id="DEP-E112",
         auth_secret="CONFIDENTIAL_DEPLOYMENT_SECRET_123",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
     )
     broker.start_ipc_server()
     try:
@@ -5220,6 +5225,7 @@ def test_d3_install_e113_wrong_unix_peer_credentials_rejected():
         deployment_id="DEP-E113",
         allowed_uid=999999,
         auth_secret="SECRET-E113",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
     )
     broker.start_ipc_server()
     try:
@@ -5248,6 +5254,7 @@ def test_d3_install_e114_unauthorized_windows_named_pipe_principal_rejected():
     broker = TrustedDeploymentAuthorityBroker(
         deployment_id="DEP-E114",
         auth_secret="WIN_SECURE_TOKEN_XYZ",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
     )
     broker.start_ipc_server()
     try:
@@ -5274,11 +5281,15 @@ def test_d3_install_e115_spoofed_deployment_identity_rejected():
     )
     from policy.exceptions import CorruptManifestError
 
-    broker = TrustedDeploymentAuthorityBroker(deployment_id="CANONICAL-DEP-115")
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="CANONICAL-DEP-115",
+        auth_secret="SECRET-E115",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
     broker.start_ipc_server()
     try:
         DeploymentProvisionerRegistry.reset_for_testing()
-        client_prov = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint)
+        client_prov = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SECRET-E115")
         SClassApplication(provisioner=client_prov)
 
         # Notify loss to put broker into RECOVERY_REQUIRED
@@ -5323,11 +5334,13 @@ def test_d3_install_e116_broker_restart_preserves_provisioned():
     broker1 = TrustedDeploymentAuthorityBroker(
         deployment_id="DEP-E116",
         state_file_path=state_file,
+        auth_secret="SECRET-E116",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
     )
     broker1.start_ipc_server()
     try:
         DeploymentProvisionerRegistry.reset_for_testing()
-        client_prov1 = IPCDeploymentProvisioner(ipc_endpoint=broker1.ipc_endpoint)
+        client_prov1 = IPCDeploymentProvisioner(ipc_endpoint=broker1.ipc_endpoint, auth_secret="SECRET-E116")
         SClassApplication(provisioner=client_prov1)
 
         manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
@@ -5347,10 +5360,12 @@ def test_d3_install_e116_broker_restart_preserves_provisioned():
     broker2 = TrustedDeploymentAuthorityBroker(
         deployment_id="DEP-E116",
         state_file_path=state_file,
+        auth_secret="SECRET-E116",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
     )
     broker2.start_ipc_server()
     try:
-        client_prov2 = IPCDeploymentProvisioner(ipc_endpoint=broker2.ipc_endpoint)
+        client_prov2 = IPCDeploymentProvisioner(ipc_endpoint=broker2.ipc_endpoint, auth_secret="SECRET-E116")
         # Status remains PROVISIONED across broker restart
         assert client_prov2.get_deployment_status() == DeploymentStatus.PROVISIONED
         assert client_prov2.get_deployment_id() == "DEP-E116"
@@ -5373,11 +5388,15 @@ def test_d3_install_e117_sclass_local_state_destruction_does_not_reset_broker():
         DeploymentStatus,
     )
 
-    broker = TrustedDeploymentAuthorityBroker(deployment_id="DEP-E117")
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E117",
+        auth_secret="SECRET-E117",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
     broker.start_ipc_server()
     try:
         DeploymentProvisionerRegistry.reset_for_testing()
-        client_prov = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint)
+        client_prov = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SECRET-E117")
         SClassApplication(provisioner=client_prov)
 
         manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
@@ -5423,11 +5442,15 @@ def test_d3_install_e118_replayed_recovery_authorization_rejected_by_broker():
         DeploymentProvisionerRegistry,
     )
 
-    broker = TrustedDeploymentAuthorityBroker(deployment_id="DEP-E118")
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E118",
+        auth_secret="SECRET-E118",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
     broker.start_ipc_server()
     try:
         DeploymentProvisionerRegistry.reset_for_testing()
-        client_prov = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint)
+        client_prov = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SECRET-E118")
         SClassApplication(provisioner=client_prov)
 
         manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
@@ -5447,6 +5470,9 @@ def test_d3_install_e118_replayed_recovery_authorization_rejected_by_broker():
         for p in [store.file_path, marker, stage]:
             if os.path.exists(p):
                 os.remove(p)
+
+        # Notify broker of local state loss so it transitions to RECOVERY_REQUIRED
+        client_prov.notify_local_state_loss()
 
         recovery_manifest = SignedAuthorityManifestLoader.sign_manifest(
             manifest_id="M-E118-RECOVERED",
@@ -5469,7 +5495,8 @@ def test_d3_install_e118_replayed_recovery_authorization_rejected_by_broker():
             reprovisioning_authorization=reprov_auth,
         )
 
-        # 2. Replay attempt fails closed at broker ledger
+        # 2. Replay attempt after second loss fails closed at broker ledger
+        client_prov.notify_local_state_loss()
         with pytest.raises(RuntimeError, match="already been consumed"):
             SignedAuthorityManifestLoader.reprovision_catastrophic_recovery(
                 data=recovery_manifest,
@@ -5511,6 +5538,406 @@ def test_d3_install_e120_test_inmemory_authority_prohibited_outside_test_mode(mo
 
     with pytest.raises(RuntimeError, match="InMemoryTestDeploymentProvisioner is strictly prohibited outside TEST_MODE"):
         InMemoryTestDeploymentProvisioner()
+
+
+def test_d3_install_e121_caller_supplied_root_key_rejected():
+    """E121: Caller-supplied root key in RPC parameters is rejected by broker."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.ipc import OSIPCClient
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E121",
+        auth_secret="SECRET-E121",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    broker.start_ipc_server()
+    try:
+        client = OSIPCClient(endpoint_path=broker.ipc_endpoint, auth_secret="SECRET-E121")
+        broker.notify_local_state_loss()
+
+        # Attacker caller supplies their own root key in RPC
+        resp = client.call("authorize_reprovisioning", {
+            "reprovisioning_authorization": {"deployment_id": "DEP-E121"},
+            "root_public_key": "FORGED_ROOT_KEY_HEX",
+        })
+        assert not resp.get("success")
+        assert "Caller-supplied root public key is rejected" in resp.get("error", "")
+        client.close()
+    finally:
+        broker.stop_ipc_server()
+
+
+def test_d3_install_e122_forged_authorization_with_caller_selected_key_rejected():
+    """E122: Forged authorization signed by caller-selected key is rejected by broker's canonical root."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import (
+        IPCDeploymentProvisioner,
+        InMemoryTestDeploymentProvisioner,
+        SClassApplication,
+        DeploymentProvisionerRegistry,
+    )
+    from policy.exceptions import InvalidManifestSignatureError
+
+    attacker_key = ed25519.Ed25519PrivateKey.generate()
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E122",
+        auth_secret="SECRET-E122",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    broker.start_ipc_server()
+    try:
+        DeploymentProvisionerRegistry.reset_for_testing()
+        client_prov = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SECRET-E122")
+        SClassApplication(provisioner=client_prov)
+        broker.notify_local_state_loss()
+
+        manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+            manifest_id="M-E122",
+            manifest_version=1,
+            issued_at="2026-08-19T10:00:00Z",
+            actors={},
+            revoked_fingerprints=[],
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+
+        forged_auth = InMemoryTestDeploymentProvisioner.create_reprovisioning_authorization(
+            deployment_id="DEP-E122",
+            target_manifest_id="M-E122",
+            root_private_key=attacker_key,
+        )
+
+        with pytest.raises(InvalidManifestSignatureError, match="canonical broker root|signature"):
+            SignedAuthorityManifestLoader.reprovision_catastrophic_recovery(
+                data=manifest_v1,
+                reprovisioning_authorization=forged_auth,
+            )
+    finally:
+        broker.stop_ipc_server()
+
+
+def test_d3_install_e123_broker_root_mutation_rejected():
+    """E123: Broker root key mutation after startup is rejected."""
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+    from events.broker import TrustedDeploymentAuthorityBroker
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E123",
+        auth_secret="SECRET-E123",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    attacker_key = ed25519.Ed25519PrivateKey.generate().public_key()
+
+    # Attempting to reassign property raises AttributeError
+    with pytest.raises(AttributeError):
+        broker.root_public_key = attacker_key
+
+
+def test_d3_install_e124_record_provisioned_from_unprovisioned_rejected():
+    """E124: Calling record_provisioned directly from UNPROVISIONED state is rejected."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.ipc import OSIPCClient
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E124",
+        auth_secret="SECRET-E124",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    broker.start_ipc_server()
+    try:
+        client = OSIPCClient(endpoint_path=broker.ipc_endpoint, auth_secret="SECRET-E124")
+        resp = client.call("record_provisioned", {
+            "installation_id": "INST-124",
+            "manifest_id": "M-124",
+            "manifest_version": 1,
+            "root_fingerprint": "ROOT-FP",
+        })
+        assert not resp.get("success")
+        assert "without prior PROVISIONING_AUTHORIZED" in resp.get("error", "")
+        client.close()
+    finally:
+        broker.stop_ipc_server()
+
+
+def test_d3_install_e125_record_reprovisioned_without_recovery_authorized_rejected():
+    """E125: Calling record_reprovisioned without RECOVERY_AUTHORIZED is rejected."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.ipc import OSIPCClient
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E125",
+        auth_secret="SECRET-E125",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    broker.start_ipc_server()
+    try:
+        client = OSIPCClient(endpoint_path=broker.ipc_endpoint, auth_secret="SECRET-E125")
+        broker.notify_local_state_loss()  # State is RECOVERY_REQUIRED, not RECOVERY_AUTHORIZED
+
+        resp = client.call("record_reprovisioned", {
+            "installation_id": "INST-125",
+            "manifest_id": "M-125",
+            "manifest_version": 1,
+            "root_fingerprint": "ROOT-FP",
+        })
+        assert not resp.get("success")
+        assert "without authorized recovery" in resp.get("error", "")
+        client.close()
+    finally:
+        broker.stop_ipc_server()
+
+
+def test_d3_install_e126_duplicated_state_transition_rejected():
+    """E126: Duplicated state transitions (e.g. repeated authorize_initial_provisioning) are rejected."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.ipc import OSIPCClient
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E126",
+        auth_secret="SECRET-E126",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    broker.start_ipc_server()
+    try:
+        client = OSIPCClient(endpoint_path=broker.ipc_endpoint, auth_secret="SECRET-E126")
+
+        # 1. First authorization succeeds
+        resp1 = client.call("authorize_initial_provisioning")
+        assert resp1.get("success")
+
+        # 2. Second authorization fails closed
+        resp2 = client.call("authorize_initial_provisioning")
+        assert not resp2.get("success")
+        assert "Cannot authorize initial provisioning from state 'PROVISIONING_AUTHORIZED'" in resp2.get("error", "")
+        client.close()
+    finally:
+        broker.stop_ipc_server()
+
+
+def test_d3_install_e127_no_auth_broker_startup_rejected():
+    """E127: Broker startup without authentication credentials or secure transport is rejected."""
+    import sys
+    from events.broker import TrustedDeploymentAuthorityBroker
+
+    # Windows or no UID check with no auth_secret
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E127",
+        auth_secret=None,
+        allowed_uid=None,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    with pytest.raises(RuntimeError, match="Broker startup rejected: mandatory authentication secret required"):
+        broker.start_ipc_server()
+
+
+def test_d3_install_e128_unauthorized_client_rejected():
+    """E128: Client connecting without matching credentials is strictly rejected."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.ipc import OSIPCClient
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E128",
+        auth_secret="MANDATORY_SECRET_128",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    broker.start_ipc_server()
+    try:
+        client = OSIPCClient(endpoint_path=broker.ipc_endpoint, auth_secret="INVALID_SECRET")
+        with pytest.raises(PermissionError):
+            client.call("get_deployment_id")
+    finally:
+        broker.stop_ipc_server()
+
+
+def test_d3_install_e129_unauthorized_windows_client_rejected():
+    """E129: Windows client without secret handshake is strictly rejected."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.ipc import OSIPCClient
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E129",
+        auth_secret="WIN_PIPE_SECRET_129",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    broker.start_ipc_server()
+    try:
+        client = OSIPCClient(endpoint_path=broker.ipc_endpoint, auth_secret=None)
+        with pytest.raises((PermissionError, ConnectionError)):
+            client.call("get_deployment_id")
+    finally:
+        broker.stop_ipc_server()
+
+
+def test_d3_install_e130_localhost_tcp_without_authentication_rejected():
+    """E130: Unauthenticated localhost TCP connection attempt is rejected."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.ipc import OSIPCClient
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E130",
+        auth_secret="TCP_AUTH_SECRET_130",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    broker.start_ipc_server()
+    try:
+        unauth_client = OSIPCClient(endpoint_path=broker.ipc_endpoint, auth_secret="WRONG_TCP_TOKEN")
+        with pytest.raises(PermissionError):
+            unauth_client.call("get_deployment_id")
+    finally:
+        broker.stop_ipc_server()
+
+
+def test_d3_install_e131_broker_state_tampering_fails_closed():
+    """E131: Tampering with broker state file fails closed upon restart."""
+    import tempfile
+    import json
+    from events.broker import TrustedDeploymentAuthorityBroker
+
+    state_file = os.path.join(tempfile.gettempdir(), f"broker_state_e131_{os.getpid()}.json")
+    if os.path.exists(state_file):
+        os.remove(state_file)
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E131",
+        state_file_path=state_file,
+        auth_secret="SECRET-E131",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    assert broker.status.value == "UNPROVISIONED"
+
+    # Attacker modifies state file without updating integrity seal
+    with open(state_file, "r") as f:
+        data = json.load(f)
+    data["payload"]["status"] = "PROVISIONED"
+    with open(state_file, "w") as f:
+        json.dump(data, f)
+
+    # Broker reload fails closed on integrity seal mismatch
+    with pytest.raises(RuntimeError, match="tampering detected: integrity seal digest mismatch"):
+        TrustedDeploymentAuthorityBroker(
+            deployment_id="DEP-E131",
+            state_file_path=state_file,
+            auth_secret="SECRET-E131",
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        )
+
+    if os.path.exists(state_file):
+        os.remove(state_file)
+
+
+def test_d3_install_e132_consumed_authorization_deletion_tampering_fails_closed():
+    """E132: Tampering with consumed authorizations ledger in state file fails closed."""
+    import tempfile
+    import json
+    from events.broker import TrustedDeploymentAuthorityBroker
+
+    state_file = os.path.join(tempfile.gettempdir(), f"broker_state_e132_{os.getpid()}.json")
+    if os.path.exists(state_file):
+        os.remove(state_file)
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E132",
+        state_file_path=state_file,
+        auth_secret="SECRET-E132",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    broker.consumed_authorizations.add("AUTH-132-USED")
+    broker._persist_state()
+
+    # Attacker deletes consumed authorization from payload
+    with open(state_file, "r") as f:
+        data = json.load(f)
+    data["payload"]["consumed_authorizations"] = []
+    with open(state_file, "w") as f:
+        json.dump(data, f)
+
+    # Reload detects tampering and fails closed
+    with pytest.raises(RuntimeError, match="tampering detected"):
+        TrustedDeploymentAuthorityBroker(
+            deployment_id="DEP-E132",
+            state_file_path=state_file,
+            auth_secret="SECRET-E132",
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        )
+
+    if os.path.exists(state_file):
+        os.remove(state_file)
+
+
+def test_d3_install_e133_status_downgrade_tampering_fails_closed():
+    """E133: Status downgrade tampering fails closed upon restart."""
+    import tempfile
+    import json
+    from events.broker import TrustedDeploymentAuthorityBroker
+
+    state_file = os.path.join(tempfile.gettempdir(), f"broker_state_e133_{os.getpid()}.json")
+    if os.path.exists(state_file):
+        os.remove(state_file)
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E133",
+        state_file_path=state_file,
+        auth_secret="SECRET-E133",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    broker.notify_local_state_loss()  # State is RECOVERY_REQUIRED
+
+    # Attacker modifies state file to revert status to UNPROVISIONED
+    with open(state_file, "r") as f:
+        data = json.load(f)
+    data["payload"]["status"] = "UNPROVISIONED"
+    with open(state_file, "w") as f:
+        json.dump(data, f)
+
+    # Reload detects tampering
+    with pytest.raises(RuntimeError, match="tampering detected"):
+        TrustedDeploymentAuthorityBroker(
+            deployment_id="DEP-E133",
+            state_file_path=state_file,
+            auth_secret="SECRET-E133",
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        )
+
+    if os.path.exists(state_file):
+        os.remove(state_file)
+
+
+def test_d3_install_e134_broker_restart_preserves_authority_state():
+    """E134: Clean broker restart faithfully preserves deployment ID, status, and consumed authorizations."""
+    import tempfile
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus
+
+    state_file = os.path.join(tempfile.gettempdir(), f"broker_state_e134_{os.getpid()}.json")
+    if os.path.exists(state_file):
+        os.remove(state_file)
+
+    broker1 = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E134-IMMUTABLE",
+        state_file_path=state_file,
+        auth_secret="SECRET-E134",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    broker1.consumed_authorizations.add("AUTH-134-A")
+    broker1.consumed_authorizations.add("AUTH-134-B")
+    broker1.notify_local_state_loss()
+    assert broker1.status == DeploymentStatus.RECOVERY_REQUIRED
+
+    # Clean reload
+    broker2 = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E134-IMMUTABLE",
+        state_file_path=state_file,
+        auth_secret="SECRET-E134",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    assert broker2.deployment_id == "DEP-E134-IMMUTABLE"
+    assert broker2.status == DeploymentStatus.RECOVERY_REQUIRED
+    assert broker2.consumed_authorizations == {"AUTH-134-A", "AUTH-134-B"}
+
+    if os.path.exists(state_file):
+        os.remove(state_file)
+
 
 
 

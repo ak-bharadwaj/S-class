@@ -939,12 +939,20 @@ class D2InstallationProvisioning:
                         pass
 
                 provisioner = DeploymentProvisionerRegistry.get_provisioner()
-                provisioner.record_provisioned(
-                    installation_id=installation_id,
-                    manifest_id=manifest_id,
-                    manifest_version=manifest_version,
-                    root_fingerprint=root_fingerprint,
-                )
+                if provisioner.get_deployment_status() == DeploymentStatus.RECOVERY_AUTHORIZED:
+                    provisioner.record_reprovisioned(
+                        installation_id=installation_id,
+                        manifest_id=manifest_id,
+                        manifest_version=manifest_version,
+                        root_fingerprint=root_fingerprint,
+                    )
+                else:
+                    provisioner.record_provisioned(
+                        installation_id=installation_id,
+                        manifest_id=manifest_id,
+                        manifest_version=manifest_version,
+                        root_fingerprint=root_fingerprint,
+                    )
 
     @classmethod
     def verify_state_agreement(cls) -> None:
@@ -1143,20 +1151,15 @@ class IPCDeploymentProvisioner(TrustedDeploymentProvisioner):
         root_public_key: Optional[Any] = None,
     ) -> Dict[str, Any]:
         with self._lock:
-            pub_hex = None
-            if root_public_key is not None:
-                pub_hex = root_public_key.public_bytes_raw().hex() if hasattr(root_public_key, "public_bytes_raw") else None
-
             resp = self._client.call("authorize_reprovisioning", {
                 "reprovisioning_authorization": reprovisioning_authorization,
-                "root_public_key": pub_hex,
             })
             if not resp.get("success"):
                 err = resp.get("error", "Unknown error")
                 if "mismatch" in err:
                     from policy.exceptions import CorruptManifestError
                     raise CorruptManifestError(err)
-                if "signature" in err.lower():
+                if "signature" in err.lower() or "root" in err.lower():
                     from policy.exceptions import InvalidManifestSignatureError
                     raise InvalidManifestSignatureError(err)
                 raise RuntimeError(f"Authority broker rejected reprovisioning: {err}")
