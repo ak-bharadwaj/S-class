@@ -25,7 +25,6 @@ from planner.lease import (
     PlanningLeaseManager,
     LeaseAcquisitionError,
     LeaseValidationError,
-    LeaseCorruptionError,
 )
 from planner.projector import StateProjector
 from planner.generator import (
@@ -41,7 +40,6 @@ from planner.evaluator import (
     HardConstraintGate,
     PlanEvaluator,
     MAX_GOVERNED_BLAST_RADIUS,
-    ALLOWED_ACTION_TYPES,
 )
 from planner.convergence import (
     ConvergenceMonitor,
@@ -109,7 +107,6 @@ __all__ = [
     "PlanningLeaseManager",
     "LeaseAcquisitionError",
     "LeaseValidationError",
-    "LeaseCorruptionError",
     "StateProjector",
     "CandidateGenerator",
     "DeterministicRuleGenerator",
@@ -119,7 +116,6 @@ __all__ = [
     "HardConstraintGate",
     "PlanEvaluator",
     "MAX_GOVERNED_BLAST_RADIUS",
-    "ALLOWED_ACTION_TYPES",
     "ConvergenceMonitor",
     "ReplanningBudgetExceededError",
     "PlanOscillationDetectedError",
