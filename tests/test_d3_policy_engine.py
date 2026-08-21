@@ -4528,62 +4528,13 @@ def test_d3_install_e90_completed_genesis_installation_seal_and_d2_state_agree()
     assert events[0].payload["root_fingerprint"] == seal_data["root_fingerprint"]
 
 
-def test_d3_install_e91_delete_d2_seal_stage_automatic_genesis_rejected():
-    """E91: Deleting D2 store + seal + stage fails closed against automatic genesis bootstrap."""
+def test_d3_install_e91_local_state_loss_transitions_to_recovery_required():
+    """E91: Deleting local state transitions external deployment authority to RECOVERY_REQUIRED."""
     SignedAuthorityManifestLoader.clear_for_testing()
-    from events.store import D2AuthorityManifestStore, D2InstallationProvisioning
+    from events.store import D2AuthorityManifestStore, D2InstallationProvisioning, DeploymentProvisionerRegistry, DeploymentStatus
 
     manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
         manifest_id="M-E91",
-        manifest_version=1,
-        issued_at="2026-08-19T10:00:00Z",
-        actors={},
-        revoked_fingerprints=[],
-        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
-    )
-    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
-
-    # Attacker wipes all local state
-    store = D2AuthorityManifestStore()
-    marker = D2InstallationProvisioning.get_marker_path()
-    stage = D2InstallationProvisioning.get_stage_path()
-    for p in [store.file_path, marker, stage]:
-        if os.path.exists(p):
-            os.remove(p)
-
-    # Automatic genesis bootstrap is rejected because deployment was already provisioned
-    with pytest.raises(RuntimeError, match="Genesis bootstrap rejected"):
-        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
-
-
-def test_d3_install_e92_restore_attacker_created_fresh_local_state_rejected():
-    """E92: Attacker attempting to bind fresh local state to conflicting deployment identity is rejected."""
-    SignedAuthorityManifestLoader.clear_for_testing()
-    from events.store import DeploymentProvisioningBoundary
-
-    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
-        manifest_id="M-E92",
-        manifest_version=1,
-        issued_at="2026-08-19T10:00:00Z",
-        actors={},
-        revoked_fingerprints=[],
-        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
-    )
-    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
-
-    # Attacker tries to bind conflicting deployment identity to re-enable genesis
-    with pytest.raises(RuntimeError, match="already bound to a different deployment identity"):
-        DeploymentProvisioningBoundary.initialize_deployment_boundary("ATTACKER-DEPLOYMENT-ROGUE")
-
-
-def test_d3_install_e93_complete_local_state_loss_fails_closed():
-    """E93: Complete local state loss fails closed for both load_from_dict and automatic genesis."""
-    SignedAuthorityManifestLoader.clear_for_testing()
-    from events.exceptions import StorageUnavailableError
-    from events.store import D2AuthorityManifestStore, D2InstallationProvisioning
-
-    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
-        manifest_id="M-E93",
         manifest_version=1,
         issued_at="2026-08-19T10:00:00Z",
         actors={},
@@ -4600,22 +4551,29 @@ def test_d3_install_e93_complete_local_state_loss_fails_closed():
         if os.path.exists(p):
             os.remove(p)
 
-    # 1. Normal load fails closed
-    with pytest.raises(StorageUnavailableError):
-        SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+    # Notify / detect local state loss in external provisioner
+    provisioner = DeploymentProvisionerRegistry.get_provisioner()
+    provisioner.notify_local_state_loss()
+    assert provisioner.get_deployment_status() == DeploymentStatus.RECOVERY_REQUIRED
 
-    # 2. Automatic genesis fails closed
-    with pytest.raises(RuntimeError, match="Genesis bootstrap rejected"):
+    # Genesis bootstrap is rejected with RECOVERY_REQUIRED
+    with pytest.raises(RuntimeError, match="RECOVERY_REQUIRED"):
         SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
 
 
-def test_d3_install_e94_authorized_external_reprovisioning_explicit_and_auditable():
-    """E94: Authorized external administrative reprovisioning succeeds with root-signed authorization."""
+def test_d3_install_e92_restart_after_loss_remains_recovery_required():
+    """E92: Process restart after complete local-state loss remains in RECOVERY_REQUIRED."""
     SignedAuthorityManifestLoader.clear_for_testing()
-    from events.store import D2AuthorityManifestStore, D2InstallationProvisioning, DeploymentProvisioningBoundary
+    from events.store import (
+        D2AuthorityManifestStore,
+        D2InstallationProvisioning,
+        DeploymentProvisionerRegistry,
+        DeploymentStatus,
+        InMemoryTestDeploymentProvisioner,
+    )
 
     manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
-        manifest_id="M-E94-ORIGINAL",
+        manifest_id="M-E92",
         manifest_version=1,
         issued_at="2026-08-19T10:00:00Z",
         actors={},
@@ -4624,7 +4582,7 @@ def test_d3_install_e94_authorized_external_reprovisioning_explicit_and_auditabl
     )
     SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
 
-    # Catastrophic state loss occurs
+    # Wipe local state
     store = D2AuthorityManifestStore()
     marker = D2InstallationProvisioning.get_marker_path()
     stage = D2InstallationProvisioning.get_stage_path()
@@ -4632,9 +4590,95 @@ def test_d3_install_e94_authorized_external_reprovisioning_explicit_and_auditabl
         if os.path.exists(p):
             os.remove(p)
 
-    # Prepare recovery manifest
+    # Re-attach external provisioner representing persistent external authority in RECOVERY_REQUIRED state
+    external_provisioner = InMemoryTestDeploymentProvisioner(
+        deployment_id="DEPLOYMENT-PERSISTED-001",
+        initial_status=DeploymentStatus.RECOVERY_REQUIRED,
+    )
+    DeploymentProvisionerRegistry.set_provisioner(external_provisioner)
+
+    assert DeploymentProvisionerRegistry.get_provisioner().get_deployment_status() == DeploymentStatus.RECOVERY_REQUIRED
+    with pytest.raises(RuntimeError, match="RECOVERY_REQUIRED"):
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+
+def test_d3_install_e93_no_external_provisioner_genesis_rejected():
+    """E93: FailClosedDeploymentProvisioner (production default) rejects automatic genesis."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import DeploymentProvisionerRegistry, FailClosedDeploymentProvisioner
+
+    DeploymentProvisionerRegistry.set_provisioner(FailClosedDeploymentProvisioner("PRODUCTION-NODE-001"))
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E93",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    with pytest.raises(RuntimeError, match="FailClosedDeploymentProvisioner"):
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+
+def test_d3_install_e94_valid_external_initial_authorization_succeeds_once():
+    """E94: Valid external initial authorization succeeds exactly once and second call is rejected."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import DeploymentProvisionerRegistry, DeploymentStatus
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E94",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    # 1. First bootstrap succeeds
+    res = SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+    assert res.manifest_version == 1
+
+    # 2. External authority is now PROVISIONED
+    provisioner = DeploymentProvisionerRegistry.get_provisioner()
+    assert provisioner.get_deployment_status() == DeploymentStatus.PROVISIONED
+
+    # 3. Second bootstrap call is rejected
+    with pytest.raises(RuntimeError, match="already PROVISIONED|already contains history|system has already been provisioned"):
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+
+def test_d3_install_e95_valid_external_reprovision_authorization_recovery_succeeds_once():
+    """E95: Valid external reprovision authorization succeeds and establishes fresh genesis state."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import (
+        D2AuthorityManifestStore,
+        D2InstallationProvisioning,
+        DeploymentProvisionerRegistry,
+        InMemoryTestDeploymentProvisioner,
+    )
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E95-ORIGINAL",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+    # Wipe local files
+    store = D2AuthorityManifestStore()
+    marker = D2InstallationProvisioning.get_marker_path()
+    stage = D2InstallationProvisioning.get_stage_path()
+    for p in [store.file_path, marker, stage]:
+        if os.path.exists(p):
+            os.remove(p)
+
     recovery_manifest = SignedAuthorityManifestLoader.sign_manifest(
-        manifest_id="M-E94-RECOVERY",
+        manifest_id="M-E95-RECOVERED",
         manifest_version=1,
         issued_at="2026-08-21T12:00:00Z",
         actors={},
@@ -4642,35 +4686,192 @@ def test_d3_install_e94_authorized_external_reprovisioning_explicit_and_auditabl
         root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
     )
 
-    # 1. Without authorized reprovisioning token, recovery fails closed
-    with pytest.raises(RuntimeError):
-        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(recovery_manifest)
-
-    # 2. Administrator issues root-signed reprovisioning authorization
-    reprov_auth = DeploymentProvisioningBoundary.create_reprovisioning_authorization(
-        target_manifest_id="M-E94-RECOVERY",
+    provisioner = DeploymentProvisionerRegistry.get_provisioner()
+    dep_id = provisioner.get_deployment_id()
+    reprov_auth = InMemoryTestDeploymentProvisioner.create_reprovisioning_authorization(
+        deployment_id=dep_id,
+        target_manifest_id="M-E95-RECOVERED",
         root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
-        reason="DISASTER_RECOVERY_TEST",
+        reason="DISASTER_RECOVERY",
     )
 
-    # 3. Explicit administrative reprovisioning succeeds
     res = SignedAuthorityManifestLoader.reprovision_catastrophic_recovery(
         data=recovery_manifest,
         reprovisioning_authorization=reprov_auth,
     )
-    assert res.manifest_id == "M-E94-RECOVERY"
+    assert res.manifest_id == "M-E95-RECOVERED"
     assert res.manifest_version == 1
 
-    # 4. State agreement is verified
-    seal_data = D2InstallationProvisioning.verify_seal()
-    assert seal_data["initial_manifest_id"] == "M-E94-RECOVERY"
+    seal = D2InstallationProvisioning.verify_seal()
+    assert seal["initial_manifest_id"] == "M-E95-RECOVERED"
 
-    # 5. Replaying the same reprovisioning authorization fails closed
-    with pytest.raises(RuntimeError, match="has already been consumed"):
+
+def test_d3_install_e96_replay_authorization_rejected():
+    """E96: Replay of an already-consumed reprovisioning authorization is rejected by external authority."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import (
+        D2AuthorityManifestStore,
+        D2InstallationProvisioning,
+        DeploymentProvisionerRegistry,
+        InMemoryTestDeploymentProvisioner,
+    )
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E96",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+    # Wipe local files
+    store = D2AuthorityManifestStore()
+    marker = D2InstallationProvisioning.get_marker_path()
+    stage = D2InstallationProvisioning.get_stage_path()
+    for p in [store.file_path, marker, stage]:
+        if os.path.exists(p):
+            os.remove(p)
+
+    recovery_manifest = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E96-RECOVERED",
+        manifest_version=1,
+        issued_at="2026-08-21T12:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    provisioner = DeploymentProvisionerRegistry.get_provisioner()
+    dep_id = provisioner.get_deployment_id()
+    reprov_auth = InMemoryTestDeploymentProvisioner.create_reprovisioning_authorization(
+        deployment_id=dep_id,
+        target_manifest_id="M-E96-RECOVERED",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    SignedAuthorityManifestLoader.reprovision_catastrophic_recovery(
+        data=recovery_manifest,
+        reprovisioning_authorization=reprov_auth,
+    )
+
+    # Replay attempt fails
+    with pytest.raises(RuntimeError, match="already been consumed"):
         SignedAuthorityManifestLoader.reprovision_catastrophic_recovery(
             data=recovery_manifest,
             reprovisioning_authorization=reprov_auth,
         )
+
+
+def test_d3_install_e97_wrong_deployment_identity_rejected():
+    """E97: Reprovisioning authorization with mismatched deployment identity fails closed."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import InMemoryTestDeploymentProvisioner
+    from policy.exceptions import CorruptManifestError
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E97",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    wrong_dep_auth = InMemoryTestDeploymentProvisioner.create_reprovisioning_authorization(
+        deployment_id="ROGUE-DEPLOYMENT-XYZ",
+        target_manifest_id="M-E97",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    with pytest.raises(CorruptManifestError, match="deployment mismatch"):
+        SignedAuthorityManifestLoader.reprovision_catastrophic_recovery(
+            data=manifest_v1,
+            reprovisioning_authorization=wrong_dep_auth,
+        )
+
+
+def test_d3_install_e98_forged_authorization_rejected():
+    """E98: Reprovisioning authorization with forged/invalid signature fails closed."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import DeploymentProvisionerRegistry, InMemoryTestDeploymentProvisioner
+    from policy.exceptions import InvalidManifestSignatureError
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E98",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    provisioner = DeploymentProvisionerRegistry.get_provisioner()
+    dep_id = provisioner.get_deployment_id()
+    auth = InMemoryTestDeploymentProvisioner.create_reprovisioning_authorization(
+        deployment_id=dep_id,
+        target_manifest_id="M-E98",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    # Attacker tampers with signature
+    auth["signature"]["signature_hex"] = "00" * 64
+
+    with pytest.raises(InvalidManifestSignatureError):
+        SignedAuthorityManifestLoader.reprovision_catastrophic_recovery(
+            data=manifest_v1,
+            reprovisioning_authorization=auth,
+        )
+
+
+def test_d3_install_e99_external_authority_unavailable_fails_closed():
+    """E99: When external deployment authority is unavailable or fails, genesis and recovery fail closed."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import DeploymentProvisionerRegistry, TrustedDeploymentProvisioner, DeploymentStatus
+
+    class UnavailableExternalProvisioner(TrustedDeploymentProvisioner):
+        def get_deployment_id(self) -> str:
+            raise ConnectionError("External deployment coordinator unreachable.")
+        def get_deployment_status(self) -> DeploymentStatus:
+            raise ConnectionError("External deployment coordinator unreachable.")
+        def authorize_initial_provisioning(self, authorization_data=None) -> None:
+            raise ConnectionError("External deployment coordinator unreachable.")
+        def record_provisioned(self, *args, **kwargs) -> None:
+            raise ConnectionError("External deployment coordinator unreachable.")
+        def notify_local_state_loss(self) -> None:
+            raise ConnectionError("External deployment coordinator unreachable.")
+        def authorize_reprovisioning(self, *args, **kwargs) -> Dict[str, Any]:
+            raise ConnectionError("External deployment coordinator unreachable.")
+        def record_reprovisioned(self, *args, **kwargs) -> None:
+            raise ConnectionError("External deployment coordinator unreachable.")
+
+    DeploymentProvisionerRegistry.set_provisioner(UnavailableExternalProvisioner())
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E99",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    with pytest.raises(ConnectionError, match="External deployment coordinator unreachable"):
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+
+def test_d3_install_e100_test_provisioner_inaccessible_outside_test_mode(monkeypatch):
+    """E100: InMemoryTestDeploymentProvisioner is strictly prohibited outside TEST_MODE."""
+    from events.store import InMemoryTestDeploymentProvisioner
+
+    # Remove all test mode environment flags
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+
+    with pytest.raises(RuntimeError, match="InMemoryTestDeploymentProvisioner is strictly prohibited outside TEST_MODE"):
+        InMemoryTestDeploymentProvisioner()
 
 
 

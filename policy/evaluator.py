@@ -481,7 +481,12 @@ class SignedAuthorityManifestLoader:
         Stage 3: FIRST_INSTALL_SEALED
         """
         with cls._bootstrap_lock:
-            from events.store import D2AuthorityManifestStore, D2InstallationProvisioning, DeploymentProvisioningBoundary
+            from events.store import (
+                D2AuthorityManifestStore,
+                D2InstallationProvisioning,
+                DeploymentProvisionerRegistry,
+                DeploymentStatus,
+            )
             from policy.exceptions import ManifestRollbackError, InvalidManifestSignatureError, CorruptManifestError
             from cryptography.exceptions import InvalidSignature
 
@@ -494,12 +499,18 @@ class SignedAuthorityManifestLoader:
             if D2InstallationProvisioning.is_installed():
                 raise RuntimeError("Genesis bootstrap rejected: system has already been provisioned/installed. Authority reset prohibited.")
 
-            # If deployment has already been provisioned or local state was lost, fail closed
-            if not DeploymentProvisioningBoundary.is_provisioning_authorized():
+            provisioner = DeploymentProvisionerRegistry.get_provisioner()
+            status = provisioner.get_deployment_status()
+            if status == DeploymentStatus.RECOVERY_REQUIRED:
                 raise RuntimeError(
-                    "Genesis bootstrap rejected: deployment has already been provisioned or complete local state loss occurred. "
-                    "Explicit authorized external reprovisioning required."
+                    "Genesis bootstrap rejected: deployment is in RECOVERY_REQUIRED state after complete local-state loss. "
+                    "Explicit root-signed external administrative reprovisioning required."
                 )
+            if status == DeploymentStatus.PROVISIONED:
+                raise RuntimeError("Genesis bootstrap rejected: system has already been provisioned/installed. Authority reset prohibited.")
+
+            # Authorize initial provisioning with external deployment authority
+            provisioner.authorize_initial_provisioning()
 
             if not isinstance(data, dict):
                 raise CorruptManifestError("Authority manifest data must be a dictionary.")
@@ -573,7 +584,7 @@ class SignedAuthorityManifestLoader:
                 root_fingerprint=sig_root_fp,
             )
 
-            # Stage 3: FIRST_INSTALL_SEALED
+            # Stage 3: FIRST_INSTALL_SEALED (and recorded as PROVISIONED in external provisioner)
             D2InstallationProvisioning.seal_first_installation(
                 manifest_id=manifest_id,
                 manifest_version=manifest_version,
@@ -592,14 +603,21 @@ class SignedAuthorityManifestLoader:
         reprovisioning_authorization: Dict[str, Any],
     ) -> ReadOnlyActorAuthorityResolver:
         """Explicit, auditable catastrophic recovery reprovisioning.
-        Requires a valid, root-signed DeploymentReprovisioningAuthorization.
+        Requires a valid, root-signed DeploymentReprovisioningAuthorization verified by the external authority.
         Fails closed on signature mismatch, deployment mismatch, or replay.
         """
         with cls._bootstrap_lock:
-            from events.store import D2AuthorityManifestStore, D2InstallationProvisioning, DeploymentProvisioningBoundary
+            from events.store import (
+                D2AuthorityManifestStore,
+                D2InstallationProvisioning,
+                DeploymentProvisionerRegistry,
+                DeploymentStatus,
+            )
 
-            # 1. Cryptographically verify and consume reprovisioning authorization
-            auth = DeploymentProvisioningBoundary.verify_and_consume_reprovisioning_authorization(reprovisioning_authorization)
+            provisioner = DeploymentProvisionerRegistry.get_provisioner()
+
+            # 1. External deployment authority cryptographically verifies and consumes reprovisioning authorization
+            auth = provisioner.authorize_reprovisioning(reprovisioning_authorization)
 
             manifest_id = data.get("manifest_id") if isinstance(data, dict) else None
             if manifest_id != auth.get("target_manifest_id"):
@@ -624,7 +642,11 @@ class SignedAuthorityManifestLoader:
                     except OSError:
                         pass
 
-            # 3. Bootstrap fresh genesis manifest under new provisioning authority
+            # 3. Allow one-time bootstrap transition in external authority
+            if hasattr(provisioner, "set_deployment_status"):
+                provisioner.set_deployment_status(DeploymentStatus.UNPROVISIONED)
+
+            # 4. Bootstrap fresh genesis manifest under external provisioning authority
             return cls.bootstrap_genesis_manifest(data)
 
     @classmethod

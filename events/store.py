@@ -938,7 +938,13 @@ class D2InstallationProvisioning:
                     except OSError:
                         pass
 
-                DeploymentProvisioningBoundary.mark_provisioned(installation_id)
+                provisioner = DeploymentProvisionerRegistry.get_provisioner()
+                provisioner.record_provisioned(
+                    installation_id=installation_id,
+                    manifest_id=manifest_id,
+                    manifest_version=manifest_version,
+                    root_fingerprint=root_fingerprint,
+                )
 
     @classmethod
     def verify_state_agreement(cls) -> None:
@@ -991,59 +997,296 @@ class D2InstallationProvisioning:
                     os.remove(lock_p)
                 except OSError:
                     pass
-        DeploymentProvisioningBoundary.clear_for_testing()
+        DeploymentProvisionerRegistry.reset_for_testing()
 
 
-class DeploymentProvisioningBoundary:
-    """Explicit, protected deployment-level provisioning and reprovisioning authority boundary.
-    Guarantees that complete local state loss (deletion of D2 ledger, seal, and staging)
-    fails closed rather than allowing silent or automatic genesis reset.
+from abc import ABC, abstractmethod
+from enum import Enum
+
+
+class DeploymentStatus(str, Enum):
+    UNPROVISIONED = "UNPROVISIONED"
+    PROVISIONING_AUTHORIZED = "PROVISIONING_AUTHORIZED"
+    PROVISIONED = "PROVISIONED"
+    RECOVERY_REQUIRED = "RECOVERY_REQUIRED"
+
+
+def _is_test_mode_active() -> bool:
+    return bool(
+        os.environ.get("SCLASS_TEST_MODE") == "1"
+        or os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") == "1"
+        or os.environ.get("PYTEST_CURRENT_TEST") is not None
+    )
+
+
+class TrustedDeploymentProvisioner(ABC):
+    """Abstract interface for an explicit external deployment authority.
+    The application cannot be its own deployment authority. External authority
+    governs initial genesis, reprovisioning, and recovery across catastrophic local-state loss.
     """
-    _deployment_id: Optional[str] = "DEPLOYMENT-DEFAULT"
-    _is_provisioned: bool = False
-    _consumed_installation_id: Optional[str] = None
-    _consumed_reprovisioning_tokens: Set[str] = set()
-    _class_lock = threading.RLock()
+    @abstractmethod
+    def get_deployment_id(self) -> str:
+        """Returns the immutable deployment identifier."""
+        pass
 
-    @classmethod
-    def initialize_deployment_boundary(cls, deployment_id: str, auto_authorize: bool = True) -> None:
-        """Initializes the trusted deployment composition root with an immutable deployment identity."""
-        with cls._class_lock:
-            if cls._deployment_id is not None and cls._deployment_id != deployment_id and cls._is_provisioned:
-                raise RuntimeError("Deployment provisioning boundary is already bound to a different deployment identity.")
-            cls._deployment_id = deployment_id
-            if auto_authorize and not cls._is_provisioned:
-                cls._is_provisioned = False
+    @abstractmethod
+    def get_deployment_status(self) -> DeploymentStatus:
+        """Returns the current deployment status from the external authority."""
+        pass
 
-    @classmethod
-    def get_deployment_id(cls) -> str:
-        with cls._class_lock:
-            if cls._deployment_id is None:
-                cls._deployment_id = "DEPLOYMENT-DEFAULT"
-            return cls._deployment_id
+    @abstractmethod
+    def authorize_initial_provisioning(self, authorization_data: Optional[Dict[str, Any]] = None) -> None:
+        """Authorizes initial genesis provisioning. Fails closed if unauthorized or already provisioned."""
+        pass
 
-    @classmethod
-    def is_provisioning_authorized(cls) -> bool:
-        """Returns True if the deployment is authorized for initial one-time genesis provisioning."""
-        with cls._class_lock:
-            # If deployment has already been provisioned, automatic genesis is prohibited (fails closed)
-            return not cls._is_provisioned
+    @abstractmethod
+    def record_provisioned(
+        self,
+        installation_id: str,
+        manifest_id: str,
+        manifest_version: int,
+        root_fingerprint: str,
+    ) -> None:
+        """Records that the initial genesis epoch has been durably committed."""
+        pass
 
-    @classmethod
-    def mark_provisioned(cls, installation_id: str) -> None:
-        """Marks the deployment provisioning token as permanently consumed."""
-        with cls._class_lock:
-            cls._is_provisioned = True
-            cls._consumed_installation_id = installation_id
+    @abstractmethod
+    def notify_local_state_loss(self) -> None:
+        """Notifies the external deployment authority of complete local-state loss,
+        transitioning deployment status to RECOVERY_REQUIRED.
+        """
+        pass
+
+    @abstractmethod
+    def authorize_reprovisioning(
+        self,
+        reprovisioning_authorization: Dict[str, Any],
+        root_public_key: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """Verifies and consumes an externally issued, root-signed reprovisioning authorization.
+        Enforces replay prevention, deployment matching, and signature authenticity externally.
+        """
+        pass
+
+    @abstractmethod
+    def record_reprovisioned(
+        self,
+        installation_id: str,
+        manifest_id: str,
+        manifest_version: int,
+        root_fingerprint: str,
+    ) -> None:
+        """Records that catastrophic recovery reprovisioning has completed."""
+        pass
+
+
+class FailClosedDeploymentProvisioner(TrustedDeploymentProvisioner):
+    """Default production provisioner. Fails closed on all genesis, reprovisioning,
+    and authority reset requests until an explicit trusted external deployment coordinator is attached.
+    """
+    def __init__(self, deployment_id: str = "PRODUCTION-UNCONFIGURED"):
+        self._deployment_id = deployment_id
+
+    def get_deployment_id(self) -> str:
+        return self._deployment_id
+
+    def get_deployment_status(self) -> DeploymentStatus:
+        return DeploymentStatus.UNPROVISIONED
+
+    def authorize_initial_provisioning(self, authorization_data: Optional[Dict[str, Any]] = None) -> None:
+        raise RuntimeError(
+            "FailClosedDeploymentProvisioner: No external trusted deployment authority configured. "
+            "Initial genesis provisioning is rejected."
+        )
+
+    def record_provisioned(self, installation_id: str, manifest_id: str, manifest_version: int, root_fingerprint: str) -> None:
+        raise RuntimeError("FailClosedDeploymentProvisioner: Cannot record provisioning on fail-closed authority.")
+
+    def notify_local_state_loss(self) -> None:
+        pass
+
+    def authorize_reprovisioning(self, reprovisioning_authorization: Dict[str, Any], root_public_key: Optional[Any] = None) -> Dict[str, Any]:
+        raise RuntimeError(
+            "FailClosedDeploymentProvisioner: No external trusted deployment authority configured. "
+            "Reprovisioning is rejected."
+        )
+
+    def record_reprovisioned(self, installation_id: str, manifest_id: str, manifest_version: int, root_fingerprint: str) -> None:
+        raise RuntimeError("FailClosedDeploymentProvisioner: Cannot record reprovisioning on fail-closed authority.")
+
+
+class InMemoryTestDeploymentProvisioner(TrustedDeploymentProvisioner):
+    """Test-only in-memory deployment provisioner with full external authority state machine.
+    Strictly prohibited outside TEST_MODE.
+    """
+    def __init__(
+        self,
+        deployment_id: str = "DEPLOYMENT-TEST-001",
+        initial_status: DeploymentStatus = DeploymentStatus.UNPROVISIONED,
+    ):
+        self._check_test_mode()
+        self._deployment_id = deployment_id
+        self._status = initial_status
+        self._consumed_auth_ids: Set[str] = set()
+        self._provisioned_records: list = []
+        self._lock = threading.RLock()
+
+    @staticmethod
+    def _check_test_mode() -> None:
+        if not _is_test_mode_active():
+            raise RuntimeError("InMemoryTestDeploymentProvisioner is strictly prohibited outside TEST_MODE.")
+
+    def get_deployment_id(self) -> str:
+        self._check_test_mode()
+        with self._lock:
+            return self._deployment_id
+
+    def get_deployment_status(self) -> DeploymentStatus:
+        self._check_test_mode()
+        with self._lock:
+            return self._status
+
+    def set_deployment_status(self, status: DeploymentStatus) -> None:
+        self._check_test_mode()
+        with self._lock:
+            self._status = status
+
+    def authorize_initial_provisioning(self, authorization_data: Optional[Dict[str, Any]] = None) -> None:
+        self._check_test_mode()
+        with self._lock:
+            if self._status == DeploymentStatus.PROVISIONED:
+                raise RuntimeError("Genesis bootstrap rejected: external deployment authority is already PROVISIONED. Authority reset prohibited.")
+            if self._status == DeploymentStatus.RECOVERY_REQUIRED:
+                raise RuntimeError(
+                    "Genesis bootstrap rejected: deployment is in RECOVERY_REQUIRED state after complete local-state loss. "
+                    "Explicit root-signed external administrative reprovisioning required."
+                )
+            self._status = DeploymentStatus.PROVISIONING_AUTHORIZED
+
+    def record_provisioned(self, installation_id: str, manifest_id: str, manifest_version: int, root_fingerprint: str) -> None:
+        self._check_test_mode()
+        with self._lock:
+            self._status = DeploymentStatus.PROVISIONED
+            self._provisioned_records.append({
+                "installation_id": installation_id,
+                "manifest_id": manifest_id,
+                "manifest_version": manifest_version,
+                "root_fingerprint": root_fingerprint,
+            })
+
+    def notify_local_state_loss(self) -> None:
+        self._check_test_mode()
+        with self._lock:
+            if self._status == DeploymentStatus.PROVISIONED:
+                self._status = DeploymentStatus.RECOVERY_REQUIRED
+
+    def authorize_reprovisioning(
+        self,
+        reprovisioning_authorization: Dict[str, Any],
+        root_public_key: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        self._check_test_mode()
+        import hashlib
+        from cryptography.exceptions import InvalidSignature
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+        from events.serializer import canonicalize_json
+        from policy.exceptions import InvalidManifestSignatureError, CorruptManifestError
+
+        if not isinstance(reprovisioning_authorization, dict):
+            raise CorruptManifestError("Reprovisioning authorization must be a dictionary.")
+
+        required_fields = [
+            "authorization_id",
+            "deployment_id",
+            "target_manifest_id",
+            "authorized_at",
+            "reason",
+            "root_fingerprint",
+            "is_administrative_reprovisioning",
+            "signature",
+        ]
+        for f in required_fields:
+            if f not in reprovisioning_authorization:
+                raise CorruptManifestError(f"Reprovisioning authorization missing required field '{f}'.")
+
+        if reprovisioning_authorization.get("is_administrative_reprovisioning") is not True:
+            raise CorruptManifestError("Invalid reprovisioning authorization flag.")
+
+        with self._lock:
+            auth_id = reprovisioning_authorization["authorization_id"]
+            if auth_id in self._consumed_auth_ids:
+                raise RuntimeError(f"External deployment authority: reprovisioning authorization '{auth_id}' has already been consumed (replay rejected).")
+
+            if reprovisioning_authorization["deployment_id"] != self._deployment_id:
+                raise CorruptManifestError(
+                    f"Reprovisioning authorization deployment mismatch: expected '{self._deployment_id}', got '{reprovisioning_authorization['deployment_id']}'."
+                )
+
+            if root_public_key is None:
+                from benchmark.parity.verify_gate_3_certificate import Gate3PublicKeystore
+                root_public_key = Gate3PublicKeystore.get_public_key()
+                if root_public_key is None:
+                    raise RuntimeError("Canonical Gate 3 Root Authority Public Key is not configured.")
+
+            if not isinstance(root_public_key, ed25519.Ed25519PublicKey):
+                raise TypeError("root_public_key must be an Ed25519PublicKey instance.")
+
+            expected_root_fp = hashlib.sha256(root_public_key.public_bytes_raw()).hexdigest()
+            if reprovisioning_authorization["root_fingerprint"] != expected_root_fp:
+                raise InvalidManifestSignatureError("Reprovisioning authorization root fingerprint mismatch.")
+
+            sig_block = reprovisioning_authorization.get("signature", {})
+            if sig_block.get("algorithm") != "ED25519" or sig_block.get("signer_identity") != "Gate3AuthoritativeVerifier":
+                raise InvalidManifestSignatureError("Invalid reprovisioning authorization signature metadata.")
+
+            sig_hex = sig_block.get("signature_hex", "")
+            if len(sig_hex) != 128:
+                raise InvalidManifestSignatureError("Invalid reprovisioning authorization signature length.")
+
+            preimage_dict = {
+                "authorization_id": reprovisioning_authorization["authorization_id"],
+                "deployment_id": reprovisioning_authorization["deployment_id"],
+                "target_manifest_id": reprovisioning_authorization["target_manifest_id"],
+                "authorized_at": reprovisioning_authorization["authorized_at"],
+                "reason": reprovisioning_authorization["reason"],
+                "root_fingerprint": reprovisioning_authorization["root_fingerprint"],
+                "is_administrative_reprovisioning": reprovisioning_authorization["is_administrative_reprovisioning"],
+            }
+            preimage_bytes = canonicalize_json(preimage_dict)
+            calc_digest = hashlib.sha256(preimage_bytes).hexdigest()
+            if sig_block.get("payload_digest") != calc_digest:
+                raise InvalidManifestSignatureError("Reprovisioning authorization payload digest mismatch.")
+
+            try:
+                root_public_key.verify(bytes.fromhex(sig_hex), preimage_bytes)
+            except InvalidSignature:
+                raise InvalidManifestSignatureError("Reprovisioning authorization Ed25519 signature verification failed.")
+
+            self._consumed_auth_ids.add(auth_id)
+            return reprovisioning_authorization
+
+    def record_reprovisioned(self, installation_id: str, manifest_id: str, manifest_version: int, root_fingerprint: str) -> None:
+        self._check_test_mode()
+        with self._lock:
+            self._status = DeploymentStatus.PROVISIONED
+            self._provisioned_records.append({
+                "installation_id": installation_id,
+                "manifest_id": manifest_id,
+                "manifest_version": manifest_version,
+                "root_fingerprint": root_fingerprint,
+                "reprovisioned": True,
+            })
 
     @classmethod
     def create_reprovisioning_authorization(
         cls,
+        deployment_id: str,
         target_manifest_id: str,
         root_private_key: Any,
         reason: str = "CATASTROPHIC_RECOVERY",
     ) -> Dict[str, Any]:
-        """Creates an explicit, root-signed administrative reprovisioning authorization."""
+        """Helper to generate a root-signed DeploymentReprovisioningAuthorization."""
+        cls._check_test_mode()
         import uuid
         import hashlib
         from datetime import datetime, timezone
@@ -1055,7 +1298,6 @@ class DeploymentProvisioningBoundary:
 
         auth_id = f"REPROV-{uuid.uuid4().hex[:16]}"
         authorized_at = datetime.now(timezone.utc).isoformat()
-        deployment_id = cls.get_deployment_id()
         root_fp = hashlib.sha256(root_private_key.public_key().public_bytes_raw()).hexdigest()
 
         preimage_dict = {
@@ -1082,103 +1324,34 @@ class DeploymentProvisioningBoundary:
         }
         return auth_record
 
-    @classmethod
-    def verify_and_consume_reprovisioning_authorization(
-        cls,
-        auth_data: Dict[str, Any],
-        root_public_key: Optional[Any] = None,
-    ) -> Dict[str, Any]:
-        """Verifies and consumes a root-signed administrative reprovisioning authorization."""
-        import hashlib
-        from cryptography.exceptions import InvalidSignature
-        from cryptography.hazmat.primitives.asymmetric import ed25519
-        from events.serializer import canonicalize_json
-        from policy.exceptions import InvalidManifestSignatureError, CorruptManifestError
 
-        if not isinstance(auth_data, dict):
-            raise CorruptManifestError("Reprovisioning authorization must be a dictionary.")
-
-        required_fields = [
-            "authorization_id",
-            "deployment_id",
-            "target_manifest_id",
-            "authorized_at",
-            "reason",
-            "root_fingerprint",
-            "is_administrative_reprovisioning",
-            "signature",
-        ]
-        for f in required_fields:
-            if f not in auth_data:
-                raise CorruptManifestError(f"Reprovisioning authorization missing required field '{f}'.")
-
-        if auth_data.get("is_administrative_reprovisioning") is not True:
-            raise CorruptManifestError("Invalid reprovisioning authorization flag.")
-
-        with cls._class_lock:
-            auth_id = auth_data["authorization_id"]
-            if auth_id in cls._consumed_reprovisioning_tokens:
-                raise RuntimeError(f"Reprovisioning authorization '{auth_id}' has already been consumed.")
-
-            dep_id = cls.get_deployment_id()
-            if auth_data["deployment_id"] != dep_id:
-                raise CorruptManifestError(
-                    f"Reprovisioning authorization deployment mismatch: expected '{dep_id}', got '{auth_data['deployment_id']}'."
-                )
-
-            if root_public_key is None:
-                from benchmark.parity.verify_gate_3_certificate import Gate3PublicKeystore
-                root_public_key = Gate3PublicKeystore.get_public_key()
-                if root_public_key is None:
-                    raise RuntimeError("Canonical Gate 3 Root Authority Public Key is not configured.")
-
-            if not isinstance(root_public_key, ed25519.Ed25519PublicKey):
-                raise TypeError("root_public_key must be an Ed25519PublicKey instance.")
-
-            expected_root_fp = hashlib.sha256(root_public_key.public_bytes_raw()).hexdigest()
-            if auth_data["root_fingerprint"] != expected_root_fp:
-                raise InvalidManifestSignatureError("Reprovisioning authorization root fingerprint mismatch.")
-
-            sig_block = auth_data.get("signature", {})
-            if sig_block.get("algorithm") != "ED25519" or sig_block.get("signer_identity") != "Gate3AuthoritativeVerifier":
-                raise InvalidManifestSignatureError("Invalid reprovisioning authorization signature metadata.")
-
-            sig_hex = sig_block.get("signature_hex", "")
-            if len(sig_hex) != 128:
-                raise InvalidManifestSignatureError("Invalid reprovisioning authorization signature length.")
-
-            preimage_dict = {
-                "authorization_id": auth_data["authorization_id"],
-                "deployment_id": auth_data["deployment_id"],
-                "target_manifest_id": auth_data["target_manifest_id"],
-                "authorized_at": auth_data["authorized_at"],
-                "reason": auth_data["reason"],
-                "root_fingerprint": auth_data["root_fingerprint"],
-                "is_administrative_reprovisioning": auth_data["is_administrative_reprovisioning"],
-            }
-            preimage_bytes = canonicalize_json(preimage_dict)
-            calc_digest = hashlib.sha256(preimage_bytes).hexdigest()
-            if sig_block.get("payload_digest") != calc_digest:
-                raise InvalidManifestSignatureError("Reprovisioning authorization payload digest mismatch.")
-
-            try:
-                root_public_key.verify(bytes.fromhex(sig_hex), preimage_bytes)
-            except InvalidSignature:
-                raise InvalidManifestSignatureError("Reprovisioning authorization Ed25519 signature verification failed.")
-
-            cls._consumed_reprovisioning_tokens.add(auth_id)
-            cls._is_provisioned = False  # Allows one-time re-provisioning
-            return auth_data
+class DeploymentProvisionerRegistry:
+    """Global registry for the external TrustedDeploymentProvisioner."""
+    _active_provisioner: Optional[TrustedDeploymentProvisioner] = None
+    _lock = threading.RLock()
 
     @classmethod
-    def clear_for_testing(cls) -> None:
-        """Controlled teardown strictly for test fixtures."""
-        if os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1" and os.environ.get("PYTEST_CURRENT_TEST") is None:
-            raise RuntimeError("Deployment boundary teardown prohibited outside active test fixture harness.")
-        with cls._class_lock:
-            cls._deployment_id = "DEPLOYMENT-DEFAULT"
-            cls._is_provisioned = False
-            cls._consumed_installation_id = None
-            cls._consumed_reprovisioning_tokens.clear()
+    def get_provisioner(cls) -> TrustedDeploymentProvisioner:
+        with cls._lock:
+            if cls._active_provisioner is None:
+                if _is_test_mode_active():
+                    cls._active_provisioner = InMemoryTestDeploymentProvisioner()
+                else:
+                    cls._active_provisioner = FailClosedDeploymentProvisioner()
+            return cls._active_provisioner
+
+    @classmethod
+    def set_provisioner(cls, provisioner: TrustedDeploymentProvisioner) -> None:
+        with cls._lock:
+            if not isinstance(provisioner, TrustedDeploymentProvisioner):
+                raise TypeError("Provisioner must implement TrustedDeploymentProvisioner.")
+            cls._active_provisioner = provisioner
+
+    @classmethod
+    def reset_for_testing(cls) -> None:
+        if not _is_test_mode_active():
+            raise RuntimeError("reset_for_testing is strictly prohibited outside TEST_MODE.")
+        with cls._lock:
+            cls._active_provisioner = None
 
 
