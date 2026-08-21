@@ -470,7 +470,12 @@ class ReadOnlyRepositoryAccessor:
     def _validate_path(self, relative_path: str) -> str:
         if relative_path is None or not isinstance(relative_path, str):
             raise PermissionError("Invalid path specified.")
-        
+
+        # Fail-closed cross-platform check: prevent drive prefix or UNC prefix from resolving within repo on POSIX
+        if re.match(r"^[A-Za-z]:", relative_path) or relative_path.startswith(("\\\\", "//")):
+            if os.name != "nt":
+                raise PermissionError(f"Path containment violation: drive or network path '{relative_path}'")
+
         if not relative_path:
             candidate_path = self._repo_root
         elif os.path.isabs(relative_path):

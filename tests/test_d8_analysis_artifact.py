@@ -500,4 +500,5 @@ def test_analysis_artifact_validation_bounds():
             task_id="T",
             repository_id="R",
             source_sha="0" * 40,
+            input_state_digest="0" * 64,
         )
