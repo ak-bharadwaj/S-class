@@ -40,6 +40,21 @@ class ProposalEmitter:
                 continue
 
             node = nodes_by_id[node_id]
+
+            # Enforce cryptographic action digest integrity against execution strategy
+            from controller.token import compute_action_digest
+            expected_digest = compute_action_digest(
+                action_type=node.action_type,
+                target=node.target,
+                purpose=node.purpose,
+                parameters=node.parameters,
+            )
+            if node.node_digest != expected_digest:
+                raise ValueError(
+                    f"Strategy node '{node.node_id}' action digest tampering detected: "
+                    f"'{node.node_digest}' != expected '{expected_digest}'"
+                )
+
             # Check prerequisites
             if all(prereq in completed_set for prereq in node.prerequisites):
                 proposal_id = f"PROP-{node.node_id}-{uuid.uuid4().hex[:6]}"

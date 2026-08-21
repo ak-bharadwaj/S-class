@@ -8,7 +8,9 @@ from __future__ import annotations
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from domain.models import Obligation, Policy
-from domain.types import Criticality, ObligationStatus
+from domain.types import Criticality, ObligationCategory, ObligationStatus
+from policy.evaluator import evaluate_policy
+from policy.models import PolicyEvaluationContext, PolicyDecisionType, PolicyDecision
 from planner.dependency import DependencyPlanner
 from planner.models import (
     ExecutionStrategyArtifact,
@@ -87,6 +89,55 @@ class HardConstraintGate:
                 f"Total strategy cost ${total_cost:.2f} exceeds remaining budget ${budget_remaining:.2f}."
             )
 
+        # 4. Structural Node and Reference Integrity (PlanCritic Criteria)
+        node_ids = tuple(n.node_id for n in strategy.nodes)
+        node_set = set(node_ids)
+        if len(node_set) != len(node_ids):
+            violations.append("Candidate plan contains duplicate node identifiers.")
+
+        for src, dst in strategy.dependency_edges:
+            if src not in node_set or dst not in node_set:
+                violations.append(f"Dependency edge references non-existent node: ({src}->{dst}).")
+
+        # 5. Target State Binding Verification
+        if hasattr(state_view.content, "state_digest") and state_view.content.state_digest:
+            if not isinstance(state_view.content.state_digest, str) or len(state_view.content.state_digest) < 32:
+                violations.append("Invalid or corrupted state_digest in context.")
+
+        # 6. D3 Policy Evaluation Delegation (Pure D3 Consumer, Zero Policy Rule Inspection)
+        for policy in getattr(state_view.content, "active_policies", ()):
+            if isinstance(policy, Policy):
+                for node in strategy.nodes:
+                    matching_obls = [
+                        o for o in state_view.content.obligations if o.get("obligation_id") == node.obligation_id
+                    ]
+                    if matching_obls:
+                        obl_dict = matching_obls[0]
+                        obl_inst = Obligation(
+                            obligation_id=obl_dict["obligation_id"],
+                            task_id=state_view.content.task_id,
+                            category=ObligationCategory(obl_dict.get("category", ObligationCategory.CORRECTNESS_FUNCTIONAL.value)),
+                            criticality=Criticality(obl_dict.get("criticality", Criticality.HIGH.value)),
+                            status=ObligationStatus(obl_dict.get("status", ObligationStatus.OPEN.value)),
+                            title=obl_dict.get("title", "Governed Obligation"),
+                            description=obl_dict.get("description", "Governed Obligation"),
+                        )
+                        eval_context = PolicyEvaluationContext(
+                            obligation=obl_inst,
+                            claims=(),
+                            evidence=(),
+                        )
+                        decision = evaluate_policy(policy, eval_context)
+                        if decision.decision == PolicyDecisionType.DENY:
+                            violations.append(
+                                f"D3 Policy '{policy.policy_id}' DENIED action for obligation '{node.obligation_id}': {decision.rationale}"
+                            )
+
+        # 7. Non-Compensating Risk Evaluation Gate
+        risk = PlanEvaluator.assess_risk(strategy, state_view)
+        if not risk.is_acceptable:
+            violations.extend(risk.rejection_reasons)
+
         return (len(violations) == 0, tuple(violations))
 
 
@@ -98,13 +149,19 @@ class PlanEvaluator:
         strategy: ExecutionStrategyArtifact,
         state_view: PlannerStateView,
     ) -> PlannerRiskAssessment:
-        """Computes formal multidimensional risk bounds."""
+        """Computes formal multidimensional risk bounds incorporating analytical artifact implications."""
         security_risk = 0.0
         irreversible_risk = 0.0
         policy_violation_risk = 0.0
         dependency_violation_risk = 0.0
         unverified_claim_risk = 0.0
         rejections: List[str] = []
+
+        # Factor in analytical implications from RiskRegressionAnalyst
+        for artifact in getattr(state_view.content, "analysis_artifacts", ()):
+            for imp in getattr(artifact, "implications", ()):
+                if getattr(imp, "risk_level", "LOW") in ("HIGH", "CRITICAL"):
+                    security_risk += 0.25
 
         # Calculate blast radius based on proportion of codebase files targeted
         unique_targets = {node.target for node in strategy.nodes}
@@ -119,16 +176,16 @@ class PlanEvaluator:
             if node.action_type in IRREVERSIBLE_ACTION_TYPES:
                 irreversible_risk = 1.0
                 rejections.append(
-                    f"Irreversible action '{node.action_type}' requires signed PolicyException (§3.5)."
+                    f"Irreversible action '{node.action_type}' prohibited by governance policy (§3.5)."
                 )
 
-            # Check if targeting critical obligation with unverified claims
+            # Check critical obligation unverified claims
             for obl in state_view.content.obligations:
                 if obl["obligation_id"] == node.obligation_id:
                     if obl.get("criticality") == Criticality.CRITICAL.value:
                         for clm_id in obl.get("claim_ids", []):
                             for clm in state_view.content.claims:
-                                if clm["claim_id"] == clm_id and clm.get("status") != "SUPPORTED":
+                                if clm["claim_id"] == clm_id and clm.get("status") not in ("SUPPORTED", "VERIFIED_TRUE"):
                                     unverified_claim_risk = max(unverified_claim_risk, 0.8)
                                     rejections.append(
                                         f"Critical claim '{clm_id}' for obligation '{node.obligation_id}' is unverified (§4.2)."

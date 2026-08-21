@@ -149,6 +149,8 @@ class PlannerStateContent:
     blocked_frontier: Tuple[str, ...] = field(default_factory=tuple)
     evidence_digests: Tuple[str, ...] = field(default_factory=tuple)
     active_policies: Tuple[Mapping[str, Any], ...] = field(default_factory=tuple)
+    analysis_digests: Tuple[str, ...] = field(default_factory=tuple)
+    analysis_artifacts: Tuple[Any, ...] = field(default_factory=tuple)
     state_version: int = 0
     state_digest: str = ""
 
@@ -166,6 +168,8 @@ class PlannerStateContent:
         object.__setattr__(self, "blocked_frontier", tuple(self.blocked_frontier))
         object.__setattr__(self, "evidence_digests", tuple(self.evidence_digests))
         object.__setattr__(self, "active_policies", _freeze_nested(self.active_policies))
+        object.__setattr__(self, "analysis_digests", tuple(self.analysis_digests))
+        object.__setattr__(self, "analysis_artifacts", tuple(self.analysis_artifacts))
 
 
 @dataclass(frozen=True)

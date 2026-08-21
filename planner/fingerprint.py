@@ -99,6 +99,19 @@ def compute_execution_strategy_fingerprint(strategy: ExecutionStrategyArtifact) 
 
 def compute_planner_state_digest(content: PlannerStateContent) -> str:
     """Computes pure semantic state digest, strictly invariant to telemetry/metadata."""
+    normalized_policies = []
+    for pol in getattr(content, "active_policies", ()):
+        if hasattr(pol, "policy_id"):
+            normalized_policies.append({
+                "policy_id": pol.policy_id,
+                "scope_level": pol.scope_level.value if hasattr(pol.scope_level, "value") else str(pol.scope_level),
+                "version": getattr(pol, "version", 1),
+            })
+        elif isinstance(pol, dict):
+            normalized_policies.append(dict(pol))
+        else:
+            normalized_policies.append({"policy_id": str(pol)})
+
     payload = {
         "task_id": content.task_id,
         "milestones": list(content.milestones),
@@ -107,7 +120,8 @@ def compute_planner_state_digest(content: PlannerStateContent) -> str:
         "executable_frontier": sorted(list(content.executable_frontier)),
         "blocked_frontier": sorted(list(content.blocked_frontier)),
         "evidence_digests": sorted(list(content.evidence_digests)),
-        "active_policies": list(content.active_policies),
+        "active_policies": normalized_policies,
+        "analysis_digests": sorted(list(getattr(content, "analysis_digests", ()))),
         "state_version": content.state_version,
         "state_digest": content.state_digest,
     }
