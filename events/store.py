@@ -6,10 +6,11 @@ Provides:
   strict fail-closed historical corruption rejection, and safe torn final write recovery at EOF.
 """
 
+from __future__ import annotations
 import json
 import os
 import threading
-from typing import List, Optional, Tuple, Set
+from typing import Any, Dict, List, Optional, Tuple, Set
 
 from domain.models import EventEnvelope
 from domain.types import EventType
