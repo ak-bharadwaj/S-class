@@ -29,6 +29,7 @@ D22: Strategy mutation after fingerprinting rejected
 import copy
 import hashlib
 import time
+import uuid
 import pytest
 from datetime import datetime, timezone
 from typing import Mapping, Sequence
@@ -67,7 +68,7 @@ from domain.types import (
 )
 from events.state import MaterializedState
 from events.store import D2NonceStore
-from benchmark.parity.gate_3_authority import Gate3AuthorityKeyStore, Gate3AuthoritySigner
+from benchmark.parity.gate_3_authority import Gate3AuthorityKeyStore, Gate3AuthoritySigner, Gate3ProviderKeyStore
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from policy.models import (
@@ -136,11 +137,18 @@ from planner.session import (
 )
 
 
+from benchmark.parity.verify_gate_3_certificate import Gate3PublicKeystore
+
+
 @pytest.fixture(autouse=True)
 def setup_authority_keys():
     Gate3AuthorityKeyStore.clear()
+    Gate3PublicKeystore.clear()
     priv = ed25519.Ed25519PrivateKey.generate()
     Gate3AuthorityKeyStore.set_private_key(priv)
+    Gate3PublicKeystore.set_public_key(priv.public_key())
+    Gate3ProviderKeyStore.clear()
+    Gate3ProviderKeyStore.register_provider_key("K1", b"0" * 32)
 
 
 @pytest.fixture
@@ -1110,3 +1118,356 @@ def test_d8_d22_strategy_mutation_after_fingerprinting_rejected(mock_context):
             state_version=1,
             state_digest="0" * 64,
         )
+
+
+# ============================================================================
+# D23-D25: Proposal-Time State Freshness Gates
+# ============================================================================
+
+from planner.session import StaleStateError
+
+
+def test_d8_d23_state_mutation_after_plan_proposal_rejected(mock_context, sample_obligation, tmp_path):
+    """D23: State version mutation after plan causes next_proposal to reject with StaleStateError."""
+    lease_manager = PlanningLeaseManager(lease_dir=str(tmp_path / ".leases"))
+    session = PlannerSession(task_id="TASK-PHASE-D-01", owner_id="OWNER-1", lease_manager=lease_manager)
+
+    with session:
+        sv_v1 = StateProjector.project(
+            task_id="TASK-PHASE-D-01",
+            obligations={"OBL-001": sample_obligation},
+            claims={},
+            executable_frontier=("OBL-001",),
+            state_version=1,
+            state_digest="1" * 64,
+        )
+        session.plan(sv_v1, mock_context)
+
+        # Mutated state view (version advanced from 1 to 2)
+        sv_v2 = StateProjector.project(
+            task_id="TASK-PHASE-D-01",
+            obligations={"OBL-001": sample_obligation},
+            claims={},
+            executable_frontier=("OBL-001",),
+            state_version=2,
+            state_digest="2" * 64,
+        )
+
+        with pytest.raises(StaleStateError, match="State version mutation detected"):
+            session.next_proposal(current_state_view=sv_v2)
+
+
+def test_d8_d24_stale_planner_state_digest_proposal_rejected(mock_context, sample_obligation, tmp_path):
+    """D24: Stale planner_state_digest causes next_proposal to reject with StaleStateError."""
+    lease_manager = PlanningLeaseManager(lease_dir=str(tmp_path / ".leases"))
+    session = PlannerSession(task_id="TASK-PHASE-D-01", owner_id="OWNER-1", lease_manager=lease_manager)
+
+    with session:
+        sv_base = StateProjector.project(
+            task_id="TASK-PHASE-D-01",
+            obligations={"OBL-001": sample_obligation},
+            claims={},
+            executable_frontier=("OBL-001",),
+            state_version=1,
+            state_digest="1" * 64,
+        )
+        session.plan(sv_base, mock_context)
+
+        # Mutated domain state with same version/digest but different claims
+        sv_mutated_claims = StateProjector.project(
+            task_id="TASK-PHASE-D-01",
+            obligations={"OBL-001": sample_obligation},
+            claims={"CLM-NEW": {"claim_id": "CLM-NEW", "tier": "V1_STRUCTURAL", "predicate": "P", "status": "SUPPORTED"}},
+            executable_frontier=("OBL-001",),
+            state_version=1,
+            state_digest="1" * 64,
+        )
+
+        with pytest.raises(StaleStateError, match="Planner state digest mutation detected"):
+            session.next_proposal(current_state_view=sv_mutated_claims)
+
+
+def test_d8_d25_stale_repository_source_state_proposal_rejected(mock_context, sample_obligation, tmp_path):
+    """D25: State authority mismatch causes next_proposal to reject with StaleStateError."""
+    lease_manager = PlanningLeaseManager(lease_dir=str(tmp_path / ".leases"))
+    state_authority = StaticStateAuthority(state_version=2, state_digest="2" * 64)
+
+    session = PlannerSession(
+        task_id="TASK-PHASE-D-01",
+        owner_id="OWNER-1",
+        lease_manager=lease_manager,
+        state_authority=state_authority,
+    )
+
+    with session:
+        # Plan was created against version 1
+        sv_v1 = StateProjector.project(
+            task_id="TASK-PHASE-D-01",
+            obligations={"OBL-001": sample_obligation},
+            claims={},
+            executable_frontier=("OBL-001",),
+            state_version=1,
+            state_digest="1" * 64,
+        )
+        session.plan(sv_v1, mock_context)
+
+        # Authority is at version 2 -> proposal rejected
+        with pytest.raises(StaleStateError, match="Authoritative state mismatch"):
+            session.next_proposal()
+
+
+# ============================================================================
+# D26-D28: Evidence-Dependent D3 Policies & Code Coverage
+# ============================================================================
+
+from domain.models import Evidence, EvidenceObservation, EvidenceScope, Provenance, HmacSessionSignature
+from domain.types import EvidencePolarity, EvidenceValidity, RawStatus
+from benchmark.parity.gate_3_authority import issue_gate_3_evidence_certificate, sign_provider_evidence
+
+
+def make_sample_evidence(ev_id: str, cap: str = "TEST_EXECUTION", source_sha: str = "0" * 40, cov_pct: float = 95.0) -> Evidence:
+    obs = EvidenceObservation(
+        raw_status=RawStatus.PASS,
+        diagnostics=(),
+        counterexample={"coverage_pct": cov_pct},
+    )
+    prov = Provenance(
+        engine_name="pytest",
+        engine_version="9.0.3",
+        environment_hash="0" * 64,
+        timestamp="2026-08-21T12:00:00Z",
+    )
+    scope = EvidenceScope(
+        targets_evaluated=("src/core.py",),
+        aspects_covered=("FUNCTIONAL_CORRECTNESS",),
+    )
+    sig = sign_provider_evidence(
+        evidence_id=ev_id,
+        claim_id="CLM-001",
+        provider_id="PROVIDER-TEST",
+        capability=cap,
+        execution_id="EXEC-001",
+        source_sha=source_sha,
+        scope=scope,
+        observation=obs,
+        provenance=prov,
+        key_id="K1",
+        nonce=uuid.uuid4().hex,
+    )
+    ev = Evidence(
+        evidence_id=ev_id,
+        claim_id="CLM-001",
+        provider_id="PROVIDER-TEST",
+        capability=cap,
+        execution_id="EXEC-001",
+        source_sha=source_sha,
+        scope=scope,
+        observation=obs,
+        polarity=EvidencePolarity.SUPPORTS,
+        validity=EvidenceValidity.VALID,
+        independence_group="GROUP-1",
+        provenance=prov,
+        signature=sig,
+    )
+    cert = issue_gate_3_evidence_certificate(ev, source_sha)
+    object.__setattr__(ev, "trust_certificate", cert)
+    return ev
+
+
+def test_d8_d26_evidence_dependent_policy_with_supplied_evidence_passes(mock_context):
+    """D26: Evidence-dependent D3 policy passes when valid supporting evidence is supplied."""
+    obl = Obligation(
+        obligation_id="OBL-001",
+        task_id="TASK-PHASE-D-01",
+        category=ObligationCategory.CORRECTNESS_FUNCTIONAL,
+        criticality=Criticality.HIGH,
+        status=ObligationStatus.OPEN,
+        title="Obligation 1",
+        description="Obligation 1",
+        policy_id="POL-REQ-CAP",
+    )
+
+    policy = Policy(
+        policy_id="POL-REQ-CAP",
+        scope_level=PolicyScope.TASK,
+        version=1,
+        expression=PolicyExpression(
+            combinator=CombinatorType.ALL,
+            rules=(
+                PolicyRule(
+                    rule_type=RuleType.REQUIRE_CAPABILITY,
+                    parameters={"capability": "TEST_EXECUTION"},
+                ),
+            ),
+        ),
+    )
+
+    ev = make_sample_evidence("EV-001", cap="TEST_EXECUTION")
+    state_view = StateProjector.project(
+        task_id="TASK-PHASE-D-01",
+        obligations={"OBL-001": obl},
+        claims={},
+        executable_frontier=("OBL-001",),
+        evidence_items=(ev,),
+        active_policies=(policy,),
+        state_version=1,
+        state_digest="0" * 64,
+    )
+
+    node = PlanNode(
+        node_id="N1",
+        obligation_id="OBL-001",
+        action_type="EXECUTE_TEST",
+        target="tests/test_x.py",
+        purpose="Test",
+        execution_context=mock_context,
+    )
+    strategy = ExecutionStrategyArtifact(
+        strategy_id="STRAT-EV-PASS",
+        plan_id="PLAN-01",
+        plan_revision=1,
+        nodes=(node,),
+        dependency_edges=(),
+    )
+
+    is_valid, violations = HardConstraintGate.evaluate(strategy, state_view)
+    assert is_valid, f"Violations: {violations}"
+
+
+def test_d8_d27_evidence_dependent_policy_without_evidence_fails_closed(mock_context):
+    """D27: Evidence-dependent D3 policy fails closed (DENY) when no evidence is available."""
+    obl = Obligation(
+        obligation_id="OBL-001",
+        task_id="TASK-PHASE-D-01",
+        category=ObligationCategory.CORRECTNESS_FUNCTIONAL,
+        criticality=Criticality.HIGH,
+        status=ObligationStatus.OPEN,
+        title="Obligation 1",
+        description="Obligation 1",
+        policy_id="POL-REQ-CAP",
+    )
+
+    policy = Policy(
+        policy_id="POL-REQ-CAP",
+        scope_level=PolicyScope.TASK,
+        version=1,
+        expression=PolicyExpression(
+            combinator=CombinatorType.ALL,
+            rules=(
+                PolicyRule(
+                    rule_type=RuleType.REQUIRE_CAPABILITY,
+                    parameters={"capability": "TEST_EXECUTION"},
+                ),
+            ),
+        ),
+    )
+
+    # Empty evidence items -> fail closed!
+    state_view = StateProjector.project(
+        task_id="TASK-PHASE-D-01",
+        obligations={"OBL-001": obl},
+        claims={},
+        executable_frontier=("OBL-001",),
+        evidence_items=(),  # EMPTY
+        active_policies=(policy,),
+        state_version=1,
+        state_digest="0" * 64,
+    )
+
+    node = PlanNode(
+        node_id="N1",
+        obligation_id="OBL-001",
+        action_type="EXECUTE_TEST",
+        target="tests/test_x.py",
+        purpose="Test",
+        execution_context=mock_context,
+    )
+    strategy = ExecutionStrategyArtifact(
+        strategy_id="STRAT-EV-FAIL",
+        plan_id="PLAN-01",
+        plan_revision=1,
+        nodes=(node,),
+        dependency_edges=(),
+    )
+
+    is_valid, violations = HardConstraintGate.evaluate(strategy, state_view)
+    assert not is_valid
+    assert any("DENIED action for obligation 'OBL-001'" in v for v in violations)
+
+
+def test_d8_d28_require_code_coverage_uses_authoritative_evidence_context(mock_context):
+    """D28: REQUIRE_CODE_COVERAGE evaluates structured metrics from authoritative evidence."""
+    obl = Obligation(
+        obligation_id="OBL-001",
+        task_id="TASK-PHASE-D-01",
+        category=ObligationCategory.CORRECTNESS_FUNCTIONAL,
+        criticality=Criticality.HIGH,
+        status=ObligationStatus.OPEN,
+        title="Obligation 1",
+        description="Obligation 1",
+        policy_id="POL-COV",
+    )
+
+    policy = Policy(
+        policy_id="POL-COV",
+        scope_level=PolicyScope.TASK,
+        version=1,
+        expression=PolicyExpression(
+            combinator=CombinatorType.ALL,
+            rules=(
+                PolicyRule(
+                    rule_type=RuleType.REQUIRE_CODE_COVERAGE,
+                    parameters={"min_coverage_pct": 80.0},
+                ),
+            ),
+        ),
+    )
+
+    # Case A: 95% coverage -> passes
+    ev_pass = make_sample_evidence("EV-001", cap="TEST_EXECUTION", cov_pct=95.0)
+    sv_pass = StateProjector.project(
+        task_id="TASK-PHASE-D-01",
+        obligations={"OBL-001": obl},
+        claims={},
+        executable_frontier=("OBL-001",),
+        evidence_items=(ev_pass,),
+        active_policies=(policy,),
+        state_version=1,
+        state_digest="0" * 64,
+    )
+
+    node = PlanNode(
+        node_id="N1",
+        obligation_id="OBL-001",
+        action_type="EXECUTE_TEST",
+        target="tests/test_x.py",
+        purpose="Test",
+        execution_context=mock_context,
+    )
+    strategy = ExecutionStrategyArtifact(
+        strategy_id="STRAT-COV",
+        plan_id="PLAN-01",
+        plan_revision=1,
+        nodes=(node,),
+        dependency_edges=(),
+    )
+
+    is_valid, violations = HardConstraintGate.evaluate(strategy, sv_pass)
+    assert is_valid, f"Violations: {violations}"
+
+    # Case B: 50% coverage -> fails
+    ev_fail = make_sample_evidence("EV-002", cap="TEST_EXECUTION", cov_pct=50.0)
+    sv_fail = StateProjector.project(
+        task_id="TASK-PHASE-D-01",
+        obligations={"OBL-001": obl},
+        claims={},
+        executable_frontier=("OBL-001",),
+        evidence_items=(ev_fail,),
+        active_policies=(policy,),
+        state_version=1,
+        state_digest="0" * 64,
+    )
+
+    is_valid_fail, violations = HardConstraintGate.evaluate(strategy, sv_fail)
+    assert not is_valid_fail
+    assert any("DENIED action for obligation 'OBL-001'" in v for v in violations)

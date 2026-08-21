@@ -249,8 +249,13 @@ class OSIPCClient:
                     raise ConnectionError(f"Failed to connect to authority broker at '{self.endpoint_path}': {e}")
 
             if self.auth_secret is not None:
-                self._sock.sendall(encode_frame({"auth_secret": self.auth_secret}))
-                resp = decode_frame(self._sock)
+                try:
+                    self._sock.sendall(encode_frame({"auth_secret": self.auth_secret}))
+                    resp = decode_frame(self._sock)
+                except (ConnectionResetError, BrokenPipeError, ConnectionError, EOFError) as e:
+                    self._sock.close()
+                    self._sock = None
+                    raise PermissionError(f"IPC connection rejected by authority broker (peer credential / transport rejected): {e}")
                 if resp.get("status") != "AUTH_OK":
                     self._sock.close()
                     self._sock = None

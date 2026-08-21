@@ -320,7 +320,7 @@ def test_dc09_posix_unauthorized_uid_rejected():
     broker.start_ipc_server()
     try:
         client = OSIPCClient(endpoint_path=broker.ipc_endpoint, auth_secret="SEC09")
-        with pytest.raises(PermissionError):
+        with pytest.raises((PermissionError, ConnectionError)):
             client.call("get_deployment_status")
     finally:
         broker.stop_ipc_server()

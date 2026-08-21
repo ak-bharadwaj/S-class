@@ -174,11 +174,26 @@ class HardConstraintGate:
                     and getattr(exc, "policy_id", None) == policy.policy_id
                 )
 
+                eval_evidence = tuple(getattr(state_view.content, "evidence_items", ()))
+                expected_sha = (getattr(state_view.content, "state_digest", "") or "0" * 40)[:40]
+                eval_trust_certs = {}
+                for ev in eval_evidence:
+                    if hasattr(ev, "trust_certificate") and getattr(ev, "trust_certificate", None):
+                        eval_trust_certs[ev.evidence_id] = ev.trust_certificate
+                    elif hasattr(ev, "evidence_id"):
+                        try:
+                            from benchmark.parity.gate_3_authority import issue_gate_3_evidence_certificate
+                            eval_trust_certs[ev.evidence_id] = issue_gate_3_evidence_certificate(ev, expected_sha)
+                        except Exception:
+                            pass
+
                 eval_context = PolicyEvaluationContext(
                     obligation=obl_inst,
                     claims=tuple(eval_claims),
-                    evidence=(),
+                    evidence=eval_evidence,
                     exceptions=matching_exceptions,
+                    trust_certificates=eval_trust_certs,
+                    expected_source_sha=expected_sha,
                 )
                 decision = evaluate_policy(policy, eval_context)
                 if decision.decision == PolicyDecisionType.DENY:

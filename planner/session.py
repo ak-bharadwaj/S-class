@@ -34,6 +34,11 @@ class NoAdmissiblePlanError(RuntimeError):
     pass
 
 
+class StaleStateError(RuntimeError):
+    """Raised when authoritative state has mutated since the active plan was synthesized."""
+    pass
+
+
 class PlannerSession:
     """Orchestrates an active planning session for a governed task."""
 
@@ -44,6 +49,7 @@ class PlannerSession:
         lease_manager: PlanningLeaseManager,
         generator: Optional[CandidateGenerator] = None,
         convergence_monitor: Optional[ConvergenceMonitor] = None,
+        state_authority: Optional[Any] = None,
         ttl_seconds: float = 60.0,
     ):
         self.task_id = task_id
@@ -51,6 +57,7 @@ class PlannerSession:
         self._lease_manager = lease_manager
         self._generator = generator or CandidateGenerator()
         self._convergence = convergence_monitor or ConvergenceMonitor()
+        self._state_authority = state_authority
         self._ttl_seconds = ttl_seconds
         self._active_lease: Optional[PlanningLease] = None
         self._active_envelope: Optional[PlanRuntimeEnvelope] = None
@@ -259,6 +266,7 @@ class PlannerSession:
         self,
         envelope: Optional[PlanRuntimeEnvelope] = None,
         completed_nodes: Sequence[str] = (),
+        current_state_view: Optional[PlannerStateView] = None,
     ) -> Optional[ActionProposal]:
         """Emits the next executable ActionProposal bound to the active lease."""
         env = envelope or self._active_envelope
@@ -266,6 +274,40 @@ class PlannerSession:
             raise RuntimeError("No active plan envelope available.")
         if not self._active_lease or not self._lease_manager.is_lease_valid(self._active_lease):
             raise RuntimeError("Planning lease has expired or is invalid.")
+
+        # 1. Check state freshness against current_state_view if supplied
+        if current_state_view is not None:
+            if current_state_view.content.state_version != env.state_version:
+                raise StaleStateError(
+                    f"State version mutation detected: current {current_state_view.content.state_version} "
+                    f"!= envelope {env.state_version}. Replanning required before emission."
+                )
+            if current_state_view.content.state_digest != env.state_digest:
+                raise StaleStateError(
+                    f"State digest mutation detected: current '{current_state_view.content.state_digest}' "
+                    f"!= envelope '{env.state_digest}'. Replanning required before emission."
+                )
+            if current_state_view.planner_state_digest != env.planner_state_digest:
+                raise StaleStateError(
+                    f"Planner state digest mutation detected: current '{current_state_view.planner_state_digest}' "
+                    f"!= envelope '{env.planner_state_digest}'. Replanning required before emission."
+                )
+
+        # 2. Check state freshness against authoritative state authority if configured
+        if self._state_authority is not None:
+            if hasattr(self._state_authority, "get_authoritative_state"):
+                auth_v, auth_d = self._state_authority.get_authoritative_state()
+                if auth_v != env.state_version or auth_d != env.state_digest:
+                    raise StaleStateError(
+                        f"Authoritative state mismatch: authority ({auth_v}, '{auth_d}') "
+                        f"!= envelope ({env.state_version}, '{env.state_digest}'). Replanning required."
+                    )
+            elif hasattr(self._state_authority, "state_version") and hasattr(self._state_authority, "state_digest"):
+                if self._state_authority.state_version != env.state_version or self._state_authority.state_digest != env.state_digest:
+                    raise StaleStateError(
+                        f"Authoritative state mismatch: authority ({self._state_authority.state_version}, '{self._state_authority.state_digest}') "
+                        f"!= envelope ({env.state_version}, '{env.state_digest}'). Replanning required."
+                    )
 
         return ProposalEmitter.emit_next_proposal(
             strategy=env.strategy,

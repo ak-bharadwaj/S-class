@@ -29,6 +29,7 @@ class StateProjector:
         executable_frontier: Sequence[str] = (),
         blocked_frontier: Sequence[str] = (),
         evidence_digests: Sequence[str] = (),
+        evidence_items: Sequence[Any] = (),
         active_policies: Sequence[Mapping[str, Any]] = (),
         exceptions: Sequence[Any] = (),
         milestones: Sequence[Mapping[str, Any]] = (),
@@ -94,6 +95,7 @@ class StateProjector:
             executable_frontier=tuple(executable_frontier),
             blocked_frontier=tuple(blocked_frontier),
             evidence_digests=tuple(evidence_digests),
+            evidence_items=tuple(evidence_items),
             active_policies=tuple(active_policies),
             exceptions=tuple(exceptions),
             analysis_digests=analysis_digests,
@@ -125,10 +127,12 @@ class StateProjector:
         blocked_frontier: Sequence[str] = (),
         active_policies: Sequence[Mapping[str, Any]] = (),
         exceptions: Sequence[Any] = (),
+        evidence_items: Sequence[Any] = (),
         analysis_artifacts: Sequence[Any] = (),
         worker_id: str = "",
     ) -> PlannerStateView:
         """Projects a D4 MaterializedState directly into PlannerStateView."""
+        ev_items = tuple(evidence_items) or tuple(mat_state.evidence.values())
         return StateProjector.project(
             task_id=task_id,
             obligations=mat_state.obligations,
@@ -136,6 +140,7 @@ class StateProjector:
             executable_frontier=executable_frontier,
             blocked_frontier=blocked_frontier,
             evidence_digests=tuple(mat_state.evidence.keys()),
+            evidence_items=ev_items,
             active_policies=active_policies,
             exceptions=exceptions,
             analysis_artifacts=analysis_artifacts,
