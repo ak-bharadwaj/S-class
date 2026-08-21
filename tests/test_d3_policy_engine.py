@@ -185,9 +185,9 @@ def _install_test_authority_manifest(version: int = 1) -> ReadOnlyActorAuthority
         revoked_fingerprints=list(_test_revoked_fingerprints),
         root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
     )
-    resolver = SignedAuthorityManifestLoader.load_from_dict(
+    SignedAuthorityManifestLoader.clear_for_testing()
+    resolver = SignedAuthorityManifestLoader.bootstrap_genesis_manifest(
         manifest_data,
-        min_version=1,
     )
     PolicyActorKeyRegistry.clear_for_testing()
     PolicyActorKeyRegistry.bootstrap_sealed_resolver(resolver)
@@ -2960,11 +2960,12 @@ def test_d3_manifest_e33_signed_rollback_rejected():
         root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
     )
 
-    # 1. Load version 2 first
+    # 1. Bootstrap genesis version 1 then upgrade to version 2
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
     res_v2 = SignedAuthorityManifestLoader.load_from_dict(manifest_v2)
     assert res_v2.manifest_version == 2
 
-    # 2. Attempting to load previously signed version 1 is strictly rejected as rollback
+    # 2. Attempting to reload previously signed version 1 is strictly rejected as rollback
     with pytest.raises(ManifestRollbackError, match="is older than highest durable accepted version"):
         SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
 
@@ -2983,7 +2984,7 @@ def test_d3_manifest_e34_same_version_actor_set_substitution_rejected():
 
     manifest_a = SignedAuthorityManifestLoader.sign_manifest(
         manifest_id="MANIFEST-SAME-001",
-        manifest_version=3,
+        manifest_version=1,
         issued_at="2026-08-19T10:00:00Z",
         actors={
             fp1: {
@@ -2999,7 +3000,7 @@ def test_d3_manifest_e34_same_version_actor_set_substitution_rejected():
     )
     manifest_b = SignedAuthorityManifestLoader.sign_manifest(
         manifest_id="MANIFEST-SAME-001",
-        manifest_version=3,
+        manifest_version=1,
         issued_at="2026-08-19T10:00:00Z",
         actors={
             fp2: {
@@ -3014,8 +3015,8 @@ def test_d3_manifest_e34_same_version_actor_set_substitution_rejected():
         root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
     )
 
-    # Load first v3 manifest
-    SignedAuthorityManifestLoader.load_from_dict(manifest_a)
+    # Bootstrap first v1 manifest
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_a)
 
     # Attempting to load alternate v3 manifest is rejected as same-version substitution
     with pytest.raises(ManifestRollbackError, match="Same-version manifest substitution rejected"):
@@ -3072,7 +3073,7 @@ def test_d3_manifest_e36_manifest_identity_substitution_rejected():
         root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
     )
 
-    SignedAuthorityManifestLoader.load_from_dict(manifest_orig)
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_orig)
 
     # Attempting to load different manifest_id in same runtime fails closed
     with pytest.raises(CorruptManifestError, match="Manifest identity substitution rejected"):
@@ -3140,7 +3141,7 @@ def test_d3_bootstrap_e39_bootstrap_with_untrusted_manifest_rejected():
     # 2. Signed payload containing malformed actor record structure fails closed with CorruptManifestError
     signed_corrupt_manifest = SignedAuthorityManifestLoader.sign_manifest(
         manifest_id="MANIFEST-BOOT-002",
-        manifest_version=2,
+        manifest_version=1,
         issued_at="2026-08-19T10:00:00Z",
         actors={"invalid_fp": "not-a-dict"},  # type: ignore
         revoked_fingerprints=[],
@@ -3224,7 +3225,8 @@ def test_d3_manifest_e43_v2_accepted_process_restart_v1_rejected():
         root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
     )
 
-    # 1. Accept v2
+    # 1. Accept v1 then v2
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
     SignedAuthorityManifestLoader.load_from_dict(manifest_v2)
 
     # 2. Simulate complete process restart: instantiate fresh loader without calling clear_for_testing()
@@ -3252,7 +3254,7 @@ def test_d3_manifest_e44_persisted_manifest_state_tampering_fails_closed():
             revoked_fingerprints=[],
             root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
         )
-        SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
 
         from events.store import D2AuthorityManifestStore
         store = D2AuthorityManifestStore()
@@ -3293,7 +3295,7 @@ def test_d3_manifest_e45_interrupted_update_cannot_downgrade_accepted_epoch():
         revoked_fingerprints=[],
         root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
     )
-    SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
 
     from events.store import D2AuthorityManifestStore
     store = D2AuthorityManifestStore()
@@ -3456,7 +3458,8 @@ def test_d3_manifest_e48_delete_manifest_store_after_v2_v1_rejected():
         root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
     )
 
-    # 1. Accept v2
+    # 1. Accept v1 then v2
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
     SignedAuthorityManifestLoader.load_from_dict(manifest_v2)
 
     # 2. Re-loading with min_version=2 strictly rejects v1 rollback
@@ -3486,7 +3489,7 @@ def test_d3_manifest_e49_truncate_manifest_store_after_v2_v1_rejected():
     )
 
     # 1. Accept v1 then v2
-    SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
     SignedAuthorityManifestLoader.load_from_dict(manifest_v2)
 
     # 2. Attempting to accept v1 again is rejected as rollback against highest accepted version 2
@@ -3516,7 +3519,7 @@ def test_d3_manifest_e50_restore_old_valid_store_snapshot_v1_rejected():
     )
 
     # 1. Accept v1 then v2
-    SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
     SignedAuthorityManifestLoader.load_from_dict(manifest_v2)
 
     # 2. Attempting to load v1 is strictly rejected
@@ -3536,7 +3539,7 @@ def test_d3_manifest_e51_crash_interrupted_epoch_commit_no_rollback():
         revoked_fingerprints=[],
         root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
     )
-    SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
 
     from events.store import D2AuthorityManifestStore
     store = D2AuthorityManifestStore()
@@ -3564,7 +3567,7 @@ def test_d3_manifest_e52_corrupt_authoritative_anchor_fails_closed():
             revoked_fingerprints=[],
             root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
         )
-        SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
 
         from events.store import D2AuthorityManifestStore
         store = D2AuthorityManifestStore()
@@ -3652,7 +3655,7 @@ def test_d3_persistence_e56_delete_store_restore_old_state_rollback_rejected():
         root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
     )
 
-    SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
     SignedAuthorityManifestLoader.load_from_dict(manifest_v2)
 
     # Attempting to load v1 is rejected as rollback
@@ -3725,7 +3728,8 @@ def test_d3_persistence_e59_restart_with_missing_d3_caches_current_d2_authority_
         root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
     )
 
-    # Accept v2
+    # Accept v1 then v2
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
     SignedAuthorityManifestLoader.load_from_dict(manifest_v2)
 
     # Simulate fresh process restart by instantiating fresh store without clearing disk
@@ -3887,7 +3891,7 @@ def test_d3_persistence_e69_restored_older_d2_snapshot_rollback_rejected():
         root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
     )
 
-    SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
     SignedAuthorityManifestLoader.load_from_dict(manifest_v2)
 
     with pytest.raises(ManifestRollbackError, match="is older than highest durable accepted version"):
@@ -3907,6 +3911,7 @@ def test_d3_concurrency_c1_concurrent_same_version_commits_single_authoritative_
         revoked_fingerprints=[],
         root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
     )
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
 
     errors = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
@@ -3940,7 +3945,10 @@ def test_d3_concurrency_c2_concurrent_monotonic_version_commits_no_lost_sequence
             revoked_fingerprints=[],
             root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
         )
-        SignedAuthorityManifestLoader.load_from_dict(m)
+        if ver == 1:
+            SignedAuthorityManifestLoader.bootstrap_genesis_manifest(m)
+        else:
+            SignedAuthorityManifestLoader.load_from_dict(m)
 
     from events.store import D2AuthorityManifestStore
     store = D2AuthorityManifestStore()
@@ -3962,7 +3970,7 @@ def test_d3_concurrency_c3_restart_during_commit_no_partial_authority_acceptance
         revoked_fingerprints=[],
         root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
     )
-    SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
 
     from events.store import D2AuthorityManifestStore
     store = D2AuthorityManifestStore()
@@ -3993,7 +4001,7 @@ def test_d3_persistence_e70_prior_deployment_missing_d2_reject():
         revoked_fingerprints=[],
         root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
     )
-    SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
 
     store = D2AuthorityManifestStore()
     if os.path.exists(store.file_path):
@@ -4049,7 +4057,7 @@ def test_d3_persistence_e72_explicit_first_bootstrap_accepted_only_through_trust
     assert res.manifest_id == "M-E72"
 
     # Second bootstrap attempt on non-empty store is strictly rejected
-    with pytest.raises(RuntimeError, match="Genesis bootstrap rejected: system has already been provisioned/installed"):
+    with pytest.raises(RuntimeError, match="Genesis bootstrap rejected"):
         SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
 
 
@@ -4066,7 +4074,7 @@ def test_d3_persistence_e73_empty_corrupt_d2_after_prior_authority_reject():
         revoked_fingerprints=[],
         root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
     )
-    SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
 
     store = D2AuthorityManifestStore()
     with open(store.file_path, "wb") as f:
@@ -4139,7 +4147,7 @@ def test_d3_install_e78_prior_installation_d2_deletion_genesis_rejected():
     if os.path.exists(store.file_path):
         os.remove(store.file_path)
 
-    with pytest.raises(RuntimeError, match="Genesis bootstrap rejected: system has already been provisioned/installed"):
+    with pytest.raises(RuntimeError, match="Genesis bootstrap rejected"):
         SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
 
 
@@ -4162,7 +4170,7 @@ def test_d3_install_e79_prior_installation_empty_d2_file_genesis_rejected():
     with open(store.file_path, "wb") as f:
         pass
 
-    with pytest.raises(RuntimeError, match="Genesis bootstrap rejected: system has already been provisioned/installed"):
+    with pytest.raises(RuntimeError, match="Genesis bootstrap rejected"):
         SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
 
 
@@ -4194,7 +4202,7 @@ def test_d3_install_e80_prior_installation_old_valid_signed_manifest_genesis_rej
     if os.path.exists(store.file_path):
         os.remove(store.file_path)
 
-    with pytest.raises(RuntimeError, match="Genesis bootstrap rejected: system has already been provisioned/installed"):
+    with pytest.raises(RuntimeError, match="Genesis bootstrap rejected"):
         SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
 
 
@@ -4219,7 +4227,7 @@ def test_d3_install_e81_first_install_bootstrap_succeeds_exactly_once():
     res = SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
     assert res.manifest_version == 1
 
-    with pytest.raises(RuntimeError, match="Genesis bootstrap rejected: system has already been provisioned/installed"):
+    with pytest.raises(RuntimeError, match="Genesis bootstrap rejected"):
         SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
 
 
@@ -4240,7 +4248,7 @@ def test_d3_install_e82_restart_bootstrap_still_rejected():
     from events.store import D2InstallationProvisioning
     assert D2InstallationProvisioning.is_installed() is True
 
-    with pytest.raises(RuntimeError, match="Genesis bootstrap rejected: system has already been provisioned/installed"):
+    with pytest.raises(RuntimeError, match="Genesis bootstrap rejected"):
         SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
 
 
@@ -4278,7 +4286,247 @@ def test_d3_install_e83_concurrent_bootstrap_exactly_one_succeeds():
     assert len(rejections) == 15
     for err in rejections:
         assert isinstance(err, RuntimeError)
-        assert "already been provisioned/installed" in str(err)
+        assert "Genesis bootstrap rejected" in str(err)
+
+
+def test_d3_install_e84_delete_installation_seal_after_prior_install_genesis_rejected():
+    """E84: Deleting installation seal after prior install is rejected because D2 history exists."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import D2InstallationProvisioning
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E84",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+    marker = D2InstallationProvisioning.get_marker_path()
+    if os.path.exists(marker):
+        os.remove(marker)
+
+    with pytest.raises(RuntimeError, match="canonical D2 authority store already contains history"):
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+
+def test_d3_install_e85_modify_installation_seal_rejected():
+    """E85: Tampering with or modifying the installation seal fails closed."""
+    import json
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import D2InstallationProvisioning
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E85",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+    marker = D2InstallationProvisioning.get_marker_path()
+    with open(marker, "r", encoding="utf-8") as f:
+        seal_data = json.load(f)
+
+    # Tamper with installation_id
+    seal_data["installation_id"] = "TAMPERED-UUID-9999"
+    with open(marker, "w", encoding="utf-8") as f:
+        json.dump(seal_data, f)
+
+    with pytest.raises(InvalidManifestSignatureError):
+        SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+
+
+def test_d3_install_e86_replace_installation_seal_with_forged_seal_rejected():
+    """E86: Replacing installation seal with a forged signature from another key fails closed."""
+    import json
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import D2InstallationProvisioning
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E86",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+    # Forge seal with attacker key
+    attacker_priv = ed25519.Ed25519PrivateKey.generate()
+    marker = D2InstallationProvisioning.get_marker_path()
+    with open(marker, "r", encoding="utf-8") as f:
+        seal_data = json.load(f)
+
+    seal_data["signature"]["public_key_fingerprint"] = hashlib.sha256(attacker_priv.public_key().public_bytes_raw()).hexdigest()
+    with open(marker, "w", encoding="utf-8") as f:
+        json.dump(seal_data, f)
+
+    with pytest.raises(InvalidManifestSignatureError):
+        SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+
+
+def test_d3_install_e87_restore_old_installation_seal_rejected():
+    """E87: Restoring an old installation seal when D2 ledger has different genesis state fails closed."""
+    import shutil
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import D2InstallationProvisioning
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E87-ORIGINAL",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+    marker = D2InstallationProvisioning.get_marker_path()
+    backup_marker = marker + ".bak"
+    shutil.copyfile(marker, backup_marker)
+
+    # Re-initialize clean test harness with different manifest
+    SignedAuthorityManifestLoader.clear_for_testing()
+    manifest_v2 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E87-SUBSEQUENT",
+        manifest_version=1,
+        issued_at="2026-08-20T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v2)
+
+    # Restore old marker from original installation
+    shutil.copyfile(backup_marker, marker)
+    try:
+        os.remove(backup_marker)
+    except OSError:
+        pass
+
+    with pytest.raises(CorruptManifestError, match="Authoritative D2 genesis state does not agree with sealed installation record"):
+        SignedAuthorityManifestLoader.load_from_dict(manifest_v2)
+
+
+def test_d3_install_e88_crash_after_seal_before_d2_commit_deterministic_recovery():
+    """E88: Crash after prepare with completed D2 event commits recovers stage into seal."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import D2AuthorityManifestStore, D2InstallationProvisioning
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E88",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    canonical_bytes = canonicalize_authority_manifest_preimage(manifest_v1)
+    expected_digest = hashlib.sha256(canonical_bytes).hexdigest()
+    root_sig = manifest_v1["root_signature"]
+    sig_root_fp = root_sig["public_key_fingerprint"]
+    signer_identity = root_sig["signer_identity"]
+
+    # Stage 1 prepared
+    inst_id = D2InstallationProvisioning.prepare_first_installation(
+        manifest_id="M-E88",
+        manifest_version=1,
+        payload_digest=expected_digest,
+        signer_identity=signer_identity,
+        root_fingerprint=sig_root_fp,
+    )
+
+    # Stage 2 D2 commit complete, but crash before Stage 3 seal
+    store = D2AuthorityManifestStore()
+    store.commit_epoch(
+        manifest_id="M-E88",
+        manifest_version=1,
+        payload_digest=expected_digest,
+        signer_identity=signer_identity,
+        root_fingerprint=sig_root_fp,
+    )
+
+    # Verify that query or load triggers deterministic recovery
+    assert D2InstallationProvisioning.is_installed() is True
+    res = SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+    assert res.manifest_id == "M-E88"
+    assert res.manifest_version == 1
+    assert D2InstallationProvisioning.has_seal() is True
+
+
+def test_d3_install_e89_crash_during_d2_commit_no_unauthorized_genesis_reset():
+    """E89: Crash during D2 commit with empty D2 cleans broken stage and fails closed against load."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.exceptions import StorageUnavailableError
+    from events.store import D2InstallationProvisioning
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E89",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    canonical_bytes = canonicalize_authority_manifest_preimage(manifest_v1)
+    expected_digest = hashlib.sha256(canonical_bytes).hexdigest()
+    root_sig = manifest_v1["root_signature"]
+
+    # Prepare stage written, but D2 store was not created / empty
+    D2InstallationProvisioning.prepare_first_installation(
+        manifest_id="M-E89",
+        manifest_version=1,
+        payload_digest=expected_digest,
+        signer_identity=root_sig["signer_identity"],
+        root_fingerprint=root_sig["public_key_fingerprint"],
+    )
+
+    # Remove D2 store file if present
+    from events.store import D2AuthorityManifestStore
+    store = D2AuthorityManifestStore()
+    if os.path.exists(store.file_path):
+        os.remove(store.file_path)
+
+    # Loading manifest fails closed with StorageUnavailableError
+    with pytest.raises(StorageUnavailableError):
+        SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+
+
+def test_d3_install_e90_completed_genesis_installation_seal_and_d2_state_agree():
+    """E90: Completed genesis produces 100% state agreement between installation seal and D2 store."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import D2AuthorityManifestStore, D2InstallationProvisioning
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E90",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    res = SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+    assert res.manifest_version == 1
+
+    # Verify seal and D2 state agreement
+    seal_data = D2InstallationProvisioning.verify_seal()
+    store = D2AuthorityManifestStore()
+    events = store.store.get_events()
+    assert len(events) == 1
+    assert events[0].payload["manifest_id"] == seal_data["initial_manifest_id"]
+    assert events[0].payload["manifest_version"] == seal_data["initial_manifest_version"]
+    assert events[0].payload["payload_digest"] == seal_data["initial_manifest_digest"]
+    assert events[0].payload["root_fingerprint"] == seal_data["root_fingerprint"]
+
 
 
 

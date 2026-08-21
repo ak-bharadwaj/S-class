@@ -505,11 +505,11 @@ class D2AuthorityManifestStore:
         Fails closed with StorageUnavailableError if the authoritative D2 store is missing and allow_uninitialized is False.
         """
         with self._lock:
-            if not os.path.exists(self._file_path):
+            if not os.path.exists(self._file_path) or os.path.getsize(self._file_path) == 0:
                 if allow_uninitialized:
                     return (0, None, None)
                 raise StorageUnavailableError(
-                    f"Canonical D2 authority store is missing at '{self._file_path}'; fail closed against silent state reset."
+                    f"Canonical D2 authority store is missing or empty at '{self._file_path}'; fail closed against silent state reset."
                 )
             store = FileAppendEventStore(self._file_path)
             state = store.replay()
@@ -620,8 +620,15 @@ def get_canonical_d2_installation_marker_path() -> str:
     return os.path.join(directory, ".d2_installation_seal.json")
 
 
+def get_canonical_d2_installation_stage_path() -> str:
+    """Returns absolute path to the transient D2 installation staging file."""
+    event_store_path = get_canonical_d2_event_store_path()
+    directory = os.path.dirname(os.path.abspath(event_store_path))
+    return os.path.join(directory, ".d2_installation_stage.json")
+
+
 class D2InstallationProvisioning:
-    """Manages the explicit, one-time first-installation state of the S-Class system.
+    """Manages the explicit, cryptographically authenticated first-installation state of S-Class.
     Separates FIRST INSTALL STATE from D2 AUTHORITY HISTORY to prevent authority resets
     when history is missing/deleted/truncated.
     """
@@ -632,10 +639,233 @@ class D2InstallationProvisioning:
         return get_canonical_d2_installation_marker_path()
 
     @classmethod
-    def is_installed(cls) -> bool:
-        """Returns True if the system has already completed first-install bootstrap."""
+    def get_stage_path(cls) -> str:
+        return get_canonical_d2_installation_stage_path()
+
+    @classmethod
+    def has_seal(cls) -> bool:
         marker = cls.get_marker_path()
         return os.path.exists(marker) and os.path.getsize(marker) > 0
+
+    @classmethod
+    def verify_seal(cls, root_public_key: Optional[Any] = None) -> Dict[str, Any]:
+        """Cryptographically verifies the installation seal. Fails closed on tampering or forgery."""
+        import json
+        import hashlib
+        from cryptography.exceptions import InvalidSignature
+        from events.serializer import canonicalize_json
+        from policy.exceptions import InvalidManifestSignatureError, CorruptManifestError
+
+        marker = cls.get_marker_path()
+        if not os.path.exists(marker):
+            raise FileNotFoundError(f"Installation seal not found at '{marker}'.")
+
+        try:
+            with open(marker, "rb") as f:
+                content = f.read()
+            data = json.loads(content.decode("utf-8"))
+        except Exception as e:
+            raise CorruptManifestError(f"Installation seal is malformed or unreadable: {e}") from e
+
+        if not isinstance(data, dict):
+            raise CorruptManifestError("Installation seal payload must be a JSON object.")
+
+        required_fields = [
+            "installation_id",
+            "initial_manifest_id",
+            "initial_manifest_version",
+            "initial_manifest_digest",
+            "root_fingerprint",
+            "provisioning_epoch",
+            "status",
+            "installed_at",
+            "signature",
+        ]
+        for field in required_fields:
+            if field not in data:
+                raise CorruptManifestError(f"Installation seal missing required field '{field}'.")
+
+        if data["status"] != "SEALED":
+            raise CorruptManifestError(f"Installation seal has invalid status '{data['status']}', expected 'SEALED'.")
+
+        if data["initial_manifest_version"] != 1:
+            raise CorruptManifestError("Installation seal initial_manifest_version must be 1.")
+
+        if data["provisioning_epoch"] != 1:
+            raise CorruptManifestError("Installation seal provisioning_epoch must be 1.")
+
+        sig_block = data.get("signature")
+        if not isinstance(sig_block, dict):
+            raise InvalidManifestSignatureError("Installation seal missing signature object.")
+
+        if sig_block.get("algorithm") != "ED25519":
+            raise InvalidManifestSignatureError("Installation seal signature algorithm must be ED25519.")
+
+        if sig_block.get("signer_identity") != "Gate3AuthoritativeVerifier":
+            raise InvalidManifestSignatureError("Installation seal signer identity must be 'Gate3AuthoritativeVerifier'.")
+
+        sig_hex = sig_block.get("signature_hex", "")
+        if not sig_hex or len(sig_hex) != 128:
+            raise InvalidManifestSignatureError("Installation seal signature hex is invalid length.")
+
+        # Resolve trusted public key
+        if root_public_key is None:
+            from benchmark.parity.verify_gate_3_certificate import Gate3PublicKeystore
+            root_public_key = Gate3PublicKeystore.get_public_key()
+            if root_public_key is None:
+                raise RuntimeError("Canonical Gate 3 Root Authority Public Key is not configured in protected keystore boundary.")
+
+        expected_root_fp = hashlib.sha256(root_public_key.public_bytes_raw()).hexdigest()
+        if data["root_fingerprint"] != expected_root_fp:
+            raise InvalidManifestSignatureError(
+                f"Installation seal root fingerprint '{data['root_fingerprint']}' does not match canonical root '{expected_root_fp}'."
+            )
+
+        if sig_block.get("public_key_fingerprint") != expected_root_fp:
+            raise InvalidManifestSignatureError("Installation seal signature fingerprint mismatch.")
+
+        # Compute preimage (all fields except signature)
+        preimage_dict = {
+            "installation_id": data["installation_id"],
+            "initial_manifest_id": data["initial_manifest_id"],
+            "initial_manifest_version": data["initial_manifest_version"],
+            "initial_manifest_digest": data["initial_manifest_digest"],
+            "root_fingerprint": data["root_fingerprint"],
+            "provisioning_epoch": data["provisioning_epoch"],
+            "status": data["status"],
+            "installed_at": data["installed_at"],
+        }
+        preimage_bytes = canonicalize_json(preimage_dict)
+        expected_digest = hashlib.sha256(preimage_bytes).hexdigest()
+
+        if sig_block.get("payload_digest") != expected_digest:
+            raise InvalidManifestSignatureError("Installation seal payload digest mismatch.")
+
+        try:
+            root_public_key.verify(bytes.fromhex(sig_hex), preimage_bytes)
+        except InvalidSignature:
+            raise InvalidManifestSignatureError("Installation seal Ed25519 signature verification failed.")
+
+        return data
+
+    @classmethod
+    def is_installed(cls) -> bool:
+        """Returns True if the system has a valid authenticated installation seal,
+        or performs deterministic recovery if interrupted during commit.
+        """
+        # 1. Check if valid seal exists
+        if cls.has_seal():
+            cls.verify_seal()
+            return True
+
+        # 2. Check if transient stage exists for deterministic crash recovery
+        stage_path = cls.get_stage_path()
+        if os.path.exists(stage_path) and os.path.getsize(stage_path) > 0:
+            return cls._recover_from_stage()
+
+        return False
+
+    @classmethod
+    def _recover_from_stage(cls) -> bool:
+        """Deterministically recovers an interrupted installation."""
+        import json
+        stage_path = cls.get_stage_path()
+        try:
+            with open(stage_path, "rb") as f:
+                stage_data = json.loads(f.read().decode("utf-8"))
+        except Exception:
+            return False
+
+        # Check D2 store state
+        from events.store import D2AuthorityManifestStore
+        store = D2AuthorityManifestStore()
+        if os.path.exists(store.file_path) and os.path.getsize(store.file_path) > 0:
+            try:
+                state = store.store.replay()
+                if (
+                    state.active_manifest_id == stage_data.get("initial_manifest_id")
+                    and state.active_manifest_version == stage_data.get("initial_manifest_version")
+                    and state.active_manifest_digest == stage_data.get("initial_manifest_digest")
+                ):
+                    # Interrupted between D2 commit and seal creation -> promote stage to seal
+                    cls.seal_first_installation(
+                        manifest_id=stage_data["initial_manifest_id"],
+                        manifest_version=stage_data["initial_manifest_version"],
+                        payload_digest=stage_data["initial_manifest_digest"],
+                        signer_identity=stage_data["signature"]["signer_identity"],
+                        root_fingerprint=stage_data["root_fingerprint"],
+                        installation_id=stage_data["installation_id"],
+                        installed_at=stage_data["installed_at"],
+                    )
+                    return True
+            except Exception:
+                pass
+
+        # If D2 store is empty or uncommitted, remove broken stage
+        try:
+            os.remove(stage_path)
+        except OSError:
+            pass
+        return False
+
+    @classmethod
+    def prepare_first_installation(
+        cls,
+        manifest_id: str,
+        manifest_version: int,
+        payload_digest: str,
+        signer_identity: str,
+        root_fingerprint: str,
+    ) -> str:
+        """Stage 1: FIRST_INSTALL_PREPARED."""
+        import uuid
+        import hashlib
+        from datetime import datetime, timezone
+        from file_lock import FileLock
+        from events.serializer import canonicalize_json
+        from benchmark.parity.gate_3_authority import Gate3AuthorityKeyStore
+
+        root_priv = Gate3AuthorityKeyStore.get_private_key()
+        if root_priv is None:
+            raise RuntimeError("Canonical Gate 3 Authority private key is not configured for installation preparation.")
+
+        installation_id = str(uuid.uuid4())
+        installed_at = datetime.now(timezone.utc).isoformat()
+        stage_path = cls.get_stage_path()
+        lock_path = stage_path + ".lock"
+
+        preimage_dict = {
+            "installation_id": installation_id,
+            "initial_manifest_id": manifest_id,
+            "initial_manifest_version": manifest_version,
+            "initial_manifest_digest": payload_digest,
+            "root_fingerprint": root_fingerprint,
+            "provisioning_epoch": 1,
+            "status": "PREPARED",
+            "installed_at": installed_at,
+        }
+        preimage_bytes = canonicalize_json(preimage_dict)
+        payload_digest_calc = hashlib.sha256(preimage_bytes).hexdigest()
+        sig_bytes = root_priv.sign(preimage_bytes)
+
+        stage_payload = dict(preimage_dict)
+        stage_payload["signature"] = {
+            "algorithm": "ED25519",
+            "signer_identity": signer_identity,
+            "public_key_fingerprint": root_fingerprint,
+            "payload_digest": payload_digest_calc,
+            "signature_hex": sig_bytes.hex(),
+            "timestamp": installed_at,
+        }
+
+        with cls._class_lock:
+            with FileLock(lock_path, timeout=10.0):
+                with open(stage_path, "wb") as f:
+                    f.write(canonicalize_json(stage_payload) + b"\n")
+                    f.flush()
+                    os.fsync(f.fileno())
+
+        return installation_id
 
     @classmethod
     def seal_first_installation(
@@ -645,51 +875,118 @@ class D2InstallationProvisioning:
         payload_digest: str,
         signer_identity: str,
         root_fingerprint: str,
+        installation_id: Optional[str] = None,
+        installed_at: Optional[str] = None,
     ) -> None:
-        """Atomically provisions and seals first installation. Fails closed if already installed."""
+        """Stage 3: FIRST_INSTALL_SEALED."""
+        import uuid
+        import hashlib
         from datetime import datetime, timezone
         from file_lock import FileLock
         from events.serializer import canonicalize_json
+        from benchmark.parity.gate_3_authority import Gate3AuthorityKeyStore
+
+        root_priv = Gate3AuthorityKeyStore.get_private_key()
+        if root_priv is None:
+            raise RuntimeError("Canonical Gate 3 Authority private key is not configured for installation seal.")
+
+        if installation_id is None:
+            installation_id = str(uuid.uuid4())
+        if installed_at is None:
+            installed_at = datetime.now(timezone.utc).isoformat()
 
         marker = cls.get_marker_path()
         lock_path = marker + ".lock"
 
+        preimage_dict = {
+            "installation_id": installation_id,
+            "initial_manifest_id": manifest_id,
+            "initial_manifest_version": manifest_version,
+            "initial_manifest_digest": payload_digest,
+            "root_fingerprint": root_fingerprint,
+            "provisioning_epoch": 1,
+            "status": "SEALED",
+            "installed_at": installed_at,
+        }
+        preimage_bytes = canonicalize_json(preimage_dict)
+        payload_digest_calc = hashlib.sha256(preimage_bytes).hexdigest()
+        sig_bytes = root_priv.sign(preimage_bytes)
+
+        seal_payload = dict(preimage_dict)
+        seal_payload["signature"] = {
+            "algorithm": "ED25519",
+            "signer_identity": signer_identity,
+            "public_key_fingerprint": root_fingerprint,
+            "payload_digest": payload_digest_calc,
+            "signature_hex": sig_bytes.hex(),
+            "timestamp": installed_at,
+        }
+
         with cls._class_lock:
             with FileLock(lock_path, timeout=10.0):
-                if cls.is_installed():
-                    raise RuntimeError("Genesis bootstrap rejected: system has already been provisioned/installed. Authority reset prohibited.")
-
-                seal_payload = {
-                    "installed_at": datetime.now(timezone.utc).isoformat(),
-                    "initial_manifest_id": manifest_id,
-                    "initial_manifest_version": manifest_version,
-                    "initial_payload_digest": payload_digest,
-                    "signer_identity": signer_identity,
-                    "root_fingerprint": root_fingerprint,
-                }
-                marker_bytes = canonicalize_json(seal_payload) + b"\n"
-
                 with open(marker, "wb") as f:
-                    f.write(marker_bytes)
+                    f.write(canonicalize_json(seal_payload) + b"\n")
                     f.flush()
                     os.fsync(f.fileno())
+
+                # Clean up staging file
+                stage_path = cls.get_stage_path()
+                if os.path.exists(stage_path):
+                    try:
+                        os.remove(stage_path)
+                    except OSError:
+                        pass
+
+    @classmethod
+    def verify_state_agreement(cls) -> None:
+        """Verifies that the authenticated installation seal and the canonical D2 event store agree."""
+        from policy.exceptions import CorruptManifestError
+        from events.exceptions import StorageUnavailableError
+
+        if not cls.has_seal():
+            return
+
+        seal_data = cls.verify_seal()
+
+        from events.store import D2AuthorityManifestStore
+        store = D2AuthorityManifestStore()
+        if not os.path.exists(store.file_path) or os.path.getsize(store.file_path) == 0:
+            raise StorageUnavailableError(
+                f"Authoritative D2 history missing at '{store.file_path}' for sealed installation; fail closed against authority reset."
+            )
+
+        events = store.store.get_events()
+        if not events:
+            raise StorageUnavailableError("Canonical D2 store contains no events for sealed installation.")
+
+        first_event = events[0]
+        payload = first_event.payload
+        if (
+            payload.get("manifest_id") != seal_data["initial_manifest_id"]
+            or payload.get("manifest_version") != seal_data["initial_manifest_version"]
+            or payload.get("payload_digest") != seal_data["initial_manifest_digest"]
+            or payload.get("root_fingerprint") != seal_data["root_fingerprint"]
+        ):
+            raise CorruptManifestError(
+                "Authoritative D2 genesis state does not agree with sealed installation record; state mismatch rejected."
+            )
 
     @classmethod
     def clear_for_testing(cls) -> None:
         """Controlled teardown of installation state strictly for test fixtures."""
         if os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1" and os.environ.get("PYTEST_CURRENT_TEST") is None:
             raise RuntimeError("Installation state teardown prohibited outside active test fixture harness.")
-        marker = cls.get_marker_path()
-        if os.path.exists(marker):
-            try:
-                os.remove(marker)
-            except OSError:
-                pass
-        lock_path = marker + ".lock"
-        if os.path.exists(lock_path):
-            try:
-                os.remove(lock_path)
-            except OSError:
-                pass
+        for p in [cls.get_marker_path(), cls.get_stage_path()]:
+            if os.path.exists(p):
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
+            lock_p = p + ".lock"
+            if os.path.exists(lock_p):
+                try:
+                    os.remove(lock_p)
+                except OSError:
+                    pass
 
 
