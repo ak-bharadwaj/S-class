@@ -41,6 +41,7 @@ from planner.evaluator import (
     HardConstraintGate,
     PlanEvaluator,
     MAX_GOVERNED_BLAST_RADIUS,
+    ALLOWED_ACTION_TYPES,
 )
 from planner.convergence import (
     ConvergenceMonitor,
@@ -52,6 +53,20 @@ from planner.emitter import ProposalEmitter
 from planner.session import (
     PlannerSession,
     NoAdmissiblePlanError,
+)
+from planner.analysis import (
+    AnalysisArtifact,
+    AnalystType,
+    EvidencePolarityHint,
+    Observation,
+    Hypothesis,
+    Inference,
+    Uncertainty,
+    Contradiction,
+    Implication,
+    ToolProvenance,
+    ModelProvenance,
+    SCLASS_ANALYSIS_ARTIFACT_DOMAIN_SEPARATOR,
 )
 
 # Backwards-compatible legacy workflow exports
@@ -94,6 +109,7 @@ __all__ = [
     "PlanningLeaseManager",
     "LeaseAcquisitionError",
     "LeaseValidationError",
+    "LeaseCorruptionError",
     "StateProjector",
     "CandidateGenerator",
     "DeterministicRuleGenerator",
@@ -103,6 +119,7 @@ __all__ = [
     "HardConstraintGate",
     "PlanEvaluator",
     "MAX_GOVERNED_BLAST_RADIUS",
+    "ALLOWED_ACTION_TYPES",
     "ConvergenceMonitor",
     "ReplanningBudgetExceededError",
     "PlanOscillationDetectedError",
@@ -110,4 +127,16 @@ __all__ = [
     "ProposalEmitter",
     "PlannerSession",
     "NoAdmissiblePlanError",
+    "AnalysisArtifact",
+    "AnalystType",
+    "EvidencePolarityHint",
+    "Observation",
+    "Hypothesis",
+    "Inference",
+    "Uncertainty",
+    "Contradiction",
+    "Implication",
+    "ToolProvenance",
+    "ModelProvenance",
+    "SCLASS_ANALYSIS_ARTIFACT_DOMAIN_SEPARATOR",
 ]
