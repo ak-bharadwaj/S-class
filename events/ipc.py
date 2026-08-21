@@ -102,8 +102,6 @@ class OSIPCServer:
                 peer_meta["gid"] = gid
                 if self.allowed_uid is not None and uid != self.allowed_uid:
                     return False, peer_meta
-                peer_meta["authenticated"] = True
-                return True, peer_meta
             except Exception:
                 pass
 
