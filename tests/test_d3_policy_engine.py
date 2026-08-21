@@ -134,8 +134,13 @@ from policy import (
     PolicyActorKeyRegistry,
     ActorKeyRecord,
     PolicyActorAuthorityResolver,
-    ManifestActorAuthorityResolver,
+    ReadOnlyActorAuthorityResolver,
+    SignedAuthorityManifestLoader,
+    canonicalize_authority_manifest_preimage,
     canonicalize_policy_exception_preimage,
+    InvalidManifestSignatureError,
+    CorruptManifestError,
+    ManifestRollbackError,
     meet_policies,
     compose_policies,
     verify_and_merge_rules,
@@ -160,12 +165,33 @@ _test_enrolled_actors: Dict[str, ActorKeyRecord] = {}
 _test_revoked_fingerprints: Set[str] = set()
 
 
-def _install_test_authority_manifest() -> None:
-    resolver = ManifestActorAuthorityResolver(
-        actors=dict(_test_enrolled_actors),
-        revoked_fingerprints=set(_test_revoked_fingerprints),
+def _install_test_authority_manifest(version: int = 1) -> ReadOnlyActorAuthorityResolver:
+    actors_dict = {}
+    for fp, rec in _test_enrolled_actors.items():
+        pub_hex = rec.public_key.public_bytes_raw().hex()
+        actors_dict[fp] = {
+            "actor_id": rec.actor_id,
+            "actor_role": rec.actor_role,
+            "public_key_fingerprint": fp,
+            "public_key_hex": pub_hex,
+            "is_active": rec.is_active,
+        }
+    manifest_data = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="TEST-MANIFEST-001",
+        manifest_version=version,
+        issued_at="2026-08-19T10:00:00Z",
+        actors=actors_dict,
+        revoked_fingerprints=list(_test_revoked_fingerprints),
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
     )
-    PolicyActorKeyRegistry.set_authority_resolver(resolver)
+    resolver = SignedAuthorityManifestLoader.load_from_dict(
+        manifest_data,
+        TEST_AUTHORITY_PUBLIC_KEY,
+        min_version=1,
+    )
+    PolicyActorKeyRegistry.clear_for_testing()
+    PolicyActorKeyRegistry.bootstrap_sealed_resolver(resolver)
+    return resolver
 
 
 @pytest.fixture(autouse=True)
@@ -178,7 +204,7 @@ def setup_test_authority_keystore():
     Gate3ProviderKeyStore.clear()
     Gate3ProviderKeyStore.register_provider_key("KEY-001", TEST_PROVIDER_SECRET)
     Gate3NonceTracker.clear()
-    PolicyActorKeyRegistry.clear()
+    PolicyActorKeyRegistry.clear_for_testing()
     _test_enrolled_actors.clear()
     _test_revoked_fingerprints.clear()
 
@@ -197,7 +223,7 @@ def setup_test_authority_keystore():
     Gate3PublicKeystore.clear()
     Gate3ProviderKeyStore.clear()
     Gate3NonceTracker.clear()
-    PolicyActorKeyRegistry.clear()
+    PolicyActorKeyRegistry.clear_for_testing()
     _test_enrolled_actors.clear()
     _test_revoked_fingerprints.clear()
 
@@ -2647,35 +2673,42 @@ def test_d3_exception_e21_signature_fingerprint_tampering_rejected():
         evaluate_policy(pol, ctx)
 
 
-def test_d3_exception_e22_manifest_durability_and_process_reload():
-    """E22: Authoritative ManifestActorAuthorityResolver survives durable reload across process boundary."""
-    priv = ed25519.Ed25519PrivateKey.generate()
-    pub = priv.public_key()
-    fp = hashlib.sha256(pub.public_bytes_raw()).hexdigest()
+def test_d3_exception_e22_arbitrary_resolver_injection_rejected():
+    """E22: Arbitrary runtime resolver injection rejected (no set_authority_resolver API)."""
+    assert hasattr(PolicyActorKeyRegistry, "set_authority_resolver") is False
+    with pytest.raises(AttributeError):
+        PolicyActorKeyRegistry.set_authority_resolver("ROGUE_RESOLVER")  # type: ignore
 
-    rec = ActorKeyRecord("SEC-DURABLE", "SECURITY_LEAD", fp, pub, True)
-    manifest = ManifestActorAuthorityResolver(actors={fp: rec}, manifest_id="MANIFEST-DURABLE-001")
 
-    # Serialize manifest to durable payload
-    serialized = manifest.to_dict()
+def test_d3_exception_e23_authority_resolver_replacement_rejected():
+    """E23: Attempting to replace or re-bootstrap a sealed authority resolver fails closed."""
+    # A sealed resolver is already installed by setup fixture
+    assert PolicyActorKeyRegistry.get_sealed_resolver() is not None
 
-    # Simulate fresh process restart with zero state
-    PolicyActorKeyRegistry.clear()
+    dummy_resolver = ReadOnlyActorAuthorityResolver(actors={}, revoked_fingerprints=set())
+    with pytest.raises(RuntimeError, match="Authority resolver is already sealed"):
+        PolicyActorKeyRegistry.bootstrap_sealed_resolver(dummy_resolver)
 
-    # Reload from serialized manifest
-    reloaded = ManifestActorAuthorityResolver.from_dict(serialized)
-    PolicyActorKeyRegistry.set_authority_resolver(reloaded)
 
-    # Verify exception signed with durable key evaluates to ALLOW
+def test_d3_exception_e24_malicious_resolver_cannot_authorize_rogue_key():
+    """E24: Rogue key in an unsealed / fake resolver cannot authorize exceptions against application sealed root."""
+    rogue_priv = ed25519.Ed25519PrivateKey.generate()
+    rogue_pub = rogue_priv.public_key()
+    rogue_fp = hashlib.sha256(rogue_pub.public_bytes_raw()).hexdigest()
+
+    # Create a local rogue resolver that trusts the rogue key
+    rogue_rec = ActorKeyRecord("ROGUE-ACTOR", "SECURITY_LEAD", rogue_fp, rogue_pub, True)
+    rogue_resolver = ReadOnlyActorAuthorityResolver(actors={rogue_fp: rogue_rec}, revoked_fingerprints=set())
+
     obl = make_test_obligation(obl_id="OBL-001")
     exc = _sign_test_exception(
         exception_id="EXC-001",
         obligation_id="OBL-001",
         policy_id="POL-001",
         justification="Manual security review approved by security lead with HSM token.",
-        actor_id="SEC-DURABLE",
+        actor_id="ROGUE-ACTOR",
         actor_role="SECURITY_LEAD",
-        private_key=priv,
+        private_key=rogue_priv,
         compensating_controls=("Audit log monitoring enabled",),
         auto_enroll=False,
     )
@@ -2684,80 +2717,281 @@ def test_d3_exception_e22_manifest_durability_and_process_reload():
         "POL-001", PolicyScope.PROJECT, 1,
         PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
     )
-    decision = evaluate_policy(pol, ctx)
-    assert decision.decision == PolicyDecisionType.ALLOW
 
-
-def test_d3_exception_e23_tampered_manifest_role_or_key_fails_closed():
-    """E23: Tampering with an actor's public key or fingerprint inside the manifest fails closed."""
-    priv = ed25519.Ed25519PrivateKey.generate()
-    pub = priv.public_key()
-    fp = hashlib.sha256(pub.public_bytes_raw()).hexdigest()
-
-    rec = ActorKeyRecord("SEC-LEAD", "SECURITY_LEAD", fp, pub, True)
-    manifest = ManifestActorAuthorityResolver(actors={fp: rec})
-    serialized = manifest.to_dict()
-
-    # Tamper with the public_key_hex in the manifest dictionary
-    serialized["actors"][fp]["public_key_hex"] = "0" * 64
-
-    # Deserialization MUST fail closed
-    with pytest.raises(ValueError, match="Corrupt authority manifest"):
-        ManifestActorAuthorityResolver.from_dict(serialized)
-
-    # Missing public_key_hex MUST fail closed
-    serialized["actors"][fp]["public_key_hex"] = ""
-    with pytest.raises(ValueError, match="Missing public_key_hex"):
-        ManifestActorAuthorityResolver.from_dict(serialized)
-
-
-def test_d3_exception_authority_resolver_getter_and_clear():
-    """PolicyActorKeyRegistry getter returns configured resolver and clear resets to None."""
-    resolver = ManifestActorAuthorityResolver()
-    PolicyActorKeyRegistry.set_authority_resolver(resolver)
-    assert PolicyActorKeyRegistry.get_authority_resolver() is resolver
-    PolicyActorKeyRegistry.clear()
-    assert PolicyActorKeyRegistry.get_authority_resolver() is None
-    assert PolicyActorKeyRegistry.lookup_actor("NON_EXISTENT") is None
-    assert PolicyActorKeyRegistry.is_revoked("NON_EXISTENT") is False
-
-
-def test_d3_exception_e24_revocation_survives_process_reload():
-    """E24: Revoked keys in manifest remain strictly revoked across process reload."""
-    priv = ed25519.Ed25519PrivateKey.generate()
-    pub = priv.public_key()
-    fp = hashlib.sha256(pub.public_bytes_raw()).hexdigest()
-
-    rec = ActorKeyRecord("SEC-REVOKED", "SECURITY_LEAD", fp, pub, False)
-    manifest = ManifestActorAuthorityResolver(actors={fp: rec}, revoked_fingerprints={fp})
-    serialized = manifest.to_dict()
-
-    # Reload in new process context
-    PolicyActorKeyRegistry.clear()
-    reloaded = ManifestActorAuthorityResolver.from_dict(serialized)
-    PolicyActorKeyRegistry.set_authority_resolver(reloaded)
-
-    assert PolicyActorKeyRegistry.is_revoked(fp) is True
-
-    obl = make_test_obligation(obl_id="OBL-001")
-    exc = _sign_test_exception(
-        exception_id="EXC-001",
-        obligation_id="OBL-001",
-        policy_id="POL-001",
-        justification="Manual security review approved by security lead with HSM token.",
-        actor_id="SEC-REVOKED",
-        actor_role="SECURITY_LEAD",
-        private_key=priv,
-        compensating_controls=("Audit log monitoring enabled",),
-        auto_enroll=False,
-    )
-    ctx = make_test_context(obl, (), (), exceptions=(exc,))
-    pol = Policy(
-        "POL-001", PolicyScope.PROJECT, 1,
-        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
-    )
-    with pytest.raises(InvalidExceptionError, match="has been revoked"):
+    # Standard policy evaluation uses sealed application root -> REJECTED
+    with pytest.raises(InvalidExceptionError, match="is not enrolled in authority registry"):
         evaluate_policy(pol, ctx)
+
+
+def test_d3_exception_e25_cross_runtime_resolver_transplantation_rejected():
+    """E25: Cross-runtime resolver transplantation rejected via explicit dependency injection boundary."""
+    priv_a = ed25519.Ed25519PrivateKey.generate()
+    pub_a = priv_a.public_key()
+    fp_a = hashlib.sha256(pub_a.public_bytes_raw()).hexdigest()
+
+    priv_b = ed25519.Ed25519PrivateKey.generate()
+    pub_b = priv_b.public_key()
+    fp_b = hashlib.sha256(pub_b.public_bytes_raw()).hexdigest()
+
+    rec_a = ActorKeyRecord("ACTOR-A", "SECURITY_LEAD", fp_a, pub_a, True)
+    rec_b = ActorKeyRecord("ACTOR-B", "SECURITY_LEAD", fp_b, pub_b, True)
+
+    resolver_a = ReadOnlyActorAuthorityResolver(actors={fp_a: rec_a}, revoked_fingerprints=set())
+    resolver_b = ReadOnlyActorAuthorityResolver(actors={fp_b: rec_b}, revoked_fingerprints=set())
+
+    obl = make_test_obligation(obl_id="OBL-001")
+    exc_a = _sign_test_exception(
+        exception_id="EXC-001",
+        obligation_id="OBL-001",
+        policy_id="POL-001",
+        justification="Approved in Runtime A",
+        actor_id="ACTOR-A",
+        actor_role="SECURITY_LEAD",
+        private_key=priv_a,
+        compensating_controls=("Controls A",),
+        auto_enroll=False,
+    )
+    ctx_a = make_test_context(obl, (), (), exceptions=(exc_a,))
+    pol = Policy(
+        "POL-001", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
+    )
+
+    # Evaluating Runtime A exception with Runtime A resolver -> ALLOW
+    dec_a = evaluate_policy(pol, ctx_a, actor_resolver=resolver_a)
+    assert dec_a.decision == PolicyDecisionType.ALLOW
+
+    # Evaluating Runtime A exception with Runtime B resolver -> REJECTED (Zero state leakage)
+    with pytest.raises(InvalidExceptionError, match="is not enrolled in authority registry"):
+        evaluate_policy(pol, ctx_a, actor_resolver=resolver_b)
+
+
+def test_d3_manifest_e26_actor_id_tampering_rejected():
+    """E26: Tampering with actor_id in signed manifest fails root signature verification."""
+    priv = ed25519.Ed25519PrivateKey.generate()
+    pub = priv.public_key()
+    fp = hashlib.sha256(pub.public_bytes_raw()).hexdigest()
+
+    manifest_data = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-001",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={
+            fp: {
+                "actor_id": "LEGIT-ACTOR",
+                "actor_role": "SECURITY_LEAD",
+                "public_key_fingerprint": fp,
+                "public_key_hex": pub.public_bytes_raw().hex(),
+                "is_active": True,
+            }
+        },
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    # Tamper with actor_id
+    manifest_data["actors"][fp]["actor_id"] = "TAMPERED-ACTOR-ID"
+
+    with pytest.raises(InvalidManifestSignatureError):
+        SignedAuthorityManifestLoader.load_from_dict(manifest_data, TEST_AUTHORITY_PUBLIC_KEY)
+
+
+def test_d3_manifest_e27_role_tampering_rejected():
+    """E27: Tampering with actor_role in signed manifest fails root signature verification."""
+    priv = ed25519.Ed25519PrivateKey.generate()
+    pub = priv.public_key()
+    fp = hashlib.sha256(pub.public_bytes_raw()).hexdigest()
+
+    manifest_data = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-001",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={
+            fp: {
+                "actor_id": "LEGIT-ACTOR",
+                "actor_role": "AUDITOR",
+                "public_key_fingerprint": fp,
+                "public_key_hex": pub.public_bytes_raw().hex(),
+                "is_active": True,
+            }
+        },
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    # Tamper with actor_role (privilege escalation attempt)
+    manifest_data["actors"][fp]["actor_role"] = "ROOT_SECURITY_ADMIN"
+
+    with pytest.raises(InvalidManifestSignatureError):
+        SignedAuthorityManifestLoader.load_from_dict(manifest_data, TEST_AUTHORITY_PUBLIC_KEY)
+
+
+def test_d3_manifest_e28_public_key_substitution_rejected():
+    """E28: Substituting public_key_hex in signed manifest fails root signature or fingerprint verification."""
+    priv1 = ed25519.Ed25519PrivateKey.generate()
+    pub1 = priv1.public_key()
+    fp1 = hashlib.sha256(pub1.public_bytes_raw()).hexdigest()
+
+    priv2 = ed25519.Ed25519PrivateKey.generate()
+    pub2 = priv2.public_key()
+
+    manifest_data = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-001",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={
+            fp1: {
+                "actor_id": "LEGIT-ACTOR",
+                "actor_role": "SECURITY_LEAD",
+                "public_key_fingerprint": fp1,
+                "public_key_hex": pub1.public_bytes_raw().hex(),
+                "is_active": True,
+            }
+        },
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    # Substitute public key hex with priv2's public key
+    manifest_data["actors"][fp1]["public_key_hex"] = pub2.public_bytes_raw().hex()
+
+    with pytest.raises((InvalidManifestSignatureError, CorruptManifestError)):
+        SignedAuthorityManifestLoader.load_from_dict(manifest_data, TEST_AUTHORITY_PUBLIC_KEY)
+
+
+def test_d3_manifest_e29_revoked_list_tampering_rejected():
+    """E29: Tampering with revoked_fingerprints in signed manifest fails root signature verification."""
+    priv = ed25519.Ed25519PrivateKey.generate()
+    pub = priv.public_key()
+    fp = hashlib.sha256(pub.public_bytes_raw()).hexdigest()
+
+    manifest_data = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-001",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[fp],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    # Adversary strips the revoked key from the manifest
+    manifest_data["revoked_fingerprints"] = []
+
+    with pytest.raises(InvalidManifestSignatureError):
+        SignedAuthorityManifestLoader.load_from_dict(manifest_data, TEST_AUTHORITY_PUBLIC_KEY)
+
+
+def test_d3_manifest_e30_manifest_signature_tampering_rejected():
+    """E30: Corrupted root signature hex or payload digest fails verification."""
+    manifest_data = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-001",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    # 1. Tamper signature hex
+    tampered_sig_data = dict(manifest_data)
+    tampered_sig_data["root_signature"] = dict(manifest_data["root_signature"])
+    tampered_sig_data["root_signature"]["signature_hex"] = "0" * 128
+    with pytest.raises(InvalidManifestSignatureError):
+        SignedAuthorityManifestLoader.load_from_dict(tampered_sig_data, TEST_AUTHORITY_PUBLIC_KEY)
+
+    # 2. Tamper payload digest
+    tampered_digest_data = dict(manifest_data)
+    tampered_digest_data["root_signature"] = dict(manifest_data["root_signature"])
+    tampered_digest_data["root_signature"]["payload_digest"] = "f" * 64
+    with pytest.raises(InvalidManifestSignatureError):
+        SignedAuthorityManifestLoader.load_from_dict(tampered_digest_data, TEST_AUTHORITY_PUBLIC_KEY)
+
+
+def test_d3_manifest_e31_wrong_root_key_rejected():
+    """E31: Manifest signed with a rogue/untrusted root private key is rejected."""
+    rogue_root_priv = ed25519.Ed25519PrivateKey.generate()
+    manifest_data = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-001",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=rogue_root_priv,
+    )
+
+    with pytest.raises(InvalidManifestSignatureError):
+        SignedAuthorityManifestLoader.load_from_dict(manifest_data, TEST_AUTHORITY_PUBLIC_KEY)
+
+
+def test_d3_manifest_e32_manifest_rollback_downgrade_rejected():
+    """E32: Manifest version downgrade / rollback below min_version is rejected."""
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-001",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    # Attempting to load v1 when min_version is 2 (e.g. following epoch rotation) -> REJECTED
+    with pytest.raises(ManifestRollbackError, match="is older than minimum required version"):
+        SignedAuthorityManifestLoader.load_from_dict(manifest_v1, TEST_AUTHORITY_PUBLIC_KEY, min_version=2)
+
+
+def test_d3_manifest_structural_validation_errors():
+    """Verify structural malformations in signed authority manifest fail closed."""
+    # 1. Non-dict manifest data
+    with pytest.raises(CorruptManifestError, match="must be a dictionary"):
+        SignedAuthorityManifestLoader.load_from_dict("not-a-dict", TEST_AUTHORITY_PUBLIC_KEY)  # type: ignore
+
+    # 2. Missing manifest_id
+    with pytest.raises(CorruptManifestError, match="missing valid 'manifest_id'"):
+        SignedAuthorityManifestLoader.load_from_dict({"manifest_version": 1}, TEST_AUTHORITY_PUBLIC_KEY)
+
+    # 3. Non-integer manifest_version
+    with pytest.raises(CorruptManifestError, match="manifest version must be an integer"):
+        SignedAuthorityManifestLoader.load_from_dict({"manifest_id": "M1", "manifest_version": "invalid"}, TEST_AUTHORITY_PUBLIC_KEY)
+
+    # 4. Missing root signature block
+    with pytest.raises(InvalidManifestSignatureError, match="missing 'root_signature'"):
+        SignedAuthorityManifestLoader.load_from_dict({"manifest_id": "M1", "manifest_version": 1}, TEST_AUTHORITY_PUBLIC_KEY)
+
+    # 5. Invalid root signature hex length
+    with pytest.raises(InvalidManifestSignatureError, match="signature hex is malformed"):
+        SignedAuthorityManifestLoader.load_from_dict(
+            {"manifest_id": "M1", "manifest_version": 1, "root_signature": {"signature_hex": "deadbeef"}},
+            TEST_AUTHORITY_PUBLIC_KEY,
+        )
+
+    # 6. Wrong signer identity
+    with pytest.raises(InvalidManifestSignatureError, match="does not match authoritative root"):
+        SignedAuthorityManifestLoader.load_from_dict(
+            {"manifest_id": "M1", "manifest_version": 1, "root_signature": {"signature_hex": "0" * 128, "signer_identity": "UNTRUSTED"}},
+            TEST_AUTHORITY_PUBLIC_KEY,
+        )
+
+    # 7. Non-Ed25519 root key passed to loader
+    with pytest.raises(TypeError, match="Expected Ed25519PublicKey"):
+        SignedAuthorityManifestLoader.load_from_dict(
+            {"manifest_id": "M1", "manifest_version": 1, "root_signature": {"signature_hex": "0" * 128, "signer_identity": "Gate3AuthoritativeVerifier"}},
+            "not-a-public-key",  # type: ignore
+        )
+
+
+def test_d3_resolver_properties_and_lookup():
+    """Verify ReadOnlyActorAuthorityResolver properties and lookup behaviors."""
+    priv = ed25519.Ed25519PrivateKey.generate()
+    pub = priv.public_key()
+    fp = hashlib.sha256(pub.public_bytes_raw()).hexdigest()
+    rec = ActorKeyRecord("A1", "R1", fp, pub, True)
+    resolver = ReadOnlyActorAuthorityResolver(actors={fp: rec}, revoked_fingerprints=set(), manifest_id="M-PROP", manifest_version=5)
+
+    assert resolver.manifest_id == "M-PROP"
+    assert resolver.manifest_version == 5
+    assert resolver.lookup_actor(fp) is rec
+    assert resolver.lookup_actor("NON_EXISTENT") is None
+    assert resolver.is_revoked(fp) is False
 
 
 def test_d3_exception_gate3_root_actor_binding():
@@ -2765,7 +2999,6 @@ def test_d3_exception_gate3_root_actor_binding():
     obl = make_test_obligation(obl_id="OBL-001")
     g3_priv = TEST_AUTHORITY_PRIVATE_KEY
     g3_pub = TEST_AUTHORITY_PUBLIC_KEY
-    g3_fp = hashlib.sha256(g3_pub.public_bytes_raw()).hexdigest()
 
     # 1. Gate3 key used with mismatched human credentials -> REJECTED
     exc_forged_human = _sign_test_exception(

@@ -129,7 +129,8 @@ class CoverageTrustPredicate:
         return True
 
 
-from typing import Protocol, runtime_checkable
+from types import MappingProxyType
+from typing import Protocol, runtime_checkable, Mapping
 
 
 @dataclass(frozen=True)
@@ -155,20 +156,31 @@ class PolicyActorAuthorityResolver(Protocol):
         ...
 
 
-class ManifestActorAuthorityResolver:
-    """Authoritative, sealed actor authority manifest resolver with durability semantics.
+class ReadOnlyActorAuthorityResolver:
+    """Immutable, read-only actor authority resolver.
     
-    Loads and serves immutable authority state across process restarts.
+    Can only be created by the cryptographically verified SignedAuthorityManifestLoader
+    or isolated test bootstrap helpers.
     """
     def __init__(
         self,
-        actors: Optional[Dict[str, ActorKeyRecord]] = None,
-        revoked_fingerprints: Optional[Set[str]] = None,
-        manifest_id: Optional[str] = None,
+        actors: Dict[str, ActorKeyRecord],
+        revoked_fingerprints: Set[str],
+        manifest_id: str = "MANIFEST-ROOT-001",
+        manifest_version: int = 1,
     ) -> None:
-        self._manifest_id = manifest_id or "MANIFEST-ROOT-001"
-        self._actors: Dict[str, ActorKeyRecord] = dict(actors or {})
-        self._revoked_fingerprints: Set[str] = set(revoked_fingerprints or ())
+        self._manifest_id = manifest_id
+        self._manifest_version = manifest_version
+        self._actors: MappingProxyType[str, ActorKeyRecord] = MappingProxyType(dict(actors))
+        self._revoked_fingerprints: frozenset[str] = frozenset(revoked_fingerprints)
+
+    @property
+    def manifest_id(self) -> str:
+        return self._manifest_id
+
+    @property
+    def manifest_version(self) -> int:
+        return self._manifest_version
 
     def lookup_actor(self, fingerprint: str) -> Optional[ActorKeyRecord]:
         """Read-only lookup of enrolled actor record."""
@@ -178,93 +190,252 @@ class ManifestActorAuthorityResolver:
         """Checks whether an actor key fingerprint is revoked."""
         return fingerprint in self._revoked_fingerprints
 
-    def to_dict(self) -> Dict[str, Any]:
-        """Serializes authority manifest for durable storage / persistence."""
-        actors_data = {}
-        for fp, rec in self._actors.items():
-            pub_hex = rec.public_key.public_bytes_raw().hex() if hasattr(rec.public_key, "public_bytes_raw") else ""
-            actors_data[fp] = {
-                "actor_id": rec.actor_id,
-                "actor_role": rec.actor_role,
-                "public_key_fingerprint": rec.public_key_fingerprint,
-                "public_key_hex": pub_hex,
-                "is_active": rec.is_active,
-            }
-        return {
-            "manifest_id": self._manifest_id,
-            "actors": actors_data,
-            "revoked_fingerprints": sorted(self._revoked_fingerprints),
+
+def canonicalize_authority_manifest_preimage(manifest_dict: Dict[str, Any]) -> bytes:
+    """Produces canonical RFC 8785 (JCS) byte sequence over authority manifest body
+    binding manifest_id, manifest_version, issued_at, actors, and revoked_fingerprints.
+    """
+    from events.serializer import canonicalize_json
+
+    root_sig = manifest_dict.get("root_signature")
+    sig_meta = {}
+    if isinstance(root_sig, dict):
+        sig_meta = {
+            "algorithm": str(root_sig.get("algorithm", "ED25519")),
+            "signer_identity": str(root_sig.get("signer_identity", "Gate3AuthoritativeVerifier")),
+            "public_key_fingerprint": str(root_sig.get("public_key_fingerprint", "")),
+        }
+    elif hasattr(root_sig, "algorithm"):
+        sig_meta = {
+            "algorithm": str(root_sig.algorithm),
+            "signer_identity": str(root_sig.signer_identity),
+            "public_key_fingerprint": str(root_sig.public_key_fingerprint),
         }
 
+    payload = {
+        "manifest_id": str(manifest_dict.get("manifest_id", "")),
+        "manifest_version": int(manifest_dict.get("manifest_version", 1)),
+        "issued_at": str(manifest_dict.get("issued_at", "")),
+        "actors": manifest_dict.get("actors", {}),
+        "revoked_fingerprints": sorted(list(manifest_dict.get("revoked_fingerprints", []))),
+        "signature_metadata": sig_meta,
+    }
+    return canonicalize_json(payload)
+
+
+class SignedAuthorityManifestLoader:
+    """Cryptographically authenticates signed authority manifests against trusted root authority."""
+
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> ManifestActorAuthorityResolver:
-        """Constructs an authoritative resolver from a durable manifest dictionary.
-        Validates cryptographic integrity and public key fingerprints.
-        """
+    def sign_manifest(
+        cls,
+        manifest_id: str,
+        manifest_version: int,
+        issued_at: str,
+        actors: Dict[str, Dict[str, Any]],
+        revoked_fingerprints: List[str],
+        root_private_key: Any,
+        signer_identity: str = "Gate3AuthoritativeVerifier",
+        timestamp: str = "2026-08-19T10:00:00Z",
+    ) -> Dict[str, Any]:
+        """Helper to generate cryptographically authentic SignedAuthorityManifest data."""
+        pub = root_private_key.public_key()
+        fp = hashlib.sha256(pub.public_bytes_raw()).hexdigest()
+
+        dummy_sig = {
+            "algorithm": "ED25519",
+            "signer_identity": signer_identity,
+            "public_key_fingerprint": fp,
+            "payload_digest": "0" * 64,
+            "signature_hex": "0" * 128,
+            "timestamp": timestamp,
+        }
+        manifest_dict = {
+            "manifest_id": manifest_id,
+            "manifest_version": manifest_version,
+            "issued_at": issued_at,
+            "actors": actors,
+            "revoked_fingerprints": sorted(revoked_fingerprints),
+            "root_signature": dummy_sig,
+        }
+        canonical_bytes = canonicalize_authority_manifest_preimage(manifest_dict)
+        payload_digest = hashlib.sha256(canonical_bytes).hexdigest()
+        sig_bytes = root_private_key.sign(canonical_bytes)
+
+        real_sig = {
+            "algorithm": "ED25519",
+            "signer_identity": signer_identity,
+            "public_key_fingerprint": fp,
+            "payload_digest": payload_digest,
+            "signature_hex": sig_bytes.hex(),
+            "timestamp": timestamp,
+        }
+        manifest_dict["root_signature"] = real_sig
+        return manifest_dict
+
+    @classmethod
+    def load_from_dict(
+        cls,
+        data: Dict[str, Any],
+        trusted_root_public_key: Any,
+        min_version: int = 1,
+    ) -> ReadOnlyActorAuthorityResolver:
+        """Validates and loads an authority manifest against the trusted root public key."""
         from cryptography.hazmat.primitives.asymmetric import ed25519
+        from cryptography.exceptions import InvalidSignature
+        from policy.exceptions import (
+            InvalidManifestSignatureError,
+            CorruptManifestError,
+            ManifestRollbackError,
+        )
+
+        if not isinstance(data, dict):
+            raise CorruptManifestError("Authority manifest data must be a dictionary.")
+
+        manifest_id = data.get("manifest_id")
+        if not manifest_id or not isinstance(manifest_id, str):
+            raise CorruptManifestError("Authority manifest missing valid 'manifest_id'.")
+
+        try:
+            manifest_version = int(data.get("manifest_version", 1))
+        except (ValueError, TypeError):
+            raise CorruptManifestError("Authority manifest version must be an integer.")
+
+        if manifest_version < min_version:
+            raise ManifestRollbackError(
+                f"Manifest version {manifest_version} is older than minimum required version {min_version} (rollback rejected)."
+            )
+
+        root_sig = data.get("root_signature")
+        if not root_sig or not isinstance(root_sig, dict):
+            raise InvalidManifestSignatureError("Authority manifest missing 'root_signature' block.")
+
+        sig_hex = root_sig.get("signature_hex", "")
+        if not sig_hex or len(sig_hex) != 128:
+            raise InvalidManifestSignatureError("Authority manifest root signature hex is malformed or invalid length.")
+
+        signer_identity = root_sig.get("signer_identity", "")
+        if signer_identity != "Gate3AuthoritativeVerifier":
+            raise InvalidManifestSignatureError(
+                f"Manifest root signer identity '{signer_identity}' does not match authoritative root 'Gate3AuthoritativeVerifier'."
+            )
+
+        if not isinstance(trusted_root_public_key, ed25519.Ed25519PublicKey):
+            raise TypeError(f"Expected Ed25519PublicKey instance for root key, got {type(trusted_root_public_key).__name__}")
+
+        expected_root_fp = hashlib.sha256(trusted_root_public_key.public_bytes_raw()).hexdigest()
+        sig_root_fp = root_sig.get("public_key_fingerprint", "")
+        if sig_root_fp != expected_root_fp:
+            raise InvalidManifestSignatureError(
+                f"Manifest root key fingerprint '{sig_root_fp}' does not match trusted root key '{expected_root_fp}'."
+            )
+
+        # Verify canonical preimage
+        canonical_bytes = canonicalize_authority_manifest_preimage(data)
+        expected_digest = hashlib.sha256(canonical_bytes).hexdigest()
+        recorded_digest = root_sig.get("payload_digest", "")
+        if recorded_digest != expected_digest:
+            raise InvalidManifestSignatureError(
+                f"Manifest payload digest mismatch: recorded '{recorded_digest}', computed '{expected_digest}'."
+            )
+
+        try:
+            trusted_root_public_key.verify(bytes.fromhex(sig_hex), canonical_bytes)
+        except InvalidSignature:
+            raise InvalidManifestSignatureError("Authority manifest Ed25519 root signature verification failed.")
+
+        # Parse and validate actor records
+        raw_actors = data.get("actors", {})
+        if not isinstance(raw_actors, dict):
+            raise CorruptManifestError("Manifest 'actors' field must be a dictionary.")
+
         actors: Dict[str, ActorKeyRecord] = {}
-        for fp, item in data.get("actors", {}).items():
+        for fp, item in raw_actors.items():
+            if not isinstance(item, dict):
+                raise CorruptManifestError(f"Actor record for '{fp}' must be a dictionary.")
+            actor_id = item.get("actor_id")
+            actor_role = item.get("actor_role")
             pub_hex = item.get("public_key_hex", "")
-            if not pub_hex:
-                raise ValueError(f"Missing public_key_hex for actor '{item.get('actor_id')}'.")
-            pub_key = ed25519.Ed25519PublicKey.from_public_bytes(bytes.fromhex(pub_hex))
+            if not actor_id or not isinstance(actor_id, str):
+                raise CorruptManifestError("Actor record missing valid 'actor_id'.")
+            if not actor_role or not isinstance(actor_role, str):
+                raise CorruptManifestError("Actor record missing valid 'actor_role'.")
+            if not pub_hex or len(pub_hex) != 64:
+                raise CorruptManifestError(f"Actor '{actor_id}' has malformed or missing public_key_hex.")
+
+            try:
+                pub_key = ed25519.Ed25519PublicKey.from_public_bytes(bytes.fromhex(pub_hex))
+            except Exception as e:
+                raise CorruptManifestError(f"Actor '{actor_id}' public key bytes are invalid: {e}")
+
             computed_fp = hashlib.sha256(pub_key.public_bytes_raw()).hexdigest()
             if computed_fp != fp or computed_fp != item.get("public_key_fingerprint"):
-                raise ValueError(
-                    f"Corrupt authority manifest: fingerprint mismatch for actor '{item.get('actor_id')}': "
-                    f"expected '{fp}', computed '{computed_fp}'."
+                raise CorruptManifestError(
+                    f"Actor '{actor_id}' fingerprint mismatch: expected '{fp}', computed '{computed_fp}'."
                 )
+
             actors[fp] = ActorKeyRecord(
-                actor_id=item["actor_id"],
-                actor_role=item["actor_role"],
+                actor_id=actor_id,
+                actor_role=actor_role,
                 public_key_fingerprint=fp,
                 public_key=pub_key,
                 is_active=item.get("is_active", True),
             )
+
         revoked = set(data.get("revoked_fingerprints", []))
-        return cls(
+        return ReadOnlyActorAuthorityResolver(
             actors=actors,
             revoked_fingerprints=revoked,
-            manifest_id=data.get("manifest_id"),
+            manifest_id=manifest_id,
+            manifest_version=manifest_version,
         )
 
 
 class PolicyActorKeyRegistry:
     """Certified actor authority registry boundary (lookup-only for D3 policy evaluation).
     
-    D3 verification consumes an injected authoritative resolver.
-    D3 DOES NOT grant authority or expose public enrollment methods.
+    D3 verification consumes an immutable/sealed authoritative resolver.
+    Arbitrary runtime injection or mutation is prohibited and fails closed.
     """
-    _resolver: Optional[PolicyActorAuthorityResolver] = None
+    _sealed_resolver: Optional[PolicyActorAuthorityResolver] = None
+    _is_sealed: bool = False
 
     @classmethod
-    def set_authority_resolver(cls, resolver: Optional[PolicyActorAuthorityResolver]) -> None:
-        """Injects an authoritative read-only resolver into the D3 evaluation boundary."""
-        cls._resolver = resolver
+    def bootstrap_sealed_resolver(cls, resolver: PolicyActorAuthorityResolver) -> None:
+        """One-time bootstrap of the application-level sealed authority resolver.
+        Fails closed if the resolver is already sealed.
+        """
+        if cls._is_sealed and cls._sealed_resolver is not None:
+            raise RuntimeError("Authority resolver is already sealed and cannot be replaced or re-injected at runtime.")
+        if not isinstance(resolver, PolicyActorAuthorityResolver):
+            raise TypeError("resolver must implement PolicyActorAuthorityResolver protocol.")
+        cls._sealed_resolver = resolver
+        cls._is_sealed = True
 
     @classmethod
-    def get_authority_resolver(cls) -> Optional[PolicyActorAuthorityResolver]:
-        """Returns the currently configured authority resolver."""
-        return cls._resolver
+    def get_sealed_resolver(cls) -> Optional[PolicyActorAuthorityResolver]:
+        """Returns the currently sealed authority resolver."""
+        return cls._sealed_resolver
 
     @classmethod
     def lookup_actor(cls, fingerprint: str) -> Optional[ActorKeyRecord]:
         """Read-only lookup of enrolled actor record."""
-        if cls._resolver is not None:
-            return cls._resolver.lookup_actor(fingerprint)
+        if cls._sealed_resolver is not None:
+            return cls._sealed_resolver.lookup_actor(fingerprint)
         return None
 
     @classmethod
     def is_revoked(cls, fingerprint: str) -> bool:
         """Read-only check if key is revoked."""
-        if cls._resolver is not None:
-            return cls._resolver.is_revoked(fingerprint)
+        if cls._sealed_resolver is not None:
+            return cls._sealed_resolver.is_revoked(fingerprint)
         return False
 
     @classmethod
-    def clear(cls) -> None:
-        """Controlled teardown of injected resolver for test isolation."""
-        cls._resolver = None
+    def clear_for_testing(cls) -> None:
+        """Controlled teardown of sealed resolver strictly for test fixtures."""
+        cls._sealed_resolver = None
+        cls._is_sealed = False
 
 
 def canonicalize_policy_exception_preimage(exception: PolicyException) -> bytes:
@@ -302,6 +473,7 @@ def _check_valid_exception(
     obligation_id: str,
     policy_id: str,
     eval_timestamp: str,
+    actor_resolver: Optional[PolicyActorAuthorityResolver] = None,
 ) -> None:
     """Validates that a PolicyException is active, unexpired, bound to obligation/policy,
     and cryptographically verified with an active Ed25519 signature binding provenance metadata.
@@ -363,10 +535,12 @@ def _check_valid_exception(
 
     # 7. Actor Key Lookup, Revocation Check, and Role/Identity Binding
     actor_fp = actor.public_key_fingerprint
-    if PolicyActorKeyRegistry.is_revoked(actor_fp):
+    resolver = actor_resolver or PolicyActorKeyRegistry.get_sealed_resolver()
+
+    if resolver is not None and resolver.is_revoked(actor_fp):
         raise InvalidExceptionError(f"Authorized actor key '{actor_fp}' has been revoked.")
 
-    enrolled = PolicyActorKeyRegistry.lookup_actor(actor_fp)
+    enrolled = resolver.lookup_actor(actor_fp) if resolver is not None else None
     pub_key = None
 
     if enrolled is not None:
@@ -755,6 +929,7 @@ def evaluate_expression(
 def evaluate_policy(
     policy: Policy,
     context: PolicyEvaluationContext,
+    actor_resolver: Optional[PolicyActorAuthorityResolver] = None,
 ) -> PolicyDecision:
     """Pure, side-effect free, deterministic evaluation of an effective policy against an evaluation context."""
     if not isinstance(policy, Policy):
@@ -778,6 +953,7 @@ def evaluate_policy(
                     context.obligation.obligation_id,
                     policy.policy_id,
                     context.evaluation_timestamp,
+                    actor_resolver=actor_resolver,
                 )
                 applicable_exceptions.append(exc)
             except (ExpiredExceptionError, InvalidExceptionError):

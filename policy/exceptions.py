@@ -23,3 +23,18 @@ class InvalidExceptionError(PolicyEngineError):
 class ExpiredExceptionError(PolicyEngineError):
     """Raised when a PolicyException has expired relative to the evaluation context timestamp."""
     pass
+
+
+class InvalidManifestSignatureError(PolicyEngineError):
+    """Raised when an authority manifest signature fails cryptographic verification against the trusted root."""
+    pass
+
+
+class CorruptManifestError(PolicyEngineError):
+    """Raised when an authority manifest contains corrupted records, invalid keys, or structural tampering."""
+    pass
+
+
+class ManifestRollbackError(PolicyEngineError):
+    """Raised when an authority manifest version is downgraded or rolled back."""
+    pass
