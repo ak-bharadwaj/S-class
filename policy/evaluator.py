@@ -501,6 +501,11 @@ class SignedAuthorityManifestLoader:
 
             provisioner = DeploymentProvisionerRegistry.get_provisioner()
             status = provisioner.get_deployment_status()
+            if status == DeploymentStatus.AUTHORITY_UNAVAILABLE:
+                raise RuntimeError(
+                    "Genesis bootstrap rejected: external deployment authority is AUTHORITY_UNAVAILABLE. "
+                    "Explicit trusted deployment bootstrap required."
+                )
             if status == DeploymentStatus.RECOVERY_REQUIRED:
                 raise RuntimeError(
                     "Genesis bootstrap rejected: deployment is in RECOVERY_REQUIRED state after complete local-state loss. "
@@ -642,12 +647,32 @@ class SignedAuthorityManifestLoader:
                     except OSError:
                         pass
 
-            # 3. Allow one-time bootstrap transition in external authority
-            if hasattr(provisioner, "set_deployment_status"):
-                provisioner.set_deployment_status(DeploymentStatus.UNPROVISIONED)
-
-            # 4. Bootstrap fresh genesis manifest under external provisioning authority
+            # 3. Bootstrap fresh genesis manifest under external provisioning authority (which is now in RECOVERY_AUTHORIZED state)
             return cls.bootstrap_genesis_manifest(data)
+
+    @classmethod
+    def clear_for_testing(cls) -> None:
+        """Controlled teardown strictly for unit test fixtures."""
+        if os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1" and os.environ.get("PYTEST_CURRENT_TEST") is None:
+            raise RuntimeError("Monotonic authority state cannot be reset outside active test fixture harness.")
+        with cls._bootstrap_lock:
+            from events.store import (
+                D2AuthorityManifestStore,
+                D2InstallationProvisioning,
+                DeploymentProvisionerRegistry,
+                InMemoryTestDeploymentProvisioner,
+            )
+            D2InstallationProvisioning.clear_for_testing()
+            store = D2AuthorityManifestStore()
+            for p in [store.file_path, store.file_path + ".lock"]:
+                if os.path.exists(p):
+                    try:
+                        os.remove(p)
+                    except OSError:
+                        pass
+            DeploymentProvisionerRegistry.reset_for_testing()
+            test_prov = InMemoryTestDeploymentProvisioner()
+            DeploymentProvisionerRegistry.bootstrap_provisioner(test_prov)
 
     @classmethod
     def _load_from_dict_with_test_root_override(

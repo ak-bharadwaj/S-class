@@ -1005,10 +1005,12 @@ from enum import Enum
 
 
 class DeploymentStatus(str, Enum):
+    AUTHORITY_UNAVAILABLE = "AUTHORITY_UNAVAILABLE"
     UNPROVISIONED = "UNPROVISIONED"
     PROVISIONING_AUTHORIZED = "PROVISIONING_AUTHORIZED"
     PROVISIONED = "PROVISIONED"
     RECOVERY_REQUIRED = "RECOVERY_REQUIRED"
+    RECOVERY_AUTHORIZED = "RECOVERY_AUTHORIZED"
 
 
 def _is_test_mode_active() -> bool:
@@ -1091,7 +1093,7 @@ class FailClosedDeploymentProvisioner(TrustedDeploymentProvisioner):
         return self._deployment_id
 
     def get_deployment_status(self) -> DeploymentStatus:
-        return DeploymentStatus.UNPROVISIONED
+        return DeploymentStatus.AUTHORITY_UNAVAILABLE
 
     def authorize_initial_provisioning(self, authorization_data: Optional[Dict[str, Any]] = None) -> None:
         raise RuntimeError(
@@ -1145,11 +1147,6 @@ class InMemoryTestDeploymentProvisioner(TrustedDeploymentProvisioner):
         self._check_test_mode()
         with self._lock:
             return self._status
-
-    def set_deployment_status(self, status: DeploymentStatus) -> None:
-        self._check_test_mode()
-        with self._lock:
-            self._status = status
 
     def authorize_initial_provisioning(self, authorization_data: Optional[Dict[str, Any]] = None) -> None:
         self._check_test_mode()
@@ -1263,6 +1260,7 @@ class InMemoryTestDeploymentProvisioner(TrustedDeploymentProvisioner):
                 raise InvalidManifestSignatureError("Reprovisioning authorization Ed25519 signature verification failed.")
 
             self._consumed_auth_ids.add(auth_id)
+            self._status = DeploymentStatus.RECOVERY_AUTHORIZED
             return reprovisioning_authorization
 
     def record_reprovisioned(self, installation_id: str, manifest_id: str, manifest_version: int, root_fingerprint: str) -> None:
@@ -1326,26 +1324,37 @@ class InMemoryTestDeploymentProvisioner(TrustedDeploymentProvisioner):
 
 
 class DeploymentProvisionerRegistry:
-    """Global registry for the external TrustedDeploymentProvisioner."""
+    """Global registry for the external TrustedDeploymentProvisioner.
+    Sealed after bootstrap to prevent runtime replacement of the authority provider.
+    """
     _active_provisioner: Optional[TrustedDeploymentProvisioner] = None
+    _is_sealed: bool = False
     _lock = threading.RLock()
 
     @classmethod
     def get_provisioner(cls) -> TrustedDeploymentProvisioner:
         with cls._lock:
             if cls._active_provisioner is None:
-                if _is_test_mode_active():
-                    cls._active_provisioner = InMemoryTestDeploymentProvisioner()
-                else:
-                    cls._active_provisioner = FailClosedDeploymentProvisioner()
+                return FailClosedDeploymentProvisioner()
             return cls._active_provisioner
 
     @classmethod
-    def set_provisioner(cls, provisioner: TrustedDeploymentProvisioner) -> None:
+    def bootstrap_provisioner(cls, provisioner: TrustedDeploymentProvisioner) -> None:
+        """Injects and seals the external trusted deployment provisioner during composition root initialization.
+        Fails closed on subsequent calls or replacement attempts.
+        """
         with cls._lock:
+            if cls._is_sealed or cls._active_provisioner is not None:
+                raise RuntimeError("DeploymentProvisionerRegistry is already sealed; provisioner replacement is prohibited.")
             if not isinstance(provisioner, TrustedDeploymentProvisioner):
                 raise TypeError("Provisioner must implement TrustedDeploymentProvisioner.")
             cls._active_provisioner = provisioner
+            cls._is_sealed = True
+
+    @classmethod
+    def is_sealed(cls) -> bool:
+        with cls._lock:
+            return cls._is_sealed
 
     @classmethod
     def reset_for_testing(cls) -> None:
@@ -1353,5 +1362,6 @@ class DeploymentProvisionerRegistry:
             raise RuntimeError("reset_for_testing is strictly prohibited outside TEST_MODE.")
         with cls._lock:
             cls._active_provisioner = None
+            cls._is_sealed = False
 
 

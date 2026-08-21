@@ -4591,11 +4591,12 @@ def test_d3_install_e92_restart_after_loss_remains_recovery_required():
             os.remove(p)
 
     # Re-attach external provisioner representing persistent external authority in RECOVERY_REQUIRED state
+    DeploymentProvisionerRegistry.reset_for_testing()
     external_provisioner = InMemoryTestDeploymentProvisioner(
         deployment_id="DEPLOYMENT-PERSISTED-001",
         initial_status=DeploymentStatus.RECOVERY_REQUIRED,
     )
-    DeploymentProvisionerRegistry.set_provisioner(external_provisioner)
+    DeploymentProvisionerRegistry.bootstrap_provisioner(external_provisioner)
 
     assert DeploymentProvisionerRegistry.get_provisioner().get_deployment_status() == DeploymentStatus.RECOVERY_REQUIRED
     with pytest.raises(RuntimeError, match="RECOVERY_REQUIRED"):
@@ -4605,9 +4606,9 @@ def test_d3_install_e92_restart_after_loss_remains_recovery_required():
 def test_d3_install_e93_no_external_provisioner_genesis_rejected():
     """E93: FailClosedDeploymentProvisioner (production default) rejects automatic genesis."""
     SignedAuthorityManifestLoader.clear_for_testing()
-    from events.store import DeploymentProvisionerRegistry, FailClosedDeploymentProvisioner
+    from events.store import DeploymentProvisionerRegistry
 
-    DeploymentProvisionerRegistry.set_provisioner(FailClosedDeploymentProvisioner("PRODUCTION-NODE-001"))
+    DeploymentProvisionerRegistry.reset_for_testing()
 
     manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
         manifest_id="M-E93",
@@ -4618,7 +4619,7 @@ def test_d3_install_e93_no_external_provisioner_genesis_rejected():
         root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
     )
 
-    with pytest.raises(RuntimeError, match="FailClosedDeploymentProvisioner"):
+    with pytest.raises(RuntimeError, match="AUTHORITY_UNAVAILABLE|FailClosedDeploymentProvisioner"):
         SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
 
 
@@ -4846,7 +4847,8 @@ def test_d3_install_e99_external_authority_unavailable_fails_closed():
         def record_reprovisioned(self, *args, **kwargs) -> None:
             raise ConnectionError("External deployment coordinator unreachable.")
 
-    DeploymentProvisionerRegistry.set_provisioner(UnavailableExternalProvisioner())
+    DeploymentProvisionerRegistry.reset_for_testing()
+    DeploymentProvisionerRegistry.bootstrap_provisioner(UnavailableExternalProvisioner())
 
     manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
         manifest_id="M-E99",
@@ -4872,6 +4874,187 @@ def test_d3_install_e100_test_provisioner_inaccessible_outside_test_mode(monkeyp
 
     with pytest.raises(RuntimeError, match="InMemoryTestDeploymentProvisioner is strictly prohibited outside TEST_MODE"):
         InMemoryTestDeploymentProvisioner()
+
+
+def test_d3_install_e101_arbitrary_provisioner_injection_rejected():
+    """E101: Arbitrary provisioner injection after sealing is rejected."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import DeploymentProvisionerRegistry, InMemoryTestDeploymentProvisioner
+
+    # Registry is already sealed during clear_for_testing() bootstrap
+    assert DeploymentProvisionerRegistry.is_sealed()
+
+    attacker_provisioner = InMemoryTestDeploymentProvisioner(deployment_id="ATTACKER-PROVISIONER-001")
+    with pytest.raises(RuntimeError, match="already sealed"):
+        DeploymentProvisionerRegistry.bootstrap_provisioner(attacker_provisioner)
+
+
+def test_d3_install_e102_provisioner_replacement_after_bootstrap_rejected():
+    """E102: Provisioner replacement after legitimate genesis bootstrap is rejected."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import DeploymentProvisionerRegistry, InMemoryTestDeploymentProvisioner
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E102",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+    rogue_provisioner = InMemoryTestDeploymentProvisioner(deployment_id="ROGUE-REPLACEMENT-001")
+    with pytest.raises(RuntimeError, match="already sealed"):
+        DeploymentProvisionerRegistry.bootstrap_provisioner(rogue_provisioner)
+
+
+def test_d3_install_e103_attacker_provisioner_cannot_authorize_genesis():
+    """E103: Attacker-supplied provisioner cannot authorize unauthorized genesis reset."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import (
+        D2AuthorityManifestStore,
+        D2InstallationProvisioning,
+        DeploymentProvisionerRegistry,
+        InMemoryTestDeploymentProvisioner,
+    )
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E103-V1",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+    # Attacker attempts to inject custom provisioner to bypass PROVISIONED status
+    attacker_provisioner = InMemoryTestDeploymentProvisioner(deployment_id="ROGUE-AUTHORITY-001")
+    with pytest.raises(RuntimeError, match="already sealed"):
+        DeploymentProvisionerRegistry.bootstrap_provisioner(attacker_provisioner)
+
+    # Genesis bootstrap still fails closed against the original sealed authority
+    with pytest.raises(RuntimeError, match="already contains history|system has already been provisioned"):
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+
+def test_d3_install_e104_production_env_flag_cannot_enable_test_authority(monkeypatch):
+    """E104: Production environment flag cannot automatically enable test authority without explicit bootstrap."""
+    from events.store import DeploymentProvisionerRegistry, FailClosedDeploymentProvisioner, DeploymentStatus
+
+    # Reset registry without bootstrapping test provisioner
+    DeploymentProvisionerRegistry.reset_for_testing()
+
+    # Even with test flags in environment, default is strictly FailClosedDeploymentProvisioner
+    monkeypatch.setenv("SCLASS_TEST_MODE", "1")
+    monkeypatch.setenv("SCLASS_TEST_FIXTURE_ACTIVE", "1")
+
+    provisioner = DeploymentProvisionerRegistry.get_provisioner()
+    assert isinstance(provisioner, FailClosedDeploymentProvisioner)
+    assert provisioner.get_deployment_status() == DeploymentStatus.AUTHORITY_UNAVAILABLE
+
+
+def test_d3_install_e105_d3_cannot_call_concrete_provisioner_mutation_apis():
+    """E105: D3 interactions with external authority rely strictly on TrustedDeploymentProvisioner ABC."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import (
+        DeploymentProvisionerRegistry,
+        TrustedDeploymentProvisioner,
+        DeploymentStatus,
+    )
+
+    # Pure minimal implementation of TrustedDeploymentProvisioner with NO concrete helper/mutation methods
+    class StrictCanonicalProvisioner(TrustedDeploymentProvisioner):
+        def __init__(self):
+            self.status = DeploymentStatus.UNPROVISIONED
+        def get_deployment_id(self) -> str:
+            return "STRICT-CANONICAL-001"
+        def get_deployment_status(self) -> DeploymentStatus:
+            return self.status
+        def authorize_initial_provisioning(self, authorization_data=None) -> None:
+            self.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+        def record_provisioned(self, installation_id, manifest_id, manifest_version, root_fingerprint) -> None:
+            self.status = DeploymentStatus.PROVISIONED
+        def notify_local_state_loss(self) -> None:
+            self.status = DeploymentStatus.RECOVERY_REQUIRED
+        def authorize_reprovisioning(self, reprovisioning_authorization, root_public_key=None) -> Dict[str, Any]:
+            self.status = DeploymentStatus.RECOVERY_AUTHORIZED
+            return reprovisioning_authorization
+        def record_reprovisioned(self, installation_id, manifest_id, manifest_version, root_fingerprint) -> None:
+            self.status = DeploymentStatus.PROVISIONED
+
+    DeploymentProvisionerRegistry.reset_for_testing()
+    canonical_prov = StrictCanonicalProvisioner()
+    DeploymentProvisionerRegistry.bootstrap_provisioner(canonical_prov)
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E105",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    res = SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+    assert res.manifest_id == "M-E105"
+    assert canonical_prov.get_deployment_status() == DeploymentStatus.PROVISIONED
+
+
+def test_d3_install_e106_recovery_requires_canonical_interface_and_preserves_immutable_identity():
+    """E106: Recovery requires canonical interface and preserves immutable deployment identity."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import (
+        D2AuthorityManifestStore,
+        D2InstallationProvisioning,
+        DeploymentProvisionerRegistry,
+        InMemoryTestDeploymentProvisioner,
+        DeploymentStatus,
+    )
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E106-ORIGINAL",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+    provisioner = DeploymentProvisionerRegistry.get_provisioner()
+    original_dep_id = provisioner.get_deployment_id()
+
+    # Wipe local files
+    store = D2AuthorityManifestStore()
+    marker = D2InstallationProvisioning.get_marker_path()
+    stage = D2InstallationProvisioning.get_stage_path()
+    for p in [store.file_path, marker, stage]:
+        if os.path.exists(p):
+            os.remove(p)
+
+    recovery_manifest = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E106-RECOVERED",
+        manifest_version=1,
+        issued_at="2026-08-21T12:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    reprov_auth = InMemoryTestDeploymentProvisioner.create_reprovisioning_authorization(
+        deployment_id=original_dep_id,
+        target_manifest_id="M-E106-RECOVERED",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    res = SignedAuthorityManifestLoader.reprovision_catastrophic_recovery(
+        data=recovery_manifest,
+        reprovisioning_authorization=reprov_auth,
+    )
+    assert res.manifest_id == "M-E106-RECOVERED"
+    assert provisioner.get_deployment_id() == original_dep_id
+    assert provisioner.get_deployment_status() == DeploymentStatus.PROVISIONED
 
 
 
