@@ -21,6 +21,7 @@ from planner.generator import CandidateGenerator
 from planner.lease import PlanningLease, PlanningLeaseManager
 from planner.models import (
     ExecutionStrategyArtifact,
+    Plan,
     PlanQualityScore,
     PlanRuntimeEnvelope,
     PlanStatus,
@@ -127,16 +128,29 @@ class PlannerSession:
         admissible_plans.sort(key=lambda item: item[1].progress_potential, reverse=True)
         best_strategy, best_score = admissible_plans[0]
 
-        # Compute fingerprints
-        strat_fp = compute_execution_strategy_fingerprint(best_strategy)
-        semantic_fp = compute_plan_semantic_fingerprint(
+        # Extract obligation IDs
+        obligation_ids = tuple(
+            obl.get("obligation_id", "") for obl in state_view.content.obligations if isinstance(obl, dict) and "obligation_id" in obl
+        ) or tuple(state_view.content.executable_frontier)
+
+        d0_plan = Plan(
+            plan_id=best_strategy.plan_id,
             task_id=self.task_id,
+            version=best_strategy.plan_revision,
             milestones=state_view.content.milestones,
-            claims=state_view.content.claims,
-            obligations=state_view.content.obligations,
+            architecture_claims=state_view.content.claims,
+            obligation_ids=obligation_ids,
+            status=PlanStatus.VALIDATED,
+            created_at=state_view.metadata.projected_at,
+            rationale="Deterministic S-Class plan synthesized from state projection",
         )
 
+        # Compute fingerprints
+        strat_fp = compute_execution_strategy_fingerprint(best_strategy)
+        semantic_fp = compute_plan_semantic_fingerprint(d0_plan)
+
         envelope = PlanRuntimeEnvelope(
+            plan=d0_plan,
             strategy=best_strategy,
             fencing_token=self._active_lease.fencing_token,
             lease_epoch=self._active_lease.lease_epoch,
@@ -198,13 +212,24 @@ class PlannerSession:
         admissible_plans.sort(key=lambda item: item[1].progress_potential, reverse=True)
         best_strategy, best_score = admissible_plans[0]
 
-        strat_fp = compute_execution_strategy_fingerprint(best_strategy)
-        semantic_fp = compute_plan_semantic_fingerprint(
+        obligation_ids = tuple(
+            obl.get("obligation_id", "") for obl in state_view.content.obligations if isinstance(obl, dict) and "obligation_id" in obl
+        ) or tuple(state_view.content.executable_frontier)
+
+        d0_plan = Plan(
+            plan_id=best_strategy.plan_id,
             task_id=self.task_id,
+            version=best_strategy.plan_revision,
             milestones=state_view.content.milestones,
-            claims=state_view.content.claims,
-            obligations=state_view.content.obligations,
+            architecture_claims=state_view.content.claims,
+            obligation_ids=obligation_ids,
+            status=PlanStatus.VALIDATED,
+            created_at=state_view.metadata.projected_at,
+            rationale="Replanned S-Class plan synthesized from state delta",
         )
+
+        strat_fp = compute_execution_strategy_fingerprint(best_strategy)
+        semantic_fp = compute_plan_semantic_fingerprint(d0_plan)
 
         # Record replan in convergence monitor (validates budget, state delta, and oscillation)
         self._convergence.record_replan(
@@ -214,6 +239,7 @@ class PlannerSession:
         )
 
         envelope = PlanRuntimeEnvelope(
+            plan=d0_plan,
             strategy=best_strategy,
             fencing_token=self._active_lease.fencing_token,
             lease_epoch=self._active_lease.lease_epoch,

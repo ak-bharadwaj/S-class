@@ -31,6 +31,36 @@ class PlanStatus(str, Enum):
     UNDER_REVIEW = "UNDER_REVIEW"
     VALIDATED = "VALIDATED"
     REJECTED = "REJECTED"
+    SUPERSEDED = "SUPERSEDED"
+
+
+@dataclass(frozen=True)
+class Plan:
+    """Canonical D0 Plan Entity (§3.6, §8.1)."""
+    plan_id: str
+    task_id: str
+    version: int
+    milestones: Tuple[Mapping[str, Any], ...] = field(default_factory=tuple)
+    architecture_claims: Tuple[Mapping[str, Any], ...] = field(default_factory=tuple)
+    obligation_ids: Tuple[str, ...] = field(default_factory=tuple)
+    status: PlanStatus = PlanStatus.DRAFT
+    created_at: str = ""
+    rationale: str = ""
+
+    def __post_init__(self):
+        if not self.plan_id:
+            raise ValueError("plan_id cannot be empty.")
+        _validate_pattern(self.task_id, TASK_ID_PATTERN, "task_id")
+        if not isinstance(self.version, int) or self.version < 1:
+            raise ValueError("version must be an integer >= 1.")
+        if not isinstance(self.status, PlanStatus):
+            raise TypeError("status must be a PlanStatus instance.")
+        if self.created_at:
+            _validate_iso8601(self.created_at, "created_at")
+
+        object.__setattr__(self, "milestones", _freeze_nested(self.milestones))
+        object.__setattr__(self, "architecture_claims", _freeze_nested(self.architecture_claims))
+        object.__setattr__(self, "obligation_ids", tuple(self.obligation_ids))
 
 
 @dataclass(frozen=True)
@@ -170,6 +200,7 @@ class PlannerStateView:
 @dataclass(frozen=True)
 class PlanRuntimeEnvelope:
     """Runtime envelope binding the D0 Plan, ExecutionStrategy, and active fencing coordinates."""
+    plan: Plan
     strategy: ExecutionStrategyArtifact
     fencing_token: int
     lease_epoch: int
@@ -182,6 +213,8 @@ class PlanRuntimeEnvelope:
     status: PlanStatus = PlanStatus.DRAFT
 
     def __post_init__(self):
+        if not isinstance(self.plan, Plan):
+            raise TypeError("plan must be a Plan instance.")
         if not isinstance(self.strategy, ExecutionStrategyArtifact):
             raise TypeError("strategy must be an ExecutionStrategyArtifact instance.")
         if not isinstance(self.fencing_token, int) or self.fencing_token < 0:

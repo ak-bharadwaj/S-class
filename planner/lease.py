@@ -7,29 +7,36 @@ fsync barrier guarantees, and strictly monotonic fencing tokens.
 from __future__ import annotations
 import json
 import os
-import sys
 import time
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from domain.models import _validate_iso8601
-from domain.types import TASK_ID_PATTERN
+from file_lock import NativeLock
 from planner.models import PlanningLease
 
 
-class LeaseAcquisitionError(RuntimeError):
-    """Raised when lease acquisition fails due to active ownership by another worker."""
+class LeaseAcquisitionError(Exception):
+    """Raised when lease acquisition fails due to contention, timeout, or active ownership."""
     pass
 
 
-class LeaseValidationError(RuntimeError):
-    """Raised when lease renewal or release fails due to expired or lost ownership."""
+class LeaseValidationError(Exception):
+    """Raised when a lease verification fails due to stale tokens, epoch mismatch, or expiry."""
     pass
 
 
 class PlanningLeaseManager:
-    """Manages cross-worker planning leases with kernel-enforced mutual exclusion."""
+    """Atomic planning lease manager for single-node and shared-filesystem environments (§8.1, §8.2).
+
+    Uses OS-native kernel advisory locking (NativeLock via POSIX fcntl / Windows msvcrt) to prevent
+    concurrent acquisition races, os.fsync for durability, atomic os.replace for crash safety,
+    and monotonic fencing token recovery.
+
+    Scope: Provides robust mutual exclusion on a single node or across a shared POSIX/SMB filesystem
+    supporting standard kernel byte-range/flock locks. Distributed multi-cluster coordination requires
+    an external consensus coordinator (such as etcd Raft or ZooKeeper).
+    """
 
     def __init__(self, lease_dir: str = ".leases", base_fencing_token: int = 0):
         self._lease_dir = os.path.abspath(lease_dir)
@@ -43,8 +50,8 @@ class PlanningLeaseManager:
         return os.path.join(self._lease_dir, f"{task_id}.json")
 
     def _sync_dir(self):
-        """Synchronizes directory metadata to persistent storage."""
-        if hasattr(os, "O_DIRECTORY") and sys.platform != "win32":
+        """Flushes directory metadata to disk on POSIX systems."""
+        if hasattr(os, "O_DIRECTORY"):
             try:
                 dir_fd = os.open(self._lease_dir, os.O_RDONLY | os.O_DIRECTORY)
                 try:
@@ -54,44 +61,22 @@ class PlanningLeaseManager:
             except OSError:
                 pass
 
-    def _acquire_lock(self, task_id: str, timeout_seconds: float = 5.0) -> int:
-        """Acquires exclusive kernel-level lockfile via O_CREAT | O_EXCL."""
-        lock_file = self._lock_path(task_id)
-        start_time = time.time()
-        while True:
-            try:
-                fd = os.open(lock_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-                return fd
-            except (FileExistsError, PermissionError):
-                # Check for abandoned lock (older than 10 seconds)
-                try:
-                    mtime = os.path.getmtime(lock_file)
-                    if time.time() - mtime > 10.0:
-                        try:
-                            os.unlink(lock_file)
-                            continue
-                        except OSError:
-                            pass
-                except OSError:
-                    pass
-
-                if time.time() - start_time >= timeout_seconds:
-                    raise LeaseAcquisitionError(
-                        f"Timeout acquiring kernel lock for task '{task_id}'."
-                    )
-                time.sleep(0.02)
-
-    def _release_lock(self, task_id: str, fd: int):
-        """Closes and unlinks the kernel lockfile."""
-        lock_file = self._lock_path(task_id)
+    def _acquire_lock(self, task_id: str, timeout_seconds: float = 5.0) -> NativeLock:
+        """Acquires exclusive OS-native kernel advisory lock without mtime deletion."""
+        lock = NativeLock(self._lock_path(task_id), timeout=timeout_seconds, poll_interval=0.01)
         try:
-            os.close(fd)
-        except OSError:
-            pass
+            lock.__enter__()
+            return lock
+        except TimeoutError:
+            raise LeaseAcquisitionError(
+                f"Timeout acquiring kernel lock for task '{task_id}'."
+            )
+
+    def _release_lock(self, task_id: str, lock: NativeLock):
+        """Releases the OS-native kernel advisory lock."""
         try:
-            if os.path.exists(lock_file):
-                os.unlink(lock_file)
-        except OSError:
+            lock.__exit__(None, None, None)
+        except Exception:
             pass
 
     def _read_lease_file(self, task_id: str) -> Optional[PlanningLease]:
@@ -155,7 +140,7 @@ class PlanningLeaseManager:
         if ttl_seconds <= 0:
             raise ValueError("ttl_seconds must be > 0.")
 
-        fd = self._acquire_lock(task_id)
+        lock = self._acquire_lock(task_id)
         try:
             current_lease = self._read_lease_file(task_id)
             now = datetime.now(timezone.utc)
@@ -194,7 +179,7 @@ class PlanningLeaseManager:
             self._write_lease_file(lease)
             return lease
         finally:
-            self._release_lock(task_id, fd)
+            self._release_lock(task_id, lock)
 
     def _renew_under_lock(
         self,
@@ -224,7 +209,7 @@ class PlanningLeaseManager:
         if not isinstance(lease, PlanningLease):
             raise TypeError("lease must be a PlanningLease instance.")
 
-        fd = self._acquire_lock(lease.task_id)
+        lock = self._acquire_lock(lease.task_id)
         try:
             current_lease = self._read_lease_file(lease.task_id)
             if not current_lease or not current_lease.is_active:
@@ -239,14 +224,14 @@ class PlanningLeaseManager:
             now = datetime.now(timezone.utc)
             return self._renew_under_lock(current_lease, ttl_seconds, now)
         finally:
-            self._release_lock(lease.task_id, fd)
+            self._release_lock(lease.task_id, lock)
 
     def release_lease(self, lease: PlanningLease) -> bool:
         """Voluntarily releases the planning lease."""
         if not isinstance(lease, PlanningLease):
             return False
 
-        fd = self._acquire_lock(lease.task_id)
+        lock = self._acquire_lock(lease.task_id)
         try:
             current_lease = self._read_lease_file(lease.task_id)
             if not current_lease or not current_lease.is_active:
@@ -269,7 +254,7 @@ class PlanningLeaseManager:
                 return True
             return False
         finally:
-            self._release_lock(lease.task_id, fd)
+            self._release_lock(lease.task_id, lock)
 
     def get_active_lease(self, task_id: str) -> Optional[PlanningLease]:
         """Returns the current active lease if not expired."""

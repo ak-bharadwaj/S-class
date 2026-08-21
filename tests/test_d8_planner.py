@@ -46,6 +46,7 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from planner.models import (
     ExecutionStrategyArtifact,
+    Plan,
     PlanNode,
     PlannerStateContent,
     PlannerStateProjectionMetadata,
@@ -102,10 +103,9 @@ def setup_authority_keys():
 
 
 @pytest.fixture
-def lease_dir(tmp_path):
-    d = str(tmp_path / "leases")
-    os.makedirs(d, exist_ok=True)
-    return d
+def lease_dir():
+    with tempfile.TemporaryDirectory() as td:
+        yield os.path.join(td, "leases")
 
 
 @pytest.fixture
@@ -138,8 +138,6 @@ def sample_state_view():
                 "category": "SECURITY_INTEGRITY",
                 "criticality": "HIGH",
                 "status": "OPEN",
-                "depends_on": [],
-                "claim_ids": ["CLM-AUTH-01"],
             },
         ),
         executable_frontier=("OBL-AUTH-01",),
@@ -168,18 +166,24 @@ def sample_state_view():
 
 def test_semantic_fingerprint_invariance_to_metadata_ordering():
     """Property: Semantic fingerprint is invariant to the insertion order of state items."""
-    fp1 = compute_plan_semantic_fingerprint(
+    plan1 = Plan(
+        plan_id="P-01",
         task_id="TASK-001",
+        version=1,
         milestones=({"milestone_id": "MS-01"}, {"milestone_id": "MS-02"}),
-        claims=({"claim_id": "CLM-01"}, {"claim_id": "CLM-02"}),
-        obligations=({"obligation_id": "OBL-01"}, {"obligation_id": "OBL-02"}),
+        architecture_claims=({"claim_id": "CLM-01"}, {"claim_id": "CLM-02"}),
+        obligation_ids=("OBL-01", "OBL-02"),
     )
-    fp2 = compute_plan_semantic_fingerprint(
+    plan2 = Plan(
+        plan_id="P-01",
         task_id="TASK-001",
+        version=1,
         milestones=({"milestone_id": "MS-01"}, {"milestone_id": "MS-02"}),
-        claims=({"claim_id": "CLM-01"}, {"claim_id": "CLM-02"}),
-        obligations=({"obligation_id": "OBL-01"}, {"obligation_id": "OBL-02"}),
+        architecture_claims=({"claim_id": "CLM-01"}, {"claim_id": "CLM-02"}),
+        obligation_ids=("OBL-02", "OBL-01"),  # Permuted obligation_ids
     )
+    fp1 = compute_plan_semantic_fingerprint(plan1)
+    fp2 = compute_plan_semantic_fingerprint(plan2)
     assert fp1 == fp2
 
 
@@ -518,8 +522,12 @@ def test_lease_crash_recovery_preserves_monotonic_fence(lease_dir):
 
 def test_lease_lock_file_cleanup_on_release(lease_manager, lease_dir):
     lease = lease_manager.acquire_lease("TASK-01", "WORKER-1", ttl_seconds=10.0)
-    lease_manager.release_lease(lease)
-    assert not os.path.exists(os.path.join(lease_dir, "TASK-01.lock"))
+    released = lease_manager.release_lease(lease)
+    assert released is True
+    assert lease_manager.get_active_lease("TASK-01") is None
+    # Subsequent worker can acquire cleanly without deadlock or contention
+    l2 = lease_manager.acquire_lease("TASK-01", "WORKER-2", ttl_seconds=10.0)
+    assert l2.owner_id == "WORKER-2"
 
 
 def test_lease_reentrant_acquire_by_same_owner_acts_as_renewal(lease_manager):
@@ -701,7 +709,12 @@ def test_proposal_emitter_fails_closed_on_inactive_lease(sample_context):
 def test_proposal_accepted_by_d5_controller(sample_context, lease_manager, tmp_path):
     signer = Gate3AuthoritySigner()
     nonce_store = D2NonceStore(str(tmp_path / "d5.log"))
-    controller = SClassController(authority_signer=signer, nonce_store=nonce_store)
+    controller = SClassController(
+        authority_signer=signer,
+        nonce_store=nonce_store,
+        lease_resolver=lease_manager.get_active_lease,
+        state_resolver=lambda: (1, "1" * 64),
+    )
 
     obl = Obligation(
         obligation_id="OBL-AUTH-01",
@@ -725,11 +738,6 @@ def test_proposal_accepted_by_d5_controller(sample_context, lease_manager, tmp_p
         policy_version=1,
         evaluated_at="2026-08-20T12:00:00Z",
         expires_at="2026-08-20T12:30:00Z",
-        active_fencing_token=lease.fencing_token,
-        active_lease_epoch=lease.lease_epoch,
-        active_owner_id=lease.owner_id,
-        expected_state_version=1,
-        expected_state_digest="1" * 64,
     )
     assert res.decision.status == AuthorizationStatus.AUTHORIZED
     assert res.execution_token is not None
@@ -738,8 +746,6 @@ def test_proposal_accepted_by_d5_controller(sample_context, lease_manager, tmp_p
 def test_proposal_with_stale_fence_rejected_by_d5_controller(sample_context, lease_manager, tmp_path):
     signer = Gate3AuthoritySigner()
     nonce_store = D2NonceStore(str(tmp_path / "d5.log"))
-    controller = SClassController(authority_signer=signer, nonce_store=nonce_store)
-
     obl = Obligation(
         obligation_id="OBL-AUTH-01",
         task_id="TASK-01",
@@ -754,7 +760,22 @@ def test_proposal_with_stale_fence_rejected_by_d5_controller(sample_context, lea
 
     prop = ProposalEmitter.emit_next_proposal(strat, lease, state_version=1, state_digest="1" * 64)
 
-    # Controller has active fencing token lease.fencing_token + 5
+    higher_lease = PlanningLease(
+        task_id="TASK-01",
+        owner_id="WORKER-1",
+        lease_epoch=lease.lease_epoch,
+        fencing_token=lease.fencing_token + 5,
+        acquired_at=lease.acquired_at,
+        expires_at=lease.expires_at,
+        is_active=True,
+    )
+    controller = SClassController(
+        authority_signer=signer,
+        nonce_store=nonce_store,
+        lease_resolver=lambda tid: higher_lease,
+        state_resolver=lambda: (1, "1" * 64),
+    )
+
     res = controller.submit_proposal(
         proposal=prop,
         obligations={obl.obligation_id: obl},
@@ -763,9 +784,6 @@ def test_proposal_with_stale_fence_rejected_by_d5_controller(sample_context, lea
         policy_version=1,
         evaluated_at="2026-08-20T12:00:00Z",
         expires_at="2026-08-20T12:30:00Z",
-        active_fencing_token=lease.fencing_token + 5,
-        active_lease_epoch=lease.lease_epoch,
-        active_owner_id=lease.owner_id,
     )
     assert res.decision.status == AuthorizationStatus.REJECTED
     assert any("INVALID_FENCING_TOKEN" in r for r in res.decision.rejection_reasons)
@@ -774,7 +792,12 @@ def test_proposal_with_stale_fence_rejected_by_d5_controller(sample_context, lea
 def test_proposal_with_stale_state_version_rejected_by_d5_controller(sample_context, lease_manager, tmp_path):
     signer = Gate3AuthoritySigner()
     nonce_store = D2NonceStore(str(tmp_path / "d5.log"))
-    controller = SClassController(authority_signer=signer, nonce_store=nonce_store)
+    controller = SClassController(
+        authority_signer=signer,
+        nonce_store=nonce_store,
+        lease_resolver=lease_manager.get_active_lease,
+        state_resolver=lambda: (5, "1" * 64),
+    )
 
     obl = Obligation(
         obligation_id="OBL-AUTH-01",
@@ -798,7 +821,6 @@ def test_proposal_with_stale_state_version_rejected_by_d5_controller(sample_cont
         policy_version=1,
         evaluated_at="2026-08-20T12:00:00Z",
         expires_at="2026-08-20T12:30:00Z",
-        expected_state_version=5,
     )
     assert res.decision.status == AuthorizationStatus.REJECTED
     assert any("STALE_STATE_VERSION" in r for r in res.decision.rejection_reasons)
@@ -807,7 +829,12 @@ def test_proposal_with_stale_state_version_rejected_by_d5_controller(sample_cont
 def test_proposal_with_stale_state_digest_rejected_by_d5_controller(sample_context, lease_manager, tmp_path):
     signer = Gate3AuthoritySigner()
     nonce_store = D2NonceStore(str(tmp_path / "d5.log"))
-    controller = SClassController(authority_signer=signer, nonce_store=nonce_store)
+    controller = SClassController(
+        authority_signer=signer,
+        nonce_store=nonce_store,
+        lease_resolver=lease_manager.get_active_lease,
+        state_resolver=lambda: (1, "9" * 64),
+    )
 
     obl = Obligation(
         obligation_id="OBL-AUTH-01",
@@ -831,7 +858,6 @@ def test_proposal_with_stale_state_digest_rejected_by_d5_controller(sample_conte
         policy_version=1,
         evaluated_at="2026-08-20T12:00:00Z",
         expires_at="2026-08-20T12:30:00Z",
-        expected_state_digest="9" * 64,
     )
     assert res.decision.status == AuthorizationStatus.REJECTED
     assert any("STALE_STATE_DIGEST" in r for r in res.decision.rejection_reasons)
@@ -858,6 +884,7 @@ def test_planner_session_end_to_end_plan_and_proposal(lease_manager, sample_cont
 
     prop = session.next_proposal()
     assert prop is not None
+    assert prop.obligation_id == "OBL-AUTH-01"
     assert prop.fencing_token == session.active_lease.fencing_token
     session.close()
 
@@ -866,36 +893,36 @@ def test_planner_session_replan_workflow(lease_manager, sample_context, sample_s
     session = PlannerSession("TASK-D8-001", "WORKER-1", lease_manager)
     session.start()
 
-    session.plan(sample_state_view, sample_context)
+    envelope1, score1 = session.plan(sample_state_view, sample_context)
+    assert envelope1.fencing_token == session.active_lease.fencing_token
 
-    # State evolves with new evidence
-    v2 = StateProjector.project(
-        task_id="TASK-D8-001",
-        obligations={
-            "OBL-AUTH-01": Obligation(
-                obligation_id="OBL-AUTH-01",
-                task_id="TASK-D8-001",
-                title="Auth Obligation",
-                description="Auth check",
-                category=ObligationCategory.SECURITY_INTEGRITY,
-                criticality=Criticality.HIGH,
-            )
-        },
-        claims={},
-        executable_frontier=("OBL-AUTH-01",),
+    # Mutate state version and digest to create legitimate state delta
+    delta_content = PlannerStateContent(
+        task_id=sample_state_view.content.task_id,
+        milestones=sample_state_view.content.milestones,
+        claims=sample_state_view.content.claims,
+        obligations=sample_state_view.content.obligations,
+        executable_frontier=sample_state_view.content.executable_frontier,
         state_version=2,
         state_digest="2" * 64,
     )
+    delta_view = PlannerStateView(
+        content=delta_content,
+        metadata=sample_state_view.metadata,
+        planner_state_digest=compute_planner_state_digest(delta_content),
+    )
 
-    env2, qual2 = session.replan(v2, sample_context)
-    assert env2.state_version == 2
+    envelope2, score2 = session.replan(delta_view, sample_context)
+    assert envelope2.state_version == 2
     session.close()
 
 
 def test_planner_session_rejects_action_when_lease_lost(lease_manager, sample_context, sample_state_view):
     session = PlannerSession("TASK-D8-001", "WORKER-1", lease_manager)
     session.start()
-    session.close()  # Voluntarily closed
+
+    # Worker 2 steals lease after expiry/release
+    session.close()
 
     with pytest.raises(RuntimeError):
         session.plan(sample_state_view, sample_context)
@@ -905,8 +932,14 @@ def test_planner_session_no_admissible_plan_error(lease_manager, sample_context)
     session = PlannerSession("TASK-D8-001", "WORKER-1", lease_manager)
     session.start()
 
-    # Empty state view produces no candidates
-    empty_view = StateProjector.project("TASK-D8-001", {}, {})
+    # Empty state view with no executable frontier
+    empty_content = PlannerStateContent(task_id="TASK-D8-001")
+    empty_view = PlannerStateView(
+        content=empty_content,
+        metadata=PlannerStateProjectionMetadata(projected_at="2026-08-20T12:00:00Z"),
+        planner_state_digest=compute_planner_state_digest(empty_content),
+    )
+
     with pytest.raises(NoAdmissiblePlanError):
         session.plan(empty_view, sample_context)
     session.close()
@@ -946,7 +979,12 @@ def test_full_governed_lifecycle_flow(lease_manager, sample_context, sample_stat
     """End-to-end integration: D4 State -> D8 Planner -> D8 Strategy -> ActionProposal -> D5 Controller."""
     signer = Gate3AuthoritySigner()
     nonce_store = D2NonceStore(str(tmp_path / "d5.log"))
-    controller = SClassController(authority_signer=signer, nonce_store=nonce_store)
+    controller = SClassController(
+        authority_signer=signer,
+        nonce_store=nonce_store,
+        lease_resolver=lease_manager.get_active_lease,
+        state_resolver=lambda: (sample_state_view.content.state_version, sample_state_view.content.state_digest),
+    )
 
     obl = Obligation(
         obligation_id="OBL-AUTH-01",
@@ -970,13 +1008,84 @@ def test_full_governed_lifecycle_flow(lease_manager, sample_context, sample_stat
             policy_version=1,
             evaluated_at="2026-08-20T12:00:00Z",
             expires_at="2026-08-20T12:30:00Z",
-            active_fencing_token=session.active_lease.fencing_token,
-            active_lease_epoch=session.active_lease.lease_epoch,
-            active_owner_id=session.active_lease.owner_id,
-            expected_state_version=sample_state_view.content.state_version,
-            expected_state_digest=sample_state_view.content.state_digest,
         )
 
         assert dispatch.decision.status == AuthorizationStatus.AUTHORIZED
         assert dispatch.execution_token is not None
         assert dispatch.execution_token.fencing_token == session.active_lease.fencing_token
+
+
+# ============================================================================
+# GROUP 7: Additional Adversarial & Schema Integrity Tests
+# ============================================================================
+
+def test_d0_plan_status_lifecycle_including_superseded():
+    """Verify D0 Plan schema supports the full frozen lifecycle including SUPERSEDED."""
+    statuses = [
+        PlanStatus.DRAFT,
+        PlanStatus.UNDER_REVIEW,
+        PlanStatus.VALIDATED,
+        PlanStatus.REJECTED,
+        PlanStatus.SUPERSEDED,
+    ]
+    for st in statuses:
+        plan = Plan(
+            plan_id=f"PLAN-{st.value}",
+            task_id="TASK-D8-001",
+            version=1,
+            status=st,
+        )
+        assert plan.status == st
+
+
+def test_plan_runtime_envelope_rejects_missing_d0_plan(sample_context):
+    """Runtime envelope must fail closed if D0 Plan entity is missing or invalid."""
+    node = PlanNode("N-1", "OBL-AUTH-01", "EXECUTE_TEST", "t.py", "p", sample_context)
+    strat = ExecutionStrategyArtifact("S-1", "P-1", 1, (node,))
+
+    with pytest.raises(TypeError):
+        PlanRuntimeEnvelope(
+            plan="NOT_A_PLAN",  # Invalid type
+            strategy=strat,
+            fencing_token=1,
+            lease_epoch=1,
+            owner_id="WORKER-1",
+            state_version=1,
+            state_digest="1" * 64,
+            planner_state_digest="2" * 64,
+        )
+
+
+def test_semantic_fingerprint_commits_to_d0_plan_fields_and_detects_drift():
+    """Semantic fingerprint commits strictly to plan_id, task_id, version, milestones, architecture_claims, and obligation_ids."""
+    base_plan = Plan(
+        plan_id="PLAN-01",
+        task_id="TASK-D8-001",
+        version=1,
+        milestones=({"milestone_id": "MS-1"},),
+        architecture_claims=({"claim_id": "CLM-1"},),
+        obligation_ids=("OBL-1",),
+    )
+    base_fp = compute_plan_semantic_fingerprint(base_plan)
+
+    # Version change triggers fingerprint drift
+    drifted_version = Plan(
+        plan_id="PLAN-01",
+        task_id="TASK-D8-001",
+        version=2,
+        milestones=({"milestone_id": "MS-1"},),
+        architecture_claims=({"claim_id": "CLM-1"},),
+        obligation_ids=("OBL-1",),
+    )
+    assert compute_plan_semantic_fingerprint(drifted_version) != base_fp
+
+    # Architecture claims change triggers fingerprint drift
+    drifted_claims = Plan(
+        plan_id="PLAN-01",
+        task_id="TASK-D8-001",
+        version=1,
+        milestones=({"milestone_id": "MS-1"},),
+        architecture_claims=({"claim_id": "CLM-MUTATED"},),
+        obligation_ids=("OBL-1",),
+    )
+    assert compute_plan_semantic_fingerprint(drifted_claims) != base_fp

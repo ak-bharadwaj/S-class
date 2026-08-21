@@ -68,12 +68,16 @@ class SClassController:
         authority_signer: AuthoritySignerProtocol,
         pipeline: Optional[LifecyclePipeline] = None,
         nonce_store: Optional[D2NonceStore] = None,
+        lease_resolver: Optional[Callable[[str], Optional[Any]]] = None,
+        state_resolver: Optional[Callable[[], Tuple[int, str]]] = None,
     ):
         if not isinstance(authority_signer, AuthoritySignerProtocol):
             raise TypeError("authority_signer must implement AuthoritySignerProtocol.")
         self._authority_signer = authority_signer
         self._pipeline = pipeline or LifecyclePipeline()
         self._nonce_store = nonce_store or D2NonceStore()
+        self._lease_resolver = lease_resolver
+        self._state_resolver = state_resolver
 
 
     def issue_session_binding(
@@ -112,11 +116,6 @@ class SClassController:
         expires_at: str,
         budget_remaining: float = 100.0,
         allowed_action_types: Optional[Sequence[str]] = None,
-        active_fencing_token: Optional[int] = None,
-        active_lease_epoch: Optional[int] = None,
-        active_owner_id: Optional[str] = None,
-        expected_state_version: Optional[int] = None,
-        expected_state_digest: Optional[str] = None,
     ) -> ControllerDispatchResult:
         """Processes an ActionProposal through PRE_VALIDATE -> PRE_AUTHORIZE -> PRE_EXECUTE."""
         if not isinstance(proposal, ActionProposal):
@@ -182,6 +181,31 @@ class SClassController:
                 error_message=pre_auth_res.error_message,
             )
 
+        # Resolve authoritative lease and state internally
+        target_obl = obligations.get(proposal.obligation_id)
+        task_id = target_obl.task_id if target_obl else None
+
+        active_fencing_token = None
+        active_lease_epoch = None
+        active_owner_id = None
+        enforce_lease = False
+
+        if self._lease_resolver is not None:
+            enforce_lease = True
+            active_lease = self._lease_resolver(task_id) if task_id else None
+            if active_lease is not None and getattr(active_lease, "is_active", True):
+                active_fencing_token = getattr(active_lease, "fencing_token", None)
+                active_lease_epoch = getattr(active_lease, "lease_epoch", None)
+                active_owner_id = getattr(active_lease, "owner_id", None)
+
+        expected_state_version = None
+        expected_state_digest = None
+        enforce_state = False
+
+        if self._state_resolver is not None:
+            enforce_state = True
+            expected_state_version, expected_state_digest = self._state_resolver()
+
         # Precondition Evaluation -> Creates IMMUTABLE AuthorizationDecision
         decision = AuthorizationEngine.evaluate_proposal(
             proposal=proposal,
@@ -197,6 +221,8 @@ class SClassController:
             active_owner_id=active_owner_id,
             expected_state_version=expected_state_version,
             expected_state_digest=expected_state_digest,
+            enforce_lease=enforce_lease,
+            enforce_state=enforce_state,
         )
 
         # If not authorized, halt immediately: no token minted
@@ -224,7 +250,7 @@ class SClassController:
                 error_message=pre_exec_res.error_message or "PRE_EXECUTE hook aborted execution",
             )
 
-        # Controller holds the ONLY issuance path, strictly binding decision_id, action_digest, context_digest
+        # Controller holds the ONLY issuance path, strictly binding decision_id, action_digest, context_digest, and owner/fencing/state
         token = _mint_execution_token(
             token_id=f"TOK-{uuid.uuid4().hex[:12].upper()}",
             decision_id=decision.decision_id,
@@ -237,6 +263,7 @@ class SClassController:
             issued_at=evaluated_at,
             expires_at=expires_at,
             authority_signer=self._authority_signer,
+            owner_id=proposal.owner_id,
             fencing_token=proposal.fencing_token,
             lease_epoch=proposal.lease_epoch,
             state_version=proposal.state_version,
@@ -362,6 +389,7 @@ class SClassController:
             policy_version=token.policy_version,
             decision_id=token.decision_id,
             admitted_at=current_time_iso,
+            owner_id=token.owner_id,
             fencing_token=token.fencing_token,
             lease_epoch=token.lease_epoch,
             state_version=token.state_version,
@@ -388,6 +416,7 @@ class SClassController:
                 admitted_at=current_time_iso,
                 is_admitted=False,
                 error_message=f"Authority signing failed: {str(e)}",
+                owner_id=token.owner_id,
                 fencing_token=token.fencing_token,
                 lease_epoch=token.lease_epoch,
                 state_version=token.state_version,
@@ -406,6 +435,7 @@ class SClassController:
             admitted_at=current_time_iso,
             is_admitted=True,
             signature=authority_sig,
+            owner_id=token.owner_id,
             fencing_token=token.fencing_token,
             lease_epoch=token.lease_epoch,
             state_version=token.state_version,
@@ -516,6 +546,8 @@ class SClassController:
             return ExecutionCompletionResult(token_id=token.token_id, is_valid_execution=False, error_message="policy_version mismatch")
         if admission.decision_id != token.decision_id:
             return ExecutionCompletionResult(token_id=token.token_id, is_valid_execution=False, error_message="decision_id mismatch")
+        if admission.owner_id != token.owner_id:
+            return ExecutionCompletionResult(token_id=token.token_id, is_valid_execution=False, error_message="owner_id mismatch")
         if admission.fencing_token != token.fencing_token:
             return ExecutionCompletionResult(token_id=token.token_id, is_valid_execution=False, error_message="fencing_token mismatch")
         if admission.lease_epoch != token.lease_epoch:

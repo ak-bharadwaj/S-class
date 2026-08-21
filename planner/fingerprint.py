@@ -13,7 +13,7 @@ import json
 from typing import Any, Mapping, Sequence
 
 from domain.models import _unfreeze_nested
-from planner.models import ExecutionStrategyArtifact, PlanNode, PlannerStateContent
+from planner.models import ExecutionStrategyArtifact, Plan, PlanNode, PlannerStateContent
 
 SCLASS_PLAN_INTENT_DOMAIN_SEPARATOR = "SCLASS_PLAN_INTENT_V1:"
 SCLASS_EXEC_STRATEGY_DOMAIN_SEPARATOR = "SCLASS_EXEC_STRATEGY_V1:"
@@ -32,18 +32,34 @@ def canonicalize_json(data: Any) -> bytes:
 
 
 def compute_plan_semantic_fingerprint(
-    task_id: str,
-    milestones: Sequence[Mapping[str, Any]],
-    claims: Sequence[Mapping[str, Any]],
-    obligations: Sequence[Mapping[str, Any]],
+    plan: Optional[Plan] = None,
+    *,
+    task_id: str = "",
+    plan_id: str = "",
+    version: int = 1,
+    milestones: Sequence[Mapping[str, Any]] = (),
+    architecture_claims: Sequence[Mapping[str, Any]] = (),
+    obligation_ids: Sequence[str] = (),
 ) -> str:
-    """Computes the high-level semantic intent fingerprint."""
-    payload = {
-        "task_id": task_id,
-        "milestones": list(milestones),
-        "claims": list(claims),
-        "obligations": list(obligations),
-    }
+    """Computes the canonical D0 Plan semantic intent fingerprint."""
+    if isinstance(plan, Plan):
+        payload = {
+            "plan_id": plan.plan_id,
+            "task_id": plan.task_id,
+            "version": plan.version,
+            "milestones": list(plan.milestones),
+            "architecture_claims": list(plan.architecture_claims),
+            "obligation_ids": sorted(list(plan.obligation_ids)),
+        }
+    else:
+        payload = {
+            "plan_id": plan_id,
+            "task_id": task_id,
+            "version": version,
+            "milestones": list(milestones),
+            "architecture_claims": list(architecture_claims),
+            "obligation_ids": sorted(list(obligation_ids)),
+        }
     raw = SCLASS_PLAN_INTENT_DOMAIN_SEPARATOR.encode("utf-8") + canonicalize_json(payload)
     return hashlib.sha256(raw).hexdigest()
 

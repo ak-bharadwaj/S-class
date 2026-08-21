@@ -177,6 +177,7 @@ class ExecutionToken:
     issued_at: str
     expires_at: str
     signature: AsymmetricAuthoritySignature
+    owner_id: str = ""
     fencing_token: int = 0
     lease_epoch: int = 0
     state_version: int = 0
@@ -227,6 +228,7 @@ class ExecutionAdmissionResult:
     is_admitted: bool
     signature: Optional[AsymmetricAuthoritySignature] = None
     error_message: Optional[str] = None
+    owner_id: str = ""
     fencing_token: int = 0
     lease_epoch: int = 0
     state_version: int = 0
@@ -298,6 +300,8 @@ class ExecutionEnvelope:
             raise ValueError("Policy version mismatch between token and admission.")
         if self.token.decision_id != self.admission.decision_id:
             raise ValueError("Decision ID mismatch between token and admission.")
+        if self.token.owner_id != self.admission.owner_id:
+            raise ValueError("Owner ID mismatch between token and admission.")
         if self.token.fencing_token != self.admission.fencing_token:
             raise ValueError("Fencing token mismatch between token and admission.")
         if self.token.lease_epoch != self.admission.lease_epoch:
@@ -320,6 +324,7 @@ def _build_token_payload(
     execution_nonce: str,
     issued_at: str,
     expires_at: str,
+    owner_id: str = "",
     fencing_token: int = 0,
     lease_epoch: int = 0,
     state_version: int = 0,
@@ -337,6 +342,7 @@ def _build_token_payload(
         "execution_nonce": execution_nonce,
         "issued_at": issued_at,
         "expires_at": expires_at,
+        "owner_id": owner_id,
         "fencing_token": fencing_token,
         "lease_epoch": lease_epoch,
         "state_version": state_version,
@@ -354,6 +360,7 @@ def _build_admission_payload(
     policy_version: int,
     decision_id: str,
     admitted_at: str,
+    owner_id: str = "",
     fencing_token: int = 0,
     lease_epoch: int = 0,
     state_version: int = 0,
@@ -369,6 +376,7 @@ def _build_admission_payload(
         "policy_version": policy_version,
         "decision_id": decision_id,
         "admitted_at": admitted_at,
+        "owner_id": owner_id,
         "fencing_token": fencing_token,
         "lease_epoch": lease_epoch,
         "state_version": state_version,
@@ -400,6 +408,7 @@ def _mint_execution_token(
     authority_signer: AuthoritySignerProtocol,
     execution_nonce: Optional[str] = None,
     signer_identity: str = "Gate3AuthoritativeVerifier",
+    owner_id: str = "",
     fencing_token: int = 0,
     lease_epoch: int = 0,
     state_version: int = 0,
@@ -425,6 +434,7 @@ def _mint_execution_token(
         execution_nonce=nonce,
         issued_at=issued_at,
         expires_at=expires_at,
+        owner_id=owner_id,
         fencing_token=fencing_token,
         lease_epoch=lease_epoch,
         state_version=state_version,
@@ -451,6 +461,7 @@ def _mint_execution_token(
         issued_at=issued_at,
         expires_at=expires_at,
         signature=authority_sig,
+        owner_id=owner_id,
         fencing_token=fencing_token,
         lease_epoch=lease_epoch,
         state_version=state_version,
@@ -477,6 +488,7 @@ def verify_execution_token_signature(
         execution_nonce=token.execution_nonce,
         issued_at=token.issued_at,
         expires_at=token.expires_at,
+        owner_id=token.owner_id,
         fencing_token=token.fencing_token,
         lease_epoch=token.lease_epoch,
         state_version=token.state_version,
@@ -508,6 +520,7 @@ def verify_admission_signature(
         policy_version=admission.policy_version,
         decision_id=admission.decision_id,
         admitted_at=admission.admitted_at,
+        owner_id=admission.owner_id,
         fencing_token=admission.fencing_token,
         lease_epoch=admission.lease_epoch,
         state_version=admission.state_version,
@@ -529,6 +542,7 @@ def verify_execution_token(
     expected_context_digest: str,
     current_time_iso: str,
     authority_signer: AuthoritySignerProtocol,
+    expected_owner_id: Optional[str] = None,
     expected_fencing_token: Optional[int] = None,
     expected_lease_epoch: Optional[int] = None,
     expected_state_version: Optional[int] = None,
@@ -550,6 +564,8 @@ def verify_execution_token(
     if token.action_digest != expected_action_digest:
         return False
     if token.context_digest != expected_context_digest:
+        return False
+    if expected_owner_id is not None and token.owner_id != expected_owner_id:
         return False
     if expected_fencing_token is not None and token.fencing_token != expected_fencing_token:
         return False
