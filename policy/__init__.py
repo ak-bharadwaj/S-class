@@ -28,6 +28,9 @@ from policy.lattice import (
 )
 from policy.evaluator import (
     CoverageTrustPredicate,
+    PolicyActorKeyRegistry,
+    canonicalize_policy_exception,
+    sign_policy_exception,
     evaluate_rule,
     evaluate_expression,
     evaluate_policy,
@@ -58,6 +61,9 @@ __all__ = [
     "verify_and_merge_rules",
     "verify_non_weakening_rule",
     "CoverageTrustPredicate",
+    "PolicyActorKeyRegistry",
+    "canonicalize_policy_exception",
+    "sign_policy_exception",
     "evaluate_rule",
     "evaluate_expression",
     "evaluate_policy",

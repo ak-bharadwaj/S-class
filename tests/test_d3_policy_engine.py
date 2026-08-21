@@ -131,6 +131,9 @@ from policy import (
     InvalidExceptionError,
     ExpiredExceptionError,
     CoverageTrustPredicate,
+    PolicyActorKeyRegistry,
+    canonicalize_policy_exception,
+    sign_policy_exception,
     meet_policies,
     compose_policies,
     verify_and_merge_rules,
@@ -150,7 +153,7 @@ TEST_PROVIDER_SECRET = b"TEST_GATE3_PROVIDER_KEYSTORE_SECRET_32B"
 
 @pytest.fixture(autouse=True)
 def setup_test_authority_keystore():
-    """Initializes the protected authority keystore and verifier public keystore for tests."""
+    """Initializes the protected authority keystore, verifier public keystore, and actor keystore for tests."""
     Gate3AuthorityKeyStore.clear()
     Gate3AuthorityKeyStore.set_private_key(TEST_AUTHORITY_PRIVATE_KEY)
     Gate3PublicKeystore.clear()
@@ -158,13 +161,14 @@ def setup_test_authority_keystore():
     Gate3ProviderKeyStore.clear()
     Gate3ProviderKeyStore.register_provider_key("KEY-001", TEST_PROVIDER_SECRET)
     Gate3NonceTracker.clear()
-
+    PolicyActorKeyRegistry.clear()
 
     yield
     Gate3AuthorityKeyStore.clear()
     Gate3PublicKeystore.clear()
     Gate3ProviderKeyStore.clear()
     Gate3NonceTracker.clear()
+    PolicyActorKeyRegistry.clear()
 
 
 def make_test_obligation(
@@ -313,27 +317,23 @@ def make_test_exception(
     obl_id: str = "OBL-001",
     policy_id: str = "POL-001",
     expiry: str = "2026-12-31T23:59:59Z",
+    private_key: Optional[Any] = None,
+    actor_id: str = "SEC-OFFICER-01",
+    actor_role: str = "SECURITY_LEAD",
 ) -> PolicyException:
-    return PolicyException(
+    priv = private_key or TEST_AUTHORITY_PRIVATE_KEY
+    return sign_policy_exception(
         exception_id=exc_id,
         obligation_id=obl_id,
         policy_id=policy_id,
         justification="Manual security review approved by security lead with HSM token.",
-        authorized_by=AuthorizedActor(
-            actor_id="SEC-OFFICER-01",
-            actor_role="SECURITY_LEAD",
-            public_key_fingerprint="f" * 64,
-        ),
+        actor_id=actor_id,
+        actor_role=actor_role,
+        private_key=priv,
         compensating_controls=("Audit log monitoring enabled", "WAF rate limit enabled"),
         expiry=expiry,
-        signature=AsymmetricAuthoritySignature(
-            algorithm="ED25519",
-            signer_identity="SEC-OFFICER-01",
-            public_key_fingerprint="f" * 64,
-            payload_digest="1" * 64,
-            signature_hex="2" * 128,
-            timestamp="2026-08-19T10:00:00Z",
-        ),
+        signer_identity=actor_id,
+        timestamp="2026-08-19T10:00:00Z",
     )
 
 
@@ -1813,3 +1813,385 @@ def test_adversarial_wrong_domain_separator_fails_closed(tmp_path):
 
     with pytest.raises(CorruptEventLogError, match="Domain separator mismatch"):
         store.is_nonce_consumed(nonce)
+
+
+# ============================================================================
+# 8. D3 Cryptographic PolicyException Authority Test Suite (E1 - E15)
+# ============================================================================
+
+def test_d3_exception_e1_valid_signature_accepted():
+    """E1: Valid genuine Ed25519 signature with registered active actor -> accepted."""
+    obl = make_test_obligation(obl_id="OBL-001")
+    exc = make_test_exception(obl_id="OBL-001", policy_id="POL-001")
+    ctx = make_test_context(obl, (), (), exceptions=(exc,))
+    pol = Policy(
+        "POL-001", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
+    )
+    decision = evaluate_policy(pol, ctx)
+    assert decision.decision == PolicyDecisionType.ALLOW
+    assert "EXC-001" in decision.exceptions_applied
+
+
+def test_d3_exception_e2_modified_justification_rejected():
+    """E2: Modified justification string after signing -> InvalidExceptionError."""
+    obl = make_test_obligation(obl_id="OBL-001")
+    exc = make_test_exception(obl_id="OBL-001", policy_id="POL-001")
+    tampered_exc = PolicyException(
+        exception_id=exc.exception_id,
+        obligation_id=exc.obligation_id,
+        policy_id=exc.policy_id,
+        justification="TAMPERED JUSTIFICATION STRING WITH SUFFICIENT LENGTH TO PASS LENGTH CHECK",
+        authorized_by=exc.authorized_by,
+        compensating_controls=exc.compensating_controls,
+        signature=exc.signature,
+        expiry=exc.expiry,
+    )
+    ctx = make_test_context(obl, (), (), exceptions=(tampered_exc,))
+    pol = Policy(
+        "POL-001", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
+    )
+    with pytest.raises(InvalidExceptionError, match="payload digest mismatch"):
+        evaluate_policy(pol, ctx)
+
+
+def test_d3_exception_e3_modified_obligation_id_rejected():
+    """E3: Modified obligation_id in exception -> InvalidExceptionError."""
+    obl = make_test_obligation(obl_id="OBL-001")
+    exc = make_test_exception(obl_id="OBL-001", policy_id="POL-001")
+    tampered_exc = PolicyException(
+        exception_id=exc.exception_id,
+        obligation_id="OBL-999",
+        policy_id=exc.policy_id,
+        justification=exc.justification,
+        authorized_by=exc.authorized_by,
+        compensating_controls=exc.compensating_controls,
+        signature=exc.signature,
+        expiry=exc.expiry,
+    )
+    ctx = make_test_context(obl, (), (), exceptions=(tampered_exc,))
+    pol = Policy(
+        "POL-001", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
+    )
+    with pytest.raises(InvalidExceptionError, match="Exception obligation mismatch"):
+        evaluate_policy(pol, ctx)
+
+
+def test_d3_exception_e4_modified_policy_id_rejected():
+    """E4: Modified policy_id in exception -> InvalidExceptionError."""
+    obl = make_test_obligation(obl_id="OBL-001")
+    exc = make_test_exception(obl_id="OBL-001", policy_id="POL-001")
+    tampered_exc = PolicyException(
+        exception_id=exc.exception_id,
+        obligation_id=exc.obligation_id,
+        policy_id="POL-999",
+        justification=exc.justification,
+        authorized_by=exc.authorized_by,
+        compensating_controls=exc.compensating_controls,
+        signature=exc.signature,
+        expiry=exc.expiry,
+    )
+    ctx = make_test_context(obl, (), (), exceptions=(tampered_exc,))
+    pol = Policy(
+        "POL-001", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
+    )
+    with pytest.raises(InvalidExceptionError, match="Exception policy mismatch"):
+        evaluate_policy(pol, ctx)
+
+
+def test_d3_exception_e5_modified_compensating_controls_rejected():
+    """E5: Modified compensating_controls -> InvalidExceptionError."""
+    obl = make_test_obligation(obl_id="OBL-001")
+    exc = make_test_exception(obl_id="OBL-001", policy_id="POL-001")
+    tampered_exc = PolicyException(
+        exception_id=exc.exception_id,
+        obligation_id=exc.obligation_id,
+        policy_id=exc.policy_id,
+        justification=exc.justification,
+        authorized_by=exc.authorized_by,
+        compensating_controls=("Tampered control replacing original",),
+        signature=exc.signature,
+        expiry=exc.expiry,
+    )
+    ctx = make_test_context(obl, (), (), exceptions=(tampered_exc,))
+    pol = Policy(
+        "POL-001", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
+    )
+    with pytest.raises(InvalidExceptionError, match="payload digest mismatch"):
+        evaluate_policy(pol, ctx)
+
+
+def test_d3_exception_e6_modified_expiry_rejected():
+    """E6: Modified expiry timestamp -> InvalidExceptionError."""
+    obl = make_test_obligation(obl_id="OBL-001")
+    exc = make_test_exception(obl_id="OBL-001", policy_id="POL-001", expiry="2026-12-31T23:59:59Z")
+    tampered_exc = PolicyException(
+        exception_id=exc.exception_id,
+        obligation_id=exc.obligation_id,
+        policy_id=exc.policy_id,
+        justification=exc.justification,
+        authorized_by=exc.authorized_by,
+        compensating_controls=exc.compensating_controls,
+        signature=exc.signature,
+        expiry="2027-12-31T23:59:59Z",
+    )
+    ctx = make_test_context(obl, (), (), exceptions=(tampered_exc,))
+    pol = Policy(
+        "POL-001", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
+    )
+    with pytest.raises(InvalidExceptionError, match="payload digest mismatch"):
+        evaluate_policy(pol, ctx)
+
+
+def test_d3_exception_e7_wrong_actor_key_rejected():
+    """E7: Signed with rogue Key B while claiming Actor A -> rejected."""
+    obl = make_test_obligation(obl_id="OBL-001")
+    rogue_priv = ed25519.Ed25519PrivateKey.generate()
+    genuine_priv = ed25519.Ed25519PrivateKey.generate()
+    genuine_pub = genuine_priv.public_key()
+    genuine_fp = PolicyActorKeyRegistry.register_actor_key("ACTOR-A", genuine_pub, "SECURITY_LEAD")
+
+    actor = AuthorizedActor("ACTOR-A", "SECURITY_LEAD", genuine_fp)
+    dummy_sig = AsymmetricAuthoritySignature(
+        algorithm="ED25519",
+        signer_identity="ACTOR-A",
+        public_key_fingerprint=genuine_fp,
+        payload_digest="0" * 64,
+        signature_hex="0" * 128,
+        timestamp="2026-08-21T00:00:00Z",
+    )
+    raw_exc = PolicyException(
+        exception_id="EXC-001",
+        obligation_id="OBL-001",
+        policy_id="POL-001",
+        justification="Manual security review approved by security lead with HSM token.",
+        authorized_by=actor,
+        compensating_controls=("Audit log monitoring enabled",),
+        signature=dummy_sig,
+        expiry=None,
+    )
+    # Sign raw_exc using rogue_priv instead of genuine_priv
+    canonical_bytes = canonicalize_policy_exception(raw_exc)
+    payload_digest = hashlib.sha256(canonical_bytes).hexdigest()
+    rogue_sig_bytes = rogue_priv.sign(canonical_bytes)
+
+    forged_sig = AsymmetricAuthoritySignature(
+        algorithm="ED25519",
+        signer_identity="ACTOR-A",
+        public_key_fingerprint=genuine_fp,
+        payload_digest=payload_digest,
+        signature_hex=rogue_sig_bytes.hex(),
+        timestamp="2026-08-21T00:00:00Z",
+    )
+    forged_exc = PolicyException(
+        exception_id="EXC-001",
+        obligation_id="OBL-001",
+        policy_id="POL-001",
+        justification="Manual security review approved by security lead with HSM token.",
+        authorized_by=actor,
+        compensating_controls=("Audit log monitoring enabled",),
+        signature=forged_sig,
+        expiry=None,
+    )
+
+    ctx = make_test_context(obl, (), (), exceptions=(forged_exc,))
+    pol = Policy(
+        "POL-001", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
+    )
+    with pytest.raises(InvalidExceptionError, match="signature verification failed"):
+        evaluate_policy(pol, ctx)
+
+
+def test_d3_exception_e8_fingerprint_mismatch_rejected():
+    """E8: Signature has genuine signature bytes but AuthorizedActor.public_key_fingerprint tampered -> rejected."""
+    obl = make_test_obligation(obl_id="OBL-001")
+    exc = make_test_exception(obl_id="OBL-001", policy_id="POL-001")
+    tampered_actor = AuthorizedActor("SEC-OFFICER-01", "SECURITY_LEAD", "0" * 64)
+    tampered_exc = PolicyException(
+        exception_id=exc.exception_id,
+        obligation_id=exc.obligation_id,
+        policy_id=exc.policy_id,
+        justification=exc.justification,
+        authorized_by=tampered_actor,
+        compensating_controls=exc.compensating_controls,
+        signature=exc.signature,
+        expiry=exc.expiry,
+    )
+    ctx = make_test_context(obl, (), (), exceptions=(tampered_exc,))
+    pol = Policy(
+        "POL-001", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
+    )
+    with pytest.raises(InvalidExceptionError, match="does not match AuthorizedActor fingerprint"):
+        evaluate_policy(pol, ctx)
+
+
+def test_d3_exception_e9_revoked_actor_key_rejected():
+    """E9: Revoked actor key -> InvalidExceptionError."""
+    obl = make_test_obligation(obl_id="OBL-001")
+    actor_priv = ed25519.Ed25519PrivateKey.generate()
+    actor_pub = actor_priv.public_key()
+    fp = PolicyActorKeyRegistry.register_actor_key("SEC-02", actor_pub, "SECURITY_LEAD")
+
+    exc = sign_policy_exception(
+        exception_id="EXC-001",
+        obligation_id="OBL-001",
+        policy_id="POL-001",
+        justification="Manual security review approved by security lead with HSM token.",
+        actor_id="SEC-02",
+        actor_role="SECURITY_LEAD",
+        private_key=actor_priv,
+        compensating_controls=("Audit log monitoring enabled",),
+    )
+    # Revoke actor key
+    PolicyActorKeyRegistry.revoke_actor_key(fp)
+
+    ctx = make_test_context(obl, (), (), exceptions=(exc,))
+    pol = Policy(
+        "POL-001", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
+    )
+    with pytest.raises(InvalidExceptionError, match="has been revoked"):
+        evaluate_policy(pol, ctx)
+
+
+def test_d3_exception_e10_expired_exception_rejected():
+    """E10: Expired exception relative to evaluation timestamp -> ExpiredExceptionError."""
+    obl = make_test_obligation(obl_id="OBL-001")
+    exc = make_test_exception(
+        obl_id="OBL-001",
+        policy_id="POL-001",
+        expiry="2026-01-01T00:00:00Z",
+    )
+    ctx = make_test_context(
+        obl, (), (), exceptions=(exc,),
+        evaluation_timestamp="2026-08-21T12:00:00Z"
+    )
+    pol = Policy(
+        "POL-001", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
+    )
+    with pytest.raises(ExpiredExceptionError, match="expired at"):
+        evaluate_policy(pol, ctx)
+
+
+def test_d3_exception_e11_malformed_signature_rejected():
+    """E11: Malformed signature hex / invalid length -> DomainValidationError / InvalidExceptionError."""
+    obl = make_test_obligation(obl_id="OBL-001")
+    exc = make_test_exception(obl_id="OBL-001", policy_id="POL-001")
+
+    # 1. Invalid hex string length rejected at schema validation
+    with pytest.raises(DomainValidationError, match="signature_hex"):
+        AsymmetricAuthoritySignature(
+            algorithm="ED25519",
+            signer_identity=exc.signature.signer_identity,
+            public_key_fingerprint=exc.signature.public_key_fingerprint,
+            payload_digest=exc.signature.payload_digest,
+            signature_hex="deadbeef",
+            timestamp=exc.signature.timestamp,
+        )
+
+    # 2. Valid-length dummy signature failing cryptographic verification
+    dummy_sig = AsymmetricAuthoritySignature(
+        algorithm="ED25519",
+        signer_identity=exc.signature.signer_identity,
+        public_key_fingerprint=exc.signature.public_key_fingerprint,
+        payload_digest=exc.signature.payload_digest,
+        signature_hex="0" * 128,
+        timestamp=exc.signature.timestamp,
+    )
+    tampered_exc = PolicyException(
+        exception_id=exc.exception_id,
+        obligation_id=exc.obligation_id,
+        policy_id=exc.policy_id,
+        justification=exc.justification,
+        authorized_by=exc.authorized_by,
+        compensating_controls=exc.compensating_controls,
+        signature=dummy_sig,
+        expiry=exc.expiry,
+    )
+    ctx = make_test_context(obl, (), (), exceptions=(tampered_exc,))
+    pol = Policy(
+        "POL-001", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
+    )
+    with pytest.raises(InvalidExceptionError):
+        evaluate_policy(pol, ctx)
+
+
+def test_d3_exception_e12_replayed_different_obligation_rejected():
+    """E12: Replaying valid exception for OBL-001 onto context for OBL-002 -> rejected."""
+    obl_different = make_test_obligation(obl_id="OBL-002")
+    exc_orig = make_test_exception(obl_id="OBL-001", policy_id="POL-001")
+    ctx = make_test_context(obl_different, (), (), exceptions=(exc_orig,))
+    pol = Policy(
+        "POL-001", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
+    )
+    with pytest.raises(InvalidExceptionError, match="Exception obligation mismatch"):
+        evaluate_policy(pol, ctx)
+
+
+def test_d3_exception_e13_replayed_different_policy_rejected():
+    """E13: Replaying valid exception for POL-001 onto evaluation for POL-002 -> rejected."""
+    obl = make_test_obligation(obl_id="OBL-001")
+    exc_orig = make_test_exception(obl_id="OBL-001", policy_id="POL-001")
+    ctx = make_test_context(obl, (), (), exceptions=(exc_orig,))
+    pol_different = Policy(
+        "POL-002", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
+    )
+    with pytest.raises(InvalidExceptionError, match="Exception policy mismatch"):
+        evaluate_policy(pol_different, ctx)
+
+
+def test_d3_exception_e14_canonical_reordering_deterministic():
+    """E14: Canonical RFC 8785 JSON ordering produces identical byte digest & valid signature."""
+    exc1 = make_test_exception(obl_id="OBL-001", policy_id="POL-001")
+    canonical_bytes1 = canonicalize_policy_exception(exc1)
+
+    # Invert dictionary insertion order
+    payload_reordered = {
+        "expiry": exc1.expiry,
+        "compensating_controls": list(exc1.compensating_controls),
+        "authorized_by": {
+            "public_key_fingerprint": exc1.authorized_by.public_key_fingerprint,
+            "actor_role": exc1.authorized_by.actor_role,
+            "actor_id": exc1.authorized_by.actor_id,
+        },
+        "justification": exc1.justification,
+        "policy_id": exc1.policy_id,
+        "obligation_id": exc1.obligation_id,
+        "exception_id": exc1.exception_id,
+    }
+    canonical_bytes2 = canonicalize_json(payload_reordered)
+    assert canonical_bytes1 == canonical_bytes2
+
+
+def test_d3_exception_e15_tampered_field_after_signing_rejected():
+    """E15: Tampered exception_id after signing -> InvalidExceptionError."""
+    obl = make_test_obligation(obl_id="OBL-001")
+    exc = make_test_exception(exc_id="EXC-001", obl_id="OBL-001", policy_id="POL-001")
+    tampered_exc = PolicyException(
+        exception_id="EXC-002",
+        obligation_id=exc.obligation_id,
+        policy_id=exc.policy_id,
+        justification=exc.justification,
+        authorized_by=exc.authorized_by,
+        compensating_controls=exc.compensating_controls,
+        signature=exc.signature,
+        expiry=exc.expiry,
+    )
+    ctx = make_test_context(obl, (), (), exceptions=(tampered_exc,))
+    pol = Policy(
+        "POL-001", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
+    )
+    with pytest.raises(InvalidExceptionError, match="payload digest mismatch"):
+        evaluate_policy(pol, ctx)
