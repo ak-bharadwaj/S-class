@@ -263,36 +263,52 @@ def test_dc08_consumed_authorization_replay_rejected():
     )
     broker.start_ipc_server()
     try:
+        DeploymentProvisionerRegistry.reset_for_testing()
         client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC08")
-        client.authorize_initial_provisioning()
-        # Record provisioned first so state loss can be notified
-        client._client.call("record_provisioned", {
-            "installation_id": "INST-08",
-            "manifest_id": "M-08",
-            "manifest_version": 1,
-            "payload_digest": "0" * 64,
-            "root_fingerprint": hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest(),
-        })
+        SClassApplication(provisioner=client)
+
+        manifest = SignedAuthorityManifestLoader.sign_manifest(
+            manifest_id="M-08",
+            manifest_version=1,
+            issued_at="2026-08-21T10:00:00Z",
+            actors={},
+            revoked_fingerprints=[],
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest)
+        assert broker.status == DeploymentStatus.PROVISIONED
+
         client.notify_local_state_loss()
         assert broker.status == DeploymentStatus.RECOVERY_REQUIRED
 
         auth = InMemoryTestDeploymentProvisioner.create_reprovisioning_authorization(
             deployment_id="DC08-DEP",
-            target_manifest_id="M-DC08",
+            target_manifest_id="M-DC08-REC",
             root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
         )
         # First consumption succeeds
         client.authorize_reprovisioning(auth)
         assert broker.status == DeploymentStatus.RECOVERY_AUTHORIZED
 
-        # Complete recovery commit
-        client._client.call("record_reprovisioned", {
-            "installation_id": "INST-08-REC",
-            "manifest_id": "M-DC08",
-            "manifest_version": 1,
-            "payload_digest": "0" * 64,
-            "root_fingerprint": hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest(),
-        })
+        # Recovery genesis
+        SignedAuthorityManifestLoader.clear_for_testing()
+        D2InstallationProvisioning.clear_for_testing()
+        store = D2AuthorityManifestStore()
+        if os.path.exists(store.file_path):
+            os.remove(store.file_path)
+
+        DeploymentProvisionerRegistry.reset_for_testing()
+        SClassApplication(provisioner=client)
+
+        rec_manifest = SignedAuthorityManifestLoader.sign_manifest(
+            manifest_id="M-DC08-REC",
+            manifest_version=1,
+            issued_at="2026-08-21T11:00:00Z",
+            actors={},
+            revoked_fingerprints=[],
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(rec_manifest)
         assert broker.status == DeploymentStatus.PROVISIONED
 
         # Subsequent local state loss: attacker tries to replay consumed auth
@@ -375,6 +391,10 @@ def test_dc12_d2_broker_manifest_mismatch_rejected():
             "manifest_version": 1,
             "payload_digest": "0" * 64,
             "root_fingerprint": "FORGED_FP",
+            "root_signature": {
+                "algorithm": "ED25519",
+                "signature_hex": "0" * 128,
+            },
         })
         assert not resp.get("success")
         assert "Root fingerprint mismatch" in resp.get("error", "")
@@ -484,15 +504,21 @@ def test_dc15_unauthorized_recovery_rejected():
     )
     broker.start_ipc_server()
     try:
+        DeploymentProvisionerRegistry.reset_for_testing()
         client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC15")
-        client.authorize_initial_provisioning()
-        client._client.call("record_provisioned", {
-            "installation_id": "INST-15",
-            "manifest_id": "M-15",
-            "manifest_version": 1,
-            "payload_digest": "0" * 64,
-            "root_fingerprint": hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest(),
-        })
+        SClassApplication(provisioner=client)
+
+        manifest = SignedAuthorityManifestLoader.sign_manifest(
+            manifest_id="M-15",
+            manifest_version=1,
+            issued_at="2026-08-21T10:00:00Z",
+            actors={},
+            revoked_fingerprints=[],
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest)
+        assert broker.status == DeploymentStatus.PROVISIONED
+
         client.notify_local_state_loss()
         assert broker.status == DeploymentStatus.RECOVERY_REQUIRED
 
@@ -539,6 +565,9 @@ def test_dc16_broker_restart_preserves_authority_state():
             root_fingerprint=expected_fp,
             payload_digest=manifest["root_signature"]["payload_digest"],
             root_signature=manifest["root_signature"],
+            actors=manifest["actors"],
+            revoked_fingerprints=manifest["revoked_fingerprints"],
+            issued_at=manifest["issued_at"],
         )
         assert broker1.status == DeploymentStatus.PROVISIONED
     finally:

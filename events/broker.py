@@ -172,6 +172,9 @@ class TrustedDeploymentAuthorityBroker:
             self._persist_state()
 
     def _verify_d2_commit_proof(self, params: Dict[str, Any]) -> Tuple[bool, str]:
+        from cryptography.exceptions import InvalidSignature
+        from events.serializer import canonicalize_json
+
         installation_id = params.get("installation_id")
         manifest_id = params.get("manifest_id")
         manifest_version = params.get("manifest_version")
@@ -181,19 +184,87 @@ class TrustedDeploymentAuthorityBroker:
 
         if not installation_id or not manifest_id:
             return False, "Missing installation_id or manifest_id in commit record."
+        if manifest_version is None:
+            return False, "Missing manifest_version in commit record."
         if not payload_digest:
             return False, "Missing payload_digest in commit record."
         if not root_fingerprint:
             return False, "Missing root_fingerprint in commit record."
+        if not root_sig or not isinstance(root_sig, dict):
+            return False, "Missing or invalid root_signature block in commit record."
 
         expected_fp = hashlib.sha256(self._root_public_key.public_bytes_raw()).hexdigest()
         if root_fingerprint != expected_fp:
             return False, f"Root fingerprint mismatch: expected '{expected_fp}', got '{root_fingerprint}'."
 
-        if root_sig:
-            sig_hex = root_sig.get("signature_hex")
-            if not sig_hex or len(sig_hex) != 128:
-                return False, "Missing or malformed signature_hex in root_signature block."
+        if root_sig.get("algorithm") != "ED25519":
+            return False, f"Invalid signature algorithm: expected ED25519, got '{root_sig.get('algorithm')}'."
+
+        sig_hex = root_sig.get("signature_hex")
+        if not sig_hex or len(sig_hex) != 128:
+            return False, "Missing or malformed signature_hex in root_signature block (must be 128 hex chars)."
+
+        # Determine preimage type: Installation Seal Preimage or Manifest Preimage
+        if "initial_manifest_id" in params or "initial_manifest_version" in params or "installed_at" in params or params.get("status") == "SEALED":
+            # Installation seal proof
+            initial_m_id = params.get("initial_manifest_id", manifest_id)
+            if initial_m_id != manifest_id:
+                return False, f"Manifest ID mismatch: expected '{manifest_id}', got '{initial_m_id}'."
+            initial_m_ver = params.get("initial_manifest_version", manifest_version)
+            if initial_m_ver != manifest_version:
+                return False, f"Manifest version mismatch: expected {manifest_version}, got {initial_m_ver}."
+
+            preimage_dict = {
+                "installation_id": installation_id,
+                "initial_manifest_id": manifest_id,
+                "initial_manifest_version": manifest_version,
+                "initial_manifest_digest": params.get("initial_manifest_digest", payload_digest),
+                "root_fingerprint": root_fingerprint,
+                "provisioning_epoch": params.get("provisioning_epoch", 1),
+                "status": "SEALED",
+                "installed_at": root_sig.get("timestamp") or params.get("installed_at", ""),
+            }
+            preimage_bytes = canonicalize_json(preimage_dict)
+        elif "actors" in params:
+            from policy.evaluator import canonicalize_authority_manifest_preimage
+            if params.get("manifest_id") != manifest_id:
+                return False, f"Manifest ID mismatch: expected '{manifest_id}', got '{params.get('manifest_id')}'."
+            if params.get("manifest_version") != manifest_version:
+                return False, f"Manifest version mismatch: expected {manifest_version}, got {params.get('manifest_version')}."
+
+            manifest_dict = {
+                "manifest_id": manifest_id,
+                "manifest_version": manifest_version,
+                "issued_at": params.get("issued_at", root_sig.get("timestamp", "")),
+                "actors": params.get("actors", {}),
+                "revoked_fingerprints": params.get("revoked_fingerprints", []),
+                "root_signature": root_sig,
+            }
+            preimage_bytes = canonicalize_authority_manifest_preimage(manifest_dict)
+        else:
+            # Fallback to seal preimage using commit fields
+            preimage_dict = {
+                "installation_id": installation_id,
+                "initial_manifest_id": manifest_id,
+                "initial_manifest_version": manifest_version,
+                "initial_manifest_digest": params.get("initial_manifest_digest", payload_digest),
+                "root_fingerprint": root_fingerprint,
+                "provisioning_epoch": params.get("provisioning_epoch", 1),
+                "status": "SEALED",
+                "installed_at": root_sig.get("timestamp") or params.get("installed_at", ""),
+            }
+            preimage_bytes = canonicalize_json(preimage_dict)
+
+        calc_digest = hashlib.sha256(preimage_bytes).hexdigest()
+        if root_sig.get("payload_digest") != calc_digest:
+            return False, f"Payload digest substitution detected: signature payload_digest '{root_sig.get('payload_digest')}' does not match canonical preimage digest '{calc_digest}'."
+
+        try:
+            self._root_public_key.verify(bytes.fromhex(sig_hex), preimage_bytes)
+        except InvalidSignature:
+            return False, "Ed25519 signature verification failed against broker canonical root authority key."
+        except Exception as e:
+            return False, f"Cryptographic verification error: {e}"
 
         return True, ""
 

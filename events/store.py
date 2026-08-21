@@ -948,14 +948,27 @@ class D2InstallationProvisioning:
                             root_fingerprint=root_fingerprint,
                             payload_digest=payload_digest_calc,
                             root_signature=seal_payload["signature"],
+                            initial_manifest_digest=payload_digest,
+                            installed_at=installed_at,
+                            status="SEALED",
                         )
                     except TypeError:
-                        provisioner.record_reprovisioned(
-                            installation_id=installation_id,
-                            manifest_id=manifest_id,
-                            manifest_version=manifest_version,
-                            root_fingerprint=root_fingerprint,
-                        )
+                        try:
+                            provisioner.record_reprovisioned(
+                                installation_id=installation_id,
+                                manifest_id=manifest_id,
+                                manifest_version=manifest_version,
+                                root_fingerprint=root_fingerprint,
+                                payload_digest=payload_digest_calc,
+                                root_signature=seal_payload["signature"],
+                            )
+                        except TypeError:
+                            provisioner.record_reprovisioned(
+                                installation_id=installation_id,
+                                manifest_id=manifest_id,
+                                manifest_version=manifest_version,
+                                root_fingerprint=root_fingerprint,
+                            )
                 else:
                     try:
                         provisioner.record_provisioned(
@@ -965,14 +978,27 @@ class D2InstallationProvisioning:
                             root_fingerprint=root_fingerprint,
                             payload_digest=payload_digest_calc,
                             root_signature=seal_payload["signature"],
+                            initial_manifest_digest=payload_digest,
+                            installed_at=installed_at,
+                            status="SEALED",
                         )
                     except TypeError:
-                        provisioner.record_provisioned(
-                            installation_id=installation_id,
-                            manifest_id=manifest_id,
-                            manifest_version=manifest_version,
-                            root_fingerprint=root_fingerprint,
-                        )
+                        try:
+                            provisioner.record_provisioned(
+                                installation_id=installation_id,
+                                manifest_id=manifest_id,
+                                manifest_version=manifest_version,
+                                root_fingerprint=root_fingerprint,
+                                payload_digest=payload_digest_calc,
+                                root_signature=seal_payload["signature"],
+                            )
+                        except TypeError:
+                            provisioner.record_provisioned(
+                                installation_id=installation_id,
+                                manifest_id=manifest_id,
+                                manifest_version=manifest_version,
+                                root_fingerprint=root_fingerprint,
+                            )
 
     @classmethod
     def verify_state_agreement(cls) -> None:
@@ -1161,16 +1187,19 @@ class IPCDeploymentProvisioner(TrustedDeploymentProvisioner):
         root_fingerprint: str,
         payload_digest: Optional[str] = None,
         root_signature: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
     ) -> None:
         with self._lock:
-            resp = self._client.call("record_provisioned", {
+            params = {
                 "installation_id": installation_id,
                 "manifest_id": manifest_id,
                 "manifest_version": manifest_version,
                 "root_fingerprint": root_fingerprint,
                 "payload_digest": payload_digest,
                 "root_signature": root_signature,
-            })
+            }
+            params.update(kwargs)
+            resp = self._client.call("record_provisioned", params)
             if not resp.get("success"):
                 raise RuntimeError(f"Authority broker rejected record_provisioned: {resp.get('error')}")
 
@@ -1208,16 +1237,19 @@ class IPCDeploymentProvisioner(TrustedDeploymentProvisioner):
         root_fingerprint: str,
         payload_digest: Optional[str] = None,
         root_signature: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
     ) -> None:
         with self._lock:
-            resp = self._client.call("record_reprovisioned", {
+            params = {
                 "installation_id": installation_id,
                 "manifest_id": manifest_id,
                 "manifest_version": manifest_version,
                 "root_fingerprint": root_fingerprint,
                 "payload_digest": payload_digest,
                 "root_signature": root_signature,
-            })
+            }
+            params.update(kwargs)
+            resp = self._client.call("record_reprovisioned", params)
             if not resp.get("success"):
                 raise RuntimeError(f"Authority broker rejected record_reprovisioned: {resp.get('error')}")
 

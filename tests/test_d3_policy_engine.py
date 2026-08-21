@@ -5939,6 +5939,344 @@ def test_d3_install_e134_broker_restart_preserves_authority_state():
         os.remove(state_file)
 
 
+def test_d3_install_e135_payload_digest_substitution_rejected():
+    """E135: Payload digest substitution in D2 commit proof is cryptographically rejected by broker."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus
+    from events.serializer import canonicalize_json
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E135",
+        auth_secret="SEC-E135",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    preimage = {
+        "installation_id": "INST-E135",
+        "initial_manifest_id": "M-E135",
+        "initial_manifest_version": 1,
+        "initial_manifest_digest": "0" * 64,
+        "root_fingerprint": fp,
+        "provisioning_epoch": 1,
+        "status": "SEALED",
+        "installed_at": "2026-08-21T10:00:00Z",
+    }
+    preimage_bytes = canonicalize_json(preimage)
+    real_digest = hashlib.sha256(preimage_bytes).hexdigest()
+    sig = TEST_AUTHORITY_PRIVATE_KEY.sign(preimage_bytes)
+
+    # Attacker substitutes payload digest in root_signature block
+    tampered_sig_block = {
+        "algorithm": "ED25519",
+        "signer_identity": "Gate3AuthoritativeVerifier",
+        "public_key_fingerprint": fp,
+        "payload_digest": "SUBSTITUTED_DIGEST_" + ("f" * 45),
+        "signature_hex": sig.hex(),
+        "timestamp": "2026-08-21T10:00:00Z",
+    }
+    resp = broker._dispatch_rpc({
+        "method": "record_provisioned",
+        "params": {
+            "installation_id": "INST-E135",
+            "manifest_id": "M-E135",
+            "initial_manifest_id": "M-E135",
+            "manifest_version": 1,
+            "initial_manifest_version": 1,
+            "initial_manifest_digest": "0" * 64,
+            "root_fingerprint": fp,
+            "payload_digest": real_digest,
+            "root_signature": tampered_sig_block,
+            "installed_at": "2026-08-21T10:00:00Z",
+        }
+    }, {})
+    assert not resp.get("success")
+    assert "Payload digest substitution detected" in resp.get("error", "")
+
+
+def test_d3_install_e136_signature_substitution_rejected():
+    """E136: Signature substitution in D2 commit proof is rejected by broker."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus
+    from events.serializer import canonicalize_json
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E136",
+        auth_secret="SEC-E136",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    preimage = {
+        "installation_id": "INST-E136",
+        "initial_manifest_id": "M-E136",
+        "initial_manifest_version": 1,
+        "initial_manifest_digest": "0" * 64,
+        "root_fingerprint": fp,
+        "provisioning_epoch": 1,
+        "status": "SEALED",
+        "installed_at": "2026-08-21T10:00:00Z",
+    }
+    preimage_bytes = canonicalize_json(preimage)
+    real_digest = hashlib.sha256(preimage_bytes).hexdigest()
+
+    # Attacker substitutes corrupted / random signature
+    tampered_sig_block = {
+        "algorithm": "ED25519",
+        "signer_identity": "Gate3AuthoritativeVerifier",
+        "public_key_fingerprint": fp,
+        "payload_digest": real_digest,
+        "signature_hex": "ab" * 64,
+        "timestamp": "2026-08-21T10:00:00Z",
+    }
+    resp = broker._dispatch_rpc({
+        "method": "record_provisioned",
+        "params": {
+            "installation_id": "INST-E136",
+            "manifest_id": "M-E136",
+            "initial_manifest_id": "M-E136",
+            "manifest_version": 1,
+            "initial_manifest_version": 1,
+            "initial_manifest_digest": "0" * 64,
+            "root_fingerprint": fp,
+            "payload_digest": real_digest,
+            "root_signature": tampered_sig_block,
+            "installed_at": "2026-08-21T10:00:00Z",
+        }
+    }, {})
+    assert not resp.get("success")
+    assert "signature verification failed" in resp.get("error", "").lower()
+
+
+def test_d3_install_e137_valid_signature_over_different_manifest_rejected():
+    """E137: Valid signature over different manifest is rejected by broker."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus
+    from events.serializer import canonicalize_json
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E137",
+        auth_secret="SEC-E137",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    # Preimage for Manifest A
+    preimage_a = {
+        "installation_id": "INST-E137",
+        "initial_manifest_id": "M-MANIFEST-A",
+        "initial_manifest_version": 1,
+        "initial_manifest_digest": "0" * 64,
+        "root_fingerprint": fp,
+        "provisioning_epoch": 1,
+        "status": "SEALED",
+        "installed_at": "2026-08-21T10:00:00Z",
+    }
+    preimage_a_bytes = canonicalize_json(preimage_a)
+    sig_a = TEST_AUTHORITY_PRIVATE_KEY.sign(preimage_a_bytes)
+    digest_a = hashlib.sha256(preimage_a_bytes).hexdigest()
+
+    sig_block_a = {
+        "algorithm": "ED25519",
+        "signer_identity": "Gate3AuthoritativeVerifier",
+        "public_key_fingerprint": fp,
+        "payload_digest": digest_a,
+        "signature_hex": sig_a.hex(),
+        "timestamp": "2026-08-21T10:00:00Z",
+    }
+
+    # Attacker tries to use Manifest A's signature to commit Manifest B
+    resp = broker._dispatch_rpc({
+        "method": "record_provisioned",
+        "params": {
+            "installation_id": "INST-E137",
+            "manifest_id": "M-MANIFEST-B",  # Mismatched manifest ID
+            "manifest_version": 1,
+            "root_fingerprint": fp,
+            "payload_digest": digest_a,
+            "root_signature": sig_block_a,
+            "installed_at": "2026-08-21T10:00:00Z",
+        }
+    }, {})
+    assert not resp.get("success")
+
+
+def test_d3_install_e138_manifest_id_mismatch_rejected():
+    """E138: Manifest ID mismatch between commit params and seal preimage is rejected."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus
+    from events.serializer import canonicalize_json
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E138",
+        auth_secret="SEC-E138",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    preimage = {
+        "installation_id": "INST-E138",
+        "initial_manifest_id": "M-ORIGINAL",
+        "initial_manifest_version": 1,
+        "initial_manifest_digest": "0" * 64,
+        "root_fingerprint": fp,
+        "provisioning_epoch": 1,
+        "status": "SEALED",
+        "installed_at": "2026-08-21T10:00:00Z",
+    }
+    preimage_bytes = canonicalize_json(preimage)
+    sig = TEST_AUTHORITY_PRIVATE_KEY.sign(preimage_bytes)
+    digest = hashlib.sha256(preimage_bytes).hexdigest()
+
+    sig_block = {
+        "algorithm": "ED25519",
+        "signer_identity": "Gate3AuthoritativeVerifier",
+        "public_key_fingerprint": fp,
+        "payload_digest": digest,
+        "signature_hex": sig.hex(),
+        "timestamp": "2026-08-21T10:00:00Z",
+    }
+
+    resp = broker._dispatch_rpc({
+        "method": "record_provisioned",
+        "params": {
+            "installation_id": "INST-E138",
+            "manifest_id": "M-FORGED-DIFFERENT",
+            "initial_manifest_id": "M-ORIGINAL",
+            "manifest_version": 1,
+            "initial_manifest_version": 1,
+            "initial_manifest_digest": "0" * 64,
+            "root_fingerprint": fp,
+            "payload_digest": digest,
+            "root_signature": sig_block,
+            "installed_at": "2026-08-21T10:00:00Z",
+        }
+    }, {})
+    assert not resp.get("success")
+    assert "Manifest ID mismatch" in resp.get("error", "")
+
+
+def test_d3_install_e139_manifest_version_mismatch_rejected():
+    """E139: Manifest version mismatch between commit params and seal preimage is rejected."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus
+    from events.serializer import canonicalize_json
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E139",
+        auth_secret="SEC-E139",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    preimage = {
+        "installation_id": "INST-E139",
+        "initial_manifest_id": "M-E139",
+        "initial_manifest_version": 1,
+        "initial_manifest_digest": "0" * 64,
+        "root_fingerprint": fp,
+        "provisioning_epoch": 1,
+        "status": "SEALED",
+        "installed_at": "2026-08-21T10:00:00Z",
+    }
+    preimage_bytes = canonicalize_json(preimage)
+    sig = TEST_AUTHORITY_PRIVATE_KEY.sign(preimage_bytes)
+    digest = hashlib.sha256(preimage_bytes).hexdigest()
+
+    sig_block = {
+        "algorithm": "ED25519",
+        "signer_identity": "Gate3AuthoritativeVerifier",
+        "public_key_fingerprint": fp,
+        "payload_digest": digest,
+        "signature_hex": sig.hex(),
+        "timestamp": "2026-08-21T10:00:00Z",
+    }
+
+    resp = broker._dispatch_rpc({
+        "method": "record_provisioned",
+        "params": {
+            "installation_id": "INST-E139",
+            "manifest_id": "M-E139",
+            "manifest_version": 99,  # Mismatched version
+            "initial_manifest_id": "M-E139",
+            "initial_manifest_version": 1,
+            "initial_manifest_digest": "0" * 64,
+            "root_fingerprint": fp,
+            "payload_digest": digest,
+            "root_signature": sig_block,
+            "installed_at": "2026-08-21T10:00:00Z",
+        }
+    }, {})
+    assert not resp.get("success")
+    assert "Manifest version mismatch" in resp.get("error", "")
+
+
+def test_d3_install_e140_fake_d2_commit_proof_with_correct_fingerprint_rejected():
+    """E140: Fake D2 commit proof presenting legitimate root fingerprint is rejected by broker."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus
+    from events.serializer import canonicalize_json
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E140",
+        auth_secret="SEC-E140",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    preimage = {
+        "installation_id": "INST-E140",
+        "initial_manifest_id": "M-E140",
+        "initial_manifest_version": 1,
+        "initial_manifest_digest": "0" * 64,
+        "root_fingerprint": fp,
+        "provisioning_epoch": 1,
+        "status": "SEALED",
+        "installed_at": "2026-08-21T10:00:00Z",
+    }
+    preimage_bytes = canonicalize_json(preimage)
+    digest = hashlib.sha256(preimage_bytes).hexdigest()
+
+    # Attacker signs with a private key other than canonical root
+    attacker_key = ed25519.Ed25519PrivateKey.generate()
+    fake_sig = attacker_key.sign(preimage_bytes)
+
+    fake_sig_block = {
+        "algorithm": "ED25519",
+        "signer_identity": "Gate3AuthoritativeVerifier",
+        "public_key_fingerprint": fp,  # Spoofed fingerprint
+        "payload_digest": digest,
+        "signature_hex": fake_sig.hex(),
+        "timestamp": "2026-08-21T10:00:00Z",
+    }
+
+    resp = broker._dispatch_rpc({
+        "method": "record_provisioned",
+        "params": {
+            "installation_id": "INST-E140",
+            "manifest_id": "M-E140",
+            "initial_manifest_id": "M-E140",
+            "manifest_version": 1,
+            "initial_manifest_version": 1,
+            "initial_manifest_digest": "0" * 64,
+            "root_fingerprint": fp,
+            "payload_digest": digest,
+            "root_signature": fake_sig_block,
+            "installed_at": "2026-08-21T10:00:00Z",
+        }
+    }, {})
+    assert not resp.get("success")
+    assert "signature verification failed" in resp.get("error", "").lower()
+
+
+
 
 
 
