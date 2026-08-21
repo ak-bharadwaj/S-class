@@ -515,6 +515,8 @@ class D2AuthorityManifestStore:
             state = store.replay()
             return (state.active_manifest_version, state.active_manifest_id, state.active_manifest_digest)
 
+    _class_lock = threading.RLock()
+
     def commit_epoch(
         self,
         manifest_id: str,
@@ -525,40 +527,38 @@ class D2AuthorityManifestStore:
     ) -> None:
         """Commits a canonical AUTHORITY_MANIFEST_COMMITTED event to the D2 event store."""
         from datetime import datetime, timezone
-        from file_lock import FileLock
         from events.serializer import compute_event_digest
         from domain.models import EventEnvelope
         from domain.types import EventType
+        from events.exceptions import DuplicateSequenceError
         from policy.exceptions import ManifestRollbackError, CorruptManifestError
 
-        lock_path = self._file_path + ".lock"
-        with self._lock:
-            with FileLock(lock_path, timeout=10.0):
-                store = FileAppendEventStore(self._file_path)
-                state = store.replay()
+        with self._class_lock:
+            store = FileAppendEventStore(self._file_path)
+            state = store.replay()
 
-                if state.active_manifest_id is not None and manifest_id != state.active_manifest_id:
-                    raise CorruptManifestError(
-                        f"Manifest identity substitution rejected: expected '{state.active_manifest_id}', got '{manifest_id}'."
-                    )
+            if state.active_manifest_id is not None and manifest_id != state.active_manifest_id:
+                raise CorruptManifestError(
+                    f"Manifest identity substitution rejected: expected '{state.active_manifest_id}', got '{manifest_id}'."
+                )
 
-                if manifest_version < state.active_manifest_version:
+            if manifest_version < state.active_manifest_version:
+                raise ManifestRollbackError(
+                    f"Manifest version {manifest_version} is older than highest durable accepted version {state.active_manifest_version} (rollback rejected)."
+                )
+
+            if manifest_version == state.active_manifest_version and state.active_manifest_digest is not None:
+                if payload_digest != state.active_manifest_digest:
                     raise ManifestRollbackError(
-                        f"Manifest version {manifest_version} is older than highest durable accepted version {state.active_manifest_version} (rollback rejected)."
+                        f"Same-version manifest substitution rejected for version {manifest_version}."
                     )
+                return
 
-                if manifest_version == state.active_manifest_version and state.active_manifest_digest is not None:
-                    if payload_digest != state.active_manifest_digest:
-                        raise ManifestRollbackError(
-                            f"Same-version manifest substitution rejected for version {manifest_version}."
-                        )
-                    return
-
-                latest = store.get_latest_event()
-                new_seq = (latest.sequence_number + 1) if latest else 1
-                parent_digest = latest.digest if latest else GENESIS_PARENT_DIGEST
-                now_iso = datetime.now(timezone.utc).isoformat()
-                event_id = f"EVT-MANIFEST-{manifest_id}-{manifest_version}"
+            latest = store.get_latest_event()
+            new_seq = (latest.sequence_number + 1) if latest else 1
+            parent_digest = latest.digest if latest else GENESIS_PARENT_DIGEST
+            now_iso = datetime.now(timezone.utc).isoformat()
+            event_id = f"EVT-MANIFEST-{manifest_id}-{manifest_version}"
 
             payload = {
                 "manifest_id": manifest_id,
@@ -589,7 +589,16 @@ class D2AuthorityManifestStore:
                 digest=digest,
             )
 
-            store.append(event)
+            try:
+                store.append(event)
+            except DuplicateSequenceError:
+                recheck_state = store.replay()
+                if (
+                    recheck_state.active_manifest_version == manifest_version
+                    and recheck_state.active_manifest_digest == payload_digest
+                ):
+                    return
+                raise
 
     def clear(self) -> None:
         """Controlled teardown of event store strictly for test fixtures."""
