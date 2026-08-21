@@ -3430,3 +3430,222 @@ def test_d3_exception_gate3_root_actor_binding():
     decision = evaluate_policy(pol, ctx_valid)
     assert decision.decision == PolicyDecisionType.ALLOW
     assert "EXC-002" in decision.exceptions_applied
+
+
+def test_d3_manifest_e48_delete_manifest_store_after_v2_v1_rejected():
+    """E48: Deleting the manifest store file after v2 was accepted does not allow v1 rollback (authoritative D2 anchor survives)."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-D2ANCHOR-001",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    manifest_v2 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-D2ANCHOR-001",
+        manifest_version=2,
+        issued_at="2026-08-20T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    # 1. Accept v2
+    SignedAuthorityManifestLoader.load_from_dict(manifest_v2)
+
+    # 2. Adversary deletes the manifest store file
+    from events.store import D2AuthorityManifestStore
+    store = D2AuthorityManifestStore()
+    if os.path.exists(store.file_path):
+        os.remove(store.file_path)
+
+    # 3. Old v1 manifest must still be rejected via canonical D2 authoritative anchor
+    with pytest.raises(ManifestRollbackError, match="is older than highest durable accepted version"):
+        SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+
+
+def test_d3_manifest_e49_truncate_manifest_store_after_v2_v1_rejected():
+    """E49: Truncating the manifest store file back to v1 does not allow v1 replay (authoritative D2 anchor enforces epoch 2)."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-TRUNC-001",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    manifest_v2 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-TRUNC-001",
+        manifest_version=2,
+        issued_at="2026-08-20T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    # 1. Accept v1 then v2
+    SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+    SignedAuthorityManifestLoader.load_from_dict(manifest_v2)
+
+    from events.store import D2AuthorityManifestStore
+    store = D2AuthorityManifestStore()
+
+    # 2. Adversary truncates manifest store to keep only line 1 (v1)
+    with open(store.file_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+    with open(store.file_path, "w", encoding="utf-8") as f:
+        f.writelines(lines[:1])
+
+    # 3. Attempting to accept v1 again is rejected because D2 anchor holds epoch 2
+    with pytest.raises(ManifestRollbackError, match="is older than highest durable accepted version"):
+        SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+
+
+def test_d3_manifest_e50_restore_old_valid_store_snapshot_v1_rejected():
+    """E50: Restoring an old valid store snapshot does not permit rollback (authoritative D2 anchor holds epoch 2)."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-SNAP-001",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    manifest_v2 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-SNAP-001",
+        manifest_version=2,
+        issued_at="2026-08-20T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    # 1. Accept v1 and snapshot
+    SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+    from events.store import D2AuthorityManifestStore
+    store = D2AuthorityManifestStore()
+    with open(store.file_path, "r", encoding="utf-8") as f:
+        v1_snapshot = f.read()
+
+    # 2. Accept v2
+    SignedAuthorityManifestLoader.load_from_dict(manifest_v2)
+
+    # 3. Adversary overwrites store with v1 snapshot
+    with open(store.file_path, "w", encoding="utf-8") as f:
+        f.write(v1_snapshot)
+
+    # 4. Attempting to load v1 is strictly rejected
+    with pytest.raises(ManifestRollbackError, match="is older than highest durable accepted version"):
+        SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+
+
+def test_d3_manifest_e51_crash_interrupted_epoch_commit_no_rollback():
+    """E51: An interrupted epoch commit or crash during write preserves atomicity and prevents rollback."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-CRASH-001",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+
+    from events.store import D2AuthorityManifestStore
+    store = D2AuthorityManifestStore()
+    ver_before, _, _ = store.get_highest_version()
+    assert ver_before == 1
+
+    # Simulate invalid / interrupted write attempt
+    with pytest.raises(CorruptManifestError):
+        SignedAuthorityManifestLoader.load_from_dict({"corrupted": "payload"})
+
+    ver_after, _, _ = store.get_highest_version()
+    assert ver_after == 1
+
+
+def test_d3_manifest_e52_corrupt_authoritative_anchor_fails_closed():
+    """E52: Tampering with the canonical D2 authoritative anchor file causes immediate fail-closed rejection."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-ANCHOR-CORRUPT-001",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+
+    from events.store import D2AuthoritativeAnchor
+    anchor = D2AuthoritativeAnchor()
+    anchor_file = anchor.file_path
+
+    # Adversary tampers with the D2 authoritative anchor on disk
+    with open(anchor_file, "r", encoding="utf-8") as f:
+        content = f.read()
+    tampered = content.replace("MANIFEST-ANCHOR-CORRUPT-001", "FORGED-ANCHOR-ID")
+    with open(anchor_file, "w", encoding="utf-8") as f:
+        f.write(tampered)
+
+    manifest_v2 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-ANCHOR-CORRUPT-001",
+        manifest_version=2,
+        issued_at="2026-08-20T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    # Subsequent load detects anchor tampering and fails closed
+    with pytest.raises(CorruptEventLogError, match="digest verification failed"):
+        SignedAuthorityManifestLoader.load_from_dict(manifest_v2)
+
+
+def test_d3_root_boundary_e53_root_keystore_replacement_rejected():
+    """E53: Attempting to replace the Gate3PublicKeystore root public key at runtime is strictly rejected."""
+    Gate3PublicKeystore.clear()
+    Gate3PublicKeystore.set_public_key(TEST_AUTHORITY_PUBLIC_KEY)
+
+    another_key = ed25519.Ed25519PrivateKey.generate().public_key()
+    with pytest.raises(RuntimeError, match="already initialized and cannot be replaced"):
+        Gate3PublicKeystore.set_public_key(another_key)
+
+
+def test_d3_root_boundary_e54_root_key_mutation_after_bootstrap_rejected():
+    """E54: Attempting to replace the Gate3AuthorityKeyStore authority key at runtime is strictly rejected."""
+    Gate3AuthorityKeyStore.clear()
+    Gate3AuthorityKeyStore.set_private_key(TEST_AUTHORITY_PRIVATE_KEY)
+
+    another_priv = ed25519.Ed25519PrivateKey.generate()
+    with pytest.raises(RuntimeError, match="already initialized and cannot be replaced"):
+        Gate3AuthorityKeyStore.set_private_key(another_priv)
+
+
+def test_d3_root_boundary_e55_gate3_root_mismatch_fails_closed():
+    """E55: Manifest signed by mismatched or attacker root fails closed against canonical Gate 3 root."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    rogue_priv = ed25519.Ed25519PrivateKey.generate()
+
+    rogue_manifest = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-ROGUE-001",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=rogue_priv,
+    )
+
+    with pytest.raises(InvalidManifestSignatureError):
+        SignedAuthorityManifestLoader.load_from_dict(rogue_manifest)
+

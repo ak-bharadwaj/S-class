@@ -24,14 +24,21 @@ class Gate3PublicKeystore:
 
     @classmethod
     def set_public_key(cls, public_key: Any) -> None:
-        """Injects public key into verifier keystore with strict type validation."""
+        """Injects public key into verifier keystore with strict type validation.
+        Controlled initialization boundary: prevents arbitrary runtime replacement of the root public key.
+        """
         from cryptography.hazmat.primitives.asymmetric import ed25519
         if not isinstance(public_key, ed25519.Ed25519PublicKey):
             raise TypeError(f"Expected Ed25519PublicKey instance, got {type(public_key).__name__}")
+        if cls._public_key is not None:
+            raise RuntimeError("Gate3PublicKeystore public key is already initialized and cannot be replaced at runtime.")
         cls._public_key = public_key
 
     @classmethod
     def clear(cls) -> None:
+        """Controlled teardown of public keystore boundary for test fixtures."""
+        if os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1" and os.environ.get("PYTEST_CURRENT_TEST") is None:
+            raise RuntimeError("Root keystore teardown prohibited outside active test fixture harness.")
         cls._public_key = None
 
     @classmethod

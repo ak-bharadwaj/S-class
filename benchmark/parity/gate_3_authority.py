@@ -40,6 +40,8 @@ class Gate3AuthorityKeyStore:
     @classmethod
     def clear(cls) -> None:
         """Controlled teardown of keystore boundary for test fixtures."""
+        if os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1" and os.environ.get("PYTEST_CURRENT_TEST") is None:
+            raise RuntimeError("Authority keystore teardown prohibited outside active test fixture harness.")
         cls._private_key = None
 
     @classmethod

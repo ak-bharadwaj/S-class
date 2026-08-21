@@ -259,3 +259,56 @@ def compute_manifest_record_digest(
         parent_digest=parent_digest,
     )
     return hashlib.sha256(preimage).hexdigest()
+
+
+D2_ANCHOR_RECORD_DOMAIN_SEPARATOR: str = "SCLASS_D2_ANCHOR_V1:"
+
+
+def compute_d2_anchor_preimage(
+    epoch: int,
+    manifest_id: str,
+    manifest_digest: str,
+    signer_identity: str,
+    root_fingerprint: str,
+    sequence_number: int,
+    timestamp: str,
+    parent_digest: str,
+) -> bytes:
+    """Produces canonical RFC 8785 preimage bytes for an authoritative D2 state anchor record."""
+    payload = {
+        "domain": D2_ANCHOR_RECORD_DOMAIN_SEPARATOR,
+        "epoch": epoch,
+        "manifest_digest": manifest_digest,
+        "manifest_id": manifest_id,
+        "parent_digest": parent_digest,
+        "root_fingerprint": root_fingerprint,
+        "sequence_number": sequence_number,
+        "signer_identity": signer_identity,
+        "timestamp": timestamp,
+    }
+    return canonicalize_json(payload)
+
+
+def compute_d2_anchor_digest(
+    epoch: int,
+    manifest_id: str,
+    manifest_digest: str,
+    signer_identity: str,
+    root_fingerprint: str,
+    sequence_number: int,
+    timestamp: str,
+    parent_digest: str,
+) -> str:
+    """Computes SHA-256 digest hex string for authoritative D2 state anchor record."""
+    preimage = compute_d2_anchor_preimage(
+        epoch=epoch,
+        manifest_id=manifest_id,
+        manifest_digest=manifest_digest,
+        signer_identity=signer_identity,
+        root_fingerprint=root_fingerprint,
+        sequence_number=sequence_number,
+        timestamp=timestamp,
+        parent_digest=parent_digest,
+    )
+    return hashlib.sha256(preimage).hexdigest()
+
