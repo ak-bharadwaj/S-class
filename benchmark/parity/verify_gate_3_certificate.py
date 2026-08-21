@@ -19,27 +19,45 @@ TRUSTED_VERIFIER_IDENTITIES = frozenset({"PARITY-GATE-3", "Gate3AuthoritativeVer
 
 
 class Gate3PublicKeystore:
-    """Public keystore boundary for verifiers."""
+    """Public keystore boundary for Gate 3 root verifiers."""
     _public_key: Optional[Any] = None
+    _is_sealed: bool = False
 
     @classmethod
-    def set_public_key(cls, public_key: Any) -> None:
-        """Injects public key into verifier keystore with strict type validation.
-        Controlled initialization boundary: prevents arbitrary runtime replacement of the root public key.
-        """
+    def bootstrap_root_public_key(cls, public_key: Any) -> None:
+        """Controlled bootstrap of the Gate 3 root public key by trusted application composition root."""
         from cryptography.hazmat.primitives.asymmetric import ed25519
         if not isinstance(public_key, ed25519.Ed25519PublicKey):
             raise TypeError(f"Expected Ed25519PublicKey instance, got {type(public_key).__name__}")
-        if cls._public_key is not None:
-            raise RuntimeError("Gate3PublicKeystore public key is already initialized and cannot be replaced at runtime.")
+        if cls._is_sealed and cls._public_key is not None:
+            raise RuntimeError("Gate3PublicKeystore root public key is already initialized and cannot be replaced at runtime.")
+
+        # If canonical authority keystore is already configured, verify key match
+        from benchmark.parity.gate_3_authority import Gate3AuthorityKeyStore
+        try:
+            canonical_pub = Gate3AuthorityKeyStore.get_public_key()
+            if canonical_pub is not None:
+                if public_key.public_bytes_raw() != canonical_pub.public_bytes_raw():
+                    raise RuntimeError("Unauthorized root initialization rejected: public key does not match canonical Gate 3 authority.")
+        except Exception as e:
+            if isinstance(e, RuntimeError) and "Unauthorized root" in str(e):
+                raise
+
         cls._public_key = public_key
+        cls._is_sealed = True
+
+    @classmethod
+    def set_public_key(cls, public_key: Any) -> None:
+        """Injects public key into verifier keystore with strict type and authorization validation."""
+        cls.bootstrap_root_public_key(public_key)
 
     @classmethod
     def clear(cls) -> None:
-        """Controlled teardown of public keystore boundary for test fixtures."""
+        """Controlled teardown of public keystore boundary strictly for test fixtures."""
         if os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1" and os.environ.get("PYTEST_CURRENT_TEST") is None:
             raise RuntimeError("Root keystore teardown prohibited outside active test fixture harness.")
         cls._public_key = None
+        cls._is_sealed = False
 
     @classmethod
     def get_public_key(cls) -> Optional[Any]:
@@ -49,6 +67,11 @@ class Gate3PublicKeystore:
         if env_pub_hex and len(env_pub_hex) == 64:
             from cryptography.hazmat.primitives.asymmetric import ed25519
             return ed25519.Ed25519PublicKey.from_public_bytes(bytes.fromhex(env_pub_hex))
+        from benchmark.parity.gate_3_authority import Gate3AuthorityKeyStore
+        try:
+            return Gate3AuthorityKeyStore.get_public_key()
+        except Exception:
+            pass
         return None
 
 

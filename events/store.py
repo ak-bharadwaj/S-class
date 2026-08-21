@@ -466,325 +466,45 @@ class D2NonceStore(NonceReservationInterface):
                             pass
 
 
-class D2AuthoritativeAnchor:
-    """Canonical D2 Authoritative State Anchor for manifest epochs.
-    Provides durable, append-only anchor state that survives deletion or truncation
-    of individual layer caches / supporting manifest stores.
-    """
-
-    def __init__(self, file_path: Optional[str] = None):
-        if file_path is None:
-            file_path = os.environ.get("D2_AUTHORITATIVE_ANCHOR_PATH")
-            if not file_path:
-                file_path = os.path.join(
-                    os.path.dirname(__file__), ".d2_authoritative_anchor.jsonl"
-                )
-        self._file_path = os.path.abspath(file_path)
-        self._lock_path = self._file_path + ".lock"
-        self._local_lock = threading.Lock()
-
-    @property
-    def file_path(self) -> str:
-        return self._file_path
-
-    def _read_and_verify(self) -> Tuple[int, Optional[str], Optional[str], int, str]:
-        if not os.path.exists(self._file_path):
-            return (0, None, None, 0, GENESIS_PARENT_DIGEST)
-
-        from events.serializer import compute_d2_anchor_digest
-
-        highest_epoch = 0
-        active_id: Optional[str] = None
-        active_digest: Optional[str] = None
-        expected_seq = 1
-        expected_parent = GENESIS_PARENT_DIGEST
-
-        try:
-            with open(self._file_path, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-        except Exception as e:
-            raise StorageUnavailableError(f"Cannot read authoritative D2 anchor at {self._file_path}: {e}")
-
-        for line_no, raw_line in enumerate(lines, start=1):
-            line_str = raw_line.strip()
-            if not line_str:
-                continue
-
-            try:
-                rec = json.loads(line_str)
-            except Exception as e:
-                raise CorruptEventLogError(f"D2 anchor line {line_no} contains invalid JSON: {e}")
-
-            if not isinstance(rec, dict):
-                raise CorruptEventLogError(f"D2 anchor line {line_no} is not a dictionary.")
-
-            epoch = rec.get("epoch")
-            m_id = rec.get("manifest_id")
-            m_digest = rec.get("manifest_digest")
-            s_ident = rec.get("signer_identity")
-            r_fp = rec.get("root_fingerprint")
-            seq = rec.get("sequence_number")
-            ts = rec.get("timestamp")
-            parent = rec.get("parent_digest")
-            digest = rec.get("digest")
-
-            if None in (epoch, m_id, m_digest, s_ident, r_fp, seq, ts, parent, digest):
-                raise CorruptEventLogError(f"D2 anchor line {line_no} has missing mandatory fields.")
-
-            if seq != expected_seq:
-                raise CorruptEventLogError(f"D2 anchor sequence gap: got {seq}, expected {expected_seq}.")
-
-            if parent != expected_parent:
-                raise CorruptEventLogError(f"D2 anchor parent digest mismatch at seq {seq}: got {parent}, expected {expected_parent}.")
-
-            computed_digest = compute_d2_anchor_digest(
-                epoch=epoch,
-                manifest_id=m_id,
-                manifest_digest=m_digest,
-                signer_identity=s_ident,
-                root_fingerprint=r_fp,
-                sequence_number=seq,
-                timestamp=ts,
-                parent_digest=parent,
-            )
-            if computed_digest != digest:
-                raise CorruptEventLogError(f"D2 anchor digest verification failed at seq {seq}.")
-
-            if epoch < highest_epoch:
-                raise CorruptEventLogError(f"D2 anchor contains non-monotonic epoch {epoch} < {highest_epoch} at seq {seq}.")
-
-            highest_epoch = epoch
-            active_id = m_id
-            active_digest = m_digest
-            expected_seq = seq + 1
-            expected_parent = digest
-
-        return (highest_epoch, active_id, active_digest, expected_seq - 1, expected_parent)
-
-    def get_highest_epoch(self) -> Tuple[int, Optional[str], Optional[str]]:
-        from file_lock import FileLock
-        with self._local_lock:
-            if not os.path.exists(self._file_path):
-                return (0, None, None)
-            try:
-                with FileLock(self._lock_path, timeout=5.0):
-                    highest_epoch, active_id, active_digest, _, _ = self._read_and_verify()
-                    return (highest_epoch, active_id, active_digest)
-            except Exception as e:
-                if isinstance(e, (CorruptEventLogError, StorageUnavailableError)):
-                    raise
-                highest_epoch, active_id, active_digest, _, _ = self._read_and_verify()
-                return (highest_epoch, active_id, active_digest)
-
-    def commit_epoch_anchor(
-        self,
-        epoch: int,
-        manifest_id: str,
-        manifest_digest: str,
-        signer_identity: str,
-        root_fingerprint: str,
-    ) -> None:
-        from datetime import datetime, timezone
-        from file_lock import FileLock
-        from events.serializer import compute_d2_anchor_digest
-
-        os.makedirs(os.path.dirname(self._file_path), exist_ok=True)
-        with self._local_lock:
-            with FileLock(self._lock_path, timeout=10.0):
-                highest_epoch, active_id, active_digest, head_seq, head_parent = self._read_and_verify()
-
-                if highest_epoch > 0 and epoch < highest_epoch:
-                    raise CorruptEventLogError(
-                        f"Authoritative anchor rollback rejected: epoch {epoch} < highest epoch {highest_epoch}."
-                    )
-
-                if epoch == highest_epoch and active_digest is not None:
-                    if manifest_digest != active_digest:
-                        raise CorruptEventLogError(
-                            f"Authoritative anchor substitution rejected for epoch {epoch}."
-                        )
-                    return
-
-                new_seq = head_seq + 1
-                now_iso = datetime.now(timezone.utc).isoformat()
-                digest = compute_d2_anchor_digest(
-                    epoch=epoch,
-                    manifest_id=manifest_id,
-                    manifest_digest=manifest_digest,
-                    signer_identity=signer_identity,
-                    root_fingerprint=root_fingerprint,
-                    sequence_number=new_seq,
-                    timestamp=now_iso,
-                    parent_digest=head_parent,
-                )
-
-                record = {
-                    "epoch": epoch,
-                    "manifest_id": manifest_id,
-                    "manifest_digest": manifest_digest,
-                    "signer_identity": signer_identity,
-                    "root_fingerprint": root_fingerprint,
-                    "sequence_number": new_seq,
-                    "timestamp": now_iso,
-                    "parent_digest": head_parent,
-                    "digest": digest,
-                }
-
-                line = json.dumps(record, sort_keys=True) + "\n"
-                with open(self._file_path, "a", encoding="utf-8") as f:
-                    f.write(line)
-                    f.flush()
-                    os.fsync(f.fileno())
-
-    def clear(self) -> None:
-        if os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1" and os.environ.get("PYTEST_CURRENT_TEST") is None:
-            raise RuntimeError("Authoritative anchor state cannot be reset outside active test fixture harness.")
-        with self._local_lock:
-            if os.path.exists(self._file_path):
-                try:
-                    os.remove(self._file_path)
-                except OSError:
-                    pass
+def get_canonical_d2_event_store_path() -> str:
+    path = os.environ.get("SCLASS_EVENT_STORE_PATH")
+    if not path:
+        path = os.environ.get("D3_AUTHORITY_MANIFEST_STORE_PATH")
+    if not path:
+        path = os.path.join(os.path.dirname(__file__), ".d2_event_log.jsonl")
+    return os.path.abspath(path)
 
 
 class D2AuthorityManifestStore:
-    """D2 Durable, cross-process atomic manifest epoch persistence engine.
-    Guarantees monotonic epoch tracking and rollback rejection across process restarts,
-    firmly anchored into the canonical D2 state persistence boundary.
+    """D2 Durable Authority Manifest Store.
+    Anchored directly into the ONE canonical D2 Event Store (FileAppendEventStore / MaterializedState).
+    No separate secondary ledger or independent anchor files.
     """
 
     def __init__(self, file_path: Optional[str] = None):
         if file_path is None:
-            file_path = os.environ.get("D3_AUTHORITY_MANIFEST_STORE_PATH")
-            if not file_path:
-                file_path = os.path.join(
-                    os.path.dirname(__file__), ".d2_authority_manifest_store.jsonl"
-                )
+            file_path = get_canonical_d2_event_store_path()
         self._file_path = os.path.abspath(file_path)
-        self._lock_path = self._file_path + ".lock"
-        self._local_lock = threading.Lock()
-        self._anchor = D2AuthoritativeAnchor()
+        self._lock = threading.Lock()
 
     @property
     def file_path(self) -> str:
         return self._file_path
 
     @property
-    def anchor(self) -> D2AuthoritativeAnchor:
-        return self._anchor
-
-    def _read_and_verify_log(self) -> Tuple[int, Optional[str], Optional[str], int, str]:
-        """Reads manifest epoch log from disk, verifying sequence continuity, parent chaining, domain separator, and SHA-256 digest integrity on every record.
-        
-        Returns:
-            Tuple[highest_accepted_version, active_manifest_id, active_manifest_digest, head_seq, head_digest]
-        """
-        if not os.path.exists(self._file_path):
-            return (0, None, None, 0, GENESIS_PARENT_DIGEST)
-
-        from events.serializer import compute_manifest_record_digest
-
-        highest_version = 0
-        active_manifest_id: Optional[str] = None
-        active_digest: Optional[str] = None
-        expected_seq = 1
-        expected_parent = GENESIS_PARENT_DIGEST
-
-        try:
-            with open(self._file_path, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-        except Exception as e:
-            raise StorageUnavailableError(f"Cannot read authority manifest durable store at {self._file_path}: {e}")
-
-        for line_no, raw_line in enumerate(lines, start=1):
-            line_str = raw_line.strip()
-            if not line_str:
-                continue
-
-            try:
-                rec = json.loads(line_str)
-            except Exception as e:
-                raise CorruptEventLogError(f"Manifest store line {line_no} contains invalid JSON: {e}")
-
-            if not isinstance(rec, dict):
-                raise CorruptEventLogError(f"Manifest store line {line_no} is not a dictionary.")
-
-            m_id = rec.get("manifest_id")
-            m_ver = rec.get("manifest_version")
-            p_digest = rec.get("payload_digest")
-            s_ident = rec.get("signer_identity")
-            r_fp = rec.get("root_fingerprint")
-            seq = rec.get("sequence_number")
-            ts = rec.get("timestamp")
-            parent = rec.get("parent_digest")
-            digest = rec.get("digest")
-
-            if None in (m_id, m_ver, p_digest, s_ident, r_fp, seq, ts, parent, digest):
-                raise CorruptEventLogError(f"Manifest store line {line_no} has missing mandatory fields.")
-
-            if seq != expected_seq:
-                raise CorruptEventLogError(f"Manifest store sequence gap or mismatch: got {seq}, expected {expected_seq}.")
-
-            if parent != expected_parent:
-                raise CorruptEventLogError(f"Manifest store parent digest mismatch at seq {seq}: got {parent}, expected {expected_parent}.")
-
-            computed_digest = compute_manifest_record_digest(
-                manifest_id=m_id,
-                manifest_version=m_ver,
-                payload_digest=p_digest,
-                signer_identity=s_ident,
-                root_fingerprint=r_fp,
-                sequence_number=seq,
-                timestamp=ts,
-                parent_digest=parent,
-            )
-            if computed_digest != digest:
-                raise CorruptEventLogError(f"Manifest store digest verification failed at seq {seq}.")
-
-            if m_ver < highest_version:
-                raise CorruptEventLogError(f"Manifest store contains non-monotonic version {m_ver} < {highest_version} at seq {seq}.")
-
-            highest_version = m_ver
-            active_manifest_id = m_id
-            active_digest = p_digest
-            expected_seq = seq + 1
-            expected_parent = digest
-
-        return (highest_version, active_manifest_id, active_digest, expected_seq - 1, expected_parent)
+    def store(self) -> FileAppendEventStore:
+        return FileAppendEventStore(self._file_path)
 
     def get_highest_version(self) -> Tuple[int, Optional[str], Optional[str]]:
-        """Atomically reads the verified highest accepted manifest version and identity from durable log,
-        firmly corroborated against the authoritative D2 state anchor.
+        """Atomically replays the canonical D2 event store into MaterializedState
+        and returns (active_manifest_version, active_manifest_id, active_manifest_digest).
         """
-        from file_lock import FileLock
-        with self._local_lock:
-            # Query canonical D2 authoritative state anchor
-            anchor_epoch, anchor_id, anchor_digest = self._anchor.get_highest_epoch()
-
+        with self._lock:
             if not os.path.exists(self._file_path):
-                if anchor_epoch > 0:
-                    # Manifest store was deleted/missing, but canonical D2 anchor proves epoch anchor_epoch
-                    return (anchor_epoch, anchor_id, anchor_digest)
                 return (0, None, None)
-
-            try:
-                with FileLock(self._lock_path, timeout=5.0):
-                    highest_ver, active_id, active_digest, _, _ = self._read_and_verify_log()
-            except Exception as e:
-                if isinstance(e, (CorruptEventLogError, StorageUnavailableError)):
-                    raise
-                highest_ver, active_id, active_digest, _, _ = self._read_and_verify_log()
-
-            if anchor_epoch > 0:
-                if highest_ver < anchor_epoch:
-                    # Manifest store file was truncated or restored from an older snapshot!
-                    # Return the authoritative anchor epoch so downgrade attempts are rejected.
-                    return (anchor_epoch, anchor_id, anchor_digest)
-                elif highest_ver == anchor_epoch:
-                    if active_digest is not None and anchor_digest is not None and active_digest != anchor_digest:
-                        raise CorruptEventLogError("Manifest store payload digest mismatch against authoritative D2 anchor.")
-
-            return (highest_ver, active_id, active_digest)
+            store = FileAppendEventStore(self._file_path)
+            state = store.replay()
+            return (state.active_manifest_version, state.active_manifest_id, state.active_manifest_digest)
 
     def commit_epoch(
         self,
@@ -794,100 +514,80 @@ class D2AuthorityManifestStore:
         signer_identity: str,
         root_fingerprint: str,
     ) -> None:
-        """Atomically records and syncs a newly accepted manifest epoch to durable append-only log and D2 authoritative anchor."""
+        """Commits a canonical AUTHORITY_MANIFEST_COMMITTED event to the D2 event store."""
         from datetime import datetime, timezone
-        from file_lock import FileLock
+        from events.serializer import compute_event_digest
+        from domain.models import EventEnvelope
+        from domain.types import EventType
         from policy.exceptions import ManifestRollbackError, CorruptManifestError
 
-        os.makedirs(os.path.dirname(self._file_path), exist_ok=True)
-        with self._local_lock:
-            with FileLock(self._lock_path, timeout=10.0):
-                # Verify against anchor first
-                anchor_epoch, anchor_id, anchor_digest = self._anchor.get_highest_epoch()
-                if anchor_epoch > 0 and manifest_version < anchor_epoch:
-                    raise ManifestRollbackError(
-                        f"Manifest version {manifest_version} is older than highest authoritative D2 anchor epoch {anchor_epoch} (rollback rejected)."
-                    )
+        with self._lock:
+            store = FileAppendEventStore(self._file_path)
+            state = store.replay()
 
-                highest_ver, active_id, active_digest, head_seq, head_parent = self._read_and_verify_log()
-
-                effective_highest = max(highest_ver, anchor_epoch)
-
-                if active_id is not None and manifest_id != active_id:
-                    raise CorruptManifestError(
-                        f"Manifest identity substitution rejected: expected '{active_id}', got '{manifest_id}'."
-                    )
-
-                if manifest_version < effective_highest:
-                    raise ManifestRollbackError(
-                        f"Manifest version {manifest_version} is older than highest durable accepted version {effective_highest} (rollback rejected)."
-                    )
-
-                if manifest_version == effective_highest and active_digest is not None:
-                    if payload_digest != active_digest:
-                        raise ManifestRollbackError(
-                            f"Same-version manifest substitution rejected for version {manifest_version}."
-                        )
-
-                now_iso = datetime.now(timezone.utc).isoformat()
-                new_seq = head_seq + 1
-                from events.serializer import compute_manifest_record_digest, canonicalize_json
-
-                rec_digest = compute_manifest_record_digest(
-                    manifest_id=manifest_id,
-                    manifest_version=manifest_version,
-                    payload_digest=payload_digest,
-                    signer_identity=signer_identity,
-                    root_fingerprint=root_fingerprint,
-                    sequence_number=new_seq,
-                    timestamp=now_iso,
-                    parent_digest=head_parent,
+            if state.active_manifest_id is not None and manifest_id != state.active_manifest_id:
+                raise CorruptManifestError(
+                    f"Manifest identity substitution rejected: expected '{state.active_manifest_id}', got '{manifest_id}'."
                 )
-                rec_payload = {
-                    "manifest_id": manifest_id,
-                    "manifest_version": manifest_version,
-                    "payload_digest": payload_digest,
-                    "signer_identity": signer_identity,
-                    "root_fingerprint": root_fingerprint,
-                    "sequence_number": new_seq,
-                    "timestamp": now_iso,
-                    "parent_digest": head_parent,
-                    "digest": rec_digest,
-                }
-                raw_bytes = canonicalize_json(rec_payload) + b"\n"
 
-                with open(self._file_path, "ab") as f:
-                    f.write(raw_bytes)
-                    f.flush()
-                    os.fsync(f.fileno())
-
-                # Commit to canonical D2 authoritative anchor
-                self._anchor.commit_epoch_anchor(
-                    epoch=manifest_version,
-                    manifest_id=manifest_id,
-                    manifest_digest=payload_digest,
-                    signer_identity=signer_identity,
-                    root_fingerprint=root_fingerprint,
+            if manifest_version < state.active_manifest_version:
+                raise ManifestRollbackError(
+                    f"Manifest version {manifest_version} is older than highest durable accepted version {state.active_manifest_version} (rollback rejected)."
                 )
+
+            if manifest_version == state.active_manifest_version and state.active_manifest_digest is not None:
+                if payload_digest != state.active_manifest_digest:
+                    raise ManifestRollbackError(
+                        f"Same-version manifest substitution rejected for version {manifest_version}."
+                    )
+                return
+
+            latest = store.get_latest_event()
+            new_seq = (latest.sequence_number + 1) if latest else 1
+            parent_digest = latest.digest if latest else GENESIS_PARENT_DIGEST
+            now_iso = datetime.now(timezone.utc).isoformat()
+            event_id = f"EVT-MANIFEST-{manifest_id}-{manifest_version}"
+
+            payload = {
+                "manifest_id": manifest_id,
+                "manifest_version": manifest_version,
+                "payload_digest": payload_digest,
+                "signer_identity": signer_identity,
+                "root_fingerprint": root_fingerprint,
+            }
+
+            digest = compute_event_digest(
+                event_id=event_id,
+                event_type=EventType.AUTHORITY_MANIFEST_COMMITTED,
+                sequence_number=new_seq,
+                aggregate_id=manifest_id,
+                timestamp=now_iso,
+                payload=payload,
+                parent_digest=parent_digest,
+            )
+
+            event = EventEnvelope(
+                event_id=event_id,
+                event_type=EventType.AUTHORITY_MANIFEST_COMMITTED,
+                sequence_number=new_seq,
+                aggregate_id=manifest_id,
+                timestamp=now_iso,
+                payload=payload,
+                parent_digest=parent_digest,
+                digest=digest,
+            )
+
+            store.append(event)
 
     def clear(self) -> None:
-        """Controlled teardown of manifest store strictly for test fixtures."""
-        from file_lock import FileLock
-        with self._local_lock:
-            self._anchor.clear()
+        """Controlled teardown of event store strictly for test fixtures."""
+        if os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1" and os.environ.get("PYTEST_CURRENT_TEST") is None:
+            raise RuntimeError("Authority state cannot be reset outside active test fixture harness.")
+        with self._lock:
             if os.path.exists(self._file_path):
                 try:
-                    with FileLock(self._lock_path, timeout=5.0):
-                        if os.path.exists(self._file_path):
-                            try:
-                                os.remove(self._file_path)
-                            except OSError:
-                                with open(self._file_path, "w", encoding="utf-8") as f:
-                                    pass
-                except Exception:
-                    if os.path.exists(self._file_path):
-                        try:
-                            os.remove(self._file_path)
-                        except OSError:
-                            pass
+                    os.remove(self._file_path)
+                except OSError:
+                    with open(self._file_path, "w", encoding="utf-8") as f:
+                        pass
 

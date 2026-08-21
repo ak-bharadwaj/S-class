@@ -32,6 +32,9 @@ class MaterializedState:
     evidence: Mapping[str, Evidence] = field(default_factory=dict)
     assessments: Mapping[str, AssessmentReceipt] = field(default_factory=dict)
     graph: ObligationGraph = field(default_factory=ObligationGraph)
+    active_manifest_id: Optional[str] = None
+    active_manifest_version: int = 0
+    active_manifest_digest: Optional[str] = None
     last_event_id: Optional[str] = None
     last_sequence_number: int = 0
     last_digest: str = GENESIS_PARENT_DIGEST

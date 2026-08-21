@@ -26,6 +26,7 @@ from events.exceptions import (
     InvalidParentDigestError,
     SequenceGapError,
     DuplicateSequenceError,
+    CorruptEventLogError,
 )
 
 
@@ -63,6 +64,10 @@ def reduce_event(state: MaterializedState, event: EventEnvelope) -> Materialized
     policies = dict(state.policies)
     evidence = dict(state.evidence)
     assessments = dict(state.assessments)
+
+    active_manifest_id = state.active_manifest_id
+    active_manifest_version = state.active_manifest_version
+    active_manifest_digest = state.active_manifest_digest
 
     # Clone graph defensively to preserve historical graph instances
     new_graph = ObligationGraph(task_id=state.graph.task_id)
@@ -102,6 +107,28 @@ def reduce_event(state: MaterializedState, event: EventEnvelope) -> Materialized
             rcpt: AssessmentReceipt = payload["assessment_receipt"]
             assessments[rcpt.receipt_id] = rcpt
 
+    elif event.event_type == EventType.AUTHORITY_MANIFEST_COMMITTED:
+        m_id = payload.get("manifest_id")
+        m_ver = int(payload.get("manifest_version", 0))
+        p_digest = payload.get("payload_digest")
+
+        if active_manifest_id is not None and m_id != active_manifest_id:
+            raise CorruptEventLogError(
+                f"Manifest identity substitution in event log: expected '{active_manifest_id}', got '{m_id}'."
+            )
+        if m_ver < active_manifest_version:
+            raise CorruptEventLogError(
+                f"Non-monotonic manifest version in event log: {m_ver} < {active_manifest_version}."
+            )
+        if m_ver == active_manifest_version and active_manifest_digest is not None and p_digest != active_manifest_digest:
+            raise CorruptEventLogError(
+                f"Same-version manifest substitution in event log for version {m_ver}."
+            )
+
+        active_manifest_id = m_id
+        active_manifest_version = m_ver
+        active_manifest_digest = p_digest
+
     return MaterializedState(
         task=task,
         obligations=obligations,
@@ -110,6 +137,9 @@ def reduce_event(state: MaterializedState, event: EventEnvelope) -> Materialized
         evidence=evidence,
         assessments=assessments,
         graph=new_graph,
+        active_manifest_id=active_manifest_id,
+        active_manifest_version=active_manifest_version,
+        active_manifest_digest=active_manifest_digest,
         last_event_id=event.event_id,
         last_sequence_number=event.sequence_number,
         last_digest=event.digest,
