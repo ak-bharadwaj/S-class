@@ -47,6 +47,14 @@ class Gate3PublicKeystore:
         cls._is_sealed = True
 
     @classmethod
+    def bootstrap_from_environment(cls) -> None:
+        """Explicit composition root bootstrap from deployment environment configuration."""
+        env_pub_hex = os.environ.get("GATE3_AUTHORITY_PUBLIC_KEY")
+        if env_pub_hex and len(env_pub_hex) == 64:
+            from cryptography.hazmat.primitives.asymmetric import ed25519
+            cls.bootstrap_root_public_key(ed25519.Ed25519PublicKey.from_public_bytes(bytes.fromhex(env_pub_hex)))
+
+    @classmethod
     def set_public_key(cls, public_key: Any) -> None:
         """Injects public key into verifier keystore with strict type and authorization validation."""
         cls.bootstrap_root_public_key(public_key)
@@ -61,18 +69,10 @@ class Gate3PublicKeystore:
 
     @classmethod
     def get_public_key(cls) -> Optional[Any]:
-        if cls._public_key is not None:
-            return cls._public_key
-        env_pub_hex = os.environ.get("GATE3_AUTHORITY_PUBLIC_KEY")
-        if env_pub_hex and len(env_pub_hex) == 64:
-            from cryptography.hazmat.primitives.asymmetric import ed25519
-            return ed25519.Ed25519PublicKey.from_public_bytes(bytes.fromhex(env_pub_hex))
-        from benchmark.parity.gate_3_authority import Gate3AuthorityKeyStore
-        try:
-            return Gate3AuthorityKeyStore.get_public_key()
-        except Exception:
-            pass
-        return None
+        """Returns the canonical root public key if explicitly bootstrapped, or None (fail-closed).
+        Implicit environment variable fallback inside verification is strictly prohibited.
+        """
+        return cls._public_key
 
 
 def verify_gate_3_evidence_trust_certificate(

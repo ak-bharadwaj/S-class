@@ -45,14 +45,20 @@ class Gate3AuthorityKeyStore:
         cls._private_key = None
 
     @classmethod
-    def get_private_key(cls) -> Any:
-        """Retrieves private key from keystore or environment trust boundary."""
-        if cls._private_key is not None:
-            return cls._private_key
+    def bootstrap_from_environment(cls) -> None:
+        """Explicit composition root bootstrap from deployment environment configuration."""
         env_key_hex = os.environ.get("GATE3_AUTHORITY_PRIVATE_KEY")
         if env_key_hex and len(env_key_hex) == 64:
             from cryptography.hazmat.primitives.asymmetric import ed25519
-            return ed25519.Ed25519PrivateKey.from_private_bytes(bytes.fromhex(env_key_hex))
+            cls.set_private_key(ed25519.Ed25519PrivateKey.from_private_bytes(bytes.fromhex(env_key_hex)))
+
+    @classmethod
+    def get_private_key(cls) -> Any:
+        """Retrieves private key from explicitly initialized keystore boundary.
+        Implicit environment variable fallback inside runtime operations is strictly prohibited.
+        """
+        if cls._private_key is not None:
+            return cls._private_key
         raise RuntimeError("Gate 3 Authority private key is not configured in protected keystore boundary.")
 
     @classmethod

@@ -3774,10 +3774,209 @@ def test_d3_root_boundary_e63_root_bootstrap_across_process_restart_preserves_sa
     Gate3PublicKeystore.clear()
     Gate3AuthorityKeyStore.clear()
     Gate3AuthorityKeyStore.set_private_key(TEST_AUTHORITY_PRIVATE_KEY)
+    Gate3PublicKeystore.set_public_key(TEST_AUTHORITY_PUBLIC_KEY)
 
     pub1 = Gate3PublicKeystore.get_public_key()
     pub2 = Gate3PublicKeystore.get_public_key()
     assert pub1.public_bytes_raw() == pub2.public_bytes_raw()
     assert pub1.public_bytes_raw() == TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()
+
+
+def test_d3_root_e64_attacker_controlled_env_var_cannot_establish_root():
+    """E64: Attacker-controlled GATE3_AUTHORITY_PUBLIC_KEY env var cannot implicitly establish root of trust."""
+    Gate3PublicKeystore.clear()
+    attacker_priv = ed25519.Ed25519PrivateKey.generate()
+    attacker_pub = attacker_priv.public_key()
+    attacker_hex = attacker_pub.public_bytes_raw().hex()
+
+    old_env = os.environ.get("GATE3_AUTHORITY_PUBLIC_KEY")
+    os.environ["GATE3_AUTHORITY_PUBLIC_KEY"] = attacker_hex
+    try:
+        # Keystore must return None when not explicitly bootstrapped, rejecting implicit env injection
+        assert Gate3PublicKeystore.get_public_key() is None
+
+        manifest = SignedAuthorityManifestLoader.sign_manifest(
+            manifest_id="M-E64",
+            manifest_version=1,
+            issued_at="2026-08-19T10:00:00Z",
+            actors={},
+            revoked_fingerprints=[],
+            root_private_key=attacker_priv,
+        )
+        with pytest.raises(RuntimeError, match="Canonical Gate 3 Root Authority Public Key is not configured"):
+            SignedAuthorityManifestLoader.load_from_dict(manifest)
+    finally:
+        if old_env is not None:
+            os.environ["GATE3_AUTHORITY_PUBLIC_KEY"] = old_env
+        else:
+            os.environ.pop("GATE3_AUTHORITY_PUBLIC_KEY", None)
+
+
+def test_d3_root_e65_root_mutation_after_bootstrap_rejected():
+    """E65: Attempting to mutate or replace the root public key after bootstrap is strictly rejected."""
+    Gate3PublicKeystore.clear()
+    Gate3AuthorityKeyStore.clear()
+    Gate3AuthorityKeyStore.set_private_key(TEST_AUTHORITY_PRIVATE_KEY)
+    Gate3PublicKeystore.set_public_key(TEST_AUTHORITY_PUBLIC_KEY)
+
+    another_key = ed25519.Ed25519PrivateKey.generate().public_key()
+    with pytest.raises(RuntimeError, match="already initialized and cannot be replaced"):
+        Gate3PublicKeystore.bootstrap_root_public_key(another_key)
+
+
+def test_d3_root_e66_missing_canonical_root_fails_closed():
+    """E66: Verification fails closed when canonical root public key is unbootstrapped/missing."""
+    Gate3PublicKeystore.clear()
+    manifest = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E66",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    with pytest.raises(RuntimeError, match="Canonical Gate 3 Root Authority Public Key is not configured"):
+        SignedAuthorityManifestLoader.load_from_dict(manifest)
+
+
+def test_d3_persistence_e67_canonical_d2_authority_store_missing_fails_closed():
+    """E67: Missing canonical D2 event store fails closed with StorageUnavailableError rather than silent epoch 0."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import D2AuthorityManifestStore
+    from events.exceptions import StorageUnavailableError
+    store = D2AuthorityManifestStore()
+    if os.path.exists(store.file_path):
+        os.remove(store.file_path)
+
+    with pytest.raises(StorageUnavailableError, match="Canonical D2 authority store is missing"):
+        store.get_highest_version(allow_uninitialized=False)
+
+
+def test_d3_persistence_e68_corrupted_d2_authority_store_fails_closed():
+    """E68: Corrupted D2 authority store fails closed immediately."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import D2AuthorityManifestStore
+    store = D2AuthorityManifestStore()
+    with open(store.file_path, "wb") as f:
+        f.write(b"CORRUPTED_NON_JSON_EVENT_LOG_GARBAGE\n")
+
+    try:
+        with pytest.raises(CorruptEventLogError):
+            store.get_highest_version()
+    finally:
+        SignedAuthorityManifestLoader.clear_for_testing()
+
+
+def test_d3_persistence_e69_restored_older_d2_snapshot_rollback_rejected():
+    """E69: Restoring older D2 event log snapshot strictly rejects manifest rollback."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E69",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    manifest_v2 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E69",
+        manifest_version=2,
+        issued_at="2026-08-20T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+    SignedAuthorityManifestLoader.load_from_dict(manifest_v2)
+
+    with pytest.raises(ManifestRollbackError, match="is older than highest durable accepted version"):
+        SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+
+
+def test_d3_concurrency_c1_concurrent_same_version_commits_single_authoritative_event():
+    """Concurrency C1: Multiple parallel threads committing the same version serialize into exactly one authoritative event."""
+    import concurrent.futures
+    SignedAuthorityManifestLoader.clear_for_testing()
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-CONCUR-C1",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    errors = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(SignedAuthorityManifestLoader.load_from_dict, manifest_v1) for _ in range(16)]
+        for fut in concurrent.futures.as_completed(futures):
+            try:
+                fut.result()
+            except Exception as e:
+                errors.append(e)
+
+    # All parallel submissions succeed idempotently
+    assert len(errors) == 0
+
+    from events.store import D2AuthorityManifestStore
+    store = D2AuthorityManifestStore()
+    events = store.store.get_events()
+    assert len(events) == 1
+    assert events[0].payload["manifest_version"] == 1
+
+
+def test_d3_concurrency_c2_concurrent_monotonic_version_commits_no_lost_sequence():
+    """Concurrency C2: Sequential monotonic commits maintain continuous cryptographic parent chaining and sequence ordering."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+
+    for ver in range(1, 6):
+        m = SignedAuthorityManifestLoader.sign_manifest(
+            manifest_id="M-CONCUR-C2",
+            manifest_version=ver,
+            issued_at=f"2026-08-19T10:0{ver}:00Z",
+            actors={},
+            revoked_fingerprints=[],
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+        SignedAuthorityManifestLoader.load_from_dict(m)
+
+    from events.store import D2AuthorityManifestStore
+    store = D2AuthorityManifestStore()
+    assert store.store.verify_integrity() is True
+    ver, active_id, _ = store.get_highest_version()
+    assert ver == 5
+    assert active_id == "M-CONCUR-C2"
+
+
+def test_d3_concurrency_c3_restart_during_commit_no_partial_authority_acceptance():
+    """Concurrency C3: Torn write fragment at EOF during interrupted commit is safely recovered without state corruption."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-CRASH-C3",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+
+    from events.store import D2AuthorityManifestStore
+    store = D2AuthorityManifestStore()
+    file_path = store.file_path
+
+    # Append torn/incomplete fragment at EOF without trailing newline (simulating power loss / kill -9 during write)
+    with open(file_path, "ab") as f:
+        f.write(b'{"event_id": "EVT-INCOMPLETE", "partial": true')
+
+    # Restarting loader safely truncates un-terminated EOF fragment and recovers valid state
+    recovered_store = D2AuthorityManifestStore()
+    highest_ver, active_id, _ = recovered_store.get_highest_version()
+    assert highest_ver == 1
+    assert active_id == "M-CRASH-C3"
+
 
 

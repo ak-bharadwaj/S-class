@@ -194,48 +194,52 @@ class FileAppendEventStore(EventStoreInterface):
         if not isinstance(event, EventEnvelope):
             raise TypeError("Expected EventEnvelope instance.")
 
+        from file_lock import FileLock
+        lock_path = self._file_path + ".lock"
         with self._lock:
-            head_seq = len(self._events)
-            expected_seq = head_seq + 1
-            expected_parent = self._events[-1].digest if self._events else GENESIS_PARENT_DIGEST
+            with FileLock(lock_path, timeout=10.0):
+                self._recover_and_load()
+                head_seq = len(self._events)
+                expected_seq = head_seq + 1
+                expected_parent = self._events[-1].digest if self._events else GENESIS_PARENT_DIGEST
 
-            if event.sequence_number < expected_seq:
-                raise DuplicateSequenceError(
-                    f"Duplicate sequence: {event.sequence_number} <= head {head_seq}."
-                )
-            elif event.sequence_number > expected_seq:
-                raise SequenceGapError(
-                    f"Sequence gap: got {event.sequence_number}, expected {expected_seq}."
-                )
+                if event.sequence_number < expected_seq:
+                    raise DuplicateSequenceError(
+                        f"Duplicate sequence: {event.sequence_number} <= head {head_seq}."
+                    )
+                elif event.sequence_number > expected_seq:
+                    raise SequenceGapError(
+                        f"Sequence gap: got {event.sequence_number}, expected {expected_seq}."
+                    )
 
-            if event.parent_digest != expected_parent:
-                raise InvalidParentDigestError(
-                    f"Invalid parent digest: got '{event.parent_digest}', expected '{expected_parent}'."
-                )
+                if event.parent_digest != expected_parent:
+                    raise InvalidParentDigestError(
+                        f"Invalid parent digest: got '{event.parent_digest}', expected '{expected_parent}'."
+                    )
 
-            if not verify_event_digest(event):
-                raise DigestMismatchError(
-                    f"Digest verification failed for event '{event.event_id}'."
-                )
+                if not verify_event_digest(event):
+                    raise DigestMismatchError(
+                        f"Digest verification failed for event '{event.event_id}'."
+                    )
 
-            event_dict = {
-                "event_id": event.event_id,
-                "event_type": event.event_type.value,
-                "sequence_number": event.sequence_number,
-                "aggregate_id": event.aggregate_id,
-                "timestamp": event.timestamp,
-                "payload": event.payload,
-                "parent_digest": event.parent_digest,
-                "digest": event.digest,
-            }
-            line_bytes = canonicalize_json(event_dict) + b"\n"
+                event_dict = {
+                    "event_id": event.event_id,
+                    "event_type": event.event_type.value,
+                    "sequence_number": event.sequence_number,
+                    "aggregate_id": event.aggregate_id,
+                    "timestamp": event.timestamp,
+                    "payload": event.payload,
+                    "parent_digest": event.parent_digest,
+                    "digest": event.digest,
+                }
+                line_bytes = canonicalize_json(event_dict) + b"\n"
 
-            with open(self._file_path, "ab") as f:
-                f.write(line_bytes)
-                f.flush()
-                os.fsync(f.fileno())
+                with open(self._file_path, "ab") as f:
+                    f.write(line_bytes)
+                    f.flush()
+                    os.fsync(f.fileno())
 
-            self._events.append(event)
+                self._events.append(event)
 
     def get_events(self, after_sequence: int = 0, limit: Optional[int] = None) -> Tuple[EventEnvelope, ...]:
         with self._lock:
@@ -495,13 +499,18 @@ class D2AuthorityManifestStore:
     def store(self) -> FileAppendEventStore:
         return FileAppendEventStore(self._file_path)
 
-    def get_highest_version(self) -> Tuple[int, Optional[str], Optional[str]]:
+    def get_highest_version(self, allow_uninitialized: bool = False) -> Tuple[int, Optional[str], Optional[str]]:
         """Atomically replays the canonical D2 event store into MaterializedState
         and returns (active_manifest_version, active_manifest_id, active_manifest_digest).
+        Fails closed with StorageUnavailableError if the authoritative D2 store is missing and allow_uninitialized is False.
         """
         with self._lock:
             if not os.path.exists(self._file_path):
-                return (0, None, None)
+                if allow_uninitialized:
+                    return (0, None, None)
+                raise StorageUnavailableError(
+                    f"Canonical D2 authority store is missing at '{self._file_path}'; fail closed against silent state reset."
+                )
             store = FileAppendEventStore(self._file_path)
             state = store.replay()
             return (state.active_manifest_version, state.active_manifest_id, state.active_manifest_digest)
@@ -516,37 +525,40 @@ class D2AuthorityManifestStore:
     ) -> None:
         """Commits a canonical AUTHORITY_MANIFEST_COMMITTED event to the D2 event store."""
         from datetime import datetime, timezone
+        from file_lock import FileLock
         from events.serializer import compute_event_digest
         from domain.models import EventEnvelope
         from domain.types import EventType
         from policy.exceptions import ManifestRollbackError, CorruptManifestError
 
+        lock_path = self._file_path + ".lock"
         with self._lock:
-            store = FileAppendEventStore(self._file_path)
-            state = store.replay()
+            with FileLock(lock_path, timeout=10.0):
+                store = FileAppendEventStore(self._file_path)
+                state = store.replay()
 
-            if state.active_manifest_id is not None and manifest_id != state.active_manifest_id:
-                raise CorruptManifestError(
-                    f"Manifest identity substitution rejected: expected '{state.active_manifest_id}', got '{manifest_id}'."
-                )
-
-            if manifest_version < state.active_manifest_version:
-                raise ManifestRollbackError(
-                    f"Manifest version {manifest_version} is older than highest durable accepted version {state.active_manifest_version} (rollback rejected)."
-                )
-
-            if manifest_version == state.active_manifest_version and state.active_manifest_digest is not None:
-                if payload_digest != state.active_manifest_digest:
-                    raise ManifestRollbackError(
-                        f"Same-version manifest substitution rejected for version {manifest_version}."
+                if state.active_manifest_id is not None and manifest_id != state.active_manifest_id:
+                    raise CorruptManifestError(
+                        f"Manifest identity substitution rejected: expected '{state.active_manifest_id}', got '{manifest_id}'."
                     )
-                return
 
-            latest = store.get_latest_event()
-            new_seq = (latest.sequence_number + 1) if latest else 1
-            parent_digest = latest.digest if latest else GENESIS_PARENT_DIGEST
-            now_iso = datetime.now(timezone.utc).isoformat()
-            event_id = f"EVT-MANIFEST-{manifest_id}-{manifest_version}"
+                if manifest_version < state.active_manifest_version:
+                    raise ManifestRollbackError(
+                        f"Manifest version {manifest_version} is older than highest durable accepted version {state.active_manifest_version} (rollback rejected)."
+                    )
+
+                if manifest_version == state.active_manifest_version and state.active_manifest_digest is not None:
+                    if payload_digest != state.active_manifest_digest:
+                        raise ManifestRollbackError(
+                            f"Same-version manifest substitution rejected for version {manifest_version}."
+                        )
+                    return
+
+                latest = store.get_latest_event()
+                new_seq = (latest.sequence_number + 1) if latest else 1
+                parent_digest = latest.digest if latest else GENESIS_PARENT_DIGEST
+                now_iso = datetime.now(timezone.utc).isoformat()
+                event_id = f"EVT-MANIFEST-{manifest_id}-{manifest_version}"
 
             payload = {
                 "manifest_id": manifest_id,

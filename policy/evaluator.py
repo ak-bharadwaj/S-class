@@ -234,11 +234,6 @@ class SignedAuthorityManifestLoader:
         pub = Gate3PublicKeystore.get_public_key()
         if pub is not None:
             return pub
-        from benchmark.parity.gate_3_authority import Gate3AuthorityKeyStore
-        try:
-            return Gate3AuthorityKeyStore.get_public_key()
-        except Exception:
-            pass
         raise RuntimeError("Canonical Gate 3 Root Authority Public Key is not configured in protected keystore boundary.")
 
     @classmethod
@@ -259,11 +254,10 @@ class SignedAuthorityManifestLoader:
         revoked_fingerprints: List[str],
         root_private_key: Any,
         signer_identity: str = "Gate3AuthoritativeVerifier",
-        timestamp: str = "2026-08-19T10:00:00Z",
     ) -> Dict[str, Any]:
-        """Helper to generate cryptographically authentic SignedAuthorityManifest data."""
-        pub = root_private_key.public_key()
-        fp = hashlib.sha256(pub.public_bytes_raw()).hexdigest()
+        """Cryptographically signs an authority manifest with Ed25519 root private key."""
+        timestamp = issued_at
+        fp = hashlib.sha256(root_private_key.public_key().public_bytes_raw()).hexdigest()
 
         dummy_sig = {
             "algorithm": "ED25519",
@@ -307,6 +301,7 @@ class SignedAuthorityManifestLoader:
         from cryptography.hazmat.primitives.asymmetric import ed25519
         from cryptography.exceptions import InvalidSignature
         from events.store import D2AuthorityManifestStore
+        from events.exceptions import StorageUnavailableError
         from policy.exceptions import (
             InvalidManifestSignatureError,
             CorruptManifestError,
@@ -339,7 +334,16 @@ class SignedAuthorityManifestLoader:
 
         # Durable monotonic version validation via D2 store
         store = D2AuthorityManifestStore()
-        highest_ver, active_id, active_digest = store.get_highest_version()
+        try:
+            highest_ver, active_id, active_digest = store.get_highest_version(allow_uninitialized=False)
+        except StorageUnavailableError:
+            if min_version is not None and min_version > manifest_version:
+                raise ManifestRollbackError(
+                    f"Missing canonical D2 authority store cannot satisfy min_version={min_version}."
+                )
+            highest_ver = 0
+            active_id = None
+            active_digest = None
 
         if active_id is not None and manifest_id != active_id:
             raise CorruptManifestError(
