@@ -940,19 +940,39 @@ class D2InstallationProvisioning:
 
                 provisioner = DeploymentProvisionerRegistry.get_provisioner()
                 if provisioner.get_deployment_status() == DeploymentStatus.RECOVERY_AUTHORIZED:
-                    provisioner.record_reprovisioned(
-                        installation_id=installation_id,
-                        manifest_id=manifest_id,
-                        manifest_version=manifest_version,
-                        root_fingerprint=root_fingerprint,
-                    )
+                    try:
+                        provisioner.record_reprovisioned(
+                            installation_id=installation_id,
+                            manifest_id=manifest_id,
+                            manifest_version=manifest_version,
+                            root_fingerprint=root_fingerprint,
+                            payload_digest=payload_digest_calc,
+                            root_signature=seal_payload["signature"],
+                        )
+                    except TypeError:
+                        provisioner.record_reprovisioned(
+                            installation_id=installation_id,
+                            manifest_id=manifest_id,
+                            manifest_version=manifest_version,
+                            root_fingerprint=root_fingerprint,
+                        )
                 else:
-                    provisioner.record_provisioned(
-                        installation_id=installation_id,
-                        manifest_id=manifest_id,
-                        manifest_version=manifest_version,
-                        root_fingerprint=root_fingerprint,
-                    )
+                    try:
+                        provisioner.record_provisioned(
+                            installation_id=installation_id,
+                            manifest_id=manifest_id,
+                            manifest_version=manifest_version,
+                            root_fingerprint=root_fingerprint,
+                            payload_digest=payload_digest_calc,
+                            root_signature=seal_payload["signature"],
+                        )
+                    except TypeError:
+                        provisioner.record_provisioned(
+                            installation_id=installation_id,
+                            manifest_id=manifest_id,
+                            manifest_version=manifest_version,
+                            root_fingerprint=root_fingerprint,
+                        )
 
     @classmethod
     def verify_state_agreement(cls) -> None:
@@ -965,14 +985,15 @@ class D2InstallationProvisioning:
 
         seal_data = cls.verify_seal()
 
-        from events.store import D2AuthorityManifestStore
+        from events.store import D2AuthorityManifestStore, FileAppendEventStore
         store = D2AuthorityManifestStore()
         if not os.path.exists(store.file_path) or os.path.getsize(store.file_path) == 0:
             raise StorageUnavailableError(
                 f"Authoritative D2 history missing at '{store.file_path}' for sealed installation; fail closed against authority reset."
             )
 
-        events = store.store.get_events()
+        event_store = FileAppendEventStore(store.file_path)
+        events = event_store.get_events()
         if not events:
             raise StorageUnavailableError("Canonical D2 store contains no events for sealed installation.")
 
@@ -1056,6 +1077,8 @@ class TrustedDeploymentProvisioner(ABC):
         manifest_id: str,
         manifest_version: int,
         root_fingerprint: str,
+        payload_digest: Optional[str] = None,
+        root_signature: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Records that the initial genesis epoch has been durably committed."""
         pass
@@ -1085,6 +1108,8 @@ class TrustedDeploymentProvisioner(ABC):
         manifest_id: str,
         manifest_version: int,
         root_fingerprint: str,
+        payload_digest: Optional[str] = None,
+        root_signature: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Records that catastrophic recovery reprovisioning has completed."""
         pass
@@ -1128,13 +1153,23 @@ class IPCDeploymentProvisioner(TrustedDeploymentProvisioner):
             if not resp.get("success"):
                 raise RuntimeError(f"Authority broker rejected initial provisioning: {resp.get('error')}")
 
-    def record_provisioned(self, installation_id: str, manifest_id: str, manifest_version: int, root_fingerprint: str) -> None:
+    def record_provisioned(
+        self,
+        installation_id: str,
+        manifest_id: str,
+        manifest_version: int,
+        root_fingerprint: str,
+        payload_digest: Optional[str] = None,
+        root_signature: Optional[Dict[str, Any]] = None,
+    ) -> None:
         with self._lock:
             resp = self._client.call("record_provisioned", {
                 "installation_id": installation_id,
                 "manifest_id": manifest_id,
                 "manifest_version": manifest_version,
                 "root_fingerprint": root_fingerprint,
+                "payload_digest": payload_digest,
+                "root_signature": root_signature,
             })
             if not resp.get("success"):
                 raise RuntimeError(f"Authority broker rejected record_provisioned: {resp.get('error')}")
@@ -1165,13 +1200,23 @@ class IPCDeploymentProvisioner(TrustedDeploymentProvisioner):
                 raise RuntimeError(f"Authority broker rejected reprovisioning: {err}")
             return resp.get("authorization", reprovisioning_authorization)
 
-    def record_reprovisioned(self, installation_id: str, manifest_id: str, manifest_version: int, root_fingerprint: str) -> None:
+    def record_reprovisioned(
+        self,
+        installation_id: str,
+        manifest_id: str,
+        manifest_version: int,
+        root_fingerprint: str,
+        payload_digest: Optional[str] = None,
+        root_signature: Optional[Dict[str, Any]] = None,
+    ) -> None:
         with self._lock:
             resp = self._client.call("record_reprovisioned", {
                 "installation_id": installation_id,
                 "manifest_id": manifest_id,
                 "manifest_version": manifest_version,
                 "root_fingerprint": root_fingerprint,
+                "payload_digest": payload_digest,
+                "root_signature": root_signature,
             })
             if not resp.get("success"):
                 raise RuntimeError(f"Authority broker rejected record_reprovisioned: {resp.get('error')}")
@@ -1200,7 +1245,15 @@ class FailClosedDeploymentProvisioner(TrustedDeploymentProvisioner):
             "Initial genesis provisioning is rejected."
         )
 
-    def record_provisioned(self, installation_id: str, manifest_id: str, manifest_version: int, root_fingerprint: str) -> None:
+    def record_provisioned(
+        self,
+        installation_id: str,
+        manifest_id: str,
+        manifest_version: int,
+        root_fingerprint: str,
+        payload_digest: Optional[str] = None,
+        root_signature: Optional[Dict[str, Any]] = None,
+    ) -> None:
         raise RuntimeError("FailClosedDeploymentProvisioner: Cannot record provisioning on fail-closed authority.")
 
     def notify_local_state_loss(self) -> None:
@@ -1212,7 +1265,15 @@ class FailClosedDeploymentProvisioner(TrustedDeploymentProvisioner):
             "Reprovisioning is rejected."
         )
 
-    def record_reprovisioned(self, installation_id: str, manifest_id: str, manifest_version: int, root_fingerprint: str) -> None:
+    def record_reprovisioned(
+        self,
+        installation_id: str,
+        manifest_id: str,
+        manifest_version: int,
+        root_fingerprint: str,
+        payload_digest: Optional[str] = None,
+        root_signature: Optional[Dict[str, Any]] = None,
+    ) -> None:
         raise RuntimeError("FailClosedDeploymentProvisioner: Cannot record reprovisioning on fail-closed authority.")
 
 
@@ -1259,7 +1320,15 @@ class InMemoryTestDeploymentProvisioner(TrustedDeploymentProvisioner):
                 )
             self._status = DeploymentStatus.PROVISIONING_AUTHORIZED
 
-    def record_provisioned(self, installation_id: str, manifest_id: str, manifest_version: int, root_fingerprint: str) -> None:
+    def record_provisioned(
+        self,
+        installation_id: str,
+        manifest_id: str,
+        manifest_version: int,
+        root_fingerprint: str,
+        payload_digest: Optional[str] = None,
+        root_signature: Optional[Dict[str, Any]] = None,
+    ) -> None:
         self._check_test_mode()
         with self._lock:
             self._status = DeploymentStatus.PROVISIONED
@@ -1268,6 +1337,8 @@ class InMemoryTestDeploymentProvisioner(TrustedDeploymentProvisioner):
                 "manifest_id": manifest_id,
                 "manifest_version": manifest_version,
                 "root_fingerprint": root_fingerprint,
+                "payload_digest": payload_digest,
+                "root_signature": root_signature,
             })
 
     def notify_local_state_loss(self) -> None:
@@ -1362,7 +1433,15 @@ class InMemoryTestDeploymentProvisioner(TrustedDeploymentProvisioner):
             self._status = DeploymentStatus.RECOVERY_AUTHORIZED
             return reprovisioning_authorization
 
-    def record_reprovisioned(self, installation_id: str, manifest_id: str, manifest_version: int, root_fingerprint: str) -> None:
+    def record_reprovisioned(
+        self,
+        installation_id: str,
+        manifest_id: str,
+        manifest_version: int,
+        root_fingerprint: str,
+        payload_digest: Optional[str] = None,
+        root_signature: Optional[Dict[str, Any]] = None,
+    ) -> None:
         self._check_test_mode()
         with self._lock:
             self._status = DeploymentStatus.PROVISIONED
@@ -1371,6 +1450,8 @@ class InMemoryTestDeploymentProvisioner(TrustedDeploymentProvisioner):
                 "manifest_id": manifest_id,
                 "manifest_version": manifest_version,
                 "root_fingerprint": root_fingerprint,
+                "payload_digest": payload_digest,
+                "root_signature": root_signature,
                 "reprovisioned": True,
             })
 

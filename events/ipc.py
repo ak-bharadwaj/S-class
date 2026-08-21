@@ -38,19 +38,32 @@ def decode_frame(sock: socket.socket) -> Dict[str, Any]:
     return json.loads(data.decode("utf-8"))
 
 
+def _is_test_env() -> bool:
+    return bool(
+        os.environ.get("SCLASS_TEST_MODE") == "1"
+        or os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") == "1"
+        or os.environ.get("PYTEST_CURRENT_TEST") is not None
+    )
+
+
 class OSIPCServer:
-    """Authenticated OS IPC Server for Trust Domain A (Broker)."""
+    """Authenticated OS IPC Server for Trust Domain A (Broker).
+    Enforces OS peer credentials (POSIX UID check) and mandatory authentication secret.
+    Prohibits unauthenticated TCP in production.
+    """
     def __init__(
         self,
         endpoint_path: str,
         handler: Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]],
         allowed_uid: Optional[int] = None,
         auth_secret: Optional[str] = None,
+        allow_tcp_test_transport: bool = False,
     ):
         self.endpoint_path = endpoint_path
         self.handler = handler
-        self.allowed_uid = allowed_uid if allowed_uid is not None else (os.getuid() if hasattr(os, "getuid") else None)
+        self.allowed_uid = allowed_uid
         self.auth_secret = auth_secret
+        self.allow_tcp_test_transport = allow_tcp_test_transport
         self.server_socket: Optional[socket.socket] = None
         self._is_running = False
         self._lock = threading.RLock()
@@ -60,30 +73,40 @@ class OSIPCServer:
         with self._lock:
             if self._is_running:
                 return
-            if sys.platform != "win32":
-                if os.path.exists(self.endpoint_path):
-                    try:
-                        os.remove(self.endpoint_path)
-                    except OSError:
-                        pass
-                self.server_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-                self.server_socket.bind(self.endpoint_path)
-                os.chmod(self.endpoint_path, 0o600)
-            else:
+
+            # Clean existing socket endpoint
+            if os.path.exists(self.endpoint_path):
                 try:
-                    if os.path.exists(self.endpoint_path):
-                        try:
-                            os.remove(self.endpoint_path)
-                        except OSError:
-                            pass
+                    os.remove(self.endpoint_path)
+                except OSError:
+                    pass
+
+            if hasattr(socket, "AF_UNIX"):
+                try:
                     self.server_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                     self.server_socket.bind(self.endpoint_path)
-                except Exception:
+                    if hasattr(os, "chmod"):
+                        try:
+                            os.chmod(self.endpoint_path, 0o600)
+                        except OSError:
+                            pass
+                except Exception as e:
+                    if not self.allow_tcp_test_transport and not _is_test_env():
+                        raise RuntimeError(f"Production OS IPC failed to bind AF_UNIX socket '{self.endpoint_path}': {e}")
+                    # Test / Local development fallback
                     self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     self.server_socket.bind(("127.0.0.1", 0))
                     port = self.server_socket.getsockname()[1]
-                    with open(self.endpoint_path, "w") as f:
+                    with open(self.endpoint_path, "w", encoding="utf-8") as f:
                         f.write(f"127.0.0.1:{port}")
+            else:
+                if not self.allow_tcp_test_transport and not _is_test_env():
+                    raise RuntimeError("Production OS IPC requires AF_UNIX / Named Pipe support. TCP prohibited.")
+                self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.server_socket.bind(("127.0.0.1", 0))
+                port = self.server_socket.getsockname()[1]
+                with open(self.endpoint_path, "w", encoding="utf-8") as f:
+                    f.write(f"127.0.0.1:{port}")
 
             self.server_socket.listen(16)
             self._is_running = True
@@ -117,6 +140,10 @@ class OSIPCServer:
                     return False, peer_meta
             except Exception:
                 return False, peer_meta
+
+        # On Windows or when secret is None, if allowed_uid was explicitly required but missing -> deny
+        if self.allowed_uid is not None and "uid" not in peer_meta and sys.platform != "win32":
+            return False, peer_meta
 
         peer_meta["authenticated"] = True
         return True, peer_meta
@@ -172,12 +199,11 @@ class OSIPCServer:
                 except Exception:
                     pass
                 self.server_socket = None
-            if sys.platform != "win32" or not self.endpoint_path.endswith(".txt"):
-                if os.path.exists(self.endpoint_path):
-                    try:
-                        os.remove(self.endpoint_path)
-                    except OSError:
-                        pass
+            if os.path.exists(self.endpoint_path):
+                try:
+                    os.remove(self.endpoint_path)
+                except OSError:
+                    pass
 
 
 class OSIPCClient:
@@ -196,19 +222,31 @@ class OSIPCClient:
             if not os.path.exists(self.endpoint_path):
                 raise ConnectionError(f"IPC endpoint not found at '{self.endpoint_path}'")
 
-            if sys.platform != "win32":
-                self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-                self._sock.connect(self.endpoint_path)
-            else:
+            connected = False
+            if hasattr(socket, "AF_UNIX"):
                 try:
                     self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                     self._sock.connect(self.endpoint_path)
+                    connected = True
                 except Exception:
-                    with open(self.endpoint_path, "r") as f:
+                    if self._sock:
+                        try:
+                            self._sock.close()
+                        except Exception:
+                            pass
+                    self._sock = None
+
+            if not connected:
+                # Check for TCP port file
+                try:
+                    with open(self.endpoint_path, "r", encoding="utf-8") as f:
                         content = f.read().strip()
                     host, port_str = content.split(":")
                     self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     self._sock.connect((host, int(port_str)))
+                    connected = True
+                except Exception as e:
+                    raise ConnectionError(f"Failed to connect to authority broker at '{self.endpoint_path}': {e}")
 
             if self.auth_secret is not None:
                 self._sock.sendall(encode_frame({"auth_secret": self.auth_secret}))

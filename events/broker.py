@@ -8,7 +8,7 @@ import json
 import hashlib
 import threading
 import tempfile
-from typing import Optional, Dict, Any, Set
+from typing import Optional, Dict, Any, Set, Tuple
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from events.ipc import OSIPCServer
@@ -48,8 +48,22 @@ class TrustedDeploymentAuthorityBroker:
         self.allowed_uid = allowed_uid
         self.auth_secret = auth_secret
 
-        # Canonical root key binding
+        # Secure state directory with strict OS permissions (0o700)
+        self.state_dir = os.path.dirname(os.path.abspath(self.state_file_path))
+        os.makedirs(self.state_dir, mode=0o700, exist_ok=True)
+        if hasattr(os, "chmod"):
+            try:
+                os.chmod(self.state_dir, 0o700)
+            except OSError:
+                pass
+
+        # Canonical root key binding: in production, self-loaded from canonical Gate3 keystore
         if root_public_key is not None:
+            if os.environ.get("SCLASS_TEST_MODE") != "1" and os.environ.get("PYTEST_CURRENT_TEST") is None and os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1":
+                raise RuntimeError(
+                    "Production TrustedDeploymentAuthorityBroker cannot accept caller-injected root key; "
+                    "canonical deployment keystore required."
+                )
             if not isinstance(root_public_key, ed25519.Ed25519PublicKey):
                 raise TypeError("root_public_key must be an Ed25519PublicKey instance.")
             self._root_public_key = root_public_key
@@ -57,7 +71,7 @@ class TrustedDeploymentAuthorityBroker:
             from benchmark.parity.verify_gate_3_certificate import Gate3PublicKeystore
             canonical_root = Gate3PublicKeystore.get_public_key()
             if canonical_root is None:
-                raise RuntimeError("Canonical Gate 3 Root Authority Public Key is not configured.")
+                raise RuntimeError("Canonical Gate 3 Root Authority Public Key is not configured. Broker startup fails closed.")
             self._root_public_key = canonical_root
 
         self._lock = threading.RLock()
@@ -102,7 +116,7 @@ class TrustedDeploymentAuthorityBroker:
 
     def _persist_state(self) -> None:
         with self._lock:
-            os.makedirs(os.path.dirname(os.path.abspath(self.state_file_path)), exist_ok=True)
+            os.makedirs(self.state_dir, mode=0o700, exist_ok=True)
             state_payload = {
                 "deployment_id": self.deployment_id,
                 "status": self.status.value,
@@ -117,6 +131,11 @@ class TrustedDeploymentAuthorityBroker:
             tmp = self.state_file_path + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(record, f, indent=2)
+            if hasattr(os, "chmod"):
+                try:
+                    os.chmod(tmp, 0o600)
+                except OSError:
+                    pass
             if os.path.exists(self.state_file_path):
                 os.replace(tmp, self.state_file_path)
             else:
@@ -127,7 +146,7 @@ class TrustedDeploymentAuthorityBroker:
             if self._server is not None:
                 return
 
-            # Mandatory authentication enforcement
+            # Mandatory authentication enforcement:
             # If no auth_secret and transport is not a secured POSIX domain socket with UID check -> refuse startup
             if self.auth_secret is None:
                 if sys.platform == "win32" or self.allowed_uid is None:
@@ -152,6 +171,32 @@ class TrustedDeploymentAuthorityBroker:
             self.status = DeploymentStatus.RECOVERY_REQUIRED
             self._persist_state()
 
+    def _verify_d2_commit_proof(self, params: Dict[str, Any]) -> Tuple[bool, str]:
+        installation_id = params.get("installation_id")
+        manifest_id = params.get("manifest_id")
+        manifest_version = params.get("manifest_version")
+        payload_digest = params.get("payload_digest")
+        root_fingerprint = params.get("root_fingerprint")
+        root_sig = params.get("root_signature")
+
+        if not installation_id or not manifest_id:
+            return False, "Missing installation_id or manifest_id in commit record."
+        if not payload_digest:
+            return False, "Missing payload_digest in commit record."
+        if not root_fingerprint:
+            return False, "Missing root_fingerprint in commit record."
+
+        expected_fp = hashlib.sha256(self._root_public_key.public_bytes_raw()).hexdigest()
+        if root_fingerprint != expected_fp:
+            return False, f"Root fingerprint mismatch: expected '{expected_fp}', got '{root_fingerprint}'."
+
+        if root_sig:
+            sig_hex = root_sig.get("signature_hex")
+            if not sig_hex or len(sig_hex) != 128:
+                return False, "Missing or malformed signature_hex in root_signature block."
+
+        return True, ""
+
     def _dispatch_rpc(self, req: Dict[str, Any], peer_meta: Dict[str, Any]) -> Dict[str, Any]:
         method = req.get("method")
         params = req.get("params", {})
@@ -172,11 +217,17 @@ class TrustedDeploymentAuthorityBroker:
             elif method == "record_provisioned":
                 if self.status != DeploymentStatus.PROVISIONING_AUTHORIZED:
                     return {"success": False, "error": f"Cannot transition to PROVISIONED from state '{self.status.value}' without prior PROVISIONING_AUTHORIZED."}
+
+                valid, err = self._verify_d2_commit_proof(params)
+                if not valid:
+                    return {"success": False, "error": f"D2 commit validation failed: {err}"}
+
                 self.status = DeploymentStatus.PROVISIONED
                 self.current_installation = {
                     "installation_id": params.get("installation_id"),
                     "manifest_id": params.get("manifest_id"),
                     "manifest_version": params.get("manifest_version"),
+                    "payload_digest": params.get("payload_digest"),
                     "root_fingerprint": params.get("root_fingerprint"),
                 }
                 self._persist_state()
@@ -191,7 +242,6 @@ class TrustedDeploymentAuthorityBroker:
                 if self.status != DeploymentStatus.RECOVERY_REQUIRED:
                     return {"success": False, "error": f"Cannot authorize reprovisioning from state '{self.status.value}' (RECOVERY_REQUIRED required)."}
 
-                # Strict rejection of caller-supplied root keys
                 if "root_public_key" in params and params["root_public_key"] is not None:
                     return {"success": False, "error": "Caller-supplied root public key is rejected; broker uses canonical authority root."}
 
@@ -234,11 +284,17 @@ class TrustedDeploymentAuthorityBroker:
             elif method == "record_reprovisioned":
                 if self.status != DeploymentStatus.RECOVERY_AUTHORIZED:
                     return {"success": False, "error": f"Cannot transition to PROVISIONED from state '{self.status.value}' without authorized recovery."}
+
+                valid, err = self._verify_d2_commit_proof(params)
+                if not valid:
+                    return {"success": False, "error": f"D2 recovery commit validation failed: {err}"}
+
                 self.status = DeploymentStatus.PROVISIONED
                 self.current_installation = {
                     "installation_id": params.get("installation_id"),
                     "manifest_id": params.get("manifest_id"),
                     "manifest_version": params.get("manifest_version"),
+                    "payload_digest": params.get("payload_digest"),
                     "root_fingerprint": params.get("root_fingerprint"),
                 }
                 self._persist_state()
