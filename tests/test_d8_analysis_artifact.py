@@ -74,6 +74,7 @@ def sample_artifact() -> AnalysisArtifact:
 
     return AnalysisArtifact(
         analysis_id="ANA-001",
+        execution_id="EXEC-SAMPLE-001",
         analyst_type=AnalystType.ARCHITECTURE,
         task_id="TASK-001",
         repository_id="repo-main",
@@ -117,6 +118,7 @@ def test_p1_mutate_observation_causes_digest_mismatch(sample_artifact):
     )
     tampered_artifact = AnalysisArtifact(
         analysis_id=sample_artifact.analysis_id,
+        execution_id=sample_artifact.execution_id,
         analyst_type=sample_artifact.analyst_type,
         task_id=sample_artifact.task_id,
         repository_id=sample_artifact.repository_id,
@@ -147,6 +149,7 @@ def test_p2_mutate_hypothesis_causes_digest_mismatch(sample_artifact):
     )
     tampered_artifact = AnalysisArtifact(
         analysis_id=sample_artifact.analysis_id,
+        execution_id=sample_artifact.execution_id,
         analyst_type=sample_artifact.analyst_type,
         task_id=sample_artifact.task_id,
         repository_id=sample_artifact.repository_id,
@@ -177,6 +180,7 @@ def test_p3_mutate_tool_provenance_causes_digest_mismatch(sample_artifact):
     )
     tampered_artifact = AnalysisArtifact(
         analysis_id=sample_artifact.analysis_id,
+        execution_id=sample_artifact.execution_id,
         analyst_type=sample_artifact.analyst_type,
         task_id=sample_artifact.task_id,
         repository_id=sample_artifact.repository_id,
@@ -210,6 +214,7 @@ def test_p4_mutate_model_provenance_causes_digest_mismatch(sample_artifact):
     )
     tampered_artifact = AnalysisArtifact(
         analysis_id=sample_artifact.analysis_id,
+        execution_id=sample_artifact.execution_id,
         analyst_type=sample_artifact.analyst_type,
         task_id=sample_artifact.task_id,
         repository_id=sample_artifact.repository_id,
@@ -235,6 +240,7 @@ def test_p5_mutate_source_sha_causes_digest_mismatch(sample_artifact):
     """Property 5: Mutating source_sha alters canonical artifact_digest."""
     tampered_artifact = AnalysisArtifact(
         analysis_id=sample_artifact.analysis_id,
+        execution_id=sample_artifact.execution_id,
         analyst_type=sample_artifact.analyst_type,
         task_id=sample_artifact.task_id,
         repository_id=sample_artifact.repository_id,
@@ -260,6 +266,7 @@ def test_p6_mutate_input_state_digest_causes_digest_mismatch(sample_artifact):
     """Property 6: Mutating input_state_digest alters canonical artifact_digest."""
     tampered_artifact = AnalysisArtifact(
         analysis_id=sample_artifact.analysis_id,
+        execution_id=sample_artifact.execution_id,
         analyst_type=sample_artifact.analyst_type,
         task_id=sample_artifact.task_id,
         repository_id=sample_artifact.repository_id,
@@ -417,6 +424,7 @@ def test_analysis_artifact_validation_bounds():
     with pytest.raises(ValueError, match="Invalid analysis_id format"):
         AnalysisArtifact(
             analysis_id="BAD_ID",
+            execution_id="EXEC-001",
             analyst_type=AnalystType.REPOSITORY,
             task_id="T",
             repository_id="R",
@@ -426,6 +434,7 @@ def test_analysis_artifact_validation_bounds():
     with pytest.raises(ValueError, match="Invalid source_sha hex format"):
         AnalysisArtifact(
             analysis_id="ANA-1",
+            execution_id="EXEC-001",
             analyst_type=AnalystType.REPOSITORY,
             task_id="T",
             repository_id="R",
@@ -435,6 +444,7 @@ def test_analysis_artifact_validation_bounds():
     with pytest.raises(TypeError, match="analyst_type must be an AnalystType enum member"):
         AnalysisArtifact(
             analysis_id="ANA-1",
+            execution_id="EXEC-001",
             analyst_type="NOT_AN_ENUM",  # type: ignore
             task_id="T",
             repository_id="R",
@@ -444,6 +454,7 @@ def test_analysis_artifact_validation_bounds():
     with pytest.raises(ValueError, match="task_id and repository_id must be non-empty"):
         AnalysisArtifact(
             analysis_id="ANA-1",
+            execution_id="EXEC-001",
             analyst_type=AnalystType.REPOSITORY,
             task_id="",
             repository_id="R",
@@ -453,6 +464,7 @@ def test_analysis_artifact_validation_bounds():
     with pytest.raises(ValueError, match="task_id and repository_id must be non-empty"):
         AnalysisArtifact(
             analysis_id="ANA-1",
+            execution_id="EXEC-001",
             analyst_type=AnalystType.REPOSITORY,
             task_id="T",
             repository_id="",
@@ -462,6 +474,7 @@ def test_analysis_artifact_validation_bounds():
     with pytest.raises(ValueError, match="Invalid input_state_digest hex format"):
         AnalysisArtifact(
             analysis_id="ANA-1",
+            execution_id="EXEC-001",
             analyst_type=AnalystType.REPOSITORY,
             task_id="T",
             repository_id="R",
@@ -471,10 +484,20 @@ def test_analysis_artifact_validation_bounds():
     with pytest.raises(ValueError, match="worker_epoch must be an integer >= 1"):
         AnalysisArtifact(
             analysis_id="ANA-1",
+            execution_id="EXEC-001",
             analyst_type=AnalystType.REPOSITORY,
             task_id="T",
             repository_id="R",
             source_sha="0" * 40,
             input_state_digest="0" * 64,
             worker_epoch=0,
+        )
+    with pytest.raises(ValueError, match="Invalid or sentinel execution_id rejected"):
+        AnalysisArtifact(
+            analysis_id="ANA-1",
+            execution_id="BAD_EXEC",
+            analyst_type=AnalystType.REPOSITORY,
+            task_id="T",
+            repository_id="R",
+            source_sha="0" * 40,
         )

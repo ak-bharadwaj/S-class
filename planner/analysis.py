@@ -13,11 +13,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 import hashlib
+import hmac
 import re
-from typing import Mapping, Sequence, Tuple, Optional, Any
+from typing import Mapping, Sequence, Tuple, Optional, Any, Dict
 from events.serializer import canonicalize_json
 
 ANALYSIS_ID_PATTERN = re.compile(r"^ANA-[A-Za-z0-9_-]+$")
+EXECUTION_ID_PATTERN = re.compile(r"^EXEC-[A-Za-z0-9_-]+$")
 OBSERVATION_ID_PATTERN = re.compile(r"^OBS-[A-Za-z0-9_-]+$")
 HYPOTHESIS_ID_PATTERN = re.compile(r"^HYP-[A-Za-z0-9_-]+$")
 INFERENCE_ID_PATTERN = re.compile(r"^INF-[A-Za-z0-9_-]+$")
@@ -28,6 +30,11 @@ HEX_64_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 HEX_40_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 
 SCLASS_ANALYSIS_ARTIFACT_DOMAIN_SEPARATOR = "SCLASS_ANALYSIS_ARTIFACT_V1:"
+
+
+class DigestVerificationError(ValueError):
+    """Raised when an AnalysisArtifact digest does not match its canonical RFC 8785 preimage."""
+    pass
 
 
 class AnalystType(str, Enum):
@@ -195,6 +202,104 @@ class ModelProvenance:
             raise ValueError("Token counts must be non-negative integers.")
 
 
+def build_analysis_artifact_canonical_payload(artifact: AnalysisArtifact) -> Dict[str, Any]:
+    """Authoritative single-source-of-truth payload constructor for canonical serialization."""
+    return {
+        "analysis_id": artifact.analysis_id,
+        "execution_id": artifact.execution_id,
+        "analyst_type": artifact.analyst_type.value,
+        "task_id": artifact.task_id,
+        "repository_id": artifact.repository_id,
+        "source_sha": artifact.source_sha,
+        "input_state_digest": artifact.input_state_digest,
+        "observations": [
+            {
+                "observation_id": o.observation_id,
+                "category": o.category,
+                "description": o.description,
+                "target_path": o.target_path,
+                "evidence_refs": list(o.evidence_refs),
+                "heuristic_confidence": o.heuristic_confidence,
+            }
+            for o in artifact.observations
+        ],
+        "hypotheses": [
+            {
+                "hypothesis_id": h.hypothesis_id,
+                "description": h.description,
+                "supporting_observations": list(h.supporting_observations),
+                "refuting_observations": list(h.refuting_observations),
+                "heuristic_plausibility": h.heuristic_plausibility,
+                "requires_verification": h.requires_verification,
+            }
+            for h in artifact.hypotheses
+        ],
+        "inferences": [
+            {
+                "inference_id": i.inference_id,
+                "description": i.description,
+                "premises": list(i.premises),
+                "derivation_rule": i.derivation_rule,
+            }
+            for i in artifact.inferences
+        ],
+        "uncertainties": [
+            {
+                "uncertainty_id": u.uncertainty_id,
+                "description": u.description,
+                "impact_area": u.impact_area,
+                "suggested_probe_action": u.suggested_probe_action,
+            }
+            for u in artifact.uncertainties
+        ],
+        "contradictions": [
+            {
+                "contradiction_id": c.contradiction_id,
+                "description": c.description,
+                "conflicting_ids": list(c.conflicting_ids),
+            }
+            for c in artifact.contradictions
+        ],
+        "implications": [
+            {
+                "implication_id": m.implication_id,
+                "description": m.description,
+                "affected_obligations": list(m.affected_obligations),
+                "risk_level": m.risk_level,
+            }
+            for m in artifact.implications
+        ],
+        "referenced_evidence_ids": list(artifact.referenced_evidence_ids),
+        "referenced_claim_ids": list(artifact.referenced_claim_ids),
+        "tool_provenance": {
+            "tools_invoked": list(artifact.tool_provenance.tools_invoked),
+            "call_count": artifact.tool_provenance.call_count,
+            "wall_time_ms": artifact.tool_provenance.wall_time_ms,
+        },
+        "model_provenance": {
+            "model_id": artifact.model_provenance.model_id,
+            "model_version": artifact.model_provenance.model_version,
+            "prompt_digest": artifact.model_provenance.prompt_digest,
+            "temperature": artifact.model_provenance.temperature,
+            "token_count_input": artifact.model_provenance.token_count_input,
+            "token_count_output": artifact.model_provenance.token_count_output,
+        },
+        "worker_epoch": artifact.worker_epoch,
+        "created_at": artifact.created_at,
+    }
+
+
+def compute_analysis_artifact_canonical_bytes(artifact: AnalysisArtifact) -> bytes:
+    """Computes authoritative RFC 8785 canonical bytes with domain separator."""
+    payload = build_analysis_artifact_canonical_payload(artifact)
+    return SCLASS_ANALYSIS_ARTIFACT_DOMAIN_SEPARATOR.encode("utf-8") + canonicalize_json(payload)
+
+
+def compute_analysis_artifact_digest(artifact: AnalysisArtifact) -> str:
+    """Computes SHA-256 digest over canonical RFC 8785 serialized AnalysisArtifact."""
+    return hashlib.sha256(compute_analysis_artifact_canonical_bytes(artifact)).hexdigest()
+
+
 @dataclass(frozen=True)
 class AnalysisArtifact:
     """Immutable, provenance-bound primary analytical output from D8 workers."""
@@ -204,6 +309,7 @@ class AnalysisArtifact:
     repository_id: str
     source_sha: str
     input_state_digest: str
+    execution_id: str
 
     # Epistemic Content Partitioning
     observations: Tuple[Observation, ...] = ()
@@ -230,6 +336,8 @@ class AnalysisArtifact:
     def __post_init__(self):
         if not ANALYSIS_ID_PATTERN.match(self.analysis_id):
             raise ValueError(f"Invalid analysis_id format: '{self.analysis_id}'")
+        if not self.execution_id or not EXECUTION_ID_PATTERN.match(self.execution_id) or self.execution_id == "EXEC-000000000000":
+            raise ValueError(f"Invalid or sentinel execution_id rejected: '{self.execution_id}'. AnalysisArtifact must originate from a valid WorkerExecution.")
         if not isinstance(self.analyst_type, AnalystType):
             raise TypeError(f"analyst_type must be an AnalystType enum member, got {type(self.analyst_type)}")
         if not self.task_id or not self.repository_id:
@@ -254,87 +362,4 @@ class AnalysisArtifact:
     @property
     def artifact_digest(self) -> str:
         """Computes RFC 8785 canonical digest over domain-separated analytical findings."""
-        payload = {
-            "analysis_id": self.analysis_id,
-            "analyst_type": self.analyst_type.value,
-            "task_id": self.task_id,
-            "repository_id": self.repository_id,
-            "source_sha": self.source_sha,
-            "input_state_digest": self.input_state_digest,
-            "observations": [
-                {
-                    "observation_id": o.observation_id,
-                    "category": o.category,
-                    "description": o.description,
-                    "target_path": o.target_path,
-                    "evidence_refs": list(o.evidence_refs),
-                    "heuristic_confidence": o.heuristic_confidence,
-                }
-                for o in self.observations
-            ],
-            "hypotheses": [
-                {
-                    "hypothesis_id": h.hypothesis_id,
-                    "description": h.description,
-                    "supporting_observations": list(h.supporting_observations),
-                    "refuting_observations": list(h.refuting_observations),
-                    "heuristic_plausibility": h.heuristic_plausibility,
-                    "requires_verification": h.requires_verification,
-                }
-                for h in self.hypotheses
-            ],
-            "inferences": [
-                {
-                    "inference_id": i.inference_id,
-                    "description": i.description,
-                    "premises": list(i.premises),
-                    "derivation_rule": i.derivation_rule,
-                }
-                for i in self.inferences
-            ],
-            "uncertainties": [
-                {
-                    "uncertainty_id": u.uncertainty_id,
-                    "description": u.description,
-                    "impact_area": u.impact_area,
-                    "suggested_probe_action": u.suggested_probe_action,
-                }
-                for u in self.uncertainties
-            ],
-            "contradictions": [
-                {
-                    "contradiction_id": c.contradiction_id,
-                    "description": c.description,
-                    "conflicting_ids": list(c.conflicting_ids),
-                }
-                for c in self.contradictions
-            ],
-            "implications": [
-                {
-                    "implication_id": m.implication_id,
-                    "description": m.description,
-                    "affected_obligations": list(m.affected_obligations),
-                    "risk_level": m.risk_level,
-                }
-                for m in self.implications
-            ],
-            "referenced_evidence_ids": list(self.referenced_evidence_ids),
-            "referenced_claim_ids": list(self.referenced_claim_ids),
-            "tool_provenance": {
-                "tools_invoked": list(self.tool_provenance.tools_invoked),
-                "call_count": self.tool_provenance.call_count,
-                "wall_time_ms": self.tool_provenance.wall_time_ms,
-            },
-            "model_provenance": {
-                "model_id": self.model_provenance.model_id,
-                "model_version": self.model_provenance.model_version,
-                "prompt_digest": self.model_provenance.prompt_digest,
-                "temperature": self.model_provenance.temperature,
-                "token_count_input": self.model_provenance.token_count_input,
-                "token_count_output": self.model_provenance.token_count_output,
-            },
-            "worker_epoch": self.worker_epoch,
-            "created_at": self.created_at,
-        }
-        canonical_bytes = SCLASS_ANALYSIS_ARTIFACT_DOMAIN_SEPARATOR.encode("utf-8") + canonicalize_json(payload)
-        return hashlib.sha256(canonical_bytes).hexdigest()
+        return compute_analysis_artifact_digest(self)
