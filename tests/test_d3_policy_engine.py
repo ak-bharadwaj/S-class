@@ -3979,4 +3979,146 @@ def test_d3_concurrency_c3_restart_during_commit_no_partial_authority_acceptance
     assert active_id == "M-CRASH-C3"
 
 
+def test_d3_persistence_e70_prior_deployment_missing_d2_reject():
+    """E70: Prior deployment with missing D2 event log rejects load_from_dict."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.exceptions import StorageUnavailableError
+    from events.store import D2AuthorityManifestStore
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E70",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+
+    store = D2AuthorityManifestStore()
+    if os.path.exists(store.file_path):
+        os.remove(store.file_path)
+
+    with pytest.raises(StorageUnavailableError, match="Canonical D2 authority store is missing"):
+        SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+
+
+def test_d3_persistence_e71_missing_d2_valid_signed_manifest_reject():
+    """E71: Missing D2 event log with a valid signed manifest rejects load_from_dict."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.exceptions import StorageUnavailableError
+    from events.store import D2AuthorityManifestStore
+
+    store = D2AuthorityManifestStore()
+    if os.path.exists(store.file_path):
+        os.remove(store.file_path)
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E71",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    with pytest.raises(StorageUnavailableError, match="Canonical D2 authority store is missing"):
+        SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+
+
+def test_d3_persistence_e72_explicit_first_bootstrap_accepted_only_through_trusted_bootstrap():
+    """E72: Explicit first bootstrap initializes D2 store; calling bootstrap again on existing store is rejected."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import D2AuthorityManifestStore
+
+    store = D2AuthorityManifestStore()
+    if os.path.exists(store.file_path):
+        os.remove(store.file_path)
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E72",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    # First-install bootstrap initializes fresh D2 store
+    res = SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+    assert res.manifest_version == 1
+    assert res.manifest_id == "M-E72"
+
+    # Second bootstrap attempt on non-empty store is strictly rejected
+    with pytest.raises(RuntimeError, match="Genesis bootstrap rejected: authoritative D2 store already contains history"):
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+
+def test_d3_persistence_e73_empty_corrupt_d2_after_prior_authority_reject():
+    """E73: Corrupt D2 store after prior authority fails closed with CorruptEventLogError."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import D2AuthorityManifestStore
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E73",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+
+    store = D2AuthorityManifestStore()
+    with open(store.file_path, "wb") as f:
+        f.write(b"CORRUPT_INVALID_STATE_PAYLOAD\n")
+
+    with pytest.raises(CorruptEventLogError):
+        SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+
+
+def test_d3_root_e74_rogue_first_bootstrap_reject():
+    """E74: Rogue first bootstrap when Gate 3 authority keystore is absent is strictly rejected."""
+    Gate3PublicKeystore.clear()
+    Gate3AuthorityKeyStore.clear()
+
+    rogue_priv = ed25519.Ed25519PrivateKey.generate()
+    rogue_pub = rogue_priv.public_key()
+
+    with pytest.raises(RuntimeError, match="Unauthorized root initialization rejected: canonical Gate 3 authority is not established"):
+        Gate3PublicKeystore.bootstrap_root_public_key(rogue_pub)
+
+
+def test_d3_root_e75_arbitrary_root_when_canonical_root_absent_reject():
+    """E75: Attempting to set arbitrary public key via public keystore API when canonical root is absent fails closed."""
+    Gate3PublicKeystore.clear()
+    Gate3AuthorityKeyStore.clear()
+
+    arbitrary_key = ed25519.Ed25519PrivateKey.generate().public_key()
+    with pytest.raises(RuntimeError, match="Unauthorized root initialization rejected"):
+        Gate3PublicKeystore.set_public_key(arbitrary_key)
+
+
+def test_d3_root_e76_legitimate_trusted_bootstrap_accept():
+    """E76: Legitimate trusted composition bootstrap with canonical root succeeds and seals keystore."""
+    Gate3PublicKeystore.clear()
+    Gate3AuthorityKeyStore.clear()
+    Gate3AuthorityKeyStore.set_private_key(TEST_AUTHORITY_PRIVATE_KEY)
+
+    Gate3PublicKeystore.bootstrap_root_public_key(TEST_AUTHORITY_PUBLIC_KEY)
+    assert Gate3PublicKeystore.get_public_key() == TEST_AUTHORITY_PUBLIC_KEY
+
+
+def test_d3_root_e77_root_replacement_after_seal_reject():
+    """E77: Attempting to replace or mutate the root key after seal is strictly rejected."""
+    Gate3PublicKeystore.clear()
+    Gate3AuthorityKeyStore.clear()
+    Gate3AuthorityKeyStore.set_private_key(TEST_AUTHORITY_PRIVATE_KEY)
+    Gate3PublicKeystore.bootstrap_root_public_key(TEST_AUTHORITY_PUBLIC_KEY)
+
+    another_key = ed25519.Ed25519PrivateKey.generate().public_key()
+    with pytest.raises(RuntimeError, match="Gate3PublicKeystore root public key is already initialized and cannot be replaced"):
+        Gate3PublicKeystore.bootstrap_root_public_key(another_key)
+
+
+
 

@@ -32,16 +32,15 @@ class Gate3PublicKeystore:
         if cls._is_sealed and cls._public_key is not None:
             raise RuntimeError("Gate3PublicKeystore root public key is already initialized and cannot be replaced at runtime.")
 
-        # If canonical authority keystore is already configured, verify key match
+        # Gate 3 root must match established canonical authority in S-Class
         from benchmark.parity.gate_3_authority import Gate3AuthorityKeyStore
         try:
             canonical_pub = Gate3AuthorityKeyStore.get_public_key()
-            if canonical_pub is not None:
-                if public_key.public_bytes_raw() != canonical_pub.public_bytes_raw():
-                    raise RuntimeError("Unauthorized root initialization rejected: public key does not match canonical Gate 3 authority.")
-        except Exception as e:
-            if isinstance(e, RuntimeError) and "Unauthorized root" in str(e):
-                raise
+        except Exception:
+            raise RuntimeError("Unauthorized root initialization rejected: canonical Gate 3 authority is not established.")
+
+        if canonical_pub is None or public_key.public_bytes_raw() != canonical_pub.public_bytes_raw():
+            raise RuntimeError("Unauthorized root initialization rejected: public key does not match canonical Gate 3 authority.")
 
         cls._public_key = public_key
         cls._is_sealed = True

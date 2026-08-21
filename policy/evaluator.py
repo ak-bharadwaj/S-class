@@ -242,7 +242,10 @@ class SignedAuthorityManifestLoader:
         if os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1" and os.environ.get("PYTEST_CURRENT_TEST") is None:
             raise RuntimeError("Monotonic authority state cannot be reset outside active test fixture harness.")
         from events.store import D2AuthorityManifestStore
-        D2AuthorityManifestStore().clear()
+        store = D2AuthorityManifestStore()
+        store.clear()
+        with open(store.file_path, "wb") as f:
+            pass
 
     @classmethod
     def sign_manifest(
@@ -301,7 +304,6 @@ class SignedAuthorityManifestLoader:
         from cryptography.hazmat.primitives.asymmetric import ed25519
         from cryptography.exceptions import InvalidSignature
         from events.store import D2AuthorityManifestStore
-        from events.exceptions import StorageUnavailableError
         from policy.exceptions import (
             InvalidManifestSignatureError,
             CorruptManifestError,
@@ -332,18 +334,9 @@ class SignedAuthorityManifestLoader:
                 f"Manifest version {manifest_version} is older than minimum required version {min_version} (rollback rejected)."
             )
 
-        # Durable monotonic version validation via D2 store
+        # Durable monotonic version validation via D2 store (fails closed if missing or corrupt)
         store = D2AuthorityManifestStore()
-        try:
-            highest_ver, active_id, active_digest = store.get_highest_version(allow_uninitialized=False)
-        except StorageUnavailableError:
-            if min_version is not None and min_version > manifest_version:
-                raise ManifestRollbackError(
-                    f"Missing canonical D2 authority store cannot satisfy min_version={min_version}."
-                )
-            highest_ver = 0
-            active_id = None
-            active_digest = None
+        highest_ver, active_id, active_digest = store.get_highest_version(allow_uninitialized=False)
 
         if active_id is not None and manifest_id != active_id:
             raise CorruptManifestError(
@@ -468,6 +461,22 @@ class SignedAuthorityManifestLoader:
         """
         canonical_root = cls.get_canonical_root_public_key()
         return cls._load_from_dict_internal(data, trusted_root_public_key=canonical_root, min_version=min_version)
+
+    @classmethod
+    def bootstrap_genesis_manifest(
+        cls,
+        data: Dict[str, Any],
+    ) -> ReadOnlyActorAuthorityResolver:
+        """Explicit, isolated first-install composition root bootstrap to initialize a fresh authoritative D2 store."""
+        from events.store import D2AuthorityManifestStore
+        store = D2AuthorityManifestStore()
+        if os.path.exists(store.file_path) and os.path.getsize(store.file_path) > 0:
+            raise RuntimeError(f"Genesis bootstrap rejected: authoritative D2 store already contains history at '{store.file_path}'.")
+
+        with open(store.file_path, "wb") as f:
+            pass
+
+        return cls.load_from_dict(data)
 
     @classmethod
     def _load_from_dict_with_test_root_override(
