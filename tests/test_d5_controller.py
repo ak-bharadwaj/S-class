@@ -473,6 +473,7 @@ def test_signed_but_uncommitted_admission_cannot_execute(fresh_nonce_store):
         lease_epoch=token.lease_epoch,
         state_version=token.state_version,
         state_digest=token.state_digest,
+        authority_context_digest=token.authority_context_digest,
     )
 
     envelope = controller.create_execution_envelope(token, uncommitted_admission, proposal.binding, proposal.execution_context)

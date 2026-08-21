@@ -107,6 +107,8 @@ class ActionProposal:
         return self.execution_context.context_digest
 
 
+from controller.authority import ProposalAuthorityContext
+
 @dataclass(frozen=True)
 class AuthorizationDecision:
     """Immutable categorical decision issued upon PRE_AUTHORIZE completion."""
@@ -120,6 +122,12 @@ class AuthorizationDecision:
     evaluated_at: str = ""
     source_sha: str = ""
     policy_version: int = 1
+    owner_id: str = ""
+    fencing_token: int = 0
+    lease_epoch: int = 0
+    state_version: int = 0
+    state_digest: str = ""
+    authority_context_digest: str = ""
 
     def __post_init__(self):
         if not self.decision_id:
@@ -133,6 +141,16 @@ class AuthorizationDecision:
         if not isinstance(self.status, AuthorizationStatus):
             raise TypeError(f"Invalid status: {self.status}")
         _validate_iso8601(self.evaluated_at, "evaluated_at")
+        if not isinstance(self.fencing_token, int) or self.fencing_token < 0:
+            raise ValueError("fencing_token must be an integer >= 0.")
+        if not isinstance(self.lease_epoch, int) or self.lease_epoch < 0:
+            raise ValueError("lease_epoch must be an integer >= 0.")
+        if not isinstance(self.state_version, int) or self.state_version < 0:
+            raise ValueError("state_version must be an integer >= 0.")
+        if self.state_digest:
+            _validate_pattern(self.state_digest, HEX_64_PATTERN, "state_digest")
+        if self.authority_context_digest:
+            _validate_pattern(self.authority_context_digest, HEX_64_PATTERN, "authority_context_digest")
         object.__setattr__(self, "rejection_reasons", tuple(self.rejection_reasons))
 
 
@@ -150,6 +168,7 @@ class AuthorizationEngine:
         budget_remaining: float = 100.0,
         allowed_action_types: Optional[Sequence[str]] = None,
         frontier: Optional[ExecutionFrontier] = None,
+        authority_context: Optional[ProposalAuthorityContext] = None,
         active_fencing_token: Optional[int] = None,
         active_lease_epoch: Optional[int] = None,
         active_owner_id: Optional[str] = None,
@@ -159,6 +178,19 @@ class AuthorizationEngine:
         """Evaluates preconditions and produces an immutable AuthorizationDecision."""
         if not evaluated_at:
             raise ValueError("evaluated_at timestamp is required.")
+
+        # Extract authoritative coordinates from ProposalAuthorityContext if supplied
+        if authority_context is not None:
+            if not isinstance(authority_context, ProposalAuthorityContext):
+                raise TypeError("authority_context must be a ProposalAuthorityContext instance.")
+            active_fencing_token = authority_context.fencing_token
+            active_lease_epoch = authority_context.lease_epoch
+            active_owner_id = authority_context.owner_id
+            expected_state_version = authority_context.state_version
+            expected_state_digest = authority_context.state_digest
+            auth_ctx_digest = authority_context.authority_context_digest
+        else:
+            auth_ctx_digest = ""
 
         reasons: list[str] = []
 
@@ -218,6 +250,12 @@ class AuthorizationEngine:
                 evaluated_at=evaluated_at,
                 source_sha=source_sha,
                 policy_version=policy_version,
+                owner_id=active_owner_id or "",
+                fencing_token=active_fencing_token or 0,
+                lease_epoch=active_lease_epoch or 0,
+                state_version=expected_state_version or 0,
+                state_digest=expected_state_digest or "",
+                authority_context_digest=auth_ctx_digest,
             )
 
         # 2. Frontier Check (READY != EXECUTABLE)
@@ -282,4 +320,10 @@ class AuthorizationEngine:
             evaluated_at=evaluated_at,
             source_sha=source_sha,
             policy_version=policy_version,
+            owner_id=active_owner_id or "",
+            fencing_token=active_fencing_token or 0,
+            lease_epoch=active_lease_epoch or 0,
+            state_version=expected_state_version or 0,
+            state_digest=expected_state_digest or "",
+            authority_context_digest=auth_ctx_digest,
         )

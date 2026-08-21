@@ -343,6 +343,7 @@ def test_gateway_rejected_on_unadmitted_or_tampered_token(tmp_path, fresh_nonce_
         lease_epoch=token.lease_epoch,
         state_version=token.state_version,
         state_digest=token.state_digest,
+        authority_context_digest=token.authority_context_digest,
     )
 
     env = ExecutionEnvelope(token, admission, binding, ctx)

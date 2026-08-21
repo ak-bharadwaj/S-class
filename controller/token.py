@@ -182,6 +182,7 @@ class ExecutionToken:
     lease_epoch: int = 0
     state_version: int = 0
     state_digest: str = ""
+    authority_context_digest: str = ""
 
     def __post_init__(self):
         if not self.token_id or not self.token_id.startswith(TOKEN_ID_PREFIX):
@@ -211,6 +212,8 @@ class ExecutionToken:
             raise ValueError("state_version must be an integer >= 0.")
         if self.state_digest:
             _validate_pattern(self.state_digest, HEX_64_PATTERN, "state_digest")
+        if self.authority_context_digest:
+            _validate_pattern(self.authority_context_digest, HEX_64_PATTERN, "authority_context_digest")
 
 
 @dataclass(frozen=True)
@@ -233,6 +236,7 @@ class ExecutionAdmissionResult:
     lease_epoch: int = 0
     state_version: int = 0
     state_digest: str = ""
+    authority_context_digest: str = ""
 
     def __post_init__(self):
         if self.is_admitted:
@@ -260,6 +264,8 @@ class ExecutionAdmissionResult:
                 raise ValueError("state_version must be an integer >= 0.")
             if self.state_digest:
                 _validate_pattern(self.state_digest, HEX_64_PATTERN, "state_digest")
+            if self.authority_context_digest:
+                _validate_pattern(self.authority_context_digest, HEX_64_PATTERN, "authority_context_digest")
 
 
 @dataclass(frozen=True)
@@ -310,6 +316,8 @@ class ExecutionEnvelope:
             raise ValueError("State version mismatch between token and admission.")
         if self.token.state_digest != self.admission.state_digest:
             raise ValueError("State digest mismatch between token and admission.")
+        if self.token.authority_context_digest != self.admission.authority_context_digest:
+            raise ValueError("Authority context digest mismatch between token and admission.")
 
 
 def _build_token_payload(
@@ -329,6 +337,7 @@ def _build_token_payload(
     lease_epoch: int = 0,
     state_version: int = 0,
     state_digest: str = "",
+    authority_context_digest: str = "",
 ) -> dict:
     return {
         "token_id": token_id,
@@ -347,6 +356,7 @@ def _build_token_payload(
         "lease_epoch": lease_epoch,
         "state_version": state_version,
         "state_digest": state_digest,
+        "authority_context_digest": authority_context_digest,
     }
 
 
@@ -365,6 +375,7 @@ def _build_admission_payload(
     lease_epoch: int = 0,
     state_version: int = 0,
     state_digest: str = "",
+    authority_context_digest: str = "",
 ) -> dict:
     return {
         "token_id": token_id,
@@ -381,6 +392,7 @@ def _build_admission_payload(
         "lease_epoch": lease_epoch,
         "state_version": state_version,
         "state_digest": state_digest,
+        "authority_context_digest": authority_context_digest,
     }
 
 
@@ -413,6 +425,7 @@ def _mint_execution_token(
     lease_epoch: int = 0,
     state_version: int = 0,
     state_digest: str = "",
+    authority_context_digest: str = "",
 ) -> ExecutionToken:
     """Internal Controller token issuance function with domain separator binding."""
     if not isinstance(authority_signer, AuthoritySignerProtocol):
@@ -439,6 +452,7 @@ def _mint_execution_token(
         lease_epoch=lease_epoch,
         state_version=state_version,
         state_digest=state_digest,
+        authority_context_digest=authority_context_digest,
     )
 
     canonical_bytes = _compute_token_canonical_bytes(payload)
@@ -466,6 +480,7 @@ def _mint_execution_token(
         lease_epoch=lease_epoch,
         state_version=state_version,
         state_digest=state_digest,
+        authority_context_digest=authority_context_digest,
     )
 
 
@@ -493,6 +508,7 @@ def verify_execution_token_signature(
         lease_epoch=token.lease_epoch,
         state_version=token.state_version,
         state_digest=token.state_digest,
+        authority_context_digest=token.authority_context_digest,
     )
     try:
         canonical_bytes = _compute_token_canonical_bytes(payload)
@@ -525,6 +541,7 @@ def verify_admission_signature(
         lease_epoch=admission.lease_epoch,
         state_version=admission.state_version,
         state_digest=admission.state_digest,
+        authority_context_digest=admission.authority_context_digest,
     )
     try:
         canonical_bytes = _compute_admission_canonical_bytes(payload)
@@ -547,6 +564,7 @@ def verify_execution_token(
     expected_lease_epoch: Optional[int] = None,
     expected_state_version: Optional[int] = None,
     expected_state_digest: Optional[str] = None,
+    expected_authority_context_digest: Optional[str] = None,
 ) -> bool:
     """PURE verification of ExecutionToken. NO D2 MUTATION."""
     if not isinstance(token, ExecutionToken):
@@ -574,6 +592,8 @@ def verify_execution_token(
     if expected_state_version is not None and token.state_version != expected_state_version:
         return False
     if expected_state_digest is not None and token.state_digest != expected_state_digest:
+        return False
+    if expected_authority_context_digest is not None and token.authority_context_digest != expected_authority_context_digest:
         return False
 
     # 2. Time Boundary Verification (issued_at <= current_time <= expires_at)
@@ -642,6 +662,18 @@ def verify_execution_envelope(
     if token.policy_version != expected_policy_version or admission.policy_version != expected_policy_version:
         return False
     if token.decision_id != admission.decision_id:
+        return False
+    if token.owner_id != admission.owner_id:
+        return False
+    if token.fencing_token != admission.fencing_token:
+        return False
+    if token.lease_epoch != admission.lease_epoch:
+        return False
+    if token.state_version != admission.state_version:
+        return False
+    if token.state_digest != admission.state_digest:
+        return False
+    if token.authority_context_digest != admission.authority_context_digest:
         return False
 
     # 2. Time Validation

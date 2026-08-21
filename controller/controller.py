@@ -41,7 +41,7 @@ from controller.token import (
     verify_execution_envelope,
 )
 
-from controller.authority import LeaseAuthority, StateAuthority
+from controller.authority import LeaseAuthority, StateAuthority, ProposalAuthorityContext
 
 
 @dataclass(frozen=True)
@@ -368,6 +368,16 @@ class SClassController:
                 error_message=f"STATE_RESOLUTION_FAILED: Failed to resolve authoritative state: {exc}",
             )
 
+        # Build immutable ProposalAuthorityContext
+        authority_context = ProposalAuthorityContext(
+            task_id=task_id,
+            owner_id=active_lease.owner_id,
+            lease_epoch=active_lease.lease_epoch,
+            fencing_token=active_lease.fencing_token,
+            state_version=expected_state_version,
+            state_digest=expected_state_digest,
+        )
+
         # Precondition Evaluation -> Creates IMMUTABLE AuthorizationDecision
         decision = AuthorizationEngine.evaluate_proposal(
             proposal=proposal,
@@ -378,11 +388,7 @@ class SClassController:
             evaluated_at=evaluated_at,
             budget_remaining=budget_remaining,
             allowed_action_types=allowed_action_types,
-            active_fencing_token=active_lease.fencing_token,
-            active_lease_epoch=active_lease.lease_epoch,
-            active_owner_id=active_lease.owner_id,
-            expected_state_version=expected_state_version,
-            expected_state_digest=expected_state_digest,
+            authority_context=authority_context,
         )
 
         # If not authorized, halt immediately: no token minted
@@ -428,6 +434,7 @@ class SClassController:
             lease_epoch=proposal.lease_epoch,
             state_version=proposal.state_version,
             state_digest=proposal.state_digest,
+            authority_context_digest=authority_context.authority_context_digest,
         )
 
         return ControllerDispatchResult(
@@ -495,6 +502,12 @@ class SClassController:
                 admitted_at=current_time_iso,
                 is_admitted=False,
                 error_message="Invalid expected_action_binding provided.",
+                owner_id=token.owner_id,
+                fencing_token=token.fencing_token,
+                lease_epoch=token.lease_epoch,
+                state_version=token.state_version,
+                state_digest=token.state_digest,
+                authority_context_digest=token.authority_context_digest,
             )
 
         if not isinstance(expected_execution_context, ExecutionContext):
@@ -510,6 +523,12 @@ class SClassController:
                 admitted_at=current_time_iso,
                 is_admitted=False,
                 error_message="Invalid expected_execution_context provided.",
+                owner_id=token.owner_id,
+                fencing_token=token.fencing_token,
+                lease_epoch=token.lease_epoch,
+                state_version=token.state_version,
+                state_digest=token.state_digest,
+                authority_context_digest=token.authority_context_digest,
             )
 
         # Step 2: Pure Token Verification (PURE - NO D2 MUTATION)
@@ -536,6 +555,12 @@ class SClassController:
                 admitted_at=current_time_iso,
                 is_admitted=False,
                 error_message="ExecutionToken verification failed.",
+                owner_id=token.owner_id,
+                fencing_token=token.fencing_token,
+                lease_epoch=token.lease_epoch,
+                state_version=token.state_version,
+                state_digest=token.state_digest,
+                authority_context_digest=token.authority_context_digest,
             )
 
         # Step 3: Create Admission Payload & Sign (PURE except authority signing - NO D2 MUTATION)
@@ -554,6 +579,7 @@ class SClassController:
             lease_epoch=token.lease_epoch,
             state_version=token.state_version,
             state_digest=token.state_digest,
+            authority_context_digest=token.authority_context_digest,
         )
         try:
             canonical_bytes = _compute_admission_canonical_bytes(admission_payload)
@@ -581,6 +607,7 @@ class SClassController:
                 lease_epoch=token.lease_epoch,
                 state_version=token.state_version,
                 state_digest=token.state_digest,
+                authority_context_digest=token.authority_context_digest,
             )
 
         provisional_admission = ExecutionAdmissionResult(
@@ -600,6 +627,7 @@ class SClassController:
             lease_epoch=token.lease_epoch,
             state_version=token.state_version,
             state_digest=token.state_digest,
+            authority_context_digest=token.authority_context_digest,
         )
 
         # Step 4: Verify Generated Admission Signature (PURE - NO D2 MUTATION)
@@ -620,6 +648,7 @@ class SClassController:
                 lease_epoch=token.lease_epoch,
                 state_version=token.state_version,
                 state_digest=token.state_digest,
+                authority_context_digest=token.authority_context_digest,
             )
 
         # Step 5: Atomically Commit Admission Nonce in D2 Store (ONLY D2 MUTATING OPERATION)
@@ -641,6 +670,7 @@ class SClassController:
                 lease_epoch=token.lease_epoch,
                 state_version=token.state_version,
                 state_digest=token.state_digest,
+                authority_context_digest=token.authority_context_digest,
             )
 
         return provisional_admission

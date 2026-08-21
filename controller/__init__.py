@@ -42,6 +42,8 @@ from controller.authority import (
     StateAuthority,
     StaticLeaseAuthority,
     StaticStateAuthority,
+    ProposalAuthorityContext,
+    resolve_proposal_authority_context,
 )
 from controller.controller import (
     SClassController,
@@ -50,6 +52,8 @@ from controller.controller import (
 )
 
 __all__ = [
+    "ProposalAuthorityContext",
+    "resolve_proposal_authority_context",
     "LeaseAuthority",
     "StateAuthority",
     "StaticLeaseAuthority",

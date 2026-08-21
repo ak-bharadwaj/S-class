@@ -900,3 +900,224 @@ def test_controller_with_corrupted_lease_record_rejects_proposal(
     assert result.decision.status == AuthorizationStatus.REJECTED
     assert any("LEASE_STATE_CORRUPT" in r for r in result.decision.rejection_reasons)
 
+
+def test_d5_rejects_stale_lease_epoch(sample_context, sample_obligation):
+    """Adversarial: Proposal with stale lease_epoch is rejected."""
+    proposal = ActionProposal(
+        proposal_id="PROP-STALE-EPOCH",
+        obligation_id=sample_obligation.obligation_id,
+        action_type="EXECUTE_TEST",
+        target="tests/test_auth.py",
+        purpose="Verify token check",
+        execution_context=sample_context,
+        fencing_token=5,
+        lease_epoch=1,  # Stale epoch
+        owner_id="WORKER-01",
+        state_version=10,
+        state_digest="a" * 64,
+    )
+
+    decision = AuthorizationEngine.evaluate_proposal(
+        proposal=proposal,
+        obligations={sample_obligation.obligation_id: sample_obligation},
+        policies={},
+        source_sha="a" * 40,
+        policy_version=1,
+        evaluated_at="2026-08-20T12:00:00Z",
+        active_fencing_token=5,
+        active_lease_epoch=2,
+        active_owner_id="WORKER-01",
+        expected_state_version=10,
+        expected_state_digest="a" * 64,
+    )
+
+    assert decision.status == AuthorizationStatus.REJECTED
+    assert any("INVALID_LEASE_EPOCH" in r for r in decision.rejection_reasons)
+
+
+def test_controller_with_invalid_state_authority_object_rejects_proposal(
+    authority_signer, temp_nonce_store, sample_context, sample_obligation
+):
+    """Adversarial: Controller with invalid state authority type fails closed."""
+    authoritative_lease = PlanningLease(
+        task_id="TASK-001",
+        owner_id="WORKER-EXACT",
+        lease_epoch=3,
+        fencing_token=42,
+        acquired_at="2026-08-20T12:00:00Z",
+        expires_at="2026-08-20T12:30:00Z",
+        is_active=True,
+    )
+    ctrl = SClassController(
+        authority_signer=authority_signer,
+        nonce_store=temp_nonce_store,
+        lease_authority=StaticLeaseAuthority({"TASK-001": authoritative_lease}),
+        state_authority="NOT_A_STATE_AUTHORITY",  # type: ignore
+    )
+    proposal = ActionProposal(
+        proposal_id="PROP-INVALID-STATE-AUTH",
+        obligation_id=sample_obligation.obligation_id,
+        action_type="EXECUTE_TEST",
+        target="tests/test_auth.py",
+        purpose="Verify token check",
+        execution_context=sample_context,
+        fencing_token=42,
+        lease_epoch=3,
+        owner_id="WORKER-EXACT",
+        state_version=100,
+        state_digest="a" * 64,
+    )
+    result = ctrl.submit_proposal(
+        proposal=proposal,
+        obligations={sample_obligation.obligation_id: sample_obligation},
+        policies={},
+        source_sha="b" * 40,
+        policy_version=1,
+        evaluated_at="2026-08-20T12:00:00Z",
+        expires_at="2026-08-20T12:30:00Z",
+    )
+    assert result.decision.status == AuthorizationStatus.REJECTED
+    assert any("INVALID_STATE_AUTHORITY" in r for r in result.decision.rejection_reasons)
+
+
+def test_controller_missing_active_lease_rejects_proposal(
+    authority_signer, temp_nonce_store, sample_context, sample_obligation
+):
+    """Adversarial: Target task has no active lease in lease authority -> fail closed."""
+    ctrl = SClassController(
+        authority_signer=authority_signer,
+        nonce_store=temp_nonce_store,
+        lease_authority=StaticLeaseAuthority({}),  # Empty: no active lease
+        state_authority=StaticStateAuthority(100, "a" * 64),
+    )
+    proposal = ActionProposal(
+        proposal_id="PROP-NO-ACTIVE-LEASE",
+        obligation_id=sample_obligation.obligation_id,
+        action_type="EXECUTE_TEST",
+        target="tests/test_auth.py",
+        purpose="Verify token check",
+        execution_context=sample_context,
+        fencing_token=42,
+        lease_epoch=3,
+        owner_id="WORKER-EXACT",
+        state_version=100,
+        state_digest="a" * 64,
+    )
+    result = ctrl.submit_proposal(
+        proposal=proposal,
+        obligations={sample_obligation.obligation_id: sample_obligation},
+        policies={},
+        source_sha="b" * 40,
+        policy_version=1,
+        evaluated_at="2026-08-20T12:00:00Z",
+        expires_at="2026-08-20T12:30:00Z",
+    )
+    assert result.decision.status == AuthorizationStatus.REJECTED
+    assert any("NO_ACTIVE_LEASE" in r for r in result.decision.rejection_reasons)
+
+
+def test_decision_authority_context_binding_provenance(controller, sample_context, sample_obligation):
+    """Requirement 11: AuthorizationDecision strictly binds authoritative context and preserves provenance chain."""
+    proposal = ActionProposal(
+        proposal_id="PROP-PROVENANCE-01",
+        obligation_id=sample_obligation.obligation_id,
+        action_type="EXECUTE_TEST",
+        target="tests/test_auth.py",
+        purpose="Verify token check",
+        execution_context=sample_context,
+        fencing_token=42,
+        lease_epoch=3,
+        owner_id="WORKER-EXACT",
+        state_version=100,
+        state_digest="a" * 64,
+    )
+    dispatch = controller.submit_proposal(
+        proposal=proposal,
+        obligations={sample_obligation.obligation_id: sample_obligation},
+        policies={},
+        source_sha="b" * 40,
+        policy_version=1,
+        evaluated_at="2026-08-20T12:00:00Z",
+        expires_at="2026-08-20T12:30:00Z",
+    )
+    assert dispatch.decision.status == AuthorizationStatus.AUTHORIZED
+    assert dispatch.decision.owner_id == "WORKER-EXACT"
+    assert dispatch.decision.fencing_token == 42
+    assert dispatch.decision.lease_epoch == 3
+    assert dispatch.decision.state_version == 100
+    assert dispatch.decision.state_digest == "a" * 64
+    assert len(dispatch.decision.authority_context_digest) == 64
+
+    token = dispatch.execution_token
+    assert token is not None
+    assert token.authority_context_digest == dispatch.decision.authority_context_digest
+
+    admission = controller.admit_execution(
+        token=token,
+        expected_obligation_id=sample_obligation.obligation_id,
+        expected_source_sha="b" * 40,
+        expected_policy_version=1,
+        expected_action_binding=proposal.binding,
+        expected_execution_context=sample_context,
+        current_time_iso="2026-08-20T12:06:00Z",
+    )
+    assert admission.is_admitted is True
+    assert admission.authority_context_digest == token.authority_context_digest
+
+    envelope = controller.create_execution_envelope(
+        token=token,
+        admission=admission,
+        action_binding=proposal.binding,
+        execution_context=sample_context,
+    )
+    assert envelope.token.authority_context_digest == envelope.admission.authority_context_digest
+
+
+def test_tampered_authority_context_digest_in_token_fails_signature(
+    authority_signer, sample_context, sample_obligation
+):
+    """Cryptographic Tamper: Mutating authority_context_digest in ExecutionToken fails signature verification."""
+    token = _mint_execution_token(
+        token_id=f"TOK-{uuid.uuid4().hex[:8]}",
+        decision_id=f"DEC-{uuid.uuid4().hex[:8]}",
+        obligation_id=sample_obligation.obligation_id,
+        proposal_id="PROP-TAMPER-CTX",
+        action_digest="c" * 64,
+        context_digest=sample_context.context_digest,
+        source_sha="b" * 40,
+        policy_version=1,
+        issued_at="2026-08-20T12:00:00Z",
+        expires_at="2026-08-20T12:30:00Z",
+        authority_signer=authority_signer,
+        owner_id="WORKER-EXACT",
+        fencing_token=42,
+        lease_epoch=3,
+        state_version=100,
+        state_digest="a" * 64,
+        authority_context_digest="d" * 64,
+    )
+    assert verify_execution_token_signature(token, authority_signer) is True
+
+    # Mutate authority_context_digest
+    tampered = ExecutionToken(
+        token_id=token.token_id,
+        decision_id=token.decision_id,
+        obligation_id=token.obligation_id,
+        proposal_id=token.proposal_id,
+        action_digest=token.action_digest,
+        context_digest=token.context_digest,
+        source_sha=token.source_sha,
+        policy_version=token.policy_version,
+        execution_nonce=token.execution_nonce,
+        issued_at=token.issued_at,
+        expires_at=token.expires_at,
+        signature=token.signature,
+        fencing_token=token.fencing_token,
+        lease_epoch=token.lease_epoch,
+        owner_id=token.owner_id,
+        state_version=token.state_version,
+        state_digest=token.state_digest,
+        authority_context_digest="e" * 64,
+    )
+    assert verify_execution_token_signature(tampered, authority_signer) is False
+
