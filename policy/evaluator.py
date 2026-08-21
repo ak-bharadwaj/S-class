@@ -1,6 +1,7 @@
 """Pure Deterministic Policy Evaluator for S-Class D3."""
 
 from __future__ import annotations
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
 import hmac
@@ -128,46 +129,90 @@ class CoverageTrustPredicate:
         return True
 
 
+@dataclass(frozen=True)
+class ActorKeyRecord:
+    """Enrolled actor authority record in D3 keystore."""
+    actor_id: str
+    actor_role: str
+    public_key_fingerprint: str
+    public_key: Any
+    is_active: bool = True
+
+
 class PolicyActorKeyRegistry:
-    """Certified in-memory public keystore boundary for AuthorizedActor signatures."""
-    _registered_keys: Dict[str, Any] = {}
-    _revoked_keys: Set[str] = set()
+    """Certified actor authority registry boundary (lookup-only for D3 policy evaluation).
+
+    Actor enrollment is restricted to controlled administrative boundaries.
+    Revocation is permanent: revoked actor keys cannot be re-enrolled.
+    """
+    _enrolled_actors: Dict[str, ActorKeyRecord] = {}
+    _revoked_fingerprints: Set[str] = set()
 
     @classmethod
-    def register_actor_key(cls, actor_id: str, public_key: Any, role: Optional[str] = None) -> str:
-        """Registers an authorized actor's Ed25519 public key and returns its SHA-256 fingerprint."""
+    def enroll_actor(cls, actor_id: str, actor_role: str, public_key: Any) -> str:
+        """Administratively enrolls an authorized actor's Ed25519 public key.
+        Fails closed if the key has been revoked or is invalid.
+        """
         from cryptography.hazmat.primitives.asymmetric import ed25519
         if not isinstance(public_key, ed25519.Ed25519PublicKey):
             raise TypeError(f"Expected Ed25519PublicKey instance, got {type(public_key).__name__}")
+        if not actor_id or not isinstance(actor_id, str):
+            raise ValueError("actor_id must be a non-empty string.")
+        if not actor_role or not isinstance(actor_role, str):
+            raise ValueError("actor_role must be a non-empty string.")
+
         fp = hashlib.sha256(public_key.public_bytes_raw()).hexdigest()
-        cls._registered_keys[fp] = public_key
+        if fp in cls._revoked_fingerprints:
+            raise RuntimeError(f"Revoked actor key '{fp}' cannot be re-enrolled.")
+
+        cls._enrolled_actors[fp] = ActorKeyRecord(
+            actor_id=actor_id,
+            actor_role=actor_role,
+            public_key_fingerprint=fp,
+            public_key=public_key,
+            is_active=True,
+        )
         return fp
 
     @classmethod
-    def revoke_actor_key(cls, fingerprint: str) -> None:
-        """Revokes an actor key fingerprint."""
-        cls._revoked_keys.add(fingerprint)
+    def revoke_actor(cls, fingerprint: str) -> None:
+        """Permanently revokes an enrolled actor key fingerprint."""
+        cls._revoked_fingerprints.add(fingerprint)
+        if fingerprint in cls._enrolled_actors:
+            rec = cls._enrolled_actors[fingerprint]
+            cls._enrolled_actors[fingerprint] = ActorKeyRecord(
+                actor_id=rec.actor_id,
+                actor_role=rec.actor_role,
+                public_key_fingerprint=fingerprint,
+                public_key=rec.public_key,
+                is_active=False,
+            )
 
     @classmethod
-    def is_key_revoked(cls, fingerprint: str) -> bool:
+    def is_revoked(cls, fingerprint: str) -> bool:
         """Checks whether an actor key fingerprint is revoked."""
-        return fingerprint in cls._revoked_keys
+        return fingerprint in cls._revoked_fingerprints
 
     @classmethod
-    def get_actor_public_key(cls, fingerprint: str) -> Optional[Any]:
-        """Retrieves registered public key for a given fingerprint."""
-        return cls._registered_keys.get(fingerprint)
+    def lookup_actor(cls, fingerprint: str) -> Optional[ActorKeyRecord]:
+        """Read-only lookup of enrolled actor record."""
+        return cls._enrolled_actors.get(fingerprint)
 
     @classmethod
     def clear(cls) -> None:
         """Controlled teardown of actor keystore for test isolation."""
-        cls._registered_keys.clear()
-        cls._revoked_keys.clear()
+        cls._enrolled_actors.clear()
+        cls._revoked_fingerprints.clear()
 
 
-def canonicalize_policy_exception(exception: PolicyException) -> bytes:
-    """Produces the deterministic canonical JCS (RFC 8785) byte sequence for a PolicyException."""
+def canonicalize_policy_exception_preimage(exception: PolicyException) -> bytes:
+    """Produces the deterministic canonical JCS (RFC 8785) byte sequence binding
+    both the exception payload AND the cryptographic signature provenance metadata
+    (algorithm, signer_identity, public_key_fingerprint, timestamp).
+    """
     from events.serializer import canonicalize_json
+
+    sig = exception.signature
     payload = {
         "exception_id": exception.exception_id,
         "obligation_id": exception.obligation_id,
@@ -180,86 +225,14 @@ def canonicalize_policy_exception(exception: PolicyException) -> bytes:
         },
         "compensating_controls": list(exception.compensating_controls),
         "expiry": exception.expiry,
+        "signature_metadata": {
+            "algorithm": sig.algorithm if sig else "",
+            "signer_identity": sig.signer_identity if sig else "",
+            "public_key_fingerprint": sig.public_key_fingerprint if sig else "",
+            "timestamp": sig.timestamp if sig else "",
+        },
     }
     return canonicalize_json(payload)
-
-
-def sign_policy_exception(
-    exception_id: str,
-    obligation_id: str,
-    policy_id: str,
-    justification: str,
-    actor_id: str,
-    actor_role: str,
-    private_key: Any,
-    compensating_controls: Tuple[str, ...],
-    expiry: Optional[str] = None,
-    signer_identity: Optional[str] = None,
-    timestamp: str = "2026-08-21T00:00:00Z",
-) -> PolicyException:
-    """Signs a PolicyException using an authorized Ed25519 private key."""
-    from cryptography.hazmat.primitives.asymmetric import ed25519
-    from domain.models import AsymmetricAuthoritySignature
-    from policy.models import AuthorizedActor
-
-    if not isinstance(private_key, ed25519.Ed25519PrivateKey):
-        raise TypeError(f"Expected Ed25519PrivateKey, got {type(private_key).__name__}")
-
-    pub_key = private_key.public_key()
-    pub_fp = hashlib.sha256(pub_key.public_bytes_raw()).hexdigest()
-
-    actor = AuthorizedActor(
-        actor_id=actor_id,
-        actor_role=actor_role,
-        public_key_fingerprint=pub_fp,
-    )
-
-    # Register public key in registry if not already registered
-    PolicyActorKeyRegistry.register_actor_key(actor_id, pub_key, actor_role)
-
-    # Build intermediate unsigned exception structure to generate canonical bytes
-    dummy_sig = AsymmetricAuthoritySignature(
-        algorithm="ED25519",
-        signer_identity=signer_identity or actor_id,
-        public_key_fingerprint=pub_fp,
-        payload_digest="0" * 64,
-        signature_hex="0" * 128,
-        timestamp=timestamp,
-    )
-    raw_exc = PolicyException(
-        exception_id=exception_id,
-        obligation_id=obligation_id,
-        policy_id=policy_id,
-        justification=justification,
-        authorized_by=actor,
-        compensating_controls=compensating_controls,
-        signature=dummy_sig,
-        expiry=expiry,
-    )
-
-    canonical_bytes = canonicalize_policy_exception(raw_exc)
-    payload_digest = hashlib.sha256(canonical_bytes).hexdigest()
-    sig_bytes = private_key.sign(canonical_bytes)
-
-    real_sig = AsymmetricAuthoritySignature(
-        algorithm="ED25519",
-        signer_identity=signer_identity or actor_id,
-        public_key_fingerprint=pub_fp,
-        payload_digest=payload_digest,
-        signature_hex=sig_bytes.hex(),
-        timestamp=timestamp,
-    )
-
-    return PolicyException(
-        exception_id=exception_id,
-        obligation_id=obligation_id,
-        policy_id=policy_id,
-        justification=justification,
-        authorized_by=actor,
-        compensating_controls=compensating_controls,
-        signature=real_sig,
-        expiry=expiry,
-    )
 
 
 def _check_valid_exception(
@@ -269,7 +242,7 @@ def _check_valid_exception(
     eval_timestamp: str,
 ) -> None:
     """Validates that a PolicyException is active, unexpired, bound to obligation/policy,
-    and cryptographically verified with an active Ed25519 signature.
+    and cryptographically verified with an active Ed25519 signature binding provenance metadata.
     """
     import hmac
 
@@ -318,47 +291,71 @@ def _check_valid_exception(
             f"AuthorizedActor fingerprint '{actor.public_key_fingerprint}'."
         )
 
-    # 6. Canonical payload digest verification (RFC 8785 JCS)
-    canonical_bytes = canonicalize_policy_exception(exception)
+    # 6. Canonical payload digest verification (RFC 8785 JCS binding signature provenance metadata)
+    canonical_bytes = canonicalize_policy_exception_preimage(exception)
     expected_digest = hashlib.sha256(canonical_bytes).hexdigest()
     if not hmac.compare_digest(sig.payload_digest, expected_digest):
         raise InvalidExceptionError(
             f"PolicyException payload digest mismatch: expected '{expected_digest}', got '{sig.payload_digest}'."
         )
 
-    # 7. Actor Key Lookup & Revocation Check
+    # 7. Actor Key Lookup, Revocation Check, and Role/Identity Binding
     actor_fp = actor.public_key_fingerprint
-    if PolicyActorKeyRegistry.is_key_revoked(actor_fp):
+    if PolicyActorKeyRegistry.is_revoked(actor_fp):
         raise InvalidExceptionError(f"Authorized actor key '{actor_fp}' has been revoked.")
 
-    pub_key = PolicyActorKeyRegistry.get_actor_public_key(actor_fp)
-    if pub_key is None:
-        # Fallback check on Gate3AuthorityKeyStore / Gate3PublicKeystore
+    enrolled = PolicyActorKeyRegistry.lookup_actor(actor_fp)
+    pub_key = None
+
+    if enrolled is not None:
+        if not enrolled.is_active:
+            raise InvalidExceptionError(f"Authorized actor key '{actor_fp}' is inactive.")
+        if enrolled.actor_id != actor.actor_id or enrolled.actor_role != actor.actor_role:
+            raise InvalidExceptionError(
+                f"Actor identity mismatch: registered as '{enrolled.actor_id}' ({enrolled.actor_role}), "
+                f"got '{actor.actor_id}' ({actor.actor_role})."
+            )
+        pub_key = enrolled.public_key
+    else:
+        # Fallback check on Gate3 Authority Keystore
+        g3_matched = False
         try:
             from benchmark.parity.gate_3_authority import Gate3AuthorityKeyStore
             g3_fp = Gate3AuthorityKeyStore.get_public_key_fingerprint()
             if hmac.compare_digest(actor_fp, g3_fp):
+                g3_matched = True
                 pub_key = Gate3AuthorityKeyStore.get_public_key()
         except Exception:
             pass
 
-    if pub_key is None:
-        try:
-            from benchmark.parity.verify_gate_3_certificate import Gate3PublicKeystore
-            g3_pub = Gate3PublicKeystore.get_public_key()
-            if g3_pub is not None:
-                g3_fp = hashlib.sha256(g3_pub.public_bytes_raw()).hexdigest()
-                if hmac.compare_digest(actor_fp, g3_fp):
-                    pub_key = g3_pub
-        except Exception:
-            pass
+        if not g3_matched:
+            try:
+                from benchmark.parity.verify_gate_3_certificate import Gate3PublicKeystore
+                g3_pub = Gate3PublicKeystore.get_public_key()
+                if g3_pub is not None:
+                    g3_fp = hashlib.sha256(g3_pub.public_bytes_raw()).hexdigest()
+                    if hmac.compare_digest(actor_fp, g3_fp):
+                        g3_matched = True
+                        pub_key = g3_pub
+            except Exception:
+                pass
+
+        if g3_matched:
+            # Enforce strict Gate3 Root identity binding
+            allowed_gate3_actors = {"Gate3AuthoritativeVerifier", "GATE3_AUTHORITY"}
+            allowed_gate3_roles = {"CERTIFICATE_AUTHORITY", "SECURITY_AUTHORITY"}
+            if actor.actor_id not in allowed_gate3_actors or actor.actor_role not in allowed_gate3_roles:
+                raise InvalidExceptionError(
+                    f"Actor identity '{actor.actor_id}' ({actor.actor_role}) does not match "
+                    f"Gate 3 Authority Root identity."
+                )
 
     if pub_key is None:
         raise InvalidExceptionError(
-            f"Authorized actor public key for fingerprint '{actor_fp}' is not registered in authority keystore."
+            f"Authorized actor public key for fingerprint '{actor_fp}' is not enrolled in authority registry."
         )
 
-    # 8. Cryptographic Ed25519 signature verification
+    # 8. Cryptographic Ed25519 signature verification over canonical bytes
     from cryptography.exceptions import InvalidSignature
     try:
         sig_bytes = bytes.fromhex(sig.signature_hex)

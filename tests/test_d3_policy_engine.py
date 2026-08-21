@@ -132,8 +132,8 @@ from policy import (
     ExpiredExceptionError,
     CoverageTrustPredicate,
     PolicyActorKeyRegistry,
-    canonicalize_policy_exception,
-    sign_policy_exception,
+    ActorKeyRecord,
+    canonicalize_policy_exception_preimage,
     meet_policies,
     compose_policies,
     verify_and_merge_rules,
@@ -312,6 +312,75 @@ def make_test_context(
     )
 
 
+def _sign_test_exception(
+    exception_id: str,
+    obligation_id: str,
+    policy_id: str,
+    justification: str,
+    actor_id: str,
+    actor_role: str,
+    private_key: Any,
+    compensating_controls: Tuple[str, ...],
+    expiry: Optional[str] = None,
+    signer_identity: Optional[str] = None,
+    timestamp: str = "2026-08-19T10:00:00Z",
+    auto_enroll: bool = True,
+) -> PolicyException:
+    """Test-only helper to generate cryptographically valid PolicyException instances."""
+    pub_key = private_key.public_key()
+    pub_fp = hashlib.sha256(pub_key.public_bytes_raw()).hexdigest()
+
+    if auto_enroll and not PolicyActorKeyRegistry.is_revoked(pub_fp):
+        if PolicyActorKeyRegistry.lookup_actor(pub_fp) is None:
+            PolicyActorKeyRegistry.enroll_actor(actor_id, actor_role, pub_key)
+
+    actor = AuthorizedActor(
+        actor_id=actor_id,
+        actor_role=actor_role,
+        public_key_fingerprint=pub_fp,
+    )
+    dummy_sig = AsymmetricAuthoritySignature(
+        algorithm="ED25519",
+        signer_identity=signer_identity or actor_id,
+        public_key_fingerprint=pub_fp,
+        payload_digest="0" * 64,
+        signature_hex="0" * 128,
+        timestamp=timestamp,
+    )
+    raw_exc = PolicyException(
+        exception_id=exception_id,
+        obligation_id=obligation_id,
+        policy_id=policy_id,
+        justification=justification,
+        authorized_by=actor,
+        compensating_controls=compensating_controls,
+        signature=dummy_sig,
+        expiry=expiry,
+    )
+    canonical_bytes = canonicalize_policy_exception_preimage(raw_exc)
+    payload_digest = hashlib.sha256(canonical_bytes).hexdigest()
+    sig_bytes = private_key.sign(canonical_bytes)
+
+    real_sig = AsymmetricAuthoritySignature(
+        algorithm="ED25519",
+        signer_identity=signer_identity or actor_id,
+        public_key_fingerprint=pub_fp,
+        payload_digest=payload_digest,
+        signature_hex=sig_bytes.hex(),
+        timestamp=timestamp,
+    )
+    return PolicyException(
+        exception_id=exception_id,
+        obligation_id=obligation_id,
+        policy_id=policy_id,
+        justification=justification,
+        authorized_by=actor,
+        compensating_controls=compensating_controls,
+        signature=real_sig,
+        expiry=expiry,
+    )
+
+
 def make_test_exception(
     exc_id: str = "EXC-001",
     obl_id: str = "OBL-001",
@@ -322,7 +391,7 @@ def make_test_exception(
     actor_role: str = "SECURITY_LEAD",
 ) -> PolicyException:
     priv = private_key or TEST_AUTHORITY_PRIVATE_KEY
-    return sign_policy_exception(
+    return _sign_test_exception(
         exception_id=exc_id,
         obligation_id=obl_id,
         policy_id=policy_id,
@@ -1816,7 +1885,7 @@ def test_adversarial_wrong_domain_separator_fails_closed(tmp_path):
 
 
 # ============================================================================
-# 8. D3 Cryptographic PolicyException Authority Test Suite (E1 - E15)
+# 8. D3 Cryptographic PolicyException Authority Test Suite (E1 - E21)
 # ============================================================================
 
 def test_d3_exception_e1_valid_signature_accepted():
@@ -1954,7 +2023,7 @@ def test_d3_exception_e7_wrong_actor_key_rejected():
     rogue_priv = ed25519.Ed25519PrivateKey.generate()
     genuine_priv = ed25519.Ed25519PrivateKey.generate()
     genuine_pub = genuine_priv.public_key()
-    genuine_fp = PolicyActorKeyRegistry.register_actor_key("ACTOR-A", genuine_pub, "SECURITY_LEAD")
+    genuine_fp = PolicyActorKeyRegistry.enroll_actor("ACTOR-A", "SECURITY_LEAD", genuine_pub)
 
     actor = AuthorizedActor("ACTOR-A", "SECURITY_LEAD", genuine_fp)
     dummy_sig = AsymmetricAuthoritySignature(
@@ -1976,7 +2045,7 @@ def test_d3_exception_e7_wrong_actor_key_rejected():
         expiry=None,
     )
     # Sign raw_exc using rogue_priv instead of genuine_priv
-    canonical_bytes = canonicalize_policy_exception(raw_exc)
+    canonical_bytes = canonicalize_policy_exception_preimage(raw_exc)
     payload_digest = hashlib.sha256(canonical_bytes).hexdigest()
     rogue_sig_bytes = rogue_priv.sign(canonical_bytes)
 
@@ -2037,9 +2106,9 @@ def test_d3_exception_e9_revoked_actor_key_rejected():
     obl = make_test_obligation(obl_id="OBL-001")
     actor_priv = ed25519.Ed25519PrivateKey.generate()
     actor_pub = actor_priv.public_key()
-    fp = PolicyActorKeyRegistry.register_actor_key("SEC-02", actor_pub, "SECURITY_LEAD")
+    fp = PolicyActorKeyRegistry.enroll_actor("SEC-02", "SECURITY_LEAD", actor_pub)
 
-    exc = sign_policy_exception(
+    exc = _sign_test_exception(
         exception_id="EXC-001",
         obligation_id="OBL-001",
         policy_id="POL-001",
@@ -2048,9 +2117,10 @@ def test_d3_exception_e9_revoked_actor_key_rejected():
         actor_role="SECURITY_LEAD",
         private_key=actor_priv,
         compensating_controls=("Audit log monitoring enabled",),
+        auto_enroll=False,
     )
     # Revoke actor key
-    PolicyActorKeyRegistry.revoke_actor_key(fp)
+    PolicyActorKeyRegistry.revoke_actor(fp)
 
     ctx = make_test_context(obl, (), (), exceptions=(exc,))
     pol = Policy(
@@ -2154,11 +2224,17 @@ def test_d3_exception_e13_replayed_different_policy_rejected():
 def test_d3_exception_e14_canonical_reordering_deterministic():
     """E14: Canonical RFC 8785 JSON ordering produces identical byte digest & valid signature."""
     exc1 = make_test_exception(obl_id="OBL-001", policy_id="POL-001")
-    canonical_bytes1 = canonicalize_policy_exception(exc1)
+    canonical_bytes1 = canonicalize_policy_exception_preimage(exc1)
 
     # Invert dictionary insertion order
     payload_reordered = {
         "expiry": exc1.expiry,
+        "signature_metadata": {
+            "timestamp": exc1.signature.timestamp,
+            "public_key_fingerprint": exc1.signature.public_key_fingerprint,
+            "signer_identity": exc1.signature.signer_identity,
+            "algorithm": exc1.signature.algorithm,
+        },
         "compensating_controls": list(exc1.compensating_controls),
         "authorized_by": {
             "public_key_fingerprint": exc1.authorized_by.public_key_fingerprint,
@@ -2195,3 +2271,194 @@ def test_d3_exception_e15_tampered_field_after_signing_rejected():
     )
     with pytest.raises(InvalidExceptionError, match="payload digest mismatch"):
         evaluate_policy(pol, ctx)
+
+
+def test_d3_exception_e16_unauthorized_actor_registration_rejected():
+    """E16: Unauthorized/invalid actor registration parameters fail closed."""
+    valid_key = ed25519.Ed25519PrivateKey.generate().public_key()
+    with pytest.raises(ValueError, match="actor_id must be a non-empty string"):
+        PolicyActorKeyRegistry.enroll_actor("", "SECURITY_LEAD", valid_key)
+
+    with pytest.raises(ValueError, match="actor_role must be a non-empty string"):
+        PolicyActorKeyRegistry.enroll_actor("SEC-01", "", valid_key)
+
+    with pytest.raises(TypeError, match="Expected Ed25519PublicKey"):
+        PolicyActorKeyRegistry.enroll_actor("SEC-01", "ROLE", "not_a_public_key")  # type: ignore
+
+
+def test_d3_exception_e17_arbitrary_public_key_cannot_become_signer():
+    """E17: Arbitrary unenrolled public key cannot verify exceptions in policy evaluator."""
+    obl = make_test_obligation(obl_id="OBL-001")
+    unenrolled_priv = ed25519.Ed25519PrivateKey.generate()
+    # Sign without enrolling in PolicyActorKeyRegistry
+    exc = _sign_test_exception(
+        exception_id="EXC-001",
+        obligation_id="OBL-001",
+        policy_id="POL-001",
+        justification="Manual security review approved by security lead with HSM token.",
+        actor_id="UNENROLLED-ACTOR",
+        actor_role="ROGUE_ROLE",
+        private_key=unenrolled_priv,
+        compensating_controls=("Audit log monitoring enabled",),
+        auto_enroll=False,
+    )
+    ctx = make_test_context(obl, (), (), exceptions=(exc,))
+    pol = Policy(
+        "POL-001", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
+    )
+    with pytest.raises(InvalidExceptionError, match="is not enrolled in authority registry"):
+        evaluate_policy(pol, ctx)
+
+
+def test_d3_exception_e18_revoked_actor_cannot_self_re_register():
+    """E18: Revoked actor key cannot be re-enrolled in authority registry."""
+    key = ed25519.Ed25519PrivateKey.generate().public_key()
+    fp = PolicyActorKeyRegistry.enroll_actor("SEC-TEMP", "TEMP_ROLE", key)
+    PolicyActorKeyRegistry.revoke_actor(fp)
+    assert PolicyActorKeyRegistry.is_revoked(fp) is True
+
+    # Attempt re-enrollment of the same revoked key fails closed
+    with pytest.raises(RuntimeError, match="cannot be re-enrolled"):
+        PolicyActorKeyRegistry.enroll_actor("SEC-TEMP", "TEMP_ROLE", key)
+
+
+def test_d3_exception_e19_signer_identity_tampering_rejected():
+    """E19: Signature signer_identity tampering is cryptographically detected and rejected."""
+    obl = make_test_obligation(obl_id="OBL-001")
+    exc = make_test_exception(obl_id="OBL-001", policy_id="POL-001")
+
+    tampered_sig = AsymmetricAuthoritySignature(
+        algorithm=exc.signature.algorithm,
+        signer_identity="ROGUE-ACTOR-IDENTITY",  # Tampered signer identity
+        public_key_fingerprint=exc.signature.public_key_fingerprint,
+        payload_digest=exc.signature.payload_digest,
+        signature_hex=exc.signature.signature_hex,
+        timestamp=exc.signature.timestamp,
+    )
+    tampered_exc = PolicyException(
+        exception_id=exc.exception_id,
+        obligation_id=exc.obligation_id,
+        policy_id=exc.policy_id,
+        justification=exc.justification,
+        authorized_by=exc.authorized_by,
+        compensating_controls=exc.compensating_controls,
+        signature=tampered_sig,
+        expiry=exc.expiry,
+    )
+    ctx = make_test_context(obl, (), (), exceptions=(tampered_exc,))
+    pol = Policy(
+        "POL-001", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
+    )
+    with pytest.raises(InvalidExceptionError, match="payload digest mismatch"):
+        evaluate_policy(pol, ctx)
+
+
+def test_d3_exception_e20_signature_timestamp_tampering_rejected():
+    """E20: Signature timestamp tampering is cryptographically detected and rejected."""
+    obl = make_test_obligation(obl_id="OBL-001")
+    exc = make_test_exception(obl_id="OBL-001", policy_id="POL-001")
+
+    tampered_sig = AsymmetricAuthoritySignature(
+        algorithm=exc.signature.algorithm,
+        signer_identity=exc.signature.signer_identity,
+        public_key_fingerprint=exc.signature.public_key_fingerprint,
+        payload_digest=exc.signature.payload_digest,
+        signature_hex=exc.signature.signature_hex,
+        timestamp="2026-08-22T12:00:00Z",  # Tampered timestamp
+    )
+    tampered_exc = PolicyException(
+        exception_id=exc.exception_id,
+        obligation_id=exc.obligation_id,
+        policy_id=exc.policy_id,
+        justification=exc.justification,
+        authorized_by=exc.authorized_by,
+        compensating_controls=exc.compensating_controls,
+        signature=tampered_sig,
+        expiry=exc.expiry,
+    )
+    ctx = make_test_context(obl, (), (), exceptions=(tampered_exc,))
+    pol = Policy(
+        "POL-001", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
+    )
+    with pytest.raises(InvalidExceptionError, match="payload digest mismatch"):
+        evaluate_policy(pol, ctx)
+
+
+def test_d3_exception_e21_signature_fingerprint_tampering_rejected():
+    """E21: Signature public_key_fingerprint tampering is detected and rejected."""
+    obl = make_test_obligation(obl_id="OBL-001")
+    exc = make_test_exception(obl_id="OBL-001", policy_id="POL-001")
+
+    tampered_sig = AsymmetricAuthoritySignature(
+        algorithm=exc.signature.algorithm,
+        signer_identity=exc.signature.signer_identity,
+        public_key_fingerprint="0" * 64,  # Tampered fingerprint
+        payload_digest=exc.signature.payload_digest,
+        signature_hex=exc.signature.signature_hex,
+        timestamp=exc.signature.timestamp,
+    )
+    tampered_exc = PolicyException(
+        exception_id=exc.exception_id,
+        obligation_id=exc.obligation_id,
+        policy_id=exc.policy_id,
+        justification=exc.justification,
+        authorized_by=exc.authorized_by,
+        compensating_controls=exc.compensating_controls,
+        signature=tampered_sig,
+        expiry=exc.expiry,
+    )
+    ctx = make_test_context(obl, (), (), exceptions=(tampered_exc,))
+    pol = Policy(
+        "POL-001", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
+    )
+    with pytest.raises(InvalidExceptionError, match="does not match AuthorizedActor fingerprint"):
+        evaluate_policy(pol, ctx)
+
+
+def test_d3_exception_gate3_root_actor_binding():
+    """Gate 3 Authority Key represents Gate3AuthoritativeVerifier root, not arbitrary human actors."""
+    obl = make_test_obligation(obl_id="OBL-001")
+    g3_priv = TEST_AUTHORITY_PRIVATE_KEY
+    g3_pub = TEST_AUTHORITY_PUBLIC_KEY
+    g3_fp = hashlib.sha256(g3_pub.public_bytes_raw()).hexdigest()
+
+    # 1. Gate3 key used with mismatched human credentials -> REJECTED
+    exc_forged_human = _sign_test_exception(
+        exception_id="EXC-001",
+        obligation_id="OBL-001",
+        policy_id="POL-001",
+        justification="Manual security review approved by security lead with HSM token.",
+        actor_id="SEC-OFFICER-01",
+        actor_role="SECURITY_LEAD",
+        private_key=g3_priv,
+        compensating_controls=("Audit log monitoring enabled",),
+        auto_enroll=False,
+    )
+    ctx_forged = make_test_context(obl, (), (), exceptions=(exc_forged_human,))
+    pol = Policy(
+        "POL-001", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
+    )
+    with pytest.raises(InvalidExceptionError, match="does not match Gate 3 Authority Root identity"):
+        evaluate_policy(pol, ctx_forged)
+
+    # 2. Gate3 key used with authoritative Gate 3 identity -> ACCEPTED
+    exc_valid_g3 = _sign_test_exception(
+        exception_id="EXC-002",
+        obligation_id="OBL-001",
+        policy_id="POL-001",
+        justification="Gate 3 authority signed exception for emergency deployment.",
+        actor_id="Gate3AuthoritativeVerifier",
+        actor_role="CERTIFICATE_AUTHORITY",
+        private_key=g3_priv,
+        compensating_controls=("Audit log monitoring enabled",),
+        auto_enroll=False,
+    )
+    ctx_valid = make_test_context(obl, (), (), exceptions=(exc_valid_g3,))
+    decision = evaluate_policy(pol, ctx_valid)
+    assert decision.decision == PolicyDecisionType.ALLOW
+    assert "EXC-002" in decision.exceptions_applied
