@@ -4570,6 +4570,7 @@ def test_d3_install_e92_restart_after_loss_remains_recovery_required():
         DeploymentProvisionerRegistry,
         DeploymentStatus,
         InMemoryTestDeploymentProvisioner,
+        TrustedCompositionRoot,
     )
 
     manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
@@ -4596,7 +4597,7 @@ def test_d3_install_e92_restart_after_loss_remains_recovery_required():
         deployment_id="DEPLOYMENT-PERSISTED-001",
         initial_status=DeploymentStatus.RECOVERY_REQUIRED,
     )
-    DeploymentProvisionerRegistry.bootstrap_provisioner(external_provisioner)
+    TrustedCompositionRoot.bootstrap_deployment_authority(external_provisioner)
 
     assert DeploymentProvisionerRegistry.get_provisioner().get_deployment_status() == DeploymentStatus.RECOVERY_REQUIRED
     with pytest.raises(RuntimeError, match="RECOVERY_REQUIRED"):
@@ -4829,7 +4830,7 @@ def test_d3_install_e98_forged_authorization_rejected():
 def test_d3_install_e99_external_authority_unavailable_fails_closed():
     """E99: When external deployment authority is unavailable or fails, genesis and recovery fail closed."""
     SignedAuthorityManifestLoader.clear_for_testing()
-    from events.store import DeploymentProvisionerRegistry, TrustedDeploymentProvisioner, DeploymentStatus
+    from events.store import DeploymentProvisionerRegistry, TrustedDeploymentProvisioner, DeploymentStatus, TrustedCompositionRoot
 
     class UnavailableExternalProvisioner(TrustedDeploymentProvisioner):
         def get_deployment_id(self) -> str:
@@ -4848,7 +4849,7 @@ def test_d3_install_e99_external_authority_unavailable_fails_closed():
             raise ConnectionError("External deployment coordinator unreachable.")
 
     DeploymentProvisionerRegistry.reset_for_testing()
-    DeploymentProvisionerRegistry.bootstrap_provisioner(UnavailableExternalProvisioner())
+    TrustedCompositionRoot.bootstrap_deployment_authority(UnavailableExternalProvisioner())
 
     manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
         manifest_id="M-E99",
@@ -4879,20 +4880,20 @@ def test_d3_install_e100_test_provisioner_inaccessible_outside_test_mode(monkeyp
 def test_d3_install_e101_arbitrary_provisioner_injection_rejected():
     """E101: Arbitrary provisioner injection after sealing is rejected."""
     SignedAuthorityManifestLoader.clear_for_testing()
-    from events.store import DeploymentProvisionerRegistry, InMemoryTestDeploymentProvisioner
+    from events.store import DeploymentProvisionerRegistry, InMemoryTestDeploymentProvisioner, TrustedCompositionRoot
 
     # Registry is already sealed during clear_for_testing() bootstrap
     assert DeploymentProvisionerRegistry.is_sealed()
 
     attacker_provisioner = InMemoryTestDeploymentProvisioner(deployment_id="ATTACKER-PROVISIONER-001")
-    with pytest.raises(RuntimeError, match="already sealed"):
-        DeploymentProvisionerRegistry.bootstrap_provisioner(attacker_provisioner)
+    with pytest.raises(RuntimeError, match="already completed deployment authority bootstrap|already sealed|Unauthorized caller"):
+        TrustedCompositionRoot.bootstrap_deployment_authority(attacker_provisioner)
 
 
 def test_d3_install_e102_provisioner_replacement_after_bootstrap_rejected():
     """E102: Provisioner replacement after legitimate genesis bootstrap is rejected."""
     SignedAuthorityManifestLoader.clear_for_testing()
-    from events.store import DeploymentProvisionerRegistry, InMemoryTestDeploymentProvisioner
+    from events.store import DeploymentProvisionerRegistry, InMemoryTestDeploymentProvisioner, TrustedCompositionRoot
 
     manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
         manifest_id="M-E102",
@@ -4905,8 +4906,8 @@ def test_d3_install_e102_provisioner_replacement_after_bootstrap_rejected():
     SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
 
     rogue_provisioner = InMemoryTestDeploymentProvisioner(deployment_id="ROGUE-REPLACEMENT-001")
-    with pytest.raises(RuntimeError, match="already sealed"):
-        DeploymentProvisionerRegistry.bootstrap_provisioner(rogue_provisioner)
+    with pytest.raises(RuntimeError, match="already completed deployment authority bootstrap|already sealed|Unauthorized caller"):
+        TrustedCompositionRoot.bootstrap_deployment_authority(rogue_provisioner)
 
 
 def test_d3_install_e103_attacker_provisioner_cannot_authorize_genesis():
@@ -4917,6 +4918,7 @@ def test_d3_install_e103_attacker_provisioner_cannot_authorize_genesis():
         D2InstallationProvisioning,
         DeploymentProvisionerRegistry,
         InMemoryTestDeploymentProvisioner,
+        TrustedCompositionRoot,
     )
 
     manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
@@ -4931,8 +4933,8 @@ def test_d3_install_e103_attacker_provisioner_cannot_authorize_genesis():
 
     # Attacker attempts to inject custom provisioner to bypass PROVISIONED status
     attacker_provisioner = InMemoryTestDeploymentProvisioner(deployment_id="ROGUE-AUTHORITY-001")
-    with pytest.raises(RuntimeError, match="already sealed"):
-        DeploymentProvisionerRegistry.bootstrap_provisioner(attacker_provisioner)
+    with pytest.raises(RuntimeError, match="already completed deployment authority bootstrap|already sealed|Unauthorized caller"):
+        TrustedCompositionRoot.bootstrap_deployment_authority(attacker_provisioner)
 
     # Genesis bootstrap still fails closed against the original sealed authority
     with pytest.raises(RuntimeError, match="already contains history|system has already been provisioned"):
@@ -4962,6 +4964,7 @@ def test_d3_install_e105_d3_cannot_call_concrete_provisioner_mutation_apis():
         DeploymentProvisionerRegistry,
         TrustedDeploymentProvisioner,
         DeploymentStatus,
+        TrustedCompositionRoot,
     )
 
     # Pure minimal implementation of TrustedDeploymentProvisioner with NO concrete helper/mutation methods
@@ -4986,7 +4989,7 @@ def test_d3_install_e105_d3_cannot_call_concrete_provisioner_mutation_apis():
 
     DeploymentProvisionerRegistry.reset_for_testing()
     canonical_prov = StrictCanonicalProvisioner()
-    DeploymentProvisionerRegistry.bootstrap_provisioner(canonical_prov)
+    TrustedCompositionRoot.bootstrap_deployment_authority(canonical_prov)
 
     manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
         manifest_id="M-E105",
@@ -5055,6 +5058,90 @@ def test_d3_install_e106_recovery_requires_canonical_interface_and_preserves_imm
     assert res.manifest_id == "M-E106-RECOVERED"
     assert provisioner.get_deployment_id() == original_dep_id
     assert provisioner.get_deployment_status() == DeploymentStatus.PROVISIONED
+
+
+def test_d3_install_e107_unauthorized_first_bootstrap_rejected():
+    """E107: Invoking DeploymentProvisionerRegistry.bootstrap_provisioner without valid token is rejected."""
+    from events.store import DeploymentProvisionerRegistry, InMemoryTestDeploymentProvisioner, CompositionRootToken
+
+    DeploymentProvisionerRegistry.reset_for_testing()
+
+    prov = InMemoryTestDeploymentProvisioner()
+
+    # 1. Direct call with no token fails closed
+    with pytest.raises(RuntimeError, match="Unauthorized caller: provisioner bootstrap is restricted to TrustedCompositionRoot"):
+        DeploymentProvisionerRegistry.bootstrap_provisioner(prov)
+
+    # 2. Direct call with forged token fails closed
+    fake_token = CompositionRootToken(_secret="FORGED_SECRET")
+    with pytest.raises(RuntimeError, match="Unauthorized caller: provisioner bootstrap is restricted to TrustedCompositionRoot"):
+        DeploymentProvisionerRegistry.bootstrap_provisioner(prov, token=fake_token)
+
+
+def test_d3_install_e108_ordinary_runtime_path_cannot_bootstrap_provider():
+    """E108: Ordinary runtime path cannot access composition token or bootstrap custom provider."""
+    from events.store import DeploymentProvisionerRegistry, InMemoryTestDeploymentProvisioner
+
+    DeploymentProvisionerRegistry.reset_for_testing()
+
+    attacker_prov = InMemoryTestDeploymentProvisioner(deployment_id="ATTACKER-RUNTIME-001")
+
+    # Ordinary runtime code cannot construct a valid CompositionRootToken
+    with pytest.raises(RuntimeError, match="Unauthorized caller"):
+        DeploymentProvisionerRegistry.bootstrap_provisioner(attacker_prov, token=None)
+
+    # Authority defaults to fail-closed
+    assert DeploymentProvisionerRegistry.get_provisioner().get_deployment_status().value == "AUTHORITY_UNAVAILABLE"
+
+
+def test_d3_install_e109_trusted_composition_root_bootstrap_succeeds_exactly_once():
+    """E109: TrustedCompositionRoot.bootstrap_deployment_authority succeeds exactly once; second call is rejected."""
+    from events.store import DeploymentProvisionerRegistry, InMemoryTestDeploymentProvisioner, TrustedCompositionRoot
+
+    DeploymentProvisionerRegistry.reset_for_testing()
+
+    prov = InMemoryTestDeploymentProvisioner(deployment_id="LEGITIMATE-ROOT-001")
+
+    # 1. First bootstrap succeeds
+    TrustedCompositionRoot.bootstrap_deployment_authority(prov)
+    assert DeploymentProvisionerRegistry.get_provisioner().get_deployment_id() == "LEGITIMATE-ROOT-001"
+    assert DeploymentProvisionerRegistry.is_sealed()
+
+    # 2. Second bootstrap attempt is rejected
+    prov_second = InMemoryTestDeploymentProvisioner(deployment_id="ATTACKER-SECOND-001")
+    with pytest.raises(RuntimeError, match="TrustedCompositionRoot has already completed deployment authority bootstrap"):
+        TrustedCompositionRoot.bootstrap_deployment_authority(prov_second)
+
+
+def test_d3_install_e110_provider_identity_cannot_change_before_or_after_first_provisioning():
+    """E110: Provider identity cannot change before or after first provisioning."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import DeploymentProvisionerRegistry, InMemoryTestDeploymentProvisioner, TrustedCompositionRoot
+
+    prov = InMemoryTestDeploymentProvisioner(deployment_id="STABLE-IMMUTABLE-DEP-001")
+    DeploymentProvisionerRegistry.reset_for_testing()
+    TrustedCompositionRoot.bootstrap_deployment_authority(prov)
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E110",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    res = SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+    assert res.manifest_version == 1
+
+    # Deployment ID is verified
+    assert DeploymentProvisionerRegistry.get_provisioner().get_deployment_id() == "STABLE-IMMUTABLE-DEP-001"
+
+    # Any attempt to replace provider fails closed
+    rogue_prov = InMemoryTestDeploymentProvisioner(deployment_id="MUTATED-DEP-002")
+    with pytest.raises(RuntimeError):
+        TrustedCompositionRoot.bootstrap_deployment_authority(rogue_prov)
+
+    assert DeploymentProvisionerRegistry.get_provisioner().get_deployment_id() == "STABLE-IMMUTABLE-DEP-001"
 
 
 

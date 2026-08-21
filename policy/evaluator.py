@@ -661,6 +661,7 @@ class SignedAuthorityManifestLoader:
                 D2InstallationProvisioning,
                 DeploymentProvisionerRegistry,
                 InMemoryTestDeploymentProvisioner,
+                TrustedCompositionRoot,
             )
             D2InstallationProvisioning.clear_for_testing()
             store = D2AuthorityManifestStore()
@@ -672,7 +673,7 @@ class SignedAuthorityManifestLoader:
                         pass
             DeploymentProvisionerRegistry.reset_for_testing()
             test_prov = InMemoryTestDeploymentProvisioner()
-            DeploymentProvisionerRegistry.bootstrap_provisioner(test_prov)
+            TrustedCompositionRoot.bootstrap_deployment_authority(test_prov)
 
     @classmethod
     def _load_from_dict_with_test_root_override(

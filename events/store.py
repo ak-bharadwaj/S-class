@@ -1323,9 +1323,54 @@ class InMemoryTestDeploymentProvisioner(TrustedDeploymentProvisioner):
         return auth_record
 
 
+class CompositionRootToken:
+    """Opaque capability token issued strictly by TrustedCompositionRoot to authorize one-time provisioner bootstrap."""
+    def __init__(self, _secret: object):
+        self._secret = _secret
+
+
+class TrustedCompositionRoot:
+    """Authoritative composition root for S-Class runtime initialization.
+    Constructs and injects TrustedDeploymentProvisioner before runtime controllers
+    and policy resolvers are initialized.
+    """
+    _root_secret = object()
+    _is_bootstrapped = False
+    _lock = threading.RLock()
+
+    @classmethod
+    def bootstrap_deployment_authority(
+        cls,
+        provisioner: TrustedDeploymentProvisioner,
+    ) -> None:
+        """Explicit composition-root entry point to inject and seal the external deployment authority."""
+        with cls._lock:
+            if cls._is_bootstrapped:
+                raise RuntimeError("TrustedCompositionRoot has already completed deployment authority bootstrap.")
+            if not isinstance(provisioner, TrustedDeploymentProvisioner):
+                raise TypeError("provisioner must implement TrustedDeploymentProvisioner ABC.")
+            
+            token = CompositionRootToken(cls._root_secret)
+            DeploymentProvisionerRegistry.bootstrap_provisioner(provisioner, token=token)
+            cls._is_bootstrapped = True
+
+    @classmethod
+    def is_bootstrapped(cls) -> bool:
+        with cls._lock:
+            return cls._is_bootstrapped
+
+    @classmethod
+    def reset_for_testing(cls) -> None:
+        if not _is_test_mode_active():
+            raise RuntimeError("reset_for_testing is strictly prohibited outside TEST_MODE.")
+        with cls._lock:
+            cls._is_bootstrapped = False
+
+
 class DeploymentProvisionerRegistry:
     """Global registry for the external TrustedDeploymentProvisioner.
     Sealed after bootstrap to prevent runtime replacement of the authority provider.
+    Accessible only via TrustedCompositionRoot with a valid CompositionRootToken.
     """
     _active_provisioner: Optional[TrustedDeploymentProvisioner] = None
     _is_sealed: bool = False
@@ -1339,11 +1384,18 @@ class DeploymentProvisionerRegistry:
             return cls._active_provisioner
 
     @classmethod
-    def bootstrap_provisioner(cls, provisioner: TrustedDeploymentProvisioner) -> None:
+    def bootstrap_provisioner(
+        cls,
+        provisioner: TrustedDeploymentProvisioner,
+        token: Optional[CompositionRootToken] = None,
+    ) -> None:
         """Injects and seals the external trusted deployment provisioner during composition root initialization.
-        Fails closed on subsequent calls or replacement attempts.
+        Requires a valid CompositionRootToken issued by TrustedCompositionRoot.
+        Fails closed on unauthorized callers, subsequent calls, or replacement attempts.
         """
         with cls._lock:
+            if token is None or not isinstance(token, CompositionRootToken) or getattr(token, "_secret", None) is not TrustedCompositionRoot._root_secret:
+                raise RuntimeError("Unauthorized caller: provisioner bootstrap is restricted to TrustedCompositionRoot.")
             if cls._is_sealed or cls._active_provisioner is not None:
                 raise RuntimeError("DeploymentProvisionerRegistry is already sealed; provisioner replacement is prohibited.")
             if not isinstance(provisioner, TrustedDeploymentProvisioner):
@@ -1363,5 +1415,6 @@ class DeploymentProvisionerRegistry:
         with cls._lock:
             cls._active_provisioner = None
             cls._is_sealed = False
+            TrustedCompositionRoot.reset_for_testing()
 
 
