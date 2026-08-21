@@ -2939,6 +2939,236 @@ def test_d3_manifest_e32_manifest_rollback_downgrade_rejected():
         SignedAuthorityManifestLoader.load_from_dict(manifest_v1, TEST_AUTHORITY_PUBLIC_KEY, min_version=2)
 
 
+def test_d3_manifest_e33_signed_rollback_rejected():
+    """E33: A validly signed older manifest (v1) is rejected once a newer manifest (v2) was accepted."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-SEQ-001",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    manifest_v2 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-SEQ-001",
+        manifest_version=2,
+        issued_at="2026-08-20T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    # 1. Load version 2 first
+    res_v2 = SignedAuthorityManifestLoader.load_from_dict(manifest_v2, TEST_AUTHORITY_PUBLIC_KEY)
+    assert res_v2.manifest_version == 2
+
+    # 2. Attempting to load previously signed version 1 is strictly rejected as rollback
+    with pytest.raises(ManifestRollbackError, match="is older than highest accepted version"):
+        SignedAuthorityManifestLoader.load_from_dict(manifest_v1, TEST_AUTHORITY_PUBLIC_KEY)
+
+
+def test_d3_manifest_e34_same_version_actor_set_substitution_rejected():
+    """E34: Attempting to substitute a different actor set under the same manifest version fails closed."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+
+    priv1 = ed25519.Ed25519PrivateKey.generate()
+    pub1 = priv1.public_key()
+    fp1 = hashlib.sha256(pub1.public_bytes_raw()).hexdigest()
+
+    priv2 = ed25519.Ed25519PrivateKey.generate()
+    pub2 = priv2.public_key()
+    fp2 = hashlib.sha256(pub2.public_bytes_raw()).hexdigest()
+
+    manifest_a = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-SAME-001",
+        manifest_version=3,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={
+            fp1: {
+                "actor_id": "ACTOR-1",
+                "actor_role": "SECURITY_LEAD",
+                "public_key_fingerprint": fp1,
+                "public_key_hex": pub1.public_bytes_raw().hex(),
+                "is_active": True,
+            }
+        },
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    manifest_b = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-SAME-001",
+        manifest_version=3,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={
+            fp2: {
+                "actor_id": "ACTOR-2",
+                "actor_role": "SECURITY_LEAD",
+                "public_key_fingerprint": fp2,
+                "public_key_hex": pub2.public_bytes_raw().hex(),
+                "is_active": True,
+            }
+        },
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    # Load first v3 manifest
+    SignedAuthorityManifestLoader.load_from_dict(manifest_a, TEST_AUTHORITY_PUBLIC_KEY)
+
+    # Attempting to load alternate v3 manifest is rejected as same-version substitution
+    with pytest.raises(ManifestRollbackError, match="Same-version manifest substitution rejected"):
+        SignedAuthorityManifestLoader.load_from_dict(manifest_b, TEST_AUTHORITY_PUBLIC_KEY)
+
+
+def test_d3_manifest_e35_invalid_future_manifest_version_fail_closed():
+    """E35: Zero, negative, and out-of-bounds future manifest versions fail closed."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+
+    # 1. Zero version rejected
+    manifest_zero = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-V-001",
+        manifest_version=0,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    with pytest.raises(ManifestRollbackError, match="positive non-zero integer"):
+        SignedAuthorityManifestLoader.load_from_dict(manifest_zero, TEST_AUTHORITY_PUBLIC_KEY)
+
+    # 2. Out-of-bounds future epoch window rejected
+    manifest_future = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-V-001",
+        manifest_version=99_000_000,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    with pytest.raises(ManifestRollbackError, match="exceeds maximum allowable epoch window"):
+        SignedAuthorityManifestLoader.load_from_dict(manifest_future, TEST_AUTHORITY_PUBLIC_KEY)
+
+
+def test_d3_manifest_e36_manifest_identity_substitution_rejected():
+    """E36: Attempting to substitute a different manifest_id in an active runtime fails closed."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+
+    manifest_orig = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-ORIGINAL",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    manifest_sub = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-SUBSTITUTE",
+        manifest_version=2,
+        issued_at="2026-08-20T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    SignedAuthorityManifestLoader.load_from_dict(manifest_orig, TEST_AUTHORITY_PUBLIC_KEY)
+
+    # Attempting to load different manifest_id in same runtime fails closed
+    with pytest.raises(CorruptManifestError, match="Manifest identity substitution rejected"):
+        SignedAuthorityManifestLoader.load_from_dict(manifest_sub, TEST_AUTHORITY_PUBLIC_KEY)
+
+
+def test_d3_manifest_e37_attacker_selected_root_bootstrap_rejected():
+    """E37: Manifest signed with attacker-selected private key fails closed during canonical bootstrap."""
+    PolicyActorKeyRegistry.clear_for_testing()
+    attacker_priv = ed25519.Ed25519PrivateKey.generate()
+
+    manifest_data = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-BOOT-001",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=attacker_priv,  # Signed by attacker key, not canonical Gate 3 root
+    )
+
+    with pytest.raises(InvalidManifestSignatureError):
+        PolicyActorKeyRegistry.bootstrap_from_signed_manifest(manifest_data)
+
+
+def test_d3_bootstrap_e38_second_bootstrap_rejected():
+    """E38: Second bootstrap attempt on PolicyActorKeyRegistry fails closed."""
+    PolicyActorKeyRegistry.clear_for_testing()
+
+    manifest_data = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-BOOT-001",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    # First bootstrap succeeds
+    PolicyActorKeyRegistry.bootstrap_from_signed_manifest(manifest_data)
+    assert PolicyActorKeyRegistry.get_sealed_resolver() is not None
+
+    # Second bootstrap fails closed
+    with pytest.raises(RuntimeError, match="Authority resolver is already sealed"):
+        PolicyActorKeyRegistry.bootstrap_from_signed_manifest(manifest_data)
+
+
+def test_d3_bootstrap_e39_bootstrap_with_untrusted_manifest_rejected():
+    """E39: Bootstrapping with a corrupted/tampered manifest fails closed."""
+    PolicyActorKeyRegistry.clear_for_testing()
+
+    # 1. Tampered payload post-signing fails closed with InvalidManifestSignatureError
+    manifest_data = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-BOOT-001",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    manifest_data["actors"] = {"forged_fp": {"actor_id": "ROGUE"}}
+
+    with pytest.raises((InvalidManifestSignatureError, CorruptManifestError)):
+        PolicyActorKeyRegistry.bootstrap_from_signed_manifest(manifest_data)
+
+    # 2. Signed payload containing malformed actor record structure fails closed with CorruptManifestError
+    signed_corrupt_manifest = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-BOOT-002",
+        manifest_version=2,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={"invalid_fp": "not-a-dict"},  # type: ignore
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    with pytest.raises(CorruptManifestError, match="must be a dictionary"):
+        PolicyActorKeyRegistry.bootstrap_from_signed_manifest(signed_corrupt_manifest)
+
+
+def test_d3_bootstrap_e40_bootstrap_after_runtime_authority_mismatch_rejected():
+    """E40: Bootstrap fails closed if canonical Gate 3 root authority is unconfigured."""
+    PolicyActorKeyRegistry.clear_for_testing()
+    Gate3PublicKeystore.clear()
+    Gate3AuthorityKeyStore.clear()
+
+    manifest_data = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="MANIFEST-BOOT-001",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    with pytest.raises(RuntimeError, match="Canonical Gate 3 Root Authority Public Key is not configured"):
+        PolicyActorKeyRegistry.bootstrap_from_signed_manifest(manifest_data)
+
+
 def test_d3_manifest_structural_validation_errors():
     """Verify structural malformations in signed authority manifest fail closed."""
     # 1. Non-dict manifest data
