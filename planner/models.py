@@ -137,6 +137,14 @@ class ExecutionStrategyArtifact:
         object.__setattr__(self, "nodes", tuple(self.nodes))
         object.__setattr__(self, "dependency_edges", tuple(self.dependency_edges))
 
+        from planner.fingerprint import compute_execution_strategy_fingerprint
+        expected_digest = compute_execution_strategy_fingerprint(self)
+        if not self.strategy_digest:
+            object.__setattr__(self, "strategy_digest", expected_digest)
+        elif self.strategy_digest != expected_digest:
+            raise ValueError(f"strategy_digest mismatch: '{self.strategy_digest}' != '{expected_digest}'")
+        _validate_pattern(self.strategy_digest, HEX_64_PATTERN, "strategy_digest")
+
 
 @dataclass(frozen=True)
 class PlannerStateContent:
@@ -149,6 +157,7 @@ class PlannerStateContent:
     blocked_frontier: Tuple[str, ...] = field(default_factory=tuple)
     evidence_digests: Tuple[str, ...] = field(default_factory=tuple)
     active_policies: Tuple[Mapping[str, Any], ...] = field(default_factory=tuple)
+    exceptions: Tuple[Any, ...] = field(default_factory=tuple)
     analysis_digests: Tuple[str, ...] = field(default_factory=tuple)
     analysis_artifacts: Tuple[Any, ...] = field(default_factory=tuple)
     state_version: int = 0
@@ -168,6 +177,7 @@ class PlannerStateContent:
         object.__setattr__(self, "blocked_frontier", tuple(self.blocked_frontier))
         object.__setattr__(self, "evidence_digests", tuple(self.evidence_digests))
         object.__setattr__(self, "active_policies", _freeze_nested(self.active_policies))
+        object.__setattr__(self, "exceptions", tuple(self.exceptions))
         object.__setattr__(self, "analysis_digests", tuple(self.analysis_digests))
         object.__setattr__(self, "analysis_artifacts", tuple(self.analysis_artifacts))
 

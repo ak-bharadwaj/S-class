@@ -30,6 +30,7 @@ class StateProjector:
         blocked_frontier: Sequence[str] = (),
         evidence_digests: Sequence[str] = (),
         active_policies: Sequence[Mapping[str, Any]] = (),
+        exceptions: Sequence[Any] = (),
         milestones: Sequence[Mapping[str, Any]] = (),
         analysis_artifacts: Sequence[Any] = (),
         state_version: int = 0,
@@ -51,6 +52,7 @@ class StateProjector:
             desc_val = obl.get("description", "Governed Obligation") if isinstance(obl, dict) else getattr(obl, "description", "Governed Obligation")
             deps_val = obl.get("depends_on", []) if isinstance(obl, dict) else list(getattr(obl, "depends_on", []))
             claims_val = obl.get("claim_ids", []) if isinstance(obl, dict) else list(getattr(obl, "claim_ids", []))
+            pol_id_val = obl.get("policy_id") if isinstance(obl, dict) else getattr(obl, "policy_id", None)
 
             obl_dict = {
                 "obligation_id": obl.get("obligation_id", obl_id) if isinstance(obl, dict) else getattr(obl, "obligation_id", obl_id),
@@ -61,6 +63,7 @@ class StateProjector:
                 "status": stat_val.value if hasattr(stat_val, "value") else str(stat_val),
                 "depends_on": deps_val,
                 "claim_ids": claims_val,
+                "policy_id": pol_id_val,
             }
             normalized_obligations.append(obl_dict)
 
@@ -92,6 +95,7 @@ class StateProjector:
             blocked_frontier=tuple(blocked_frontier),
             evidence_digests=tuple(evidence_digests),
             active_policies=tuple(active_policies),
+            exceptions=tuple(exceptions),
             analysis_digests=analysis_digests,
             analysis_artifacts=tuple(analysis_artifacts),
             state_version=state_version,
@@ -120,6 +124,7 @@ class StateProjector:
         executable_frontier: Sequence[str] = (),
         blocked_frontier: Sequence[str] = (),
         active_policies: Sequence[Mapping[str, Any]] = (),
+        exceptions: Sequence[Any] = (),
         analysis_artifacts: Sequence[Any] = (),
         worker_id: str = "",
     ) -> PlannerStateView:
@@ -132,6 +137,7 @@ class StateProjector:
             blocked_frontier=blocked_frontier,
             evidence_digests=tuple(mat_state.evidence.keys()),
             active_policies=active_policies,
+            exceptions=exceptions,
             analysis_artifacts=analysis_artifacts,
             state_version=mat_state.last_sequence_number,
             state_digest=mat_state.last_digest,

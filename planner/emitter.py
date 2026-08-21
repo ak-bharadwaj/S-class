@@ -30,6 +30,14 @@ class ProposalEmitter:
         if not isinstance(lease, PlanningLease) or not lease.is_active:
             raise ValueError("An active PlanningLease is required to emit proposals.")
 
+        # Enforce execution strategy fingerprint integrity
+        from planner.fingerprint import compute_execution_strategy_fingerprint
+        expected_strat_digest = compute_execution_strategy_fingerprint(strategy)
+        if strategy.strategy_digest != expected_strat_digest:
+            raise ValueError(
+                f"Execution strategy digest tampering detected: '{strategy.strategy_digest}' != expected '{expected_strat_digest}'"
+            )
+
         completed_set: Set[str] = set(completed_node_ids)
         topo_order = DependencyPlanner.topological_sort(strategy)
         nodes_by_id = {node.node_id: node for node in strategy.nodes}

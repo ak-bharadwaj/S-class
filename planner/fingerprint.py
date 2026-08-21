@@ -97,20 +97,75 @@ def compute_execution_strategy_fingerprint(strategy: ExecutionStrategyArtifact) 
     return hashlib.sha256(raw).hexdigest()
 
 
+def _canonicalize_policy_expression(expr: Any) -> Dict[str, Any]:
+    if expr is None:
+        return {}
+    if isinstance(expr, dict):
+        return dict(expr)
+
+    rules = []
+    for r in getattr(expr, "rules", ()):
+        if hasattr(r, "rule_type"):
+            rules.append({
+                "rule_type": r.rule_type.value if hasattr(r.rule_type, "value") else str(r.rule_type),
+                "parameters": dict(getattr(r, "parameters", {})),
+            })
+        elif isinstance(r, dict):
+            rules.append(dict(r))
+        else:
+            rules.append({"rule": str(r)})
+
+    rules.sort(key=lambda x: (x.get("rule_type", ""), str(sorted(x.get("parameters", {}).items()))))
+
+    cond = getattr(expr, "condition", None)
+    if cond is not None:
+        cond = dict(cond)
+
+    then_e = getattr(expr, "then_expression", None)
+    else_e = getattr(expr, "else_expression", None)
+
+    return {
+        "combinator": expr.combinator.value if hasattr(expr.combinator, "value") else str(expr.combinator),
+        "rules": rules,
+        "min_count": getattr(expr, "min_count", None),
+        "condition": cond,
+        "then_expression": _canonicalize_policy_expression(then_e) if then_e else None,
+        "else_expression": _canonicalize_policy_expression(else_e) if else_e else None,
+    }
+
+
+def _canonicalize_policy(pol: Any) -> Dict[str, Any]:
+    if hasattr(pol, "policy_id"):
+        return {
+            "policy_id": pol.policy_id,
+            "scope_level": pol.scope_level.value if hasattr(pol.scope_level, "value") else str(pol.scope_level),
+            "version": getattr(pol, "version", 1),
+            "expression": _canonicalize_policy_expression(getattr(pol, "expression", None)),
+        }
+    elif isinstance(pol, dict):
+        return dict(pol)
+    return {"policy_id": str(pol)}
+
+
+def _canonicalize_exception(exc: Any) -> Dict[str, Any]:
+    if hasattr(exc, "exception_id"):
+        return {
+            "exception_id": exc.exception_id,
+            "obligation_id": exc.obligation_id,
+            "policy_id": exc.policy_id,
+            "justification": exc.justification,
+            "compensating_controls": list(getattr(exc, "compensating_controls", ())),
+            "expiry": getattr(exc, "expiry", None),
+        }
+    elif isinstance(exc, dict):
+        return dict(exc)
+    return {"exception_id": str(exc)}
+
+
 def compute_planner_state_digest(content: PlannerStateContent) -> str:
     """Computes pure semantic state digest, strictly invariant to telemetry/metadata."""
-    normalized_policies = []
-    for pol in getattr(content, "active_policies", ()):
-        if hasattr(pol, "policy_id"):
-            normalized_policies.append({
-                "policy_id": pol.policy_id,
-                "scope_level": pol.scope_level.value if hasattr(pol.scope_level, "value") else str(pol.scope_level),
-                "version": getattr(pol, "version", 1),
-            })
-        elif isinstance(pol, dict):
-            normalized_policies.append(dict(pol))
-        else:
-            normalized_policies.append({"policy_id": str(pol)})
+    normalized_policies = [_canonicalize_policy(pol) for pol in getattr(content, "active_policies", ())]
+    normalized_exceptions = [_canonicalize_exception(exc) for exc in getattr(content, "exceptions", ())]
 
     payload = {
         "task_id": content.task_id,
@@ -121,6 +176,7 @@ def compute_planner_state_digest(content: PlannerStateContent) -> str:
         "blocked_frontier": sorted(list(content.blocked_frontier)),
         "evidence_digests": sorted(list(content.evidence_digests)),
         "active_policies": normalized_policies,
+        "exceptions": normalized_exceptions,
         "analysis_digests": sorted(list(getattr(content, "analysis_digests", ()))),
         "state_version": content.state_version,
         "state_digest": content.state_digest,

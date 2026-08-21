@@ -48,11 +48,12 @@ class DeterministicRuleGenerator:
         content = state_view.content
         task_id = content.task_id
 
-        # Collect open obligations in the executable frontier
+        # Collect open obligations strictly belonging to the executable frontier
         exec_obl_ids = set(content.executable_frontier)
         open_obls = [
             obl for obl in content.obligations
             if obl.get("status") in (ObligationStatus.OPEN.value, "OPEN")
+            and obl.get("obligation_id") in exec_obl_ids
         ]
 
         if not open_obls:
@@ -95,11 +96,12 @@ class DeterministicRuleGenerator:
             for cid in getattr(artifact, "referenced_claim_ids", ()):
                 evidence_claim_refs.append(cid)
 
-        primary_target = analytical_targets[0] if analytical_targets else "src/core.py"
+        # Grounded primary target: do NOT invent a target if none was observed in analysis
+        primary_target = analytical_targets[0] if analytical_targets else None
 
         candidates: List[ExecutionStrategyArtifact] = []
 
-        # Candidate 1: Frontier-first test-driven verification strategy
+        # Candidate 1: Frontier-first verification-driven strategy
         nodes_c1: List[PlanNode] = []
         edges_c1: List[Tuple[str, str]] = []
         for idx, obl in enumerate(open_obls):
@@ -108,13 +110,11 @@ class DeterministicRuleGenerator:
             node_patch_id = f"NODE-PATCH-{obl_id}-{idx+1}"
 
             if verification_action_type in ("STATIC_ANALYSIS", "TYPE_CHECK", "READ_FILE"):
-                verif_target = primary_target
+                verif_target = primary_target or f"tests/test_{obl_id.lower().replace('-', '_')}.py"
             elif verification_action_type == "FUZZ_CONTRACT":
                 verif_target = f"tests/fuzz_{obl_id.lower().replace('-', '_')}.py"
             else:
                 verif_target = f"tests/test_{obl_id.lower().replace('-', '_')}.py"
-
-            patch_target = primary_target
 
             # Step A: Execute appropriate verification action
             nodes_c1.append(
@@ -131,21 +131,22 @@ class DeterministicRuleGenerator:
                 )
             )
 
-            # Step B: Apply patch (depends on verification)
-            nodes_c1.append(
-                PlanNode(
-                    node_id=node_patch_id,
-                    obligation_id=obl_id,
-                    action_type="APPLY_PATCH",
-                    target=patch_target,
-                    purpose=f"Implementation patch for {obl_id} on {patch_target}",
-                    execution_context=context,
-                    prerequisites=(node_verif_id,),
-                    estimated_cost_usd=0.10,
-                    timeout_seconds=45,
+            # Step B: Apply patch ONLY if a grounded target exists!
+            if primary_target:
+                nodes_c1.append(
+                    PlanNode(
+                        node_id=node_patch_id,
+                        obligation_id=obl_id,
+                        action_type="APPLY_PATCH",
+                        target=primary_target,
+                        purpose=f"Implementation patch for {obl_id} on {primary_target}",
+                        execution_context=context,
+                        prerequisites=(node_verif_id,),
+                        estimated_cost_usd=0.10,
+                        timeout_seconds=45,
+                    )
                 )
-            )
-            edges_c1.append((node_verif_id, node_patch_id))
+                edges_c1.append((node_verif_id, node_patch_id))
 
         strat_c1 = ExecutionStrategyArtifact(
             strategy_id=f"STRAT-{task_id}-C1",
@@ -154,18 +155,9 @@ class DeterministicRuleGenerator:
             nodes=tuple(nodes_c1),
             dependency_edges=tuple(edges_c1),
         )
-        strat_c1_digest = compute_execution_strategy_fingerprint(strat_c1)
-        strat_c1_final = ExecutionStrategyArtifact(
-            strategy_id=strat_c1.strategy_id,
-            plan_id=strat_c1.plan_id,
-            plan_revision=strat_c1.plan_revision,
-            nodes=strat_c1.nodes,
-            dependency_edges=strat_c1.dependency_edges,
-            strategy_digest=strat_c1_digest,
-        )
-        candidates.append(strat_c1_final)
+        candidates.append(strat_c1)
 
-        # Candidate 2: Static-analysis and Type-check first strategy
+        # Candidate 2: Static-analysis and audit-first strategy
         if max_candidates > 1:
             nodes_c2: List[PlanNode] = []
             edges_c2: List[Tuple[str, str]] = []
@@ -179,7 +171,7 @@ class DeterministicRuleGenerator:
                         node_id=node_sa_id,
                         obligation_id=obl_id,
                         action_type="STATIC_ANALYSIS",
-                        target="src/",
+                        target=primary_target or "src/",
                         purpose=f"Static audit for {obl_id}",
                         execution_context=context,
                         prerequisites=(),
@@ -188,20 +180,21 @@ class DeterministicRuleGenerator:
                     )
                 )
 
-                nodes_c2.append(
-                    PlanNode(
-                        node_id=node_patch_id,
-                        obligation_id=obl_id,
-                        action_type="APPLY_PATCH",
-                        target="src/core.py",
-                        purpose=f"Conservative patch for {obl_id}",
-                        execution_context=context,
-                        prerequisites=(node_sa_id,),
-                        estimated_cost_usd=0.08,
-                        timeout_seconds=40,
+                if primary_target:
+                    nodes_c2.append(
+                        PlanNode(
+                            node_id=node_patch_id,
+                            obligation_id=obl_id,
+                            action_type="APPLY_PATCH",
+                            target=primary_target,
+                            purpose=f"Conservative patch for {obl_id} on {primary_target}",
+                            execution_context=context,
+                            prerequisites=(node_sa_id,),
+                            estimated_cost_usd=0.08,
+                            timeout_seconds=40,
+                        )
                     )
-                )
-                edges_c2.append((node_sa_id, node_patch_id))
+                    edges_c2.append((node_sa_id, node_patch_id))
 
             strat_c2 = ExecutionStrategyArtifact(
                 strategy_id=f"STRAT-{task_id}-C2",
@@ -210,16 +203,7 @@ class DeterministicRuleGenerator:
                 nodes=tuple(nodes_c2),
                 dependency_edges=tuple(edges_c2),
             )
-            strat_c2_digest = compute_execution_strategy_fingerprint(strat_c2)
-            strat_c2_final = ExecutionStrategyArtifact(
-                strategy_id=strat_c2.strategy_id,
-                plan_id=strat_c2.plan_id,
-                plan_revision=strat_c2.plan_revision,
-                nodes=strat_c2.nodes,
-                dependency_edges=strat_c2.dependency_edges,
-                strategy_digest=strat_c2_digest,
-            )
-            candidates.append(strat_c2_final)
+            candidates.append(strat_c2)
 
         return tuple(candidates[:max_candidates])
 

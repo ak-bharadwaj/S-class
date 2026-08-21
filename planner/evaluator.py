@@ -7,10 +7,10 @@ governed risk bounds, and multi-objective Pareto ranking.
 from __future__ import annotations
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
-from domain.models import Obligation, Policy
-from domain.types import Criticality, ObligationCategory, ObligationStatus
+from domain.models import Obligation, Policy, Claim, ClaimSubject
+from domain.types import Criticality, ObligationCategory, ObligationStatus, ClaimTier, ClaimStatus, PolicyScope, TargetType
 from policy.evaluator import evaluate_policy
-from policy.models import PolicyEvaluationContext, PolicyDecisionType, PolicyDecision
+from policy.models import PolicyEvaluationContext, PolicyDecisionType, PolicyDecision, PolicyException
 from planner.dependency import DependencyPlanner
 from planner.models import (
     ExecutionStrategyArtifact,
@@ -55,10 +55,19 @@ class HardConstraintGate:
         if not DependencyPlanner.validate_acyclicity(strategy):
             violations.append("Dependency cycle detected in execution strategy DAG.")
 
-        # 2. Obligation Existence and Validity
+        # 2. Strategy Digest Integrity
+        from planner.fingerprint import compute_execution_strategy_fingerprint
+        expected_strat_digest = compute_execution_strategy_fingerprint(strategy)
+        if strategy.strategy_digest != expected_strat_digest:
+            violations.append(
+                f"Execution strategy digest mismatch: '{strategy.strategy_digest}' != expected '{expected_strat_digest}'."
+            )
+
+        # 3. Obligation Existence, Validity, and Frontier Executability
         known_obl_ids = {
             obl["obligation_id"] for obl in state_view.content.obligations
         }
+        exec_frontier_set = set(state_view.content.executable_frontier)
         total_cost = 0.0
 
         for node in strategy.nodes:
@@ -66,6 +75,12 @@ class HardConstraintGate:
             if node.obligation_id not in known_obl_ids:
                 violations.append(
                     f"Node '{node.node_id}' references unknown obligation '{node.obligation_id}'."
+                )
+
+            # Check executable frontier
+            if node.obligation_id not in exec_frontier_set:
+                violations.append(
+                    f"Node '{node.node_id}' targets non-executable obligation '{node.obligation_id}' (not in executable frontier)."
                 )
 
             # Check action type permission
@@ -83,13 +98,13 @@ class HardConstraintGate:
                     f"Node '{node.node_id}' timeout {node.timeout_seconds}s exceeds maximum ceiling (600s)."
                 )
 
-        # 3. Budget Bound
+        # 4. Budget Bound
         if total_cost > budget_remaining:
             violations.append(
                 f"Total strategy cost ${total_cost:.2f} exceeds remaining budget ${budget_remaining:.2f}."
             )
 
-        # 4. Structural Node and Reference Integrity (PlanCritic Criteria)
+        # 5. Structural Node and Reference Integrity (PlanCritic Criteria)
         node_ids = tuple(n.node_id for n in strategy.nodes)
         node_set = set(node_ids)
         if len(node_set) != len(node_ids):
@@ -99,41 +114,79 @@ class HardConstraintGate:
             if src not in node_set or dst not in node_set:
                 violations.append(f"Dependency edge references non-existent node: ({src}->{dst}).")
 
-        # 5. Target State Binding Verification
+        # 6. Target State Binding Verification
         if hasattr(state_view.content, "state_digest") and state_view.content.state_digest:
             if not isinstance(state_view.content.state_digest, str) or len(state_view.content.state_digest) < 32:
                 violations.append("Invalid or corrupted state_digest in context.")
 
-        # 6. D3 Policy Evaluation Delegation (Pure D3 Consumer, Zero Policy Rule Inspection)
-        for policy in getattr(state_view.content, "active_policies", ()):
-            if isinstance(policy, Policy):
-                for node in strategy.nodes:
-                    matching_obls = [
-                        o for o in state_view.content.obligations if o.get("obligation_id") == node.obligation_id
-                    ]
-                    if matching_obls:
-                        obl_dict = matching_obls[0]
-                        obl_inst = Obligation(
-                            obligation_id=obl_dict["obligation_id"],
-                            task_id=state_view.content.task_id,
-                            category=ObligationCategory(obl_dict.get("category", ObligationCategory.CORRECTNESS_FUNCTIONAL.value)),
-                            criticality=Criticality(obl_dict.get("criticality", Criticality.HIGH.value)),
-                            status=ObligationStatus(obl_dict.get("status", ObligationStatus.OPEN.value)),
-                            title=obl_dict.get("title", "Governed Obligation"),
-                            description=obl_dict.get("description", "Governed Obligation"),
-                        )
-                        eval_context = PolicyEvaluationContext(
-                            obligation=obl_inst,
-                            claims=(),
-                            evidence=(),
-                        )
-                        decision = evaluate_policy(policy, eval_context)
-                        if decision.decision == PolicyDecisionType.DENY:
-                            violations.append(
-                                f"D3 Policy '{policy.policy_id}' DENIED action for obligation '{node.obligation_id}': {decision.rationale}"
-                            )
+        # 7. Exact D3 Policy Evaluation Delegation (Pure D3 Consumer, Zero Policy Rule Inspection)
+        claims_map = {c.get("claim_id"): c for c in state_view.content.claims if hasattr(c, "get")}
+        for node in strategy.nodes:
+            matching_obls = [
+                o for o in state_view.content.obligations if o.get("obligation_id") == node.obligation_id
+            ]
+            if not matching_obls:
+                continue
+            obl_dict = matching_obls[0]
+            target_policy_id = obl_dict.get("policy_id")
 
-        # 7. Non-Compensating Risk Evaluation Gate
+            # Match exact policy for this obligation (or task-scoped fallback if unassigned)
+            target_policies = []
+            for policy in getattr(state_view.content, "active_policies", ()):
+                if isinstance(policy, Policy):
+                    if target_policy_id and policy.policy_id == target_policy_id:
+                        target_policies.append(policy)
+                    elif not target_policy_id and policy.scope_level == PolicyScope.TASK:
+                        target_policies.append(policy)
+
+            for policy in target_policies:
+                obl_claim_ids = obl_dict.get("claim_ids", [])
+                eval_claims = []
+                for cid in obl_claim_ids:
+                    cd = claims_map.get(cid)
+                    if cd:
+                        clm_inst = Claim(
+                            claim_id=cd.get("claim_id", cid),
+                            obligation_id=node.obligation_id,
+                            tier=ClaimTier(cd.get("tier", ClaimTier.V1_STRUCTURAL.value)),
+                            subject=ClaimSubject(target_type=TargetType.FUNCTION, identifier=str(cd.get("predicate", "func"))),
+                            predicate=cd.get("predicate", "Invariant"),
+                            criticality=Criticality(obl_dict.get("criticality", Criticality.HIGH.value)),
+                            status=ClaimStatus(cd.get("status", ClaimStatus.UNSUPPORTED.value)),
+                        )
+                        eval_claims.append(clm_inst)
+
+                obl_inst = Obligation(
+                    obligation_id=obl_dict["obligation_id"],
+                    task_id=state_view.content.task_id,
+                    category=ObligationCategory(obl_dict.get("category", ObligationCategory.CORRECTNESS_FUNCTIONAL.value)),
+                    criticality=Criticality(obl_dict.get("criticality", Criticality.HIGH.value)),
+                    status=ObligationStatus(obl_dict.get("status", ObligationStatus.OPEN.value)),
+                    title=obl_dict.get("title", "Governed Obligation"),
+                    description=obl_dict.get("description", "Governed Obligation"),
+                    claim_ids=tuple(obl_claim_ids),
+                    policy_id=target_policy_id,
+                )
+
+                matching_exceptions = tuple(
+                    exc for exc in getattr(state_view.content, "exceptions", ())
+                    if getattr(exc, "obligation_id", None) == node.obligation_id
+                    and getattr(exc, "policy_id", None) == policy.policy_id
+                )
+
+                eval_context = PolicyEvaluationContext(
+                    obligation=obl_inst,
+                    claims=tuple(eval_claims),
+                    evidence=(),
+                    exceptions=matching_exceptions,
+                )
+                decision = evaluate_policy(policy, eval_context)
+                if decision.decision == PolicyDecisionType.DENY:
+                    violations.append(
+                        f"D3 Policy '{policy.policy_id}' DENIED action for obligation '{node.obligation_id}': {decision.rationale}"
+                    )
+
+        # 8. Non-Compensating Risk Evaluation Gate
         risk = PlanEvaluator.assess_risk(strategy, state_view)
         if not risk.is_acceptable:
             violations.extend(risk.rejection_reasons)
@@ -174,10 +227,17 @@ class PlanEvaluator:
 
         for node in strategy.nodes:
             if node.action_type in IRREVERSIBLE_ACTION_TYPES:
-                irreversible_risk = 1.0
-                rejections.append(
-                    f"Irreversible action '{node.action_type}' prohibited by governance policy (§3.5)."
-                )
+                # Check for matching signed PolicyException
+                has_valid_exception = False
+                for exc in getattr(state_view.content, "exceptions", ()):
+                    if getattr(exc, "obligation_id", None) == node.obligation_id:
+                        has_valid_exception = True
+                        break
+                if not has_valid_exception:
+                    irreversible_risk = 1.0
+                    rejections.append(
+                        f"Irreversible action '{node.action_type}' requires signed PolicyException (§3.5)."
+                    )
 
             # Check critical obligation unverified claims
             for obl in state_view.content.obligations:
