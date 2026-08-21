@@ -7,6 +7,7 @@ import hashlib
 import hmac
 import math
 import re
+import os
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from domain.models import (
@@ -226,10 +227,6 @@ def canonicalize_authority_manifest_preimage(manifest_dict: Dict[str, Any]) -> b
 class SignedAuthorityManifestLoader:
     """Cryptographically authenticates signed authority manifests against trusted root authority."""
 
-    _highest_accepted_version: int = 0
-    _active_manifest_id: Optional[str] = None
-    _active_manifest_digest: Optional[str] = None
-
     @classmethod
     def get_canonical_root_public_key(cls) -> Any:
         """Retrieves the canonical Gate 3 Root Authority Public Key from the established trust boundary."""
@@ -246,10 +243,11 @@ class SignedAuthorityManifestLoader:
 
     @classmethod
     def clear_for_testing(cls) -> None:
-        """Controlled teardown of manifest loader state for test fixtures."""
-        cls._highest_accepted_version = 0
-        cls._active_manifest_id = None
-        cls._active_manifest_digest = None
+        """Controlled teardown of manifest loader state strictly for test fixtures."""
+        if os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1" and os.environ.get("PYTEST_CURRENT_TEST") is None:
+            raise RuntimeError("Monotonic authority state cannot be reset outside active test fixture harness.")
+        from events.store import D2AuthorityManifestStore
+        D2AuthorityManifestStore().clear()
 
     @classmethod
     def sign_manifest(
@@ -299,17 +297,16 @@ class SignedAuthorityManifestLoader:
         return manifest_dict
 
     @classmethod
-    def load_from_dict(
+    def _load_from_dict_internal(
         cls,
         data: Dict[str, Any],
-        trusted_root_public_key: Optional[Any] = None,
+        trusted_root_public_key: Any,
         min_version: Optional[int] = None,
     ) -> ReadOnlyActorAuthorityResolver:
-        """Validates and loads an authority manifest against the canonical Gate 3 root public key.
-        Enforces monotonic version tracking, rollback prevention, and identity immutability.
-        """
+        """Internal manifest verification implementation."""
         from cryptography.hazmat.primitives.asymmetric import ed25519
         from cryptography.exceptions import InvalidSignature
+        from events.store import D2AuthorityManifestStore
         from policy.exceptions import (
             InvalidManifestSignatureError,
             CorruptManifestError,
@@ -322,12 +319,6 @@ class SignedAuthorityManifestLoader:
         manifest_id = data.get("manifest_id")
         if not manifest_id or not isinstance(manifest_id, str):
             raise CorruptManifestError("Authority manifest missing valid 'manifest_id'.")
-
-        # Identity consistency check across sequential rotations
-        if cls._active_manifest_id is not None and manifest_id != cls._active_manifest_id:
-            raise CorruptManifestError(
-                f"Manifest identity substitution rejected: expected '{cls._active_manifest_id}', got '{manifest_id}'."
-            )
 
         try:
             manifest_version = int(data.get("manifest_version", 1))
@@ -346,11 +337,19 @@ class SignedAuthorityManifestLoader:
                 f"Manifest version {manifest_version} is older than minimum required version {min_version} (rollback rejected)."
             )
 
-        # Monotonic version validation
-        if cls._highest_accepted_version > 0:
-            if manifest_version < cls._highest_accepted_version:
+        # Durable monotonic version validation via D2 store
+        store = D2AuthorityManifestStore()
+        highest_ver, active_id, active_digest = store.get_highest_version()
+
+        if active_id is not None and manifest_id != active_id:
+            raise CorruptManifestError(
+                f"Manifest identity substitution rejected: expected '{active_id}', got '{manifest_id}'."
+            )
+
+        if highest_ver > 0:
+            if manifest_version < highest_ver:
                 raise ManifestRollbackError(
-                    f"Manifest version {manifest_version} is older than highest accepted version {cls._highest_accepted_version} (rollback rejected)."
+                    f"Manifest version {manifest_version} is older than highest durable accepted version {highest_ver} (rollback rejected)."
                 )
 
         root_sig = data.get("root_signature")
@@ -367,13 +366,10 @@ class SignedAuthorityManifestLoader:
                 f"Manifest root signer identity '{signer_identity}' does not match authoritative root 'Gate3AuthoritativeVerifier'."
             )
 
-        # Canonical Root Public Key Resolution (no caller override required in production)
-        root_key = trusted_root_public_key if trusted_root_public_key is not None else cls.get_canonical_root_public_key()
+        if not isinstance(trusted_root_public_key, ed25519.Ed25519PublicKey):
+            raise TypeError(f"Expected Ed25519PublicKey instance for root key, got {type(trusted_root_public_key).__name__}")
 
-        if not isinstance(root_key, ed25519.Ed25519PublicKey):
-            raise TypeError(f"Expected Ed25519PublicKey instance for root key, got {type(root_key).__name__}")
-
-        expected_root_fp = hashlib.sha256(root_key.public_bytes_raw()).hexdigest()
+        expected_root_fp = hashlib.sha256(trusted_root_public_key.public_bytes_raw()).hexdigest()
         sig_root_fp = root_sig.get("public_key_fingerprint", "")
         if sig_root_fp != expected_root_fp:
             raise InvalidManifestSignatureError(
@@ -390,13 +386,13 @@ class SignedAuthorityManifestLoader:
             )
 
         try:
-            root_key.verify(bytes.fromhex(sig_hex), canonical_bytes)
+            trusted_root_public_key.verify(bytes.fromhex(sig_hex), canonical_bytes)
         except InvalidSignature:
             raise InvalidManifestSignatureError("Authority manifest Ed25519 root signature verification failed.")
 
         # Same-version replay / substitution check
-        if manifest_version == cls._highest_accepted_version and cls._active_manifest_digest is not None:
-            if expected_digest != cls._active_manifest_digest:
+        if manifest_version == highest_ver and active_digest is not None:
+            if expected_digest != active_digest:
                 raise ManifestRollbackError(
                     f"Same-version manifest substitution rejected for version {manifest_version}."
                 )
@@ -441,10 +437,14 @@ class SignedAuthorityManifestLoader:
 
         revoked = set(data.get("revoked_fingerprints", []))
 
-        # Commit state updates
-        cls._highest_accepted_version = max(cls._highest_accepted_version, manifest_version)
-        cls._active_manifest_id = manifest_id
-        cls._active_manifest_digest = expected_digest
+        # Commit monotonic version update to durable D2 store
+        store.commit_epoch(
+            manifest_id=manifest_id,
+            manifest_version=manifest_version,
+            payload_digest=expected_digest,
+            signer_identity=signer_identity,
+            root_fingerprint=sig_root_fp,
+        )
 
         return ReadOnlyActorAuthorityResolver(
             actors=actors,
@@ -452,6 +452,28 @@ class SignedAuthorityManifestLoader:
             manifest_id=manifest_id,
             manifest_version=manifest_version,
         )
+
+    @classmethod
+    def load_from_dict(
+        cls,
+        data: Dict[str, Any],
+        min_version: Optional[int] = None,
+    ) -> ReadOnlyActorAuthorityResolver:
+        """Production manifest loader: strictly validates authority manifest against the canonical Gate 3 root public key.
+        Caller-supplied root override is prohibited in the production API surface.
+        """
+        canonical_root = cls.get_canonical_root_public_key()
+        return cls._load_from_dict_internal(data, trusted_root_public_key=canonical_root, min_version=min_version)
+
+    @classmethod
+    def _load_from_dict_with_test_root_override(
+        cls,
+        data: Dict[str, Any],
+        test_root_public_key: Any,
+        min_version: Optional[int] = None,
+    ) -> ReadOnlyActorAuthorityResolver:
+        """Private test-only helper to verify rejection of non-canonical root keys."""
+        return cls._load_from_dict_internal(data, trusted_root_public_key=test_root_public_key, min_version=min_version)
 
 
 class PolicyActorKeyRegistry:
@@ -510,6 +532,8 @@ class PolicyActorKeyRegistry:
     @classmethod
     def clear_for_testing(cls) -> None:
         """Controlled teardown of sealed resolver strictly for test fixtures."""
+        if os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1" and os.environ.get("PYTEST_CURRENT_TEST") is None:
+            raise RuntimeError("Sealed authority cannot be cleared outside active test fixture harness.")
         cls._sealed_resolver = None
         cls._is_sealed = False
         SignedAuthorityManifestLoader.clear_for_testing()

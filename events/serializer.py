@@ -207,3 +207,55 @@ def compute_nonce_digest(
         parent_digest=parent_digest,
     )
     return hashlib.sha256(preimage).hexdigest()
+
+
+MANIFEST_RECORD_DOMAIN_SEPARATOR: str = "SCLASS_MANIFEST_EPOCH_V1:"
+
+
+def compute_manifest_record_preimage(
+    manifest_id: str,
+    manifest_version: int,
+    payload_digest: str,
+    signer_identity: str,
+    root_fingerprint: str,
+    sequence_number: int,
+    timestamp: str,
+    parent_digest: str,
+) -> bytes:
+    """Produces the exact RFC 8785 canonical preimage bytes for a durable manifest epoch record with frozen domain separator."""
+    payload = {
+        "domain": MANIFEST_RECORD_DOMAIN_SEPARATOR,
+        "manifest_id": manifest_id,
+        "manifest_version": manifest_version,
+        "parent_digest": parent_digest,
+        "payload_digest": payload_digest,
+        "root_fingerprint": root_fingerprint,
+        "sequence_number": sequence_number,
+        "signer_identity": signer_identity,
+        "timestamp": timestamp,
+    }
+    return canonicalize_json(payload)
+
+
+def compute_manifest_record_digest(
+    manifest_id: str,
+    manifest_version: int,
+    payload_digest: str,
+    signer_identity: str,
+    root_fingerprint: str,
+    sequence_number: int,
+    timestamp: str,
+    parent_digest: str,
+) -> str:
+    """Computes SHA-256 digest hex string from canonical RFC 8785 manifest epoch record preimage with domain separator."""
+    preimage = compute_manifest_record_preimage(
+        manifest_id=manifest_id,
+        manifest_version=manifest_version,
+        payload_digest=payload_digest,
+        signer_identity=signer_identity,
+        root_fingerprint=root_fingerprint,
+        sequence_number=sequence_number,
+        timestamp=timestamp,
+        parent_digest=parent_digest,
+    )
+    return hashlib.sha256(preimage).hexdigest()

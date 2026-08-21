@@ -464,3 +464,205 @@ class D2NonceStore(NonceReservationInterface):
                             os.remove(self._file_path)
                         except OSError:
                             pass
+
+
+class D2AuthorityManifestStore:
+    """D2 Durable, cross-process atomic manifest epoch persistence engine.
+    Guarantees monotonic epoch tracking and rollback rejection across process restarts.
+    """
+
+    def __init__(self, file_path: Optional[str] = None):
+        if file_path is None:
+            file_path = os.environ.get("D3_AUTHORITY_MANIFEST_STORE_PATH")
+            if not file_path:
+                file_path = os.path.join(
+                    os.path.dirname(__file__), ".d2_authority_manifest_store.jsonl"
+                )
+        self._file_path = os.path.abspath(file_path)
+        self._lock_path = self._file_path + ".lock"
+        self._local_lock = threading.Lock()
+
+    @property
+    def file_path(self) -> str:
+        return self._file_path
+
+    def _read_and_verify_log(self) -> Tuple[int, Optional[str], Optional[str], int, str]:
+        """Reads manifest epoch log from disk, verifying sequence continuity, parent chaining, domain separator, and SHA-256 digest integrity on every record.
+        
+        Returns:
+            Tuple[highest_accepted_version, active_manifest_id, active_manifest_digest, head_seq, head_digest]
+        """
+        if not os.path.exists(self._file_path):
+            return (0, None, None, 0, GENESIS_PARENT_DIGEST)
+
+        from events.serializer import compute_manifest_record_digest
+
+        highest_version = 0
+        active_manifest_id: Optional[str] = None
+        active_digest: Optional[str] = None
+        expected_seq = 1
+        expected_parent = GENESIS_PARENT_DIGEST
+
+        try:
+            with open(self._file_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+        except Exception as e:
+            raise StorageUnavailableError(f"Cannot read authority manifest durable store at {self._file_path}: {e}")
+
+        for line_no, raw_line in enumerate(lines, start=1):
+            line_str = raw_line.strip()
+            if not line_str:
+                continue
+
+            try:
+                rec = json.loads(line_str)
+            except Exception as e:
+                raise CorruptEventLogError(f"Manifest store line {line_no} contains invalid JSON: {e}")
+
+            if not isinstance(rec, dict):
+                raise CorruptEventLogError(f"Manifest store line {line_no} is not a dictionary.")
+
+            m_id = rec.get("manifest_id")
+            m_ver = rec.get("manifest_version")
+            p_digest = rec.get("payload_digest")
+            s_ident = rec.get("signer_identity")
+            r_fp = rec.get("root_fingerprint")
+            seq = rec.get("sequence_number")
+            ts = rec.get("timestamp")
+            parent = rec.get("parent_digest")
+            digest = rec.get("digest")
+
+            if None in (m_id, m_ver, p_digest, s_ident, r_fp, seq, ts, parent, digest):
+                raise CorruptEventLogError(f"Manifest store line {line_no} has missing mandatory fields.")
+
+            if seq != expected_seq:
+                raise CorruptEventLogError(f"Manifest store sequence gap or mismatch: got {seq}, expected {expected_seq}.")
+
+            if parent != expected_parent:
+                raise CorruptEventLogError(f"Manifest store parent digest mismatch at seq {seq}: got {parent}, expected {expected_parent}.")
+
+            computed_digest = compute_manifest_record_digest(
+                manifest_id=m_id,
+                manifest_version=m_ver,
+                payload_digest=p_digest,
+                signer_identity=s_ident,
+                root_fingerprint=r_fp,
+                sequence_number=seq,
+                timestamp=ts,
+                parent_digest=parent,
+            )
+            if computed_digest != digest:
+                raise CorruptEventLogError(f"Manifest store digest verification failed at seq {seq}.")
+
+            if m_ver < highest_version:
+                raise CorruptEventLogError(f"Manifest store contains non-monotonic version {m_ver} < {highest_version} at seq {seq}.")
+
+            highest_version = m_ver
+            active_manifest_id = m_id
+            active_digest = p_digest
+            expected_seq = seq + 1
+            expected_parent = digest
+
+        return (highest_version, active_manifest_id, active_digest, expected_seq - 1, expected_parent)
+
+    def get_highest_version(self) -> Tuple[int, Optional[str], Optional[str]]:
+        """Atomically reads the verified highest accepted manifest version and identity from durable log."""
+        from file_lock import FileLock
+        with self._local_lock:
+            if not os.path.exists(self._file_path):
+                return (0, None, None)
+            try:
+                with FileLock(self._lock_path, timeout=5.0):
+                    highest_ver, active_id, active_digest, _, _ = self._read_and_verify_log()
+                    return (highest_ver, active_id, active_digest)
+            except Exception as e:
+                if isinstance(e, (CorruptEventLogError, StorageUnavailableError)):
+                    raise
+                highest_ver, active_id, active_digest, _, _ = self._read_and_verify_log()
+                return (highest_ver, active_id, active_digest)
+
+    def commit_epoch(
+        self,
+        manifest_id: str,
+        manifest_version: int,
+        payload_digest: str,
+        signer_identity: str,
+        root_fingerprint: str,
+    ) -> None:
+        """Atomically records and syncs a newly accepted manifest epoch to durable append-only log."""
+        from datetime import datetime, timezone
+        from file_lock import FileLock
+        from policy.exceptions import ManifestRollbackError, CorruptManifestError
+
+        os.makedirs(os.path.dirname(self._file_path), exist_ok=True)
+        with self._local_lock:
+            with FileLock(self._lock_path, timeout=10.0):
+                highest_ver, active_id, active_digest, head_seq, head_parent = self._read_and_verify_log()
+
+                if active_id is not None and manifest_id != active_id:
+                    raise CorruptManifestError(
+                        f"Manifest identity substitution rejected: expected '{active_id}', got '{manifest_id}'."
+                    )
+
+                if manifest_version < highest_ver:
+                    raise ManifestRollbackError(
+                        f"Manifest version {manifest_version} is older than highest durable accepted version {highest_ver} (rollback rejected)."
+                    )
+
+                if manifest_version == highest_ver and active_digest is not None:
+                    if payload_digest != active_digest:
+                        raise ManifestRollbackError(
+                            f"Same-version manifest substitution rejected for version {manifest_version}."
+                        )
+
+                now_iso = datetime.now(timezone.utc).isoformat()
+                new_seq = head_seq + 1
+                from events.serializer import compute_manifest_record_digest, canonicalize_json
+
+                rec_digest = compute_manifest_record_digest(
+                    manifest_id=manifest_id,
+                    manifest_version=manifest_version,
+                    payload_digest=payload_digest,
+                    signer_identity=signer_identity,
+                    root_fingerprint=root_fingerprint,
+                    sequence_number=new_seq,
+                    timestamp=now_iso,
+                    parent_digest=head_parent,
+                )
+                rec_payload = {
+                    "manifest_id": manifest_id,
+                    "manifest_version": manifest_version,
+                    "payload_digest": payload_digest,
+                    "signer_identity": signer_identity,
+                    "root_fingerprint": root_fingerprint,
+                    "sequence_number": new_seq,
+                    "timestamp": now_iso,
+                    "parent_digest": head_parent,
+                    "digest": rec_digest,
+                }
+                raw_bytes = canonicalize_json(rec_payload) + b"\n"
+
+                with open(self._file_path, "ab") as f:
+                    f.write(raw_bytes)
+                    f.flush()
+                    os.fsync(f.fileno())
+
+    def clear(self) -> None:
+        """Controlled teardown of manifest store strictly for test fixtures."""
+        from file_lock import FileLock
+        with self._local_lock:
+            if os.path.exists(self._file_path):
+                try:
+                    with FileLock(self._lock_path, timeout=5.0):
+                        if os.path.exists(self._file_path):
+                            try:
+                                os.remove(self._file_path)
+                            except OSError:
+                                with open(self._file_path, "w", encoding="utf-8") as f:
+                                    pass
+                except Exception:
+                    if os.path.exists(self._file_path):
+                        try:
+                            os.remove(self._file_path)
+                        except OSError:
+                            pass
