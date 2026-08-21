@@ -481,7 +481,7 @@ class SignedAuthorityManifestLoader:
         Stage 3: FIRST_INSTALL_SEALED
         """
         with cls._bootstrap_lock:
-            from events.store import D2AuthorityManifestStore, D2InstallationProvisioning
+            from events.store import D2AuthorityManifestStore, D2InstallationProvisioning, DeploymentProvisioningBoundary
             from policy.exceptions import ManifestRollbackError, InvalidManifestSignatureError, CorruptManifestError
             from cryptography.exceptions import InvalidSignature
 
@@ -493,6 +493,13 @@ class SignedAuthorityManifestLoader:
             # If installation is already sealed, reject genesis bootstrap
             if D2InstallationProvisioning.is_installed():
                 raise RuntimeError("Genesis bootstrap rejected: system has already been provisioned/installed. Authority reset prohibited.")
+
+            # If deployment has already been provisioned or local state was lost, fail closed
+            if not DeploymentProvisioningBoundary.is_provisioning_authorized():
+                raise RuntimeError(
+                    "Genesis bootstrap rejected: deployment has already been provisioned or complete local state loss occurred. "
+                    "Explicit authorized external reprovisioning required."
+                )
 
             if not isinstance(data, dict):
                 raise CorruptManifestError("Authority manifest data must be a dictionary.")
@@ -577,6 +584,48 @@ class SignedAuthorityManifestLoader:
             )
 
             return cls.load_from_dict(data)
+
+    @classmethod
+    def reprovision_catastrophic_recovery(
+        cls,
+        data: Dict[str, Any],
+        reprovisioning_authorization: Dict[str, Any],
+    ) -> ReadOnlyActorAuthorityResolver:
+        """Explicit, auditable catastrophic recovery reprovisioning.
+        Requires a valid, root-signed DeploymentReprovisioningAuthorization.
+        Fails closed on signature mismatch, deployment mismatch, or replay.
+        """
+        with cls._bootstrap_lock:
+            from events.store import D2AuthorityManifestStore, D2InstallationProvisioning, DeploymentProvisioningBoundary
+
+            # 1. Cryptographically verify and consume reprovisioning authorization
+            auth = DeploymentProvisioningBoundary.verify_and_consume_reprovisioning_authorization(reprovisioning_authorization)
+
+            manifest_id = data.get("manifest_id") if isinstance(data, dict) else None
+            if manifest_id != auth.get("target_manifest_id"):
+                raise RuntimeError(
+                    f"Reprovisioning authorization target '{auth.get('target_manifest_id')}' does not match manifest '{manifest_id}'."
+                )
+
+            # 2. Controlled teardown of broken/partial local state
+            marker = D2InstallationProvisioning.get_marker_path()
+            stage = D2InstallationProvisioning.get_stage_path()
+            store = D2AuthorityManifestStore()
+            for p in [marker, stage, store.file_path]:
+                if os.path.exists(p):
+                    try:
+                        os.remove(p)
+                    except OSError:
+                        pass
+                lock_p = p + ".lock"
+                if os.path.exists(lock_p):
+                    try:
+                        os.remove(lock_p)
+                    except OSError:
+                        pass
+
+            # 3. Bootstrap fresh genesis manifest under new provisioning authority
+            return cls.bootstrap_genesis_manifest(data)
 
     @classmethod
     def _load_from_dict_with_test_root_override(

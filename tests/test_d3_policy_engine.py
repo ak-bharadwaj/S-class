@@ -4528,6 +4528,152 @@ def test_d3_install_e90_completed_genesis_installation_seal_and_d2_state_agree()
     assert events[0].payload["root_fingerprint"] == seal_data["root_fingerprint"]
 
 
+def test_d3_install_e91_delete_d2_seal_stage_automatic_genesis_rejected():
+    """E91: Deleting D2 store + seal + stage fails closed against automatic genesis bootstrap."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import D2AuthorityManifestStore, D2InstallationProvisioning
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E91",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+    # Attacker wipes all local state
+    store = D2AuthorityManifestStore()
+    marker = D2InstallationProvisioning.get_marker_path()
+    stage = D2InstallationProvisioning.get_stage_path()
+    for p in [store.file_path, marker, stage]:
+        if os.path.exists(p):
+            os.remove(p)
+
+    # Automatic genesis bootstrap is rejected because deployment was already provisioned
+    with pytest.raises(RuntimeError, match="Genesis bootstrap rejected"):
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+
+def test_d3_install_e92_restore_attacker_created_fresh_local_state_rejected():
+    """E92: Attacker attempting to bind fresh local state to conflicting deployment identity is rejected."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import DeploymentProvisioningBoundary
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E92",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+    # Attacker tries to bind conflicting deployment identity to re-enable genesis
+    with pytest.raises(RuntimeError, match="already bound to a different deployment identity"):
+        DeploymentProvisioningBoundary.initialize_deployment_boundary("ATTACKER-DEPLOYMENT-ROGUE")
+
+
+def test_d3_install_e93_complete_local_state_loss_fails_closed():
+    """E93: Complete local state loss fails closed for both load_from_dict and automatic genesis."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.exceptions import StorageUnavailableError
+    from events.store import D2AuthorityManifestStore, D2InstallationProvisioning
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E93",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+    # Attacker wipes all local files
+    store = D2AuthorityManifestStore()
+    marker = D2InstallationProvisioning.get_marker_path()
+    stage = D2InstallationProvisioning.get_stage_path()
+    for p in [store.file_path, marker, stage]:
+        if os.path.exists(p):
+            os.remove(p)
+
+    # 1. Normal load fails closed
+    with pytest.raises(StorageUnavailableError):
+        SignedAuthorityManifestLoader.load_from_dict(manifest_v1)
+
+    # 2. Automatic genesis fails closed
+    with pytest.raises(RuntimeError, match="Genesis bootstrap rejected"):
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+
+def test_d3_install_e94_authorized_external_reprovisioning_explicit_and_auditable():
+    """E94: Authorized external administrative reprovisioning succeeds with root-signed authorization."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import D2AuthorityManifestStore, D2InstallationProvisioning, DeploymentProvisioningBoundary
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E94-ORIGINAL",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+    # Catastrophic state loss occurs
+    store = D2AuthorityManifestStore()
+    marker = D2InstallationProvisioning.get_marker_path()
+    stage = D2InstallationProvisioning.get_stage_path()
+    for p in [store.file_path, marker, stage]:
+        if os.path.exists(p):
+            os.remove(p)
+
+    # Prepare recovery manifest
+    recovery_manifest = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E94-RECOVERY",
+        manifest_version=1,
+        issued_at="2026-08-21T12:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    # 1. Without authorized reprovisioning token, recovery fails closed
+    with pytest.raises(RuntimeError):
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(recovery_manifest)
+
+    # 2. Administrator issues root-signed reprovisioning authorization
+    reprov_auth = DeploymentProvisioningBoundary.create_reprovisioning_authorization(
+        target_manifest_id="M-E94-RECOVERY",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        reason="DISASTER_RECOVERY_TEST",
+    )
+
+    # 3. Explicit administrative reprovisioning succeeds
+    res = SignedAuthorityManifestLoader.reprovision_catastrophic_recovery(
+        data=recovery_manifest,
+        reprovisioning_authorization=reprov_auth,
+    )
+    assert res.manifest_id == "M-E94-RECOVERY"
+    assert res.manifest_version == 1
+
+    # 4. State agreement is verified
+    seal_data = D2InstallationProvisioning.verify_seal()
+    assert seal_data["initial_manifest_id"] == "M-E94-RECOVERY"
+
+    # 5. Replaying the same reprovisioning authorization fails closed
+    with pytest.raises(RuntimeError, match="has already been consumed"):
+        SignedAuthorityManifestLoader.reprovision_catastrophic_recovery(
+            data=recovery_manifest,
+            reprovisioning_authorization=reprov_auth,
+        )
+
+
+
 
 
 
