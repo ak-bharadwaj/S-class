@@ -5140,63 +5140,378 @@ def test_d3_install_e110_provider_identity_cannot_change_before_or_after_first_p
     assert DeploymentProvisionerRegistry.get_provisioner().get_deployment_id() == "STABLE-IMMUTABLE-DEP-001"
 
 
-def test_d3_install_e111_direct_composition_root_bootstrap_by_ordinary_caller_rejected():
-    """E111: Direct composition-root bootstrap by ordinary caller is rejected."""
-    from events.store import TrustedCompositionRoot, InMemoryTestDeploymentProvisioner
+def test_d3_install_e111_same_process_caller_cannot_mutate_broker_authority():
+    """E111: In-process caller cannot mutate broker authority state directly."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import IPCDeploymentProvisioner, SClassApplication, DeploymentProvisionerRegistry, DeploymentStatus
 
-    prov = InMemoryTestDeploymentProvisioner()
-    with pytest.raises(RuntimeError, match="Direct static composition root bootstrap is prohibited"):
-        TrustedCompositionRoot.bootstrap_deployment_authority(prov)
+    broker = TrustedDeploymentAuthorityBroker(deployment_id="DEP-E111")
+    broker.start_ipc_server()
+    try:
+        DeploymentProvisionerRegistry.reset_for_testing()
+        client_prov = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint)
+        SClassApplication(provisioner=client_prov)
+
+        # 1. Broker is initially UNPROVISIONED
+        assert client_prov.get_deployment_status() == DeploymentStatus.UNPROVISIONED
+
+        # 2. Local in-process caller attempts to manipulate local attributes
+        client_prov._deployment_id = "ATTACKER-MUTATED"
+        # The broker is the authority and still returns the genuine deployment identity over IPC
+        assert client_prov.get_deployment_id() == "DEP-E111"
+
+        # 3. Genesis bootstrap transitions broker to PROVISIONED
+        manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+            manifest_id="M-E111",
+            manifest_version=1,
+            issued_at="2026-08-19T10:00:00Z",
+            actors={},
+            revoked_fingerprints=[],
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+        res = SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+        assert res.manifest_version == 1
+        assert client_prov.get_deployment_status() == DeploymentStatus.PROVISIONED
+        assert broker.status == DeploymentStatus.PROVISIONED
+    finally:
+        broker.stop_ipc_server()
 
 
-def test_d3_install_e112_attacker_provider_cannot_be_installed_through_public_api():
-    """E112: Attacker provider cannot be installed through public API or static registry setter."""
-    from events.store import DeploymentProvisionerRegistry, InMemoryTestDeploymentProvisioner
+def test_d3_install_e112_untrusted_process_cannot_connect_to_broker():
+    """E112: Untrusted process with invalid/missing credentials cannot connect to broker."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.ipc import OSIPCClient
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E112",
+        auth_secret="CONFIDENTIAL_DEPLOYMENT_SECRET_123",
+    )
+    broker.start_ipc_server()
+    try:
+        # 1. Attacker client connects with wrong auth secret -> rejected
+        attacker_client = OSIPCClient(
+            endpoint_path=broker.ipc_endpoint,
+            auth_secret="WRONG_FORGED_SECRET",
+        )
+        with pytest.raises(PermissionError, match="Invalid auth credentials|rejected"):
+            attacker_client.call("get_deployment_id")
+
+        # 2. Legitimate client connects with correct secret -> accepted
+        legit_client = OSIPCClient(
+            endpoint_path=broker.ipc_endpoint,
+            auth_secret="CONFIDENTIAL_DEPLOYMENT_SECRET_123",
+        )
+        resp = legit_client.call("get_deployment_id")
+        assert resp["deployment_id"] == "DEP-E112"
+        legit_client.close()
+    finally:
+        broker.stop_ipc_server()
+
+
+def test_d3_install_e113_wrong_unix_peer_credentials_rejected():
+    """E113: Peer credential verification rejects connection if caller UID does not match allowed UID."""
+    import sys
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.ipc import OSIPCClient
+
+    # Set allowed_uid to an impossible UID (e.g. 999999)
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E113",
+        allowed_uid=999999,
+        auth_secret="SECRET-E113",
+    )
+    broker.start_ipc_server()
+    try:
+        # Client runs with current process UID (which is not 999999 on Linux/POSIX)
+        client = OSIPCClient(
+            endpoint_path=broker.ipc_endpoint,
+            auth_secret="SECRET-E113",
+        )
+        if sys.platform != "win32":
+            with pytest.raises((ConnectionError, PermissionError)):
+                client.call("get_deployment_id")
+        else:
+            # On Windows, secret verification protects the endpoint
+            resp = client.call("get_deployment_id")
+            assert resp["deployment_id"] == "DEP-E113"
+            client.close()
+    finally:
+        broker.stop_ipc_server()
+
+
+def test_d3_install_e114_unauthorized_windows_named_pipe_principal_rejected():
+    """E114: Unauthorized client principal attempting IPC communication is rejected."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.ipc import OSIPCClient
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E114",
+        auth_secret="WIN_SECURE_TOKEN_XYZ",
+    )
+    broker.start_ipc_server()
+    try:
+        # Client without secret handshake cannot execute RPCs
+        bad_client = OSIPCClient(
+            endpoint_path=broker.ipc_endpoint,
+            auth_secret=None,
+        )
+        with pytest.raises((PermissionError, ConnectionError)):
+            bad_client.call("get_deployment_id")
+    finally:
+        broker.stop_ipc_server()
+
+
+def test_d3_install_e115_spoofed_deployment_identity_rejected():
+    """E115: Reprovisioning authorization targeting a different/spoofed deployment identity is rejected by broker."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import (
+        IPCDeploymentProvisioner,
+        InMemoryTestDeploymentProvisioner,
+        SClassApplication,
+        DeploymentProvisionerRegistry,
+    )
+    from policy.exceptions import CorruptManifestError
+
+    broker = TrustedDeploymentAuthorityBroker(deployment_id="CANONICAL-DEP-115")
+    broker.start_ipc_server()
+    try:
+        DeploymentProvisionerRegistry.reset_for_testing()
+        client_prov = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint)
+        SClassApplication(provisioner=client_prov)
+
+        # Notify loss to put broker into RECOVERY_REQUIRED
+        broker.notify_local_state_loss()
+
+        manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+            manifest_id="M-E115",
+            manifest_version=1,
+            issued_at="2026-08-19T10:00:00Z",
+            actors={},
+            revoked_fingerprints=[],
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+
+        # Authorization signed for spoofed deployment ID
+        spoofed_auth = InMemoryTestDeploymentProvisioner.create_reprovisioning_authorization(
+            deployment_id="SPOOFED-DEPLOYMENT-ID",
+            target_manifest_id="M-E115",
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+
+        with pytest.raises(CorruptManifestError, match="deployment mismatch"):
+            SignedAuthorityManifestLoader.reprovision_catastrophic_recovery(
+                data=manifest_v1,
+                reprovisioning_authorization=spoofed_auth,
+            )
+    finally:
+        broker.stop_ipc_server()
+
+
+def test_d3_install_e116_broker_restart_preserves_provisioned():
+    """E116: Broker service restart preserves PROVISIONED state from durable external storage."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    import tempfile
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import IPCDeploymentProvisioner, SClassApplication, DeploymentProvisionerRegistry, DeploymentStatus
+
+    state_file = os.path.join(tempfile.gettempdir(), f"broker_state_e116_{os.getpid()}.json")
+    if os.path.exists(state_file):
+        os.remove(state_file)
+
+    broker1 = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E116",
+        state_file_path=state_file,
+    )
+    broker1.start_ipc_server()
+    try:
+        DeploymentProvisionerRegistry.reset_for_testing()
+        client_prov1 = IPCDeploymentProvisioner(ipc_endpoint=broker1.ipc_endpoint)
+        SClassApplication(provisioner=client_prov1)
+
+        manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+            manifest_id="M-E116",
+            manifest_version=1,
+            issued_at="2026-08-19T10:00:00Z",
+            actors={},
+            revoked_fingerprints=[],
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+        assert client_prov1.get_deployment_status() == DeploymentStatus.PROVISIONED
+    finally:
+        broker1.stop_ipc_server()
+
+    # Broker crashes / restarts
+    broker2 = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E116",
+        state_file_path=state_file,
+    )
+    broker2.start_ipc_server()
+    try:
+        client_prov2 = IPCDeploymentProvisioner(ipc_endpoint=broker2.ipc_endpoint)
+        # Status remains PROVISIONED across broker restart
+        assert client_prov2.get_deployment_status() == DeploymentStatus.PROVISIONED
+        assert client_prov2.get_deployment_id() == "DEP-E116"
+    finally:
+        broker2.stop_ipc_server()
+        if os.path.exists(state_file):
+            os.remove(state_file)
+
+
+def test_d3_install_e117_sclass_local_state_destruction_does_not_reset_broker():
+    """E117: S-Class local state destruction does not reset broker state."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import (
+        D2AuthorityManifestStore,
+        D2InstallationProvisioning,
+        IPCDeploymentProvisioner,
+        SClassApplication,
+        DeploymentProvisionerRegistry,
+        DeploymentStatus,
+    )
+
+    broker = TrustedDeploymentAuthorityBroker(deployment_id="DEP-E117")
+    broker.start_ipc_server()
+    try:
+        DeploymentProvisionerRegistry.reset_for_testing()
+        client_prov = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint)
+        SClassApplication(provisioner=client_prov)
+
+        manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+            manifest_id="M-E117",
+            manifest_version=1,
+            issued_at="2026-08-19T10:00:00Z",
+            actors={},
+            revoked_fingerprints=[],
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+        assert broker.status == DeploymentStatus.PROVISIONED
+
+        # Destroy all S-Class local state
+        store = D2AuthorityManifestStore()
+        marker = D2InstallationProvisioning.get_marker_path()
+        stage = D2InstallationProvisioning.get_stage_path()
+        for p in [store.file_path, marker, stage]:
+            if os.path.exists(p):
+                os.remove(p)
+
+        # Notify loss
+        client_prov.notify_local_state_loss()
+        assert broker.status == DeploymentStatus.RECOVERY_REQUIRED
+
+        # Automatic genesis bootstrap is rejected
+        with pytest.raises(RuntimeError, match="RECOVERY_REQUIRED"):
+            SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+    finally:
+        broker.stop_ipc_server()
+
+
+def test_d3_install_e118_replayed_recovery_authorization_rejected_by_broker():
+    """E118: Replay of an already-consumed reprovisioning authorization is rejected by broker."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import (
+        D2AuthorityManifestStore,
+        D2InstallationProvisioning,
+        IPCDeploymentProvisioner,
+        InMemoryTestDeploymentProvisioner,
+        SClassApplication,
+        DeploymentProvisionerRegistry,
+    )
+
+    broker = TrustedDeploymentAuthorityBroker(deployment_id="DEP-E118")
+    broker.start_ipc_server()
+    try:
+        DeploymentProvisionerRegistry.reset_for_testing()
+        client_prov = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint)
+        SClassApplication(provisioner=client_prov)
+
+        manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+            manifest_id="M-E118-ORIGINAL",
+            manifest_version=1,
+            issued_at="2026-08-19T10:00:00Z",
+            actors={},
+            revoked_fingerprints=[],
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+        # Wipe local files
+        store = D2AuthorityManifestStore()
+        marker = D2InstallationProvisioning.get_marker_path()
+        stage = D2InstallationProvisioning.get_stage_path()
+        for p in [store.file_path, marker, stage]:
+            if os.path.exists(p):
+                os.remove(p)
+
+        recovery_manifest = SignedAuthorityManifestLoader.sign_manifest(
+            manifest_id="M-E118-RECOVERED",
+            manifest_version=1,
+            issued_at="2026-08-21T12:00:00Z",
+            actors={},
+            revoked_fingerprints=[],
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+
+        reprov_auth = InMemoryTestDeploymentProvisioner.create_reprovisioning_authorization(
+            deployment_id="DEP-E118",
+            target_manifest_id="M-E118-RECOVERED",
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+
+        # 1. First recovery succeeds
+        SignedAuthorityManifestLoader.reprovision_catastrophic_recovery(
+            data=recovery_manifest,
+            reprovisioning_authorization=reprov_auth,
+        )
+
+        # 2. Replay attempt fails closed at broker ledger
+        with pytest.raises(RuntimeError, match="already been consumed"):
+            SignedAuthorityManifestLoader.reprovision_catastrophic_recovery(
+                data=recovery_manifest,
+                reprovisioning_authorization=reprov_auth,
+            )
+    finally:
+        broker.stop_ipc_server()
+
+
+def test_d3_install_e119_broker_unavailable_fails_closed():
+    """E119: When broker is unavailable/unreachable, D3 fails closed."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import IPCDeploymentProvisioner, SClassApplication, DeploymentProvisionerRegistry
 
     DeploymentProvisionerRegistry.reset_for_testing()
-    attacker_prov = InMemoryTestDeploymentProvisioner(deployment_id="ATTACKER-API-001")
+    unreachable_client = IPCDeploymentProvisioner(ipc_endpoint="/nonexistent/broker_socket.sock")
+    SClassApplication(provisioner=unreachable_client)
 
-    # Static registry has no mutable setter and bootstrap_provisioner raises RuntimeError
-    with pytest.raises(RuntimeError, match="DeploymentProvisionerRegistry cannot be bootstrapped directly"):
-        DeploymentProvisionerRegistry.bootstrap_provisioner(attacker_prov)
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E119",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
 
-
-def test_d3_install_e113_forged_composition_root_token_rejected():
-    """E113: Constructing or passing forged CompositionRootToken is rejected."""
-    from events.store import CompositionRootToken
-
-    with pytest.raises(RuntimeError, match="CompositionRootToken is obsolete and rejected"):
-        CompositionRootToken(_secret="FORGED_SECRET")
-
-
-def test_d3_install_e114_access_to_root_secret_cannot_produce_accepted_capability():
-    """E114: Access to internal secrets or private attributes cannot bypass application container."""
-    from events.store import TrustedCompositionRoot, InMemoryTestDeploymentProvisioner
-
-    # TrustedCompositionRoot has no valid bootstrap path
-    prov = InMemoryTestDeploymentProvisioner()
-    with pytest.raises(RuntimeError, match="Direct static composition root bootstrap is prohibited"):
-        TrustedCompositionRoot.bootstrap_deployment_authority(prov)
+    with pytest.raises(RuntimeError, match="AUTHORITY_UNAVAILABLE"):
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
 
 
-def test_d3_install_e115_provider_installation_only_possible_through_trusted_application_construction_path():
-    """E115: Provider installation is strictly possible through trusted application construction path."""
-    from events.store import DeploymentProvisionerRegistry, InMemoryTestDeploymentProvisioner, SClassApplication
+def test_d3_install_e120_test_inmemory_authority_prohibited_outside_test_mode(monkeypatch):
+    """E120: Test in-memory authority cannot be selected or constructed by production runtime."""
+    from events.store import InMemoryTestDeploymentProvisioner
 
-    DeploymentProvisionerRegistry.reset_for_testing()
-    assert not DeploymentProvisionerRegistry.is_sealed()
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
 
-    # Valid construction
-    trusted_prov = InMemoryTestDeploymentProvisioner(deployment_id="TRUSTED-APP-DEP-001")
-    app = SClassApplication(provisioner=trusted_prov)
+    with pytest.raises(RuntimeError, match="InMemoryTestDeploymentProvisioner is strictly prohibited outside TEST_MODE"):
+        InMemoryTestDeploymentProvisioner()
 
-    assert app.provisioner.get_deployment_id() == "TRUSTED-APP-DEP-001"
-    assert DeploymentProvisionerRegistry.is_sealed()
-    assert DeploymentProvisionerRegistry.get_provisioner().get_deployment_id() == "TRUSTED-APP-DEP-001"
-
-    # Replacement rejected
-    with pytest.raises(RuntimeError, match="already been constructed"):
-        SClassApplication(provisioner=InMemoryTestDeploymentProvisioner())
 
 
 

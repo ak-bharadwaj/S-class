@@ -1082,6 +1082,102 @@ class TrustedDeploymentProvisioner(ABC):
         pass
 
 
+class IPCDeploymentProvisioner(TrustedDeploymentProvisioner):
+    """Production deployment provisioner communicating with an out-of-process
+    TrustedDeploymentAuthorityBroker over authenticated OS IPC.
+    """
+    def __init__(
+        self,
+        ipc_endpoint: str,
+        auth_secret: Optional[str] = None,
+    ):
+        from events.ipc import OSIPCClient
+        self.ipc_endpoint = ipc_endpoint
+        self.auth_secret = auth_secret
+        self._client = OSIPCClient(endpoint_path=ipc_endpoint, auth_secret=auth_secret)
+        self._lock = threading.RLock()
+
+    def get_deployment_id(self) -> str:
+        with self._lock:
+            resp = self._client.call("get_deployment_id")
+            if not resp.get("success"):
+                raise RuntimeError(f"Authority broker error: {resp.get('error')}")
+            return resp["deployment_id"]
+
+    def get_deployment_status(self) -> DeploymentStatus:
+        with self._lock:
+            try:
+                resp = self._client.call("get_deployment_status")
+                if not resp.get("success"):
+                    return DeploymentStatus.AUTHORITY_UNAVAILABLE
+                return DeploymentStatus(resp["status"])
+            except Exception:
+                return DeploymentStatus.AUTHORITY_UNAVAILABLE
+
+    def authorize_initial_provisioning(self, authorization_data: Optional[Dict[str, Any]] = None) -> None:
+        with self._lock:
+            resp = self._client.call("authorize_initial_provisioning", {"authorization_data": authorization_data})
+            if not resp.get("success"):
+                raise RuntimeError(f"Authority broker rejected initial provisioning: {resp.get('error')}")
+
+    def record_provisioned(self, installation_id: str, manifest_id: str, manifest_version: int, root_fingerprint: str) -> None:
+        with self._lock:
+            resp = self._client.call("record_provisioned", {
+                "installation_id": installation_id,
+                "manifest_id": manifest_id,
+                "manifest_version": manifest_version,
+                "root_fingerprint": root_fingerprint,
+            })
+            if not resp.get("success"):
+                raise RuntimeError(f"Authority broker rejected record_provisioned: {resp.get('error')}")
+
+    def notify_local_state_loss(self) -> None:
+        with self._lock:
+            resp = self._client.call("notify_local_state_loss")
+            if not resp.get("success"):
+                raise RuntimeError(f"Authority broker error on notify_local_state_loss: {resp.get('error')}")
+
+    def authorize_reprovisioning(
+        self,
+        reprovisioning_authorization: Dict[str, Any],
+        root_public_key: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        with self._lock:
+            pub_hex = None
+            if root_public_key is not None:
+                pub_hex = root_public_key.public_bytes_raw().hex() if hasattr(root_public_key, "public_bytes_raw") else None
+
+            resp = self._client.call("authorize_reprovisioning", {
+                "reprovisioning_authorization": reprovisioning_authorization,
+                "root_public_key": pub_hex,
+            })
+            if not resp.get("success"):
+                err = resp.get("error", "Unknown error")
+                if "mismatch" in err:
+                    from policy.exceptions import CorruptManifestError
+                    raise CorruptManifestError(err)
+                if "signature" in err.lower():
+                    from policy.exceptions import InvalidManifestSignatureError
+                    raise InvalidManifestSignatureError(err)
+                raise RuntimeError(f"Authority broker rejected reprovisioning: {err}")
+            return resp.get("authorization", reprovisioning_authorization)
+
+    def record_reprovisioned(self, installation_id: str, manifest_id: str, manifest_version: int, root_fingerprint: str) -> None:
+        with self._lock:
+            resp = self._client.call("record_reprovisioned", {
+                "installation_id": installation_id,
+                "manifest_id": manifest_id,
+                "manifest_version": manifest_version,
+                "root_fingerprint": root_fingerprint,
+            })
+            if not resp.get("success"):
+                raise RuntimeError(f"Authority broker rejected record_reprovisioned: {resp.get('error')}")
+
+    def close(self) -> None:
+        with self._lock:
+            self._client.close()
+
+
 class FailClosedDeploymentProvisioner(TrustedDeploymentProvisioner):
     """Default production provisioner. Fails closed on all genesis, reprovisioning,
     and authority reset requests until an explicit trusted external deployment coordinator is attached.

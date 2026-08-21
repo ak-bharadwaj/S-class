@@ -1,0 +1,204 @@
+"""Trusted Deployment Authority Broker (Trust Domain A).
+Independent authority service maintaining durable deployment identity, provisioning lifecycle,
+reprovisioning authorization, replay prevention, and root association outside S-Class.
+"""
+import os
+import json
+import threading
+import tempfile
+from typing import Optional, Dict, Any, Tuple
+from events.ipc import OSIPCServer
+from events.store import DeploymentStatus
+
+
+class TrustedDeploymentAuthorityBroker:
+    """Out-of-process / isolated deployment authority broker."""
+    def __init__(
+        self,
+        deployment_id: str,
+        state_file_path: Optional[str] = None,
+        ipc_endpoint: Optional[str] = None,
+        allowed_uid: Optional[int] = None,
+        auth_secret: Optional[str] = None,
+        initial_status: DeploymentStatus = DeploymentStatus.UNPROVISIONED,
+    ):
+        self.deployment_id = deployment_id
+        if state_file_path is None:
+            # Isolated directory outside S-Class working directory
+            self._temp_dir = tempfile.mkdtemp(prefix="sclass_broker_")
+            self.state_file_path = os.path.join(self._temp_dir, "broker_state.json")
+        else:
+            self._temp_dir = None
+            self.state_file_path = state_file_path
+
+        if ipc_endpoint is None:
+            endpoint_dir = self._temp_dir or tempfile.gettempdir()
+            self.ipc_endpoint = os.path.join(endpoint_dir, f"broker_{deployment_id}.sock")
+        else:
+            self.ipc_endpoint = ipc_endpoint
+
+        self.allowed_uid = allowed_uid
+        self.auth_secret = auth_secret
+        self._lock = threading.RLock()
+        self._server: Optional[OSIPCServer] = None
+        self._load_or_initialize_state(initial_status)
+
+    def _load_or_initialize_state(self, default_status: DeploymentStatus) -> None:
+        with self._lock:
+            if os.path.exists(self.state_file_path) and os.path.getsize(self.state_file_path) > 0:
+                try:
+                    with open(self.state_file_path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    self.deployment_id = data.get("deployment_id", self.deployment_id)
+                    self.status = DeploymentStatus(data.get("status", default_status.value))
+                    self.consumed_authorizations = set(data.get("consumed_authorizations", []))
+                    self.current_installation = data.get("current_installation")
+                    return
+                except Exception:
+                    pass
+
+            self.status = default_status
+            self.consumed_authorizations = set()
+            self.current_installation = None
+            self._persist_state()
+
+    def _persist_state(self) -> None:
+        with self._lock:
+            os.makedirs(os.path.dirname(os.path.abspath(self.state_file_path)), exist_ok=True)
+            data = {
+                "deployment_id": self.deployment_id,
+                "status": self.status.value,
+                "consumed_authorizations": list(self.consumed_authorizations),
+                "current_installation": self.current_installation,
+            }
+            tmp = self.state_file_path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            if os.path.exists(self.state_file_path):
+                os.replace(tmp, self.state_file_path)
+            else:
+                os.rename(tmp, self.state_file_path)
+
+    def start_ipc_server(self) -> None:
+        with self._lock:
+            if self._server is not None:
+                return
+            self._server = OSIPCServer(
+                endpoint_path=self.ipc_endpoint,
+                handler=self._dispatch_rpc,
+                allowed_uid=self.allowed_uid,
+                auth_secret=self.auth_secret,
+            )
+            self._server.start()
+
+    def stop_ipc_server(self) -> None:
+        with self._lock:
+            if self._server:
+                self._server.stop()
+                self._server = None
+
+    def notify_local_state_loss(self) -> None:
+        with self._lock:
+            self.status = DeploymentStatus.RECOVERY_REQUIRED
+            self._persist_state()
+
+    def _dispatch_rpc(self, req: Dict[str, Any], peer_meta: Dict[str, Any]) -> Dict[str, Any]:
+        method = req.get("method")
+        params = req.get("params", {})
+        with self._lock:
+            if method == "get_deployment_id":
+                return {"success": True, "deployment_id": self.deployment_id}
+
+            elif method == "get_deployment_status":
+                return {"success": True, "status": self.status.value}
+
+            elif method == "authorize_initial_provisioning":
+                if self.status == DeploymentStatus.PROVISIONED:
+                    return {"success": False, "error": "System has already been provisioned; authority reset is prohibited."}
+                if self.status == DeploymentStatus.RECOVERY_REQUIRED:
+                    return {"success": False, "error": "System is in RECOVERY_REQUIRED state; explicit root-signed reprovisioning required."}
+                self.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+                self._persist_state()
+                return {"success": True, "status": self.status.value}
+
+            elif method == "record_provisioned":
+                if self.status not in (DeploymentStatus.PROVISIONING_AUTHORIZED, DeploymentStatus.UNPROVISIONED):
+                    return {"success": False, "error": f"Cannot transition to PROVISIONED from state '{self.status.value}'."}
+                self.status = DeploymentStatus.PROVISIONED
+                self.current_installation = {
+                    "installation_id": params.get("installation_id"),
+                    "manifest_id": params.get("manifest_id"),
+                    "manifest_version": params.get("manifest_version"),
+                    "root_fingerprint": params.get("root_fingerprint"),
+                }
+                self._persist_state()
+                return {"success": True, "status": self.status.value}
+
+            elif method == "notify_local_state_loss":
+                self.status = DeploymentStatus.RECOVERY_REQUIRED
+                self._persist_state()
+                return {"success": True, "status": self.status.value}
+
+            elif method == "authorize_reprovisioning":
+                auth_data = params.get("reprovisioning_authorization", {})
+                auth_dep_id = auth_data.get("deployment_id")
+                if auth_dep_id != self.deployment_id:
+                    return {"success": False, "error": f"Reprovisioning authorization deployment mismatch: expected '{self.deployment_id}', got '{auth_dep_id}'."}
+
+                auth_id = auth_data.get("authorization_id")
+                if auth_id in self.consumed_authorizations:
+                    return {"success": False, "error": f"Reprovisioning authorization '{auth_id}' has already been consumed."}
+
+                import hashlib
+                from cryptography.exceptions import InvalidSignature
+                from cryptography.hazmat.primitives.asymmetric import ed25519
+                from events.serializer import canonicalize_json
+
+                sig_obj = auth_data.get("signature", {})
+                sig_hex = sig_obj.get("signature_hex")
+                root_pub_hex = params.get("root_public_key")
+                if root_pub_hex:
+                    root_public_key = ed25519.Ed25519PublicKey.from_public_bytes(bytes.fromhex(root_pub_hex))
+                else:
+                    from benchmark.parity.verify_gate_3_certificate import Gate3PublicKeystore
+                    root_public_key = Gate3PublicKeystore.get_public_key()
+                    if root_public_key is None:
+                        return {"success": False, "error": "Canonical Gate 3 Root Authority Public Key is not configured."}
+
+                preimage_dict = {
+                    "authorization_id": auth_id,
+                    "deployment_id": auth_dep_id,
+                    "target_manifest_id": auth_data.get("target_manifest_id"),
+                    "authorized_at": auth_data.get("authorized_at"),
+                    "reason": auth_data.get("reason"),
+                    "root_fingerprint": auth_data.get("root_fingerprint"),
+                    "is_administrative_reprovisioning": auth_data.get("is_administrative_reprovisioning"),
+                }
+                preimage_bytes = canonicalize_json(preimage_dict)
+                try:
+                    root_public_key.verify(bytes.fromhex(sig_hex), preimage_bytes)
+                except InvalidSignature:
+                    return {"success": False, "error": "Invalid reprovisioning authorization signature"}
+                except Exception as e:
+                    return {"success": False, "error": f"Signature verification error: {e}"}
+
+                self.consumed_authorizations.add(auth_id)
+                self.status = DeploymentStatus.RECOVERY_AUTHORIZED
+                self._persist_state()
+                return {"success": True, "status": self.status.value, "authorization": auth_data}
+
+            elif method == "record_reprovisioned":
+                if self.status != DeploymentStatus.RECOVERY_AUTHORIZED:
+                    return {"success": False, "error": f"Cannot transition to PROVISIONED from state '{self.status.value}' without authorized recovery."}
+                self.status = DeploymentStatus.PROVISIONED
+                self.current_installation = {
+                    "installation_id": params.get("installation_id"),
+                    "manifest_id": params.get("manifest_id"),
+                    "manifest_version": params.get("manifest_version"),
+                    "root_fingerprint": params.get("root_fingerprint"),
+                }
+                self._persist_state()
+                return {"success": True, "status": self.status.value}
+
+            else:
+                return {"success": False, "error": f"Unknown RPC method: {method}"}
