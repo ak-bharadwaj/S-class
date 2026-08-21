@@ -129,6 +129,9 @@ class CoverageTrustPredicate:
         return True
 
 
+from typing import Protocol, runtime_checkable
+
+
 @dataclass(frozen=True)
 class ActorKeyRecord:
     """Enrolled actor authority record in D3 keystore."""
@@ -139,70 +142,129 @@ class ActorKeyRecord:
     is_active: bool = True
 
 
-class PolicyActorKeyRegistry:
-    """Certified actor authority registry boundary (lookup-only for D3 policy evaluation).
+@runtime_checkable
+class PolicyActorAuthorityResolver(Protocol):
+    """Read-only authority resolver protocol consumed by D3 Policy Evaluator."""
 
-    Actor enrollment is restricted to controlled administrative boundaries.
-    Revocation is permanent: revoked actor keys cannot be re-enrolled.
+    def lookup_actor(self, fingerprint: str) -> Optional[ActorKeyRecord]:
+        """Read-only lookup of enrolled actor record by public key fingerprint."""
+        ...
+
+    def is_revoked(self, fingerprint: str) -> bool:
+        """Checks whether a public key fingerprint is revoked."""
+        ...
+
+
+class ManifestActorAuthorityResolver:
+    """Authoritative, sealed actor authority manifest resolver with durability semantics.
+    
+    Loads and serves immutable authority state across process restarts.
     """
-    _enrolled_actors: Dict[str, ActorKeyRecord] = {}
-    _revoked_fingerprints: Set[str] = set()
+    def __init__(
+        self,
+        actors: Optional[Dict[str, ActorKeyRecord]] = None,
+        revoked_fingerprints: Optional[Set[str]] = None,
+        manifest_id: Optional[str] = None,
+    ) -> None:
+        self._manifest_id = manifest_id or "MANIFEST-ROOT-001"
+        self._actors: Dict[str, ActorKeyRecord] = dict(actors or {})
+        self._revoked_fingerprints: Set[str] = set(revoked_fingerprints or ())
+
+    def lookup_actor(self, fingerprint: str) -> Optional[ActorKeyRecord]:
+        """Read-only lookup of enrolled actor record."""
+        return self._actors.get(fingerprint)
+
+    def is_revoked(self, fingerprint: str) -> bool:
+        """Checks whether an actor key fingerprint is revoked."""
+        return fingerprint in self._revoked_fingerprints
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serializes authority manifest for durable storage / persistence."""
+        actors_data = {}
+        for fp, rec in self._actors.items():
+            pub_hex = rec.public_key.public_bytes_raw().hex() if hasattr(rec.public_key, "public_bytes_raw") else ""
+            actors_data[fp] = {
+                "actor_id": rec.actor_id,
+                "actor_role": rec.actor_role,
+                "public_key_fingerprint": rec.public_key_fingerprint,
+                "public_key_hex": pub_hex,
+                "is_active": rec.is_active,
+            }
+        return {
+            "manifest_id": self._manifest_id,
+            "actors": actors_data,
+            "revoked_fingerprints": sorted(self._revoked_fingerprints),
+        }
 
     @classmethod
-    def enroll_actor(cls, actor_id: str, actor_role: str, public_key: Any) -> str:
-        """Administratively enrolls an authorized actor's Ed25519 public key.
-        Fails closed if the key has been revoked or is invalid.
+    def from_dict(cls, data: Dict[str, Any]) -> ManifestActorAuthorityResolver:
+        """Constructs an authoritative resolver from a durable manifest dictionary.
+        Validates cryptographic integrity and public key fingerprints.
         """
         from cryptography.hazmat.primitives.asymmetric import ed25519
-        if not isinstance(public_key, ed25519.Ed25519PublicKey):
-            raise TypeError(f"Expected Ed25519PublicKey instance, got {type(public_key).__name__}")
-        if not actor_id or not isinstance(actor_id, str):
-            raise ValueError("actor_id must be a non-empty string.")
-        if not actor_role or not isinstance(actor_role, str):
-            raise ValueError("actor_role must be a non-empty string.")
-
-        fp = hashlib.sha256(public_key.public_bytes_raw()).hexdigest()
-        if fp in cls._revoked_fingerprints:
-            raise RuntimeError(f"Revoked actor key '{fp}' cannot be re-enrolled.")
-
-        cls._enrolled_actors[fp] = ActorKeyRecord(
-            actor_id=actor_id,
-            actor_role=actor_role,
-            public_key_fingerprint=fp,
-            public_key=public_key,
-            is_active=True,
-        )
-        return fp
-
-    @classmethod
-    def revoke_actor(cls, fingerprint: str) -> None:
-        """Permanently revokes an enrolled actor key fingerprint."""
-        cls._revoked_fingerprints.add(fingerprint)
-        if fingerprint in cls._enrolled_actors:
-            rec = cls._enrolled_actors[fingerprint]
-            cls._enrolled_actors[fingerprint] = ActorKeyRecord(
-                actor_id=rec.actor_id,
-                actor_role=rec.actor_role,
-                public_key_fingerprint=fingerprint,
-                public_key=rec.public_key,
-                is_active=False,
+        actors: Dict[str, ActorKeyRecord] = {}
+        for fp, item in data.get("actors", {}).items():
+            pub_hex = item.get("public_key_hex", "")
+            if not pub_hex:
+                raise ValueError(f"Missing public_key_hex for actor '{item.get('actor_id')}'.")
+            pub_key = ed25519.Ed25519PublicKey.from_public_bytes(bytes.fromhex(pub_hex))
+            computed_fp = hashlib.sha256(pub_key.public_bytes_raw()).hexdigest()
+            if computed_fp != fp or computed_fp != item.get("public_key_fingerprint"):
+                raise ValueError(
+                    f"Corrupt authority manifest: fingerprint mismatch for actor '{item.get('actor_id')}': "
+                    f"expected '{fp}', computed '{computed_fp}'."
+                )
+            actors[fp] = ActorKeyRecord(
+                actor_id=item["actor_id"],
+                actor_role=item["actor_role"],
+                public_key_fingerprint=fp,
+                public_key=pub_key,
+                is_active=item.get("is_active", True),
             )
+        revoked = set(data.get("revoked_fingerprints", []))
+        return cls(
+            actors=actors,
+            revoked_fingerprints=revoked,
+            manifest_id=data.get("manifest_id"),
+        )
+
+
+class PolicyActorKeyRegistry:
+    """Certified actor authority registry boundary (lookup-only for D3 policy evaluation).
+    
+    D3 verification consumes an injected authoritative resolver.
+    D3 DOES NOT grant authority or expose public enrollment methods.
+    """
+    _resolver: Optional[PolicyActorAuthorityResolver] = None
 
     @classmethod
-    def is_revoked(cls, fingerprint: str) -> bool:
-        """Checks whether an actor key fingerprint is revoked."""
-        return fingerprint in cls._revoked_fingerprints
+    def set_authority_resolver(cls, resolver: Optional[PolicyActorAuthorityResolver]) -> None:
+        """Injects an authoritative read-only resolver into the D3 evaluation boundary."""
+        cls._resolver = resolver
+
+    @classmethod
+    def get_authority_resolver(cls) -> Optional[PolicyActorAuthorityResolver]:
+        """Returns the currently configured authority resolver."""
+        return cls._resolver
 
     @classmethod
     def lookup_actor(cls, fingerprint: str) -> Optional[ActorKeyRecord]:
         """Read-only lookup of enrolled actor record."""
-        return cls._enrolled_actors.get(fingerprint)
+        if cls._resolver is not None:
+            return cls._resolver.lookup_actor(fingerprint)
+        return None
+
+    @classmethod
+    def is_revoked(cls, fingerprint: str) -> bool:
+        """Read-only check if key is revoked."""
+        if cls._resolver is not None:
+            return cls._resolver.is_revoked(fingerprint)
+        return False
 
     @classmethod
     def clear(cls) -> None:
-        """Controlled teardown of actor keystore for test isolation."""
-        cls._enrolled_actors.clear()
-        cls._revoked_fingerprints.clear()
+        """Controlled teardown of injected resolver for test isolation."""
+        cls._resolver = None
 
 
 def canonicalize_policy_exception_preimage(exception: PolicyException) -> bytes:

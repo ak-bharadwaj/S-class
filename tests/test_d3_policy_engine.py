@@ -133,6 +133,8 @@ from policy import (
     CoverageTrustPredicate,
     PolicyActorKeyRegistry,
     ActorKeyRecord,
+    PolicyActorAuthorityResolver,
+    ManifestActorAuthorityResolver,
     canonicalize_policy_exception_preimage,
     meet_policies,
     compose_policies,
@@ -150,6 +152,21 @@ TEST_AUTHORITY_PRIVATE_KEY = ed25519.Ed25519PrivateKey.generate()
 TEST_AUTHORITY_PUBLIC_KEY = TEST_AUTHORITY_PRIVATE_KEY.public_key()
 TEST_PROVIDER_SECRET = b"TEST_GATE3_PROVIDER_KEYSTORE_SECRET_32B"
 
+TEST_OFFICER_KEY = ed25519.Ed25519PrivateKey.generate()
+TEST_OFFICER_PUB = TEST_OFFICER_KEY.public_key()
+TEST_OFFICER_FP = hashlib.sha256(TEST_OFFICER_PUB.public_bytes_raw()).hexdigest()
+
+_test_enrolled_actors: Dict[str, ActorKeyRecord] = {}
+_test_revoked_fingerprints: Set[str] = set()
+
+
+def _install_test_authority_manifest() -> None:
+    resolver = ManifestActorAuthorityResolver(
+        actors=dict(_test_enrolled_actors),
+        revoked_fingerprints=set(_test_revoked_fingerprints),
+    )
+    PolicyActorKeyRegistry.set_authority_resolver(resolver)
+
 
 @pytest.fixture(autouse=True)
 def setup_test_authority_keystore():
@@ -162,6 +179,18 @@ def setup_test_authority_keystore():
     Gate3ProviderKeyStore.register_provider_key("KEY-001", TEST_PROVIDER_SECRET)
     Gate3NonceTracker.clear()
     PolicyActorKeyRegistry.clear()
+    _test_enrolled_actors.clear()
+    _test_revoked_fingerprints.clear()
+
+    # Pre-enroll default test security officer into authoritative manifest
+    _test_enrolled_actors[TEST_OFFICER_FP] = ActorKeyRecord(
+        actor_id="SEC-OFFICER-01",
+        actor_role="SECURITY_LEAD",
+        public_key_fingerprint=TEST_OFFICER_FP,
+        public_key=TEST_OFFICER_PUB,
+        is_active=True,
+    )
+    _install_test_authority_manifest()
 
     yield
     Gate3AuthorityKeyStore.clear()
@@ -169,6 +198,8 @@ def setup_test_authority_keystore():
     Gate3ProviderKeyStore.clear()
     Gate3NonceTracker.clear()
     PolicyActorKeyRegistry.clear()
+    _test_enrolled_actors.clear()
+    _test_revoked_fingerprints.clear()
 
 
 def make_test_obligation(
@@ -332,7 +363,8 @@ def _sign_test_exception(
 
     if auto_enroll and not PolicyActorKeyRegistry.is_revoked(pub_fp):
         if PolicyActorKeyRegistry.lookup_actor(pub_fp) is None:
-            PolicyActorKeyRegistry.enroll_actor(actor_id, actor_role, pub_key)
+            _test_enrolled_actors[pub_fp] = ActorKeyRecord(actor_id, actor_role, pub_fp, pub_key, True)
+            _install_test_authority_manifest()
 
     actor = AuthorizedActor(
         actor_id=actor_id,
@@ -390,7 +422,7 @@ def make_test_exception(
     actor_id: str = "SEC-OFFICER-01",
     actor_role: str = "SECURITY_LEAD",
 ) -> PolicyException:
-    priv = private_key or TEST_AUTHORITY_PRIVATE_KEY
+    priv = private_key or TEST_OFFICER_KEY
     return _sign_test_exception(
         exception_id=exc_id,
         obligation_id=obl_id,
@@ -1854,6 +1886,201 @@ def test_adversarial_cached_nonce_corrupt_parent_chain_replay_check_fails_closed
     rec2 = json.loads(lines[1])
     rec2["parent_digest"] = "e" * 64
     lines[1] = json.dumps(rec2) + "\n"
+    assert "D2 storage failure" in cert.rejection_reason or "Corrupt" in cert.rejection_reason
+
+
+def test_duplicate_nonce_rejected_atomic_insert_if_absent(tmp_path):
+    """Test: duplicate nonce -> rejected under atomic INSERT-if-absent semantics."""
+    from events.store import D2NonceStore
+    store_file = str(tmp_path / "insert_if_absent.log")
+    store = D2NonceStore(file_path=store_file)
+    nonce = f"INSERT-ABSENT-NONCE-{uuid.uuid4().hex[:8]}"
+
+    # First reservation succeeds (absent)
+    assert store.reserve_nonce(nonce) is True
+    # Second reservation fails (duplicate)
+    assert store.reserve_nonce(nonce) is False
+
+
+def test_deployment_with_fresh_process_replay_rejected(tmp_path):
+    """Test: deployment with fresh process -> replay still rejected from persistent D2 store."""
+    import subprocess
+    import sys
+    store_file = str(tmp_path / "deployment_process_nonce.log")
+    nonce = f"DEPLOYMENT-NONCE-{uuid.uuid4().hex[:8]}"
+
+    # Process 1 (initial deployment worker) consumes nonce
+    script_p1 = f"""
+import sys
+from benchmark.parity.gate_3_authority import Gate3NonceTracker
+Gate3NonceTracker.set_store_path({repr(store_file)})
+res = Gate3NonceTracker.consume_nonce({repr(nonce)})
+print("SUCCESS" if res else "FAIL")
+"""
+    p1 = subprocess.Popen([sys.executable, "-c", script_p1], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    out1, _ = p1.communicate(timeout=10)
+    assert out1.strip() == "SUCCESS"
+
+    # Process 2 (newly deployed fresh container/process) attempts to reuse nonce
+    script_p2 = f"""
+import sys
+from benchmark.parity.gate_3_authority import Gate3NonceTracker
+Gate3NonceTracker.set_store_path({repr(store_file)})
+res = Gate3NonceTracker.consume_nonce({repr(nonce)})
+print("SUCCESS" if res else "REJECT")
+"""
+    p2 = subprocess.Popen([sys.executable, "-c", script_p2], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    out2, _ = p2.communicate(timeout=10)
+    assert out2.strip() == "REJECT"
+
+def test_adversarial_modified_nonce_record_fails_closed(tmp_path):
+    """Adversarial vector: Modifying nonce value in record -> CorruptEventLogError (fail closed)."""
+    from events.store import D2NonceStore
+    from events.exceptions import CorruptEventLogError
+
+    store_file = str(tmp_path / "mod_nonce.log")
+    store = D2NonceStore(file_path=store_file)
+    store.reserve_nonce("VALID-NONCE-1")
+
+    # Tamper with the nonce value in the JSON line without recomputing hash
+    with open(store_file, "r", encoding="utf-8") as f:
+        data = f.read()
+    tampered_data = data.replace("VALID-NONCE-1", "TAMPERED-NONCE-1")
+    with open(store_file, "w", encoding="utf-8") as f:
+        f.write(tampered_data)
+
+    tampered_store = D2NonceStore(file_path=store_file)
+    with pytest.raises(CorruptEventLogError, match="Cryptographic digest forgery/corruption"):
+        tampered_store.reserve_nonce("ANOTHER-NONCE")
+
+
+def test_adversarial_modified_timestamp_record_fails_closed(tmp_path):
+    """Adversarial vector: Modifying timestamp in record -> CorruptEventLogError (fail closed)."""
+    import json
+    from events.store import D2NonceStore
+    from events.exceptions import CorruptEventLogError
+
+    store_file = str(tmp_path / "mod_ts.log")
+    store = D2NonceStore(file_path=store_file)
+    store.reserve_nonce("VALID-NONCE-TS")
+
+    with open(store_file, "r", encoding="utf-8") as f:
+        line = f.readline().strip()
+    record = json.loads(line)
+    record["timestamp"] = "1970-01-01T00:00:00Z"
+    with open(store_file, "w", encoding="utf-8") as f:
+        f.write(json.dumps(record) + "\n")
+
+    tampered_store = D2NonceStore(file_path=store_file)
+    with pytest.raises(CorruptEventLogError, match="Cryptographic digest forgery/corruption"):
+        tampered_store.is_nonce_consumed("VALID-NONCE-TS")
+
+
+def test_adversarial_modified_digest_record_fails_closed(tmp_path):
+    """Adversarial vector: Modifying digest hash in record -> CorruptEventLogError (fail closed)."""
+    import json
+    from events.store import D2NonceStore
+    from events.exceptions import CorruptEventLogError
+
+    store_file = str(tmp_path / "mod_digest.log")
+    store = D2NonceStore(file_path=store_file)
+    store.reserve_nonce("VALID-NONCE-DIGEST")
+
+    with open(store_file, "r", encoding="utf-8") as f:
+        line = f.readline().strip()
+    record = json.loads(line)
+    record["digest"] = "f" * 64
+    with open(store_file, "w", encoding="utf-8") as f:
+        f.write(json.dumps(record) + "\n")
+
+    tampered_store = D2NonceStore(file_path=store_file)
+    with pytest.raises(CorruptEventLogError, match="Cryptographic digest forgery/corruption"):
+        tampered_store.reserve_nonce("ANOTHER-NONCE")
+
+
+def test_adversarial_deleted_or_partial_record_fails_closed(tmp_path):
+    """Adversarial vector: Deleted record breaking sequence/chain or torn record -> fail closed."""
+    from events.store import D2NonceStore
+    from events.exceptions import CorruptEventLogError
+
+    store_file = str(tmp_path / "partial_record.log")
+    store = D2NonceStore(file_path=store_file)
+    store.reserve_nonce("NONCE-1")
+    store.reserve_nonce("NONCE-2")
+
+    # 1. Truncate / corrupt last line
+    with open(store_file, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+    with open(store_file, "w", encoding="utf-8") as f:
+        f.write(lines[0] + '{"nonce": "INCOMPLETE')
+
+    tampered_store = D2NonceStore(file_path=store_file)
+    with pytest.raises(CorruptEventLogError, match="Corrupt JSON"):
+        tampered_store.reserve_nonce("NONCE-3")
+
+    # 2. Sequence / Chain discontinuity (deleting record 1)
+    store_file_discontinuity = str(tmp_path / "discontinuity.log")
+    store2 = D2NonceStore(file_path=store_file_discontinuity)
+    store2.reserve_nonce("NONCE-A")
+    store2.reserve_nonce("NONCE-B")
+    with open(store_file_discontinuity, "r", encoding="utf-8") as f:
+        lines2 = f.readlines()
+    # keep only line 2 (which has sequence_number=2, expected=1)
+    with open(store_file_discontinuity, "w", encoding="utf-8") as f:
+        f.write(lines2[1])
+
+    tampered_store2 = D2NonceStore(file_path=store_file_discontinuity)
+    with pytest.raises(CorruptEventLogError, match="Sequence discontinuity"):
+        tampered_store2.reserve_nonce("NONCE-C")
+
+def test_adversarial_valid_nonce_cached_then_tamper_durable_record_fails_closed(tmp_path):
+    """Adversarial vector: Valid nonce queried -> durable record tampered -> same-process query fails closed with CorruptEventLogError."""
+    from events.store import D2NonceStore
+    from events.exceptions import CorruptEventLogError
+
+    store_file = str(tmp_path / "cache_tamper.log")
+    store = D2NonceStore(file_path=store_file)
+    nonce = f"CACHE-TAMPER-NONCE-{uuid.uuid4().hex[:8]}"
+
+    # 1. Valid reservation
+    assert store.reserve_nonce(nonce) is True
+    assert store.is_nonce_consumed(nonce) is True
+
+    # 2. Adversary tampers with durable record on disk
+    with open(store_file, "r", encoding="utf-8") as f:
+        data = f.read()
+    tampered_data = data.replace(nonce, "FORGED_NONCE_VALUE")
+    with open(store_file, "w", encoding="utf-8") as f:
+        f.write(tampered_data)
+
+    # 3. Same-process query on the SAME store instance MUST NOT return cached truth; MUST verify durable store and fail closed
+    with pytest.raises(CorruptEventLogError, match="Cryptographic digest forgery/corruption"):
+        store.is_nonce_consumed(nonce)
+
+    with pytest.raises(CorruptEventLogError, match="Cryptographic digest forgery/corruption"):
+        store.reserve_nonce(f"ANOTHER-NONCE-{uuid.uuid4().hex[:8]}")
+
+
+def test_adversarial_cached_nonce_corrupt_parent_chain_replay_check_fails_closed(tmp_path):
+    """Adversarial vector: Cached nonce -> corrupt parent chain on disk -> replay check fails closed with CorruptEventLogError."""
+    import json
+    from events.store import D2NonceStore
+    from events.exceptions import CorruptEventLogError
+
+    store_file = str(tmp_path / "chain_tamper.log")
+    store = D2NonceStore(file_path=store_file)
+    nonce1 = f"CHAIN-NONCE-1-{uuid.uuid4().hex[:8]}"
+    nonce2 = f"CHAIN-NONCE-2-{uuid.uuid4().hex[:8]}"
+
+    assert store.reserve_nonce(nonce1) is True
+    assert store.reserve_nonce(nonce2) is True
+
+    # Tamper with the parent digest of record 2 in the durable log
+    with open(store_file, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+    rec2 = json.loads(lines[1])
+    rec2["parent_digest"] = "e" * 64
+    lines[1] = json.dumps(rec2) + "\n"
     with open(store_file, "w", encoding="utf-8") as f:
         f.writelines(lines)
 
@@ -1885,7 +2112,7 @@ def test_adversarial_wrong_domain_separator_fails_closed(tmp_path):
 
 
 # ============================================================================
-# 8. D3 Cryptographic PolicyException Authority Test Suite (E1 - E21)
+# 8. D3 Cryptographic PolicyException Authority Test Suite (E1 - E24)
 # ============================================================================
 
 def test_d3_exception_e1_valid_signature_accepted():
@@ -2023,7 +2250,10 @@ def test_d3_exception_e7_wrong_actor_key_rejected():
     rogue_priv = ed25519.Ed25519PrivateKey.generate()
     genuine_priv = ed25519.Ed25519PrivateKey.generate()
     genuine_pub = genuine_priv.public_key()
-    genuine_fp = PolicyActorKeyRegistry.enroll_actor("ACTOR-A", "SECURITY_LEAD", genuine_pub)
+    genuine_fp = hashlib.sha256(genuine_pub.public_bytes_raw()).hexdigest()
+
+    _test_enrolled_actors[genuine_fp] = ActorKeyRecord("ACTOR-A", "SECURITY_LEAD", genuine_fp, genuine_pub, True)
+    _install_test_authority_manifest()
 
     actor = AuthorizedActor("ACTOR-A", "SECURITY_LEAD", genuine_fp)
     dummy_sig = AsymmetricAuthoritySignature(
@@ -2106,7 +2336,10 @@ def test_d3_exception_e9_revoked_actor_key_rejected():
     obl = make_test_obligation(obl_id="OBL-001")
     actor_priv = ed25519.Ed25519PrivateKey.generate()
     actor_pub = actor_priv.public_key()
-    fp = PolicyActorKeyRegistry.enroll_actor("SEC-02", "SECURITY_LEAD", actor_pub)
+    fp = hashlib.sha256(actor_pub.public_bytes_raw()).hexdigest()
+
+    _test_enrolled_actors[fp] = ActorKeyRecord("SEC-02", "SECURITY_LEAD", fp, actor_pub, True)
+    _install_test_authority_manifest()
 
     exc = _sign_test_exception(
         exception_id="EXC-001",
@@ -2119,8 +2352,9 @@ def test_d3_exception_e9_revoked_actor_key_rejected():
         compensating_controls=("Audit log monitoring enabled",),
         auto_enroll=False,
     )
-    # Revoke actor key
-    PolicyActorKeyRegistry.revoke_actor(fp)
+    # Revoke actor key in authority manifest
+    _test_revoked_fingerprints.add(fp)
+    _install_test_authority_manifest()
 
     ctx = make_test_context(obl, (), (), exceptions=(exc,))
     pol = Policy(
@@ -2273,17 +2507,12 @@ def test_d3_exception_e15_tampered_field_after_signing_rejected():
         evaluate_policy(pol, ctx)
 
 
-def test_d3_exception_e16_unauthorized_actor_registration_rejected():
-    """E16: Unauthorized/invalid actor registration parameters fail closed."""
-    valid_key = ed25519.Ed25519PrivateKey.generate().public_key()
-    with pytest.raises(ValueError, match="actor_id must be a non-empty string"):
-        PolicyActorKeyRegistry.enroll_actor("", "SECURITY_LEAD", valid_key)
-
-    with pytest.raises(ValueError, match="actor_role must be a non-empty string"):
-        PolicyActorKeyRegistry.enroll_actor("SEC-01", "", valid_key)
-
-    with pytest.raises(TypeError, match="Expected Ed25519PublicKey"):
-        PolicyActorKeyRegistry.enroll_actor("SEC-01", "ROLE", "not_a_public_key")  # type: ignore
+def test_d3_exception_e16_unauthorized_caller_cannot_grant_authority():
+    """E16: PolicyActorKeyRegistry is lookup-only in production and has no public enroll_actor method."""
+    assert hasattr(PolicyActorKeyRegistry, "enroll_actor") is False
+    assert hasattr(PolicyActorKeyRegistry, "register_actor_key") is False
+    with pytest.raises(AttributeError):
+        PolicyActorKeyRegistry.enroll_actor("ROGUE", "ROLE", "KEY")  # type: ignore
 
 
 def test_d3_exception_e17_arbitrary_public_key_cannot_become_signer():
@@ -2312,15 +2541,14 @@ def test_d3_exception_e17_arbitrary_public_key_cannot_become_signer():
 
 
 def test_d3_exception_e18_revoked_actor_cannot_self_re_register():
-    """E18: Revoked actor key cannot be re-enrolled in authority registry."""
+    """E18: Revoked actor key recorded in authority manifest returns is_revoked True and cannot verify exceptions."""
     key = ed25519.Ed25519PrivateKey.generate().public_key()
-    fp = PolicyActorKeyRegistry.enroll_actor("SEC-TEMP", "TEMP_ROLE", key)
-    PolicyActorKeyRegistry.revoke_actor(fp)
-    assert PolicyActorKeyRegistry.is_revoked(fp) is True
+    fp = hashlib.sha256(key.public_bytes_raw()).hexdigest()
+    _test_enrolled_actors[fp] = ActorKeyRecord("SEC-TEMP", "TEMP_ROLE", fp, key, False)
+    _test_revoked_fingerprints.add(fp)
+    _install_test_authority_manifest()
 
-    # Attempt re-enrollment of the same revoked key fails closed
-    with pytest.raises(RuntimeError, match="cannot be re-enrolled"):
-        PolicyActorKeyRegistry.enroll_actor("SEC-TEMP", "TEMP_ROLE", key)
+    assert PolicyActorKeyRegistry.is_revoked(fp) is True
 
 
 def test_d3_exception_e19_signer_identity_tampering_rejected():
@@ -2416,6 +2644,119 @@ def test_d3_exception_e21_signature_fingerprint_tampering_rejected():
         PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
     )
     with pytest.raises(InvalidExceptionError, match="does not match AuthorizedActor fingerprint"):
+        evaluate_policy(pol, ctx)
+
+
+def test_d3_exception_e22_manifest_durability_and_process_reload():
+    """E22: Authoritative ManifestActorAuthorityResolver survives durable reload across process boundary."""
+    priv = ed25519.Ed25519PrivateKey.generate()
+    pub = priv.public_key()
+    fp = hashlib.sha256(pub.public_bytes_raw()).hexdigest()
+
+    rec = ActorKeyRecord("SEC-DURABLE", "SECURITY_LEAD", fp, pub, True)
+    manifest = ManifestActorAuthorityResolver(actors={fp: rec}, manifest_id="MANIFEST-DURABLE-001")
+
+    # Serialize manifest to durable payload
+    serialized = manifest.to_dict()
+
+    # Simulate fresh process restart with zero state
+    PolicyActorKeyRegistry.clear()
+
+    # Reload from serialized manifest
+    reloaded = ManifestActorAuthorityResolver.from_dict(serialized)
+    PolicyActorKeyRegistry.set_authority_resolver(reloaded)
+
+    # Verify exception signed with durable key evaluates to ALLOW
+    obl = make_test_obligation(obl_id="OBL-001")
+    exc = _sign_test_exception(
+        exception_id="EXC-001",
+        obligation_id="OBL-001",
+        policy_id="POL-001",
+        justification="Manual security review approved by security lead with HSM token.",
+        actor_id="SEC-DURABLE",
+        actor_role="SECURITY_LEAD",
+        private_key=priv,
+        compensating_controls=("Audit log monitoring enabled",),
+        auto_enroll=False,
+    )
+    ctx = make_test_context(obl, (), (), exceptions=(exc,))
+    pol = Policy(
+        "POL-001", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
+    )
+    decision = evaluate_policy(pol, ctx)
+    assert decision.decision == PolicyDecisionType.ALLOW
+
+
+def test_d3_exception_e23_tampered_manifest_role_or_key_fails_closed():
+    """E23: Tampering with an actor's public key or fingerprint inside the manifest fails closed."""
+    priv = ed25519.Ed25519PrivateKey.generate()
+    pub = priv.public_key()
+    fp = hashlib.sha256(pub.public_bytes_raw()).hexdigest()
+
+    rec = ActorKeyRecord("SEC-LEAD", "SECURITY_LEAD", fp, pub, True)
+    manifest = ManifestActorAuthorityResolver(actors={fp: rec})
+    serialized = manifest.to_dict()
+
+    # Tamper with the public_key_hex in the manifest dictionary
+    serialized["actors"][fp]["public_key_hex"] = "0" * 64
+
+    # Deserialization MUST fail closed
+    with pytest.raises(ValueError, match="Corrupt authority manifest"):
+        ManifestActorAuthorityResolver.from_dict(serialized)
+
+    # Missing public_key_hex MUST fail closed
+    serialized["actors"][fp]["public_key_hex"] = ""
+    with pytest.raises(ValueError, match="Missing public_key_hex"):
+        ManifestActorAuthorityResolver.from_dict(serialized)
+
+
+def test_d3_exception_authority_resolver_getter_and_clear():
+    """PolicyActorKeyRegistry getter returns configured resolver and clear resets to None."""
+    resolver = ManifestActorAuthorityResolver()
+    PolicyActorKeyRegistry.set_authority_resolver(resolver)
+    assert PolicyActorKeyRegistry.get_authority_resolver() is resolver
+    PolicyActorKeyRegistry.clear()
+    assert PolicyActorKeyRegistry.get_authority_resolver() is None
+    assert PolicyActorKeyRegistry.lookup_actor("NON_EXISTENT") is None
+    assert PolicyActorKeyRegistry.is_revoked("NON_EXISTENT") is False
+
+
+def test_d3_exception_e24_revocation_survives_process_reload():
+    """E24: Revoked keys in manifest remain strictly revoked across process reload."""
+    priv = ed25519.Ed25519PrivateKey.generate()
+    pub = priv.public_key()
+    fp = hashlib.sha256(pub.public_bytes_raw()).hexdigest()
+
+    rec = ActorKeyRecord("SEC-REVOKED", "SECURITY_LEAD", fp, pub, False)
+    manifest = ManifestActorAuthorityResolver(actors={fp: rec}, revoked_fingerprints={fp})
+    serialized = manifest.to_dict()
+
+    # Reload in new process context
+    PolicyActorKeyRegistry.clear()
+    reloaded = ManifestActorAuthorityResolver.from_dict(serialized)
+    PolicyActorKeyRegistry.set_authority_resolver(reloaded)
+
+    assert PolicyActorKeyRegistry.is_revoked(fp) is True
+
+    obl = make_test_obligation(obl_id="OBL-001")
+    exc = _sign_test_exception(
+        exception_id="EXC-001",
+        obligation_id="OBL-001",
+        policy_id="POL-001",
+        justification="Manual security review approved by security lead with HSM token.",
+        actor_id="SEC-REVOKED",
+        actor_role="SECURITY_LEAD",
+        private_key=priv,
+        compensating_controls=("Audit log monitoring enabled",),
+        auto_enroll=False,
+    )
+    ctx = make_test_context(obl, (), (), exceptions=(exc,))
+    pol = Policy(
+        "POL-001", PolicyScope.PROJECT, 1,
+        PolicyExpression(CombinatorType.ALL, (PolicyRule(RuleType.REQUIRE_CAPABILITY, {"capability": "API_CONTRACT_FUZZING"}),))
+    )
+    with pytest.raises(InvalidExceptionError, match="has been revoked"):
         evaluate_policy(pol, ctx)
 
 
