@@ -241,9 +241,10 @@ class SignedAuthorityManifestLoader:
         """Controlled teardown of manifest loader state strictly for test fixtures."""
         if os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1" and os.environ.get("PYTEST_CURRENT_TEST") is None:
             raise RuntimeError("Monotonic authority state cannot be reset outside active test fixture harness.")
-        from events.store import D2AuthorityManifestStore
+        from events.store import D2AuthorityManifestStore, D2InstallationProvisioning
         store = D2AuthorityManifestStore()
         store.clear()
+        D2InstallationProvisioning.clear_for_testing()
         with open(store.file_path, "wb") as f:
             pass
 
@@ -467,14 +468,80 @@ class SignedAuthorityManifestLoader:
         cls,
         data: Dict[str, Any],
     ) -> ReadOnlyActorAuthorityResolver:
-        """Explicit, isolated first-install composition root bootstrap to initialize a fresh authoritative D2 store."""
-        from events.store import D2AuthorityManifestStore
-        store = D2AuthorityManifestStore()
-        if os.path.exists(store.file_path) and os.path.getsize(store.file_path) > 0:
-            raise RuntimeError(f"Genesis bootstrap rejected: authoritative D2 store already contains history at '{store.file_path}'.")
+        """Explicit, isolated first-install composition root bootstrap.
+        Requires that the system has NOT been provisioned before.
+        Fails closed against authority resets if system was already installed.
+        """
+        from events.store import D2AuthorityManifestStore, D2InstallationProvisioning
+        from policy.exceptions import ManifestRollbackError, InvalidManifestSignatureError, CorruptManifestError
+        from cryptography.exceptions import InvalidSignature
 
-        with open(store.file_path, "wb") as f:
-            pass
+        if D2InstallationProvisioning.is_installed():
+            raise RuntimeError("Genesis bootstrap rejected: system has already been provisioned/installed. Authority reset prohibited.")
+
+        if not isinstance(data, dict):
+            raise CorruptManifestError("Authority manifest data must be a dictionary.")
+
+        manifest_id = data.get("manifest_id")
+        if not manifest_id or not isinstance(manifest_id, str):
+            raise CorruptManifestError("Authority manifest missing valid 'manifest_id'.")
+
+        try:
+            manifest_version = int(data.get("manifest_version", 1))
+        except (ValueError, TypeError):
+            raise CorruptManifestError("Authority manifest version must be an integer.")
+
+        if manifest_version != 1:
+            raise ManifestRollbackError("Genesis authority manifest must be version 1.")
+
+        canonical_root = cls.get_canonical_root_public_key()
+        root_sig = data.get("root_signature")
+        if not root_sig or not isinstance(root_sig, dict):
+            raise InvalidManifestSignatureError("Authority manifest missing 'root_signature' block.")
+
+        sig_hex = root_sig.get("signature_hex", "")
+        if not sig_hex or len(sig_hex) != 128:
+            raise InvalidManifestSignatureError("Authority manifest root signature hex is malformed or invalid length.")
+
+        signer_identity = root_sig.get("signer_identity", "")
+        if signer_identity != "Gate3AuthoritativeVerifier":
+            raise InvalidManifestSignatureError(
+                f"Manifest root signer identity '{signer_identity}' does not match authoritative root 'Gate3AuthoritativeVerifier'."
+            )
+
+        expected_root_fp = hashlib.sha256(canonical_root.public_bytes_raw()).hexdigest()
+        sig_root_fp = root_sig.get("public_key_fingerprint", "")
+        if sig_root_fp != expected_root_fp:
+            raise InvalidManifestSignatureError(
+                f"Manifest root key fingerprint '{sig_root_fp}' does not match trusted root key '{expected_root_fp}'."
+            )
+
+        canonical_bytes = canonicalize_authority_manifest_preimage(data)
+        expected_digest = hashlib.sha256(canonical_bytes).hexdigest()
+        recorded_digest = root_sig.get("payload_digest", "")
+        if recorded_digest != expected_digest:
+            raise InvalidManifestSignatureError(
+                f"Manifest payload digest mismatch: recorded '{recorded_digest}', computed '{expected_digest}'."
+            )
+
+        try:
+            canonical_root.verify(bytes.fromhex(sig_hex), canonical_bytes)
+        except InvalidSignature:
+            raise InvalidManifestSignatureError("Authority manifest Ed25519 root signature verification failed.")
+
+        # Atomically seal first installation (fails closed if already installed)
+        D2InstallationProvisioning.seal_first_installation(
+            manifest_id=manifest_id,
+            manifest_version=manifest_version,
+            payload_digest=expected_digest,
+            signer_identity=signer_identity,
+            root_fingerprint=sig_root_fp,
+        )
+
+        store = D2AuthorityManifestStore()
+        if not os.path.exists(store.file_path):
+            with open(store.file_path, "wb") as f:
+                pass
 
         return cls.load_from_dict(data)
 

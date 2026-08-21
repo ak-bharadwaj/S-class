@@ -612,3 +612,84 @@ class D2AuthorityManifestStore:
                     with open(self._file_path, "w", encoding="utf-8") as f:
                         pass
 
+
+def get_canonical_d2_installation_marker_path() -> str:
+    """Returns absolute path to the canonical D2 installation provisioning marker."""
+    event_store_path = get_canonical_d2_event_store_path()
+    directory = os.path.dirname(os.path.abspath(event_store_path))
+    return os.path.join(directory, ".d2_installation_seal.json")
+
+
+class D2InstallationProvisioning:
+    """Manages the explicit, one-time first-installation state of the S-Class system.
+    Separates FIRST INSTALL STATE from D2 AUTHORITY HISTORY to prevent authority resets
+    when history is missing/deleted/truncated.
+    """
+    _class_lock = threading.RLock()
+
+    @classmethod
+    def get_marker_path(cls) -> str:
+        return get_canonical_d2_installation_marker_path()
+
+    @classmethod
+    def is_installed(cls) -> bool:
+        """Returns True if the system has already completed first-install bootstrap."""
+        marker = cls.get_marker_path()
+        return os.path.exists(marker) and os.path.getsize(marker) > 0
+
+    @classmethod
+    def seal_first_installation(
+        cls,
+        manifest_id: str,
+        manifest_version: int,
+        payload_digest: str,
+        signer_identity: str,
+        root_fingerprint: str,
+    ) -> None:
+        """Atomically provisions and seals first installation. Fails closed if already installed."""
+        from datetime import datetime, timezone
+        from file_lock import FileLock
+        from events.serializer import canonicalize_json
+
+        marker = cls.get_marker_path()
+        lock_path = marker + ".lock"
+
+        with cls._class_lock:
+            with FileLock(lock_path, timeout=10.0):
+                if cls.is_installed():
+                    raise RuntimeError("Genesis bootstrap rejected: system has already been provisioned/installed. Authority reset prohibited.")
+
+                seal_payload = {
+                    "installed_at": datetime.now(timezone.utc).isoformat(),
+                    "initial_manifest_id": manifest_id,
+                    "initial_manifest_version": manifest_version,
+                    "initial_payload_digest": payload_digest,
+                    "signer_identity": signer_identity,
+                    "root_fingerprint": root_fingerprint,
+                }
+                marker_bytes = canonicalize_json(seal_payload) + b"\n"
+
+                with open(marker, "wb") as f:
+                    f.write(marker_bytes)
+                    f.flush()
+                    os.fsync(f.fileno())
+
+    @classmethod
+    def clear_for_testing(cls) -> None:
+        """Controlled teardown of installation state strictly for test fixtures."""
+        if os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1" and os.environ.get("PYTEST_CURRENT_TEST") is None:
+            raise RuntimeError("Installation state teardown prohibited outside active test fixture harness.")
+        marker = cls.get_marker_path()
+        if os.path.exists(marker):
+            try:
+                os.remove(marker)
+            except OSError:
+                pass
+        lock_path = marker + ".lock"
+        if os.path.exists(lock_path):
+            try:
+                os.remove(lock_path)
+            except OSError:
+                pass
+
+

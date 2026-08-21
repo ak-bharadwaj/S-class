@@ -4049,7 +4049,7 @@ def test_d3_persistence_e72_explicit_first_bootstrap_accepted_only_through_trust
     assert res.manifest_id == "M-E72"
 
     # Second bootstrap attempt on non-empty store is strictly rejected
-    with pytest.raises(RuntimeError, match="Genesis bootstrap rejected: authoritative D2 store already contains history"):
+    with pytest.raises(RuntimeError, match="Genesis bootstrap rejected: system has already been provisioned/installed"):
         SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
 
 
@@ -4118,6 +4118,168 @@ def test_d3_root_e77_root_replacement_after_seal_reject():
     another_key = ed25519.Ed25519PrivateKey.generate().public_key()
     with pytest.raises(RuntimeError, match="Gate3PublicKeystore root public key is already initialized and cannot be replaced"):
         Gate3PublicKeystore.bootstrap_root_public_key(another_key)
+
+
+def test_d3_install_e78_prior_installation_d2_deletion_genesis_rejected():
+    """E78: Prior installation with D2 ledger deleted strictly rejects bootstrap_genesis_manifest."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import D2AuthorityManifestStore
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E78",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+    store = D2AuthorityManifestStore()
+    if os.path.exists(store.file_path):
+        os.remove(store.file_path)
+
+    with pytest.raises(RuntimeError, match="Genesis bootstrap rejected: system has already been provisioned/installed"):
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+
+def test_d3_install_e79_prior_installation_empty_d2_file_genesis_rejected():
+    """E79: Prior installation with empty/zeroed D2 file strictly rejects bootstrap_genesis_manifest."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import D2AuthorityManifestStore
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E79",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+    store = D2AuthorityManifestStore()
+    with open(store.file_path, "wb") as f:
+        pass
+
+    with pytest.raises(RuntimeError, match="Genesis bootstrap rejected: system has already been provisioned/installed"):
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+
+def test_d3_install_e80_prior_installation_old_valid_signed_manifest_genesis_rejected():
+    """E80: Prior installation with old valid signed manifest rejects genesis reset after D2 destruction."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import D2AuthorityManifestStore
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E80",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    manifest_v2 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E80",
+        manifest_version=2,
+        issued_at="2026-08-20T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+    SignedAuthorityManifestLoader.load_from_dict(manifest_v2)
+
+    store = D2AuthorityManifestStore()
+    if os.path.exists(store.file_path):
+        os.remove(store.file_path)
+
+    with pytest.raises(RuntimeError, match="Genesis bootstrap rejected: system has already been provisioned/installed"):
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+
+def test_d3_install_e81_first_install_bootstrap_succeeds_exactly_once():
+    """E81: First-install bootstrap succeeds on unprovisioned system and fails closed on second call."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import D2AuthorityManifestStore
+
+    store = D2AuthorityManifestStore()
+    if os.path.exists(store.file_path):
+        os.remove(store.file_path)
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E81",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    res = SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+    assert res.manifest_version == 1
+
+    with pytest.raises(RuntimeError, match="Genesis bootstrap rejected: system has already been provisioned/installed"):
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+
+def test_d3_install_e82_restart_bootstrap_still_rejected():
+    """E82: Installation state persists across process restart; subsequent genesis bootstrap is still rejected."""
+    SignedAuthorityManifestLoader.clear_for_testing()
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E82",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+    # Simulate restart by re-querying fresh D2InstallationProvisioning
+    from events.store import D2InstallationProvisioning
+    assert D2InstallationProvisioning.is_installed() is True
+
+    with pytest.raises(RuntimeError, match="Genesis bootstrap rejected: system has already been provisioned/installed"):
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest_v1)
+
+
+def test_d3_install_e83_concurrent_bootstrap_exactly_one_succeeds():
+    """E83: Multiple parallel threads attempting genesis bootstrap on fresh system serialize to exactly 1 success."""
+    import concurrent.futures
+    SignedAuthorityManifestLoader.clear_for_testing()
+    from events.store import D2AuthorityManifestStore
+
+    store = D2AuthorityManifestStore()
+    if os.path.exists(store.file_path):
+        os.remove(store.file_path)
+
+    manifest_v1 = SignedAuthorityManifestLoader.sign_manifest(
+        manifest_id="M-E83",
+        manifest_version=1,
+        issued_at="2026-08-19T10:00:00Z",
+        actors={},
+        revoked_fingerprints=[],
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    successes = []
+    rejections = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(SignedAuthorityManifestLoader.bootstrap_genesis_manifest, manifest_v1) for _ in range(16)]
+        for fut in concurrent.futures.as_completed(futures):
+            try:
+                res = fut.result()
+                successes.append(res)
+            except Exception as e:
+                rejections.append(e)
+
+    assert len(successes) == 1
+    assert len(rejections) == 15
+    for err in rejections:
+        assert isinstance(err, RuntimeError)
+        assert "already been provisioned/installed" in str(err)
+
 
 
 
