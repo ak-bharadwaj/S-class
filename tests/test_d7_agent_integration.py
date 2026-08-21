@@ -97,6 +97,10 @@ def setup_authority_keys():
     Gate3AuthorityKeyStore.clear()
 
 
+from controller.authority import StaticLeaseAuthority, StaticStateAuthority
+from planner.models import PlanningLease
+
+
 @pytest.fixture
 def default_authority_signer():
     return Gate3AuthoritySigner()
@@ -105,7 +109,37 @@ def default_authority_signer():
 @pytest.fixture
 def fresh_controller(tmp_path, default_authority_signer):
     nonce_store = D2NonceStore(file_path=str(tmp_path / "d7_nonces.log"))
-    return SClassController(authority_signer=default_authority_signer, nonce_store=nonce_store)
+    leases = {
+        DEFAULT_TASK_ID: PlanningLease(
+            task_id=DEFAULT_TASK_ID,
+            owner_id="DEFAULT-WORKER",
+            lease_epoch=1,
+            fencing_token=1,
+            acquired_at=TIMESTAMP_NOW,
+            expires_at=TIMESTAMP_EXPIRY,
+            is_active=True,
+        )
+    }
+    for i in range(10):
+        tid1 = f"TASK-AGENT-{i:02d}"
+        tid2 = f"TASK-AGENT-{i}"
+        l = PlanningLease(
+            task_id=tid1,
+            owner_id=f"worker-{i}",
+            lease_epoch=1,
+            fencing_token=1,
+            acquired_at=TIMESTAMP_NOW,
+            expires_at=TIMESTAMP_EXPIRY,
+            is_active=True,
+        )
+        leases[tid1] = l
+        leases[tid2] = l
+    return SClassController(
+        authority_signer=default_authority_signer,
+        nonce_store=nonce_store,
+        lease_authority=StaticLeaseAuthority(leases),
+        state_authority=StaticStateAuthority(1, "1" * 64),
+    )
 
 
 @pytest.fixture
@@ -988,13 +1022,28 @@ def test_concurrent_agent_sessions_remain_isolated(
 
     def run_worker_session(worker_idx: int):
         worker = MockAgentWorker(f"worker-{worker_idx}")
+        worker_obl_id = f"OBL-CONCURRENT-{worker_idx}"
+        worker_obls = {
+            worker_obl_id: Obligation(
+                obligation_id=worker_obl_id,
+                task_id=f"TASK-AGENT-{worker_idx}",
+                title=f"Test Invariant Worker {worker_idx}",
+                description="Verify property invariant",
+                category=ObligationCategory.SECURITY_INTEGRITY,
+                criticality=Criticality.HIGH,
+                status=ObligationStatus.OPEN,
+                depends_on=(),
+                claim_ids=(),
+                policy_id="POL-001",
+            )
+        }
         t1 = AgentTurnResponse(
             thought=f"Turn 1 for worker {worker_idx}",
             tool_calls=(
                 AgentToolCall(
                     f"C-{worker_idx}",
                     "propose_test_run",
-                    {"obligation_id": "OBL-001", "target_test": f"test_{worker_idx}.py", "purpose": "Test"},
+                    {"obligation_id": worker_obl_id, "target_test": f"test_{worker_idx}.py", "purpose": "Test"},
                 ),
             ),
             turn_status=AgentTurnStatus.COMPLETED,
@@ -1028,7 +1077,7 @@ def test_concurrent_agent_sessions_remain_isolated(
             source_sha=DEFAULT_SHA,
             task_id=f"TASK-AGENT-{worker_idx}",
             objective="Concurrent test",
-            obligations=obls,
+            obligations=worker_obls,
             policies=policies,
             policy_version=1,
             session_binding=worker_binding,

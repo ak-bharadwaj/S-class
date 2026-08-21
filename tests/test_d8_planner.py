@@ -706,14 +706,17 @@ def test_proposal_emitter_fails_closed_on_inactive_lease(sample_context):
         ProposalEmitter.emit_next_proposal(strat, inactive_lease, state_version=1, state_digest="1" * 64)
 
 
+from controller.authority import StaticLeaseAuthority, StaticStateAuthority
+
+
 def test_proposal_accepted_by_d5_controller(sample_context, lease_manager, tmp_path):
     signer = Gate3AuthoritySigner()
     nonce_store = D2NonceStore(str(tmp_path / "d5.log"))
     controller = SClassController(
         authority_signer=signer,
         nonce_store=nonce_store,
-        lease_resolver=lease_manager.get_active_lease,
-        state_resolver=lambda: (1, "1" * 64),
+        lease_authority=lease_manager,
+        state_authority=StaticStateAuthority(1, "1" * 64),
     )
 
     obl = Obligation(
@@ -772,8 +775,8 @@ def test_proposal_with_stale_fence_rejected_by_d5_controller(sample_context, lea
     controller = SClassController(
         authority_signer=signer,
         nonce_store=nonce_store,
-        lease_resolver=lambda tid: higher_lease,
-        state_resolver=lambda: (1, "1" * 64),
+        lease_authority=StaticLeaseAuthority({"TASK-01": higher_lease}),
+        state_authority=StaticStateAuthority(1, "1" * 64),
     )
 
     res = controller.submit_proposal(
@@ -795,8 +798,8 @@ def test_proposal_with_stale_state_version_rejected_by_d5_controller(sample_cont
     controller = SClassController(
         authority_signer=signer,
         nonce_store=nonce_store,
-        lease_resolver=lease_manager.get_active_lease,
-        state_resolver=lambda: (5, "1" * 64),
+        lease_authority=lease_manager,
+        state_authority=StaticStateAuthority(5, "1" * 64),
     )
 
     obl = Obligation(
@@ -832,8 +835,8 @@ def test_proposal_with_stale_state_digest_rejected_by_d5_controller(sample_conte
     controller = SClassController(
         authority_signer=signer,
         nonce_store=nonce_store,
-        lease_resolver=lease_manager.get_active_lease,
-        state_resolver=lambda: (1, "9" * 64),
+        lease_authority=lease_manager,
+        state_authority=StaticStateAuthority(1, "9" * 64),
     )
 
     obl = Obligation(
@@ -982,9 +985,37 @@ def test_full_governed_lifecycle_flow(lease_manager, sample_context, sample_stat
     controller = SClassController(
         authority_signer=signer,
         nonce_store=nonce_store,
-        lease_resolver=lease_manager.get_active_lease,
-        state_resolver=lambda: (sample_state_view.content.state_version, sample_state_view.content.state_digest),
+        lease_authority=lease_manager,
+        state_authority=StaticStateAuthority(sample_state_view.content.state_version, sample_state_view.content.state_digest),
     )
+
+    obl = Obligation(
+        obligation_id="OBL-AUTH-01",
+        task_id="TASK-D8-001",
+        title="Verify Authentication",
+        description="Must enforce 403 on unauthenticated request",
+        category=ObligationCategory.SECURITY_INTEGRITY,
+        criticality=Criticality.HIGH,
+    )
+
+    with PlannerSession("TASK-D8-001", "WORKER-E2E", lease_manager) as session:
+        envelope, score = session.plan(sample_state_view, sample_context)
+        proposal = session.next_proposal()
+        assert proposal is not None
+
+        dispatch = controller.submit_proposal(
+            proposal=proposal,
+            obligations={obl.obligation_id: obl},
+            policies={},
+            source_sha="c" * 40,
+            policy_version=1,
+            evaluated_at="2026-08-20T12:00:00Z",
+            expires_at="2026-08-20T12:30:00Z",
+        )
+
+        assert dispatch.decision.status == AuthorizationStatus.AUTHORIZED
+        assert dispatch.execution_token is not None
+        assert dispatch.execution_token.fencing_token == session.active_lease.fencing_token
 
     obl = Obligation(
         obligation_id="OBL-AUTH-01",

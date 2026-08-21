@@ -88,6 +88,10 @@ def fresh_nonce_store(tmp_path):
     return D2NonceStore(file_path=log_file)
 
 
+from controller.authority import StaticLeaseAuthority, StaticStateAuthority
+from planner.models import PlanningLease
+
+
 def make_valid_envelope(
     tmp_path,
     nonce_store: D2NonceStore,
@@ -98,7 +102,21 @@ def make_valid_envelope(
 ) -> ExecutionEnvelope:
     """Helper creating a cryptographically verified and durably admitted ExecutionEnvelope via Controller."""
     signer = Gate3AuthoritySigner()
-    controller = SClassController(authority_signer=signer, nonce_store=nonce_store)
+    lease = PlanningLease(
+        task_id="TASK-001",
+        owner_id="TEST_WORKER",
+        lease_epoch=1,
+        fencing_token=1,
+        acquired_at=TIMESTAMP_NOW,
+        expires_at=TIMESTAMP_EXPIRY,
+        is_active=True,
+    )
+    controller = SClassController(
+        authority_signer=signer,
+        nonce_store=nonce_store,
+        lease_authority=StaticLeaseAuthority({"TASK-001": lease}),
+        state_authority=StaticStateAuthority(1, "1" * 64),
+    )
 
     obligation = Obligation(
         obligation_id="OBL-001",
@@ -133,6 +151,11 @@ def make_valid_envelope(
         purpose="Verify test pass in workspace",
         execution_context=context,
         parameters={"quiet": True},
+        owner_id="TEST_WORKER",
+        fencing_token=1,
+        lease_epoch=1,
+        state_version=1,
+        state_digest="1" * 64,
     )
     dispatch = controller.submit_proposal(
         proposal=proposal,
@@ -236,7 +259,21 @@ def test_gateway_rejected_on_unadmitted_or_tampered_token(tmp_path, fresh_nonce_
     signer = Gate3AuthoritySigner()
     gateway = D6ExecutionGateway(authority_signer=signer, nonce_store=fresh_nonce_store)
 
-    controller = SClassController(authority_signer=signer, nonce_store=fresh_nonce_store)
+    lease = PlanningLease(
+        task_id="TASK-001",
+        owner_id="TEST_WORKER",
+        lease_epoch=1,
+        fencing_token=1,
+        acquired_at=TIMESTAMP_NOW,
+        expires_at=TIMESTAMP_EXPIRY,
+        is_active=True,
+    )
+    controller = SClassController(
+        authority_signer=signer,
+        nonce_store=fresh_nonce_store,
+        lease_authority=StaticLeaseAuthority({"TASK-001": lease}),
+        state_authority=StaticStateAuthority(1, "1" * 64),
+    )
     obligation = Obligation(
         obligation_id="OBL-001",
         task_id="TASK-001",
@@ -255,7 +292,19 @@ def test_gateway_rejected_on_unadmitted_or_tampered_token(tmp_path, fresh_nonce_
         expression=PolicyExpression(combinator=CombinatorType.ALL, rules=(PolicyRule(rule_type=RuleType.NO_CONFLICTS, parameters={}),)),
     )
     ctx = ExecutionContext("pytest_runner_engine", "sbx_1", "ws_1", "res_1", ("CAP_EXEC_TEST",))
-    proposal = ActionProposal("ACT-001", "OBL-001", "EXECUTE_TEST", "tests/t.py", "test", ctx)
+    proposal = ActionProposal(
+        proposal_id="ACT-001",
+        obligation_id="OBL-001",
+        action_type="EXECUTE_TEST",
+        target="tests/t.py",
+        purpose="test",
+        execution_context=ctx,
+        owner_id="TEST_WORKER",
+        fencing_token=1,
+        lease_epoch=1,
+        state_version=1,
+        state_digest="1" * 64,
+    )
 
     dispatch = controller.submit_proposal(
         proposal=proposal,
@@ -289,6 +338,11 @@ def test_gateway_rejected_on_unadmitted_or_tampered_token(tmp_path, fresh_nonce_
         admitted_at=TIMESTAMP_NOW,
         is_admitted=True,
         signature=signer.sign_payload(b"tampered", timestamp_iso=TIMESTAMP_NOW),
+        owner_id=token.owner_id,
+        fencing_token=token.fencing_token,
+        lease_epoch=token.lease_epoch,
+        state_version=token.state_version,
+        state_digest=token.state_digest,
     )
 
     env = ExecutionEnvelope(token, admission, binding, ctx)

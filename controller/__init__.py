@@ -37,6 +37,12 @@ from controller.authorization import (
     AuthorizationDecision,
     AuthorizationEngine,
 )
+from controller.authority import (
+    LeaseAuthority,
+    StateAuthority,
+    StaticLeaseAuthority,
+    StaticStateAuthority,
+)
 from controller.controller import (
     SClassController,
     ControllerDispatchResult,
@@ -44,6 +50,10 @@ from controller.controller import (
 )
 
 __all__ = [
+    "LeaseAuthority",
+    "StateAuthority",
+    "StaticLeaseAuthority",
+    "StaticStateAuthority",
     "ActionBinding",
     "ExecutionContext",
     "ExecutionToken",

@@ -155,8 +155,6 @@ class AuthorizationEngine:
         active_owner_id: Optional[str] = None,
         expected_state_version: Optional[int] = None,
         expected_state_digest: Optional[str] = None,
-        enforce_lease: bool = False,
-        enforce_state: bool = False,
     ) -> AuthorizationDecision:
         """Evaluates preconditions and produces an immutable AuthorizationDecision."""
         if not evaluated_at:
@@ -164,68 +162,47 @@ class AuthorizationEngine:
 
         reasons: list[str] = []
 
-        # 0. Exact Fencing & Lease Identity Validation
-        if enforce_lease:
-            if active_fencing_token is None:
-                reasons.append("INVALID_FENCING_TOKEN: No active planning lease found for target obligation.")
-            elif proposal.fencing_token != active_fencing_token:
-                reasons.append(
-                    f"INVALID_FENCING_TOKEN: Proposal fencing_token {proposal.fencing_token} "
-                    f"does not match active lease fencing_token {active_fencing_token}."
-                )
-            if active_lease_epoch is not None and proposal.lease_epoch != active_lease_epoch:
-                reasons.append(
-                    f"INVALID_LEASE_EPOCH: Proposal lease_epoch {proposal.lease_epoch} "
-                    f"does not match active lease lease_epoch {active_lease_epoch}."
-                )
-            if active_owner_id is not None and proposal.owner_id != active_owner_id:
-                reasons.append(
-                    f"WRONG_LEASE_OWNER: Proposal owner '{proposal.owner_id}' "
-                    f"does not match active lease owner '{active_owner_id}'."
-                )
-        else:
-            if active_fencing_token is not None and proposal.fencing_token != active_fencing_token:
-                reasons.append(
-                    f"INVALID_FENCING_TOKEN: Proposal fencing_token {proposal.fencing_token} "
-                    f"does not match active lease fencing_token {active_fencing_token}."
-                )
-            if active_lease_epoch is not None and proposal.lease_epoch != active_lease_epoch:
-                reasons.append(
-                    f"INVALID_LEASE_EPOCH: Proposal lease_epoch {proposal.lease_epoch} "
-                    f"does not match active lease lease_epoch {active_lease_epoch}."
-                )
-            if active_owner_id is not None and proposal.owner_id != active_owner_id:
-                reasons.append(
-                    f"WRONG_LEASE_OWNER: Proposal owner '{proposal.owner_id}' "
-                    f"does not match active lease owner '{active_owner_id}'."
-                )
+        # 0. Exact Fencing & Lease Identity Validation (Strict Fail-Closed)
+        if active_fencing_token is None:
+            reasons.append("INVALID_FENCING_TOKEN: No active planning lease found for target obligation.")
+        elif proposal.fencing_token != active_fencing_token:
+            reasons.append(
+                f"INVALID_FENCING_TOKEN: Proposal fencing_token {proposal.fencing_token} "
+                f"does not match active lease fencing_token {active_fencing_token}."
+            )
 
-        # 0b. Exact State Freshness Validation
-        if enforce_state:
-            if expected_state_version is None or not expected_state_digest:
-                reasons.append("STALE_STATE_VERSION: No authoritative state resolution available.")
-            else:
-                if proposal.state_version != expected_state_version:
-                    reasons.append(
-                        f"STALE_STATE_VERSION: Proposal state_version {proposal.state_version} "
-                        f"does not match authoritative state_version {expected_state_version}."
-                    )
-                if proposal.state_digest != expected_state_digest:
-                    reasons.append(
-                        f"STALE_STATE_DIGEST: Proposal state_digest '{proposal.state_digest}' "
-                        f"does not match authoritative state_digest '{expected_state_digest}'."
-                    )
-        else:
-            if expected_state_version is not None and proposal.state_version != expected_state_version:
-                reasons.append(
-                    f"STALE_STATE_VERSION: Proposal state_version {proposal.state_version} "
-                    f"does not match current state_version {expected_state_version}."
-                )
-            if expected_state_digest is not None and proposal.state_digest != expected_state_digest:
-                reasons.append(
-                    f"STALE_STATE_DIGEST: Proposal state_digest '{proposal.state_digest}' "
-                    f"does not match current state_digest '{expected_state_digest}'."
-                )
+        if active_lease_epoch is None:
+            reasons.append("INVALID_LEASE_EPOCH: No active lease epoch available.")
+        elif proposal.lease_epoch != active_lease_epoch:
+            reasons.append(
+                f"INVALID_LEASE_EPOCH: Proposal lease_epoch {proposal.lease_epoch} "
+                f"does not match active lease lease_epoch {active_lease_epoch}."
+            )
+
+        if not active_owner_id:
+            reasons.append("WRONG_LEASE_OWNER: No active lease owner available.")
+        elif proposal.owner_id != active_owner_id:
+            reasons.append(
+                f"WRONG_LEASE_OWNER: Proposal owner '{proposal.owner_id}' "
+                f"does not match active lease owner '{active_owner_id}'."
+            )
+
+        # 0b. Exact State Freshness Validation (Strict Fail-Closed)
+        if expected_state_version is None:
+            reasons.append("STALE_STATE_VERSION: No authoritative state version available.")
+        elif proposal.state_version != expected_state_version:
+            reasons.append(
+                f"STALE_STATE_VERSION: Proposal state_version {proposal.state_version} "
+                f"does not match authoritative state_version {expected_state_version}."
+            )
+
+        if not expected_state_digest:
+            reasons.append("STALE_STATE_DIGEST: No authoritative state digest available.")
+        elif proposal.state_digest != expected_state_digest:
+            reasons.append(
+                f"STALE_STATE_DIGEST: Proposal state_digest '{proposal.state_digest}' "
+                f"does not match authoritative state_digest '{expected_state_digest}'."
+            )
 
         # 1. Target Obligation Existence
         target_obl = obligations.get(proposal.obligation_id)

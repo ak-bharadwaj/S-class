@@ -41,10 +41,12 @@ from controller.token import (
     verify_execution_envelope,
 )
 
+from controller.authority import LeaseAuthority, StateAuthority
+
 
 @dataclass(frozen=True)
 class ControllerDispatchResult:
-    """Result of submitting an ActionProposal to the Controller."""
+    """Immutable result of submitting an ActionProposal to the controller."""
     proposal_id: str
     decision: AuthorizationDecision
     execution_token: Optional[ExecutionToken] = None
@@ -68,16 +70,16 @@ class SClassController:
         authority_signer: AuthoritySignerProtocol,
         pipeline: Optional[LifecyclePipeline] = None,
         nonce_store: Optional[D2NonceStore] = None,
-        lease_resolver: Optional[Callable[[str], Optional[Any]]] = None,
-        state_resolver: Optional[Callable[[], Tuple[int, str]]] = None,
+        lease_authority: Optional[LeaseAuthority] = None,
+        state_authority: Optional[StateAuthority] = None,
     ):
         if not isinstance(authority_signer, AuthoritySignerProtocol):
             raise TypeError("authority_signer must implement AuthoritySignerProtocol.")
         self._authority_signer = authority_signer
         self._pipeline = pipeline or LifecyclePipeline()
         self._nonce_store = nonce_store or D2NonceStore()
-        self._lease_resolver = lease_resolver
-        self._state_resolver = state_resolver
+        self._lease_authority = lease_authority
+        self._state_authority = state_authority
 
 
     def issue_session_binding(
@@ -181,30 +183,190 @@ class SClassController:
                 error_message=pre_auth_res.error_message,
             )
 
-        # Resolve authoritative lease and state internally
+        # Resolve authoritative lease internally (Strict Fail-Closed)
+        if self._lease_authority is None:
+            decision = AuthorizationDecision(
+                decision_id=f"DEC-{uuid.uuid4().hex[:8]}",
+                proposal_id=proposal.proposal_id,
+                obligation_id=proposal.obligation_id,
+                action_digest=proposal.action_digest,
+                context_digest=proposal.context_digest,
+                status=AuthorizationStatus.REJECTED,
+                rejection_reasons=("MISSING_LEASE_AUTHORITY: Controller has no authoritative lease provider configured",),
+                evaluated_at=evaluated_at,
+                source_sha=source_sha,
+                policy_version=policy_version,
+            )
+            return ControllerDispatchResult(
+                proposal_id=proposal.proposal_id,
+                decision=decision,
+                error_message="MISSING_LEASE_AUTHORITY: Controller has no authoritative lease provider configured",
+            )
+
+        if not isinstance(self._lease_authority, LeaseAuthority):
+            decision = AuthorizationDecision(
+                decision_id=f"DEC-{uuid.uuid4().hex[:8]}",
+                proposal_id=proposal.proposal_id,
+                obligation_id=proposal.obligation_id,
+                action_digest=proposal.action_digest,
+                context_digest=proposal.context_digest,
+                status=AuthorizationStatus.REJECTED,
+                rejection_reasons=("INVALID_LEASE_AUTHORITY: lease_authority does not implement LeaseAuthority protocol",),
+                evaluated_at=evaluated_at,
+                source_sha=source_sha,
+                policy_version=policy_version,
+            )
+            return ControllerDispatchResult(
+                proposal_id=proposal.proposal_id,
+                decision=decision,
+                error_message="INVALID_LEASE_AUTHORITY: lease_authority does not implement LeaseAuthority protocol",
+            )
+
         target_obl = obligations.get(proposal.obligation_id)
         task_id = target_obl.task_id if target_obl else None
+        if not task_id:
+            decision = AuthorizationDecision(
+                decision_id=f"DEC-{uuid.uuid4().hex[:8]}",
+                proposal_id=proposal.proposal_id,
+                obligation_id=proposal.obligation_id,
+                action_digest=proposal.action_digest,
+                context_digest=proposal.context_digest,
+                status=AuthorizationStatus.REJECTED,
+                rejection_reasons=(f"Target obligation '{proposal.obligation_id}' has no associated task_id",),
+                evaluated_at=evaluated_at,
+                source_sha=source_sha,
+                policy_version=policy_version,
+            )
+            return ControllerDispatchResult(
+                proposal_id=proposal.proposal_id,
+                decision=decision,
+                error_message="Target obligation has no associated task_id",
+            )
 
-        active_fencing_token = None
-        active_lease_epoch = None
-        active_owner_id = None
-        enforce_lease = False
+        try:
+            active_lease = self._lease_authority.get_active_lease(task_id)
+        except Exception as exc:
+            decision = AuthorizationDecision(
+                decision_id=f"DEC-{uuid.uuid4().hex[:8]}",
+                proposal_id=proposal.proposal_id,
+                obligation_id=proposal.obligation_id,
+                action_digest=proposal.action_digest,
+                context_digest=proposal.context_digest,
+                status=AuthorizationStatus.REJECTED,
+                rejection_reasons=(f"LEASE_STATE_CORRUPT: Failed to resolve lease for task '{task_id}': {exc}",),
+                evaluated_at=evaluated_at,
+                source_sha=source_sha,
+                policy_version=policy_version,
+            )
+            return ControllerDispatchResult(
+                proposal_id=proposal.proposal_id,
+                decision=decision,
+                error_message=f"LEASE_STATE_CORRUPT: Failed to resolve lease for task '{task_id}': {exc}",
+            )
 
-        if self._lease_resolver is not None:
-            enforce_lease = True
-            active_lease = self._lease_resolver(task_id) if task_id else None
-            if active_lease is not None and getattr(active_lease, "is_active", True):
-                active_fencing_token = getattr(active_lease, "fencing_token", None)
-                active_lease_epoch = getattr(active_lease, "lease_epoch", None)
-                active_owner_id = getattr(active_lease, "owner_id", None)
+        if active_lease is None or not active_lease.is_active:
+            decision = AuthorizationDecision(
+                decision_id=f"DEC-{uuid.uuid4().hex[:8]}",
+                proposal_id=proposal.proposal_id,
+                obligation_id=proposal.obligation_id,
+                action_digest=proposal.action_digest,
+                context_digest=proposal.context_digest,
+                status=AuthorizationStatus.REJECTED,
+                rejection_reasons=(f"NO_ACTIVE_LEASE: No active planning lease found for task '{task_id}'",),
+                evaluated_at=evaluated_at,
+                source_sha=source_sha,
+                policy_version=policy_version,
+            )
+            return ControllerDispatchResult(
+                proposal_id=proposal.proposal_id,
+                decision=decision,
+                error_message=f"NO_ACTIVE_LEASE: No active planning lease found for task '{task_id}'",
+            )
 
-        expected_state_version = None
-        expected_state_digest = None
-        enforce_state = False
+        from planner.models import PlanningLease
+        if not isinstance(active_lease, PlanningLease):
+            decision = AuthorizationDecision(
+                decision_id=f"DEC-{uuid.uuid4().hex[:8]}",
+                proposal_id=proposal.proposal_id,
+                obligation_id=proposal.obligation_id,
+                action_digest=proposal.action_digest,
+                context_digest=proposal.context_digest,
+                status=AuthorizationStatus.REJECTED,
+                rejection_reasons=("INVALID_LEASE_RECORD: Resolved lease is not a PlanningLease instance",),
+                evaluated_at=evaluated_at,
+                source_sha=source_sha,
+                policy_version=policy_version,
+            )
+            return ControllerDispatchResult(
+                proposal_id=proposal.proposal_id,
+                decision=decision,
+                error_message="INVALID_LEASE_RECORD: Resolved lease is not a PlanningLease instance",
+            )
 
-        if self._state_resolver is not None:
-            enforce_state = True
-            expected_state_version, expected_state_digest = self._state_resolver()
+        # Resolve authoritative state internally (Strict Fail-Closed)
+        if self._state_authority is None:
+            decision = AuthorizationDecision(
+                decision_id=f"DEC-{uuid.uuid4().hex[:8]}",
+                proposal_id=proposal.proposal_id,
+                obligation_id=proposal.obligation_id,
+                action_digest=proposal.action_digest,
+                context_digest=proposal.context_digest,
+                status=AuthorizationStatus.REJECTED,
+                rejection_reasons=("MISSING_STATE_AUTHORITY: Controller has no authoritative state provider configured",),
+                evaluated_at=evaluated_at,
+                source_sha=source_sha,
+                policy_version=policy_version,
+            )
+            return ControllerDispatchResult(
+                proposal_id=proposal.proposal_id,
+                decision=decision,
+                error_message="MISSING_STATE_AUTHORITY: Controller has no authoritative state provider configured",
+            )
+
+        if not isinstance(self._state_authority, StateAuthority):
+            decision = AuthorizationDecision(
+                decision_id=f"DEC-{uuid.uuid4().hex[:8]}",
+                proposal_id=proposal.proposal_id,
+                obligation_id=proposal.obligation_id,
+                action_digest=proposal.action_digest,
+                context_digest=proposal.context_digest,
+                status=AuthorizationStatus.REJECTED,
+                rejection_reasons=("INVALID_STATE_AUTHORITY: state_authority does not implement StateAuthority protocol",),
+                evaluated_at=evaluated_at,
+                source_sha=source_sha,
+                policy_version=policy_version,
+            )
+            return ControllerDispatchResult(
+                proposal_id=proposal.proposal_id,
+                decision=decision,
+                error_message="INVALID_STATE_AUTHORITY: state_authority does not implement StateAuthority protocol",
+            )
+
+        try:
+            state_coords = self._state_authority.get_authoritative_state()
+            if not isinstance(state_coords, tuple) or len(state_coords) != 2:
+                raise ValueError("State coordinates must be a Tuple[int, str]")
+            expected_state_version, expected_state_digest = state_coords
+            if not isinstance(expected_state_version, int) or not isinstance(expected_state_digest, str):
+                raise ValueError("expected_state_version must be int and expected_state_digest must be str")
+        except Exception as exc:
+            decision = AuthorizationDecision(
+                decision_id=f"DEC-{uuid.uuid4().hex[:8]}",
+                proposal_id=proposal.proposal_id,
+                obligation_id=proposal.obligation_id,
+                action_digest=proposal.action_digest,
+                context_digest=proposal.context_digest,
+                status=AuthorizationStatus.REJECTED,
+                rejection_reasons=(f"STATE_RESOLUTION_FAILED: Failed to resolve authoritative state: {exc}",),
+                evaluated_at=evaluated_at,
+                source_sha=source_sha,
+                policy_version=policy_version,
+            )
+            return ControllerDispatchResult(
+                proposal_id=proposal.proposal_id,
+                decision=decision,
+                error_message=f"STATE_RESOLUTION_FAILED: Failed to resolve authoritative state: {exc}",
+            )
 
         # Precondition Evaluation -> Creates IMMUTABLE AuthorizationDecision
         decision = AuthorizationEngine.evaluate_proposal(
@@ -216,13 +378,11 @@ class SClassController:
             evaluated_at=evaluated_at,
             budget_remaining=budget_remaining,
             allowed_action_types=allowed_action_types,
-            active_fencing_token=active_fencing_token,
-            active_lease_epoch=active_lease_epoch,
-            active_owner_id=active_owner_id,
+            active_fencing_token=active_lease.fencing_token,
+            active_lease_epoch=active_lease.lease_epoch,
+            active_owner_id=active_lease.owner_id,
             expected_state_version=expected_state_version,
             expected_state_digest=expected_state_digest,
-            enforce_lease=enforce_lease,
-            enforce_state=enforce_state,
         )
 
         # If not authorized, halt immediately: no token minted

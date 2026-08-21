@@ -25,6 +25,7 @@ from planner.lease import (
     PlanningLeaseManager,
     LeaseAcquisitionError,
     LeaseValidationError,
+    LeaseCorruptionError,
 )
 from planner.projector import StateProjector
 from planner.generator import (

@@ -90,8 +90,30 @@ class ActionProposalSynthesizer:
                 f"do not match execution context capability set {sorted_caps}."
             )
 
-        if not sorted_caps:
-            return None, "Cannot synthesize proposal with empty capability set in execution context."
+        # Extract active lease and state coordinates from authoritative controller providers
+        fencing_token = 0
+        lease_epoch = 0
+        owner_id = ""
+        state_version = 0
+        state_digest = ""
+
+        if getattr(controller, "_lease_authority", None) is not None:
+            try:
+                active_lease = controller._lease_authority.get_active_lease(active_task_id)
+                if active_lease is not None and getattr(active_lease, "is_active", False):
+                    fencing_token = active_lease.fencing_token
+                    lease_epoch = active_lease.lease_epoch
+                    owner_id = active_lease.owner_id
+            except Exception:
+                pass
+
+        if getattr(controller, "_state_authority", None) is not None:
+            try:
+                state_coords = controller._state_authority.get_authoritative_state()
+                if isinstance(state_coords, tuple) and len(state_coords) == 2:
+                    state_version, state_digest = state_coords
+            except Exception:
+                pass
 
         args = tool_call.arguments
         proposal_id = f"PROP-{uuid.uuid4().hex[:8].upper()}"
@@ -116,6 +138,11 @@ class ActionProposalSynthesizer:
                 execution_context=session_execution_context,
                 estimated_cost_usd=estimated_cost_usd,
                 parameters=params,
+                owner_id=owner_id,
+                fencing_token=fencing_token,
+                lease_epoch=lease_epoch,
+                state_version=state_version,
+                state_digest=state_digest,
             )
             return proposal, None
 
@@ -141,6 +168,11 @@ class ActionProposalSynthesizer:
                 execution_context=session_execution_context,
                 estimated_cost_usd=estimated_cost_usd,
                 parameters={"patch_content": patch_content},
+                owner_id=owner_id,
+                fencing_token=fencing_token,
+                lease_epoch=lease_epoch,
+                state_version=state_version,
+                state_digest=state_digest,
             )
             return proposal, None
 

@@ -26,6 +26,11 @@ class LeaseValidationError(Exception):
     pass
 
 
+class LeaseCorruptionError(Exception):
+    """Raised when on-disk lease metadata is malformed or corrupted (§8.1, §8.2)."""
+    pass
+
+
 class PlanningLeaseManager:
     """Atomic planning lease manager for single-node and shared-filesystem environments (§8.1, §8.2).
 
@@ -80,7 +85,11 @@ class PlanningLeaseManager:
             pass
 
     def _read_lease_file(self, task_id: str) -> Optional[PlanningLease]:
-        """Reads and parses the active lease file if present."""
+        """Reads and parses the active lease file if present.
+        
+        Raises:
+            LeaseCorruptionError: If the lease file exists but contains invalid JSON or corrupted schema.
+        """
         path = self._lease_path(task_id)
         if not os.path.exists(path):
             return None
@@ -96,8 +105,10 @@ class PlanningLeaseManager:
                 expires_at=data["expires_at"],
                 is_active=data.get("is_active", True),
             )
-        except Exception:
-            return None
+        except Exception as exc:
+            raise LeaseCorruptionError(
+                f"Lease record for task '{task_id}' is corrupted on disk at '{path}': {exc}"
+            ) from exc
 
     def _write_lease_file(self, lease: PlanningLease):
         """Atomically writes lease file with fsync and rename."""
