@@ -11,9 +11,205 @@ import tempfile
 from typing import Optional, Dict, Any, Set, Tuple
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric import ed25519
-from events.ipc import OSIPCServer
+from events.ipc import OSIPCServer, OSIPCClient
 from events.store import DeploymentStatus
 from events.serializer import canonicalize_json
+
+
+class DurableDeploymentAuthorityStore:
+    """External durable authority storage for deployment lifecycle and one-time authorization records.
+    Survives broker restart, S-Class restart, local broker-state destruction, D2 store destruction,
+    and process crashes.
+    """
+    def __init__(self, store_path: Optional[str] = None):
+        if store_path is None:
+            store_path = os.environ.get(
+                "SCLASS_EXTERNAL_AUTHORITY_STORE_PATH",
+                os.path.join(tempfile.gettempdir(), ".sclass_external_authority_registry.json")
+            )
+        self.store_path = os.path.abspath(store_path)
+        self.lock_path = self.store_path + ".lock"
+        self._ensure_dir()
+
+    def _ensure_dir(self) -> None:
+        os.makedirs(os.path.dirname(self.store_path), mode=0o700, exist_ok=True)
+
+    def _load_data(self) -> Dict[str, Any]:
+        if not os.path.exists(self.store_path) or os.path.getsize(self.store_path) == 0:
+            return {"consumed_authorizations": {}, "bootstrapped_deployments": {}}
+        try:
+            with open(self.store_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+        except Exception:
+            pass
+        return {"consumed_authorizations": {}, "bootstrapped_deployments": {}}
+
+    def _save_data(self, data: Dict[str, Any]) -> None:
+        self._ensure_dir()
+        dir_name = os.path.dirname(self.store_path)
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=dir_name, prefix="ext_auth_", suffix=".tmp")
+        try:
+            with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, self.store_path)
+            if hasattr(os, "chmod"):
+                try:
+                    os.chmod(self.store_path, 0o600)
+                except OSError:
+                    pass
+        finally:
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+
+    def record_consumed_authorization(
+        self,
+        auth_id: str,
+        deployment_id: str,
+        authorized_at: str,
+    ) -> bool:
+        from file_lock import FileLock
+        with FileLock(self.lock_path, timeout=10.0):
+            data = self._load_data()
+            consumed = data.setdefault("consumed_authorizations", {})
+            if auth_id in consumed:
+                return False
+            consumed[auth_id] = {
+                "authorization_id": auth_id,
+                "deployment_id": deployment_id,
+                "consumed_at": authorized_at,
+            }
+            data.setdefault("bootstrapped_deployments", {})[deployment_id] = auth_id
+            self._save_data(data)
+            return True
+
+    def is_consumed(self, auth_id: str) -> bool:
+        from file_lock import FileLock
+        with FileLock(self.lock_path, timeout=10.0):
+            data = self._load_data()
+            return auth_id in data.get("consumed_authorizations", {})
+
+    def clear_for_testing(self) -> None:
+        if os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1" and os.environ.get("PYTEST_CURRENT_TEST") is None and os.environ.get("SCLASS_TEST_MODE") != "1":
+            raise RuntimeError("clear_for_testing prohibited outside test harness.")
+        from file_lock import FileLock
+        with FileLock(self.lock_path, timeout=10.0):
+            if os.path.exists(self.store_path):
+                try:
+                    os.remove(self.store_path)
+                except OSError:
+                    pass
+
+
+class ExternalDeploymentAuthorityServer:
+    """Authenticated External Deployment Authority Service.
+    Runs as an isolated process/service with durable storage and authenticated IPC.
+    """
+    def __init__(
+        self,
+        endpoint_path: Optional[str] = None,
+        store_path: Optional[str] = None,
+        auth_secret: Optional[str] = None,
+        allowed_uid: Optional[int] = None,
+        root_public_key: Optional[ed25519.Ed25519PublicKey] = None,
+    ):
+        if endpoint_path is None:
+            endpoint_path = os.path.join(tempfile.gettempdir(), f"ext_auth_{os.getpid()}.sock")
+        self.endpoint_path = endpoint_path
+        self.auth_secret = auth_secret or "EXT_AUTH_SECRET"
+        self.allowed_uid = allowed_uid
+        self.store = DurableDeploymentAuthorityStore(store_path=store_path)
+        if root_public_key is None:
+            from benchmark.parity.verify_gate_3_certificate import Gate3PublicKeystore
+            self.root_public_key = Gate3PublicKeystore.get_public_key()
+        else:
+            self.root_public_key = root_public_key
+        self._server = OSIPCServer(
+            endpoint_path=self.endpoint_path,
+            handler=self._handle_request,
+            allowed_uid=self.allowed_uid,
+            auth_secret=self.auth_secret,
+        )
+
+    def _handle_request(self, frame: Dict[str, Any], caller_ctx: Dict[str, Any]) -> Dict[str, Any]:
+        method = frame.get("method")
+        params = frame.get("params", {})
+        if method == "consume_bootstrap_authorization":
+            auth_data = params.get("bootstrap_authorization", {})
+            deployment_id = params.get("deployment_id", "")
+            auth_id = auth_data.get("authorization_id")
+            if not auth_id:
+                return {"success": False, "error": "Missing authorization_id."}
+            if auth_data.get("deployment_id") != deployment_id:
+                return {"success": False, "error": f"Deployment mismatch: expected '{deployment_id}', got '{auth_data.get('deployment_id')}'."}
+            if auth_data.get("purpose") != "VIRGIN_DEPLOYMENT_BOOTSTRAP":
+                return {"success": False, "error": "Invalid purpose: VIRGIN_DEPLOYMENT_BOOTSTRAP required."}
+
+            if self.root_public_key is not None:
+                expected_fp = hashlib.sha256(self.root_public_key.public_bytes_raw()).hexdigest()
+                if auth_data.get("root_fingerprint") != expected_fp:
+                    return {"success": False, "error": "Root fingerprint mismatch."}
+                sig_hex = auth_data.get("signature", {}).get("signature_hex")
+                if not sig_hex:
+                    return {"success": False, "error": "Missing signature."}
+                preimage_bytes = canonicalize_json({
+                    "authorization_id": auth_id,
+                    "deployment_id": deployment_id,
+                    "purpose": "VIRGIN_DEPLOYMENT_BOOTSTRAP",
+                    "authorized_at": auth_data.get("authorized_at"),
+                    "root_fingerprint": expected_fp,
+                })
+                try:
+                    self.root_public_key.verify(bytes.fromhex(sig_hex), preimage_bytes)
+                except Exception as e:
+                    return {"success": False, "error": f"Invalid bootstrap authorization signature: {e}"}
+
+            ok = self.store.record_consumed_authorization(
+                auth_id=auth_id,
+                deployment_id=deployment_id,
+                authorized_at=auth_data.get("authorized_at", ""),
+            )
+            if not ok:
+                return {"success": False, "error": f"Bootstrap authorization '{auth_id}' has already been consumed (replay rejected)."}
+            return {"success": True}
+
+        elif method == "is_consumed":
+            auth_id = params.get("authorization_id", "")
+            return {"success": True, "is_consumed": self.store.is_consumed(auth_id)}
+
+        return {"success": False, "error": f"Unknown method '{method}'"}
+
+    def start(self) -> None:
+        self._server.start()
+
+    def stop(self) -> None:
+        self._server.stop()
+
+
+class ExternalDeploymentAuthorityClient:
+    """Authenticated client for External Deployment Authority Service."""
+    def __init__(self, endpoint_path: str, auth_secret: str):
+        self.endpoint_path = endpoint_path
+        self.auth_secret = auth_secret
+        self._client = OSIPCClient(endpoint_path=endpoint_path, auth_secret=auth_secret)
+
+    def consume_bootstrap_authorization(self, bootstrap_authorization: Dict[str, Any], deployment_id: str) -> None:
+        resp = self._client.call("consume_bootstrap_authorization", {
+            "bootstrap_authorization": bootstrap_authorization,
+            "deployment_id": deployment_id,
+        })
+        if not resp.get("success"):
+            raise RuntimeError(resp.get("error", "External authority rejected bootstrap authorization."))
+
+    def is_consumed(self, authorization_id: str) -> bool:
+        resp = self._client.call("is_consumed", {"authorization_id": authorization_id})
+        return bool(resp.get("is_consumed", False))
 
 
 class TrustedDeploymentBootstrapAuthority:
@@ -21,53 +217,66 @@ class TrustedDeploymentBootstrapAuthority:
     Durably records bootstrap authorizations and ensures exact-once consumption across
     local state destruction, process crashes, and concurrent invocations.
     """
+    _default_store: Optional[DurableDeploymentAuthorityStore] = None
     _lock = threading.RLock()
-    _consumed_authorizations: Dict[str, Dict[str, Any]] = {}
-    _bootstrapped_deployments: Dict[str, str] = {}
+
+    @classmethod
+    def get_store(cls) -> DurableDeploymentAuthorityStore:
+        env_store = os.environ.get("SCLASS_EXTERNAL_AUTHORITY_STORE_PATH")
+        if env_store:
+            return DurableDeploymentAuthorityStore(store_path=env_store)
+        with cls._lock:
+            if cls._default_store is None:
+                cls._default_store = DurableDeploymentAuthorityStore()
+            return cls._default_store
 
     @classmethod
     def consume_bootstrap_authorization(
         cls,
         bootstrap_authorization: Dict[str, Any],
         deployment_id: str,
+        ipc_endpoint: Optional[str] = None,
+        auth_secret: Optional[str] = None,
     ) -> None:
-        with cls._lock:
-            auth_id = bootstrap_authorization.get("authorization_id")
-            if not auth_id:
-                raise RuntimeError("Missing authorization_id in bootstrap authorization.")
+        auth_id = bootstrap_authorization.get("authorization_id")
+        if not auth_id:
+            raise RuntimeError("Missing authorization_id in bootstrap authorization.")
 
-            if auth_id in cls._consumed_authorizations:
-                raise RuntimeError(
-                    f"Bootstrap authorization '{auth_id}' has already been consumed (replay rejected)."
-                )
+        auth_dep_id = bootstrap_authorization.get("deployment_id")
+        if auth_dep_id != deployment_id:
+            raise RuntimeError(
+                f"Bootstrap authorization deployment mismatch: expected '{deployment_id}', got '{auth_dep_id}'."
+            )
 
-            auth_dep_id = bootstrap_authorization.get("deployment_id")
-            if auth_dep_id != deployment_id:
-                raise RuntimeError(
-                    f"Bootstrap authorization deployment mismatch: expected '{deployment_id}', got '{auth_dep_id}'."
-                )
+        if ipc_endpoint:
+            client = ExternalDeploymentAuthorityClient(endpoint_path=ipc_endpoint, auth_secret=auth_secret or "EXT_AUTH_SECRET")
+            client.consume_bootstrap_authorization(bootstrap_authorization, deployment_id)
+            return
 
-            # Atomic consumption
-            cls._consumed_authorizations[auth_id] = {
-                "authorization_id": auth_id,
-                "deployment_id": deployment_id,
-                "consumed_at": bootstrap_authorization.get("authorized_at"),
-            }
-            cls._bootstrapped_deployments[deployment_id] = auth_id
+        store = cls.get_store()
+        ok = store.record_consumed_authorization(
+            auth_id=auth_id,
+            deployment_id=deployment_id,
+            authorized_at=bootstrap_authorization.get("authorized_at", ""),
+        )
+        if not ok:
+            raise RuntimeError(
+                f"Bootstrap authorization '{auth_id}' has already been consumed (replay rejected)."
+            )
 
     @classmethod
-    def is_consumed(cls, auth_id: str) -> bool:
-        with cls._lock:
-            return auth_id in cls._consumed_authorizations
+    def is_consumed(cls, auth_id: str, ipc_endpoint: Optional[str] = None, auth_secret: Optional[str] = None) -> bool:
+        if ipc_endpoint:
+            client = ExternalDeploymentAuthorityClient(endpoint_path=ipc_endpoint, auth_secret=auth_secret or "EXT_AUTH_SECRET")
+            return client.is_consumed(auth_id)
+        return cls.get_store().is_consumed(auth_id)
 
     @classmethod
     def reset_for_testing(cls) -> None:
         """Controlled reset strictly for test harness."""
         if os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1" and os.environ.get("PYTEST_CURRENT_TEST") is None and os.environ.get("SCLASS_TEST_MODE") != "1":
             raise RuntimeError("reset_for_testing prohibited outside test harness.")
-        with cls._lock:
-            cls._consumed_authorizations.clear()
-            cls._bootstrapped_deployments.clear()
+        cls.get_store().clear_for_testing()
 
 
 class TrustedDeploymentBootstrap:

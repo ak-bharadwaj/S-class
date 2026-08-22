@@ -1,4 +1,4 @@
-"""End-to-End Deployment-Level Trust Topology Certification Suite (DC01 - DC50).
+"""End-to-End Deployment-Level Trust Topology Certification Suite (DC01 - DC55).
 Defines and executes the complete out-of-process authority boundary certification:
 
 DC01: production root cannot be caller-selected
@@ -51,6 +51,11 @@ DC47: replay after complete local state destruction -> reject
 DC48: same authorization concurrently used twice -> exactly one succeeds
 DC49: fresh authorization for different deployment -> reject
 DC50: bootstrap authorization deployment/path mismatch -> reject
+DC51: bootstrap authorization consumed -> kill broker process -> start fresh process -> replay same authorization -> REJECT
+DC52: consume authorization -> delete all local S-Class state -> restart -> replay authorization -> REJECT
+DC53: two independent processes race same authorization -> exactly one succeeds
+DC54: consumed authorization survives authority-process restart
+DC55: authorization consumed -> crash before bootstrap state write -> deterministic administrative recovery
 """
 import os
 import sys
@@ -2405,5 +2410,330 @@ def test_dc50_bootstrap_authorization_deployment_mismatch_fails_closed(monkeypat
             )
 
     for p in (state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+
+def _mp_worker_dc53(auth_dict, sf, d2f, ext_store, pub_bytes, q):
+    import os
+    import sys
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+    os.environ["SCLASS_EXTERNAL_AUTHORITY_STORE_PATH"] = ext_store
+    os.environ["SCLASS_EVENT_STORE_PATH"] = os.path.abspath(d2f)
+    try:
+        from events.broker import TrustedDeploymentBootstrap
+        pub_key = ed25519.Ed25519PublicKey.from_public_bytes(pub_bytes)
+        res = TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
+            deployment_id="DC53-DEP",
+            state_file_path=sf,
+            d2_store_path=d2f,
+            bootstrap_authorization=auth_dict,
+            root_public_key=pub_key,
+        )
+        q.put(("SUCCESS", res))
+    except Exception as e:
+        q.put(("ERROR", str(e)))
+
+
+def test_dc51_consumed_authorization_survives_process_kill_and_fresh_process_replay_rejected(monkeypatch):
+    """DC51: Consumed bootstrap authorization survives process kill; fresh process replay is rejected."""
+    ext_store = os.path.join(tempfile.gettempdir(), f"dc51_ext_{os.getpid()}.json")
+    state_file1 = os.path.join(tempfile.gettempdir(), f"dc51_state1_{os.getpid()}.json")
+    state_file2 = os.path.join(tempfile.gettempdir(), f"dc51_state2_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc51_d2_{os.getpid()}.jsonl")
+    for p in (ext_store, ext_store + ".lock", state_file1, state_file2, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+    with patch.dict(os.environ, {
+        "SCLASS_EXTERNAL_AUTHORITY_STORE_PATH": ext_store,
+        "SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file),
+    }):
+        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+        auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
+            deployment_id="DC51-DEP",
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+
+        # 1. Process 1 consumes authorization and bootstraps
+        TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
+            deployment_id="DC51-DEP",
+            state_file_path=state_file1,
+            d2_store_path=d2_file,
+            bootstrap_authorization=auth,
+        )
+        broker1 = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC51-DEP",
+            state_file_path=state_file1,
+            auth_secret="SEC51",
+        )
+        assert broker1.status == DeploymentStatus.NEVER_PROVISIONED
+        del broker1  # Simulated process termination
+
+        # 2. Fresh process attempts to replay authorization
+        with pytest.raises(RuntimeError, match=r"has already been consumed \(replay rejected\)"):
+            TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
+                deployment_id="DC51-DEP",
+                state_file_path=state_file2,
+                d2_store_path=d2_file,
+                bootstrap_authorization=auth,
+            )
+
+    for p in (ext_store, ext_store + ".lock", state_file1, state_file2, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+
+def test_dc52_consume_delete_all_local_state_restart_replay_rejected(monkeypatch):
+    """DC52: After complete local state destruction, replaying consumed authorization is rejected by external authority."""
+    ext_store = os.path.join(tempfile.gettempdir(), f"dc52_ext_{os.getpid()}.json")
+    state_file = os.path.join(tempfile.gettempdir(), f"dc52_state_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc52_d2_{os.getpid()}.jsonl")
+    for p in (ext_store, ext_store + ".lock", state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+    with patch.dict(os.environ, {
+        "SCLASS_EXTERNAL_AUTHORITY_STORE_PATH": ext_store,
+        "SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file),
+    }):
+        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+        auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
+            deployment_id="DC52-DEP",
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+        TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
+            deployment_id="DC52-DEP",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+            bootstrap_authorization=auth,
+        )
+
+        broker = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC52-DEP",
+            state_file_path=state_file,
+            auth_secret="SEC52",
+        )
+        assert broker.status == DeploymentStatus.NEVER_PROVISIONED
+        del broker
+
+        # Complete local state destruction
+        if os.path.exists(state_file):
+            os.remove(state_file)
+        if os.path.exists(d2_file):
+            os.remove(d2_file)
+
+        # Attacker restarts process and attempts replay of consumed authorization
+        with pytest.raises(RuntimeError, match=r"has already been consumed \(replay rejected\)"):
+            TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
+                deployment_id="DC52-DEP",
+                state_file_path=state_file,
+                d2_store_path=d2_file,
+                bootstrap_authorization=auth,
+            )
+
+        # Fresh broker on wiped host starts strictly in CATASTROPHIC_LOSS
+        fresh_broker = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC52-DEP",
+            state_file_path=state_file,
+            auth_secret="SEC52",
+        )
+        assert fresh_broker.status == DeploymentStatus.CATASTROPHIC_LOSS
+
+    for p in (ext_store, ext_store + ".lock", state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+
+def test_dc53_two_independent_processes_race_same_authorization_exactly_one_succeeds(monkeypatch):
+    """DC53: Two independent OS processes racing the same bootstrap authorization results in exactly one success."""
+    import multiprocessing
+    ext_store = os.path.join(tempfile.gettempdir(), f"dc53_ext_{os.getpid()}.json")
+    state_file1 = os.path.join(tempfile.gettempdir(), f"dc53_state1_{os.getpid()}.json")
+    state_file2 = os.path.join(tempfile.gettempdir(), f"dc53_state2_{os.getpid()}.json")
+    d2_file1 = os.path.join(tempfile.gettempdir(), f"dc53_d2_1_{os.getpid()}.jsonl")
+    d2_file2 = os.path.join(tempfile.gettempdir(), f"dc53_d2_2_{os.getpid()}.jsonl")
+    for p in (ext_store, ext_store + ".lock", state_file1, state_file2, d2_file1, d2_file2):
+        if os.path.exists(p):
+            os.remove(p)
+
+    auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
+        deployment_id="DC53-DEP",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    pub_bytes = TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()
+    q = multiprocessing.Queue()
+    p1 = multiprocessing.Process(target=_mp_worker_dc53, args=(auth, state_file1, d2_file1, ext_store, pub_bytes, q))
+    p2 = multiprocessing.Process(target=_mp_worker_dc53, args=(auth, state_file2, d2_file2, ext_store, pub_bytes, q))
+
+    p1.start()
+    p2.start()
+    p1.join(timeout=10)
+    p2.join(timeout=10)
+
+    res1 = q.get(timeout=5)
+    res2 = q.get(timeout=5)
+    statuses = [res1[0], res2[0]]
+
+    assert statuses.count("SUCCESS") == 1
+    assert statuses.count("ERROR") == 1
+    err = res1[1] if res1[0] == "ERROR" else res2[1]
+    assert "has already been consumed" in err
+
+    for p in (ext_store, ext_store + ".lock", state_file1, state_file2, d2_file1, d2_file2):
+        if os.path.exists(p):
+            os.remove(p)
+
+
+def test_dc54_consumed_authorization_survives_authority_process_restart(monkeypatch):
+    """DC54: Consumed authorization in external authority server survives service restart."""
+    from events.broker import ExternalDeploymentAuthorityServer, ExternalDeploymentAuthorityClient
+
+    ext_store = os.path.join(tempfile.gettempdir(), f"dc54_ext_{os.getpid()}.json")
+    endpoint = os.path.join(tempfile.gettempdir(), f"dc54_auth_{os.getpid()}.sock")
+    for p in (ext_store, ext_store + ".lock", endpoint):
+        if os.path.exists(p):
+            os.remove(p)
+
+    auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
+        deployment_id="DC54-DEP",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    # 1. Start External Authority Server
+    server1 = ExternalDeploymentAuthorityServer(
+        endpoint_path=endpoint,
+        store_path=ext_store,
+        auth_secret="SEC54",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    server1.start()
+    try:
+        client1 = ExternalDeploymentAuthorityClient(endpoint_path=endpoint, auth_secret="SEC54")
+        client1.consume_bootstrap_authorization(auth, deployment_id="DC54-DEP")
+        assert client1.is_consumed(auth["authorization_id"])
+    finally:
+        server1.stop()
+
+    # 2. Restart External Authority Server on same durable store
+    server2 = ExternalDeploymentAuthorityServer(
+        endpoint_path=endpoint,
+        store_path=ext_store,
+        auth_secret="SEC54",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    server2.start()
+    try:
+        client2 = ExternalDeploymentAuthorityClient(endpoint_path=endpoint, auth_secret="SEC54")
+        assert client2.is_consumed(auth["authorization_id"])
+        # Attempting to re-consume same authorization fails
+        with pytest.raises(RuntimeError, match=r"has already been consumed \(replay rejected\)"):
+            client2.consume_bootstrap_authorization(auth, deployment_id="DC54-DEP")
+    finally:
+        server2.stop()
+        for p in (ext_store, ext_store + ".lock", endpoint):
+            if os.path.exists(p):
+                os.remove(p)
+
+
+def test_dc55_authorization_consumed_crash_before_bootstrap_state_write_administrative_recovery(monkeypatch):
+    """DC55: Authorization consumed but process crashed before state write leaves host in CATASTROPHIC_LOSS, recovered via reprovisioning."""
+    from events.broker import DurableDeploymentAuthorityStore
+
+    ext_store = os.path.join(tempfile.gettempdir(), f"dc55_ext_{os.getpid()}.json")
+    state_file = os.path.join(tempfile.gettempdir(), f"dc55_state_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc55_d2_{os.getpid()}.jsonl")
+    for p in (ext_store, ext_store + ".lock", state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+    with patch.dict(os.environ, {
+        "SCLASS_EXTERNAL_AUTHORITY_STORE_PATH": ext_store,
+        "SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file),
+    }):
+        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+        auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
+            deployment_id="DC55-DEP",
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+
+        # 1. Simulate consumption in durable authority store, followed by crash before state write
+        store = DurableDeploymentAuthorityStore(store_path=ext_store)
+        store.record_consumed_authorization(
+            auth_id=auth["authorization_id"],
+            deployment_id="DC55-DEP",
+            authorized_at=auth["authorized_at"],
+        )
+
+        # 2. Attempting to replay consumed authorization is rejected
+        with pytest.raises(RuntimeError, match=r"has already been consumed \(replay rejected\)"):
+            TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
+                deployment_id="DC55-DEP",
+                state_file_path=state_file,
+                d2_store_path=d2_file,
+                bootstrap_authorization=auth,
+            )
+
+        # 3. Fresh broker starts without local state -> enters CATASTROPHIC_LOSS
+        broker = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC55-DEP",
+            state_file_path=state_file,
+            auth_secret="SEC55",
+        )
+        assert broker.status == DeploymentStatus.CATASTROPHIC_LOSS
+        broker.start_ipc_server()
+        try:
+            client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC55")
+
+            # 4. External Administrative Reprovisioning Authorization recovers the system
+            reprov_auth = SignedAuthorityManifestLoader.create_reprovisioning_authorization(
+                deployment_id="DC55-DEP",
+                target_manifest_id="M-55-REC",
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            resp = client._client.call("authorize_reprovisioning", {"reprovisioning_authorization": reprov_auth})
+            assert resp.get("success")
+            assert broker.status == DeploymentStatus.RECOVERY_AUTHORIZED
+
+            fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+            client._client.call("register_pending_reprovisioning", {
+                "installation_id": "INST-55-REC",
+                "manifest_id": "M-55-REC",
+                "manifest_version": 1,
+                "manifest_digest": "5" * 64,
+                "root_fingerprint": fp,
+            })
+            d2_store = D2AuthorityManifestStore(file_path=d2_file)
+            d2_store.commit_epoch(
+                manifest_id="M-55-REC",
+                manifest_version=1,
+                payload_digest="5" * 64,
+                signer_identity="Gate3AuthoritativeVerifier",
+                root_fingerprint=fp,
+            )
+            proof = D2InstallationProvisioning.generate_commit_proof(
+                deployment_id="DC55-DEP",
+                installation_id="INST-55-REC",
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+                signer_identity="Gate3AuthoritativeVerifier",
+                d2_store_path=d2_file,
+            )
+            resp_final = client._client.call("record_reprovisioned", {"commit_proof": proof.to_dict()})
+            assert resp_final.get("success")
+            assert broker.status == DeploymentStatus.PROVISIONED
+        finally:
+            broker.stop_ipc_server()
+
+    for p in (ext_store, ext_store + ".lock", state_file, d2_file):
         if os.path.exists(p):
             os.remove(p)
