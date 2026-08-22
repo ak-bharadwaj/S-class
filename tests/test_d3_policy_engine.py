@@ -8983,3 +8983,149 @@ def test_d3_install_e180_same_initial_authorization_single_use_across_restart_an
     )
     # Authorization ID remains recorded in consumed_authorizations
     assert auth["authorization_id"] in restarted_broker.consumed_authorizations
+
+
+def test_d3_install_e181_crash_after_initial_authorization_consumed_survives_restart(tmp_path):
+    """E181: Crash after InitialProvisioningAuthorization is consumed but before pending registration:
+    - Broker restarts in PROVISIONING_AUTHORIZED.
+    - active_initial_authorization is durably preserved.
+    - No replay authorization required.
+    - Only exact authorized pending intent accepted.
+    - Completes to PROVISIONED.
+    """
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, D2AuthorityManifestStore, D2InstallationProvisioning, InMemoryTestDeploymentProvisioner
+
+    d2_file = str(tmp_path / "d2_e181.jsonl")
+    state_file = str(tmp_path / "broker_state_e181.json")
+    store = D2AuthorityManifestStore(file_path=d2_file)
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E181",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+
+    auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+        deployment_id="DEP-E181",
+        target_manifest_id="M-E181",
+        target_manifest_version=1,
+        target_manifest_digest="1" * 64,
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    # 1. Authorize initial provisioning
+    resp = broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": auth}}, {})
+    assert resp.get("success")
+    assert broker.status == DeploymentStatus.PROVISIONING_AUTHORIZED
+    assert auth["authorization_id"] in broker.consumed_authorizations
+
+    # 2. Crash happens before register_pending_provisioning
+    del broker
+
+    # 3. Restart broker
+    restarted_broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E181",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    assert restarted_broker.status == DeploymentStatus.PROVISIONING_AUTHORIZED
+    assert auth["authorization_id"] in restarted_broker.consumed_authorizations
+    assert restarted_broker.active_initial_authorization["target_manifest_id"] == "M-E181"
+    assert restarted_broker.active_initial_authorization["target_manifest_digest"] == "1" * 64
+
+    # 4. Attempting to replay authorization fails
+    resp_replay = restarted_broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": auth}}, {})
+    assert not resp_replay.get("success")
+
+    # 5. Attempting to register mismatched intent fails
+    resp_bad_pending = restarted_broker._dispatch_rpc({
+        "method": "register_pending_provisioning",
+        "params": {
+            "installation_id": "INST-E181",
+            "manifest_id": "M-E181-ROGUE",
+            "manifest_version": 1,
+            "manifest_digest": "1" * 64,
+            "root_fingerprint": fp,
+        }
+    }, {})
+    assert not resp_bad_pending.get("success")
+
+    # 6. Registering exact authorized intent succeeds without re-authorization
+    resp_good_pending = restarted_broker._dispatch_rpc({
+        "method": "register_pending_provisioning",
+        "params": {
+            "installation_id": "INST-E181",
+            "manifest_id": "M-E181",
+            "manifest_version": 1,
+            "manifest_digest": "1" * 64,
+            "root_fingerprint": fp,
+        }
+    }, {})
+    assert resp_good_pending.get("success")
+    assert restarted_broker.status == DeploymentStatus.PROVISIONING_PENDING
+
+    # 7. Commit D2 and finalize to PROVISIONED
+    store.commit_epoch(
+        manifest_id="M-E181",
+        manifest_version=1,
+        payload_digest="1" * 64,
+        signer_identity="Gate3AuthoritativeVerifier",
+        root_fingerprint=fp,
+    )
+    proof = D2InstallationProvisioning.generate_commit_proof(
+        deployment_id="DEP-E181",
+        installation_id="INST-E181",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        signer_identity="Gate3AuthoritativeVerifier",
+        d2_store_path=d2_file,
+    )
+    resp_final = restarted_broker._dispatch_rpc({"method": "record_provisioned", "params": {"commit_proof": proof}}, {})
+    assert resp_final.get("success")
+    assert restarted_broker.status == DeploymentStatus.PROVISIONED
+
+
+def test_d3_install_e182_concurrent_clients_racing_same_initial_authorization(tmp_path):
+    """E182: Concurrent clients racing the same initial authorization -> exactly one admission, no replay, identical resulting intent."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, InMemoryTestDeploymentProvisioner
+    import threading
+
+    state_file = str(tmp_path / "broker_state_e182.json")
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E182",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+
+    auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+        deployment_id="DEP-E182",
+        target_manifest_id="M-E182",
+        target_manifest_version=1,
+        target_manifest_digest="2" * 64,
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    results = []
+    def client_worker():
+        r = broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": auth}}, {})
+        results.append(r)
+
+    threads = [threading.Thread(target=client_worker) for _ in range(10)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    successes = [r for r in results if r.get("success")]
+    failures = [r for r in results if not r.get("success")]
+
+    assert len(successes) == 1
+    assert len(failures) == 9
+    assert broker.status == DeploymentStatus.PROVISIONING_AUTHORIZED
+    assert auth["authorization_id"] in broker.consumed_authorizations
+    assert broker.active_initial_authorization["target_manifest_id"] == "M-E182"
+
