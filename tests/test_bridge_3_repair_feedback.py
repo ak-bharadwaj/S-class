@@ -153,3 +153,13 @@ def test_repair_feedback_builder_rejected_assessment():
     assert "AssertionError: assert 5 == 9" in feedback.failure_diagnostics
     assert "def square(x):" in feedback.suggested_repair_prompt
     assert "AssertionError: assert 5 == 9" in feedback.suggested_repair_prompt
+
+
+def test_repair_feedback_builder_rejects_unauthenticated_receipt():
+    """Verifies that an unauthenticated or invalid receipt is rejected fail-closed."""
+    with pytest.raises(TypeError):
+        RepairFeedbackBuilder.build_repair_feedback(
+            receipt="not_a_receipt",  # type: ignore
+            claim_states={},
+            evidence_items=[],
+        )

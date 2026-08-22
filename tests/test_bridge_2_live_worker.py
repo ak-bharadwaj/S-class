@@ -4,8 +4,8 @@ Verifies:
 1. Parsing of JSON tool calls into AgentToolCall objects.
 2. Parsing of Python code blocks into propose_code_patch tool calls.
 3. Canonical hash-chaining and AgentMessageChainValidator verification.
-4. Error containment and graceful degradation on model exceptions.
-5. Multi-turn execution within AgentSessionManager.
+4. Strict tool name registry validation and argument schema enforcement.
+5. Error containment and graceful degradation on model exceptions.
 """
 
 import pytest
@@ -108,6 +108,70 @@ def test_live_worker_json_tool_call_parsing(sample_context):
     assert len(turn_resp.tool_calls) == 1
     assert turn_resp.tool_calls[0].tool_name == "propose_test_run"
     assert turn_resp.tool_calls[0].arguments["obligation_id"] == "OBL-001"
+
+
+def test_live_worker_reject_unauthorized_tool_name(sample_context):
+    """Verifies that model attempts to invoke unapproved tools are rejected."""
+    bad_tool_reply = (
+        "```json\n"
+        "{\n"
+        '  "thought": "Let me bypass policy and delete files",\n'
+        '  "tool": "arbitrary_shell_command",\n'
+        '  "args": {"cmd": "rm -rf /"},\n'
+        '  "status": "CONTINUE"\n'
+        "}\n"
+        "```"
+    )
+    worker = LiveModelWorker(provider=MockTestProvider([bad_tool_reply]), worker_id="test-worker")
+    msg = worker.generate_inbound_message(
+        context=sample_context,
+        sequence=1,
+        previous_digest=GENESIS_DIGEST,
+        history=(),
+    )
+    valid, _, _, turn_resp = AgentMessageChainValidator.validate_inbound_message(
+        message=msg,
+        expected_session_id=sample_context.session_id,
+        expected_worker_id="test-worker",
+        expected_sequence=1,
+        expected_previous_digest=GENESIS_DIGEST,
+    )
+    assert valid is True
+    assert turn_resp is not None
+    assert len(turn_resp.tool_calls) == 0
+    assert "not in allowed tool registry" in turn_resp.thought
+
+
+def test_live_worker_reject_malformed_arguments(sample_context):
+    """Verifies that tool calls missing mandatory arguments are rejected."""
+    bad_args_reply = (
+        "```json\n"
+        "{\n"
+        '  "thought": "Proposing test without target_test path",\n'
+        '  "tool": "propose_test_run",\n'
+        '  "args": {"obligation_id": "OBL-001"},\n'
+        '  "status": "CONTINUE"\n'
+        "}\n"
+        "```"
+    )
+    worker = LiveModelWorker(provider=MockTestProvider([bad_args_reply]), worker_id="test-worker")
+    msg = worker.generate_inbound_message(
+        context=sample_context,
+        sequence=1,
+        previous_digest=GENESIS_DIGEST,
+        history=(),
+    )
+    valid, _, _, turn_resp = AgentMessageChainValidator.validate_inbound_message(
+        message=msg,
+        expected_session_id=sample_context.session_id,
+        expected_worker_id="test-worker",
+        expected_sequence=1,
+        expected_previous_digest=GENESIS_DIGEST,
+    )
+    assert valid is True
+    assert turn_resp is not None
+    assert len(turn_resp.tool_calls) == 0
+    assert "'target_test' is required" in turn_resp.thought
 
 
 def test_live_worker_python_code_block_parsing(sample_context):

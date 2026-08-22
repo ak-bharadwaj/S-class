@@ -24,6 +24,8 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 from domain.compiler import SpecCompiler, CompiledDomainPackage
 from domain.models import (
     Task,
+    TaskConstraints,
+    RepositoryContext,
     Obligation,
     Claim,
     Policy,
@@ -191,6 +193,15 @@ def test_full_governed_llm_loop_with_all_three_bridges(tmp_path):
     # =========================================================================
     # BRIDGE 1: SpecCompiler (Task Spec -> Canonical Domain Models)
     # =========================================================================
+    repo_context = RepositoryContext(
+        repository_id="REPO-MAIN",
+        base_commit_sha=DEFAULT_SHA,
+        branch="master",
+    )
+    constraints = TaskConstraints(
+        languages=("python",),
+        timeout_seconds=120,
+    )
     raw_task_spec = {
         "task_id": "MATH-PROD",
         "domain": "Arithmetic / Functional Invariance",
@@ -199,7 +210,11 @@ def test_full_governed_llm_loop_with_all_three_bridges(tmp_path):
             "Verify squaring invariant on positive integers square(x) == x * x"
         ],
     }
-    package: CompiledDomainPackage = SpecCompiler.compile(raw_task_spec, default_base_sha=DEFAULT_SHA)
+    package: CompiledDomainPackage = SpecCompiler.compile(
+        raw_task_spec,
+        repository_context=repo_context,
+        constraints=constraints,
+    )
     assert package.task.task_id == "TASK-MATH-PROD"
     assert len(package.obligations) == 1
     assert len(package.claims) == 1

@@ -1,6 +1,6 @@
 """
 S-Class EOS V11.2 - D1 Domain Spec Compiler (Bridge 1).
-Compiles unstructured tasks, task specifications, and synthesized requirements
+Compiles unstructured tasks, task specifications, VerifiedSpec instances, and synthesized requirements
 into canonical, deeply immutable D1 domain objects (Task, Obligation DAG, Policy, Claim).
 """
 
@@ -41,9 +41,6 @@ from domain.types import (
 )
 from domain.dag import ObligationGraph
 from domain.exceptions import DomainValidationError
-
-
-DEFAULT_BASE_SHA = "a" * 40
 
 
 def _sanitize_slug(text: str) -> str:
@@ -95,36 +92,111 @@ class SpecCompiler:
     @classmethod
     def compile(
         cls,
-        spec_data: Union[Dict[str, Any], str],
+        spec_data: Union[Dict[str, Any], str, Any],
         repository_context: Optional[RepositoryContext] = None,
-        default_base_sha: str = DEFAULT_BASE_SHA,
-        default_repo_id: str = "REPO-MAIN",
+        constraints: Optional[TaskConstraints] = None,
+        task_id_override: Optional[str] = None,
     ) -> CompiledDomainPackage:
         """
-        Compiles raw dictionary, JSON string, or prompt text into a CompiledDomainPackage.
+        Compiles raw dictionary, JSON string, prompt text, VerifiedSpec, or SynthesizedRequirements into a CompiledDomainPackage.
         
         Enforces:
+        - Strict repository_context and constraints presence (fails closed, zero silent manufactured facts).
+        - Fail-closed category and criticality validation (invalid enums raise DomainValidationError).
         - Canonical ID formatting (TASK-*, OBL-*, CLM-*, POL-*).
         - Obligation DAG acyclicity and single-task containment.
         - Initial ClaimStatus.UNSUPPORTED and ObligationStatus.OPEN.
-        - Deep immutability and schema pattern constraints.
         """
-        if isinstance(spec_data, str):
+        raw_obligations: List[Dict[str, Any]] = []
+        invariants: List[str] = []
+        domain_name = "General"
+        raw_prompt = ""
+        task_raw_id = ""
+
+        # 1. Resolve typed input sources
+        # A. VerifiedSpec (from enterprise_pipeline.py)
+        if hasattr(spec_data, "spec_id") and hasattr(spec_data, "invariants") and hasattr(spec_data, "obligations"):
+            task_raw_id = spec_data.spec_id
+            raw_prompt = f"Execute verified specification {spec_data.spec_id}"
+            invariants = list(spec_data.invariants)
+            raw_obligations = list(spec_data.obligations)
+            domain_name = "VerifiedEnterpriseSpec"
+
+        # B. Sequence of SynthesizedRequirement (from domain_primitives.py)
+        elif isinstance(spec_data, (list, tuple)) and spec_data and hasattr(spec_data[0], "id") and hasattr(spec_data[0], "description"):
+            task_raw_id = task_id_override or f"TASK-SYNTH-{uuid.uuid4().hex[:8].upper()}"
+            raw_prompt = "Execute synthesized requirements specification"
+            domain_name = "SynthesizedRequirements"
+            for req in spec_data:
+                # Map requirement category
+                req_cat = getattr(req, "category", None)
+                cat_val = req_cat.value if hasattr(req_cat, "value") else str(req_cat)
+                
+                # Map into canonical obligation dict
+                raw_obligations.append({
+                    "obligation_id": req.id,
+                    "title": req.id,
+                    "description": req.description,
+                    "depends_on": getattr(req, "depends_on", []),
+                    "category": "CORRECTNESS_FUNCTIONAL",
+                    "criticality": "HIGH",
+                })
+
+        # C. Plain string prompt
+        elif isinstance(spec_data, str):
             raw_prompt = spec_data.strip()
-            task_raw_id = f"TASK-{uuid.uuid4().hex[:8].upper()}"
-            invariants: List[str] = [raw_prompt]
+            if not raw_prompt:
+                raise DomainValidationError("raw_prompt cannot be empty.")
+            task_raw_id = task_id_override or f"TASK-{uuid.uuid4().hex[:8].upper()}"
+            invariants = [raw_prompt]
             domain_name = "General"
-            raw_obligations: List[Dict[str, Any]] = []
+
+        # D. Dictionary specification
         elif isinstance(spec_data, dict):
-            raw_prompt = spec_data.get("raw_prompt") or spec_data.get("description") or "Execute governed task"
-            task_raw_id = spec_data.get("task_id") or f"TASK-{uuid.uuid4().hex[:8].upper()}"
+            raw_prompt = spec_data.get("raw_prompt") or spec_data.get("description")
+            if not raw_prompt:
+                raise DomainValidationError("Spec dictionary must contain 'raw_prompt' or 'description'.")
+            task_raw_id = spec_data.get("task_id") or task_id_override or f"TASK-{uuid.uuid4().hex[:8].upper()}"
             invariants = spec_data.get("must_invariants") or spec_data.get("invariants") or []
             domain_name = spec_data.get("domain", "General")
             raw_obligations = spec_data.get("obligations") or []
+
+            # Extract repository_context if embedded
+            if repository_context is None and "repository_context" in spec_data:
+                rc_dict = spec_data["repository_context"]
+                if not isinstance(rc_dict, dict):
+                    raise DomainValidationError("repository_context in spec must be a dictionary.")
+                if "repository_id" not in rc_dict or "base_commit_sha" not in rc_dict or "branch" not in rc_dict:
+                    raise DomainValidationError("repository_context must specify repository_id, base_commit_sha, and branch.")
+                repository_context = RepositoryContext(
+                    repository_id=rc_dict["repository_id"],
+                    base_commit_sha=rc_dict["base_commit_sha"],
+                    branch=rc_dict["branch"],
+                )
+
+            # Extract constraints if embedded
+            if constraints is None and "constraints" in spec_data:
+                c_dict = spec_data["constraints"]
+                if not isinstance(c_dict, dict):
+                    raise DomainValidationError("constraints in spec must be a dictionary.")
+                constraints = TaskConstraints(
+                    languages=tuple(c_dict.get("languages", ("python",))),
+                    timeout_seconds=int(c_dict.get("timeout_seconds", 120)),
+                )
         else:
             raise DomainValidationError(f"Unsupported spec_data type: {type(spec_data)}")
 
-        # 1. Format and validate Task ID
+        # 2. Strict RepositoryContext & Constraints Enforcement (BLOCKER 4)
+        if repository_context is None:
+            raise DomainValidationError(
+                "repository_context is required and cannot be manufactured from unknown defaults."
+            )
+        if constraints is None:
+            raise DomainValidationError(
+                "constraints is required and cannot be manufactured from unknown defaults."
+            )
+
+        # 3. Format and validate Task ID
         slug = _sanitize_slug(task_raw_id)
         if not slug.startswith("TASK-"):
             task_id = f"TASK-{slug}"
@@ -134,32 +206,16 @@ class SpecCompiler:
         if not TASK_ID_PATTERN.match(task_id):
             raise DomainValidationError(f"Synthesized task_id '{task_id}' does not match TASK_ID_PATTERN.")
 
-        # 2. Build or validate RepositoryContext
-        if repository_context is None:
-            if isinstance(spec_data, dict) and "repository_context" in spec_data:
-                rc_dict = spec_data["repository_context"]
-                repository_context = RepositoryContext(
-                    repository_id=rc_dict.get("repository_id", default_repo_id),
-                    base_commit_sha=rc_dict.get("base_commit_sha", default_base_sha),
-                    branch=rc_dict.get("branch", "master"),
-                )
-            else:
-                repository_context = RepositoryContext(
-                    repository_id=default_repo_id,
-                    base_commit_sha=default_base_sha,
-                    branch="master",
-                )
-
-        # 3. Build Task
+        # 4. Build Task
         task = Task(
             task_id=task_id,
             raw_prompt=raw_prompt,
             repository_context=repository_context,
-            constraints=TaskConstraints(languages=("python",), timeout_seconds=120),
+            constraints=constraints,
             environment={"domain": domain_name, "compiler": "SpecCompiler-V11.2"},
         )
 
-        # 4. Synthesize Policy
+        # 5. Synthesize Policy
         pol_id = f"POL-{task_id[5:]}" if task_id.startswith("TASK-") else f"POL-{task_id}"
         if not POLICY_ID_PATTERN.match(pol_id):
             pol_id = f"POL-{_sanitize_slug(pol_id)}"
@@ -174,7 +230,7 @@ class SpecCompiler:
             ),
         )
 
-        # 5. Extract and build Obligations and Claims
+        # 6. Extract and build Obligations and Claims with Fail-Closed Validation (BLOCKER 2)
         obligations: List[Obligation] = []
         claims: List[Claim] = []
 
@@ -187,16 +243,28 @@ class SpecCompiler:
                 if not CLAIM_ID_PATTERN.match(clm_id):
                     clm_id = f"CLM-{_sanitize_slug(clm_id)}"
 
-                cat_str = raw_obl.get("category", "CORRECTNESS_FUNCTIONAL")
-                try:
-                    cat = ObligationCategory(cat_str)
-                except ValueError:
+                # Strict Category Validation
+                cat_val = raw_obl.get("category")
+                if cat_val is not None:
+                    try:
+                        cat = ObligationCategory(cat_val)
+                    except (ValueError, TypeError):
+                        raise DomainValidationError(
+                            f"Invalid obligation category: '{cat_val}'. Must be a valid ObligationCategory enum value."
+                        )
+                else:
                     cat = ObligationCategory.CORRECTNESS_FUNCTIONAL
 
-                crit_str = raw_obl.get("criticality", "HIGH")
-                try:
-                    crit = Criticality(crit_str)
-                except ValueError:
+                # Strict Criticality Validation
+                crit_val = raw_obl.get("criticality")
+                if crit_val is not None:
+                    try:
+                        crit = Criticality(crit_val)
+                    except (ValueError, TypeError):
+                        raise DomainValidationError(
+                            f"Invalid criticality: '{crit_val}'. Must be a valid Criticality enum value."
+                        )
+                else:
                     crit = Criticality.HIGH
 
                 target_module = raw_obl.get("target", "target_module.py")
@@ -310,7 +378,7 @@ class SpecCompiler:
             )
             obligations.append(obl)
 
-        # 6. Validate Obligation DAG acyclicity and constraints
+        # 7. Validate Obligation DAG acyclicity and constraints
         dag = ObligationGraph(task_id=task_id)
         for obl in obligations:
             dag.add_obligation(obl)

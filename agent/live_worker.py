@@ -116,6 +116,8 @@ class LiveModelWorker(AgentWorkerProtocol):
         tool_calls: List[Dict[str, Any]] = []
         status = "CONTINUE"
 
+        ALLOWED_TOOLS = {"propose_test_run", "propose_code_patch", "inspect_file", "list_files"}
+
         # 1. Attempt JSON block extraction
         json_blocks = re.findall(r"```json\s*(\{.*?\})\s*```", text, re.DOTALL)
         for jb in json_blocks:
@@ -123,16 +125,47 @@ class LiveModelWorker(AgentWorkerProtocol):
                 data = json.loads(jb)
                 if isinstance(data, dict):
                     thought = data.get("thought", thought)
-                    if "status" in data and data["status"] in ("CONTINUE", "COMPLETED", "PAUSE_FOR_DISPATCH", "YIELD_BUDGET"):
+                    if "status" in data and data["status"] in ("CONTINUE", "COMPLETED", "PAUSE_FOR_DISPATCH", "FAILED", "WORKER_TIMEOUT"):
                         status = data["status"]
                     if "tool" in data:
-                        tool_calls.append({
-                            "call_id": f"CALL-{uuid.uuid4().hex[:6].upper()}",
-                            "tool": str(data["tool"]),
-                            "args": dict(data.get("args", {})),
-                        })
-            except Exception:
-                pass
+                        tool_name = str(data["tool"]).strip()
+                        raw_args = data.get("args", {})
+                        if not isinstance(raw_args, dict):
+                            thought += f" [Rejected: Tool arguments for '{tool_name}' must be a dictionary]"
+                            continue
+
+                        # Strict tool name validation
+                        if tool_name not in ALLOWED_TOOLS:
+                            thought += f" [Rejected: Tool '{tool_name}' is not in allowed tool registry {sorted(ALLOWED_TOOLS)}]"
+                            continue
+
+                        # Strict argument schema validation
+                        is_valid = True
+                        if tool_name == "propose_test_run":
+                            if not raw_args.get("target_test") or not isinstance(raw_args.get("target_test"), str):
+                                thought += " [Rejected: 'target_test' is required and must be a non-empty string]"
+                                is_valid = False
+                        elif tool_name == "propose_code_patch":
+                            if not raw_args.get("code_content") or not isinstance(raw_args.get("code_content"), str):
+                                thought += " [Rejected: 'code_content' is required and must be a non-empty string]"
+                                is_valid = False
+                        elif tool_name == "inspect_file":
+                            if not raw_args.get("file_path") or not isinstance(raw_args.get("file_path"), str):
+                                thought += " [Rejected: 'file_path' is required and must be a non-empty string]"
+                                is_valid = False
+                        elif tool_name == "list_files":
+                            if "directory_path" in raw_args and not isinstance(raw_args.get("directory_path"), str):
+                                thought += " [Rejected: 'directory_path' must be a string]"
+                                is_valid = False
+
+                        if is_valid:
+                            tool_calls.append({
+                                "call_id": f"CALL-{uuid.uuid4().hex[:6].upper()}",
+                                "tool": tool_name,
+                                "args": raw_args,
+                            })
+            except Exception as ex:
+                thought += f" [JSON parse error: {ex}]"
 
         # 2. If no tool found, attempt Python code fence extraction
         if not tool_calls:
@@ -156,7 +189,8 @@ class LiveModelWorker(AgentWorkerProtocol):
                     },
                 })
             else:
-                thought = text.strip()
+                if not thought:
+                    thought = text.strip()
                 if "done" in text.lower() or "completed" in text.lower() or "all tests pass" in text.lower():
                     status = "COMPLETED"
 

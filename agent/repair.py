@@ -55,14 +55,20 @@ class RepairFeedbackBuilder:
         """Extracts failure lineage from refuting evidence and constructs a bounded repair context."""
         if not isinstance(receipt, AssessmentReceipt):
             raise TypeError("receipt must be an AssessmentReceipt instance.")
+        if not receipt.signature or not receipt.signature.signature_hex:
+            raise ValueError("AssessmentReceipt signature is missing or unverified.")
 
         is_rejected = receipt.verdict == AssessmentVerdict.REJECTED
         refuted_claims: List[str] = []
         contradicted_aspects: List[str] = []
         failure_diagnostics: List[str] = []
 
-        # Map evidence by ID
-        ev_by_id = {ev.evidence_id: ev for ev in evidence_items}
+        # Map evidence by ID, filtering for authentic, valid evidence
+        from domain.types import EvidenceValidity
+        ev_by_id = {
+            ev.evidence_id: ev for ev in evidence_items
+            if isinstance(ev, Evidence) and ev.validity == EvidenceValidity.VALID and ev.signature and ev.signature.raw_stdout_digest
+        }
 
         for cid, state in claim_states.items():
             if state.epistemic_state in (ClaimEpistemicState.CONTRADICTED, ClaimEpistemicState.CONFLICTED):
