@@ -116,7 +116,7 @@ class TypeVerificationProvider:
     @classmethod
     def _get_pyright_version(cls) -> Optional[str]:
         try:
-            proc = subprocess.run([sys.executable, "-m", "pyright", "--version"], capture_output=True, text=True, timeout=10)
+            proc = subprocess.run([sys.executable, "-m", "pyright", "--version"], capture_output=True, text=True, timeout=10, stdin=subprocess.DEVNULL)
             if proc.returncode == 0 and proc.stdout.strip():
                 return proc.stdout.strip()
         except Exception:
@@ -185,7 +185,8 @@ class TypeVerificationProvider:
                     cmd,
                     capture_output=True,
                     text=True,
-                    timeout=60
+                    timeout=60,
+                    stdin=subprocess.DEVNULL
                 )
                 exit_code = proc.returncode
                 raw_output = proc.stdout.strip()

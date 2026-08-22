@@ -386,15 +386,31 @@ def test_dc12_d2_broker_manifest_mismatch_rejected():
         client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC12")
         client.authorize_initial_provisioning()
         resp = client._client.call("record_provisioned", {
-            "installation_id": "INST-12",
-            "manifest_id": "M-12",
-            "manifest_version": 1,
-            "payload_digest": "0" * 64,
-            "root_fingerprint": "FORGED_FP",
-            "root_signature": {
-                "algorithm": "ED25519",
-                "signature_hex": "0" * 128,
-            },
+            "commit_proof": {
+                "proof_version": "D2CommitProofV1",
+                "deployment_id": "DC12-DEP",
+                "installation_id": "INST-12",
+                "manifest_id": "M-12",
+                "manifest_version": 1,
+                "manifest_digest": "0" * 64,
+                "event_type": "AUTHORITY_MANIFEST_COMMITTED",
+                "event_id": "EVT-12",
+                "sequence_number": 1,
+                "parent_digest": "0" * 64,
+                "event_digest": "0" * 64,
+                "head_digest": "0" * 64,
+                "root_fingerprint": "FORGED_FP",
+                "installed_at": "2026-08-21T10:00:00Z",
+                "status": "SEALED",
+                "signature": {
+                    "algorithm": "ED25519",
+                    "signer_identity": "Gate3AuthoritativeVerifier",
+                    "public_key_fingerprint": "FORGED_FP",
+                    "payload_digest": "0" * 64,
+                    "signature_hex": "0" * 128,
+                    "timestamp": "2026-08-21T10:00:00Z",
+                },
+            }
         })
         assert not resp.get("success")
         assert "Root fingerprint mismatch" in resp.get("error", "")

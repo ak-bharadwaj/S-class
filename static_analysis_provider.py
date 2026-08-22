@@ -117,7 +117,7 @@ class StaticAnalysisProvider:
     @classmethod
     def _get_linter_version(cls) -> Optional[str]:
         try:
-            proc = subprocess.run([sys.executable, "-m", "ruff", "--version"], capture_output=True, text=True, timeout=5)
+            proc = subprocess.run([sys.executable, "-m", "ruff", "--version"], capture_output=True, text=True, timeout=5, stdin=subprocess.DEVNULL)
             if proc.returncode == 0 and proc.stdout.strip():
                 return proc.stdout.strip()
         except Exception:
@@ -181,7 +181,8 @@ class StaticAnalysisProvider:
                     cmd,
                     capture_output=True,
                     text=True,
-                    timeout=30
+                    timeout=30,
+                    stdin=subprocess.DEVNULL
                 )
                 exit_code = proc.returncode
                 raw_output = proc.stdout.strip()

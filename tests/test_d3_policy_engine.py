@@ -5939,36 +5939,55 @@ def test_d3_install_e134_broker_restart_preserves_authority_state():
         os.remove(state_file)
 
 
-def test_d3_install_e135_payload_digest_substitution_rejected():
-    """E135: Payload digest substitution in D2 commit proof is cryptographically rejected by broker."""
+def test_d3_install_e135_payload_digest_substitution_rejected(tmp_path):
+    """E135: Payload digest substitution in D2CommitProofV1 signature block is rejected by broker."""
     from events.broker import TrustedDeploymentAuthorityBroker
-    from events.store import DeploymentStatus
+    from events.store import DeploymentStatus, D2AuthorityManifestStore
     from events.serializer import canonicalize_json
+
+    d2_file = str(tmp_path / "d2_e135.jsonl")
+    store = D2AuthorityManifestStore(file_path=d2_file)
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    store.commit_epoch(
+        manifest_id="M-E135",
+        manifest_version=1,
+        payload_digest="1" * 64,
+        signer_identity="Gate3AuthoritativeVerifier",
+        root_fingerprint=fp,
+    )
+    evt = store.store.get_events()[-1]
 
     broker = TrustedDeploymentAuthorityBroker(
         deployment_id="DEP-E135",
         auth_secret="SEC-E135",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
     )
     broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
-    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
 
-    preimage = {
+    proof_dict = {
+        "proof_version": "D2CommitProofV1",
+        "deployment_id": "DEP-E135",
         "installation_id": "INST-E135",
-        "initial_manifest_id": "M-E135",
-        "initial_manifest_version": 1,
-        "initial_manifest_digest": "0" * 64,
+        "manifest_id": "M-E135",
+        "manifest_version": 1,
+        "manifest_digest": "1" * 64,
+        "event_type": "AUTHORITY_MANIFEST_COMMITTED",
+        "event_id": evt.event_id,
+        "sequence_number": evt.sequence_number,
+        "parent_digest": evt.parent_digest,
+        "event_digest": evt.digest,
+        "head_digest": evt.digest,
         "root_fingerprint": fp,
-        "provisioning_epoch": 1,
-        "status": "SEALED",
         "installed_at": "2026-08-21T10:00:00Z",
+        "status": "SEALED",
     }
-    preimage_bytes = canonicalize_json(preimage)
-    real_digest = hashlib.sha256(preimage_bytes).hexdigest()
+    preimage_bytes = canonicalize_json(proof_dict)
     sig = TEST_AUTHORITY_PRIVATE_KEY.sign(preimage_bytes)
 
-    # Attacker substitutes payload digest in root_signature block
-    tampered_sig_block = {
+    # Attacker substitutes payload digest in signature block
+    proof_dict["signature"] = {
         "algorithm": "ED25519",
         "signer_identity": "Gate3AuthoritativeVerifier",
         "public_key_fingerprint": fp,
@@ -5976,54 +5995,66 @@ def test_d3_install_e135_payload_digest_substitution_rejected():
         "signature_hex": sig.hex(),
         "timestamp": "2026-08-21T10:00:00Z",
     }
+
     resp = broker._dispatch_rpc({
         "method": "record_provisioned",
         "params": {
-            "installation_id": "INST-E135",
-            "manifest_id": "M-E135",
-            "initial_manifest_id": "M-E135",
-            "manifest_version": 1,
-            "initial_manifest_version": 1,
-            "initial_manifest_digest": "0" * 64,
-            "root_fingerprint": fp,
-            "payload_digest": real_digest,
-            "root_signature": tampered_sig_block,
-            "installed_at": "2026-08-21T10:00:00Z",
+            "commit_proof": proof_dict,
         }
     }, {})
     assert not resp.get("success")
     assert "Payload digest substitution detected" in resp.get("error", "")
 
 
-def test_d3_install_e136_signature_substitution_rejected():
-    """E136: Signature substitution in D2 commit proof is rejected by broker."""
+def test_d3_install_e136_signature_substitution_rejected(tmp_path):
+    """E136: Signature substitution in D2CommitProofV1 is rejected by broker."""
     from events.broker import TrustedDeploymentAuthorityBroker
-    from events.store import DeploymentStatus
+    from events.store import DeploymentStatus, D2AuthorityManifestStore
     from events.serializer import canonicalize_json
+
+    d2_file = str(tmp_path / "d2_e136.jsonl")
+    store = D2AuthorityManifestStore(file_path=d2_file)
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    store.commit_epoch(
+        manifest_id="M-E136",
+        manifest_version=1,
+        payload_digest="1" * 64,
+        signer_identity="Gate3AuthoritativeVerifier",
+        root_fingerprint=fp,
+    )
+    evt = store.store.get_events()[-1]
 
     broker = TrustedDeploymentAuthorityBroker(
         deployment_id="DEP-E136",
         auth_secret="SEC-E136",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
     )
     broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
-    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
 
-    preimage = {
+    proof_dict = {
+        "proof_version": "D2CommitProofV1",
+        "deployment_id": "DEP-E136",
         "installation_id": "INST-E136",
-        "initial_manifest_id": "M-E136",
-        "initial_manifest_version": 1,
-        "initial_manifest_digest": "0" * 64,
+        "manifest_id": "M-E136",
+        "manifest_version": 1,
+        "manifest_digest": "1" * 64,
+        "event_type": "AUTHORITY_MANIFEST_COMMITTED",
+        "event_id": evt.event_id,
+        "sequence_number": evt.sequence_number,
+        "parent_digest": evt.parent_digest,
+        "event_digest": evt.digest,
+        "head_digest": evt.digest,
         "root_fingerprint": fp,
-        "provisioning_epoch": 1,
-        "status": "SEALED",
         "installed_at": "2026-08-21T10:00:00Z",
+        "status": "SEALED",
     }
-    preimage_bytes = canonicalize_json(preimage)
+    preimage_bytes = canonicalize_json(proof_dict)
     real_digest = hashlib.sha256(preimage_bytes).hexdigest()
 
     # Attacker substitutes corrupted / random signature
-    tampered_sig_block = {
+    proof_dict["signature"] = {
         "algorithm": "ED25519",
         "signer_identity": "Gate3AuthoritativeVerifier",
         "public_key_fingerprint": fp,
@@ -6034,52 +6065,67 @@ def test_d3_install_e136_signature_substitution_rejected():
     resp = broker._dispatch_rpc({
         "method": "record_provisioned",
         "params": {
-            "installation_id": "INST-E136",
-            "manifest_id": "M-E136",
-            "initial_manifest_id": "M-E136",
-            "manifest_version": 1,
-            "initial_manifest_version": 1,
-            "initial_manifest_digest": "0" * 64,
-            "root_fingerprint": fp,
-            "payload_digest": real_digest,
-            "root_signature": tampered_sig_block,
-            "installed_at": "2026-08-21T10:00:00Z",
+            "commit_proof": proof_dict,
         }
     }, {})
     assert not resp.get("success")
     assert "signature verification failed" in resp.get("error", "").lower()
 
 
-def test_d3_install_e137_valid_signature_over_different_manifest_rejected():
-    """E137: Valid signature over different manifest is rejected by broker."""
+def test_d3_install_e137_valid_signature_over_different_manifest_rejected(tmp_path):
+    """E137: Valid signature over different manifest inside D2CommitProofV1 is rejected by broker."""
     from events.broker import TrustedDeploymentAuthorityBroker
-    from events.store import DeploymentStatus
+    from events.store import DeploymentStatus, D2AuthorityManifestStore
     from events.serializer import canonicalize_json
+
+    d2_file = str(tmp_path / "d2_e137.jsonl")
+    store = D2AuthorityManifestStore(file_path=d2_file)
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    store.commit_epoch(
+        manifest_id="M-MANIFEST-B",
+        manifest_version=1,
+        payload_digest="1" * 64,
+        signer_identity="Gate3AuthoritativeVerifier",
+        root_fingerprint=fp,
+    )
+    evt = store.store.get_events()[-1]
 
     broker = TrustedDeploymentAuthorityBroker(
         deployment_id="DEP-E137",
         auth_secret="SEC-E137",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
     )
     broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
-    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
 
     # Preimage for Manifest A
-    preimage_a = {
+    proof_dict_a = {
+        "proof_version": "D2CommitProofV1",
+        "deployment_id": "DEP-E137",
         "installation_id": "INST-E137",
-        "initial_manifest_id": "M-MANIFEST-A",
-        "initial_manifest_version": 1,
-        "initial_manifest_digest": "0" * 64,
+        "manifest_id": "M-MANIFEST-A",
+        "manifest_version": 1,
+        "manifest_digest": "0" * 64,
+        "event_type": "AUTHORITY_MANIFEST_COMMITTED",
+        "event_id": evt.event_id,
+        "sequence_number": evt.sequence_number,
+        "parent_digest": evt.parent_digest,
+        "event_digest": evt.digest,
+        "head_digest": evt.digest,
         "root_fingerprint": fp,
-        "provisioning_epoch": 1,
-        "status": "SEALED",
         "installed_at": "2026-08-21T10:00:00Z",
+        "status": "SEALED",
     }
-    preimage_a_bytes = canonicalize_json(preimage_a)
+    preimage_a_bytes = canonicalize_json(proof_dict_a)
     sig_a = TEST_AUTHORITY_PRIVATE_KEY.sign(preimage_a_bytes)
     digest_a = hashlib.sha256(preimage_a_bytes).hexdigest()
 
-    sig_block_a = {
+    # Attacker tries to use Manifest A's signature to commit Manifest B
+    proof_dict_b = dict(proof_dict_a)
+    proof_dict_b["manifest_id"] = "M-MANIFEST-B"
+    proof_dict_b["manifest_digest"] = "1" * 64
+    proof_dict_b["signature"] = {
         "algorithm": "ED25519",
         "signer_identity": "Gate3AuthoritativeVerifier",
         "public_key_fingerprint": fp,
@@ -6088,51 +6134,64 @@ def test_d3_install_e137_valid_signature_over_different_manifest_rejected():
         "timestamp": "2026-08-21T10:00:00Z",
     }
 
-    # Attacker tries to use Manifest A's signature to commit Manifest B
     resp = broker._dispatch_rpc({
         "method": "record_provisioned",
         "params": {
-            "installation_id": "INST-E137",
-            "manifest_id": "M-MANIFEST-B",  # Mismatched manifest ID
-            "manifest_version": 1,
-            "root_fingerprint": fp,
-            "payload_digest": digest_a,
-            "root_signature": sig_block_a,
-            "installed_at": "2026-08-21T10:00:00Z",
+            "commit_proof": proof_dict_b,
         }
     }, {})
     assert not resp.get("success")
 
 
-def test_d3_install_e138_manifest_id_mismatch_rejected():
-    """E138: Manifest ID mismatch between commit params and seal preimage is rejected."""
+def test_d3_install_e138_manifest_id_mismatch_rejected(tmp_path):
+    """E138: Manifest ID mismatch between D2 event and signed D2CommitProofV1 is rejected."""
     from events.broker import TrustedDeploymentAuthorityBroker
-    from events.store import DeploymentStatus
+    from events.store import DeploymentStatus, D2AuthorityManifestStore
     from events.serializer import canonicalize_json
+
+    d2_file = str(tmp_path / "d2_e138.jsonl")
+    store = D2AuthorityManifestStore(file_path=d2_file)
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    store.commit_epoch(
+        manifest_id="M-ORIGINAL",
+        manifest_version=1,
+        payload_digest="1" * 64,
+        signer_identity="Gate3AuthoritativeVerifier",
+        root_fingerprint=fp,
+    )
+    evt = store.store.get_events()[-1]
 
     broker = TrustedDeploymentAuthorityBroker(
         deployment_id="DEP-E138",
         auth_secret="SEC-E138",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
     )
     broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
-    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
 
-    preimage = {
+    proof_dict = {
+        "proof_version": "D2CommitProofV1",
+        "deployment_id": "DEP-E138",
         "installation_id": "INST-E138",
-        "initial_manifest_id": "M-ORIGINAL",
-        "initial_manifest_version": 1,
-        "initial_manifest_digest": "0" * 64,
+        "manifest_id": "M-FORGED-DIFFERENT",
+        "manifest_version": 1,
+        "manifest_digest": "1" * 64,
+        "event_type": "AUTHORITY_MANIFEST_COMMITTED",
+        "event_id": evt.event_id,
+        "sequence_number": evt.sequence_number,
+        "parent_digest": evt.parent_digest,
+        "event_digest": evt.digest,
+        "head_digest": evt.digest,
         "root_fingerprint": fp,
-        "provisioning_epoch": 1,
-        "status": "SEALED",
         "installed_at": "2026-08-21T10:00:00Z",
+        "status": "SEALED",
     }
-    preimage_bytes = canonicalize_json(preimage)
+    preimage_bytes = canonicalize_json(proof_dict)
     sig = TEST_AUTHORITY_PRIVATE_KEY.sign(preimage_bytes)
     digest = hashlib.sha256(preimage_bytes).hexdigest()
 
-    sig_block = {
+    proof_dict["signature"] = {
         "algorithm": "ED25519",
         "signer_identity": "Gate3AuthoritativeVerifier",
         "public_key_fingerprint": fp,
@@ -6144,51 +6203,62 @@ def test_d3_install_e138_manifest_id_mismatch_rejected():
     resp = broker._dispatch_rpc({
         "method": "record_provisioned",
         "params": {
-            "installation_id": "INST-E138",
-            "manifest_id": "M-FORGED-DIFFERENT",
-            "initial_manifest_id": "M-ORIGINAL",
-            "manifest_version": 1,
-            "initial_manifest_version": 1,
-            "initial_manifest_digest": "0" * 64,
-            "root_fingerprint": fp,
-            "payload_digest": digest,
-            "root_signature": sig_block,
-            "installed_at": "2026-08-21T10:00:00Z",
+            "commit_proof": proof_dict,
         }
     }, {})
     assert not resp.get("success")
     assert "Manifest ID mismatch" in resp.get("error", "")
 
 
-def test_d3_install_e139_manifest_version_mismatch_rejected():
-    """E139: Manifest version mismatch between commit params and seal preimage is rejected."""
+def test_d3_install_e139_manifest_version_mismatch_rejected(tmp_path):
+    """E139: Manifest version mismatch between D2 event and signed D2CommitProofV1 is rejected."""
     from events.broker import TrustedDeploymentAuthorityBroker
-    from events.store import DeploymentStatus
+    from events.store import DeploymentStatus, D2AuthorityManifestStore
     from events.serializer import canonicalize_json
+
+    d2_file = str(tmp_path / "d2_e139.jsonl")
+    store = D2AuthorityManifestStore(file_path=d2_file)
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    store.commit_epoch(
+        manifest_id="M-E139",
+        manifest_version=1,
+        payload_digest="1" * 64,
+        signer_identity="Gate3AuthoritativeVerifier",
+        root_fingerprint=fp,
+    )
+    evt = store.store.get_events()[-1]
 
     broker = TrustedDeploymentAuthorityBroker(
         deployment_id="DEP-E139",
         auth_secret="SEC-E139",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
     )
     broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
-    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
 
-    preimage = {
+    proof_dict = {
+        "proof_version": "D2CommitProofV1",
+        "deployment_id": "DEP-E139",
         "installation_id": "INST-E139",
-        "initial_manifest_id": "M-E139",
-        "initial_manifest_version": 1,
-        "initial_manifest_digest": "0" * 64,
+        "manifest_id": "M-E139",
+        "manifest_version": 99,  # Mismatched version
+        "manifest_digest": "1" * 64,
+        "event_type": "AUTHORITY_MANIFEST_COMMITTED",
+        "event_id": evt.event_id,
+        "sequence_number": evt.sequence_number,
+        "parent_digest": evt.parent_digest,
+        "event_digest": evt.digest,
+        "head_digest": evt.digest,
         "root_fingerprint": fp,
-        "provisioning_epoch": 1,
-        "status": "SEALED",
         "installed_at": "2026-08-21T10:00:00Z",
+        "status": "SEALED",
     }
-    preimage_bytes = canonicalize_json(preimage)
+    preimage_bytes = canonicalize_json(proof_dict)
     sig = TEST_AUTHORITY_PRIVATE_KEY.sign(preimage_bytes)
     digest = hashlib.sha256(preimage_bytes).hexdigest()
 
-    sig_block = {
+    proof_dict["signature"] = {
         "algorithm": "ED25519",
         "signer_identity": "Gate3AuthoritativeVerifier",
         "public_key_fingerprint": fp,
@@ -6200,55 +6270,66 @@ def test_d3_install_e139_manifest_version_mismatch_rejected():
     resp = broker._dispatch_rpc({
         "method": "record_provisioned",
         "params": {
-            "installation_id": "INST-E139",
-            "manifest_id": "M-E139",
-            "manifest_version": 99,  # Mismatched version
-            "initial_manifest_id": "M-E139",
-            "initial_manifest_version": 1,
-            "initial_manifest_digest": "0" * 64,
-            "root_fingerprint": fp,
-            "payload_digest": digest,
-            "root_signature": sig_block,
-            "installed_at": "2026-08-21T10:00:00Z",
+            "commit_proof": proof_dict,
         }
     }, {})
     assert not resp.get("success")
     assert "Manifest version mismatch" in resp.get("error", "")
 
 
-def test_d3_install_e140_fake_d2_commit_proof_with_correct_fingerprint_rejected():
+def test_d3_install_e140_fake_d2_commit_proof_with_correct_fingerprint_rejected(tmp_path):
     """E140: Fake D2 commit proof presenting legitimate root fingerprint is rejected by broker."""
     from events.broker import TrustedDeploymentAuthorityBroker
-    from events.store import DeploymentStatus
+    from events.store import DeploymentStatus, D2AuthorityManifestStore
     from events.serializer import canonicalize_json
     from cryptography.hazmat.primitives.asymmetric import ed25519
+
+    d2_file = str(tmp_path / "d2_e140.jsonl")
+    store = D2AuthorityManifestStore(file_path=d2_file)
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    store.commit_epoch(
+        manifest_id="M-E140",
+        manifest_version=1,
+        payload_digest="1" * 64,
+        signer_identity="Gate3AuthoritativeVerifier",
+        root_fingerprint=fp,
+    )
+    evt = store.store.get_events()[-1]
 
     broker = TrustedDeploymentAuthorityBroker(
         deployment_id="DEP-E140",
         auth_secret="SEC-E140",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
     )
     broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
-    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
 
-    preimage = {
+    proof_dict = {
+        "proof_version": "D2CommitProofV1",
+        "deployment_id": "DEP-E140",
         "installation_id": "INST-E140",
-        "initial_manifest_id": "M-E140",
-        "initial_manifest_version": 1,
-        "initial_manifest_digest": "0" * 64,
+        "manifest_id": "M-E140",
+        "manifest_version": 1,
+        "manifest_digest": "1" * 64,
+        "event_type": "AUTHORITY_MANIFEST_COMMITTED",
+        "event_id": evt.event_id,
+        "sequence_number": evt.sequence_number,
+        "parent_digest": evt.parent_digest,
+        "event_digest": evt.digest,
+        "head_digest": evt.digest,
         "root_fingerprint": fp,
-        "provisioning_epoch": 1,
-        "status": "SEALED",
         "installed_at": "2026-08-21T10:00:00Z",
+        "status": "SEALED",
     }
-    preimage_bytes = canonicalize_json(preimage)
+    preimage_bytes = canonicalize_json(proof_dict)
     digest = hashlib.sha256(preimage_bytes).hexdigest()
 
     # Attacker signs with a private key other than canonical root
     attacker_key = ed25519.Ed25519PrivateKey.generate()
     fake_sig = attacker_key.sign(preimage_bytes)
 
-    fake_sig_block = {
+    proof_dict["signature"] = {
         "algorithm": "ED25519",
         "signer_identity": "Gate3AuthoritativeVerifier",
         "public_key_fingerprint": fp,  # Spoofed fingerprint
@@ -6260,16 +6341,7 @@ def test_d3_install_e140_fake_d2_commit_proof_with_correct_fingerprint_rejected(
     resp = broker._dispatch_rpc({
         "method": "record_provisioned",
         "params": {
-            "installation_id": "INST-E140",
-            "manifest_id": "M-E140",
-            "initial_manifest_id": "M-E140",
-            "manifest_version": 1,
-            "initial_manifest_version": 1,
-            "initial_manifest_digest": "0" * 64,
-            "root_fingerprint": fp,
-            "payload_digest": digest,
-            "root_signature": fake_sig_block,
-            "installed_at": "2026-08-21T10:00:00Z",
+            "commit_proof": proof_dict,
         }
     }, {})
     assert not resp.get("success")
@@ -6279,7 +6351,7 @@ def test_d3_install_e140_fake_d2_commit_proof_with_correct_fingerprint_rejected(
 def test_d3_install_e141_valid_signed_proof_non_existent_d2_commit_rejected(tmp_path):
     """E141: Valid signed D2CommitProof for non-existent D2 commit is rejected by broker."""
     from events.broker import TrustedDeploymentAuthorityBroker
-    from events.store import DeploymentStatus, D2CommitProof
+    from events.store import DeploymentStatus
     from events.serializer import canonicalize_json
 
     non_existent_store = str(tmp_path / "non_existent_d2.jsonl")
@@ -6293,11 +6365,13 @@ def test_d3_install_e141_valid_signed_proof_non_existent_d2_commit_rejected(tmp_
     fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
 
     proof_dict = {
+        "proof_version": "D2CommitProofV1",
         "deployment_id": "DEP-E141",
         "installation_id": "INST-E141",
         "manifest_id": "M-E141",
         "manifest_version": 1,
         "manifest_digest": "1" * 64,
+        "event_type": "AUTHORITY_MANIFEST_COMMITTED",
         "event_id": "EVT-MANIFEST-M-E141-1",
         "sequence_number": 1,
         "parent_digest": "0" * 64,
@@ -6323,9 +6397,6 @@ def test_d3_install_e141_valid_signed_proof_non_existent_d2_commit_rejected(tmp_
     resp = broker._dispatch_rpc({
         "method": "record_provisioned",
         "params": {
-            "installation_id": "INST-E141",
-            "manifest_id": "M-E141",
-            "manifest_version": 1,
             "commit_proof": proof_dict,
         }
     }, {})
@@ -6373,11 +6444,13 @@ def test_d3_install_e142_valid_signed_proof_old_d2_commit_rejected(tmp_path):
 
     # Construct and sign proof for old commit (v1, sequence 1)
     old_proof = {
+        "proof_version": "D2CommitProofV1",
         "deployment_id": "DEP-E142",
         "installation_id": "INST-E142",
         "manifest_id": "M-E142",
         "manifest_version": 1,
         "manifest_digest": "1" * 64,
+        "event_type": "AUTHORITY_MANIFEST_COMMITTED",
         "event_id": evt1.event_id,
         "sequence_number": evt1.sequence_number,
         "parent_digest": evt1.parent_digest,
@@ -6403,9 +6476,6 @@ def test_d3_install_e142_valid_signed_proof_old_d2_commit_rejected(tmp_path):
     resp = broker._dispatch_rpc({
         "method": "record_provisioned",
         "params": {
-            "installation_id": "INST-E142",
-            "manifest_id": "M-E142",
-            "manifest_version": 1,
             "commit_proof": old_proof,
         }
     }, {})
@@ -6441,11 +6511,13 @@ def test_d3_install_e143_valid_signature_altered_event_id_rejected(tmp_path):
     broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
 
     proof_dict = {
+        "proof_version": "D2CommitProofV1",
         "deployment_id": "DEP-E143",
         "installation_id": "INST-E143",
         "manifest_id": "M-E143",
         "manifest_version": 1,
         "manifest_digest": "1" * 64,
+        "event_type": "AUTHORITY_MANIFEST_COMMITTED",
         "event_id": "EVT-FORGED-ID-E143",  # Altered event_id
         "sequence_number": evt.sequence_number,
         "parent_digest": evt.parent_digest,
@@ -6471,9 +6543,6 @@ def test_d3_install_e143_valid_signature_altered_event_id_rejected(tmp_path):
     resp = broker._dispatch_rpc({
         "method": "record_provisioned",
         "params": {
-            "installation_id": "INST-E143",
-            "manifest_id": "M-E143",
-            "manifest_version": 1,
             "commit_proof": proof_dict,
         }
     }, {})
@@ -6509,11 +6578,13 @@ def test_d3_install_e144_valid_signature_altered_sequence_rejected(tmp_path):
     broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
 
     proof_dict = {
+        "proof_version": "D2CommitProofV1",
         "deployment_id": "DEP-E144",
         "installation_id": "INST-E144",
         "manifest_id": "M-E144",
         "manifest_version": 1,
         "manifest_digest": "1" * 64,
+        "event_type": "AUTHORITY_MANIFEST_COMMITTED",
         "event_id": evt.event_id,
         "sequence_number": 999,  # Altered sequence number
         "parent_digest": evt.parent_digest,
@@ -6539,9 +6610,6 @@ def test_d3_install_e144_valid_signature_altered_sequence_rejected(tmp_path):
     resp = broker._dispatch_rpc({
         "method": "record_provisioned",
         "params": {
-            "installation_id": "INST-E144",
-            "manifest_id": "M-E144",
-            "manifest_version": 1,
             "commit_proof": proof_dict,
         }
     }, {})
@@ -6577,11 +6645,13 @@ def test_d3_install_e145_valid_signature_manifest_digest_not_in_d2_rejected(tmp_
     broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
 
     proof_dict = {
+        "proof_version": "D2CommitProofV1",
         "deployment_id": "DEP-E145",
         "installation_id": "INST-E145",
         "manifest_id": "M-E145",
         "manifest_version": 1,
         "manifest_digest": "F" * 64,  # Mismatched manifest digest
+        "event_type": "AUTHORITY_MANIFEST_COMMITTED",
         "event_id": evt.event_id,
         "sequence_number": evt.sequence_number,
         "parent_digest": evt.parent_digest,
@@ -6607,9 +6677,6 @@ def test_d3_install_e145_valid_signature_manifest_digest_not_in_d2_rejected(tmp_
     resp = broker._dispatch_rpc({
         "method": "record_provisioned",
         "params": {
-            "installation_id": "INST-E145",
-            "manifest_id": "M-E145",
-            "manifest_version": 1,
             "commit_proof": proof_dict,
         }
     }, {})
@@ -6645,11 +6712,13 @@ def test_d3_install_e146_valid_proof_another_deployment_rejected(tmp_path):
     broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
 
     proof_dict = {
+        "proof_version": "D2CommitProofV1",
         "deployment_id": "DEP-FOREIGN-E146",  # Issued for foreign deployment
         "installation_id": "INST-E146",
         "manifest_id": "M-E146",
         "manifest_version": 1,
         "manifest_digest": "1" * 64,
+        "event_type": "AUTHORITY_MANIFEST_COMMITTED",
         "event_id": evt.event_id,
         "sequence_number": evt.sequence_number,
         "parent_digest": evt.parent_digest,
@@ -6675,9 +6744,6 @@ def test_d3_install_e146_valid_proof_another_deployment_rejected(tmp_path):
     resp = broker._dispatch_rpc({
         "method": "record_provisioned",
         "params": {
-            "installation_id": "INST-E146",
-            "manifest_id": "M-E146",
-            "manifest_version": 1,
             "commit_proof": proof_dict,
         }
     }, {})
@@ -6713,11 +6779,13 @@ def test_d3_install_e147_valid_proof_previous_d2_head_rejected(tmp_path):
     broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
 
     proof_dict = {
+        "proof_version": "D2CommitProofV1",
         "deployment_id": "DEP-E147",
         "installation_id": "INST-E147",
         "manifest_id": "M-E147",
         "manifest_version": 1,
         "manifest_digest": "1" * 64,
+        "event_type": "AUTHORITY_MANIFEST_COMMITTED",
         "event_id": evt.event_id,
         "sequence_number": evt.sequence_number,
         "parent_digest": evt.parent_digest,
@@ -6743,9 +6811,6 @@ def test_d3_install_e147_valid_proof_previous_d2_head_rejected(tmp_path):
     resp = broker._dispatch_rpc({
         "method": "record_provisioned",
         "params": {
-            "installation_id": "INST-E147",
-            "manifest_id": "M-E147",
-            "manifest_version": 1,
             "commit_proof": proof_dict,
         }
     }, {})
@@ -6774,18 +6839,20 @@ def test_d3_install_e148_d2_head_changes_after_proof_creation_rejected(tmp_path)
 
     # Create proof for sequence 1
     proof_dict = {
+        "proof_version": "D2CommitProofV1",
         "deployment_id": "DEP-E148",
         "installation_id": "INST-E148",
         "manifest_id": "M-E148",
         "manifest_version": 1,
         "manifest_digest": "1" * 64,
+        "event_type": "AUTHORITY_MANIFEST_COMMITTED",
         "event_id": evt.event_id,
         "sequence_number": evt.sequence_number,
         "parent_digest": evt.parent_digest,
         "event_digest": evt.digest,
         "head_digest": evt.digest,
         "root_fingerprint": fp,
-        "installed_at": "2026-08-22T10:00:00Z",
+        "installed_at": "2026-08-21T10:00:00Z",
         "status": "SEALED",
     }
     preimage_bytes = canonicalize_json(proof_dict)
@@ -6798,7 +6865,7 @@ def test_d3_install_e148_d2_head_changes_after_proof_creation_rejected(tmp_path)
         "public_key_fingerprint": fp,
         "payload_digest": digest,
         "signature_hex": sig.hex(),
-        "timestamp": "2026-08-22T10:00:00Z",
+        "timestamp": "2026-08-21T10:00:00Z",
     }
 
     # Now simulate a race condition where D2 commits another event (version 2) before broker RPC arrives
@@ -6821,14 +6888,301 @@ def test_d3_install_e148_d2_head_changes_after_proof_creation_rejected(tmp_path)
     resp = broker._dispatch_rpc({
         "method": "record_provisioned",
         "params": {
-            "installation_id": "INST-E148",
-            "manifest_id": "M-E148",
-            "manifest_version": 1,
             "commit_proof": proof_dict,
         }
     }, {})
     assert not resp.get("success")
     assert "Stale or superseded D2 commit" in resp.get("error", "")
+
+
+def test_d3_install_e149_wrong_event_type_with_matching_payload_rejected(tmp_path):
+    """E149: D2 event of non-authority type (e.g. TASK_CREATED) with matching payload is rejected."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, FileAppendEventStore
+    from events.serializer import canonicalize_json, compute_event_digest
+    from domain.models import EventEnvelope
+    from domain.types import EventType
+
+    d2_file = str(tmp_path / "d2_e149.jsonl")
+    event_store = FileAppendEventStore(d2_file)
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    payload = {
+        "manifest_id": "M-E149",
+        "manifest_version": 1,
+        "payload_digest": "1" * 64,
+        "signer_identity": "Gate3AuthoritativeVerifier",
+        "root_fingerprint": fp,
+    }
+    event_id = "EVT-TASK-E149-1"
+    digest = compute_event_digest(
+        event_id=event_id,
+        event_type=EventType.TASK_CREATED,
+        sequence_number=1,
+        aggregate_id="TASK-1",
+        timestamp="2026-08-22T10:00:00Z",
+        payload=payload,
+        parent_digest="0" * 64,
+    )
+    event = EventEnvelope(
+        event_id=event_id,
+        event_type=EventType.TASK_CREATED,
+        sequence_number=1,
+        aggregate_id="TASK-1",
+        timestamp="2026-08-22T10:00:00Z",
+        payload=payload,
+        parent_digest="0" * 64,
+        digest=digest,
+    )
+    event_store.append(event)
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E149",
+        auth_secret="SEC-E149",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+
+    proof_dict = {
+        "proof_version": "D2CommitProofV1",
+        "deployment_id": "DEP-E149",
+        "installation_id": "INST-E149",
+        "manifest_id": "M-E149",
+        "manifest_version": 1,
+        "manifest_digest": "1" * 64,
+        "event_type": "AUTHORITY_MANIFEST_COMMITTED",
+        "event_id": event_id,
+        "sequence_number": 1,
+        "parent_digest": "0" * 64,
+        "event_digest": digest,
+        "head_digest": digest,
+        "root_fingerprint": fp,
+        "installed_at": "2026-08-22T10:00:00Z",
+        "status": "SEALED",
+    }
+    preimage_bytes = canonicalize_json(proof_dict)
+    sig = TEST_AUTHORITY_PRIVATE_KEY.sign(preimage_bytes)
+    calc_digest = hashlib.sha256(preimage_bytes).hexdigest()
+
+    proof_dict["signature"] = {
+        "algorithm": "ED25519",
+        "signer_identity": "Gate3AuthoritativeVerifier",
+        "public_key_fingerprint": fp,
+        "payload_digest": calc_digest,
+        "signature_hex": sig.hex(),
+        "timestamp": "2026-08-22T10:00:00Z",
+    }
+
+    resp = broker._dispatch_rpc({
+        "method": "record_provisioned",
+        "params": {
+            "commit_proof": proof_dict,
+        }
+    }, {})
+    assert not resp.get("success")
+    assert "Invalid D2 event type" in resp.get("error", "")
+
+
+def test_d3_install_e150_generic_event_impersonating_authority_commit_rejected(tmp_path):
+    """E150: Generic event claim claiming event_type other than AUTHORITY_MANIFEST_COMMITTED is rejected."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, D2AuthorityManifestStore
+    from events.serializer import canonicalize_json
+
+    d2_file = str(tmp_path / "d2_e150.jsonl")
+    store = D2AuthorityManifestStore(file_path=d2_file)
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    store.commit_epoch(
+        manifest_id="M-E150",
+        manifest_version=1,
+        payload_digest="1" * 64,
+        signer_identity="Gate3AuthoritativeVerifier",
+        root_fingerprint=fp,
+    )
+    evt = store.store.get_events()[-1]
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E150",
+        auth_secret="SEC-E150",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+
+    proof_dict = {
+        "proof_version": "D2CommitProofV1",
+        "deployment_id": "DEP-E150",
+        "installation_id": "INST-E150",
+        "manifest_id": "M-E150",
+        "manifest_version": 1,
+        "manifest_digest": "1" * 64,
+        "event_type": "GENERIC_ACTION_EVENT",  # Impersonating non-authority event type
+        "event_id": evt.event_id,
+        "sequence_number": evt.sequence_number,
+        "parent_digest": evt.parent_digest,
+        "event_digest": evt.digest,
+        "head_digest": evt.digest,
+        "root_fingerprint": fp,
+        "installed_at": "2026-08-22T10:00:00Z",
+        "status": "SEALED",
+    }
+    preimage_bytes = canonicalize_json(proof_dict)
+    sig = TEST_AUTHORITY_PRIVATE_KEY.sign(preimage_bytes)
+    calc_digest = hashlib.sha256(preimage_bytes).hexdigest()
+
+    proof_dict["signature"] = {
+        "algorithm": "ED25519",
+        "signer_identity": "Gate3AuthoritativeVerifier",
+        "public_key_fingerprint": fp,
+        "payload_digest": calc_digest,
+        "signature_hex": sig.hex(),
+        "timestamp": "2026-08-22T10:00:00Z",
+    }
+
+    resp = broker._dispatch_rpc({
+        "method": "record_provisioned",
+        "params": {
+            "commit_proof": proof_dict,
+        }
+    }, {})
+    assert not resp.get("success")
+    assert "Invalid proof event_type" in resp.get("error", "")
+
+
+def test_d3_install_e151_production_d2_store_path_override_rejected(monkeypatch):
+    """E151: Production broker strictly rejects caller-injected d2_store_path override."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+
+    # Clear test mode environment flags to simulate production
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+    with pytest.raises(RuntimeError, match="cannot accept caller-injected d2_store_path"):
+        TrustedDeploymentAuthorityBroker(
+            deployment_id="DEP-PROD-E151",
+            auth_secret="SEC-PROD-E151",
+            d2_store_path="/attacker/controlled/fake_d2.jsonl",
+        )
+
+
+def test_d3_install_e152_attacker_controlled_d2_store_rejected(monkeypatch):
+    """E152: Production broker fails closed against caller pointing to attacker D2 universe."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+    with pytest.raises(RuntimeError, match="canonical deployment store configuration required"):
+        TrustedDeploymentAuthorityBroker(
+            deployment_id="DEP-PROD-E152",
+            auth_secret="SEC-PROD-E152",
+            d2_store_path="C:\\malicious\\fake_store.jsonl",
+        )
+
+
+def test_d3_install_e153_broker_restart_preserves_canonical_d2_binding(tmp_path):
+    """E153: Broker restart strictly validates against tampering or moving the canonical D2 store path."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+
+    state_file = str(tmp_path / "broker_e153_state.json")
+    d2_path_1 = str(tmp_path / "canonical_d2.jsonl")
+    d2_path_2 = str(tmp_path / "moved_d2.jsonl")
+
+    broker1 = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E153",
+        state_file_path=state_file,
+        auth_secret="SEC-E153",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_path_1,
+    )
+    assert broker1.d2_store_path == os.path.abspath(d2_path_1)
+
+    # Attempting to restart broker pointing to a different D2 path fails closed
+    with pytest.raises(RuntimeError, match="Broker D2 store binding mismatch on restart"):
+        TrustedDeploymentAuthorityBroker(
+            deployment_id="DEP-E153",
+            state_file_path=state_file,
+            auth_secret="SEC-E153",
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            d2_store_path=d2_path_2,
+        )
+
+
+def test_d3_install_schema_negative_missing_or_extra_proof_fields_rejected(tmp_path):
+    """Schema-negative: Missing required fields, extra fields, or invalid version/status fails closed."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, D2AuthorityManifestStore
+
+    d2_file = str(tmp_path / "d2_schema_neg.jsonl")
+    store = D2AuthorityManifestStore(file_path=d2_file)
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    store.commit_epoch(
+        manifest_id="M-SCHEMA",
+        manifest_version=1,
+        payload_digest="1" * 64,
+        signer_identity="Gate3AuthoritativeVerifier",
+        root_fingerprint=fp,
+    )
+    evt = store.store.get_events()[-1]
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-SCHEMA",
+        auth_secret="SEC-SCHEMA",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+
+    # Case 1: Missing commit_proof completely
+    resp = broker._dispatch_rpc({"method": "record_provisioned", "params": {}}, {})
+    assert not resp.get("success")
+    assert "Missing required 'commit_proof' object" in resp.get("error", "")
+
+    # Case 2: Extra unexpected field in commit_proof
+    proof_with_extra = {
+        "proof_version": "D2CommitProofV1",
+        "deployment_id": "DEP-SCHEMA",
+        "installation_id": "INST-1",
+        "manifest_id": "M-SCHEMA",
+        "manifest_version": 1,
+        "manifest_digest": "1" * 64,
+        "event_type": "AUTHORITY_MANIFEST_COMMITTED",
+        "event_id": evt.event_id,
+        "sequence_number": evt.sequence_number,
+        "parent_digest": evt.parent_digest,
+        "event_digest": evt.digest,
+        "head_digest": evt.digest,
+        "root_fingerprint": fp,
+        "installed_at": "2026-08-22T10:00:00Z",
+        "status": "SEALED",
+        "signature": {"algorithm": "ED25519", "signer_identity": "Gate3AuthoritativeVerifier", "public_key_fingerprint": fp, "payload_digest": "0"*64, "signature_hex": "0"*128, "timestamp": "2026-08-22T10:00:00Z"},
+        "extra_malicious_field": "injected",
+    }
+    resp = broker._dispatch_rpc({"method": "record_provisioned", "params": {"commit_proof": proof_with_extra}}, {})
+    assert not resp.get("success")
+    assert "unexpected extraneous fields" in resp.get("error", "")
+
+    # Case 3: Invalid proof_version
+    proof_bad_ver = dict(proof_with_extra)
+    del proof_bad_ver["extra_malicious_field"]
+    proof_bad_ver["proof_version"] = "D2CommitProofV99"
+    resp = broker._dispatch_rpc({"method": "record_provisioned", "params": {"commit_proof": proof_bad_ver}}, {})
+    assert not resp.get("success")
+    assert "Unsupported proof_version" in resp.get("error", "")
+
+    # Case 4: Invalid status
+    proof_bad_status = dict(proof_with_extra)
+    del proof_bad_status["extra_malicious_field"]
+    proof_bad_status["status"] = "UNSEALED"
+    resp = broker._dispatch_rpc({"method": "record_provisioned", "params": {"commit_proof": proof_bad_status}}, {})
+    assert not resp.get("success")
+    assert "Invalid proof status" in resp.get("error", "")
+
 
 
 

@@ -1228,7 +1228,7 @@ class WorldModelPromotionEngine:
             )
 
         # 5. Execute in isolated subprocess (shell=False)
-        proc = subprocess.run(test_command, cwd=real_cwd, capture_output=True, text=True, shell=False)
+        proc = subprocess.run(test_command, cwd=real_cwd, capture_output=True, text=True, shell=False, stdin=subprocess.DEVNULL)
         if proc.returncode != 0:
             raise ValueError(f"Test runner execution failed (exit_code={proc.returncode}): {proc.stderr}")
 

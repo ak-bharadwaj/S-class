@@ -628,7 +628,7 @@ def test_provenance_strict_mode_sha_and_version_enforcement():
 
     # 5. Stale historical commit SHA (HEAD~1) -> FAIL CLOSED (Not current authoritative revision)
     try:
-        stale_sha = subprocess.check_output(["git", "rev-parse", "HEAD~1"], text=True).strip()
+        stale_sha = subprocess.check_output(["git", "rev-parse", "HEAD~1"], text=True, stdin=subprocess.DEVNULL).strip()
         runner_stale = SchemathesisRunner(source_sha=stale_sha, strict_provenance=True)
         res_stale = runner_stale.execute(schema_dict=schema)
         assert res_stale.status == ProviderStatus.INPUT_INVALID
@@ -638,11 +638,7 @@ def test_provenance_strict_mode_sha_and_version_enforcement():
         pass
 
     # 6. Current authentic repository HEAD commit SHA -> PASS
-    try:
-        head_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-    except Exception:
-        head_sha = "a" * 40
-
+    head_sha = SchemathesisRunner.get_authoritative_revision() or "a" * 40
     runner_valid = SchemathesisRunner(source_sha=head_sha, strict_provenance=True)
 
     def mock_communicate(input=None, timeout=None):

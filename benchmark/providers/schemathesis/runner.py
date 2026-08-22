@@ -61,7 +61,8 @@ class SchemathesisRunner:
                 capture_output=True,
                 text=True,
                 cwd=os.getcwd(),
-                timeout=5.0
+                timeout=5.0,
+                stdin=subprocess.DEVNULL
             )
             if res.returncode == 0:
                 head_sha = res.stdout.strip()

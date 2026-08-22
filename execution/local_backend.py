@@ -227,6 +227,7 @@ class LocalProcessBackend(ExecutionBackend):
         popen_kwargs = {
             "cwd": working_directory,
             "env": cleaned_env,
+            "stdin": subprocess.DEVNULL,
             "stdout": subprocess.PIPE,
             "stderr": subprocess.PIPE,
             "shell": False,

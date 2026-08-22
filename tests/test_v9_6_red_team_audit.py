@@ -1900,7 +1900,7 @@ if lock._fd is not None:
 print("HELD", flush=True)
 time.sleep(30)
 """
-        proc = subprocess.Popen([sys.executable, "-c", code], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        proc = subprocess.Popen([sys.executable, "-c", code], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, stdin=subprocess.DEVNULL)
         try:
             line = proc.stdout.readline()
             self.assertIn("HELD", line, "Subprocess A must hold kernel lock first")
