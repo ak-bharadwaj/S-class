@@ -22,11 +22,20 @@ class DurableDeploymentAuthorityStore:
     and process crashes.
     """
     def __init__(self, store_path: Optional[str] = None):
+        is_test = bool(
+            os.environ.get("SCLASS_TEST_MODE") == "1"
+            or os.environ.get("PYTEST_CURRENT_TEST")
+            or os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") == "1"
+        )
         if store_path is None:
-            store_path = os.environ.get(
-                "SCLASS_EXTERNAL_AUTHORITY_STORE_PATH",
-                os.path.join(tempfile.gettempdir(), ".sclass_external_authority_registry.json")
-            )
+            store_path = os.environ.get("SCLASS_EXTERNAL_AUTHORITY_STORE_PATH")
+            if store_path is None:
+                if not is_test:
+                    raise RuntimeError(
+                        "Production DurableDeploymentAuthorityStore requires explicit SCLASS_EXTERNAL_AUTHORITY_STORE_PATH; "
+                        "insecure default paths prohibited in production."
+                    )
+                store_path = os.path.join(tempfile.gettempdir(), ".sclass_external_authority_registry.json")
         self.store_path = os.path.abspath(store_path)
         self.lock_path = self.store_path + ".lock"
         self._ensure_dir()
@@ -248,8 +257,25 @@ class TrustedDeploymentBootstrapAuthority:
                 f"Bootstrap authorization deployment mismatch: expected '{deployment_id}', got '{auth_dep_id}'."
             )
 
-        if ipc_endpoint:
-            client = ExternalDeploymentAuthorityClient(endpoint_path=ipc_endpoint, auth_secret=auth_secret or "EXT_AUTH_SECRET")
+        is_test = bool(
+            os.environ.get("SCLASS_TEST_MODE") == "1"
+            or os.environ.get("PYTEST_CURRENT_TEST")
+            or os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") == "1"
+        )
+        endpoint = ipc_endpoint or os.environ.get("SCLASS_EXTERNAL_AUTHORITY_ENDPOINT")
+
+        # In production, external authority service is strictly mandatory; local-mode fallback prohibited
+        if not is_test and not endpoint:
+            raise RuntimeError(
+                "Production deployment authority cannot use local store; "
+                "authenticated external authority service required. Failing closed."
+            )
+
+        if endpoint:
+            client = ExternalDeploymentAuthorityClient(
+                endpoint_path=endpoint,
+                auth_secret=auth_secret or os.environ.get("SCLASS_EXTERNAL_AUTHORITY_SECRET", "EXT_AUTH_SECRET"),
+            )
             client.consume_bootstrap_authorization(bootstrap_authorization, deployment_id)
             return
 
@@ -292,18 +318,14 @@ class TrustedDeploymentBootstrap:
         d2_store_path: Optional[str] = None,
         bootstrap_authorization: Optional[Dict[str, Any]] = None,
         root_public_key: Optional[ed25519.Ed25519PublicKey] = None,
+        authority_ipc_endpoint: Optional[str] = None,
+        authority_auth_secret: Optional[str] = None,
     ) -> str:
         """Establishes a genuine first-installation deployment in NEVER_PROVISIONED state.
-        Requires valid root-signed bootstrap authorization in production.
+        Requires valid root-signed bootstrap authorization and mandatory external authority service in production.
         Fails closed if the deployment already has existing state or D2 history.
         """
         is_test = bool(os.environ.get("SCLASS_TEST_MODE") == "1" or os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") == "1")
-
-        # In production, virgin bootstrap strictly requires root-signed bootstrap authorization
-        if not is_test and bootstrap_authorization is None:
-            raise RuntimeError(
-                "Virgin deployment bootstrap prohibited: valid root-signed bootstrap authorization required."
-            )
 
         state_file_path = os.path.abspath(state_file_path)
         if os.path.exists(state_file_path) and os.path.getsize(state_file_path) > 0:
@@ -321,6 +343,20 @@ class TrustedDeploymentBootstrap:
             raise RuntimeError(
                 f"Trusted deployment bootstrap rejected: D2 store already contains history at '{canonical_d2}'. "
                 "Cannot bootstrap as NEVER_PROVISIONED."
+            )
+
+        # In production, virgin bootstrap strictly requires root-signed bootstrap authorization
+        if not is_test and bootstrap_authorization is None:
+            raise RuntimeError(
+                "Virgin deployment bootstrap prohibited: valid root-signed bootstrap authorization required."
+            )
+
+        # In production, virgin bootstrap strictly requires external authority IPC endpoint
+        endpoint = authority_ipc_endpoint or os.environ.get("SCLASS_EXTERNAL_AUTHORITY_ENDPOINT")
+        if not is_test and not endpoint:
+            raise RuntimeError(
+                "Production virgin deployment bootstrap requires mandatory external deployment authority IPC endpoint; "
+                "local-mode fallback prohibited. Failing closed."
             )
 
         # Validate bootstrap authorization if present or in production
@@ -372,7 +408,12 @@ class TrustedDeploymentBootstrap:
                 raise RuntimeError(f"Invalid bootstrap authorization signature against canonical broker root: {e}")
 
             # Atomically consume authorization in the external install authority
-            TrustedDeploymentBootstrapAuthority.consume_bootstrap_authorization(bootstrap_authorization, deployment_id)
+            TrustedDeploymentBootstrapAuthority.consume_bootstrap_authorization(
+                bootstrap_authorization=bootstrap_authorization,
+                deployment_id=deployment_id,
+                ipc_endpoint=endpoint,
+                auth_secret=authority_auth_secret or os.environ.get("SCLASS_EXTERNAL_AUTHORITY_SECRET"),
+            )
 
         state_dir = os.path.dirname(state_file_path)
         os.makedirs(state_dir, mode=0o700, exist_ok=True)
