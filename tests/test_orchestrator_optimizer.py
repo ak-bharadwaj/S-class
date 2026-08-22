@@ -24,6 +24,7 @@ from domain.types import (
     ClaimStatus,
 )
 from claim.reducer import ClaimReductionState, ClaimEpistemicState
+from planner.models import PlanStatus
 
 
 @pytest.fixture
@@ -61,9 +62,17 @@ def sample_plan():
     return StrategicPlanArtifact(
         plan_id="PLAN-001",
         task_id="TASK-01",
+        version=1,
         strategy_name="TDD_STRATEGY",
         rationale="Plan rationale",
+        plan_claims=("CLM-OPT-01",),
         stages=(),
+        dependency_edges=(),
+        evidence_requirements=("D6_EXECUTION_OBSERVATION",),
+        identified_risks=(),
+        potential_contradictions=(),
+        revision_lineage=(),
+        status=PlanStatus.VALIDATED,
         estimated_risk_score=0.2,
         plan_digest="a" * 64,
         created_at_iso="2026-08-20T12:00:00Z",

@@ -6,7 +6,8 @@ across reasoning modes until task closure.
 
 Strictly preserves architectural boundaries:
 - Authoritative State Projections: Derived strictly from canonical D1/D2/D4 state (claims, receipts, DAG).
-- Ephemeral Session Working Memory: Transient counters, code drafts, and context summaries.
+- Zero Manufactured Facts: Unestablished repository/risk facts remain None / UNKNOWN.
+- Governed Plan-as-Artifact: Validated deterministically outside LLM via PlanArtifactValidator.
 - Public Authority Ingress: Consumes controller.resolve_proposal_authority_context() and public gateway methods.
 """
 
@@ -51,6 +52,8 @@ from orchestrator.models import (
 )
 from orchestrator.optimizer import StateOptimizerRouter
 from orchestrator.context import BoundedContextBuilder
+from orchestrator.validator import PlanArtifactValidator
+from planner.models import PlanStatus
 
 
 class GovernedOrchestrationSession:
@@ -117,8 +120,37 @@ class GovernedOrchestrationSession:
         self.satisfied_obligation_ids = tuple(satisfied)
 
     def snapshot(self) -> OrchestrationStateSnapshot:
-        """Builds an immutable projection snapshot of current authoritative and session state."""
+        """
+        Builds an immutable projection snapshot of current authoritative and session state.
+        Derives all facts strictly from authoritative package/task data without manufactured constants.
+        """
         self._refresh_frontier()
+
+        # Derive facts strictly from authoritative input package
+        task = self.package.task
+        repo_facts = RepositoryFacts(
+            languages=task.constraints.languages,
+            dirty_working_tree=task.repository_context.dirty_working_tree,
+            has_test_framework=None,
+            test_framework_name="UNKNOWN",
+            estimated_symbol_count=None,
+        )
+
+        task_risk = TaskRiskAssessment(
+            criticality_score=None,
+            blast_radius="UNKNOWN",
+            complexity_score=None,
+            requires_formal_verification=None,
+        )
+
+        verif_profile = VerificationProfile(
+            requires_unit_tests=None,
+            requires_property_tests=None,
+            requires_regression_run=None,
+            requires_security_audit=None,
+            requires_soak_test=None,
+        )
+
         return OrchestrationStateSnapshot(
             task_id=self.package.task.task_id,
             source_sha=self.package.task.repository_context.base_commit_sha,
@@ -132,19 +164,9 @@ class GovernedOrchestrationSession:
             satisfied_obligation_ids=self.satisfied_obligation_ids,
             failed_obligation_ids=self.failed_obligation_ids,
             active_plan=self.active_plan,
-            repository_facts=RepositoryFacts(
-                languages=self.package.task.constraints.languages,
-                dirty_working_tree=self.package.task.repository_context.dirty_working_tree,
-            ),
-            task_risk=TaskRiskAssessment(
-                criticality_score=0.7,
-                blast_radius="LOCAL_MODULE",
-                complexity_score=0.6,
-            ),
-            verification_profile=VerificationProfile(
-                requires_unit_tests=True,
-                requires_regression_run=True,
-            ),
+            repository_facts=repo_facts,
+            task_risk=task_risk,
+            verification_profile=verif_profile,
             available_providers=self.available_providers,
             repair_attempts_by_obligation=dict(self.repair_attempts),
             turn_index=self.turn_index,
@@ -204,11 +226,12 @@ class GovernedOrchestrationSession:
         if not valid or turn_resp is None:
             self.turn_summaries.append(f"Turn {self.turn_index} failed chain validation: {err}")
             self.turn_index += 1
+            self._refresh_frontier()
             return decision, None, False
 
         self.previous_digest = msg.message_digest
 
-        # 3. Handle PLAN / REPLAN Artifact Synthesis
+        # 3. Handle PLAN / REPLAN Artifact Synthesis with Out-of-LLM Validation
         if decision.mode in (ReasoningMode.PLAN, ReasoningMode.REPLAN):
             stages = tuple(
                 PlanStage(
@@ -218,23 +241,40 @@ class GovernedOrchestrationSession:
                     prerequisite_stage_ids=(),
                     description=f"Plan stage for {obl_id}",
                     verification_gate="D6 sandbox test",
+                    evidence_types_required=("D6_EXECUTION_OBSERVATION",),
                 )
                 for i, obl_id in enumerate(self.ready_obligation_ids)
             )
-            plan_raw = f"{self.package.task.task_id}: {turn_resp.thought}"
-            plan_digest = hashlib.sha256(plan_raw.encode("utf-8")).hexdigest()
-            self.active_plan = StrategicPlanArtifact(
+            candidate_plan = StrategicPlanArtifact(
                 plan_id=f"PLAN-{self.turn_index:03d}",
                 task_id=self.package.task.task_id,
+                version=1 if decision.mode == ReasoningMode.PLAN else (self.active_plan.version + 1 if self.active_plan else 2),
                 strategy_name="TDD_INVARIANCE_STRATEGY",
                 rationale=turn_resp.thought[:200],
+                plan_claims=tuple(self.claims_by_id.keys()),
                 stages=stages,
-                estimated_risk_score=0.3,
-                plan_digest=plan_digest,
+                dependency_edges=(),
+                evidence_requirements=("D6_EXECUTION_OBSERVATION",),
+                identified_risks=("Potential regression",),
+                potential_contradictions=(),
+                revision_lineage=(self.active_plan.plan_id,) if self.active_plan else (),
+                status=PlanStatus.DRAFT,
                 created_at_iso=current_time_iso,
-                is_active=True,
             )
-            self.turn_summaries.append(f"Turn {self.turn_index} (PLAN): Formulated plan {self.active_plan.plan_id}")
+
+            # Deterministically validate plan artifact outside LLM
+            is_valid, val_reason, validated_plan = PlanArtifactValidator.validate(
+                candidate_plan,
+                self.obligations_by_id,
+            )
+
+            if is_valid:
+                self.active_plan = validated_plan
+                self.turn_summaries.append(f"Turn {self.turn_index} (PLAN): Formulated and validated plan {self.active_plan.plan_id}")
+            else:
+                self.active_plan = validated_plan
+                self.turn_summaries.append(f"Turn {self.turn_index} (PLAN): Candidate plan rejected: {val_reason}")
+
             self.turn_index += 1
             self.remaining_budget_units -= 1.0
             self._refresh_frontier()

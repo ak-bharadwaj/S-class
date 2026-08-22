@@ -5,8 +5,8 @@ Defines the complete canonical data models for:
 - 14 Reasoning Modes
 - 9 Skill Categories & Skill Playbooks
 - 4 Model Tiers & Dynamic Provider Routing
-- Governed Plan-as-Artifact (StrategicPlanArtifact, PlanStage)
-- Task Risk, Repository Facts, and Verification Profiles
+- Governed Plan-as-Artifact (StrategicPlanArtifact, PlanStage, PlanStatus)
+- Task Risk, Repository Facts, and Verification Profiles (with zero manufactured facts)
 - Bounded Context Slices & Immutable State Snapshots
 """
 
@@ -14,9 +14,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Tuple, Dict, Any, Optional, Sequence, Mapping
+import hashlib
 
 from domain.models import Obligation, Claim, AssessmentReceipt, Policy
 from claim.reducer import ClaimReductionState
+from planner.models import PlanStatus
 
 
 class ReasoningMode(str, Enum):
@@ -78,17 +80,31 @@ class ArtifactType(str, Enum):
     ESCALATION_RECEIPT = "ESCALATION_RECEIPT"
 
 
+class SkillAdoptionStatus(str, Enum):
+    """Classification of adopted skills relative to S-Class master plan."""
+    INTEGRATE = "INTEGRATE"
+    ADAPT = "ADAPT"
+    REBUILD = "REBUILD"
+    REJECT = "REJECT"
+
+
 @dataclass(frozen=True)
 class SkillPlaybook:
     """Deterministic engineering procedure playbook."""
     skill_id: str
     name: str
     category: SkillCategory
+    adoption_status: SkillAdoptionStatus
     purpose: str
+    prerequisites: Tuple[str, ...]
+    inputs: Tuple[str, ...]
     guidelines: Tuple[str, ...]
+    procedure: Tuple[str, ...]
     required_capabilities: Tuple[str, ...]
     target_action_type: str
     expected_artifact_type: ArtifactType
+    evidence_requirements: Tuple[str, ...]
+    applicable_modes: Tuple[ReasoningMode, ...]
     verification_procedure: str
 
 
@@ -101,49 +117,80 @@ class PlanStage:
     prerequisite_stage_ids: Tuple[str, ...]
     description: str
     verification_gate: str
+    evidence_types_required: Tuple[str, ...] = ("EXECUTION_OBSERVATION",)
 
 
 @dataclass(frozen=True)
 class StrategicPlanArtifact:
-    """Governed Plan-as-Artifact generated during PLAN / REPLAN modes."""
+    """
+    Governed Plan-as-Artifact generated during PLAN / REPLAN modes.
+    Contains explicit claims, stages, dependency graph, risks, and verification requirements.
+    Validated deterministically outside the LLM.
+    """
     plan_id: str
     task_id: str
+    version: int
     strategy_name: str
     rationale: str
+    plan_claims: Tuple[str, ...]
     stages: Tuple[PlanStage, ...]
-    estimated_risk_score: float
-    plan_digest: str
-    created_at_iso: str
-    is_active: bool = True
+    dependency_edges: Tuple[Tuple[str, str], ...]
+    evidence_requirements: Tuple[str, ...]
+    identified_risks: Tuple[str, ...]
+    potential_contradictions: Tuple[str, ...]
+    revision_lineage: Tuple[str, ...]
+    status: PlanStatus = PlanStatus.DRAFT
+    estimated_risk_score: Optional[float] = None
+    plan_digest: str = ""
+    created_at_iso: str = ""
+
+    def __post_init__(self):
+        if not self.plan_digest:
+            payload = (
+                f"{self.plan_id}:{self.task_id}:{self.version}:{self.strategy_name}:"
+                f"{','.join(self.plan_claims)}:{len(self.stages)}"
+            )
+            digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+            object.__setattr__(self, "plan_digest", digest)
 
 
 @dataclass(frozen=True)
 class TaskRiskAssessment:
-    """Evaluated risk profile of a task slice."""
-    criticality_score: float  # 0.0 (low) to 1.0 (critical)
-    blast_radius: str         # "LOCAL_MODULE", "CROSS_MODULE", "GLOBAL_SYSTEM"
-    complexity_score: float   # 0.0 (trivial) to 1.0 (complex)
-    requires_formal_verification: bool = False
+    """
+    Evaluated risk profile of a task slice.
+    All fields are None/UNKNOWN unless established by authoritative discovery/policy.
+    Zero manufactured default constants.
+    """
+    criticality_score: Optional[float] = None
+    blast_radius: str = "UNKNOWN"
+    complexity_score: Optional[float] = None
+    requires_formal_verification: Optional[bool] = None
 
 
 @dataclass(frozen=True)
 class RepositoryFacts:
-    """Discovered facts regarding the target repository and workspace."""
-    languages: Tuple[str, ...] = ("python",)
-    dirty_working_tree: bool = False
-    has_test_framework: bool = True
-    test_framework_name: str = "pytest"
-    estimated_symbol_count: int = 100
+    """
+    Discovered facts regarding the target repository and workspace.
+    Zero manufactured default constants.
+    """
+    languages: Tuple[str, ...] = field(default_factory=tuple)
+    dirty_working_tree: Optional[bool] = None
+    has_test_framework: Optional[bool] = None
+    test_framework_name: str = "UNKNOWN"
+    estimated_symbol_count: Optional[int] = None
 
 
 @dataclass(frozen=True)
 class VerificationProfile:
-    """Required verification rigor for claim satisfaction."""
-    requires_unit_tests: bool = True
-    requires_property_tests: bool = False
-    requires_regression_run: bool = True
-    requires_security_audit: bool = False
-    requires_soak_test: bool = False
+    """
+    Required verification rigor for claim satisfaction.
+    Zero manufactured default constants.
+    """
+    requires_unit_tests: Optional[bool] = None
+    requires_property_tests: Optional[bool] = None
+    requires_regression_run: Optional[bool] = None
+    requires_security_audit: Optional[bool] = None
+    requires_soak_test: Optional[bool] = None
 
 
 @dataclass(frozen=True)
@@ -194,7 +241,7 @@ class OrchestrationStateSnapshot:
     failed_obligation_ids: Tuple[str, ...] = field(default_factory=tuple)
     active_plan: Optional[StrategicPlanArtifact] = None
     repository_facts: RepositoryFacts = field(default_factory=RepositoryFacts)
-    task_risk: TaskRiskAssessment = field(default_factory=lambda: TaskRiskAssessment(0.5, "LOCAL_MODULE", 0.5))
+    task_risk: TaskRiskAssessment = field(default_factory=TaskRiskAssessment)
     verification_profile: VerificationProfile = field(default_factory=VerificationProfile)
     available_providers: Tuple[str, ...] = ("gemini", "openai", "anthropic", "local")
     repair_attempts_by_obligation: Mapping[str, int] = field(default_factory=dict)
