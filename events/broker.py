@@ -128,6 +128,7 @@ class TrustedDeploymentAuthorityBroker:
                 self.consumed_authorizations: Set[str] = set(payload.get("consumed_authorizations", []))
                 self.current_installation = payload.get("current_installation")
                 self.pending_provisioning = payload.get("pending_provisioning")
+                self.active_initial_authorization = payload.get("active_initial_authorization")
 
                 from domain.types import EventType
                 from events.store import FileAppendEventStore
@@ -243,6 +244,7 @@ class TrustedDeploymentAuthorityBroker:
             self.consumed_authorizations = set()
             self.current_installation = None
             self.pending_provisioning = None
+            self.active_initial_authorization = None
             self._persist_state()
 
     def _persist_state(self) -> None:
@@ -255,6 +257,7 @@ class TrustedDeploymentAuthorityBroker:
                 "consumed_authorizations": sorted(list(self.consumed_authorizations)),
                 "current_installation": self.current_installation,
                 "pending_provisioning": getattr(self, "pending_provisioning", None),
+                "active_initial_authorization": getattr(self, "active_initial_authorization", None),
             }
             seal = hashlib.sha256(canonicalize_json(state_payload)).hexdigest()
             wrapper = {
@@ -480,10 +483,73 @@ class TrustedDeploymentAuthorityBroker:
 
             elif method == "authorize_initial_provisioning":
                 if self.status != DeploymentStatus.UNPROVISIONED:
-                    return {"success": False, "error": f"Cannot authorize initial provisioning from state '{self.status.value}'."}
+                    return {"success": False, "error": f"Cannot authorize initial provisioning from state '{self.status.value}' (UNPROVISIONED required)."}
+
+                if "root_public_key" in params and params["root_public_key"] is not None:
+                    return {"success": False, "error": "Caller-supplied root public key is rejected; broker uses canonical authority root."}
+
+                auth_data = params.get("initial_authorization", params.get("authorization_data"))
+                if not auth_data or not isinstance(auth_data, dict):
+                    return {"success": False, "error": "Missing or invalid initial provisioning authorization; authenticated S-Class client cannot self-authorize."}
+
+                auth_dep_id = auth_data.get("deployment_id")
+                if auth_dep_id != self.deployment_id:
+                    return {"success": False, "error": f"Initial provisioning authorization deployment mismatch: expected '{self.deployment_id}', got '{auth_dep_id}'."}
+
+                auth_id = auth_data.get("authorization_id")
+                if not auth_id:
+                    return {"success": False, "error": "Missing authorization_id in initial provisioning authorization."}
+
+                if auth_id in self.consumed_authorizations:
+                    return {"success": False, "error": f"Initial provisioning authorization '{auth_id}' has already been consumed."}
+
+                purpose = auth_data.get("purpose")
+                if purpose != "INITIAL_PROVISIONING":
+                    return {"success": False, "error": f"Invalid authorization purpose '{purpose}': 'INITIAL_PROVISIONING' required."}
+
+                target_manifest_id = auth_data.get("target_manifest_id")
+                if not target_manifest_id:
+                    return {"success": False, "error": "Missing target_manifest_id in initial provisioning authorization."}
+
+                target_manifest_digest = auth_data.get("target_manifest_digest")
+                if not target_manifest_digest:
+                    return {"success": False, "error": "Missing target_manifest_digest in initial provisioning authorization."}
+
+                target_manifest_version = int(auth_data.get("target_manifest_version", 1))
+
+                expected_fp = hashlib.sha256(self._root_public_key.public_bytes_raw()).hexdigest()
+                root_fp = auth_data.get("root_fingerprint")
+                if root_fp != expected_fp:
+                    return {"success": False, "error": f"Initial provisioning authorization root fingerprint mismatch: expected '{expected_fp}', got '{root_fp}'."}
+
+                sig_obj = auth_data.get("signature", {})
+                sig_hex = sig_obj.get("signature_hex")
+                if not sig_hex:
+                    return {"success": False, "error": "Missing signature in initial provisioning authorization."}
+
+                preimage_dict = {
+                    "authorization_id": auth_id,
+                    "deployment_id": auth_dep_id,
+                    "target_manifest_id": target_manifest_id,
+                    "target_manifest_version": target_manifest_version,
+                    "target_manifest_digest": target_manifest_digest,
+                    "authorized_at": auth_data.get("authorized_at"),
+                    "purpose": purpose,
+                    "root_fingerprint": root_fp,
+                }
+                preimage_bytes = canonicalize_json(preimage_dict)
+                try:
+                    self._root_public_key.verify(bytes.fromhex(sig_hex), preimage_bytes)
+                except InvalidSignature:
+                    return {"success": False, "error": "Invalid initial provisioning authorization signature against canonical broker root."}
+                except Exception as e:
+                    return {"success": False, "error": f"Signature verification error: {e}"}
+
+                self.consumed_authorizations.add(auth_id)
+                self.active_initial_authorization = dict(preimage_dict)
                 self.status = DeploymentStatus.PROVISIONING_AUTHORIZED
                 self._persist_state()
-                return {"success": True, "status": self.status.value}
+                return {"success": True, "status": self.status.value, "authorization": auth_data}
 
             elif method == "register_pending_provisioning":
                 if self.status not in (DeploymentStatus.PROVISIONING_AUTHORIZED, DeploymentStatus.PROVISIONING_PENDING):
@@ -493,6 +559,17 @@ class TrustedDeploymentAuthorityBroker:
                 m_digest = str(params_dict.get("manifest_digest", params_dict.get("payload_digest", "")))
                 if not m_digest:
                     return {"success": False, "error": "Missing manifest_digest/payload_digest for pending provisioning."}
+
+                # Bind pending intent to active initial authorization if coming from PROVISIONING_AUTHORIZED
+                if self.status == DeploymentStatus.PROVISIONING_AUTHORIZED and getattr(self, "active_initial_authorization", None) is not None:
+                    auth = self.active_initial_authorization
+                    if (
+                        str(params_dict.get("manifest_id", "")) != str(auth.get("target_manifest_id", ""))
+                        or int(params_dict.get("manifest_version", 1)) != int(auth.get("target_manifest_version", 1))
+                        or m_digest != str(auth.get("target_manifest_digest", ""))
+                        or (params_dict.get("root_fingerprint") and str(params_dict["root_fingerprint"]) != str(auth.get("root_fingerprint", "")))
+                    ):
+                        return {"success": False, "error": "Pending provisioning intent does not match authorized initial provisioning parameters."}
 
                 if self.status == DeploymentStatus.PROVISIONING_PENDING and self.pending_provisioning is not None:
                     p = self.pending_provisioning

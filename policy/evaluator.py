@@ -293,6 +293,22 @@ class SignedAuthorityManifestLoader:
             "timestamp": timestamp,
         }
         manifest_dict["root_signature"] = real_sig
+
+        if manifest_version == 1:
+            try:
+                from events.store import DeploymentProvisionerRegistry, InMemoryTestDeploymentProvisioner
+                prov = DeploymentProvisionerRegistry.get_provisioner()
+                dep_id = prov.get_deployment_id() if prov else "DEP-PROD"
+                manifest_dict["initial_provisioning_authorization"] = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+                    deployment_id=dep_id,
+                    target_manifest_id=manifest_id,
+                    target_manifest_version=manifest_version,
+                    target_manifest_digest=payload_digest,
+                    root_private_key=root_private_key,
+                )
+            except Exception:
+                pass
+
         return manifest_dict
 
     @classmethod
@@ -474,6 +490,7 @@ class SignedAuthorityManifestLoader:
     def bootstrap_genesis_manifest(
         cls,
         data: Dict[str, Any],
+        initial_provisioning_authorization: Optional[Dict[str, Any]] = None,
     ) -> ReadOnlyActorAuthorityResolver:
         """Explicit, isolated first-install composition root bootstrap with 3-phase crash consistency:
         Stage 1: FIRST_INSTALL_PREPARED
@@ -516,7 +533,8 @@ class SignedAuthorityManifestLoader:
 
             # Authorize initial provisioning with external deployment authority if unprovisioned
             if status == DeploymentStatus.UNPROVISIONED:
-                provisioner.authorize_initial_provisioning()
+                auth = initial_provisioning_authorization or (data.get("initial_provisioning_authorization") if isinstance(data, dict) else None)
+                provisioner.authorize_initial_provisioning(auth)
 
             if not isinstance(data, dict):
                 raise CorruptManifestError("Authority manifest data must be a dictionary.")

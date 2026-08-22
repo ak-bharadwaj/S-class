@@ -5701,13 +5701,27 @@ def test_d3_install_e126_duplicated_state_transition_rejected():
     broker.start_ipc_server()
     try:
         client = OSIPCClient(endpoint_path=broker.ipc_endpoint, auth_secret="SECRET-E126")
-
+        from events.store import InMemoryTestDeploymentProvisioner
+        auth1 = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+            deployment_id="DEP-E126",
+            target_manifest_id="M-E126",
+            target_manifest_version=1,
+            target_manifest_digest="0" * 64,
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
         # 1. First authorization succeeds
-        resp1 = client.call("authorize_initial_provisioning")
+        resp1 = client.call("authorize_initial_provisioning", {"initial_authorization": auth1})
         assert resp1.get("success")
 
         # 2. Second authorization fails closed
-        resp2 = client.call("authorize_initial_provisioning")
+        auth2 = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+            deployment_id="DEP-E126",
+            target_manifest_id="M-E126",
+            target_manifest_version=1,
+            target_manifest_digest="0" * 64,
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+        resp2 = client.call("authorize_initial_provisioning", {"initial_authorization": auth2})
         assert not resp2.get("success")
         assert "Cannot authorize initial provisioning from state 'PROVISIONING_AUTHORIZED'" in resp2.get("error", "")
         client.close()
@@ -7353,7 +7367,15 @@ def test_d3_install_e154_d2_advances_after_proof_creation_rejected(tmp_path):
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    from events.store import InMemoryTestDeploymentProvisioner
+    init_auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+        deployment_id="DEP-E154",
+        target_manifest_id="M-E154",
+        target_manifest_version=1,
+        target_manifest_digest="1111111111111111111111111111111111111111111111111111111111111111",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": init_auth}}, {})
     broker._dispatch_rpc({"method": "register_pending_provisioning", "params": {"installation_id": "INST-E154", "manifest_id": "M-E154", "manifest_version": 1, "manifest_digest": "1" * 64, "root_fingerprint": fp}}, {})
 
     # Broker admission attempt with stale proof_v1 must be rejected
@@ -7393,7 +7415,15 @@ def test_d3_install_e155_d2_advances_between_verification_and_broker_transition_
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    from events.store import InMemoryTestDeploymentProvisioner
+    init_auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+        deployment_id="DEP-E155",
+        target_manifest_id="M-E155",
+        target_manifest_version=1,
+        target_manifest_digest="3333333333333333333333333333333333333333333333333333333333333333",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": init_auth}}, {})
     broker._dispatch_rpc({"method": "register_pending_provisioning", "params": {"installation_id": "INST-E155", "manifest_id": "M-E155", "manifest_version": 1, "manifest_digest": "3" * 64, "root_fingerprint": fp}}, {})
 
     # Advance D2 store right before dispatching record_provisioned
@@ -7442,7 +7472,15 @@ def test_d3_install_e156_concurrent_d2_commit_and_broker_admission_deterministic
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    from events.store import InMemoryTestDeploymentProvisioner
+    init_auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+        deployment_id="DEP-E156",
+        target_manifest_id="M-E156",
+        target_manifest_version=1,
+        target_manifest_digest="5555555555555555555555555555555555555555555555555555555555555555",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": init_auth}}, {})
     broker._dispatch_rpc({"method": "register_pending_provisioning", "params": {"installation_id": "INST-E156", "manifest_id": "M-E156", "manifest_version": 1, "manifest_digest": "5" * 64, "root_fingerprint": fp}}, {})
 
     results = []
@@ -7512,7 +7550,15 @@ def test_d3_install_e157_retry_after_race_deterministic_result(tmp_path):
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    from events.store import InMemoryTestDeploymentProvisioner
+    init_auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+        deployment_id="DEP-E157",
+        target_manifest_id="M-E157",
+        target_manifest_version=1,
+        target_manifest_digest="7777777777777777777777777777777777777777777777777777777777777777",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": init_auth}}, {})
     broker._dispatch_rpc({
         "method": "register_pending_provisioning",
         "params": {
@@ -7550,6 +7596,14 @@ def test_d3_install_e157_retry_after_race_deterministic_result(tmp_path):
 
     # Register updated pending intent for epoch 2
     broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+    init_auth_v2 = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+        deployment_id="DEP-E157",
+        target_manifest_id="M-E157",
+        target_manifest_version=2,
+        target_manifest_digest="8" * 64,
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    broker.active_initial_authorization = dict(init_auth_v2)
     broker._dispatch_rpc({
         "method": "register_pending_provisioning",
         "params": {
@@ -7659,7 +7713,15 @@ def test_d3_install_e158_crash_after_d2_commit_before_broker_persistence_determi
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    from events.store import InMemoryTestDeploymentProvisioner
+    init_auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+        deployment_id="DEP-E158",
+        target_manifest_id="M-E158",
+        target_manifest_version=1,
+        target_manifest_digest="a" * 64,
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": init_auth}}, {})
     assert broker.status == DeploymentStatus.PROVISIONING_AUTHORIZED
 
     # Simulated crash: broker process dies before record_provisioned is recorded
@@ -7780,7 +7842,15 @@ def test_d3_install_e160_later_d2_event_after_admission_does_not_invalidate_auth
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    from events.store import InMemoryTestDeploymentProvisioner
+    init_auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+        deployment_id="DEP-E160",
+        target_manifest_id="M-E160",
+        target_manifest_version=1,
+        target_manifest_digest="c" * 64,
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": init_auth}}, {})
     broker._dispatch_rpc({"method": "register_pending_provisioning", "params": {"installation_id": "INST-E160", "manifest_id": "M-E160", "manifest_version": 1, "manifest_digest": "c" * 64, "root_fingerprint": fp}}, {})
     resp = broker._dispatch_rpc({"method": "record_provisioned", "params": {"commit_proof": proof}}, {})
     assert resp.get("success")
@@ -7879,7 +7949,15 @@ def test_d3_install_e161_referenced_d2_event_deleted_or_corrupted_fails_closed(t
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    from events.store import InMemoryTestDeploymentProvisioner
+    init_auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+        deployment_id="DEP-E161",
+        target_manifest_id="M-E161",
+        target_manifest_version=1,
+        target_manifest_digest="f" * 64,
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": init_auth}}, {})
     broker._dispatch_rpc({"method": "register_pending_provisioning", "params": {"installation_id": "INST-E161", "manifest_id": "M-E161", "manifest_version": 1, "manifest_digest": "f" * 64, "root_fingerprint": fp}}, {})
     resp = broker._dispatch_rpc({"method": "record_provisioned", "params": {"commit_proof": proof}}, {})
     assert resp.get("success")
@@ -8006,7 +8084,15 @@ def test_d3_install_e163_crash_before_d2_commit_deterministic_non_authoritative_
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    from events.store import InMemoryTestDeploymentProvisioner
+    init_auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+        deployment_id="DEP-E163",
+        target_manifest_id="M-E163",
+        target_manifest_version=1,
+        target_manifest_digest="a" * 64,
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": init_auth}}, {})
 
     # Register pending intent before D2 commit
     reg_resp = broker._dispatch_rpc({
@@ -8054,7 +8140,15 @@ def test_d3_install_e164_crash_after_d2_commit_before_finalization_provisioned_r
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    from events.store import InMemoryTestDeploymentProvisioner
+    init_auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+        deployment_id="DEP-E164",
+        target_manifest_id="M-E164",
+        target_manifest_version=1,
+        target_manifest_digest="b" * 64,
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": init_auth}}, {})
 
     # 1. Register pending provisioning intent
     broker._dispatch_rpc({
@@ -8109,7 +8203,15 @@ def test_d3_install_e165_crash_before_pending_persistence_no_authority_ambiguity
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    from events.store import InMemoryTestDeploymentProvisioner
+    init_auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+        deployment_id="DEP-E165",
+        target_manifest_id="M-E165",
+        target_manifest_version=1,
+        target_manifest_digest="0000000000000000000000000000000000000000000000000000000000000000",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": init_auth}}, {})
     assert broker.status == DeploymentStatus.PROVISIONING_AUTHORIZED
 
     # Simulated crash: no pending intent registered, no D2 commit
@@ -8141,7 +8243,15 @@ def test_d3_install_e166_pending_record_bound_to_wrong_d2_event_rejected(tmp_pat
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    from events.store import InMemoryTestDeploymentProvisioner
+    init_auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+        deployment_id="DEP-E166",
+        target_manifest_id="M-E166-AUTHORIZED",
+        target_manifest_version=1,
+        target_manifest_digest="c" * 64,
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": init_auth}}, {})
 
     # Register intent for M-E166-AUTHORIZED
     broker._dispatch_rpc({
@@ -8196,7 +8306,15 @@ def test_d3_install_e167_pending_record_manifest_substitution_rejected(tmp_path)
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    from events.store import InMemoryTestDeploymentProvisioner
+    init_auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+        deployment_id="DEP-E167",
+        target_manifest_id="M-E167",
+        target_manifest_version=1,
+        target_manifest_digest="e" * 64,
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": init_auth}}, {})
 
     # Register intent for M-E167 version 1 with digest 'e'*64
     broker._dispatch_rpc({
@@ -8249,7 +8367,15 @@ def test_d3_install_e168_repeated_recovery_is_idempotent(tmp_path):
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    from events.store import InMemoryTestDeploymentProvisioner
+    init_auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+        deployment_id="DEP-E168",
+        target_manifest_id="M-E168",
+        target_manifest_version=1,
+        target_manifest_digest="1" * 64,
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": init_auth}}, {})
 
     broker._dispatch_rpc({
         "method": "register_pending_provisioning",
@@ -8349,7 +8475,15 @@ def test_d3_install_e169_direct_record_provisioned_from_provisioning_authorized_
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    from events.store import InMemoryTestDeploymentProvisioner
+    init_auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+        deployment_id="DEP-E169",
+        target_manifest_id="M-E169",
+        target_manifest_version=1,
+        target_manifest_digest="9999999999999999999999999999999999999999999999999999999999999999",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": init_auth}}, {})
     assert broker.status == DeploymentStatus.PROVISIONING_AUTHORIZED
 
     # Direct call to record_provisioned without register_pending_provisioning must be rejected
@@ -8398,7 +8532,15 @@ def test_d3_install_e171_crash_non_pending_path_impossible(tmp_path):
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    from events.store import InMemoryTestDeploymentProvisioner
+    init_auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+        deployment_id="DEP-E171",
+        target_manifest_id="M-E171",
+        target_manifest_version=1,
+        target_manifest_digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": init_auth}}, {})
 
     # Attacker tries to write D2 commit without pending intent registered
     store.commit_epoch(
@@ -8521,7 +8663,15 @@ def test_d3_install_e173_pending_intent_substitution_rejected(tmp_path):
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    from events.store import InMemoryTestDeploymentProvisioner
+    init_auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+        deployment_id="DEP-E173",
+        target_manifest_id="M-E173",
+        target_manifest_version=1,
+        target_manifest_digest="1111111111111111111111111111111111111111111111111111111111111111",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": init_auth}}, {})
 
     # Register initial pending intent
     reg1 = broker._dispatch_rpc({
@@ -8581,3 +8731,255 @@ def test_d3_install_e173_pending_intent_substitution_rejected(tmp_path):
     }, {})
     assert not reg_diff_dig.get("success")
     assert "Pending provisioning intent is immutable" in reg_diff_dig.get("error", "")
+
+
+def test_d3_install_e174_unsigned_initial_provisioning_authorization_rejected(tmp_path):
+    """E174: Unsigned initial provisioning authorization or invalid signature -> reject fail-closed."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, InMemoryTestDeploymentProvisioner
+
+    state_file = str(tmp_path / "broker_state_e174.json")
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E174",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+
+    # 1. Missing signature
+    auth_unsigned = {
+        "authorization_id": "INIT-UNSIGNED",
+        "deployment_id": "DEP-E174",
+        "target_manifest_id": "M-E174",
+        "target_manifest_version": 1,
+        "target_manifest_digest": "0" * 64,
+        "authorized_at": "2026-08-22T10:00:00Z",
+        "purpose": "INITIAL_PROVISIONING",
+        "root_fingerprint": hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest(),
+    }
+    resp1 = broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": auth_unsigned}}, {})
+    assert not resp1.get("success")
+    assert "Missing signature" in resp1.get("error", "")
+
+    # 2. Forged signature
+    auth_forged = dict(auth_unsigned)
+    auth_forged["signature"] = {"signature_hex": "0" * 128}
+    resp2 = broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": auth_forged}}, {})
+    assert not resp2.get("success")
+    assert "Invalid initial provisioning authorization signature" in resp2.get("error", "")
+    assert broker.status == DeploymentStatus.UNPROVISIONED
+
+
+def test_d3_install_e175_wrong_deployment_authorization_rejected(tmp_path):
+    """E175: Initial provisioning authorization for wrong deployment ID -> reject fail-closed."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, InMemoryTestDeploymentProvisioner
+
+    state_file = str(tmp_path / "broker_state_e175.json")
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E175-TARGET",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+
+    wrong_auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+        deployment_id="DEP-E175-OTHER",
+        target_manifest_id="M-E175",
+        target_manifest_version=1,
+        target_manifest_digest="0" * 64,
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    resp = broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": wrong_auth}}, {})
+    assert not resp.get("success")
+    assert "deployment mismatch" in resp.get("error", "")
+    assert broker.status == DeploymentStatus.UNPROVISIONED
+
+
+def test_d3_install_e176_wrong_target_manifest_rejected(tmp_path):
+    """E176: Pending registration with manifest differing from authorized initial provisioning -> reject fail-closed."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, InMemoryTestDeploymentProvisioner
+
+    state_file = str(tmp_path / "broker_state_e176.json")
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E176",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+
+    auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+        deployment_id="DEP-E176",
+        target_manifest_id="M-E176-AUTHORIZED",
+        target_manifest_version=1,
+        target_manifest_digest="1" * 64,
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    auth_resp = broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": auth}}, {})
+    assert auth_resp.get("success")
+    assert broker.status == DeploymentStatus.PROVISIONING_AUTHORIZED
+
+    # Pending intent targeting substituted manifest
+    resp = broker._dispatch_rpc({
+        "method": "register_pending_provisioning",
+        "params": {
+            "installation_id": "INST-E176",
+            "manifest_id": "M-E176-SUBSTITUTED",
+            "manifest_version": 1,
+            "manifest_digest": "1" * 64,
+            "root_fingerprint": fp,
+        }
+    }, {})
+    assert not resp.get("success")
+    assert "Pending provisioning intent does not match authorized initial provisioning parameters" in resp.get("error", "")
+
+
+def test_d3_install_e177_replayed_initial_authorization_rejected(tmp_path):
+    """E177: Replayed initial provisioning authorization (same authorization_id) -> reject fail-closed."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, InMemoryTestDeploymentProvisioner
+
+    state_file = str(tmp_path / "broker_state_e177.json")
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E177",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+
+    auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+        deployment_id="DEP-E177",
+        target_manifest_id="M-E177",
+        target_manifest_version=1,
+        target_manifest_digest="0" * 64,
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    resp1 = broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": auth}}, {})
+    assert resp1.get("success")
+
+    # Manually reset status to UNPROVISIONED to simulate attempt to reuse consumed authorization
+    broker.status = DeploymentStatus.UNPROVISIONED
+    resp2 = broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": auth}}, {})
+    assert not resp2.get("success")
+    assert "has already been consumed" in resp2.get("error", "")
+
+
+def test_d3_install_e178_pending_intent_differs_from_authorization_rejected(tmp_path):
+    """E178: Pending intent differing in version or digest from authorization -> reject."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, InMemoryTestDeploymentProvisioner
+
+    state_file = str(tmp_path / "broker_state_e178.json")
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E178",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+
+    auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+        deployment_id="DEP-E178",
+        target_manifest_id="M-E178",
+        target_manifest_version=1,
+        target_manifest_digest="a" * 64,
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    auth_resp = broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": auth}}, {})
+    assert auth_resp.get("success")
+
+    # Mismatched digest
+    resp_bad_digest = broker._dispatch_rpc({
+        "method": "register_pending_provisioning",
+        "params": {
+            "installation_id": "INST-E178",
+            "manifest_id": "M-E178",
+            "manifest_version": 1,
+            "manifest_digest": "b" * 64,
+            "root_fingerprint": fp,
+        }
+    }, {})
+    assert not resp_bad_digest.get("success")
+    assert "Pending provisioning intent does not match" in resp_bad_digest.get("error", "")
+
+    # Mismatched version
+    resp_bad_ver = broker._dispatch_rpc({
+        "method": "register_pending_provisioning",
+        "params": {
+            "installation_id": "INST-E178",
+            "manifest_id": "M-E178",
+            "manifest_version": 2,
+            "manifest_digest": "a" * 64,
+            "root_fingerprint": fp,
+        }
+    }, {})
+    assert not resp_bad_ver.get("success")
+    assert "Pending provisioning intent does not match" in resp_bad_ver.get("error", "")
+
+
+def test_d3_install_e179_authenticated_client_cannot_self_authorize_initial_provisioning(tmp_path):
+    """E179: Authenticated S-Class IPC client cannot self-authorize initial provisioning without external root signature."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, IPCDeploymentProvisioner
+
+    state_file = str(tmp_path / "broker_state_e179.json")
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E179",
+        state_file_path=state_file,
+        auth_secret="SEC179",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    broker.start_ipc_server()
+    try:
+        client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC179")
+        # Attempt to authorize without signed authorization artifact
+        with pytest.raises(RuntimeError, match="Missing or invalid initial provisioning authorization; authenticated S-Class client cannot self-authorize"):
+            client.authorize_initial_provisioning(None)
+        assert broker.status == DeploymentStatus.UNPROVISIONED
+    finally:
+        broker.stop_ipc_server()
+
+
+def test_d3_install_e180_same_initial_authorization_single_use_across_restart_and_concurrency(tmp_path):
+    """E180: Same initial authorization is strictly single-use across broker restart and concurrency."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, InMemoryTestDeploymentProvisioner
+    import threading
+
+    state_file = str(tmp_path / "broker_state_e180.json")
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E180",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+
+    auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+        deployment_id="DEP-E180",
+        target_manifest_id="M-E180",
+        target_manifest_version=1,
+        target_manifest_digest="0" * 64,
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    # 1. Concurrent authorization attempts with the same authorization artifact
+    results = []
+    def auth_worker():
+        r = broker._dispatch_rpc({"method": "authorize_initial_provisioning", "params": {"initial_authorization": auth}}, {})
+        results.append(r)
+
+    threads = [threading.Thread(target=auth_worker) for _ in range(5)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    successes = [r for r in results if r.get("success")]
+    failures = [r for r in results if not r.get("success")]
+    assert len(successes) == 1
+    assert len(failures) == 4
+
+    # 2. Restart broker
+    restarted_broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E180",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    # Authorization ID remains recorded in consumed_authorizations
+    assert auth["authorization_id"] in restarted_broker.consumed_authorizations

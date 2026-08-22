@@ -169,7 +169,14 @@ def test_dc05_sclass_cannot_modify_broker_state():
     broker.start_ipc_server()
     try:
         client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC05")
-        client.authorize_initial_provisioning()
+        auth_init = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+            deployment_id="DC05-DEP",
+            target_manifest_id="M-05",
+            target_manifest_version=1,
+            target_manifest_digest="0" * 64,
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+        client.authorize_initial_provisioning(auth_init)
 
         # S-Class attempts to modify state file on disk out-of-band
         with open(state_file, "r", encoding="utf-8") as f:
@@ -206,7 +213,14 @@ def test_dc06_state_deletion_fails_closed():
     broker.start_ipc_server()
     try:
         client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC06")
-        client.authorize_initial_provisioning()
+        auth_init = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+            deployment_id="DC06-DEP",
+            target_manifest_id="M-06",
+            target_manifest_version=1,
+            target_manifest_digest="0" * 64,
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+        client.authorize_initial_provisioning(auth_init)
         os.remove(state_file)
 
         # Reopening after state deletion defaults to fresh state or fails closed
@@ -237,7 +251,14 @@ def test_dc07_state_corruption_fails_closed():
     broker.start_ipc_server()
     try:
         client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC07")
-        client.authorize_initial_provisioning()
+        auth_init = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+            deployment_id="DC07-DEP",
+            target_manifest_id="M-07",
+            target_manifest_version=1,
+            target_manifest_digest="0" * 64,
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+        client.authorize_initial_provisioning(auth_init)
         with open(state_file, "wb") as f:
             f.write(b"CORRUPTED_NON_JSON_BYTES")
 
@@ -384,13 +405,20 @@ def test_dc12_d2_broker_manifest_mismatch_rejected():
     broker.start_ipc_server()
     try:
         client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC12")
-        client.authorize_initial_provisioning()
+        auth_init = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+            deployment_id="DC12-DEP",
+            target_manifest_id="M-12",
+            target_manifest_version=1,
+            target_manifest_digest="0" * 64,
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+        client.authorize_initial_provisioning(auth_init)
         client.register_pending_provisioning(
             installation_id="INST-12",
             manifest_id="M-12",
             manifest_version=1,
             manifest_digest="0" * 64,
-            root_fingerprint="FORGED_FP",
+            root_fingerprint=auth_init["root_fingerprint"],
         )
         resp = client._client.call("record_provisioned", {
             "commit_proof": {
@@ -686,7 +714,14 @@ def test_dc19_complete_broker_state_loss_fails_closed():
     broker.start_ipc_server()
     try:
         client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC19")
-        client.authorize_initial_provisioning()
+        auth_init = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+            deployment_id="DC19-DEP",
+            target_manifest_id="M-19",
+            target_manifest_version=1,
+            target_manifest_digest="0" * 64,
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+        client.authorize_initial_provisioning(auth_init)
     finally:
         broker.stop_ipc_server()
 

@@ -1360,11 +1360,15 @@ class IPCDeploymentProvisioner(TrustedDeploymentProvisioner):
             except Exception:
                 return DeploymentStatus.AUTHORITY_UNAVAILABLE
 
-    def authorize_initial_provisioning(self, authorization_data: Optional[Dict[str, Any]] = None) -> None:
+    def authorize_initial_provisioning(self, authorization_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         with self._lock:
-            resp = self._client.call("authorize_initial_provisioning", {"authorization_data": authorization_data})
+            resp = self._client.call("authorize_initial_provisioning", {
+                "initial_authorization": authorization_data,
+                "authorization_data": authorization_data,
+            })
             if not resp.get("success"):
                 raise RuntimeError(f"Authority broker rejected initial provisioning: {resp.get('error')}")
+            return resp.get("authorization", authorization_data or {})
 
     def register_pending_provisioning(
         self,
@@ -1751,6 +1755,56 @@ class InMemoryTestDeploymentProvisioner(TrustedDeploymentProvisioner):
                 "root_signature": root_signature,
                 "reprovisioned": True,
             })
+
+    @classmethod
+    def create_initial_provisioning_authorization(
+        cls,
+        deployment_id: str,
+        target_manifest_id: str,
+        target_manifest_version: int,
+        target_manifest_digest: str,
+        root_private_key: Any,
+        reason: str = "INITIAL_PROVISIONING",
+    ) -> Dict[str, Any]:
+        """Helper to generate a root-signed InitialProvisioningAuthorization."""
+        cls._check_test_mode()
+        import uuid
+        import hashlib
+        from datetime import datetime, timezone
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+        from events.serializer import canonicalize_json
+
+        if not isinstance(root_private_key, ed25519.Ed25519PrivateKey):
+            raise TypeError("root_private_key must be an Ed25519PrivateKey instance.")
+
+        auth_id = f"INITAUTH-{uuid.uuid4().hex[:16]}"
+        authorized_at = datetime.now(timezone.utc).isoformat()
+        root_fp = hashlib.sha256(root_private_key.public_key().public_bytes_raw()).hexdigest()
+
+        preimage_dict = {
+            "authorization_id": auth_id,
+            "deployment_id": deployment_id,
+            "target_manifest_id": target_manifest_id,
+            "target_manifest_version": int(target_manifest_version),
+            "target_manifest_digest": target_manifest_digest,
+            "authorized_at": authorized_at,
+            "purpose": "INITIAL_PROVISIONING",
+            "root_fingerprint": root_fp,
+        }
+        preimage_bytes = canonicalize_json(preimage_dict)
+        digest = hashlib.sha256(preimage_bytes).hexdigest()
+        sig_bytes = root_private_key.sign(preimage_bytes)
+
+        auth_record = dict(preimage_dict)
+        auth_record["signature"] = {
+            "algorithm": "ED25519",
+            "signer_identity": "Gate3AuthoritativeVerifier",
+            "public_key_fingerprint": root_fp,
+            "payload_digest": digest,
+            "signature_hex": sig_bytes.hex(),
+            "timestamp": authorized_at,
+        }
+        return auth_record
 
     @classmethod
     def create_reprovisioning_authorization(
