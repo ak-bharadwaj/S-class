@@ -1,11 +1,17 @@
 """
 S-Class Full Orchestration Lifecycle Integration Test.
 
-Executes a complete 2-turn dynamic orchestration session:
-Turn 1: Model generates buggy code -> D6 execution fails -> D4 reduces to CONTRADICTED ->
+Executes a complete 3-turn dynamic orchestration session:
+Turn 1: PLAN mode -> Model synthesizes strategic plan -> StrategicPlanArtifact registered.
+Turn 2: IMPLEMENT mode -> Model generates buggy code -> D6 execution fails -> D4 reduces to CONTRADICTED ->
         AssessmentReceipt(REJECTED) -> Optimizer routes to REPAIR with skill-systematic-debug.
-Turn 2: Model generates repaired code -> D6 execution passes -> D4 reduces to SUPPORTED ->
+Turn 3: REPAIR mode -> Model generates repaired code -> D6 execution passes -> D4 reduces to SUPPORTED ->
         AssessmentReceipt(SATISFIED) -> Optimizer routes to CLOSE.
+
+Verifies:
+1. Zero private attribute access on Controller or Execution Gateway.
+2. Full Plan-as-Artifact governed lifecycle.
+3. Clean boundary between authoritative state projections and ephemeral session working memory.
 """
 
 import os
@@ -36,8 +42,12 @@ NOW_ISO = "2026-08-20T12:00:00Z"
 EXPIRY_ISO = "2026-08-20T13:00:00Z"
 
 
-class MultiTurnMockProvider(LLMProvider):
-    """Returns buggy code on turn 1, repaired code on turn 2."""
+class MultiTurnPlanRepairMockProvider(LLMProvider):
+    """
+    Turn 1: Emits strategic plan thought.
+    Turn 2: Emits buggy implementation.
+    Turn 3: Emits repaired implementation based on failure diagnostics.
+    """
     def __init__(self):
         super().__init__(LLMProviderConfig(provider_type="mock_orchestrator"))
         self._turn = 1
@@ -45,7 +55,16 @@ class MultiTurnMockProvider(LLMProvider):
     def generate(self, prompt: str, system_prompt: str = None, **kwargs) -> LLMResponse:
         if self._turn == 1:
             self._turn += 1
-            # Buggy code: returns x + 1 instead of x * x
+            # Turn 1: Planning response
+            text = (
+                "Strategic Plan: Decompose task into two stages:\n"
+                "Stage 1: Implement mathematical square function adhering to square(x) == x * x invariant.\n"
+                "Stage 2: Run isolated pytest verification.\n"
+                "Plan formulation complete."
+            )
+        elif self._turn == 2:
+            self._turn += 1
+            # Turn 2: Buggy code: returns x + 1 instead of x * x
             text = (
                 "```json\n"
                 "{\n"
@@ -62,7 +81,7 @@ class MultiTurnMockProvider(LLMProvider):
                 "```"
             )
         else:
-            # Repaired code: returns x * x
+            # Turn 3: Repaired code: returns x * x
             text = (
                 "```json\n"
                 "{\n"
@@ -146,7 +165,7 @@ def setup_authority_keys():
 
 
 def test_governed_orchestration_multi_turn_repair_lifecycle(tmp_path):
-    """Executes complete multi-turn orchestrated repair lifecycle to task closure."""
+    """Executes complete multi-turn orchestrated planning and repair lifecycle to task closure."""
     signer = Gate3AuthoritySigner()
 
     # 1. Setup durable D2 log and workspace
@@ -218,7 +237,7 @@ def test_governed_orchestration_multi_turn_repair_lifecycle(tmp_path):
     )
 
     worker = LiveModelWorker(
-        provider=MultiTurnMockProvider(),
+        provider=MultiTurnPlanRepairMockProvider(),
         worker_id="test-orch-worker",
     )
 
@@ -226,11 +245,11 @@ def test_governed_orchestration_multi_turn_repair_lifecycle(tmp_path):
     session = GovernedOrchestrationSession(
         package=package,
         session_id="SESS-ORCH-TEST-001",
-        max_turns=5,
+        max_turns=6,
         initial_budget_units=10.0,
     )
 
-    # TURN 1: Initial Implementation (Buggy)
+    # TURN 1: PLAN Mode (Synthesizes StrategicPlanArtifact)
     decision_1, receipt_1, is_terminal_1 = session.execute_turn(
         worker=worker,
         controller=controller,
@@ -240,14 +259,12 @@ def test_governed_orchestration_multi_turn_repair_lifecycle(tmp_path):
         test_harness_template=test_harness_code,
     )
 
-    assert decision_1.mode == ReasoningMode.IMPLEMENT
+    assert decision_1.mode == ReasoningMode.PLAN
     assert is_terminal_1 is False
-    assert receipt_1 is not None
-    assert receipt_1.verdict == AssessmentVerdict.REJECTED
-    assert session.repair_attempts[obl.obligation_id] == 1
-    assert len(session.latest_failure_diagnostics) > 0
+    assert session.active_plan is not None
+    assert session.active_plan.plan_id.startswith("PLAN-")
 
-    # TURN 2: Repaired Implementation (Correct)
+    # TURN 2: IMPLEMENT Mode (Initial Implementation with Bug)
     decision_2, receipt_2, is_terminal_2 = session.execute_turn(
         worker=worker,
         controller=controller,
@@ -257,13 +274,14 @@ def test_governed_orchestration_multi_turn_repair_lifecycle(tmp_path):
         test_harness_template=test_harness_code,
     )
 
-    assert decision_2.mode in (ReasoningMode.DIAGNOSE, ReasoningMode.REPAIR)
+    assert decision_2.mode == ReasoningMode.IMPLEMENT
     assert is_terminal_2 is False
     assert receipt_2 is not None
-    assert receipt_2.verdict == AssessmentVerdict.SATISFIED
-    assert obl.obligation_id in session.satisfied_obligation_ids
+    assert receipt_2.verdict == AssessmentVerdict.REJECTED
+    assert session.repair_attempts[obl.obligation_id] == 1
+    assert len(session.latest_failure_diagnostics) > 0
 
-    # TURN 3: Verification of Task Closure
+    # TURN 3: REPAIR Mode (Repaired Implementation based on diagnostics)
     decision_3, receipt_3, is_terminal_3 = session.execute_turn(
         worker=worker,
         controller=controller,
@@ -273,5 +291,21 @@ def test_governed_orchestration_multi_turn_repair_lifecycle(tmp_path):
         test_harness_template=test_harness_code,
     )
 
-    assert decision_3.mode == ReasoningMode.CLOSE
-    assert is_terminal_3 is True
+    assert decision_3.mode in (ReasoningMode.DIAGNOSE, ReasoningMode.REPAIR)
+    assert is_terminal_3 is False
+    assert receipt_3 is not None
+    assert receipt_3.verdict == AssessmentVerdict.SATISFIED
+    assert obl.obligation_id in session.satisfied_obligation_ids
+
+    # TURN 4: Verification of Task Closure
+    decision_4, receipt_4, is_terminal_4 = session.execute_turn(
+        worker=worker,
+        controller=controller,
+        gateway=gateway,
+        authority_signer=signer,
+        workspace_id=ws_id,
+        test_harness_template=test_harness_code,
+    )
+
+    assert decision_4.mode == ReasoningMode.CLOSE
+    assert is_terminal_4 is True

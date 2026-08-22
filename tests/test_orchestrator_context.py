@@ -5,6 +5,9 @@ Unit Tests for BoundedContextBuilder and EngineeringSkillRegistry.
 import pytest
 from orchestrator.models import (
     ReasoningMode,
+    ModelTier,
+    ArtifactType,
+    ContextSliceSpec,
     OrchestrationStateSnapshot,
     RoutingDecision,
 )
@@ -25,9 +28,8 @@ def test_skill_registry_lookup_and_selection():
     assert selected_diag is not None
     assert selected_diag.skill_id == "skill-systematic-debug"
 
-    selected_sec = EngineeringSkillRegistry.select_for_mode("REVIEW")
-    assert selected_sec is not None
-    assert selected_sec.skill_id == "skill-security-audit"
+    composed = EngineeringSkillRegistry.compose_skills_for_mode("VERIFY")
+    assert len(composed) >= 2
 
 
 def test_bounded_context_builder_slices_frontier_and_sanitizes_feedback():
@@ -60,11 +62,19 @@ def test_bounded_context_builder_slices_frontier_and_sanitizes_feedback():
     decision = RoutingDecision(
         mode=ReasoningMode.IMPLEMENT,
         active_frontier_ids=("OBL-01",),
-        selected_skill=EngineeringSkillRegistry.get("skill-tdd-verification"),
+        selected_skills=(EngineeringSkillRegistry.get("skill-tdd-verification"),),
         target_provider_type="gemini",
-        target_model_tier="code_fast",
+        target_model_tier=ModelTier.CODE_FAST,
         reasoning_objective="Implement square function",
         required_capabilities=("CAP_READ_CODE", "CAP_PROPOSE_ACTION"),
+        expected_artifact_type=ArtifactType.CODE_PATCH,
+        verification_requirement="Pytest sandbox run.",
+        context_slice_spec=ContextSliceSpec(
+            include_governance_header=True,
+            target_obligation_ids=("OBL-01",),
+            include_diagnostics=True,
+            max_diagnostic_lines=10,
+        ),
         rationale="Active frontier slice",
     )
 

@@ -50,6 +50,19 @@ class D6ExecutionGateway:
         if not self._registry.resolve("pytest_runner_engine"):
             self._registry.register(PytestExecutionProvider())
 
+    @property
+    def registry(self) -> D6ProviderRegistry:
+        """Public access to the execution provider registry."""
+        return self._registry
+
+    def resolve_provider_for_action(self, action_type: str) -> Optional[D6ExecutionProvider]:
+        """Publicly resolves the first registered provider supporting action_type."""
+        for provider_id in self._registry.list_providers():
+            provider = self._registry.resolve(provider_id)
+            if provider and action_type in provider.supported_action_types:
+                return provider
+        return None
+
     def execute(
         self,
         envelope: ExecutionEnvelope,

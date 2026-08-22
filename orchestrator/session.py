@@ -3,9 +3,17 @@ S-Class Governed Orchestration Session.
 
 Coordinates multi-turn cognitive reasoning and deterministic S-Class execution
 across reasoning modes until task closure.
+
+Strictly preserves architectural boundaries:
+- Authoritative State Projections: Derived strictly from canonical D1/D2/D4 state (claims, receipts, DAG).
+- Ephemeral Session Working Memory: Transient counters, code drafts, and context summaries.
+- Public Authority Ingress: Consumes controller.resolve_proposal_authority_context() and public gateway methods.
 """
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Mapping
+import hashlib
+from datetime import datetime, timezone
+
 from domain.models import (
     Task,
     Obligation,
@@ -35,13 +43,21 @@ from orchestrator.models import (
     ReasoningMode,
     OrchestrationStateSnapshot,
     RoutingDecision,
+    StrategicPlanArtifact,
+    PlanStage,
+    RepositoryFacts,
+    TaskRiskAssessment,
+    VerificationProfile,
 )
 from orchestrator.optimizer import StateOptimizerRouter
 from orchestrator.context import BoundedContextBuilder
 
 
 class GovernedOrchestrationSession:
-    """Manages multi-turn governed reasoning and execution lifecycle for an S-Class task."""
+    """
+    Manages multi-turn governed reasoning and execution lifecycle for an S-Class task.
+    Distinguishes strictly between authoritative state projections and ephemeral working state.
+    """
 
     def __init__(
         self,
@@ -49,24 +65,26 @@ class GovernedOrchestrationSession:
         session_id: str = "SESS-ORCH-001",
         max_turns: int = 10,
         initial_budget_units: float = 10.0,
+        available_providers: Tuple[str, ...] = ("gemini", "openai", "anthropic", "local"),
     ):
-        self.package = package
-        self.session_id = session_id
-        self.max_turns = max_turns
-        self.remaining_budget_units = initial_budget_units
-        self.turn_index = 1
-        self.fencing_token = 1
-        self.state_version = 1
-        self.previous_digest = GENESIS_DIGEST
+        # 1. Immutable Input Package & Authoritative Projections
+        self.package: CompiledDomainPackage = package
+        self.session_id: str = session_id
+        self.max_turns: int = max_turns
+        self.available_providers: Tuple[str, ...] = available_providers
 
         self.obligations_by_id: Dict[str, Obligation] = dict(package.obligations_by_id)
         self.claims_by_id: Dict[str, Claim] = dict(package.claims_by_id)
+        self.policies_by_id: Dict[str, Policy] = dict(package.policies_by_id)
         self.claim_states: Dict[str, ClaimReductionState] = {}
         self.latest_receipts: Dict[str, AssessmentReceipt] = {}
-        self.satisfied_obligation_ids: List[str] = []
-        self.failed_obligation_ids: List[str] = []
-        self.repair_attempts: Dict[str, int] = {obl_id: 0 for obl_id in self.obligations_by_id}
 
+        # 2. Ephemeral Session Working Memory (Transient)
+        self.remaining_budget_units: float = initial_budget_units
+        self.turn_index: int = 1
+        self.previous_digest: str = GENESIS_DIGEST
+        self.active_plan: Optional[StrategicPlanArtifact] = None
+        self.repair_attempts: Dict[str, int] = {obl_id: 0 for obl_id in self.obligations_by_id}
         self.turn_summaries: List[str] = []
         self.latest_failure_diagnostics: List[str] = []
         self.current_code_content: str = ""
@@ -75,7 +93,7 @@ class GovernedOrchestrationSession:
         self._refresh_frontier()
 
     def _refresh_frontier(self) -> None:
-        """Recalculates ready, failed, and satisfied obligation sets."""
+        """Projects ready, failed, and satisfied obligation sets from authoritative receipts."""
         ready = []
         failed = []
         satisfied = []
@@ -99,7 +117,7 @@ class GovernedOrchestrationSession:
         self.satisfied_obligation_ids = tuple(satisfied)
 
     def snapshot(self) -> OrchestrationStateSnapshot:
-        """Builds an immutable snapshot of current orchestration state."""
+        """Builds an immutable projection snapshot of current authoritative and session state."""
         self._refresh_frontier()
         return OrchestrationStateSnapshot(
             task_id=self.package.task.task_id,
@@ -107,11 +125,27 @@ class GovernedOrchestrationSession:
             policy_version=1,
             obligations=tuple(self.obligations_by_id.values()),
             claims=tuple(self.claims_by_id.values()),
+            policies=tuple(self.policies_by_id.values()),
             claim_states=dict(self.claim_states),
             latest_receipts=dict(self.latest_receipts),
             ready_obligation_ids=self.ready_obligation_ids,
             satisfied_obligation_ids=self.satisfied_obligation_ids,
             failed_obligation_ids=self.failed_obligation_ids,
+            active_plan=self.active_plan,
+            repository_facts=RepositoryFacts(
+                languages=self.package.task.constraints.languages,
+                dirty_working_tree=self.package.task.repository_context.dirty_working_tree,
+            ),
+            task_risk=TaskRiskAssessment(
+                criticality_score=0.7,
+                blast_radius="LOCAL_MODULE",
+                complexity_score=0.6,
+            ),
+            verification_profile=VerificationProfile(
+                requires_unit_tests=True,
+                requires_regression_run=True,
+            ),
+            available_providers=self.available_providers,
             repair_attempts_by_obligation=dict(self.repair_attempts),
             turn_index=self.turn_index,
             max_turns=self.max_turns,
@@ -173,15 +207,48 @@ class GovernedOrchestrationSession:
             return decision, None, False
 
         self.previous_digest = msg.message_digest
-        tool_calls = turn_resp.tool_calls
 
+        # 3. Handle PLAN / REPLAN Artifact Synthesis
+        if decision.mode in (ReasoningMode.PLAN, ReasoningMode.REPLAN):
+            stages = tuple(
+                PlanStage(
+                    stage_id=f"STAGE-{i+1}",
+                    title=f"Execute {obl_id}",
+                    target_obligation_ids=(obl_id,),
+                    prerequisite_stage_ids=(),
+                    description=f"Plan stage for {obl_id}",
+                    verification_gate="D6 sandbox test",
+                )
+                for i, obl_id in enumerate(self.ready_obligation_ids)
+            )
+            plan_raw = f"{self.package.task.task_id}: {turn_resp.thought}"
+            plan_digest = hashlib.sha256(plan_raw.encode("utf-8")).hexdigest()
+            self.active_plan = StrategicPlanArtifact(
+                plan_id=f"PLAN-{self.turn_index:03d}",
+                task_id=self.package.task.task_id,
+                strategy_name="TDD_INVARIANCE_STRATEGY",
+                rationale=turn_resp.thought[:200],
+                stages=stages,
+                estimated_risk_score=0.3,
+                plan_digest=plan_digest,
+                created_at_iso=current_time_iso,
+                is_active=True,
+            )
+            self.turn_summaries.append(f"Turn {self.turn_index} (PLAN): Formulated plan {self.active_plan.plan_id}")
+            self.turn_index += 1
+            self.remaining_budget_units -= 1.0
+            self._refresh_frontier()
+            return decision, None, False
+
+        tool_calls = turn_resp.tool_calls
         if not tool_calls:
             self.turn_summaries.append(f"Turn {self.turn_index} ({decision.mode.value}): {turn_resp.thought[:100]}")
             self.turn_index += 1
             self.remaining_budget_units -= 1.0
+            self._refresh_frontier()
             return decision, None, False
 
-        # 3. Extract tool call parameters
+        # 4. Extract tool call parameters
         first_call = tool_calls[0]
         code_content = first_call.arguments.get("code_content", self.current_code_content)
         if "code_content" in first_call.arguments:
@@ -190,12 +257,9 @@ class GovernedOrchestrationSession:
         target_obl_id = decision.active_frontier_ids[0] if decision.active_frontier_ids else list(self.obligations_by_id.keys())[0]
         target_claim = next((c for c in self.claims_by_id.values() if c.obligation_id == target_obl_id), list(self.claims_by_id.values())[0])
 
-        # 4. Route through D5 Controller
-        provider_id = "pytest_runner_engine"
-        for p in gateway._registry._providers.values():
-            if "EXECUTE_TEST" in p.supported_action_types:
-                provider_id = p.provider_id
-                break
+        # 5. Route through D5 Controller using strictly PUBLIC APIs
+        provider = gateway.resolve_provider_for_action("EXECUTE_TEST")
+        provider_id = provider.provider_id if provider else "pytest_runner_engine"
 
         exec_ctx = ExecutionContext(
             provider_id=provider_id,
@@ -205,14 +269,8 @@ class GovernedOrchestrationSession:
             capability_set=("CAP_EXEC_TEST",),
         )
 
-        # Read authoritative coordinates from controller
-        lease = controller._lease_authority.get_active_lease(self.package.task.task_id) if controller._lease_authority else None
-        owner_id = lease.owner_id if lease else "PLANNER_ORCHESTRATOR"
-        lease_epoch = lease.lease_epoch if lease else 1
-        fencing_token = lease.fencing_token if lease else self.fencing_token
-
-        state_coords = controller._state_authority.get_authoritative_state() if controller._state_authority else (1, "1" * 64)
-        state_version, state_digest = state_coords
+        # Authoritatively resolve coordinates via Controller's public authority resolver
+        auth_ctx = controller.resolve_proposal_authority_context(self.package.task.task_id)
 
         proposal = ActionProposal(
             proposal_id=f"PROP-ORCH-{self.turn_index:03d}",
@@ -222,11 +280,11 @@ class GovernedOrchestrationSession:
             purpose=f"Execute verification for turn {self.turn_index}",
             execution_context=exec_ctx,
             parameters={"code_content": self.current_code_content, "test_content": test_harness_template},
-            owner_id=owner_id,
-            fencing_token=fencing_token,
-            lease_epoch=lease_epoch,
-            state_version=state_version,
-            state_digest=state_digest,
+            owner_id=auth_ctx.owner_id,
+            fencing_token=auth_ctx.fencing_token,
+            lease_epoch=auth_ctx.lease_epoch,
+            state_version=auth_ctx.state_version,
+            state_digest=auth_ctx.state_digest,
         )
 
         dispatch = controller.submit_proposal(
@@ -244,6 +302,7 @@ class GovernedOrchestrationSession:
             reasons_str = ", ".join(dispatch.decision.rejection_reasons)
             self.turn_summaries.append(f"Turn {self.turn_index} REJECTED by D5 Controller: {reasons_str}")
             self.turn_index += 1
+            self._refresh_frontier()
             return decision, None, False
 
         token = dispatch.execution_token
@@ -267,9 +326,10 @@ class GovernedOrchestrationSession:
         if not admission.is_admitted:
             self.turn_summaries.append(f"Turn {self.turn_index} ADMISSION FAILED: {admission.reason}")
             self.turn_index += 1
+            self._refresh_frontier()
             return decision, None, False
 
-        # 5. Execute in D6 Gateway
+        # 6. Execute in D6 Gateway
         envelope = ExecutionEnvelope(
             token=token,
             admission=admission,
@@ -285,7 +345,7 @@ class GovernedOrchestrationSession:
             timeout_seconds=20.0,
         )
 
-        # 6. Convert to Evidence & Reduce Claim
+        # 7. Convert to Evidence & Reduce Claim
         ev = ObservationEvidenceAdapter.create_evidence(
             observation=obs,
             claim=target_claim,
@@ -306,7 +366,7 @@ class GovernedOrchestrationSession:
         )
         self.latest_receipts[target_obl_id] = receipt
 
-        # 7. Update turn state & diagnostics
+        # 8. Update turn state & diagnostics
         if receipt.verdict == AssessmentVerdict.SATISFIED:
             self.latest_failure_diagnostics = []
             self.turn_summaries.append(f"Turn {self.turn_index}: Obligation '{target_obl_id}' SATISFIED.")
@@ -325,8 +385,6 @@ class GovernedOrchestrationSession:
             self.turn_summaries.append(f"Turn {self.turn_index}: Obligation '{target_obl_id}' REJECTED.")
 
         self.turn_index += 1
-        self.fencing_token += 1
-        self.state_version += 1
         self.remaining_budget_units -= 1.0
         self._refresh_frontier()
 

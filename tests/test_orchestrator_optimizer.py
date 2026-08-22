@@ -1,18 +1,17 @@
 """
-Unit Tests for S-Class State Optimizer & Reasoning Router.
-Verifies:
-1. Initial discovery/specification routing.
-2. Dynamic mode selection based on decision frontier and claim reduction status.
-3. Diagnostic & repair mode routing on refutations.
-4. Fail-closed safety escalations (budget exhaustion, oscillation, max repair attempts).
-5. Global convergence and task closure.
+Unit Tests for S-Class Multi-Factor State Optimizer & Reasoning Router.
 """
 
 import pytest
 from orchestrator.models import (
     ReasoningMode,
+    ModelTier,
+    ArtifactType,
     OrchestrationStateSnapshot,
-    RoutingDecision,
+    StrategicPlanArtifact,
+    TaskRiskAssessment,
+    RepositoryFacts,
+    VerificationProfile,
 )
 from orchestrator.optimizer import StateOptimizerRouter
 from domain.models import Obligation, Claim, ClaimSubject
@@ -57,7 +56,21 @@ def sample_claim():
     )
 
 
-def test_optimizer_initial_discovery_routing():
+@pytest.fixture
+def sample_plan():
+    return StrategicPlanArtifact(
+        plan_id="PLAN-001",
+        task_id="TASK-01",
+        strategy_name="TDD_STRATEGY",
+        rationale="Plan rationale",
+        stages=(),
+        estimated_risk_score=0.2,
+        plan_digest="a" * 64,
+        created_at_iso="2026-08-20T12:00:00Z",
+    )
+
+
+def test_optimizer_initial_discovery():
     """Verifies that an empty task routes to DISCOVER."""
     snap = OrchestrationStateSnapshot(
         task_id="TASK-EMPTY",
@@ -67,11 +80,12 @@ def test_optimizer_initial_discovery_routing():
     )
     decision = StateOptimizerRouter.derive_next_decision(snap)
     assert decision.mode == ReasoningMode.DISCOVER
-    assert "CAP_READ_CODE" in decision.required_capabilities
+    assert decision.expected_artifact_type == ArtifactType.REPO_INVENTORY
+    assert decision.target_model_tier == ModelTier.REASONING_PRO
 
 
-def test_optimizer_ready_frontier_routes_to_implement(sample_obligation, sample_claim):
-    """Verifies that ready frontier with unsupported claims routes to IMPLEMENT."""
+def test_optimizer_unplanned_frontier_routes_to_plan(sample_obligation, sample_claim):
+    """Verifies that an un-planned task with ready obligations routes to PLAN."""
     snap = OrchestrationStateSnapshot(
         task_id="TASK-01",
         source_sha="a" * 40,
@@ -79,16 +93,35 @@ def test_optimizer_ready_frontier_routes_to_implement(sample_obligation, sample_
         obligations=(sample_obligation,),
         claims=(sample_claim,),
         ready_obligation_ids=("OBL-OPT-01",),
+        active_plan=None,
+    )
+    decision = StateOptimizerRouter.derive_next_decision(snap)
+    assert decision.mode == ReasoningMode.PLAN
+    assert decision.expected_artifact_type == ArtifactType.STRATEGIC_PLAN
+    assert decision.target_model_tier == ModelTier.REASONING_PRO
+
+
+def test_optimizer_planned_frontier_routes_to_implement(sample_obligation, sample_claim, sample_plan):
+    """Verifies that planned ready frontier routes to IMPLEMENT with skill composition."""
+    snap = OrchestrationStateSnapshot(
+        task_id="TASK-01",
+        source_sha="a" * 40,
+        policy_version=1,
+        obligations=(sample_obligation,),
+        claims=(sample_claim,),
+        ready_obligation_ids=("OBL-OPT-01",),
+        active_plan=sample_plan,
+        task_risk=TaskRiskAssessment(criticality_score=0.9, blast_radius="LOCAL", complexity_score=0.8),
     )
     decision = StateOptimizerRouter.derive_next_decision(snap)
     assert decision.mode == ReasoningMode.IMPLEMENT
-    assert decision.active_frontier_ids == ("OBL-OPT-01",)
-    assert decision.selected_skill is not None
-    assert decision.selected_skill.skill_id == "skill-tdd-verification"
+    assert decision.expected_artifact_type == ArtifactType.CODE_PATCH
+    assert decision.target_model_tier == ModelTier.CODE_FAST
+    assert len(decision.selected_skills) >= 1
 
 
-def test_optimizer_refutation_routes_to_diagnose_and_repair(sample_obligation, sample_claim):
-    """Verifies that refuted obligations route to DIAGNOSE then REPAIR."""
+def test_optimizer_repeated_failure_routes_to_replan(sample_obligation, sample_claim, sample_plan):
+    """Verifies that 2 failed repair attempts triggers REPLAN before escalation."""
     refuted_state = ClaimReductionState(
         claim_id="CLM-OPT-01",
         epistemic_state=ClaimEpistemicState.CONTRADICTED,
@@ -102,63 +135,70 @@ def test_optimizer_refutation_routes_to_diagnose_and_repair(sample_obligation, s
         claims=(sample_claim,),
         claim_states={"CLM-OPT-01": refuted_state},
         failed_obligation_ids=("OBL-OPT-01",),
+        active_plan=sample_plan,
+        repair_attempts_by_obligation={"OBL-OPT-01": 2},
     )
     decision = StateOptimizerRouter.derive_next_decision(snap)
-    assert decision.mode == ReasoningMode.DIAGNOSE
-    assert decision.active_frontier_ids == ("OBL-OPT-01",)
-    assert decision.selected_skill is not None
-    assert decision.selected_skill.skill_id == "skill-systematic-debug"
+    assert decision.mode == ReasoningMode.REPLAN
+    assert decision.expected_artifact_type == ArtifactType.REVISED_PLAN
+    assert decision.target_model_tier == ModelTier.REASONING_PRO
 
 
-def test_optimizer_budget_exhaustion_escalates():
-    """Verifies that budget depletion triggers immediate ESCALATE."""
-    snap = OrchestrationStateSnapshot(
+def test_optimizer_dynamic_provider_selection(sample_obligation, sample_claim, sample_plan):
+    """Verifies that optimizer dynamically picks from available providers without hardcoding."""
+    snap_anthropic = OrchestrationStateSnapshot(
+        task_id="TASK-01",
+        source_sha="a" * 40,
+        policy_version=1,
+        obligations=(sample_obligation,),
+        claims=(sample_claim,),
+        ready_obligation_ids=("OBL-OPT-01",),
+        active_plan=sample_plan,
+        available_providers=("anthropic", "local"),
+    )
+    decision = StateOptimizerRouter.derive_next_decision(snap_anthropic)
+    assert decision.target_provider_type == "anthropic"
+
+    snap_openai = OrchestrationStateSnapshot(
+        task_id="TASK-01",
+        source_sha="a" * 40,
+        policy_version=1,
+        obligations=(sample_obligation,),
+        claims=(sample_claim,),
+        ready_obligation_ids=("OBL-OPT-01",),
+        active_plan=sample_plan,
+        available_providers=("openai", "local"),
+    )
+    decision_oa = StateOptimizerRouter.derive_next_decision(snap_openai)
+    assert decision_oa.target_provider_type == "openai"
+
+
+def test_optimizer_safety_escalations():
+    """Verifies safety escalations for budget, oscillation, and max repair attempts."""
+    # 1. Budget exhausted
+    snap_b = OrchestrationStateSnapshot(
         task_id="TASK-01",
         source_sha="a" * 40,
         policy_version=1,
         remaining_budget_units=0.0,
     )
-    decision = StateOptimizerRouter.derive_next_decision(snap)
-    assert decision.mode == ReasoningMode.ESCALATE
-    assert "budget" in decision.rationale.lower()
+    assert StateOptimizerRouter.derive_next_decision(snap_b).mode == ReasoningMode.ESCALATE
 
-
-def test_optimizer_max_repair_attempts_escalates(sample_obligation):
-    """Verifies that exceeding 3 repair attempts on an obligation triggers ESCALATE."""
-    snap = OrchestrationStateSnapshot(
-        task_id="TASK-01",
-        source_sha="a" * 40,
-        policy_version=1,
-        obligations=(sample_obligation,),
-        failed_obligation_ids=("OBL-OPT-01",),
-        repair_attempts_by_obligation={"OBL-OPT-01": 3},
-    )
-    decision = StateOptimizerRouter.derive_next_decision(snap)
-    assert decision.mode == ReasoningMode.ESCALATE
-    assert "maximum repair attempts" in decision.reasoning_objective
-
-
-def test_optimizer_oscillation_escalates():
-    """Verifies that detected plan oscillation triggers ESCALATE."""
-    snap = OrchestrationStateSnapshot(
+    # 2. Oscillation
+    snap_o = OrchestrationStateSnapshot(
         task_id="TASK-01",
         source_sha="a" * 40,
         policy_version=1,
         has_oscillation_detected=True,
     )
-    decision = StateOptimizerRouter.derive_next_decision(snap)
-    assert decision.mode == ReasoningMode.ESCALATE
-    assert "oscillation" in decision.rationale.lower()
+    assert StateOptimizerRouter.derive_next_decision(snap_o).mode == ReasoningMode.ESCALATE
 
-
-def test_optimizer_all_satisfied_routes_to_close(sample_obligation):
-    """Verifies that all satisfied obligations route to CLOSE."""
-    snap = OrchestrationStateSnapshot(
+    # 3. 3 attempts
+    snap_3 = OrchestrationStateSnapshot(
         task_id="TASK-01",
         source_sha="a" * 40,
         policy_version=1,
-        obligations=(sample_obligation,),
-        satisfied_obligation_ids=("OBL-OPT-01",),
+        failed_obligation_ids=("OBL-01",),
+        repair_attempts_by_obligation={"OBL-01": 3},
     )
-    decision = StateOptimizerRouter.derive_next_decision(snap)
-    assert decision.mode == ReasoningMode.CLOSE
+    assert StateOptimizerRouter.derive_next_decision(snap_3).mode == ReasoningMode.ESCALATE

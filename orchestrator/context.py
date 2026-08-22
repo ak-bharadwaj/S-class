@@ -45,20 +45,23 @@ class BoundedContextBuilder:
         )
 
         # 2. Extract verification feedback if in failure mode
-        verif_feedback = tuple(failure_diagnostics) if failure_diagnostics else ()
+        verif_feedback = tuple(failure_diagnostics) if (failure_diagnostics and decision.context_slice_spec.include_diagnostics) else ()
 
         # 3. Assemble bounded objective prompt
         prompt_sections = []
         prompt_sections.append(f"## Reasoning Mode: {decision.mode.value}")
         prompt_sections.append(f"**Objective**: {decision.reasoning_objective}")
+        prompt_sections.append(f"**Expected Output Artifact**: {decision.expected_artifact_type.value}")
+        prompt_sections.append(f"**Verification Gate**: {decision.verification_requirement}")
 
-        if decision.selected_skill:
-            skill = decision.selected_skill
-            prompt_sections.append(f"### Active Procedure: {skill.name}")
-            prompt_sections.append(f"*{skill.purpose}*")
-            prompt_sections.append("Guidelines:")
-            for g in skill.guidelines:
-                prompt_sections.append(f"- {g}")
+        if decision.selected_skills:
+            prompt_sections.append("### Active Engineering Skill Playbooks:")
+            for skill in decision.selected_skills:
+                prompt_sections.append(f"#### [{skill.category.value}] {skill.name}")
+                prompt_sections.append(f"*{skill.purpose}*")
+                prompt_sections.append("Guidelines:")
+                for g in skill.guidelines:
+                    prompt_sections.append(f"- {g}")
 
         if frontier_details:
             prompt_sections.append("### Active Obligation Frontier:")
@@ -71,12 +74,14 @@ class BoundedContextBuilder:
 
         if verif_feedback:
             prompt_sections.append("### Refutation & Failure Diagnostics:")
-            for diag in verif_feedback[:10]:  # Cap at top 10 diagnostic lines
+            max_lines = decision.context_slice_spec.max_diagnostic_lines
+            for diag in verif_feedback[:max_lines]:
                 prompt_sections.append(f"> {diag.strip()}")
 
-        if prior_turn_summaries:
+        if prior_turn_summaries and decision.context_slice_spec.include_turn_history:
             prompt_sections.append("### Prior Turn Trajectory:")
-            for s in prior_turn_summaries[-3:]:  # Sliding window of last 3 turns
+            max_hist = decision.context_slice_spec.max_turn_history_count
+            for s in prior_turn_summaries[-max_hist:]:
                 prompt_sections.append(f"- {s.strip()}")
 
         objective_text = "\n\n".join(prompt_sections)
