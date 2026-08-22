@@ -16,51 +16,6 @@ from events.store import DeploymentStatus
 from events.serializer import canonicalize_json
 
 
-class TrustedDeploymentControlPlane:
-    """External deployment-level durable authority control plane outside local broker and host filesystem.
-    Represents the centralized deployment control plane / fleet authority that maintains the authoritative
-    record of provisioned deployment identities across their lifecycle.
-    """
-    _lock = threading.RLock()
-    _provisioned_deployments: Dict[str, Dict[str, Any]] = {}
-
-    @classmethod
-    def record_provisioned_deployment(
-        cls,
-        deployment_id: str,
-        installation_id: str,
-        manifest_id: str,
-        manifest_version: int,
-        payload_digest: str,
-        root_fingerprint: str,
-    ) -> None:
-        with cls._lock:
-            cls._provisioned_deployments[deployment_id] = {
-                "deployment_id": deployment_id,
-                "installation_id": installation_id,
-                "manifest_id": manifest_id,
-                "manifest_version": manifest_version,
-                "payload_digest": payload_digest,
-                "root_fingerprint": root_fingerprint,
-            }
-
-    @classmethod
-    def is_deployment_provisioned(cls, deployment_id: str) -> bool:
-        with cls._lock:
-            return deployment_id in cls._provisioned_deployments
-
-    @classmethod
-    def get_deployment_record(cls, deployment_id: str) -> Optional[Dict[str, Any]]:
-        with cls._lock:
-            record = cls._provisioned_deployments.get(deployment_id)
-            return dict(record) if record else None
-
-    @classmethod
-    def clear_for_testing(cls) -> None:
-        with cls._lock:
-            cls._provisioned_deployments.clear()
-
-
 class TrustedDeploymentAuthorityBroker:
     """Out-of-process / isolated deployment authority broker.
     Owns deployment identity, provisioning state machine, canonical root public key,
@@ -74,7 +29,7 @@ class TrustedDeploymentAuthorityBroker:
         allowed_uid: Optional[int] = None,
         auth_secret: Optional[str] = None,
         root_public_key: Optional[ed25519.Ed25519PublicKey] = None,
-        initial_status: DeploymentStatus = DeploymentStatus.UNPROVISIONED,
+        initial_status: DeploymentStatus = DeploymentStatus.CATASTROPHIC_LOSS,
         d2_store_path: Optional[str] = None,
     ):
         self.deployment_id = deployment_id
@@ -151,16 +106,7 @@ class TrustedDeploymentAuthorityBroker:
                     self._persist_state()
                     return
 
-                if TrustedDeploymentControlPlane.is_deployment_provisioned(self.deployment_id):
-                    # Catastrophic total loss: broker state absent + D2 store absent on established deployment -> AUTHORITY_UNAVAILABLE
-                    self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
-                    self.consumed_authorizations = set()
-                    self.current_installation = None
-                    self.pending_provisioning = None
-                    self.active_initial_authorization = None
-                    self._persist_state()
-                    return
-
+                # Option B: Complete local authority loss (broker state absent + D2 store absent) -> CATASTROPHIC_LOSS
                 self.status = default_status
                 self.consumed_authorizations = set()
                 self.current_installation = None
@@ -216,21 +162,6 @@ class TrustedDeploymentAuthorityBroker:
                     "Failing closed into AUTHORITY_UNAVAILABLE."
                 )
 
-            # Anti-fabrication check 2: Established deployment in control plane can never have fabricated UNPROVISIONED state
-            if (
-                persisted_status == DeploymentStatus.UNPROVISIONED
-                and TrustedDeploymentControlPlane.is_deployment_provisioned(self.deployment_id)
-            ):
-                self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
-                self.consumed_authorizations = set(payload.get("consumed_authorizations", []))
-                self.current_installation = None
-                self.pending_provisioning = None
-                self.active_initial_authorization = None
-                self._persist_state()
-                raise RuntimeError(
-                    f"Broker state tampering or fabricated UNPROVISIONED state detected: deployment '{self.deployment_id}' "
-                    f"is established in deployment control plane. Failing closed into AUTHORITY_UNAVAILABLE."
-                )
 
             self.status = persisted_status
             self.consumed_authorizations = set(payload.get("consumed_authorizations", []))
@@ -740,14 +671,6 @@ class TrustedDeploymentAuthorityBroker:
                         }
                         self.pending_provisioning = None
                         self._persist_state()
-                        TrustedDeploymentControlPlane.record_provisioned_deployment(
-                            deployment_id=self.deployment_id,
-                            installation_id=str(self.current_installation.get("installation_id")),
-                            manifest_id=str(self.current_installation.get("manifest_id")),
-                            manifest_version=int(self.current_installation.get("manifest_version", 1)),
-                            payload_digest=str(self.current_installation.get("payload_digest")),
-                            root_fingerprint=str(self.current_installation.get("root_fingerprint")),
-                        )
                         return {"success": True, "status": self.status.value}
                 except Exception as e:
                     return {"success": False, "error": f"D2 admission transaction error: {e}"}
@@ -763,8 +686,8 @@ class TrustedDeploymentAuthorityBroker:
                 if auth_id in self.consumed_authorizations:
                     return {"success": False, "error": f"Reprovisioning authorization '{auth_id}' has already been consumed."}
 
-                if self.status not in (DeploymentStatus.RECOVERY_REQUIRED, DeploymentStatus.AUTHORITY_UNAVAILABLE):
-                    return {"success": False, "error": f"Cannot authorize reprovisioning from state '{self.status.value}' (RECOVERY_REQUIRED or AUTHORITY_UNAVAILABLE required)."}
+                if self.status not in (DeploymentStatus.RECOVERY_REQUIRED, DeploymentStatus.AUTHORITY_UNAVAILABLE, DeploymentStatus.CATASTROPHIC_LOSS):
+                    return {"success": False, "error": f"Cannot authorize reprovisioning from state '{self.status.value}' (RECOVERY_REQUIRED, AUTHORITY_UNAVAILABLE, or CATASTROPHIC_LOSS required)."}
 
                 if "root_public_key" in params and params["root_public_key"] is not None:
                     return {"success": False, "error": "Caller-supplied root public key is rejected; broker uses canonical authority root."}
@@ -879,14 +802,6 @@ class TrustedDeploymentAuthorityBroker:
                         }
                         self.pending_provisioning = None
                         self._persist_state()
-                        TrustedDeploymentControlPlane.record_provisioned_deployment(
-                            deployment_id=self.deployment_id,
-                            installation_id=str(self.current_installation.get("installation_id")),
-                            manifest_id=str(self.current_installation.get("manifest_id")),
-                            manifest_version=int(self.current_installation.get("manifest_version", 1)),
-                            payload_digest=str(self.current_installation.get("payload_digest")),
-                            root_fingerprint=str(self.current_installation.get("root_fingerprint")),
-                        )
                         return {"success": True, "status": self.status.value}
                 except Exception as e:
                     return {"success": False, "error": f"D2 recovery admission transaction error: {e}"}

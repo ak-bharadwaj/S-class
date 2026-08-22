@@ -105,6 +105,7 @@ from domain.types import (
 from domain.exceptions import DomainValidationError
 from events.serializer import canonicalize_json
 from events.exceptions import CorruptEventLogError
+from events.store import DeploymentStatus
 from benchmark.parity.gate_3_authority import (
     Gate3AuthorityKeyStore,
     Gate3ProviderKeyStore,
@@ -5150,6 +5151,7 @@ def test_d3_install_e111_same_process_caller_cannot_mutate_broker_authority():
         deployment_id="DEP-E111",
         auth_secret="SECRET-E111",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     broker.start_ipc_server()
     try:
@@ -5191,6 +5193,7 @@ def test_d3_install_e112_untrusted_process_cannot_connect_to_broker():
         deployment_id="DEP-E112",
         auth_secret="CONFIDENTIAL_DEPLOYMENT_SECRET_123",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     broker.start_ipc_server()
     try:
@@ -5226,6 +5229,7 @@ def test_d3_install_e113_wrong_unix_peer_credentials_rejected():
         allowed_uid=999999,
         auth_secret="SECRET-E113",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     broker.start_ipc_server()
     try:
@@ -5255,6 +5259,7 @@ def test_d3_install_e114_unauthorized_windows_named_pipe_principal_rejected():
         deployment_id="DEP-E114",
         auth_secret="WIN_SECURE_TOKEN_XYZ",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     broker.start_ipc_server()
     try:
@@ -5285,6 +5290,7 @@ def test_d3_install_e115_spoofed_deployment_identity_rejected():
         deployment_id="CANONICAL-DEP-115",
         auth_secret="SECRET-E115",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     broker.start_ipc_server()
     try:
@@ -5336,6 +5342,7 @@ def test_d3_install_e116_broker_restart_preserves_provisioned():
         state_file_path=state_file,
         auth_secret="SECRET-E116",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     broker1.start_ipc_server()
     try:
@@ -5362,6 +5369,7 @@ def test_d3_install_e116_broker_restart_preserves_provisioned():
         state_file_path=state_file,
         auth_secret="SECRET-E116",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     broker2.start_ipc_server()
     try:
@@ -5392,6 +5400,7 @@ def test_d3_install_e117_sclass_local_state_destruction_does_not_reset_broker():
         deployment_id="DEP-E117",
         auth_secret="SECRET-E117",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     broker.start_ipc_server()
     try:
@@ -5446,6 +5455,7 @@ def test_d3_install_e118_replayed_recovery_authorization_rejected_by_broker():
         deployment_id="DEP-E118",
         auth_secret="SECRET-E118",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     broker.start_ipc_server()
     try:
@@ -5549,6 +5559,7 @@ def test_d3_install_e121_caller_supplied_root_key_rejected():
         deployment_id="DEP-E121",
         auth_secret="SECRET-E121",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     broker.start_ipc_server()
     try:
@@ -5585,6 +5596,7 @@ def test_d3_install_e122_forged_authorization_with_caller_selected_key_rejected(
         deployment_id="DEP-E122",
         auth_secret="SECRET-E122",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     broker.start_ipc_server()
     try:
@@ -5626,6 +5638,7 @@ def test_d3_install_e123_broker_root_mutation_rejected():
         deployment_id="DEP-E123",
         auth_secret="SECRET-E123",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     attacker_key = ed25519.Ed25519PrivateKey.generate().public_key()
 
@@ -5643,6 +5656,7 @@ def test_d3_install_e124_record_provisioned_from_unprovisioned_rejected():
         deployment_id="DEP-E124",
         auth_secret="SECRET-E124",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     broker.start_ipc_server()
     try:
@@ -5669,6 +5683,7 @@ def test_d3_install_e125_record_reprovisioned_without_recovery_authorized_reject
         deployment_id="DEP-E125",
         auth_secret="SECRET-E125",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     broker.start_ipc_server()
     try:
@@ -5697,6 +5712,7 @@ def test_d3_install_e126_duplicated_state_transition_rejected():
         deployment_id="DEP-E126",
         auth_secret="SECRET-E126",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     broker.start_ipc_server()
     try:
@@ -5740,6 +5756,7 @@ def test_d3_install_e127_no_auth_broker_startup_rejected():
         auth_secret=None,
         allowed_uid=None,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     with pytest.raises(RuntimeError, match="Broker startup rejected: mandatory authentication secret required"):
         broker.start_ipc_server()
@@ -5754,6 +5771,7 @@ def test_d3_install_e128_unauthorized_client_rejected():
         deployment_id="DEP-E128",
         auth_secret="MANDATORY_SECRET_128",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     broker.start_ipc_server()
     try:
@@ -5773,6 +5791,7 @@ def test_d3_install_e129_unauthorized_windows_client_rejected():
         deployment_id="DEP-E129",
         auth_secret="WIN_PIPE_SECRET_129",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     broker.start_ipc_server()
     try:
@@ -5792,6 +5811,7 @@ def test_d3_install_e130_localhost_tcp_without_authentication_rejected():
         deployment_id="DEP-E130",
         auth_secret="TCP_AUTH_SECRET_130",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     broker.start_ipc_server()
     try:
@@ -5817,6 +5837,7 @@ def test_d3_install_e131_broker_state_tampering_fails_closed():
         state_file_path=state_file,
         auth_secret="SECRET-E131",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     assert broker.status.value == "UNPROVISIONED"
 
@@ -5834,6 +5855,7 @@ def test_d3_install_e131_broker_state_tampering_fails_closed():
             state_file_path=state_file,
             auth_secret="SECRET-E131",
             root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         )
 
     if os.path.exists(state_file):
@@ -5855,6 +5877,7 @@ def test_d3_install_e132_consumed_authorization_deletion_tampering_fails_closed(
         state_file_path=state_file,
         auth_secret="SECRET-E132",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     broker.consumed_authorizations.add("AUTH-132-USED")
     broker._persist_state()
@@ -5873,6 +5896,7 @@ def test_d3_install_e132_consumed_authorization_deletion_tampering_fails_closed(
             state_file_path=state_file,
             auth_secret="SECRET-E132",
             root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         )
 
     if os.path.exists(state_file):
@@ -5894,6 +5918,7 @@ def test_d3_install_e133_status_downgrade_tampering_fails_closed():
         state_file_path=state_file,
         auth_secret="SECRET-E133",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     broker.notify_local_state_loss()  # State is RECOVERY_REQUIRED
 
@@ -5911,6 +5936,7 @@ def test_d3_install_e133_status_downgrade_tampering_fails_closed():
             state_file_path=state_file,
             auth_secret="SECRET-E133",
             root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         )
 
     if os.path.exists(state_file):
@@ -5932,6 +5958,7 @@ def test_d3_install_e134_broker_restart_preserves_authority_state():
         state_file_path=state_file,
         auth_secret="SECRET-E134",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     broker1.consumed_authorizations.add("AUTH-134-A")
     broker1.consumed_authorizations.add("AUTH-134-B")
@@ -5944,6 +5971,7 @@ def test_d3_install_e134_broker_restart_preserves_authority_state():
         state_file_path=state_file,
         auth_secret="SECRET-E134",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     assert broker2.deployment_id == "DEP-E134-IMMUTABLE"
     assert broker2.status == DeploymentStatus.RECOVERY_REQUIRED
@@ -5976,6 +6004,7 @@ def test_d3_install_e135_payload_digest_substitution_rejected(tmp_path):
         deployment_id="DEP-E135",
         auth_secret="SEC-E135",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     broker.status = DeploymentStatus.PROVISIONING_PENDING
@@ -6051,6 +6080,7 @@ def test_d3_install_e136_signature_substitution_rejected(tmp_path):
         deployment_id="DEP-E136",
         auth_secret="SEC-E136",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     broker.status = DeploymentStatus.PROVISIONING_PENDING
@@ -6125,6 +6155,7 @@ def test_d3_install_e137_valid_signature_over_different_manifest_rejected(tmp_pa
         deployment_id="DEP-E137",
         auth_secret="SEC-E137",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
@@ -6196,6 +6227,7 @@ def test_d3_install_e138_manifest_id_mismatch_rejected(tmp_path):
         deployment_id="DEP-E138",
         auth_secret="SEC-E138",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     broker.status = DeploymentStatus.PROVISIONING_PENDING
@@ -6271,6 +6303,7 @@ def test_d3_install_e139_manifest_version_mismatch_rejected(tmp_path):
         deployment_id="DEP-E139",
         auth_secret="SEC-E139",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     broker.status = DeploymentStatus.PROVISIONING_PENDING
@@ -6347,6 +6380,7 @@ def test_d3_install_e140_fake_d2_commit_proof_with_correct_fingerprint_rejected(
         deployment_id="DEP-E140",
         auth_secret="SEC-E140",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     broker.status = DeploymentStatus.PROVISIONING_PENDING
@@ -6414,6 +6448,7 @@ def test_d3_install_e141_valid_signed_proof_non_existent_d2_commit_rejected(tmp_
         deployment_id="DEP-E141",
         auth_secret="SEC-E141",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=non_existent_store,
     )
     broker.status = DeploymentStatus.PROVISIONING_PENDING
@@ -6500,6 +6535,7 @@ def test_d3_install_e142_valid_signed_proof_old_d2_commit_rejected(tmp_path):
         deployment_id="DEP-E142",
         auth_secret="SEC-E142",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     broker.status = DeploymentStatus.PROVISIONING_PENDING
@@ -6576,6 +6612,7 @@ def test_d3_install_e143_valid_signature_altered_event_id_rejected(tmp_path):
         deployment_id="DEP-E143",
         auth_secret="SEC-E143",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     broker.status = DeploymentStatus.PROVISIONING_PENDING
@@ -6651,6 +6688,7 @@ def test_d3_install_e144_valid_signature_altered_sequence_rejected(tmp_path):
         deployment_id="DEP-E144",
         auth_secret="SEC-E144",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     broker.status = DeploymentStatus.PROVISIONING_PENDING
@@ -6726,6 +6764,7 @@ def test_d3_install_e145_valid_signature_manifest_digest_not_in_d2_rejected(tmp_
         deployment_id="DEP-E145",
         auth_secret="SEC-E145",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     broker.status = DeploymentStatus.PROVISIONING_PENDING
@@ -6801,6 +6840,7 @@ def test_d3_install_e146_valid_proof_another_deployment_rejected(tmp_path):
         deployment_id="DEP-TARGET-E146",  # Broker deployment ID
         auth_secret="SEC-E146",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     broker.status = DeploymentStatus.PROVISIONING_PENDING
@@ -6876,6 +6916,7 @@ def test_d3_install_e147_valid_proof_previous_d2_head_rejected(tmp_path):
         deployment_id="DEP-E147",
         auth_secret="SEC-E147",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     broker.status = DeploymentStatus.PROVISIONING_PENDING
@@ -6991,6 +7032,7 @@ def test_d3_install_e148_d2_head_changes_after_proof_creation_rejected(tmp_path)
         deployment_id="DEP-E148",
         auth_secret="SEC-E148",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     broker.status = DeploymentStatus.PROVISIONING_PENDING
@@ -7058,6 +7100,7 @@ def test_d3_install_e149_wrong_event_type_with_matching_payload_rejected(tmp_pat
         deployment_id="DEP-E149",
         auth_secret="SEC-E149",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     broker.status = DeploymentStatus.PROVISIONING_PENDING
@@ -7133,6 +7176,7 @@ def test_d3_install_e150_generic_event_impersonating_authority_commit_rejected(t
         deployment_id="DEP-E150",
         auth_secret="SEC-E150",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     broker.status = DeploymentStatus.PROVISIONING_PENDING
@@ -7231,6 +7275,7 @@ def test_d3_install_e153_broker_restart_preserves_canonical_d2_binding(tmp_path)
         state_file_path=state_file,
         auth_secret="SEC-E153",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_path_1,
     )
     assert broker1.d2_store_path == os.path.abspath(d2_path_1)
@@ -7242,6 +7287,7 @@ def test_d3_install_e153_broker_restart_preserves_canonical_d2_binding(tmp_path)
             state_file_path=state_file,
             auth_secret="SEC-E153",
             root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
             d2_store_path=d2_path_2,
         )
 
@@ -7268,6 +7314,7 @@ def test_d3_install_schema_negative_missing_or_extra_proof_fields_rejected(tmp_p
         deployment_id="DEP-SCHEMA",
         auth_secret="SEC-SCHEMA",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     broker.status = DeploymentStatus.PROVISIONING_PENDING
@@ -7338,6 +7385,7 @@ def test_d3_install_e154_d2_advances_after_proof_creation_rejected(tmp_path):
     broker = TrustedDeploymentAuthorityBroker(
         deployment_id="DEP-E154",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     from events.store import InMemoryTestDeploymentProvisioner
@@ -7395,6 +7443,7 @@ def test_d3_install_e155_d2_advances_between_verification_and_broker_transition_
     broker = TrustedDeploymentAuthorityBroker(
         deployment_id="DEP-E155",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     from events.store import InMemoryTestDeploymentProvisioner
@@ -7450,6 +7499,7 @@ def test_d3_install_e156_concurrent_d2_commit_and_broker_admission_deterministic
     broker = TrustedDeploymentAuthorityBroker(
         deployment_id="DEP-E156",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     from events.store import InMemoryTestDeploymentProvisioner
@@ -7525,6 +7575,7 @@ def test_d3_install_e157_retry_after_race_deterministic_result(tmp_path):
     broker = TrustedDeploymentAuthorityBroker(
         deployment_id="DEP-E157",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     from events.store import InMemoryTestDeploymentProvisioner
@@ -7648,6 +7699,7 @@ def test_d3_deployment_configuration_evidence_and_restart_binding(tmp_path):
         deployment_id="DEP-DEPLOY-PROOF",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=canonical_d2,
     )
     assert broker1.d2_store_path == os.path.abspath(canonical_d2)
@@ -7657,6 +7709,7 @@ def test_d3_deployment_configuration_evidence_and_restart_binding(tmp_path):
         deployment_id="DEP-DEPLOY-PROOF",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=canonical_d2,
     )
     assert broker2.d2_store_path == os.path.abspath(canonical_d2)
@@ -7668,6 +7721,7 @@ def test_d3_deployment_configuration_evidence_and_restart_binding(tmp_path):
             deployment_id="DEP-DEPLOY-PROOF",
             state_file_path=state_file,
             root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
             d2_store_path=rogue_d2,
         )
 
@@ -7686,6 +7740,7 @@ def test_d3_install_e158_crash_after_d2_commit_before_broker_persistence_determi
         deployment_id="DEP-E158",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     from events.store import InMemoryTestDeploymentProvisioner
@@ -7724,6 +7779,7 @@ def test_d3_install_e158_crash_after_d2_commit_before_broker_persistence_determi
         deployment_id="DEP-E158",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     assert broker_recovered.status == DeploymentStatus.PROVISIONING_AUTHORIZED
@@ -7765,6 +7821,7 @@ def test_d3_install_e159_restart_from_broker_commit_pending_finalizes_provisione
         deployment_id="DEP-E159",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
@@ -7790,6 +7847,7 @@ def test_d3_install_e159_restart_from_broker_commit_pending_finalizes_provisione
         deployment_id="DEP-E159",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     assert recovered_broker.status == DeploymentStatus.PROVISIONED
@@ -7814,6 +7872,7 @@ def test_d3_install_e160_later_d2_event_after_admission_does_not_invalidate_auth
         deployment_id="DEP-E160",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     from events.store import InMemoryTestDeploymentProvisioner
@@ -7902,6 +7961,7 @@ def test_d3_install_e160_later_d2_event_after_admission_does_not_invalidate_auth
         deployment_id="DEP-E160",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     assert restarted_broker.status == DeploymentStatus.PROVISIONED
@@ -7920,6 +7980,7 @@ def test_d3_install_e161_referenced_d2_event_deleted_or_corrupted_fails_closed(t
         deployment_id="DEP-E161",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     from events.store import InMemoryTestDeploymentProvisioner
@@ -7961,6 +8022,7 @@ def test_d3_install_e161_referenced_d2_event_deleted_or_corrupted_fails_closed(t
             deployment_id="DEP-E161",
             state_file_path=state_file,
             root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
             d2_store_path=d2_file,
         )
 
@@ -7971,6 +8033,7 @@ def test_d3_install_e161_referenced_d2_event_deleted_or_corrupted_fails_closed(t
             deployment_id="DEP-E161",
             state_file_path=state_file,
             root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
             d2_store_path=d2_file,
         )
 def test_d3_install_e162_repeated_recovery_is_idempotent(tmp_path):
@@ -8003,6 +8066,7 @@ def test_d3_install_e162_repeated_recovery_is_idempotent(tmp_path):
         deployment_id="DEP-E162",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
@@ -8027,6 +8091,7 @@ def test_d3_install_e162_repeated_recovery_is_idempotent(tmp_path):
         deployment_id="DEP-E162",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     assert rec1.status == DeploymentStatus.PROVISIONED
@@ -8037,6 +8102,7 @@ def test_d3_install_e162_repeated_recovery_is_idempotent(tmp_path):
         deployment_id="DEP-E162",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     assert rec2.status == DeploymentStatus.PROVISIONED
@@ -8047,6 +8113,7 @@ def test_d3_install_e162_repeated_recovery_is_idempotent(tmp_path):
         deployment_id="DEP-E162",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     assert rec3.status == DeploymentStatus.PROVISIONED
@@ -8069,6 +8136,7 @@ def test_d3_install_e163_crash_before_d2_commit_deterministic_non_authoritative_
         deployment_id="DEP-E163",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     from events.store import InMemoryTestDeploymentProvisioner
@@ -8104,6 +8172,7 @@ def test_d3_install_e163_crash_before_d2_commit_deterministic_non_authoritative_
         deployment_id="DEP-E163",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     # Never ungrounded PROVISIONED, never reset to UNPROVISIONED: recovers cleanly to PROVISIONING_AUTHORIZED
@@ -8125,6 +8194,7 @@ def test_d3_install_e164_crash_after_d2_commit_before_finalization_provisioned_r
         deployment_id="DEP-E164",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     from events.store import InMemoryTestDeploymentProvisioner
@@ -8168,6 +8238,7 @@ def test_d3_install_e164_crash_after_d2_commit_before_finalization_provisioned_r
         deployment_id="DEP-E164",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     assert recovered_broker.status == DeploymentStatus.PROVISIONED
@@ -8188,6 +8259,7 @@ def test_d3_install_e165_crash_before_pending_persistence_no_authority_ambiguity
         deployment_id="DEP-E165",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     from events.store import InMemoryTestDeploymentProvisioner
@@ -8208,6 +8280,7 @@ def test_d3_install_e165_crash_before_pending_persistence_no_authority_ambiguity
         deployment_id="DEP-E165",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     assert recovered_broker.status == DeploymentStatus.PROVISIONING_AUTHORIZED
@@ -8228,6 +8301,7 @@ def test_d3_install_e166_pending_record_bound_to_wrong_d2_event_rejected(tmp_pat
         deployment_id="DEP-E166",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     from events.store import InMemoryTestDeploymentProvisioner
@@ -8291,6 +8365,7 @@ def test_d3_install_e167_pending_record_manifest_substitution_rejected(tmp_path)
         deployment_id="DEP-E167",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     from events.store import InMemoryTestDeploymentProvisioner
@@ -8352,6 +8427,7 @@ def test_d3_install_e168_repeated_recovery_is_idempotent(tmp_path):
         deployment_id="DEP-E168",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     from events.store import InMemoryTestDeploymentProvisioner
@@ -8388,6 +8464,7 @@ def test_d3_install_e168_repeated_recovery_is_idempotent(tmp_path):
         deployment_id="DEP-E168",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     assert r1.status == DeploymentStatus.PROVISIONED
@@ -8398,6 +8475,7 @@ def test_d3_install_e168_repeated_recovery_is_idempotent(tmp_path):
         deployment_id="DEP-E168",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     assert r2.status == DeploymentStatus.PROVISIONED
@@ -8408,6 +8486,7 @@ def test_d3_install_e168_repeated_recovery_is_idempotent(tmp_path):
         deployment_id="DEP-E168",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     assert r3.status == DeploymentStatus.PROVISIONED
@@ -8444,6 +8523,7 @@ def test_d3_install_e169_direct_record_provisioned_from_provisioning_authorized_
         deployment_id="DEP-E169",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     from events.store import InMemoryTestDeploymentProvisioner
@@ -8489,6 +8569,7 @@ def test_d3_install_e170_record_provisioned_without_pending_intent_rejected(tmp_
         deployment_id="DEP-E170",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     # Force status to PROVISIONING_PENDING but with pending_provisioning = None
@@ -8514,6 +8595,7 @@ def test_d3_install_e171_crash_non_pending_path_impossible(tmp_path):
         deployment_id="DEP-E171",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     from events.store import InMemoryTestDeploymentProvisioner
@@ -8543,6 +8625,7 @@ def test_d3_install_e171_crash_non_pending_path_impossible(tmp_path):
         deployment_id="DEP-E171",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     # Broker remains PROVISIONING_AUTHORIZED and does not grant PROVISIONED authority
@@ -8565,6 +8648,7 @@ def test_d3_install_e172_recovery_requires_recovery_pending(tmp_path):
         deployment_id="DEP-E172",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     broker.notify_local_state_loss()
@@ -8645,6 +8729,7 @@ def test_d3_install_e173_pending_intent_substitution_rejected(tmp_path):
         deployment_id="DEP-E173",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     from events.store import InMemoryTestDeploymentProvisioner
@@ -8727,6 +8812,7 @@ def test_d3_install_e174_unsigned_initial_provisioning_authorization_rejected(tm
         deployment_id="DEP-E174",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
 
     # 1. Missing signature
@@ -8763,6 +8849,7 @@ def test_d3_install_e175_wrong_deployment_authorization_rejected(tmp_path):
         deployment_id="DEP-E175-TARGET",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
 
     wrong_auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
@@ -8789,6 +8876,7 @@ def test_d3_install_e176_wrong_target_manifest_rejected(tmp_path):
         deployment_id="DEP-E176",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
 
     auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
@@ -8827,6 +8915,7 @@ def test_d3_install_e177_replayed_initial_authorization_rejected(tmp_path):
         deployment_id="DEP-E177",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
 
     auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
@@ -8857,6 +8946,7 @@ def test_d3_install_e178_pending_intent_differs_from_authorization_rejected(tmp_
         deployment_id="DEP-E178",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
 
     auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
@@ -8909,6 +8999,7 @@ def test_d3_install_e179_authenticated_client_cannot_self_authorize_initial_prov
         state_file_path=state_file,
         auth_secret="SEC179",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     broker.start_ipc_server()
     try:
@@ -8932,6 +9023,7 @@ def test_d3_install_e180_same_initial_authorization_single_use_across_restart_an
         deployment_id="DEP-E180",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
 
     auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
@@ -8964,6 +9056,7 @@ def test_d3_install_e180_same_initial_authorization_single_use_across_restart_an
         deployment_id="DEP-E180",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
     # Authorization ID remains recorded in consumed_authorizations
     assert auth["authorization_id"] in restarted_broker.consumed_authorizations
@@ -8989,6 +9082,7 @@ def test_d3_install_e181_crash_after_initial_authorization_consumed_survives_res
         deployment_id="DEP-E181",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
 
@@ -9014,6 +9108,7 @@ def test_d3_install_e181_crash_after_initial_authorization_consumed_survives_res
         deployment_id="DEP-E181",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
         d2_store_path=d2_file,
     )
     assert restarted_broker.status == DeploymentStatus.PROVISIONING_AUTHORIZED
@@ -9083,6 +9178,7 @@ def test_d3_install_e182_concurrent_clients_racing_same_initial_authorization(tm
         deployment_id="DEP-E182",
         state_file_path=state_file,
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            initial_status=DeploymentStatus.UNPROVISIONED,
     )
 
     auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
