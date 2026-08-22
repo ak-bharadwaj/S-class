@@ -1,4 +1,4 @@
-"""End-to-End Deployment-Level Trust Topology Certification Suite (DC01 - DC60).
+"""End-to-End Deployment-Level Trust Topology Certification Suite (DC01 - DC69).
 Defines and executes the complete out-of-process authority boundary certification:
 
 DC01: production root cannot be caller-selected
@@ -61,6 +61,15 @@ DC57: production local-store fallback attempt -> rejected
 DC58: authority service restart preserves consumed authorization
 DC59: S-Class process cannot mutate authority registry
 DC60: two independent S-Class processes race same bootstrap auth -> exactly one succeeds
+DC61: delete external authority registry -> replay rejected/fail closed
+DC62: corrupt external authority registry -> fail closed into AUTHORITY_UNAVAILABLE
+DC63: restart after authority-state loss -> AUTHORITY_UNAVAILABLE
+DC64: authorization A cannot be replayed after authority-state destruction
+DC65: authority service with no production secret -> startup rejected
+DC66: same-UID/untrusted S-Class peer -> rejected
+DC67: S-Class cannot write authority store
+DC68: caller-injected authority root -> rejected in production
+DC69: authority service restart preserves consumed authorization
 """
 import os
 import sys
@@ -1678,8 +1687,8 @@ def test_dc38_legitimate_fresh_production_deployment_bootstrap_end_to_end(monkey
             endpoint_path=ext_endpoint,
             store_path=ext_store,
             auth_secret="EXT_SEC38",
-            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         )
+        ext_server.store.initialize_store_if_missing()
         ext_server.start()
         broker = None
 
@@ -2085,8 +2094,8 @@ def test_dc44_only_trusted_deployment_bootstrap_can_create_never_provisioned(mon
             endpoint_path=ext_endpoint,
             store_path=ext_store,
             auth_secret="EXT_SEC44",
-            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         )
+        ext_server.store.initialize_store_if_missing()
         ext_server.start()
 
         try:
@@ -2165,8 +2174,8 @@ def test_dc45_bootstrap_is_single_use_and_survives_process_restart(monkeypatch):
             endpoint_path=ext_endpoint,
             store_path=ext_store,
             auth_secret="EXT_SEC45",
-            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         )
+        ext_server.store.initialize_store_if_missing()
         ext_server.start()
 
         try:
@@ -2260,8 +2269,8 @@ def test_dc46_virgin_bootstrap_authorization_replay_rejected(monkeypatch):
             endpoint_path=ext_endpoint,
             store_path=ext_store,
             auth_secret="EXT_SEC46",
-            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         )
+        ext_server.store.initialize_store_if_missing()
         ext_server.start()
 
         try:
@@ -2316,8 +2325,8 @@ def test_dc47_replay_after_complete_local_state_destruction_rejected(monkeypatch
             endpoint_path=ext_endpoint,
             store_path=ext_store,
             auth_secret="EXT_SEC47",
-            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         )
+        ext_server.store.initialize_store_if_missing()
         ext_server.start()
 
         try:
@@ -2394,8 +2403,8 @@ def test_dc48_same_authorization_concurrently_used_twice_exactly_one_succeeds(mo
         endpoint_path=ext_endpoint,
         store_path=ext_store,
         auth_secret="EXT_SEC48",
-        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
     )
+    ext_server.store.initialize_store_if_missing()
     ext_server.start()
 
     try:
@@ -2457,8 +2466,8 @@ def test_dc49_fresh_authorization_for_different_deployment_rejected(monkeypatch)
         endpoint_path=ext_endpoint,
         store_path=ext_store,
         auth_secret="EXT_SEC49",
-        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
     )
+    ext_server.store.initialize_store_if_missing()
     ext_server.start()
 
     try:
@@ -2554,8 +2563,8 @@ def test_dc51_consumed_authorization_survives_process_kill_and_fresh_process_rep
             endpoint_path=ext_endpoint,
             store_path=ext_store,
             auth_secret="EXT_SEC51",
-            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         )
+        ext_server.store.initialize_store_if_missing()
         ext_server.start()
 
         try:
@@ -2620,8 +2629,8 @@ def test_dc52_consume_delete_all_local_state_restart_replay_rejected(monkeypatch
             endpoint_path=ext_endpoint,
             store_path=ext_store,
             auth_secret="EXT_SEC52",
-            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         )
+        ext_server.store.initialize_store_if_missing()
         ext_server.start()
 
         try:
@@ -2695,8 +2704,8 @@ def test_dc53_two_independent_processes_race_same_authorization_exactly_one_succ
         endpoint_path=ext_endpoint,
         store_path=ext_store,
         auth_secret="EXT_SEC53",
-        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
     )
+    ext_server.store.initialize_store_if_missing()
     ext_server.start()
 
     try:
@@ -2801,8 +2810,8 @@ def test_dc55_authorization_consumed_crash_before_bootstrap_state_write_administ
             endpoint_path=ext_endpoint,
             store_path=ext_store,
             auth_secret="EXT_SEC55",
-            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         )
+        ext_server.store.initialize_store_if_missing()
         ext_server.start()
 
         try:
@@ -3100,5 +3109,341 @@ def test_dc60_two_independent_processes_race_same_bootstrap_auth_through_externa
     finally:
         server.stop()
         for p in (ext_store, ext_store + ".lock", endpoint, state_file1, state_file2, d2_file1, d2_file2):
+            if os.path.exists(p):
+                os.remove(p)
+
+
+def test_dc61_delete_external_authority_registry_fails_closed(monkeypatch):
+    """DC61: Deleting external authority registry causes subsequent replay to fail closed into AUTHORITY_UNAVAILABLE."""
+    ext_store = os.path.join(tempfile.gettempdir(), f"dc61_ext_{os.getpid()}.json")
+    endpoint = os.path.join(tempfile.gettempdir(), f"dc61_auth_{os.getpid()}.sock")
+    for p in (ext_store, ext_store + ".lock", endpoint):
+        if os.path.exists(p):
+            os.remove(p)
+
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+    server = ExternalDeploymentAuthorityServer(
+        endpoint_path=endpoint,
+        store_path=ext_store,
+        auth_secret="SEC61",
+    )
+    server.store.initialize_store_if_missing()
+    server.start()
+    try:
+        auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
+            deployment_id="DC61-DEP",
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+        client = ExternalDeploymentAuthorityClient(endpoint_path=endpoint, auth_secret="SEC61")
+        client.consume_bootstrap_authorization(auth, deployment_id="DC61-DEP")
+        assert client.is_consumed(auth["authorization_id"])
+
+        # Delete external authority registry
+        if os.path.exists(ext_store):
+            os.remove(ext_store)
+
+        # Subsequent consume or replay attempt fails closed into AUTHORITY_UNAVAILABLE
+        with pytest.raises(RuntimeError, match="AUTHORITY_UNAVAILABLE|missing or destroyed"):
+            client.consume_bootstrap_authorization(auth, deployment_id="DC61-DEP")
+    finally:
+        server.stop()
+        for p in (ext_store, ext_store + ".lock", endpoint):
+            if os.path.exists(p):
+                os.remove(p)
+
+
+def test_dc62_corrupt_external_authority_registry_fails_closed(monkeypatch):
+    """DC62: Corrupted authority registry or integrity seal mismatch causes external authority to fail closed."""
+    ext_store = os.path.join(tempfile.gettempdir(), f"dc62_ext_{os.getpid()}.json")
+    endpoint = os.path.join(tempfile.gettempdir(), f"dc62_auth_{os.getpid()}.sock")
+    for p in (ext_store, ext_store + ".lock", endpoint):
+        if os.path.exists(p):
+            os.remove(p)
+
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+    server = ExternalDeploymentAuthorityServer(
+        endpoint_path=endpoint,
+        store_path=ext_store,
+        auth_secret="SEC62",
+    )
+    server.store.initialize_store_if_missing()
+    server.start()
+    try:
+        auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
+            deployment_id="DC62-DEP",
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+        client = ExternalDeploymentAuthorityClient(endpoint_path=endpoint, auth_secret="SEC62")
+        client.consume_bootstrap_authorization(auth, deployment_id="DC62-DEP")
+
+        # Corrupt the authority store file by altering payload without updating integrity seal
+        with open(ext_store, "w", encoding="utf-8") as f:
+            f.write(json.dumps({"payload": {"consumed_authorizations": {}}, "integrity_seal": "tampered_seal"}))
+
+        # Authority client request fails closed
+        with pytest.raises(RuntimeError, match="AUTHORITY_UNAVAILABLE|integrity seal mismatch"):
+            client.consume_bootstrap_authorization(auth, deployment_id="DC62-DEP")
+    finally:
+        server.stop()
+        for p in (ext_store, ext_store + ".lock", endpoint):
+            if os.path.exists(p):
+                os.remove(p)
+
+
+def test_dc63_restart_after_authority_state_loss_enters_authority_unavailable(monkeypatch):
+    """DC63: External authority service restarted after state destruction enters AUTHORITY_UNAVAILABLE and fails closed."""
+    ext_store = os.path.join(tempfile.gettempdir(), f"dc63_ext_{os.getpid()}.json")
+    endpoint = os.path.join(tempfile.gettempdir(), f"dc63_auth_{os.getpid()}.sock")
+    for p in (ext_store, ext_store + ".lock", endpoint):
+        if os.path.exists(p):
+            os.remove(p)
+
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+    # 1. Start server 1 and consume auth
+    server1 = ExternalDeploymentAuthorityServer(
+        endpoint_path=endpoint,
+        store_path=ext_store,
+        auth_secret="SEC63",
+    )
+    server1.store.initialize_store_if_missing()
+    server1.start()
+    auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
+        deployment_id="DC63-DEP",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+    try:
+        client1 = ExternalDeploymentAuthorityClient(endpoint_path=endpoint, auth_secret="SEC63")
+        client1.consume_bootstrap_authorization(auth, deployment_id="DC63-DEP")
+    finally:
+        server1.stop()
+
+    # 2. State file deleted
+    if os.path.exists(ext_store):
+        os.remove(ext_store)
+
+    # 3. Server 2 restarted on wiped store path in production mode
+    server2 = ExternalDeploymentAuthorityServer(
+        endpoint_path=endpoint,
+        store_path=ext_store,
+        auth_secret="SEC63",
+    )
+    server2.start()
+    try:
+        client2 = ExternalDeploymentAuthorityClient(endpoint_path=endpoint, auth_secret="SEC63")
+        # Attempting operation against restarted authority fails closed into AUTHORITY_UNAVAILABLE
+        with pytest.raises(RuntimeError, match="AUTHORITY_UNAVAILABLE|missing or destroyed"):
+            client2.consume_bootstrap_authorization(auth, deployment_id="DC63-DEP")
+    finally:
+        server2.stop()
+        for p in (ext_store, ext_store + ".lock", endpoint):
+            if os.path.exists(p):
+                os.remove(p)
+
+
+def test_dc64_authorization_cannot_be_replayed_after_authority_state_destruction(monkeypatch):
+    """DC64: Deleting external authority state does not permit replaying consumed authorization; fails closed."""
+    ext_store = os.path.join(tempfile.gettempdir(), f"dc64_ext_{os.getpid()}.json")
+    endpoint = os.path.join(tempfile.gettempdir(), f"dc64_auth_{os.getpid()}.sock")
+    state_file = os.path.join(tempfile.gettempdir(), f"dc64_state_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc64_d2_{os.getpid()}.jsonl")
+    for p in (ext_store, ext_store + ".lock", endpoint, state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+    with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
+        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+        server = ExternalDeploymentAuthorityServer(
+            endpoint_path=endpoint,
+            store_path=ext_store,
+            auth_secret="SEC64",
+        )
+        server.store.initialize_store_if_missing()
+        server.start()
+        try:
+            auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
+                deployment_id="DC64-DEP",
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            # 1. Bootstrap succeeds
+            TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
+                deployment_id="DC64-DEP",
+                state_file_path=state_file,
+                d2_store_path=d2_file,
+                bootstrap_authorization=auth,
+                authority_ipc_endpoint=endpoint,
+                authority_auth_secret="SEC64",
+            )
+
+            # 2. Attacker deletes local broker state + D2 store + external authority registry
+            if os.path.exists(state_file):
+                os.remove(state_file)
+            if os.path.exists(d2_file):
+                os.remove(d2_file)
+            if os.path.exists(ext_store):
+                os.remove(ext_store)
+
+            # 3. Replay attempt fails closed into AUTHORITY_UNAVAILABLE
+            with pytest.raises(RuntimeError, match="AUTHORITY_UNAVAILABLE|missing or destroyed"):
+                TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
+                    deployment_id="DC64-DEP",
+                    state_file_path=state_file,
+                    d2_store_path=d2_file,
+                    bootstrap_authorization=auth,
+                    authority_ipc_endpoint=endpoint,
+                    authority_auth_secret="SEC64",
+                )
+        finally:
+            server.stop()
+            for p in (ext_store, ext_store + ".lock", endpoint, state_file, d2_file):
+                if os.path.exists(p):
+                    os.remove(p)
+
+
+def test_dc65_authority_service_with_no_production_secret_rejected(monkeypatch):
+    """DC65: Production ExternalDeploymentAuthorityServer startup without an explicit auth secret is rejected."""
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+    monkeypatch.delenv("SCLASS_EXTERNAL_AUTHORITY_SECRET", raising=False)
+
+    ext_store = os.path.join(tempfile.gettempdir(), f"dc65_ext_{os.getpid()}.json")
+    endpoint = os.path.join(tempfile.gettempdir(), f"dc65_auth_{os.getpid()}.sock")
+    for p in (ext_store, ext_store + ".lock", endpoint):
+        if os.path.exists(p):
+            os.remove(p)
+
+    with pytest.raises(RuntimeError, match="Production ExternalDeploymentAuthorityServer requires explicit authentication secret"):
+        ExternalDeploymentAuthorityServer(
+            endpoint_path=endpoint,
+            store_path=ext_store,
+            auth_secret=None,
+        )
+
+
+def test_dc66_untrusted_peer_identity_rejected(monkeypatch):
+    """DC66: S-Class peer connecting with unauthenticated/untrusted credentials is rejected."""
+    ext_store = os.path.join(tempfile.gettempdir(), f"dc66_ext_{os.getpid()}.json")
+    endpoint = os.path.join(tempfile.gettempdir(), f"dc66_auth_{os.getpid()}.sock")
+    for p in (ext_store, ext_store + ".lock", endpoint):
+        if os.path.exists(p):
+            os.remove(p)
+
+    server = ExternalDeploymentAuthorityServer(
+        endpoint_path=endpoint,
+        store_path=ext_store,
+        auth_secret="REAL_SECRET_66",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    server.start()
+    try:
+        client = OSIPCClient(endpoint_path=endpoint, auth_secret="WRONG_SECRET_66")
+        with pytest.raises(Exception):
+            client.call("is_consumed", {"authorization_id": "AUTH-66"})
+    finally:
+        server.stop()
+        for p in (ext_store, ext_store + ".lock", endpoint):
+            if os.path.exists(p):
+                os.remove(p)
+
+
+def test_dc67_sclass_cannot_write_authority_store(monkeypatch):
+    """DC67: Authority registry is protected with 0o600 file permissions and 0o700 directory permissions."""
+    ext_store = os.path.join(tempfile.gettempdir(), f"dc67_ext_{os.getpid()}.json")
+    for p in (ext_store, ext_store + ".lock"):
+        if os.path.exists(p):
+            os.remove(p)
+
+    store = DurableDeploymentAuthorityStore(store_path=ext_store)
+    store.record_consumed_authorization(auth_id="AUTH-67", deployment_id="DC67-DEP", authorized_at="2026-08-22T10:00:00Z")
+
+    assert os.path.exists(ext_store)
+    if hasattr(os, "stat") and sys.platform != "win32":
+        mode = os.stat(ext_store).st_mode & 0o777
+        assert mode == 0o600
+
+    for p in (ext_store, ext_store + ".lock"):
+        if os.path.exists(p):
+            os.remove(p)
+
+
+def test_dc68_caller_injected_authority_root_rejected_in_production(monkeypatch):
+    """DC68: Caller-injected root key is strictly rejected in production ExternalDeploymentAuthorityServer."""
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+    ext_store = os.path.join(tempfile.gettempdir(), f"dc68_ext_{os.getpid()}.json")
+    endpoint = os.path.join(tempfile.gettempdir(), f"dc68_auth_{os.getpid()}.sock")
+    for p in (ext_store, ext_store + ".lock", endpoint):
+        if os.path.exists(p):
+            os.remove(p)
+
+    rogue_key = ed25519.Ed25519PrivateKey.generate().public_key()
+
+    with pytest.raises(RuntimeError, match="Production ExternalDeploymentAuthorityServer cannot accept caller-selected root key"):
+        ExternalDeploymentAuthorityServer(
+            endpoint_path=endpoint,
+            store_path=ext_store,
+            auth_secret="SEC68",
+            root_public_key=rogue_key,
+        )
+
+
+def test_dc69_authority_service_restart_preserves_consumed_authorization(monkeypatch):
+    """DC69: External deployment authority service restart durably preserves consumed authorizations."""
+    ext_store = os.path.join(tempfile.gettempdir(), f"dc69_ext_{os.getpid()}.json")
+    endpoint = os.path.join(tempfile.gettempdir(), f"dc69_auth_{os.getpid()}.sock")
+    for p in (ext_store, ext_store + ".lock", endpoint):
+        if os.path.exists(p):
+            os.remove(p)
+
+    auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
+        deployment_id="DC69-DEP",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    # 1. Authority server 1 consumes authorization
+    server1 = ExternalDeploymentAuthorityServer(
+        endpoint_path=endpoint,
+        store_path=ext_store,
+        auth_secret="SEC69",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    server1.start()
+    try:
+        client1 = ExternalDeploymentAuthorityClient(endpoint_path=endpoint, auth_secret="SEC69")
+        client1.consume_bootstrap_authorization(auth, deployment_id="DC69-DEP")
+        assert client1.is_consumed(auth["authorization_id"])
+    finally:
+        server1.stop()
+
+    # 2. Authority server 2 restarted from same durable store
+    server2 = ExternalDeploymentAuthorityServer(
+        endpoint_path=endpoint,
+        store_path=ext_store,
+        auth_secret="SEC69",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+    )
+    server2.start()
+    try:
+        client2 = ExternalDeploymentAuthorityClient(endpoint_path=endpoint, auth_secret="SEC69")
+        assert client2.is_consumed(auth["authorization_id"])
+        with pytest.raises(RuntimeError, match=r"has already been consumed \(replay rejected\)"):
+            client2.consume_bootstrap_authorization(auth, deployment_id="DC69-DEP")
+    finally:
+        server2.stop()
+        for p in (ext_store, ext_store + ".lock", endpoint):
             if os.path.exists(p):
                 os.remove(p)

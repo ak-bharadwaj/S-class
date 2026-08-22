@@ -20,6 +20,7 @@ class DurableDeploymentAuthorityStore:
     """External durable authority storage for deployment lifecycle and one-time authorization records.
     Survives broker restart, S-Class restart, local broker-state destruction, D2 store destruction,
     and process crashes.
+    Enforces cryptographic integrity seal and fail-closed state on loss, corruption, or tampering.
     """
     def __init__(self, store_path: Optional[str] = None):
         is_test = bool(
@@ -43,25 +44,67 @@ class DurableDeploymentAuthorityStore:
     def _ensure_dir(self) -> None:
         os.makedirs(os.path.dirname(self.store_path), mode=0o700, exist_ok=True)
 
+    def initialize_store_if_missing(self) -> None:
+        """Initializes empty sealed store file on brand-new installation."""
+        from file_lock import FileLock
+        with FileLock(self.lock_path, timeout=10.0):
+            if not os.path.exists(self.store_path):
+                self._save_data({"consumed_authorizations": {}, "bootstrapped_deployments": {}})
+
     def _load_data(self) -> Dict[str, Any]:
+        is_test = bool(
+            os.environ.get("SCLASS_TEST_MODE") == "1"
+            or os.environ.get("PYTEST_CURRENT_TEST")
+            or os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") == "1"
+        )
         if not os.path.exists(self.store_path) or os.path.getsize(self.store_path) == 0:
+            if not is_test:
+                raise RuntimeError(
+                    f"External authority registry at '{self.store_path}' is missing or destroyed. "
+                    "External authority enters AUTHORITY_UNAVAILABLE; fail-closed."
+                )
             return {"consumed_authorizations": {}, "bootstrapped_deployments": {}}
         try:
             with open(self.store_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                if isinstance(data, dict):
-                    return data
-        except Exception:
-            pass
-        return {"consumed_authorizations": {}, "bootstrapped_deployments": {}}
+                doc = json.load(f)
+            if not isinstance(doc, dict):
+                raise ValueError("Authority registry root must be a JSON object.")
 
-    def _save_data(self, data: Dict[str, Any]) -> None:
+            if "payload" in doc and "integrity_seal" in doc:
+                payload = doc["payload"]
+                expected_seal = hashlib.sha256(canonicalize_json(payload)).hexdigest()
+                if doc["integrity_seal"] != expected_seal:
+                    raise RuntimeError(
+                        f"External authority registry integrity seal mismatch at '{self.store_path}'. "
+                        "Tampering or corruption detected. Entering AUTHORITY_UNAVAILABLE; fail-closed."
+                    )
+                if not isinstance(payload, dict):
+                    raise ValueError("Authority registry payload must be a JSON object.")
+                return payload
+            elif "consumed_authorizations" in doc:
+                return doc
+            else:
+                raise ValueError("Unrecognized authority registry schema format.")
+        except Exception as e:
+            if isinstance(e, RuntimeError):
+                raise
+            raise RuntimeError(
+                f"External authority registry at '{self.store_path}' is corrupted: {e}. "
+                "External authority enters AUTHORITY_UNAVAILABLE; fail-closed."
+            )
+
+    def _save_data(self, payload: Dict[str, Any]) -> None:
         self._ensure_dir()
+        seal = hashlib.sha256(canonicalize_json(payload)).hexdigest()
+        doc = {
+            "payload": payload,
+            "integrity_seal": seal,
+        }
         dir_name = os.path.dirname(self.store_path)
         tmp_fd, tmp_path = tempfile.mkstemp(dir=dir_name, prefix="ext_auth_", suffix=".tmp")
         try:
             with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2)
+                json.dump(doc, f, indent=2)
                 f.flush()
                 os.fsync(f.fileno())
             os.replace(tmp_path, self.store_path)
@@ -128,17 +171,64 @@ class ExternalDeploymentAuthorityServer:
         allowed_uid: Optional[int] = None,
         root_public_key: Optional[ed25519.Ed25519PublicKey] = None,
     ):
+        is_test = bool(
+            os.environ.get("SCLASS_TEST_MODE") == "1"
+            or os.environ.get("PYTEST_CURRENT_TEST")
+            or os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") == "1"
+        )
         if endpoint_path is None:
-            endpoint_path = os.path.join(tempfile.gettempdir(), f"ext_auth_{os.getpid()}.sock")
+            endpoint_path = os.environ.get("SCLASS_EXTERNAL_AUTHORITY_ENDPOINT")
+            if endpoint_path is None:
+                if not is_test:
+                    raise RuntimeError("Production ExternalDeploymentAuthorityServer requires explicit endpoint_path.")
+                endpoint_path = os.path.join(tempfile.gettempdir(), f"ext_auth_{os.getpid()}.sock")
         self.endpoint_path = endpoint_path
-        self.auth_secret = auth_secret or "EXT_AUTH_SECRET"
+
+        # Production secret enforcement
+        secret = auth_secret or os.environ.get("SCLASS_EXTERNAL_AUTHORITY_SECRET")
+        if not secret:
+            if not is_test:
+                raise RuntimeError(
+                    "Production ExternalDeploymentAuthorityServer requires explicit authentication secret; "
+                    "startup rejected."
+                )
+            secret = "TEST_EXT_AUTH_SECRET"
+        self.auth_secret = secret
+
+        # Production peer UID enforcement on POSIX
+        if allowed_uid is None and sys.platform != "win32" and not is_test:
+            env_uid = os.environ.get("SCLASS_EXTERNAL_AUTHORITY_ALLOWED_UID")
+            if env_uid is not None:
+                try:
+                    allowed_uid = int(env_uid)
+                except ValueError:
+                    pass
+            if allowed_uid is None:
+                raise RuntimeError(
+                    "Production ExternalDeploymentAuthorityServer requires explicit peer OS identity (allowed_uid); "
+                    "startup rejected."
+                )
         self.allowed_uid = allowed_uid
-        self.store = DurableDeploymentAuthorityStore(store_path=store_path)
-        if root_public_key is None:
+
+        # Root key binding: caller-injection strictly prohibited in production
+        if root_public_key is not None:
+            if not is_test:
+                raise RuntimeError(
+                    "Production ExternalDeploymentAuthorityServer cannot accept caller-selected root key; "
+                    "canonical authority keystore required."
+                )
+            self.root_public_key = root_public_key
+        else:
             from benchmark.parity.verify_gate_3_certificate import Gate3PublicKeystore
             self.root_public_key = Gate3PublicKeystore.get_public_key()
-        else:
-            self.root_public_key = root_public_key
+            if self.root_public_key is None and not is_test:
+                raise RuntimeError("Canonical Gate 3 root public key unavailable. Authority server fails closed.")
+
+        self.store = DurableDeploymentAuthorityStore(store_path=store_path)
+        # Ensure initial store exists on fresh start if permitted in test mode
+        if is_test:
+            self.store.initialize_store_if_missing()
+
         self._server = OSIPCServer(
             endpoint_path=self.endpoint_path,
             handler=self._handle_request,
@@ -149,50 +239,53 @@ class ExternalDeploymentAuthorityServer:
     def _handle_request(self, frame: Dict[str, Any], caller_ctx: Dict[str, Any]) -> Dict[str, Any]:
         method = frame.get("method")
         params = frame.get("params", {})
-        if method == "consume_bootstrap_authorization":
-            auth_data = params.get("bootstrap_authorization", {})
-            deployment_id = params.get("deployment_id", "")
-            auth_id = auth_data.get("authorization_id")
-            if not auth_id:
-                return {"success": False, "error": "Missing authorization_id."}
-            if auth_data.get("deployment_id") != deployment_id:
-                return {"success": False, "error": f"Deployment mismatch: expected '{deployment_id}', got '{auth_data.get('deployment_id')}'."}
-            if auth_data.get("purpose") != "VIRGIN_DEPLOYMENT_BOOTSTRAP":
-                return {"success": False, "error": "Invalid purpose: VIRGIN_DEPLOYMENT_BOOTSTRAP required."}
+        try:
+            if method == "consume_bootstrap_authorization":
+                auth_data = params.get("bootstrap_authorization", {})
+                deployment_id = params.get("deployment_id", "")
+                auth_id = auth_data.get("authorization_id")
+                if not auth_id:
+                    return {"success": False, "error": "Missing authorization_id."}
+                if auth_data.get("deployment_id") != deployment_id:
+                    return {"success": False, "error": f"Deployment mismatch: expected '{deployment_id}', got '{auth_data.get('deployment_id')}'."}
+                if auth_data.get("purpose") != "VIRGIN_DEPLOYMENT_BOOTSTRAP":
+                    return {"success": False, "error": "Invalid purpose: VIRGIN_DEPLOYMENT_BOOTSTRAP required."}
 
-            if self.root_public_key is not None:
-                expected_fp = hashlib.sha256(self.root_public_key.public_bytes_raw()).hexdigest()
-                if auth_data.get("root_fingerprint") != expected_fp:
-                    return {"success": False, "error": "Root fingerprint mismatch."}
-                sig_hex = auth_data.get("signature", {}).get("signature_hex")
-                if not sig_hex:
-                    return {"success": False, "error": "Missing signature."}
-                preimage_bytes = canonicalize_json({
-                    "authorization_id": auth_id,
-                    "deployment_id": deployment_id,
-                    "purpose": "VIRGIN_DEPLOYMENT_BOOTSTRAP",
-                    "authorized_at": auth_data.get("authorized_at"),
-                    "root_fingerprint": expected_fp,
-                })
-                try:
-                    self.root_public_key.verify(bytes.fromhex(sig_hex), preimage_bytes)
-                except Exception as e:
-                    return {"success": False, "error": f"Invalid bootstrap authorization signature: {e}"}
+                if self.root_public_key is not None:
+                    expected_fp = hashlib.sha256(self.root_public_key.public_bytes_raw()).hexdigest()
+                    if auth_data.get("root_fingerprint") != expected_fp:
+                        return {"success": False, "error": "Root fingerprint mismatch."}
+                    sig_hex = auth_data.get("signature", {}).get("signature_hex")
+                    if not sig_hex:
+                        return {"success": False, "error": "Missing signature."}
+                    preimage_bytes = canonicalize_json({
+                        "authorization_id": auth_id,
+                        "deployment_id": deployment_id,
+                        "purpose": "VIRGIN_DEPLOYMENT_BOOTSTRAP",
+                        "authorized_at": auth_data.get("authorized_at"),
+                        "root_fingerprint": expected_fp,
+                    })
+                    try:
+                        self.root_public_key.verify(bytes.fromhex(sig_hex), preimage_bytes)
+                    except Exception as e:
+                        return {"success": False, "error": f"Invalid bootstrap authorization signature: {e}"}
 
-            ok = self.store.record_consumed_authorization(
-                auth_id=auth_id,
-                deployment_id=deployment_id,
-                authorized_at=auth_data.get("authorized_at", ""),
-            )
-            if not ok:
-                return {"success": False, "error": f"Bootstrap authorization '{auth_id}' has already been consumed (replay rejected)."}
-            return {"success": True}
+                ok = self.store.record_consumed_authorization(
+                    auth_id=auth_id,
+                    deployment_id=deployment_id,
+                    authorized_at=auth_data.get("authorized_at", ""),
+                )
+                if not ok:
+                    return {"success": False, "error": f"Bootstrap authorization '{auth_id}' has already been consumed (replay rejected)."}
+                return {"success": True}
 
-        elif method == "is_consumed":
-            auth_id = params.get("authorization_id", "")
-            return {"success": True, "is_consumed": self.store.is_consumed(auth_id)}
+            elif method == "is_consumed":
+                auth_id = params.get("authorization_id", "")
+                return {"success": True, "is_consumed": self.store.is_consumed(auth_id)}
 
-        return {"success": False, "error": f"Unknown method '{method}'"}
+            return {"success": False, "error": f"Unknown method '{method}'"}
+        except RuntimeError as e:
+            return {"success": False, "error": str(e)}
 
     def start(self) -> None:
         self._server.start()
