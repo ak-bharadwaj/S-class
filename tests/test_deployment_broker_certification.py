@@ -1,4 +1,4 @@
-"""End-to-End Deployment-Level Trust Topology Certification Suite (DC01 - DC40).
+"""End-to-End Deployment-Level Trust Topology Certification Suite (DC01 - DC45).
 Defines and executes the complete out-of-process authority boundary certification:
 
 DC01: production root cannot be caller-selected
@@ -41,6 +41,11 @@ DC37: constructor state override cannot bypass catastrophic-loss
 DC38: legitimate fresh production deployment: trusted bootstrap -> NEVER_PROVISIONED -> valid INITIAL_PROVISIONING authorization -> PROVISIONED
 DC39: previously provisioned deployment: complete loss -> CATASTROPHIC_LOSS -> initial provisioning rejected -> external reprovisioning required
 DC40: state confusion: catastrophic-loss deployment cannot be converted to NEVER_PROVISIONED by constructor args, fabricated files, env vars, or restart
+DC41: ordinary runtime cannot invoke virgin bootstrap
+DC42: forged bootstrap provenance is rejected
+DC43: deleting all local state does not permit self-bootstrap
+DC44: only trusted deployment bootstrap can create NEVER_PROVISIONED
+DC45: bootstrap is single-use and survives process restart
 """
 import os
 import sys
@@ -1651,11 +1656,17 @@ def test_dc38_legitimate_fresh_production_deployment_bootstrap_end_to_end(monkey
         monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
         monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
 
-        # 1. Trusted Deployment Bootstrap establishes NEVER_PROVISIONED state
+        # 1. Trusted Deployment Bootstrap with root-signed authorization
+        bootstrap_auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
+            deployment_id="DC38-DEP",
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            canonical_d2_store_path=os.path.abspath(d2_file),
+        )
         TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
             deployment_id="DC38-DEP",
             state_file_path=state_file,
             d2_store_path=d2_file,
+            bootstrap_authorization=bootstrap_auth,
         )
 
         # 2. Production broker starts and verifies NEVER_PROVISIONED state
@@ -1713,10 +1724,16 @@ def test_dc39_previously_provisioned_deployment_complete_loss_requires_reprovisi
         SignedAuthorityManifestLoader.clear_for_testing()
         DeploymentProvisionerRegistry.reset_for_testing()
 
+        bootstrap_auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
+            deployment_id="DC39-DEP",
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            canonical_d2_store_path=os.path.abspath(d2_file),
+        )
         TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
             deployment_id="DC39-DEP",
             state_file_path=state_file,
             d2_store_path=d2_file,
+            bootstrap_authorization=bootstrap_auth,
         )
         broker = TrustedDeploymentAuthorityBroker(
             deployment_id="DC39-DEP",
@@ -1736,7 +1753,15 @@ def test_dc39_previously_provisioned_deployment_complete_loss_requires_reprovisi
                 revoked_fingerprints=[],
                 root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
             )
-            SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest)
+            m_digest = manifest["root_signature"]["payload_digest"]
+            init_auth = SignedAuthorityManifestLoader.create_initial_provisioning_authorization(
+                deployment_id="DC39-DEP",
+                target_manifest_id="M-39",
+                target_manifest_version=1,
+                target_manifest_digest=m_digest,
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest, initial_provisioning_authorization=init_auth)
             assert broker.status == DeploymentStatus.PROVISIONED
         finally:
             broker.stop_ipc_server()
@@ -1851,11 +1876,17 @@ def test_dc40_state_confusion_catastrophic_loss_cannot_be_converted_to_never_pro
         )
 
         # 3. Calling TrustedDeploymentBootstrap on host with existing D2 is rejected fail-closed
+        bootstrap_auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
+            deployment_id="DC40-DEP",
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            canonical_d2_store_path=os.path.abspath(d2_file),
+        )
         with pytest.raises(RuntimeError, match="D2 store already contains history"):
             TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
                 deployment_id="DC40-DEP",
                 state_file_path=state_file,
                 d2_store_path=d2_file,
+                bootstrap_authorization=bootstrap_auth,
             )
 
         # 4. Fabricating a state file claiming NEVER_PROVISIONED with existing D2 is detected and fails closed
@@ -1870,7 +1901,7 @@ def test_dc40_state_confusion_catastrophic_loss_cannot_be_converted_to_never_pro
         }
         seal = hashlib.sha256(canonicalize_json(payload)).hexdigest()
         with open(state_file, "w", encoding="utf-8") as f:
-            json.dump({"payload": payload, "integrity_seal": seal}, f)
+            json.dump({"payload": payload, "integrity_seal": seal, "bootstrap_provenance": "TRUSTED_DEPLOYMENT_BOOTSTRAP", "bootstrap_authorization": bootstrap_auth}, f)
 
         with pytest.raises(RuntimeError, match="fabricated.*UNPROVISIONED state detected"):
             TrustedDeploymentAuthorityBroker(
@@ -1878,6 +1909,262 @@ def test_dc40_state_confusion_catastrophic_loss_cannot_be_converted_to_never_pro
                 state_file_path=state_file,
                 auth_secret="SEC40",
             )
+
+        if os.path.exists(state_file):
+            os.remove(state_file)
+        if os.path.exists(d2_file):
+            os.remove(d2_file)
+
+
+def test_dc41_ordinary_runtime_cannot_invoke_virgin_bootstrap(monkeypatch):
+    """DC41: Ordinary application runtime in production cannot invoke virgin bootstrap without root authorization."""
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+    state_file = os.path.join(tempfile.gettempdir(), f"dc41_state_{os.getpid()}.json")
+    if os.path.exists(state_file):
+        os.remove(state_file)
+
+    with pytest.raises(RuntimeError, match="Virgin deployment bootstrap prohibited: valid root-signed bootstrap authorization required"):
+        TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
+            deployment_id="DC41-DEP",
+            state_file_path=state_file,
+        )
+
+
+def test_dc42_forged_bootstrap_provenance_is_rejected(monkeypatch):
+    """DC42: Forged or invalid bootstrap provenance / signature is detected and rejected fail-closed."""
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+    state_file = os.path.join(tempfile.gettempdir(), f"dc42_state_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc42_d2_{os.getpid()}.jsonl")
+    for p in (state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+    with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
+        rogue_key = ed25519.Ed25519PrivateKey.generate()
+        forged_auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
+            deployment_id="DC42-DEP",
+            root_private_key=rogue_key,
+            canonical_d2_store_path=os.path.abspath(d2_file),
+        )
+
+        payload = {
+            "deployment_id": "DC42-DEP",
+            "status": DeploymentStatus.NEVER_PROVISIONED.value,
+            "canonical_d2_store_path": os.path.abspath(d2_file),
+            "consumed_authorizations": [],
+            "current_installation": None,
+            "pending_provisioning": None,
+            "active_initial_authorization": None,
+        }
+        seal = hashlib.sha256(canonicalize_json(payload)).hexdigest()
+        with open(state_file, "w", encoding="utf-8") as f:
+            json.dump({
+                "payload": payload,
+                "integrity_seal": seal,
+                "bootstrap_provenance": "TRUSTED_DEPLOYMENT_BOOTSTRAP",
+                "bootstrap_authorization": forged_auth,
+            }, f)
+
+        with pytest.raises(RuntimeError, match="forged or invalid NEVER_PROVISIONED bootstrap signature|fingerprint mismatch"):
+            TrustedDeploymentAuthorityBroker(
+                deployment_id="DC42-DEP",
+                state_file_path=state_file,
+                auth_secret="SEC42",
+            )
+
+        if os.path.exists(state_file):
+            os.remove(state_file)
+        if os.path.exists(d2_file):
+            os.remove(d2_file)
+
+
+def test_dc43_deleting_all_local_state_does_not_permit_self_bootstrap(monkeypatch):
+    """DC43: Attacker deleting all local state cannot self-bootstrap without root authorization."""
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+    state_file = os.path.join(tempfile.gettempdir(), f"dc43_state_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc43_d2_{os.getpid()}.jsonl")
+    for p in (state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+    with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
+        # 1. Self-bootstrap attempt fails
+        with pytest.raises(RuntimeError, match="Virgin deployment bootstrap prohibited"):
+            TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
+                deployment_id="DC43-DEP",
+                state_file_path=state_file,
+                d2_store_path=d2_file,
+            )
+
+        # 2. Broker starts in CATASTROPHIC_LOSS
+        broker = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC43-DEP",
+            state_file_path=state_file,
+            auth_secret="SEC43",
+        )
+        assert broker.status == DeploymentStatus.CATASTROPHIC_LOSS
+        assert broker.status != DeploymentStatus.NEVER_PROVISIONED
+
+        if os.path.exists(state_file):
+            os.remove(state_file)
+        if os.path.exists(d2_file):
+            os.remove(d2_file)
+
+
+def test_dc44_only_trusted_deployment_bootstrap_can_create_never_provisioned(monkeypatch):
+    """DC44: Only root-authorized deployment bootstrap creates valid NEVER_PROVISIONED state and allows provisioning."""
+    state_file = os.path.join(tempfile.gettempdir(), f"dc44_state_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc44_d2_{os.getpid()}.jsonl")
+    for p in (state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+    with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
+        D2InstallationProvisioning.clear_for_testing()
+        SignedAuthorityManifestLoader.clear_for_testing()
+        DeploymentProvisionerRegistry.reset_for_testing()
+
+        # Switch to production mode
+        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+        bootstrap_auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
+            deployment_id="DC44-DEP",
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            canonical_d2_store_path=os.path.abspath(d2_file),
+        )
+        TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
+            deployment_id="DC44-DEP",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+            bootstrap_authorization=bootstrap_auth,
+        )
+
+        broker = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC44-DEP",
+            state_file_path=state_file,
+            auth_secret="SEC44",
+        )
+        assert broker.status == DeploymentStatus.NEVER_PROVISIONED
+        broker.start_ipc_server()
+        try:
+            client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC44")
+            SClassApplication(provisioner=client)
+
+            manifest = SignedAuthorityManifestLoader.sign_manifest(
+                manifest_id="M-44",
+                manifest_version=1,
+                issued_at="2026-08-21T10:00:00Z",
+                actors={},
+                revoked_fingerprints=[],
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            m_digest = manifest["root_signature"]["payload_digest"]
+            init_auth = SignedAuthorityManifestLoader.create_initial_provisioning_authorization(
+                deployment_id="DC44-DEP",
+                target_manifest_id="M-44",
+                target_manifest_version=1,
+                target_manifest_digest=m_digest,
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest, initial_provisioning_authorization=init_auth)
+            assert broker.status == DeploymentStatus.PROVISIONED
+        finally:
+            broker.stop_ipc_server()
+            if os.path.exists(state_file):
+                os.remove(state_file)
+            if os.path.exists(d2_file):
+                os.remove(d2_file)
+
+
+def test_dc45_bootstrap_is_single_use_and_survives_process_restart(monkeypatch):
+    """DC45: Bootstrap is single-use, survives process restart, and cannot re-bootstrap an established deployment."""
+    state_file = os.path.join(tempfile.gettempdir(), f"dc45_state_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc45_d2_{os.getpid()}.jsonl")
+    for p in (state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+    with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
+        D2InstallationProvisioning.clear_for_testing()
+        SignedAuthorityManifestLoader.clear_for_testing()
+        DeploymentProvisionerRegistry.reset_for_testing()
+
+        # Switch to production mode
+        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+        bootstrap_auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
+            deployment_id="DC45-DEP",
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            canonical_d2_store_path=os.path.abspath(d2_file),
+        )
+        TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
+            deployment_id="DC45-DEP",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+            bootstrap_authorization=bootstrap_auth,
+        )
+
+        broker = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC45-DEP",
+            state_file_path=state_file,
+            auth_secret="SEC45",
+        )
+        broker.start_ipc_server()
+        try:
+            client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC45")
+            SClassApplication(provisioner=client)
+
+            manifest = SignedAuthorityManifestLoader.sign_manifest(
+                manifest_id="M-45",
+                manifest_version=1,
+                issued_at="2026-08-21T10:00:00Z",
+                actors={},
+                revoked_fingerprints=[],
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            m_digest = manifest["root_signature"]["payload_digest"]
+            init_auth = SignedAuthorityManifestLoader.create_initial_provisioning_authorization(
+                deployment_id="DC45-DEP",
+                target_manifest_id="M-45",
+                target_manifest_version=1,
+                target_manifest_digest=m_digest,
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest, initial_provisioning_authorization=init_auth)
+            assert broker.status == DeploymentStatus.PROVISIONED
+        finally:
+            broker.stop_ipc_server()
+
+        # 1. Attempting second bootstrap on same state file fails
+        with pytest.raises(RuntimeError, match="state file already exists"):
+            TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
+                deployment_id="DC45-DEP",
+                state_file_path=state_file,
+                d2_store_path=d2_file,
+                bootstrap_authorization=bootstrap_auth,
+            )
+
+        # 2. Broker restart preserves PROVISIONED state
+        broker2 = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC45-DEP",
+            state_file_path=state_file,
+            auth_secret="SEC45",
+        )
+        assert broker2.status == DeploymentStatus.PROVISIONED
+        assert broker2.current_installation["manifest_id"] == "M-45"
 
         if os.path.exists(state_file):
             os.remove(state_file)

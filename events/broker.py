@@ -27,10 +27,21 @@ class TrustedDeploymentBootstrap:
         deployment_id: str,
         state_file_path: str,
         d2_store_path: Optional[str] = None,
+        bootstrap_authorization: Optional[Dict[str, Any]] = None,
+        root_public_key: Optional[ed25519.Ed25519PublicKey] = None,
     ) -> str:
         """Establishes a genuine first-installation deployment in NEVER_PROVISIONED state.
+        Requires valid root-signed bootstrap authorization in production.
         Fails closed if the deployment already has existing state or D2 history.
         """
+        is_test = bool(os.environ.get("SCLASS_TEST_MODE") == "1" or os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") == "1")
+
+        # In production, virgin bootstrap strictly requires root-signed bootstrap authorization
+        if not is_test and bootstrap_authorization is None:
+            raise RuntimeError(
+                "Virgin deployment bootstrap prohibited: valid root-signed bootstrap authorization required."
+            )
+
         state_file_path = os.path.abspath(state_file_path)
         if os.path.exists(state_file_path) and os.path.getsize(state_file_path) > 0:
             raise RuntimeError(
@@ -48,6 +59,55 @@ class TrustedDeploymentBootstrap:
                 f"Trusted deployment bootstrap rejected: D2 store already contains history at '{canonical_d2}'. "
                 "Cannot bootstrap as NEVER_PROVISIONED."
             )
+
+        # Validate bootstrap authorization if present or in production
+        if bootstrap_authorization is not None:
+            if not isinstance(bootstrap_authorization, dict):
+                raise RuntimeError("Invalid bootstrap authorization: dictionary required.")
+
+            if root_public_key is None:
+                from benchmark.parity.verify_gate_3_certificate import Gate3PublicKeystore
+                root_public_key = Gate3PublicKeystore.get_public_key()
+                if root_public_key is None:
+                    raise RuntimeError("Canonical Gate 3 Root Authority Public Key is not configured. Bootstrap fails closed.")
+
+            expected_root_fp = hashlib.sha256(root_public_key.public_bytes_raw()).hexdigest()
+            auth_dep_id = bootstrap_authorization.get("deployment_id")
+            if auth_dep_id != deployment_id:
+                raise RuntimeError(
+                    f"Bootstrap authorization deployment mismatch: expected '{deployment_id}', got '{auth_dep_id}'."
+                )
+
+            purpose = bootstrap_authorization.get("purpose")
+            if purpose != "VIRGIN_DEPLOYMENT_BOOTSTRAP":
+                raise RuntimeError(
+                    f"Invalid bootstrap authorization purpose '{purpose}': 'VIRGIN_DEPLOYMENT_BOOTSTRAP' required."
+                )
+
+            root_fp = bootstrap_authorization.get("root_fingerprint")
+            if root_fp != expected_root_fp:
+                raise RuntimeError(
+                    f"Bootstrap authorization root fingerprint mismatch: expected '{expected_root_fp}', got '{root_fp}'."
+                )
+
+            sig_obj = bootstrap_authorization.get("signature", {})
+            sig_hex = sig_obj.get("signature_hex")
+            if not sig_hex:
+                raise RuntimeError("Missing signature in bootstrap authorization.")
+
+            preimage_dict = {
+                "authorization_id": bootstrap_authorization.get("authorization_id"),
+                "deployment_id": auth_dep_id,
+                "purpose": purpose,
+                "authorized_at": bootstrap_authorization.get("authorized_at"),
+                "canonical_d2_store_path": bootstrap_authorization.get("canonical_d2_store_path", ""),
+                "root_fingerprint": root_fp,
+            }
+            preimage_bytes = canonicalize_json(preimage_dict)
+            try:
+                root_public_key.verify(bytes.fromhex(sig_hex), preimage_bytes)
+            except Exception as e:
+                raise RuntimeError(f"Invalid bootstrap authorization signature against canonical broker root: {e}")
 
         state_dir = os.path.dirname(state_file_path)
         os.makedirs(state_dir, mode=0o700, exist_ok=True)
@@ -72,9 +132,28 @@ class TrustedDeploymentBootstrap:
             "integrity_seal": seal,
             "bootstrap_provenance": "TRUSTED_DEPLOYMENT_BOOTSTRAP",
         }
+        if bootstrap_authorization is not None:
+            wrapped["bootstrap_authorization"] = bootstrap_authorization
 
-        with open(state_file_path, "w", encoding="utf-8") as f:
-            json.dump(wrapped, f, indent=2)
+        # Crash-consistent fsync atomic write
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=state_dir, prefix="bootstrap_state_", suffix=".tmp")
+        try:
+            with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+                json.dump(wrapped, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, state_file_path)
+            if hasattr(os, "chmod"):
+                try:
+                    os.chmod(state_file_path, 0o600)
+                except OSError:
+                    pass
+        finally:
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
 
         return state_file_path
 
@@ -230,6 +309,65 @@ class TrustedDeploymentAuthorityBroker:
                     "Broker state tampering or fabricated NEVER_PROVISIONED/UNPROVISIONED state detected on established deployment with D2 history. "
                     "Failing closed into AUTHORITY_UNAVAILABLE."
                 )
+
+            # Authenticate NEVER_PROVISIONED state file against trusted deployment bootstrap boundary
+            if persisted_status == DeploymentStatus.NEVER_PROVISIONED:
+                self.consumed_authorizations = set(payload.get("consumed_authorizations", []))
+                self.current_installation = None
+                self.pending_provisioning = None
+                self.active_initial_authorization = None
+
+                if data.get("bootstrap_provenance") != "TRUSTED_DEPLOYMENT_BOOTSTRAP":
+                    self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                    self._persist_state()
+                    raise RuntimeError("Broker state tampering detected: invalid bootstrap provenance for NEVER_PROVISIONED. Failing closed.")
+
+                is_test = bool(os.environ.get("SCLASS_TEST_MODE") == "1" or os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") == "1")
+                bootstrap_auth = data.get("bootstrap_authorization")
+                if not is_test or bootstrap_auth is not None:
+                    if not bootstrap_auth or not isinstance(bootstrap_auth, dict):
+                        self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                        self._persist_state()
+                        raise RuntimeError("Broker state tampering detected: missing bootstrap authorization for NEVER_PROVISIONED. Failing closed.")
+
+                    expected_root_fp = hashlib.sha256(self._root_public_key.public_bytes_raw()).hexdigest()
+                    if bootstrap_auth.get("deployment_id") != self.deployment_id:
+                        self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                        self._persist_state()
+                        raise RuntimeError("Broker state tampering detected: bootstrap authorization deployment mismatch. Failing closed.")
+
+                    if bootstrap_auth.get("purpose") != "VIRGIN_DEPLOYMENT_BOOTSTRAP":
+                        self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                        self._persist_state()
+                        raise RuntimeError("Broker state tampering detected: invalid bootstrap authorization purpose. Failing closed.")
+
+                    if bootstrap_auth.get("root_fingerprint") != expected_root_fp:
+                        self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                        self._persist_state()
+                        raise RuntimeError("Broker state tampering detected: bootstrap authorization root fingerprint mismatch. Failing closed.")
+
+                    sig_obj = bootstrap_auth.get("signature", {})
+                    sig_hex = sig_obj.get("signature_hex")
+                    if not sig_hex:
+                        self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                        self._persist_state()
+                        raise RuntimeError("Broker state tampering detected: missing bootstrap authorization signature. Failing closed.")
+
+                    preimage_dict = {
+                        "authorization_id": bootstrap_auth.get("authorization_id"),
+                        "deployment_id": self.deployment_id,
+                        "purpose": "VIRGIN_DEPLOYMENT_BOOTSTRAP",
+                        "authorized_at": bootstrap_auth.get("authorized_at"),
+                        "canonical_d2_store_path": bootstrap_auth.get("canonical_d2_store_path", ""),
+                        "root_fingerprint": expected_root_fp,
+                    }
+                    preimage_bytes = canonicalize_json(preimage_dict)
+                    try:
+                        self._root_public_key.verify(bytes.fromhex(sig_hex), preimage_bytes)
+                    except Exception as e:
+                        self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                        self._persist_state()
+                        raise RuntimeError(f"Broker state tampering detected: forged or invalid NEVER_PROVISIONED bootstrap signature: {e}. Failing closed.")
 
 
             self.status = persisted_status

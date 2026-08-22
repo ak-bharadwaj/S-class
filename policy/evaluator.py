@@ -473,6 +473,49 @@ class SignedAuthorityManifestLoader:
         )
 
     @classmethod
+    def create_virgin_bootstrap_authorization(
+        cls,
+        deployment_id: str,
+        root_private_key: Any,
+        canonical_d2_store_path: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Root Authority helper to issue a root-signed DeploymentBootstrapAuthorization for genuine first installation."""
+        import uuid
+        from datetime import datetime, timezone
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+        from events.serializer import canonicalize_json
+
+        if not isinstance(root_private_key, ed25519.Ed25519PrivateKey):
+            raise TypeError("root_private_key must be an Ed25519PrivateKey instance.")
+
+        auth_id = f"BOOTSTRAP-{uuid.uuid4().hex[:16]}"
+        authorized_at = datetime.now(timezone.utc).isoformat()
+        root_fp = hashlib.sha256(root_private_key.public_key().public_bytes_raw()).hexdigest()
+
+        preimage_dict = {
+            "authorization_id": auth_id,
+            "deployment_id": deployment_id,
+            "purpose": "VIRGIN_DEPLOYMENT_BOOTSTRAP",
+            "authorized_at": authorized_at,
+            "canonical_d2_store_path": canonical_d2_store_path or "",
+            "root_fingerprint": root_fp,
+        }
+        preimage_bytes = canonicalize_json(preimage_dict)
+        digest = hashlib.sha256(preimage_bytes).hexdigest()
+        sig_bytes = root_private_key.sign(preimage_bytes)
+
+        auth_record = dict(preimage_dict)
+        auth_record["signature"] = {
+            "algorithm": "ED25519",
+            "signer_identity": "Gate3AuthoritativeVerifier",
+            "public_key_fingerprint": root_fp,
+            "payload_digest": digest,
+            "signature_hex": sig_bytes.hex(),
+            "timestamp": authorized_at,
+        }
+        return auth_record
+
+    @classmethod
     def create_initial_provisioning_authorization(
         cls,
         deployment_id: str,
