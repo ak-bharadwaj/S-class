@@ -127,6 +127,75 @@ class TrustedDeploymentAuthorityBroker:
                 self.status = DeploymentStatus(payload.get("status", default_status.value))
                 self.consumed_authorizations: Set[str] = set(payload.get("consumed_authorizations", []))
                 self.current_installation = payload.get("current_installation")
+
+                from domain.types import EventType
+                from events.store import FileAppendEventStore
+
+                if self.status == DeploymentStatus.BROKER_COMMIT_PENDING:
+                    if not self.current_installation or not isinstance(self.current_installation, dict):
+                        self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                        raise RuntimeError("Cannot recover from BROKER_COMMIT_PENDING: missing commit coordinates. Failing closed.")
+
+                    if not os.path.exists(self.d2_store_path) or os.path.getsize(self.d2_store_path) == 0:
+                        self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                        raise RuntimeError(f"Cannot recover from BROKER_COMMIT_PENDING: D2 store missing at '{self.d2_store_path}'. Failing closed.")
+
+                    try:
+                        event_store = FileAppendEventStore(self.d2_store_path)
+                        events = event_store.get_events()
+                    except Exception as e:
+                        self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                        raise RuntimeError(f"Cannot recover from BROKER_COMMIT_PENDING: D2 store unreadable or corrupt: {e}. Failing closed.")
+
+                    target_seq = self.current_installation.get("sequence_number")
+                    matching = [e for e in events if e.sequence_number == target_seq]
+                    if not matching:
+                        self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                        raise RuntimeError(f"Cannot recover from BROKER_COMMIT_PENDING: referenced D2 event sequence {target_seq} not found. Failing closed.")
+
+                    target_event = matching[0]
+                    if (
+                        target_event.event_id != str(self.current_installation.get("event_id"))
+                        or target_event.digest != str(self.current_installation.get("event_digest"))
+                        or target_event.event_type != EventType.AUTHORITY_MANIFEST_COMMITTED
+                        or target_event.payload.get("manifest_id") != str(self.current_installation.get("manifest_id"))
+                        or target_event.payload.get("manifest_version") != int(self.current_installation.get("manifest_version"))
+                        or target_event.payload.get("payload_digest") != str(self.current_installation.get("payload_digest"))
+                    ):
+                        self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                        raise RuntimeError(f"Cannot recover from BROKER_COMMIT_PENDING: referenced D2 event {target_seq} corrupted or tampered. Failing closed.")
+
+                    self.status = DeploymentStatus.PROVISIONED
+                    self._persist_state()
+                    return
+
+                elif self.status == DeploymentStatus.PROVISIONED and self.current_installation:
+                    if os.path.exists(self.d2_store_path) and os.path.getsize(self.d2_store_path) > 0:
+                        try:
+                            event_store = FileAppendEventStore(self.d2_store_path)
+                            events = event_store.get_events()
+                            target_seq = self.current_installation.get("sequence_number")
+                            matching = [e for e in events if e.sequence_number == target_seq] if target_seq is not None else []
+                            if matching:
+                                target_event = matching[0]
+                                if (
+                                    target_event.event_id != str(self.current_installation.get("event_id", target_event.event_id))
+                                    or target_event.digest != str(self.current_installation.get("event_digest", target_event.digest))
+                                ):
+                                    self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                                    raise RuntimeError(f"Accepted D2 authority event {target_seq} was altered or corrupted on disk. Failing closed.")
+                            elif target_seq is not None:
+                                self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                                raise RuntimeError(f"Accepted D2 authority event sequence {target_seq} missing from D2 store. Failing closed.")
+                        except RuntimeError:
+                            raise
+                        except Exception as e:
+                            self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                            raise RuntimeError(f"Authoritative D2 store corrupted on restart: {e}. Failing closed.")
+                    else:
+                        self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                        raise RuntimeError(f"Authoritative D2 store missing at '{self.d2_store_path}' on restart. Failing closed.")
+
                 return
 
             self.status = default_status
@@ -387,14 +456,23 @@ class TrustedDeploymentAuthorityBroker:
                             return {"success": False, "error": f"D2 commit validation failed: {err}"}
 
                         proof = params["commit_proof"]
-                        self.status = DeploymentStatus.PROVISIONED
+                        # Stage 1: Durable intermediate state BROKER_COMMIT_PENDING with immutable D2 coordinates
+                        self.status = DeploymentStatus.BROKER_COMMIT_PENDING
                         self.current_installation = {
-                            "installation_id": proof["installation_id"],
-                            "manifest_id": proof["manifest_id"],
-                            "manifest_version": proof["manifest_version"],
-                            "payload_digest": proof["manifest_digest"],
-                            "root_fingerprint": proof["root_fingerprint"],
+                            "installation_id": str(proof["installation_id"]),
+                            "manifest_id": str(proof["manifest_id"]),
+                            "manifest_version": int(proof["manifest_version"]),
+                            "payload_digest": str(proof["manifest_digest"]),
+                            "event_id": str(proof["event_id"]),
+                            "sequence_number": int(proof["sequence_number"]),
+                            "event_digest": str(proof["event_digest"]),
+                            "head_digest": str(proof["head_digest"]),
+                            "root_fingerprint": str(proof["root_fingerprint"]),
                         }
+                        self._persist_state()
+
+                        # Stage 2: Finalize to PROVISIONED
+                        self.status = DeploymentStatus.PROVISIONED
                         self._persist_state()
                         return {"success": True, "status": self.status.value}
                 except Exception as e:
@@ -462,14 +540,23 @@ class TrustedDeploymentAuthorityBroker:
                             return {"success": False, "error": f"D2 recovery commit validation failed: {err}"}
 
                         proof = params["commit_proof"]
-                        self.status = DeploymentStatus.PROVISIONED
+                        # Stage 1: Durable intermediate state BROKER_COMMIT_PENDING with immutable D2 coordinates
+                        self.status = DeploymentStatus.BROKER_COMMIT_PENDING
                         self.current_installation = {
-                            "installation_id": proof["installation_id"],
-                            "manifest_id": proof["manifest_id"],
-                            "manifest_version": proof["manifest_version"],
-                            "payload_digest": proof["manifest_digest"],
-                            "root_fingerprint": proof["root_fingerprint"],
+                            "installation_id": str(proof["installation_id"]),
+                            "manifest_id": str(proof["manifest_id"]),
+                            "manifest_version": int(proof["manifest_version"]),
+                            "payload_digest": str(proof["manifest_digest"]),
+                            "event_id": str(proof["event_id"]),
+                            "sequence_number": int(proof["sequence_number"]),
+                            "event_digest": str(proof["event_digest"]),
+                            "head_digest": str(proof["head_digest"]),
+                            "root_fingerprint": str(proof["root_fingerprint"]),
                         }
+                        self._persist_state()
+
+                        # Stage 2: Finalize to PROVISIONED
+                        self.status = DeploymentStatus.PROVISIONED
                         self._persist_state()
                         return {"success": True, "status": self.status.value}
                 except Exception as e:

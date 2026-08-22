@@ -7472,6 +7472,369 @@ def test_d3_deployment_configuration_evidence_and_restart_binding(tmp_path):
         )
 
 
+def test_d3_install_e158_crash_after_d2_commit_before_broker_persistence_deterministic_recovery(tmp_path):
+    """E158: Crash after D2 commit before broker persistence -> deterministic recovery on retry."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, D2AuthorityManifestStore, D2InstallationProvisioning
+
+    d2_file = str(tmp_path / "d2_e158.jsonl")
+    state_file = str(tmp_path / "broker_state_e158.json")
+    store = D2AuthorityManifestStore(file_path=d2_file)
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    # Step 1: D2 commit durable
+    store.commit_epoch(
+        manifest_id="M-E158",
+        manifest_version=1,
+        payload_digest="a" * 64,
+        signer_identity="Gate3AuthoritativeVerifier",
+        root_fingerprint=fp,
+    )
+
+    proof = D2InstallationProvisioning.generate_commit_proof(
+        deployment_id="DEP-E158",
+        installation_id="INST-E158",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        signer_identity="Gate3AuthoritativeVerifier",
+        d2_store_path=d2_file,
+    )
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E158",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    assert broker.status == DeploymentStatus.PROVISIONING_AUTHORIZED
+
+    # Simulated crash: broker process dies before record_provisioned is recorded
+    del broker
+
+    # Restarted broker remains PROVISIONING_AUTHORIZED
+    broker_recovered = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E158",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    assert broker_recovered.status == DeploymentStatus.PROVISIONING_AUTHORIZED
+
+    # Retry admission with valid proof succeeds deterministically
+    resp = broker_recovered._dispatch_rpc({"method": "record_provisioned", "params": {"commit_proof": proof}}, {})
+    assert resp.get("success")
+    assert broker_recovered.status == DeploymentStatus.PROVISIONED
+    assert broker_recovered.current_installation["manifest_id"] == "M-E158"
+
+
+def test_d3_install_e159_restart_from_broker_commit_pending_finalizes_provisioned(tmp_path):
+    """E159: Restart from BROKER_COMMIT_PENDING -> re-reads exact D2 coordinates and finalizes PROVISIONED."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, D2AuthorityManifestStore, D2InstallationProvisioning
+
+    d2_file = str(tmp_path / "d2_e159.jsonl")
+    state_file = str(tmp_path / "broker_state_e159.json")
+    store = D2AuthorityManifestStore(file_path=d2_file)
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    store.commit_epoch(
+        manifest_id="M-E159",
+        manifest_version=1,
+        payload_digest="b" * 64,
+        signer_identity="Gate3AuthoritativeVerifier",
+        root_fingerprint=fp,
+    )
+
+    proof = D2InstallationProvisioning.generate_commit_proof(
+        deployment_id="DEP-E159",
+        installation_id="INST-E159",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        signer_identity="Gate3AuthoritativeVerifier",
+        d2_store_path=d2_file,
+    )
+
+    # Initialize broker and authorize provisioning
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E159",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+
+    # Simulate crash mid-admission after writing BROKER_COMMIT_PENDING
+    broker.status = DeploymentStatus.BROKER_COMMIT_PENDING
+    broker.current_installation = {
+        "installation_id": proof.installation_id,
+        "manifest_id": proof.manifest_id,
+        "manifest_version": proof.manifest_version,
+        "payload_digest": proof.manifest_digest,
+        "event_id": proof.event_id,
+        "sequence_number": proof.sequence_number,
+        "event_digest": proof.event_digest,
+        "head_digest": proof.head_digest,
+        "root_fingerprint": proof.root_fingerprint,
+    }
+    broker._persist_state()
+    del broker
+
+    # Restart broker: _load_or_initialize_state must recover coordinates from D2 and finalize PROVISIONED
+    recovered_broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E159",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    assert recovered_broker.status == DeploymentStatus.PROVISIONED
+    assert recovered_broker.current_installation["sequence_number"] == 1
+    assert recovered_broker.current_installation["manifest_id"] == "M-E159"
+
+
+def test_d3_install_e160_later_d2_event_after_admission_does_not_invalidate_authority(tmp_path):
+    """E160: Later D2 event after successful admission does not invalidate accepted authority."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, D2AuthorityManifestStore, D2InstallationProvisioning, FileAppendEventStore
+    from domain.models import EventEnvelope
+    from domain.types import EventType
+    from events.serializer import compute_event_digest
+
+    d2_file = str(tmp_path / "d2_e160.jsonl")
+    state_file = str(tmp_path / "broker_state_e160.json")
+    store = D2AuthorityManifestStore(file_path=d2_file)
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    store.commit_epoch(
+        manifest_id="M-E160",
+        manifest_version=1,
+        payload_digest="c" * 64,
+        signer_identity="Gate3AuthoritativeVerifier",
+        root_fingerprint=fp,
+    )
+
+    proof = D2InstallationProvisioning.generate_commit_proof(
+        deployment_id="DEP-E160",
+        installation_id="INST-E160",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        signer_identity="Gate3AuthoritativeVerifier",
+        d2_store_path=d2_file,
+    )
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E160",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    resp = broker._dispatch_rpc({"method": "record_provisioned", "params": {"commit_proof": proof}}, {})
+    assert resp.get("success")
+    assert broker.status == DeploymentStatus.PROVISIONED
+
+    # Append subsequent operational/system events to D2 log (sequences 2 and 3)
+    event_store = FileAppendEventStore(d2_file)
+    payload2 = {"task_name": "initial_scan"}
+    d2 = compute_event_digest(
+        event_id="EVT-OP2",
+        event_type=EventType.TASK_CREATED,
+        sequence_number=2,
+        aggregate_id="AGG-001",
+        timestamp="2026-08-22T10:00:00Z",
+        payload=payload2,
+        parent_digest=proof.event_digest,
+    )
+    ev2 = EventEnvelope(
+        event_id="EVT-OP2",
+        event_type=EventType.TASK_CREATED,
+        sequence_number=2,
+        aggregate_id="AGG-001",
+        timestamp="2026-08-22T10:00:00Z",
+        payload=payload2,
+        parent_digest=proof.event_digest,
+        digest=d2,
+    )
+    event_store.append(ev2)
+
+    payload3 = {"claim_name": "syntax_valid"}
+    d3 = compute_event_digest(
+        event_id="EVT-OP3",
+        event_type=EventType.CLAIM_REGISTERED,
+        sequence_number=3,
+        aggregate_id="AGG-001",
+        timestamp="2026-08-22T10:00:01Z",
+        payload=payload3,
+        parent_digest=d2,
+    )
+    ev3 = EventEnvelope(
+        event_id="EVT-OP3",
+        event_type=EventType.CLAIM_REGISTERED,
+        sequence_number=3,
+        aggregate_id="AGG-001",
+        timestamp="2026-08-22T10:00:01Z",
+        payload=payload3,
+        parent_digest=d2,
+        digest=d3,
+    )
+    event_store.append(ev3)
+
+    # In-memory broker status query remains PROVISIONED
+    status_resp = broker._dispatch_rpc({"method": "get_deployment_status"}, {})
+    assert status_resp.get("status") == DeploymentStatus.PROVISIONED.value
+
+    # Restart broker: verify it remains PROVISIONED even though sequence 1 is no longer the head
+    restarted_broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E160",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    assert restarted_broker.status == DeploymentStatus.PROVISIONED
+    assert restarted_broker.current_installation["sequence_number"] == 1
+
+
+def test_d3_install_e161_referenced_d2_event_deleted_or_corrupted_fails_closed(tmp_path):
+    """E161: Referenced D2 event deleted/corrupted -> AUTHORITY_UNAVAILABLE (never silently UNPROVISIONED)."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, D2AuthorityManifestStore, D2InstallationProvisioning
+
+    d2_file = str(tmp_path / "d2_e161.jsonl")
+    state_file = str(tmp_path / "broker_state_e161.json")
+    store = D2AuthorityManifestStore(file_path=d2_file)
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    store.commit_epoch(
+        manifest_id="M-E161",
+        manifest_version=1,
+        payload_digest="f" * 64,
+        signer_identity="Gate3AuthoritativeVerifier",
+        root_fingerprint=fp,
+    )
+
+    proof = D2InstallationProvisioning.generate_commit_proof(
+        deployment_id="DEP-E161",
+        installation_id="INST-E161",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        signer_identity="Gate3AuthoritativeVerifier",
+        d2_store_path=d2_file,
+    )
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E161",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    resp = broker._dispatch_rpc({"method": "record_provisioned", "params": {"commit_proof": proof}}, {})
+    assert resp.get("success")
+    assert broker.status == DeploymentStatus.PROVISIONED
+
+    # Case A: Corrupt D2 event payload/digest on disk
+    with open(d2_file, "w", encoding="utf-8") as f:
+        f.write('{"event_id": "TAMPERED", "sequence_number": 1, "digest": "0000"}\n')
+
+    with pytest.raises(RuntimeError, match="Authoritative D2 store corrupted|Accepted D2 authority event"):
+        TrustedDeploymentAuthorityBroker(
+            deployment_id="DEP-E161",
+            state_file_path=state_file,
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            d2_store_path=d2_file,
+        )
+
+    # Case B: Delete D2 file completely -> AUTHORITY_UNAVAILABLE
+    os.remove(d2_file)
+    with pytest.raises(RuntimeError, match="Authoritative D2 store missing|corrupted|Accepted D2"):
+        TrustedDeploymentAuthorityBroker(
+            deployment_id="DEP-E161",
+            state_file_path=state_file,
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            d2_store_path=d2_file,
+        )
+
+
+def test_d3_install_e162_repeated_recovery_is_idempotent(tmp_path):
+    """E162: Repeated recovery is idempotent producing identical deterministic PROVISIONED state."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, D2AuthorityManifestStore, D2InstallationProvisioning
+
+    d2_file = str(tmp_path / "d2_e162.jsonl")
+    state_file = str(tmp_path / "broker_state_e162.json")
+    store = D2AuthorityManifestStore(file_path=d2_file)
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    store.commit_epoch(
+        manifest_id="M-E162",
+        manifest_version=1,
+        payload_digest="9" * 64,
+        signer_identity="Gate3AuthoritativeVerifier",
+        root_fingerprint=fp,
+    )
+
+    proof = D2InstallationProvisioning.generate_commit_proof(
+        deployment_id="DEP-E162",
+        installation_id="INST-E162",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        signer_identity="Gate3AuthoritativeVerifier",
+        d2_store_path=d2_file,
+    )
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E162",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+
+    # Simulate BROKER_COMMIT_PENDING
+    broker.status = DeploymentStatus.BROKER_COMMIT_PENDING
+    broker.current_installation = {
+        "installation_id": proof.installation_id,
+        "manifest_id": proof.manifest_id,
+        "manifest_version": proof.manifest_version,
+        "payload_digest": proof.manifest_digest,
+        "event_id": proof.event_id,
+        "sequence_number": proof.sequence_number,
+        "event_digest": proof.event_digest,
+        "head_digest": proof.head_digest,
+        "root_fingerprint": proof.root_fingerprint,
+    }
+    broker._persist_state()
+
+    # Recovery iteration 1
+    rec1 = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E162",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    assert rec1.status == DeploymentStatus.PROVISIONED
+    inst1 = dict(rec1.current_installation)
+
+    # Recovery iteration 2
+    rec2 = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E162",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    assert rec2.status == DeploymentStatus.PROVISIONED
+    inst2 = dict(rec2.current_installation)
+
+    # Recovery iteration 3
+    rec3 = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E162",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    assert rec3.status == DeploymentStatus.PROVISIONED
+    inst3 = dict(rec3.current_installation)
+
+    # Absolute idempotency check
+    assert inst1 == inst2 == inst3
+
+
+
 
 
 
