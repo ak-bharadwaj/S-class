@@ -1,4 +1,4 @@
-"""End-to-End Deployment-Level Trust Topology Certification Suite (DC01 - DC45).
+"""End-to-End Deployment-Level Trust Topology Certification Suite (DC01 - DC50).
 Defines and executes the complete out-of-process authority boundary certification:
 
 DC01: production root cannot be caller-selected
@@ -46,6 +46,11 @@ DC42: forged bootstrap provenance is rejected
 DC43: deleting all local state does not permit self-bootstrap
 DC44: only trusted deployment bootstrap can create NEVER_PROVISIONED
 DC45: bootstrap is single-use and survives process restart
+DC46: virgin bootstrap authorization replay -> reject
+DC47: replay after complete local state destruction -> reject
+DC48: same authorization concurrently used twice -> exactly one succeeds
+DC49: fresh authorization for different deployment -> reject
+DC50: bootstrap authorization deployment/path mismatch -> reject
 """
 import os
 import sys
@@ -2170,3 +2175,235 @@ def test_dc45_bootstrap_is_single_use_and_survives_process_restart(monkeypatch):
             os.remove(state_file)
         if os.path.exists(d2_file):
             os.remove(d2_file)
+
+
+def test_dc46_virgin_bootstrap_authorization_replay_rejected(monkeypatch):
+    """DC46: Replaying a consumed virgin bootstrap authorization is rejected by the external install authority."""
+    state_file1 = os.path.join(tempfile.gettempdir(), f"dc46_state1_{os.getpid()}.json")
+    state_file2 = os.path.join(tempfile.gettempdir(), f"dc46_state2_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc46_d2_{os.getpid()}.jsonl")
+    for p in (state_file1, state_file2, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+    with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
+        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+        auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
+            deployment_id="DC46-DEP",
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+
+        # 1. First bootstrap succeeds
+        TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
+            deployment_id="DC46-DEP",
+            state_file_path=state_file1,
+            d2_store_path=d2_file,
+            bootstrap_authorization=auth,
+        )
+
+        # 2. Replaying the same authorization for a second bootstrap is rejected
+        with pytest.raises(RuntimeError, match=r"has already been consumed \(replay rejected\)"):
+            TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
+                deployment_id="DC46-DEP",
+                state_file_path=state_file2,
+                d2_store_path=d2_file,
+                bootstrap_authorization=auth,
+            )
+
+        for p in (state_file1, state_file2, d2_file):
+            if os.path.exists(p):
+                os.remove(p)
+
+
+def test_dc47_replay_after_complete_local_state_destruction_rejected(monkeypatch):
+    """DC47: Replaying bootstrap authorization after complete local state destruction is rejected."""
+    state_file = os.path.join(tempfile.gettempdir(), f"dc47_state_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc47_d2_{os.getpid()}.jsonl")
+    for p in (state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+    with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
+        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+        auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
+            deployment_id="DC47-DEP",
+            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        )
+        TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
+            deployment_id="DC47-DEP",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+            bootstrap_authorization=auth,
+        )
+
+        broker = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC47-DEP",
+            state_file_path=state_file,
+            auth_secret="SEC47",
+        )
+        assert broker.status == DeploymentStatus.NEVER_PROVISIONED
+
+        # Complete local state destruction
+        if os.path.exists(state_file):
+            os.remove(state_file)
+        if os.path.exists(d2_file):
+            os.remove(d2_file)
+
+        # Attacker attempts to replay original bootstrap authorization
+        with pytest.raises(RuntimeError, match=r"has already been consumed \(replay rejected\)"):
+            TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
+                deployment_id="DC47-DEP",
+                state_file_path=state_file,
+                d2_store_path=d2_file,
+                bootstrap_authorization=auth,
+            )
+
+        # Fresh broker without state starts in CATASTROPHIC_LOSS
+        broker2 = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC47-DEP",
+            state_file_path=state_file,
+            auth_secret="SEC47",
+        )
+        assert broker2.status == DeploymentStatus.CATASTROPHIC_LOSS
+
+        if os.path.exists(state_file):
+            os.remove(state_file)
+        if os.path.exists(d2_file):
+            os.remove(d2_file)
+
+
+def test_dc48_same_authorization_concurrently_used_twice_exactly_one_succeeds(monkeypatch):
+    """DC48: Same bootstrap authorization concurrently raced across threads allows exactly one success."""
+    import threading
+
+    state_file1 = os.path.join(tempfile.gettempdir(), f"dc48_state1_{os.getpid()}.json")
+    state_file2 = os.path.join(tempfile.gettempdir(), f"dc48_state2_{os.getpid()}.json")
+    d2_file1 = os.path.join(tempfile.gettempdir(), f"dc48_d2_1_{os.getpid()}.jsonl")
+    d2_file2 = os.path.join(tempfile.gettempdir(), f"dc48_d2_2_{os.getpid()}.jsonl")
+    for p in (state_file1, state_file2, d2_file1, d2_file2):
+        if os.path.exists(p):
+            os.remove(p)
+
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+    auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
+        deployment_id="DC48-DEP",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    results = []
+    errors = []
+
+    def attempt_bootstrap(sf, d2f):
+        try:
+            res = TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
+                deployment_id="DC48-DEP",
+                state_file_path=sf,
+                d2_store_path=d2f,
+                bootstrap_authorization=auth,
+            )
+            results.append(res)
+        except Exception as e:
+            errors.append(e)
+
+    t1 = threading.Thread(target=attempt_bootstrap, args=(state_file1, d2_file1))
+    t2 = threading.Thread(target=attempt_bootstrap, args=(state_file2, d2_file2))
+
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+
+    assert len(results) == 1
+    assert len(errors) == 1
+    assert "has already been consumed" in str(errors[0])
+
+    for p in (state_file1, state_file2, d2_file1, d2_file2):
+        if os.path.exists(p):
+            os.remove(p)
+
+
+def test_dc49_fresh_authorization_for_different_deployment_rejected(monkeypatch):
+    """DC49: Bootstrap authorization bound to deployment A cannot be used on deployment B."""
+    state_file = os.path.join(tempfile.gettempdir(), f"dc49_state_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc49_d2_{os.getpid()}.jsonl")
+    for p in (state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+    auth_a = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
+        deployment_id="DC49-DEP-ALPHA",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    with pytest.raises(RuntimeError, match="Bootstrap authorization deployment mismatch: expected 'DC49-DEP-BETA', got 'DC49-DEP-ALPHA'"):
+        TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
+            deployment_id="DC49-DEP-BETA",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+            bootstrap_authorization=auth_a,
+        )
+
+    for p in (state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+
+def test_dc50_bootstrap_authorization_deployment_mismatch_fails_closed(monkeypatch):
+    """DC50: State file containing bootstrap authorization for mismatched deployment fails closed into AUTHORITY_UNAVAILABLE."""
+    state_file = os.path.join(tempfile.gettempdir(), f"dc50_state_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc50_d2_{os.getpid()}.jsonl")
+    for p in (state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+    auth_wrong = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
+        deployment_id="DC50-DEP-WRONG",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+    )
+
+    payload = {
+        "deployment_id": "DC50-DEP-TARGET",
+        "status": DeploymentStatus.NEVER_PROVISIONED.value,
+        "canonical_d2_store_path": os.path.abspath(d2_file),
+        "consumed_authorizations": [],
+        "current_installation": None,
+        "pending_provisioning": None,
+        "active_initial_authorization": None,
+    }
+    seal = hashlib.sha256(canonicalize_json(payload)).hexdigest()
+    with open(state_file, "w", encoding="utf-8") as f:
+        json.dump({
+            "payload": payload,
+            "integrity_seal": seal,
+            "bootstrap_provenance": "TRUSTED_DEPLOYMENT_BOOTSTRAP",
+            "bootstrap_authorization": auth_wrong,
+        }, f)
+
+    with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
+        with pytest.raises(RuntimeError, match="bootstrap authorization deployment mismatch"):
+            TrustedDeploymentAuthorityBroker(
+                deployment_id="DC50-DEP-TARGET",
+                state_file_path=state_file,
+                auth_secret="SEC50",
+            )
+
+    for p in (state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)

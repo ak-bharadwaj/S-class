@@ -497,7 +497,6 @@ class SignedAuthorityManifestLoader:
             "deployment_id": deployment_id,
             "purpose": "VIRGIN_DEPLOYMENT_BOOTSTRAP",
             "authorized_at": authorized_at,
-            "canonical_d2_store_path": canonical_d2_store_path or "",
             "root_fingerprint": root_fp,
         }
         preimage_bytes = canonicalize_json(preimage_dict)

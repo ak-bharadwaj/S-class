@@ -16,6 +16,60 @@ from events.store import DeploymentStatus
 from events.serializer import canonicalize_json
 
 
+class TrustedDeploymentBootstrapAuthority:
+    """Trusted Deployment & Installation Authority outside S-Class local state.
+    Durably records bootstrap authorizations and ensures exact-once consumption across
+    local state destruction, process crashes, and concurrent invocations.
+    """
+    _lock = threading.RLock()
+    _consumed_authorizations: Dict[str, Dict[str, Any]] = {}
+    _bootstrapped_deployments: Dict[str, str] = {}
+
+    @classmethod
+    def consume_bootstrap_authorization(
+        cls,
+        bootstrap_authorization: Dict[str, Any],
+        deployment_id: str,
+    ) -> None:
+        with cls._lock:
+            auth_id = bootstrap_authorization.get("authorization_id")
+            if not auth_id:
+                raise RuntimeError("Missing authorization_id in bootstrap authorization.")
+
+            if auth_id in cls._consumed_authorizations:
+                raise RuntimeError(
+                    f"Bootstrap authorization '{auth_id}' has already been consumed (replay rejected)."
+                )
+
+            auth_dep_id = bootstrap_authorization.get("deployment_id")
+            if auth_dep_id != deployment_id:
+                raise RuntimeError(
+                    f"Bootstrap authorization deployment mismatch: expected '{deployment_id}', got '{auth_dep_id}'."
+                )
+
+            # Atomic consumption
+            cls._consumed_authorizations[auth_id] = {
+                "authorization_id": auth_id,
+                "deployment_id": deployment_id,
+                "consumed_at": bootstrap_authorization.get("authorized_at"),
+            }
+            cls._bootstrapped_deployments[deployment_id] = auth_id
+
+    @classmethod
+    def is_consumed(cls, auth_id: str) -> bool:
+        with cls._lock:
+            return auth_id in cls._consumed_authorizations
+
+    @classmethod
+    def reset_for_testing(cls) -> None:
+        """Controlled reset strictly for test harness."""
+        if os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1" and os.environ.get("PYTEST_CURRENT_TEST") is None and os.environ.get("SCLASS_TEST_MODE") != "1":
+            raise RuntimeError("reset_for_testing prohibited outside test harness.")
+        with cls._lock:
+            cls._consumed_authorizations.clear()
+            cls._bootstrapped_deployments.clear()
+
+
 class TrustedDeploymentBootstrap:
     """Trusted Deployment Bootstrap Boundary.
     Executes exclusively at installation / bootstrap time outside normal S-Class runtime
@@ -100,7 +154,6 @@ class TrustedDeploymentBootstrap:
                 "deployment_id": auth_dep_id,
                 "purpose": purpose,
                 "authorized_at": bootstrap_authorization.get("authorized_at"),
-                "canonical_d2_store_path": bootstrap_authorization.get("canonical_d2_store_path", ""),
                 "root_fingerprint": root_fp,
             }
             preimage_bytes = canonicalize_json(preimage_dict)
@@ -108,6 +161,9 @@ class TrustedDeploymentBootstrap:
                 root_public_key.verify(bytes.fromhex(sig_hex), preimage_bytes)
             except Exception as e:
                 raise RuntimeError(f"Invalid bootstrap authorization signature against canonical broker root: {e}")
+
+            # Atomically consume authorization in the external install authority
+            TrustedDeploymentBootstrapAuthority.consume_bootstrap_authorization(bootstrap_authorization, deployment_id)
 
         state_dir = os.path.dirname(state_file_path)
         os.makedirs(state_dir, mode=0o700, exist_ok=True)
@@ -358,7 +414,6 @@ class TrustedDeploymentAuthorityBroker:
                         "deployment_id": self.deployment_id,
                         "purpose": "VIRGIN_DEPLOYMENT_BOOTSTRAP",
                         "authorized_at": bootstrap_auth.get("authorized_at"),
-                        "canonical_d2_store_path": bootstrap_auth.get("canonical_d2_store_path", ""),
                         "root_fingerprint": expected_root_fp,
                     }
                     preimage_bytes = canonicalize_json(preimage_dict)
