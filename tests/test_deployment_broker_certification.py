@@ -1,4 +1,4 @@
-"""End-to-End Deployment-Level Trust Topology Certification Suite (DC01 - DC25).
+"""End-to-End Deployment-Level Trust Topology Certification Suite (DC01 - DC30).
 Defines and executes the complete out-of-process authority boundary certification:
 
 DC01: production root cannot be caller-selected
@@ -26,6 +26,11 @@ DC22: state recreation with fabricated UNPROVISIONED data -> rejected
 DC23: complete broker-state loss cannot trigger ordinary initial provisioning
 DC24: authorized external recovery is required to return to provisioning-capable state
 DC25: missing broker state + unrelated D2 history -> AUTHORITY_UNAVAILABLE, initial provisioning impossible
+DC26: complete broker-state + D2 + installation-artifact loss -> fail closed
+DC27: fresh process after complete authority loss -> fail closed
+DC28: fabricated fresh local state after complete loss -> rejected
+DC29: authorized external catastrophic reprovisioning -> succeeds exactly once
+DC30: replayed catastrophic reprovisioning authorization -> rejected
 """
 import os
 import sys
@@ -39,7 +44,7 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from benchmark.parity.verify_gate_3_certificate import Gate3PublicKeystore
 from benchmark.parity.gate_3_authority import Gate3AuthorityKeyStore
-from events.broker import TrustedDeploymentAuthorityBroker
+from events.broker import TrustedDeploymentAuthorityBroker, TrustedDeploymentControlPlane
 from events.ipc import OSIPCServer, OSIPCClient
 from events.store import (
     D2AuthorityManifestStore,
@@ -59,6 +64,7 @@ from tests.test_d3_policy_engine import (
 
 @pytest.fixture(autouse=True)
 def setup_certification_environment():
+    TrustedDeploymentControlPlane.clear_for_testing()
     Gate3AuthorityKeyStore.clear()
     Gate3AuthorityKeyStore.set_private_key(TEST_AUTHORITY_PRIVATE_KEY)
     Gate3PublicKeystore.clear()
@@ -1163,3 +1169,397 @@ def test_dc25_missing_broker_state_with_unrelated_d2_history_fails_closed():
                 os.remove(d2_file)
 
 
+
+
+def test_dc26_complete_authority_loss_fails_closed():
+    """DC26: Complete broker-state + D2 + installation-artifact loss fails closed into AUTHORITY_UNAVAILABLE."""
+    state_file = os.path.join(tempfile.gettempdir(), f"dc26_state_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc26_d2_{os.getpid()}.jsonl")
+    for p in (state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+    with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
+        D2InstallationProvisioning.clear_for_testing()
+        SignedAuthorityManifestLoader.clear_for_testing()
+        broker = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC26-DEP",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+            auth_secret="SEC26",
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        )
+        broker.start_ipc_server()
+        try:
+            DeploymentProvisionerRegistry.reset_for_testing()
+            client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC26")
+            SClassApplication(provisioner=client)
+            manifest = SignedAuthorityManifestLoader.sign_manifest(
+                manifest_id="M-26",
+                manifest_version=1,
+                issued_at="2026-08-21T10:00:00Z",
+                actors={},
+                revoked_fingerprints=[],
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest)
+            assert broker.status == DeploymentStatus.PROVISIONED
+        finally:
+            broker.stop_ipc_server()
+
+        # Complete Catastrophic Authority Loss: delete broker state file + delete D2 event store
+        if os.path.exists(state_file):
+            os.remove(state_file)
+        if os.path.exists(d2_file):
+            os.remove(d2_file)
+        D2InstallationProvisioning.clear_for_testing()
+        SignedAuthorityManifestLoader.clear_for_testing()
+
+        assert not os.path.exists(state_file)
+        assert not os.path.exists(d2_file)
+
+        # Reopening on established deployment after complete authority loss fails closed into AUTHORITY_UNAVAILABLE
+        broker2 = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC26-DEP",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+            auth_secret="SEC26",
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        )
+        assert broker2.status == DeploymentStatus.AUTHORITY_UNAVAILABLE
+        assert broker2.status != DeploymentStatus.UNPROVISIONED
+
+        broker2.start_ipc_server()
+        try:
+            client2 = IPCDeploymentProvisioner(ipc_endpoint=broker2.ipc_endpoint, auth_secret="SEC26")
+            auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+                deployment_id="DC26-DEP",
+                target_manifest_id="M-26-NEW",
+                target_manifest_version=1,
+                target_manifest_digest="0" * 64,
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            with pytest.raises(RuntimeError, match="Cannot authorize initial provisioning from state 'AUTHORITY_UNAVAILABLE'"):
+                client2.authorize_initial_provisioning(auth)
+            assert broker2.status == DeploymentStatus.AUTHORITY_UNAVAILABLE
+        finally:
+            broker2.stop_ipc_server()
+            if os.path.exists(state_file):
+                os.remove(state_file)
+            if os.path.exists(d2_file):
+                os.remove(d2_file)
+
+
+def test_dc27_fresh_process_after_complete_authority_loss_fails_closed():
+    """DC27: Fresh process started after complete authority loss initializes into AUTHORITY_UNAVAILABLE."""
+    state_file = os.path.join(tempfile.gettempdir(), f"dc27_state_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc27_d2_{os.getpid()}.jsonl")
+    for p in (state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+    with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
+        D2InstallationProvisioning.clear_for_testing()
+        SignedAuthorityManifestLoader.clear_for_testing()
+        broker = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC27-DEP",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+            auth_secret="SEC27",
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        )
+        broker.start_ipc_server()
+        try:
+            DeploymentProvisionerRegistry.reset_for_testing()
+            client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC27")
+            SClassApplication(provisioner=client)
+            manifest = SignedAuthorityManifestLoader.sign_manifest(
+                manifest_id="M-27",
+                manifest_version=1,
+                issued_at="2026-08-21T10:00:00Z",
+                actors={},
+                revoked_fingerprints=[],
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest)
+            assert broker.status == DeploymentStatus.PROVISIONED
+        finally:
+            broker.stop_ipc_server()
+
+        # Wipe all local files
+        if os.path.exists(state_file):
+            os.remove(state_file)
+        if os.path.exists(d2_file):
+            os.remove(d2_file)
+        D2InstallationProvisioning.clear_for_testing()
+        SignedAuthorityManifestLoader.clear_for_testing()
+
+        # Completely fresh broker process starts up
+        broker_fresh = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC27-DEP",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+            auth_secret="SEC27",
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        )
+        assert broker_fresh.status == DeploymentStatus.AUTHORITY_UNAVAILABLE
+        broker_fresh.start_ipc_server()
+        try:
+            client_fresh = IPCDeploymentProvisioner(ipc_endpoint=broker_fresh.ipc_endpoint, auth_secret="SEC27")
+            assert client_fresh.get_deployment_status() == DeploymentStatus.AUTHORITY_UNAVAILABLE
+        finally:
+            broker_fresh.stop_ipc_server()
+            if os.path.exists(state_file):
+                os.remove(state_file)
+            if os.path.exists(d2_file):
+                os.remove(d2_file)
+
+
+def test_dc28_fabricated_fresh_local_state_after_complete_loss_rejected():
+    """DC28: Fabricating fresh local UNPROVISIONED state on an established deployment after complete loss is rejected."""
+    state_file = os.path.join(tempfile.gettempdir(), f"dc28_state_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc28_d2_{os.getpid()}.jsonl")
+    for p in (state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+    with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
+        D2InstallationProvisioning.clear_for_testing()
+        SignedAuthorityManifestLoader.clear_for_testing()
+        broker = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC28-DEP",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+            auth_secret="SEC28",
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        )
+        broker.start_ipc_server()
+        try:
+            DeploymentProvisionerRegistry.reset_for_testing()
+            client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC28")
+            SClassApplication(provisioner=client)
+            manifest = SignedAuthorityManifestLoader.sign_manifest(
+                manifest_id="M-28",
+                manifest_version=1,
+                issued_at="2026-08-21T10:00:00Z",
+                actors={},
+                revoked_fingerprints=[],
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest)
+            assert broker.status == DeploymentStatus.PROVISIONED
+        finally:
+            broker.stop_ipc_server()
+
+        # Wipe state and D2
+        if os.path.exists(state_file):
+            os.remove(state_file)
+        if os.path.exists(d2_file):
+            os.remove(d2_file)
+
+        # Attacker crafts fabricated UNPROVISIONED state file
+        payload = {
+            "deployment_id": "DC28-DEP",
+            "status": DeploymentStatus.UNPROVISIONED.value,
+            "canonical_d2_store_path": os.path.abspath(d2_file),
+            "consumed_authorizations": [],
+            "current_installation": None,
+            "pending_provisioning": None,
+            "active_initial_authorization": None,
+        }
+        seal = hashlib.sha256(canonicalize_json(payload)).hexdigest()
+        with open(state_file, "w", encoding="utf-8") as f:
+            json.dump({"payload": payload, "integrity_seal": seal}, f)
+
+        # Broker startup detects fabricated fresh state on established deployment and fails closed
+        with pytest.raises(RuntimeError, match="fabricated UNPROVISIONED state detected"):
+            TrustedDeploymentAuthorityBroker(
+                deployment_id="DC28-DEP",
+                state_file_path=state_file,
+                d2_store_path=d2_file,
+                auth_secret="SEC28",
+                root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            )
+        if os.path.exists(state_file):
+            os.remove(state_file)
+        if os.path.exists(d2_file):
+            os.remove(d2_file)
+
+
+def test_dc29_authorized_external_catastrophic_reprovisioning_succeeds_once():
+    """DC29: Authorized external catastrophic reprovisioning succeeds and transitions AUTHORITY_UNAVAILABLE to PROVISIONED."""
+    state_file = os.path.join(tempfile.gettempdir(), f"dc29_state_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc29_d2_{os.getpid()}.jsonl")
+    for p in (state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+    with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
+        D2InstallationProvisioning.clear_for_testing()
+        SignedAuthorityManifestLoader.clear_for_testing()
+        broker = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC29-DEP",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+            auth_secret="SEC29",
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        )
+        broker.start_ipc_server()
+        try:
+            DeploymentProvisionerRegistry.reset_for_testing()
+            client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC29")
+            SClassApplication(provisioner=client)
+            manifest = SignedAuthorityManifestLoader.sign_manifest(
+                manifest_id="M-29",
+                manifest_version=1,
+                issued_at="2026-08-21T10:00:00Z",
+                actors={},
+                revoked_fingerprints=[],
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest)
+            assert broker.status == DeploymentStatus.PROVISIONED
+        finally:
+            broker.stop_ipc_server()
+
+        # Wipe state and D2 completely
+        if os.path.exists(state_file):
+            os.remove(state_file)
+        if os.path.exists(d2_file):
+            os.remove(d2_file)
+
+        # Broker restarts in AUTHORITY_UNAVAILABLE
+        broker2 = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC29-DEP",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+            auth_secret="SEC29",
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        )
+        assert broker2.status == DeploymentStatus.AUTHORITY_UNAVAILABLE
+        broker2.start_ipc_server()
+        try:
+            client2 = IPCDeploymentProvisioner(ipc_endpoint=broker2.ipc_endpoint, auth_secret="SEC29")
+            reprov_auth = InMemoryTestDeploymentProvisioner.create_reprovisioning_authorization(
+                deployment_id="DC29-DEP",
+                target_manifest_id="M-29-REC",
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            # Step 1: External administrative recovery authorization
+            resp = client2._client.call("authorize_reprovisioning", {"reprovisioning_authorization": reprov_auth})
+            assert resp.get("success")
+            assert broker2.status == DeploymentStatus.RECOVERY_AUTHORIZED
+
+            # Step 2: Register pending reprovisioning intent
+            fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+            resp_pending = client2._client.call("register_pending_reprovisioning", {
+                "installation_id": "INST-29-REC",
+                "manifest_id": "M-29-REC",
+                "manifest_version": 1,
+                "manifest_digest": "8" * 64,
+                "root_fingerprint": fp,
+            })
+            assert resp_pending.get("success")
+            assert broker2.status == DeploymentStatus.RECOVERY_PENDING
+
+            # Step 3: Commit D2 recovery epoch
+            store = D2AuthorityManifestStore(file_path=d2_file)
+            store.commit_epoch(
+                manifest_id="M-29-REC",
+                manifest_version=1,
+                payload_digest="8" * 64,
+                signer_identity="Gate3AuthoritativeVerifier",
+                root_fingerprint=fp,
+            )
+            proof = D2InstallationProvisioning.generate_commit_proof(
+                deployment_id="DC29-DEP",
+                installation_id="INST-29-REC",
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+                signer_identity="Gate3AuthoritativeVerifier",
+                d2_store_path=d2_file,
+            )
+
+            # Step 4: Finalize reprovisioning
+            resp_final = client2._client.call("record_reprovisioned", {"commit_proof": proof.to_dict()})
+            assert resp_final.get("success")
+            assert broker2.status == DeploymentStatus.PROVISIONED
+            assert broker2.current_installation["manifest_id"] == "M-29-REC"
+        finally:
+            broker2.stop_ipc_server()
+            if os.path.exists(state_file):
+                os.remove(state_file)
+            if os.path.exists(d2_file):
+                os.remove(d2_file)
+
+
+def test_dc30_replayed_catastrophic_reprovisioning_authorization_rejected():
+    """DC30: Replaying a consumed catastrophic reprovisioning authorization is rejected."""
+    state_file = os.path.join(tempfile.gettempdir(), f"dc30_state_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc30_d2_{os.getpid()}.jsonl")
+    for p in (state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+    with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
+        D2InstallationProvisioning.clear_for_testing()
+        SignedAuthorityManifestLoader.clear_for_testing()
+        broker = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC30-DEP",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+            auth_secret="SEC30",
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        )
+        broker.start_ipc_server()
+        try:
+            DeploymentProvisionerRegistry.reset_for_testing()
+            client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC30")
+            SClassApplication(provisioner=client)
+            manifest = SignedAuthorityManifestLoader.sign_manifest(
+                manifest_id="M-30",
+                manifest_version=1,
+                issued_at="2026-08-21T10:00:00Z",
+                actors={},
+                revoked_fingerprints=[],
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest)
+            assert broker.status == DeploymentStatus.PROVISIONED
+        finally:
+            broker.stop_ipc_server()
+
+        # Wipe state and D2
+        if os.path.exists(state_file):
+            os.remove(state_file)
+        if os.path.exists(d2_file):
+            os.remove(d2_file)
+
+        broker2 = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC30-DEP",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+            auth_secret="SEC30",
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        )
+        assert broker2.status == DeploymentStatus.AUTHORITY_UNAVAILABLE
+        broker2.start_ipc_server()
+        try:
+            client2 = IPCDeploymentProvisioner(ipc_endpoint=broker2.ipc_endpoint, auth_secret="SEC30")
+            reprov_auth = InMemoryTestDeploymentProvisioner.create_reprovisioning_authorization(
+                deployment_id="DC30-DEP",
+                target_manifest_id="M-30-REC",
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            resp = client2._client.call("authorize_reprovisioning", {"reprovisioning_authorization": reprov_auth})
+            assert resp.get("success")
+
+            # Replay the exact same reprovisioning authorization
+            resp_replay = client2._client.call("authorize_reprovisioning", {"reprovisioning_authorization": reprov_auth})
+            assert not resp_replay.get("success")
+            assert "already been consumed" in resp_replay.get("error", "")
+        finally:
+            broker2.stop_ipc_server()
+            if os.path.exists(state_file):
+                os.remove(state_file)
+            if os.path.exists(d2_file):
+                os.remove(d2_file)
