@@ -16,6 +16,69 @@ from events.store import DeploymentStatus
 from events.serializer import canonicalize_json
 
 
+class TrustedDeploymentBootstrap:
+    """Trusted Deployment Bootstrap Boundary.
+    Executes exclusively at installation / bootstrap time outside normal S-Class runtime
+    to establish a virgin deployment identity in the NEVER_PROVISIONED state.
+    """
+    @classmethod
+    def bootstrap_virgin_deployment(
+        cls,
+        deployment_id: str,
+        state_file_path: str,
+        d2_store_path: Optional[str] = None,
+    ) -> str:
+        """Establishes a genuine first-installation deployment in NEVER_PROVISIONED state.
+        Fails closed if the deployment already has existing state or D2 history.
+        """
+        state_file_path = os.path.abspath(state_file_path)
+        if os.path.exists(state_file_path) and os.path.getsize(state_file_path) > 0:
+            raise RuntimeError(
+                f"Trusted deployment bootstrap rejected: state file already exists at '{state_file_path}'."
+            )
+
+        if d2_store_path is not None:
+            canonical_d2 = os.path.abspath(d2_store_path)
+        else:
+            from events.store import get_canonical_d2_event_store_path
+            canonical_d2 = get_canonical_d2_event_store_path()
+
+        if os.path.exists(canonical_d2) and os.path.getsize(canonical_d2) > 0:
+            raise RuntimeError(
+                f"Trusted deployment bootstrap rejected: D2 store already contains history at '{canonical_d2}'. "
+                "Cannot bootstrap as NEVER_PROVISIONED."
+            )
+
+        state_dir = os.path.dirname(state_file_path)
+        os.makedirs(state_dir, mode=0o700, exist_ok=True)
+        if hasattr(os, "chmod"):
+            try:
+                os.chmod(state_dir, 0o700)
+            except OSError:
+                pass
+
+        payload = {
+            "deployment_id": deployment_id,
+            "status": DeploymentStatus.NEVER_PROVISIONED.value,
+            "canonical_d2_store_path": canonical_d2,
+            "consumed_authorizations": [],
+            "current_installation": None,
+            "pending_provisioning": None,
+            "active_initial_authorization": None,
+        }
+        seal = hashlib.sha256(canonicalize_json(payload)).hexdigest()
+        wrapped = {
+            "payload": payload,
+            "integrity_seal": seal,
+            "bootstrap_provenance": "TRUSTED_DEPLOYMENT_BOOTSTRAP",
+        }
+
+        with open(state_file_path, "w", encoding="utf-8") as f:
+            json.dump(wrapped, f, indent=2)
+
+        return state_file_path
+
+
 class TrustedDeploymentAuthorityBroker:
     """Out-of-process / isolated deployment authority broker.
     Owns deployment identity, provisioning state machine, canonical root public key,
@@ -151,9 +214,9 @@ class TrustedDeploymentAuthorityBroker:
             self.deployment_id = payload.get("deployment_id", self.deployment_id)
             persisted_status = DeploymentStatus(payload.get("status", default_status.value))
 
-            # Anti-fabrication check: D2 store with events can never have UNPROVISIONED status
+            # Anti-fabrication check: D2 store with events can never have NEVER_PROVISIONED or UNPROVISIONED status
             if (
-                persisted_status == DeploymentStatus.UNPROVISIONED
+                persisted_status in (DeploymentStatus.NEVER_PROVISIONED, DeploymentStatus.UNPROVISIONED)
                 and os.path.exists(self.d2_store_path)
                 and os.path.getsize(self.d2_store_path) > 0
             ):
@@ -164,7 +227,7 @@ class TrustedDeploymentAuthorityBroker:
                 self.active_initial_authorization = None
                 self._persist_state()
                 raise RuntimeError(
-                    "Broker state tampering or fabricated UNPROVISIONED state detected on established deployment with D2 history. "
+                    "Broker state tampering or fabricated NEVER_PROVISIONED/UNPROVISIONED state detected on established deployment with D2 history. "
                     "Failing closed into AUTHORITY_UNAVAILABLE."
                 )
 
@@ -518,8 +581,8 @@ class TrustedDeploymentAuthorityBroker:
                 return {"success": True, "status": self.status.value}
 
             elif method == "authorize_initial_provisioning":
-                if self.status != DeploymentStatus.UNPROVISIONED:
-                    return {"success": False, "error": f"Cannot authorize initial provisioning from state '{self.status.value}' (UNPROVISIONED required)."}
+                if self.status not in (DeploymentStatus.NEVER_PROVISIONED, DeploymentStatus.UNPROVISIONED):
+                    return {"success": False, "error": f"Cannot authorize initial provisioning from state '{self.status.value}' (NEVER_PROVISIONED required)."}
 
                 if "root_public_key" in params and params["root_public_key"] is not None:
                     return {"success": False, "error": "Caller-supplied root public key is rejected; broker uses canonical authority root."}

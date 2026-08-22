@@ -91,7 +91,7 @@ class OSIPCServer:
                         except OSError:
                             pass
                 except Exception as e:
-                    if not self.allow_tcp_test_transport and not _is_test_env():
+                    if not self.allow_tcp_test_transport and not _is_test_env() and sys.platform != "win32":
                         raise RuntimeError(f"Production OS IPC failed to bind AF_UNIX socket '{self.endpoint_path}': {e}")
                     # Test / Local development fallback
                     self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -100,7 +100,7 @@ class OSIPCServer:
                     with open(self.endpoint_path, "w", encoding="utf-8") as f:
                         f.write(f"127.0.0.1:{port}")
             else:
-                if not self.allow_tcp_test_transport and not _is_test_env():
+                if not self.allow_tcp_test_transport and not _is_test_env() and sys.platform != "win32":
                     raise RuntimeError("Production OS IPC requires AF_UNIX / Named Pipe support. TCP prohibited.")
                 self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 self.server_socket.bind(("127.0.0.1", 0))

@@ -1,4 +1,4 @@
-"""End-to-End Deployment-Level Trust Topology Certification Suite (DC01 - DC37).
+"""End-to-End Deployment-Level Trust Topology Certification Suite (DC01 - DC40).
 Defines and executes the complete out-of-process authority boundary certification:
 
 DC01: production root cannot be caller-selected
@@ -38,6 +38,9 @@ DC34: production initial_status=RECOVERY_REQUIRED -> reject
 DC35: production initial_status=PROVISIONED -> reject
 DC36: fresh production broker -> CATASTROPHIC_LOSS
 DC37: constructor state override cannot bypass catastrophic-loss
+DC38: legitimate fresh production deployment: trusted bootstrap -> NEVER_PROVISIONED -> valid INITIAL_PROVISIONING authorization -> PROVISIONED
+DC39: previously provisioned deployment: complete loss -> CATASTROPHIC_LOSS -> initial provisioning rejected -> external reprovisioning required
+DC40: state confusion: catastrophic-loss deployment cannot be converted to NEVER_PROVISIONED by constructor args, fabricated files, env vars, or restart
 """
 import os
 import sys
@@ -51,7 +54,7 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from benchmark.parity.verify_gate_3_certificate import Gate3PublicKeystore
 from benchmark.parity.gate_3_authority import Gate3AuthorityKeyStore
-from events.broker import TrustedDeploymentAuthorityBroker
+from events.broker import TrustedDeploymentAuthorityBroker, TrustedDeploymentBootstrap
 from events.ipc import OSIPCServer, OSIPCClient
 from events.store import (
     D2AuthorityManifestStore,
@@ -945,7 +948,7 @@ def test_dc22_state_recreation_with_fabricated_unprovisioned_data_rejected():
             json.dump({"payload": payload, "integrity_seal": seal}, f)
 
         # Broker startup detects fabricated UNPROVISIONED state and fails closed
-        with pytest.raises(RuntimeError, match="fabricated UNPROVISIONED state"):
+        with pytest.raises(RuntimeError, match="fabricated.*UNPROVISIONED state detected"):
             TrustedDeploymentAuthorityBroker(
                 deployment_id="DC22-DEP",
                 state_file_path=state_file,
@@ -1334,7 +1337,7 @@ def test_dc29_fabricated_fresh_local_state_rejected():
             json.dump({"payload": payload, "integrity_seal": seal}, f)
 
         # Broker startup detects fabricated fresh state with existing D2 store and fails closed
-        with pytest.raises(RuntimeError, match="fabricated UNPROVISIONED state detected"):
+        with pytest.raises(RuntimeError, match="fabricated.*UNPROVISIONED state detected"):
             TrustedDeploymentAuthorityBroker(
                 deployment_id="DC29-DEP",
                 state_file_path=state_file,
@@ -1628,3 +1631,255 @@ def test_dc37_constructor_state_override_cannot_bypass_catastrophic_loss(monkeyp
                 auth_secret="SEC37",
                 initial_status=unauthorized_status,
             )
+
+
+def test_dc38_legitimate_fresh_production_deployment_bootstrap_end_to_end(monkeypatch):
+    """DC38: Legitimate fresh production deployment established via trusted bootstrap reaches PROVISIONED."""
+    state_file = os.path.join(tempfile.gettempdir(), f"dc38_state_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc38_d2_{os.getpid()}.jsonl")
+    for p in (state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+    with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
+        D2InstallationProvisioning.clear_for_testing()
+        SignedAuthorityManifestLoader.clear_for_testing()
+        DeploymentProvisionerRegistry.reset_for_testing()
+
+        # Switch to production mode
+        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+        # 1. Trusted Deployment Bootstrap establishes NEVER_PROVISIONED state
+        TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
+            deployment_id="DC38-DEP",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+        )
+
+        # 2. Production broker starts and verifies NEVER_PROVISIONED state
+        broker = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC38-DEP",
+            state_file_path=state_file,
+            auth_secret="SEC38",
+        )
+        assert broker.status == DeploymentStatus.NEVER_PROVISIONED
+        broker.start_ipc_server()
+        try:
+            client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC38")
+            SClassApplication(provisioner=client)
+
+            # 3. Root-signed Initial Provisioning Authorization
+            manifest = SignedAuthorityManifestLoader.sign_manifest(
+                manifest_id="M-38",
+                manifest_version=1,
+                issued_at="2026-08-21T10:00:00Z",
+                actors={},
+                revoked_fingerprints=[],
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            m_digest = manifest["root_signature"]["payload_digest"]
+            init_auth = SignedAuthorityManifestLoader.create_initial_provisioning_authorization(
+                deployment_id="DC38-DEP",
+                target_manifest_id="M-38",
+                target_manifest_version=1,
+                target_manifest_digest=m_digest,
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest, initial_provisioning_authorization=init_auth)
+
+            # 4. Successfully finalized to PROVISIONED
+            assert broker.status == DeploymentStatus.PROVISIONED
+            assert broker.current_installation["manifest_id"] == "M-38"
+        finally:
+            broker.stop_ipc_server()
+            if os.path.exists(state_file):
+                os.remove(state_file)
+            if os.path.exists(d2_file):
+                os.remove(d2_file)
+
+
+def test_dc39_previously_provisioned_deployment_complete_loss_requires_reprovisioning(monkeypatch):
+    """DC39: Previously provisioned deployment after complete loss enters CATASTROPHIC_LOSS and requires reprovisioning."""
+    state_file = os.path.join(tempfile.gettempdir(), f"dc39_state_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc39_d2_{os.getpid()}.jsonl")
+    for p in (state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+    with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
+        D2InstallationProvisioning.clear_for_testing()
+        SignedAuthorityManifestLoader.clear_for_testing()
+        DeploymentProvisionerRegistry.reset_for_testing()
+
+        TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
+            deployment_id="DC39-DEP",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+        )
+        broker = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC39-DEP",
+            state_file_path=state_file,
+            auth_secret="SEC39",
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        )
+        broker.start_ipc_server()
+        try:
+            client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC39")
+            SClassApplication(provisioner=client)
+            manifest = SignedAuthorityManifestLoader.sign_manifest(
+                manifest_id="M-39",
+                manifest_version=1,
+                issued_at="2026-08-21T10:00:00Z",
+                actors={},
+                revoked_fingerprints=[],
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest)
+            assert broker.status == DeploymentStatus.PROVISIONED
+        finally:
+            broker.stop_ipc_server()
+
+        # Complete Catastrophic Loss: delete broker state + D2 + installation artifacts
+        if os.path.exists(state_file):
+            os.remove(state_file)
+        if os.path.exists(d2_file):
+            os.remove(d2_file)
+
+        # Switch to production mode
+        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+        # Fresh production broker restarts
+        broker2 = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC39-DEP",
+            state_file_path=state_file,
+            auth_secret="SEC39",
+        )
+        assert broker2.status == DeploymentStatus.CATASTROPHIC_LOSS
+        broker2.start_ipc_server()
+        try:
+            client2 = IPCDeploymentProvisioner(ipc_endpoint=broker2.ipc_endpoint, auth_secret="SEC39")
+            init_auth = SignedAuthorityManifestLoader.create_initial_provisioning_authorization(
+                deployment_id="DC39-DEP",
+                target_manifest_id="M-39-GENESIS",
+                target_manifest_version=1,
+                target_manifest_digest="0" * 64,
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            # Initial provisioning must be rejected fail-closed from CATASTROPHIC_LOSS
+            with pytest.raises(RuntimeError, match="Cannot authorize initial provisioning from state 'CATASTROPHIC_LOSS'"):
+                client2.authorize_initial_provisioning(init_auth)
+
+            # External Administrative Reprovisioning succeeds
+            reprov_auth = SignedAuthorityManifestLoader.create_reprovisioning_authorization(
+                deployment_id="DC39-DEP",
+                target_manifest_id="M-39-REC",
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            resp = client2._client.call("authorize_reprovisioning", {"reprovisioning_authorization": reprov_auth})
+            assert resp.get("success")
+            assert broker2.status == DeploymentStatus.RECOVERY_AUTHORIZED
+
+            fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+            client2._client.call("register_pending_reprovisioning", {
+                "installation_id": "INST-39-REC",
+                "manifest_id": "M-39-REC",
+                "manifest_version": 1,
+                "manifest_digest": "9" * 64,
+                "root_fingerprint": fp,
+            })
+            store = D2AuthorityManifestStore(file_path=d2_file)
+            store.commit_epoch(
+                manifest_id="M-39-REC",
+                manifest_version=1,
+                payload_digest="9" * 64,
+                signer_identity="Gate3AuthoritativeVerifier",
+                root_fingerprint=fp,
+            )
+            proof = D2InstallationProvisioning.generate_commit_proof(
+                deployment_id="DC39-DEP",
+                installation_id="INST-39-REC",
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+                signer_identity="Gate3AuthoritativeVerifier",
+                d2_store_path=d2_file,
+            )
+            resp_final = client2._client.call("record_reprovisioned", {"commit_proof": proof.to_dict()})
+            assert resp_final.get("success")
+            assert broker2.status == DeploymentStatus.PROVISIONED
+        finally:
+            broker2.stop_ipc_server()
+            if os.path.exists(state_file):
+                os.remove(state_file)
+            if os.path.exists(d2_file):
+                os.remove(d2_file)
+
+
+def test_dc40_state_confusion_catastrophic_loss_cannot_be_converted_to_never_provisioned(monkeypatch):
+    """DC40: Catastrophic-loss deployment cannot be converted to NEVER_PROVISIONED by constructor args, bootstrap on existing D2, fabricated files, or restart."""
+    state_file = os.path.join(tempfile.gettempdir(), f"dc40_state_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc40_d2_{os.getpid()}.jsonl")
+    for p in (state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+    with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
+        # Switch to production mode
+        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+        # 1. Constructor arg override rejected in production
+        with pytest.raises(RuntimeError, match="Production TrustedDeploymentAuthorityBroker cannot accept caller-selected initial_status"):
+            TrustedDeploymentAuthorityBroker(
+                deployment_id="DC40-DEP",
+                auth_secret="SEC40",
+                initial_status=DeploymentStatus.NEVER_PROVISIONED,
+            )
+
+        # 2. D2 history exists on host
+        store = D2AuthorityManifestStore(file_path=d2_file)
+        fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+        store.commit_epoch(
+            manifest_id="M-40",
+            manifest_version=1,
+            payload_digest="3" * 64,
+            signer_identity="Gate3AuthoritativeVerifier",
+            root_fingerprint=fp,
+        )
+
+        # 3. Calling TrustedDeploymentBootstrap on host with existing D2 is rejected fail-closed
+        with pytest.raises(RuntimeError, match="D2 store already contains history"):
+            TrustedDeploymentBootstrap.bootstrap_virgin_deployment(
+                deployment_id="DC40-DEP",
+                state_file_path=state_file,
+                d2_store_path=d2_file,
+            )
+
+        # 4. Fabricating a state file claiming NEVER_PROVISIONED with existing D2 is detected and fails closed
+        payload = {
+            "deployment_id": "DC40-DEP",
+            "status": DeploymentStatus.NEVER_PROVISIONED.value,
+            "canonical_d2_store_path": os.path.abspath(d2_file),
+            "consumed_authorizations": [],
+            "current_installation": None,
+            "pending_provisioning": None,
+            "active_initial_authorization": None,
+        }
+        seal = hashlib.sha256(canonicalize_json(payload)).hexdigest()
+        with open(state_file, "w", encoding="utf-8") as f:
+            json.dump({"payload": payload, "integrity_seal": seal}, f)
+
+        with pytest.raises(RuntimeError, match="fabricated.*UNPROVISIONED state detected"):
+            TrustedDeploymentAuthorityBroker(
+                deployment_id="DC40-DEP",
+                state_file_path=state_file,
+                auth_secret="SEC40",
+            )
+
+        if os.path.exists(state_file):
+            os.remove(state_file)
+        if os.path.exists(d2_file):
+            os.remove(d2_file)

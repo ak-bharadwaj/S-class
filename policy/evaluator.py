@@ -473,6 +473,98 @@ class SignedAuthorityManifestLoader:
         )
 
     @classmethod
+    def create_initial_provisioning_authorization(
+        cls,
+        deployment_id: str,
+        target_manifest_id: str,
+        target_manifest_version: int,
+        target_manifest_digest: str,
+        root_private_key: Any,
+    ) -> Dict[str, Any]:
+        """Root Authority helper to issue a root-signed InitialProvisioningAuthorization."""
+        import uuid
+        from datetime import datetime, timezone
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+        from events.serializer import canonicalize_json
+
+        if not isinstance(root_private_key, ed25519.Ed25519PrivateKey):
+            raise TypeError("root_private_key must be an Ed25519PrivateKey instance.")
+
+        auth_id = f"INITAUTH-{uuid.uuid4().hex[:16]}"
+        authorized_at = datetime.now(timezone.utc).isoformat()
+        root_fp = hashlib.sha256(root_private_key.public_key().public_bytes_raw()).hexdigest()
+
+        preimage_dict = {
+            "authorization_id": auth_id,
+            "deployment_id": deployment_id,
+            "target_manifest_id": target_manifest_id,
+            "target_manifest_version": int(target_manifest_version),
+            "target_manifest_digest": target_manifest_digest,
+            "authorized_at": authorized_at,
+            "purpose": "INITIAL_PROVISIONING",
+            "root_fingerprint": root_fp,
+        }
+        preimage_bytes = canonicalize_json(preimage_dict)
+        digest = hashlib.sha256(preimage_bytes).hexdigest()
+        sig_bytes = root_private_key.sign(preimage_bytes)
+
+        auth_record = dict(preimage_dict)
+        auth_record["signature"] = {
+            "algorithm": "ED25519",
+            "signer_identity": "Gate3AuthoritativeVerifier",
+            "public_key_fingerprint": root_fp,
+            "payload_digest": digest,
+            "signature_hex": sig_bytes.hex(),
+            "timestamp": authorized_at,
+        }
+        return auth_record
+
+    @classmethod
+    def create_reprovisioning_authorization(
+        cls,
+        deployment_id: str,
+        target_manifest_id: str,
+        root_private_key: Any,
+        reason: str = "CATASTROPHIC_RECOVERY",
+    ) -> Dict[str, Any]:
+        """Root Authority helper to issue a root-signed DeploymentReprovisioningAuthorization."""
+        import uuid
+        from datetime import datetime, timezone
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+        from events.serializer import canonicalize_json
+
+        if not isinstance(root_private_key, ed25519.Ed25519PrivateKey):
+            raise TypeError("root_private_key must be an Ed25519PrivateKey instance.")
+
+        auth_id = f"REPROV-{uuid.uuid4().hex[:16]}"
+        authorized_at = datetime.now(timezone.utc).isoformat()
+        root_fp = hashlib.sha256(root_private_key.public_key().public_bytes_raw()).hexdigest()
+
+        preimage_dict = {
+            "authorization_id": auth_id,
+            "deployment_id": deployment_id,
+            "target_manifest_id": target_manifest_id,
+            "authorized_at": authorized_at,
+            "reason": reason,
+            "root_fingerprint": root_fp,
+            "is_administrative_reprovisioning": True,
+        }
+        preimage_bytes = canonicalize_json(preimage_dict)
+        digest = hashlib.sha256(preimage_bytes).hexdigest()
+        sig_bytes = root_private_key.sign(preimage_bytes)
+
+        auth_record = dict(preimage_dict)
+        auth_record["signature"] = {
+            "algorithm": "ED25519",
+            "signer_identity": "Gate3AuthoritativeVerifier",
+            "public_key_fingerprint": root_fp,
+            "payload_digest": digest,
+            "signature_hex": sig_bytes.hex(),
+            "timestamp": authorized_at,
+        }
+        return auth_record
+
+    @classmethod
     def load_from_dict(
         cls,
         data: Dict[str, Any],
@@ -531,8 +623,8 @@ class SignedAuthorityManifestLoader:
             if status == DeploymentStatus.PROVISIONED:
                 raise RuntimeError("Genesis bootstrap rejected: system has already been provisioned/installed. Authority reset prohibited.")
 
-            # Authorize initial provisioning with external deployment authority if unprovisioned
-            if status == DeploymentStatus.UNPROVISIONED:
+            # Authorize initial provisioning with external deployment authority if unprovisioned or never provisioned
+            if status in (DeploymentStatus.NEVER_PROVISIONED, DeploymentStatus.UNPROVISIONED):
                 auth = initial_provisioning_authorization or (data.get("initial_provisioning_authorization") if isinstance(data, dict) else None)
                 provisioner.authorize_initial_provisioning(auth)
 
