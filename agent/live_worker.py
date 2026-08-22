@@ -93,7 +93,10 @@ class LiveModelWorker(AgentWorkerProtocol):
         if context.verification_feedback:
             lines.append("\nVerification Feedback / Failure Diagnostics:")
             for fb in context.verification_feedback:
-                lines.append(f"- {fb.get('feedback', fb)}")
+                if isinstance(fb, dict):
+                    lines.append(f"- {fb.get('feedback', fb)}")
+                else:
+                    lines.append(f"- {fb}")
 
         if history:
             lines.append("\nPrior Turn History:")
