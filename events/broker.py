@@ -196,14 +196,16 @@ class ExternalDeploymentAuthorityServer:
         self.auth_secret = secret
 
         # Production peer UID enforcement on POSIX
-        if allowed_uid is None and sys.platform != "win32" and not is_test:
+        if allowed_uid is None and sys.platform != "win32":
             env_uid = os.environ.get("SCLASS_EXTERNAL_AUTHORITY_ALLOWED_UID")
             if env_uid is not None:
                 try:
                     allowed_uid = int(env_uid)
                 except ValueError:
                     pass
-            if allowed_uid is None:
+            elif hasattr(os, "getuid"):
+                allowed_uid = os.getuid()
+            if allowed_uid is None and not is_test:
                 raise RuntimeError(
                     "Production ExternalDeploymentAuthorityServer requires explicit peer OS identity (allowed_uid); "
                     "startup rejected."
