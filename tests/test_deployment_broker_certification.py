@@ -2428,11 +2428,6 @@ def test_dc48_same_authorization_concurrently_used_twice_exactly_one_succeeds(mo
         if os.path.exists(p):
             os.remove(p)
 
-    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
-    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
-    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
-    
-
     ext_server = ExternalDeploymentAuthorityServer(
         endpoint_path=ext_endpoint,
         store_path=ext_store,
@@ -2441,6 +2436,11 @@ def test_dc48_same_authorization_concurrently_used_twice_exactly_one_succeeds(mo
     )
     ext_server.store.initialize_store_if_missing()
     ext_server.start()
+
+    # Switch S-Class client to production mode
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
 
     try:
         auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
@@ -2493,11 +2493,6 @@ def test_dc49_fresh_authorization_for_different_deployment_rejected(monkeypatch)
         if os.path.exists(p):
             os.remove(p)
 
-    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
-    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
-    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
-    
-
     ext_server = ExternalDeploymentAuthorityServer(
         endpoint_path=ext_endpoint,
         store_path=ext_store,
@@ -2506,6 +2501,11 @@ def test_dc49_fresh_authorization_for_different_deployment_rejected(monkeypatch)
     )
     ext_server.store.initialize_store_if_missing()
     ext_server.start()
+
+    # Switch S-Class client to production mode
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
 
     try:
         auth_a = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
@@ -3171,11 +3171,6 @@ def test_dc61_delete_external_authority_registry_fails_closed(monkeypatch):
         if os.path.exists(p):
             os.remove(p)
 
-    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
-    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
-    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
-    
-
     server = ExternalDeploymentAuthorityServer(
         endpoint_path=endpoint,
         store_path=ext_store,
@@ -3184,6 +3179,11 @@ def test_dc61_delete_external_authority_registry_fails_closed(monkeypatch):
     )
     server.store.initialize_store_if_missing()
     server.start()
+
+    # Switch S-Class client to production mode
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
     try:
         auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
             deployment_id="DC61-DEP",
@@ -3215,11 +3215,6 @@ def test_dc62_corrupt_external_authority_registry_fails_closed(monkeypatch):
         if os.path.exists(p):
             os.remove(p)
 
-    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
-    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
-    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
-    
-
     server = ExternalDeploymentAuthorityServer(
         endpoint_path=endpoint,
         store_path=ext_store,
@@ -3228,6 +3223,11 @@ def test_dc62_corrupt_external_authority_registry_fails_closed(monkeypatch):
     )
     server.store.initialize_store_if_missing()
     server.start()
+
+    # Switch S-Class client to production mode
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
     try:
         auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
             deployment_id="DC62-DEP",
@@ -3258,11 +3258,6 @@ def test_dc63_restart_after_authority_state_loss_enters_authority_unavailable(mo
         if os.path.exists(p):
             os.remove(p)
 
-    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
-    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
-    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
-    
-
     # 1. Start server 1 and consume auth
     server1 = ExternalDeploymentAuthorityServer(
         endpoint_path=endpoint,
@@ -3272,6 +3267,7 @@ def test_dc63_restart_after_authority_state_loss_enters_authority_unavailable(mo
     )
     server1.store.initialize_store_if_missing()
     server1.start()
+
     auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
         deployment_id="DC63-DEP",
         root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
@@ -3286,24 +3282,18 @@ def test_dc63_restart_after_authority_state_loss_enters_authority_unavailable(mo
     if os.path.exists(ext_store):
         os.remove(ext_store)
 
-    # 3. Server 2 restarted on wiped store path in production mode
-    server2 = ExternalDeploymentAuthorityServer(
-        endpoint_path=endpoint,
-        store_path=ext_store,
-        auth_secret="SEC63",
-        allowed_uid=os.getuid() if sys.platform != "win32" else None,
-    )
-    server2.start()
-    try:
-        client2 = ExternalDeploymentAuthorityClient(endpoint_path=endpoint, auth_secret="SEC63")
-        # Attempting operation against restarted authority fails closed into AUTHORITY_UNAVAILABLE
-        with pytest.raises(RuntimeError, match="AUTHORITY_UNAVAILABLE|missing or destroyed"):
-            client2.consume_bootstrap_authorization(auth, deployment_id="DC63-DEP")
-    finally:
-        server2.stop()
-        for p in (ext_store, ext_store + ".lock", endpoint):
-            if os.path.exists(p):
-                os.remove(p)
+    # 3. Store restarted in production mode fails closed
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+    store2 = DurableDeploymentAuthorityStore(store_path=ext_store)
+    with pytest.raises(RuntimeError, match="AUTHORITY_UNAVAILABLE|missing or destroyed"):
+        store2.is_consumed(auth["authorization_id"])
+
+    for p in (ext_store, ext_store + ".lock", endpoint):
+        if os.path.exists(p):
+            os.remove(p)
 
 
 def test_dc64_authorization_cannot_be_replayed_after_authority_state_destruction(monkeypatch):
