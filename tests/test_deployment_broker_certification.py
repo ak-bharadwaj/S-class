@@ -27,6 +27,8 @@ import sys
 import json
 import pytest
 import tempfile
+from unittest.mock import patch
+from events.serializer import canonicalize_json
 import hashlib
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
@@ -200,41 +202,58 @@ def test_dc05_sclass_cannot_modify_broker_state():
 
 
 def test_dc06_state_deletion_fails_closed():
-    """DC06: If broker state file is deleted after provisioning, broker fails closed."""
+    """DC06: If broker state file is deleted after provisioning, broker restarts into AUTHORITY_UNAVAILABLE (never UNPROVISIONED)."""
     state_file = os.path.join(tempfile.gettempdir(), f"dc06_state_{os.getpid()}.json")
-    if os.path.exists(state_file):
-        os.remove(state_file)
-    broker = TrustedDeploymentAuthorityBroker(
-        deployment_id="DC06-DEP",
-        state_file_path=state_file,
-        auth_secret="SEC06",
-        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
-    )
-    broker.start_ipc_server()
-    try:
-        client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC06")
-        auth_init = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
-            deployment_id="DC06-DEP",
-            target_manifest_id="M-06",
-            target_manifest_version=1,
-            target_manifest_digest="0" * 64,
-            root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
-        )
-        client.authorize_initial_provisioning(auth_init)
-        os.remove(state_file)
-
-        # Reopening after state deletion defaults to fresh state or fails closed
-        broker2 = TrustedDeploymentAuthorityBroker(
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc06_d2_{os.getpid()}.jsonl")
+    for p in (state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+    with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
+        D2InstallationProvisioning.clear_for_testing()
+        SignedAuthorityManifestLoader.clear_for_testing()
+        broker = TrustedDeploymentAuthorityBroker(
             deployment_id="DC06-DEP",
             state_file_path=state_file,
+            d2_store_path=d2_file,
             auth_secret="SEC06",
             root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         )
-        assert broker2.status == DeploymentStatus.UNPROVISIONED
-    finally:
-        broker.stop_ipc_server()
+        broker.start_ipc_server()
+        try:
+            DeploymentProvisionerRegistry.reset_for_testing()
+            client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC06")
+            SClassApplication(provisioner=client)
+            manifest = SignedAuthorityManifestLoader.sign_manifest(
+                manifest_id="M-06",
+                manifest_version=1,
+                issued_at="2026-08-21T10:00:00Z",
+                actors={},
+                revoked_fingerprints=[],
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest)
+            assert broker.status == DeploymentStatus.PROVISIONED
+        finally:
+            broker.stop_ipc_server()
+
+        # Broker state file is deleted after provisioning while D2 store has history
+        os.remove(state_file)
+        assert os.path.exists(d2_file) and os.path.getsize(d2_file) > 0
+
+        # Reopening after state deletion fails closed into AUTHORITY_UNAVAILABLE (never UNPROVISIONED)
+        broker2 = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC06-DEP",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+            auth_secret="SEC06",
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        )
+        assert broker2.status == DeploymentStatus.AUTHORITY_UNAVAILABLE
+        assert broker2.status != DeploymentStatus.UNPROVISIONED
         if os.path.exists(state_file):
             os.remove(state_file)
+        if os.path.exists(d2_file):
+            os.remove(d2_file)
 
 
 def test_dc07_state_corruption_fails_closed():
@@ -779,3 +798,296 @@ def test_dc20_complete_trust_topology_end_to_end_verification():
         broker.stop_ipc_server()
         if os.path.exists(state_file):
             os.remove(state_file)
+
+
+def test_dc21_broker_restart_after_state_deletion_remains_authority_unavailable():
+    """DC21: Broker restart after state deletion remains AUTHORITY_UNAVAILABLE across multiple restarts."""
+    state_file = os.path.join(tempfile.gettempdir(), f"dc21_state_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc21_d2_{os.getpid()}.jsonl")
+    for p in (state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+    with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
+        D2InstallationProvisioning.clear_for_testing()
+        SignedAuthorityManifestLoader.clear_for_testing()
+        broker = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC21-DEP",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+            auth_secret="SEC21",
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        )
+        broker.start_ipc_server()
+        try:
+            DeploymentProvisionerRegistry.reset_for_testing()
+            client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC21")
+            SClassApplication(provisioner=client)
+            manifest = SignedAuthorityManifestLoader.sign_manifest(
+                manifest_id="M-21",
+                manifest_version=1,
+                issued_at="2026-08-21T10:00:00Z",
+                actors={},
+                revoked_fingerprints=[],
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest)
+            assert broker.status == DeploymentStatus.PROVISIONED
+        finally:
+            broker.stop_ipc_server()
+
+        os.remove(state_file)
+
+        # First restart
+        broker2 = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC21-DEP",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+            auth_secret="SEC21",
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        )
+        assert broker2.status == DeploymentStatus.AUTHORITY_UNAVAILABLE
+
+        # Second restart
+        broker3 = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC21-DEP",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+            auth_secret="SEC21",
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        )
+        assert broker3.status == DeploymentStatus.AUTHORITY_UNAVAILABLE
+        if os.path.exists(state_file):
+            os.remove(state_file)
+        if os.path.exists(d2_file):
+            os.remove(d2_file)
+
+
+def test_dc22_state_recreation_with_fabricated_unprovisioned_data_rejected():
+    """DC22: State recreation with fabricated UNPROVISIONED data on an established deployment is rejected."""
+    state_file = os.path.join(tempfile.gettempdir(), f"dc22_state_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc22_d2_{os.getpid()}.jsonl")
+    for p in (state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+    with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
+        D2InstallationProvisioning.clear_for_testing()
+        SignedAuthorityManifestLoader.clear_for_testing()
+        broker = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC22-DEP",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+            auth_secret="SEC22",
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        )
+        broker.start_ipc_server()
+        try:
+            DeploymentProvisionerRegistry.reset_for_testing()
+            client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC22")
+            SClassApplication(provisioner=client)
+            manifest = SignedAuthorityManifestLoader.sign_manifest(
+                manifest_id="M-22",
+                manifest_version=1,
+                issued_at="2026-08-21T10:00:00Z",
+                actors={},
+                revoked_fingerprints=[],
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest)
+            assert broker.status == DeploymentStatus.PROVISIONED
+        finally:
+            broker.stop_ipc_server()
+
+        # Attacker writes fabricated state file claiming UNPROVISIONED status
+        payload = {
+            "deployment_id": "DC22-DEP",
+            "status": DeploymentStatus.UNPROVISIONED.value,
+            "canonical_d2_store_path": os.path.abspath(d2_file),
+            "consumed_authorizations": [],
+            "current_installation": None,
+            "pending_provisioning": None,
+            "active_initial_authorization": None,
+        }
+        seal = hashlib.sha256(canonicalize_json(payload)).hexdigest()
+        with open(state_file, "w", encoding="utf-8") as f:
+            json.dump({"payload": payload, "integrity_seal": seal}, f)
+
+        # Broker startup detects fabricated UNPROVISIONED state and fails closed
+        with pytest.raises(RuntimeError, match="fabricated UNPROVISIONED state"):
+            TrustedDeploymentAuthorityBroker(
+                deployment_id="DC22-DEP",
+                state_file_path=state_file,
+                d2_store_path=d2_file,
+                auth_secret="SEC22",
+                root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            )
+        if os.path.exists(state_file):
+            os.remove(state_file)
+        if os.path.exists(d2_file):
+            os.remove(d2_file)
+
+
+def test_dc23_complete_broker_state_loss_cannot_trigger_ordinary_initial_provisioning():
+    """DC23: Complete broker-state loss cannot trigger ordinary initial provisioning."""
+    state_file = os.path.join(tempfile.gettempdir(), f"dc23_state_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc23_d2_{os.getpid()}.jsonl")
+    for p in (state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+    with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
+        D2InstallationProvisioning.clear_for_testing()
+        SignedAuthorityManifestLoader.clear_for_testing()
+        broker = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC23-DEP",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+            auth_secret="SEC23",
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        )
+        broker.start_ipc_server()
+        try:
+            DeploymentProvisionerRegistry.reset_for_testing()
+            client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC23")
+            SClassApplication(provisioner=client)
+            manifest = SignedAuthorityManifestLoader.sign_manifest(
+                manifest_id="M-23",
+                manifest_version=1,
+                issued_at="2026-08-21T10:00:00Z",
+                actors={},
+                revoked_fingerprints=[],
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest)
+            assert broker.status == DeploymentStatus.PROVISIONED
+        finally:
+            broker.stop_ipc_server()
+
+        # Delete state file
+        os.remove(state_file)
+
+        # Broker starts in AUTHORITY_UNAVAILABLE
+        broker2 = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC23-DEP",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+            auth_secret="SEC23",
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        )
+        broker2.start_ipc_server()
+        try:
+            client2 = IPCDeploymentProvisioner(ipc_endpoint=broker2.ipc_endpoint, auth_secret="SEC23")
+            auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+                deployment_id="DC23-DEP",
+                target_manifest_id="M-23-NEW",
+                target_manifest_version=1,
+                target_manifest_digest="0" * 64,
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            # Attempting initial provisioning on broken/lost state must be rejected fail-closed
+            with pytest.raises(RuntimeError, match="Cannot authorize initial provisioning from state 'AUTHORITY_UNAVAILABLE'"):
+                client2.authorize_initial_provisioning(auth)
+            assert broker2.status == DeploymentStatus.AUTHORITY_UNAVAILABLE
+        finally:
+            broker2.stop_ipc_server()
+            if os.path.exists(state_file):
+                os.remove(state_file)
+            if os.path.exists(d2_file):
+                os.remove(d2_file)
+
+
+def test_dc24_authorized_external_recovery_required_to_return_to_provisioning_capable_state():
+    """DC24: Authorized external recovery (DeploymentReprovisioningAuthorization) is required to return to a provisioning-capable state."""
+    state_file = os.path.join(tempfile.gettempdir(), f"dc24_state_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc24_d2_{os.getpid()}.jsonl")
+    for p in (state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+    with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
+        D2InstallationProvisioning.clear_for_testing()
+        SignedAuthorityManifestLoader.clear_for_testing()
+        broker = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC24-DEP",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+            auth_secret="SEC24",
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        )
+        broker.start_ipc_server()
+        try:
+            DeploymentProvisionerRegistry.reset_for_testing()
+            client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC24")
+            SClassApplication(provisioner=client)
+            manifest = SignedAuthorityManifestLoader.sign_manifest(
+                manifest_id="M-24",
+                manifest_version=1,
+                issued_at="2026-08-21T10:00:00Z",
+                actors={},
+                revoked_fingerprints=[],
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest)
+            assert broker.status == DeploymentStatus.PROVISIONED
+        finally:
+            broker.stop_ipc_server()
+
+        # Delete state file -> broker enters AUTHORITY_UNAVAILABLE on restart
+        os.remove(state_file)
+        broker2 = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC24-DEP",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+            auth_secret="SEC24",
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        )
+        assert broker2.status == DeploymentStatus.AUTHORITY_UNAVAILABLE
+        broker2.start_ipc_server()
+        try:
+            client2 = IPCDeploymentProvisioner(ipc_endpoint=broker2.ipc_endpoint, auth_secret="SEC24")
+            reprov_auth = InMemoryTestDeploymentProvisioner.create_reprovisioning_authorization(
+                deployment_id="DC24-DEP",
+                target_manifest_id="M-24",
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+            # Authorize external recovery
+            resp = client2._client.call("authorize_reprovisioning", {"reprovisioning_authorization": reprov_auth})
+            assert resp.get("success")
+            assert broker2.status == DeploymentStatus.RECOVERY_AUTHORIZED
+
+            # Register pending recovery
+            fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+            resp_pending = client2._client.call("register_pending_reprovisioning", {
+                "installation_id": "INST-24-REC",
+                "manifest_id": "M-24",
+                "manifest_version": 2,
+                "manifest_digest": "9" * 64,
+                "root_fingerprint": fp,
+            })
+            assert resp_pending.get("success")
+            assert broker2.status == DeploymentStatus.RECOVERY_PENDING
+
+            # Commit D2 recovery epoch
+            store = D2AuthorityManifestStore(file_path=d2_file)
+            store.commit_epoch(
+                manifest_id="M-24",
+                manifest_version=2,
+                payload_digest="9" * 64,
+                signer_identity="Gate3AuthoritativeVerifier",
+                root_fingerprint=fp,
+            )
+            proof = D2InstallationProvisioning.generate_commit_proof(
+                deployment_id="DC24-DEP",
+                installation_id="INST-24-REC",
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+                signer_identity="Gate3AuthoritativeVerifier",
+                d2_store_path=d2_file,
+            )
+            resp_final = client2._client.call("record_reprovisioned", {"commit_proof": proof.to_dict()})
+            assert resp_final.get("success")
+            assert broker2.status == DeploymentStatus.PROVISIONED
+            assert broker2.current_installation["manifest_id"] == "M-24"
+        finally:
+            broker2.stop_ipc_server()
+            if os.path.exists(state_file):
+                os.remove(state_file)
+            if os.path.exists(d2_file):
+                os.remove(d2_file)
+

@@ -95,157 +95,185 @@ class TrustedDeploymentAuthorityBroker:
 
     def _load_or_initialize_state(self, default_status: DeploymentStatus) -> None:
         with self._lock:
-            if os.path.exists(self.state_file_path) and os.path.getsize(self.state_file_path) > 0:
+            if not os.path.exists(self.state_file_path) or os.path.getsize(self.state_file_path) == 0:
+                if os.path.exists(self.d2_store_path) and os.path.getsize(self.d2_store_path) > 0:
+                    # Missing broker state on established deployment with D2 history -> AUTHORITY_UNAVAILABLE
+                    self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                    self.consumed_authorizations = set()
+                    self.current_installation = None
+                    self.pending_provisioning = None
+                    self.active_initial_authorization = None
+                    self._persist_state()
+                    return
+
+                self.status = default_status
+                self.consumed_authorizations = set()
+                self.current_installation = None
+                self.pending_provisioning = None
+                self.active_initial_authorization = None
+                self._persist_state()
+                return
+
+            try:
+                with open(self.state_file_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception as e:
+                self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                raise RuntimeError(f"Broker state file corrupted or unreadable: {e}. Failing closed.")
+
+            if not isinstance(data, dict) or "payload" not in data or "integrity_seal" not in data:
+                self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                raise RuntimeError("Broker state file tampering detected: missing integrity seal. Failing closed.")
+
+            payload = data["payload"]
+            seal = data["integrity_seal"]
+            computed_digest = hashlib.sha256(canonicalize_json(payload)).hexdigest()
+            if computed_digest != seal:
+                self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                raise RuntimeError("Broker state file tampering detected: integrity seal digest mismatch. Failing closed.")
+
+            if "canonical_d2_store_path" in payload:
+                persisted_d2_path = payload["canonical_d2_store_path"]
+                if persisted_d2_path != self.d2_store_path:
+                    self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                    raise RuntimeError(
+                        f"Broker D2 store binding mismatch on restart: state was bound to '{persisted_d2_path}', "
+                        f"current configuration is '{self.d2_store_path}'. Failing closed."
+                    )
+
+            self.deployment_id = payload.get("deployment_id", self.deployment_id)
+            persisted_status = DeploymentStatus(payload.get("status", default_status.value))
+
+            # Anti-fabrication check: D2 store with events can never have UNPROVISIONED status
+            if (
+                persisted_status == DeploymentStatus.UNPROVISIONED
+                and os.path.exists(self.d2_store_path)
+                and os.path.getsize(self.d2_store_path) > 0
+            ):
+                self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                self.consumed_authorizations = set(payload.get("consumed_authorizations", []))
+                self.current_installation = None
+                self.pending_provisioning = None
+                self.active_initial_authorization = None
+                self._persist_state()
+                raise RuntimeError(
+                    "Broker state tampering or fabricated UNPROVISIONED state detected on established deployment with D2 history. "
+                    "Failing closed into AUTHORITY_UNAVAILABLE."
+                )
+
+            self.status = persisted_status
+            self.consumed_authorizations = set(payload.get("consumed_authorizations", []))
+            self.current_installation = payload.get("current_installation")
+            self.pending_provisioning = payload.get("pending_provisioning")
+            self.active_initial_authorization = payload.get("active_initial_authorization")
+
+            from domain.types import EventType
+            from events.store import FileAppendEventStore
+
+            # Recovery Matrix: PENDING states (PROVISIONING_PENDING, BROKER_COMMIT_PENDING, RECOVERY_PENDING)
+            if self.status in (DeploymentStatus.PROVISIONING_PENDING, DeploymentStatus.BROKER_COMMIT_PENDING, DeploymentStatus.RECOVERY_PENDING):
+                pending = self.pending_provisioning or self.current_installation
+                if not pending or not isinstance(pending, dict):
+                    # Non-authoritative deterministic recovery
+                    if self.status == DeploymentStatus.RECOVERY_PENDING:
+                        self.status = DeploymentStatus.RECOVERY_AUTHORIZED
+                    else:
+                        self.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+                    self.pending_provisioning = None
+                    self.current_installation = None
+                    self._persist_state()
+                    return
+
+                if not os.path.exists(self.d2_store_path) or os.path.getsize(self.d2_store_path) == 0:
+                    # PENDING + no matching D2 commit -> non-authoritative recovery
+                    if self.status == DeploymentStatus.RECOVERY_PENDING:
+                        self.status = DeploymentStatus.RECOVERY_AUTHORIZED
+                    else:
+                        self.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+                    self.pending_provisioning = None
+                    self.current_installation = None
+                    self._persist_state()
+                    return
+
                 try:
-                    with open(self.state_file_path, "r", encoding="utf-8") as f:
-                        data = json.load(f)
+                    event_store = FileAppendEventStore(self.d2_store_path)
+                    events = event_store.get_events()
                 except Exception as e:
                     self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
-                    raise RuntimeError(f"Broker state file corrupted or unreadable: {e}. Failing closed.")
+                    raise RuntimeError(f"Cannot recover from pending state: D2 store unreadable or corrupt: {e}. Failing closed.")
 
-                if not isinstance(data, dict) or "payload" not in data or "integrity_seal" not in data:
-                    self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
-                    raise RuntimeError("Broker state file tampering detected: missing integrity seal. Failing closed.")
+                # Look for exact matching D2 commit
+                m_id = str(pending.get("manifest_id", ""))
+                m_ver = int(pending.get("manifest_version", 1))
+                m_dig = str(pending.get("manifest_digest", pending.get("payload_digest", "")))
+                target_seq = pending.get("sequence_number")
+                target_eid = pending.get("event_id")
 
-                payload = data["payload"]
-                seal = data["integrity_seal"]
-                computed_digest = hashlib.sha256(canonicalize_json(payload)).hexdigest()
-                if computed_digest != seal:
-                    self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
-                    raise RuntimeError("Broker state file tampering detected: integrity seal digest mismatch. Failing closed.")
+                matching_events = [
+                    e for e in events
+                    if e.event_type == EventType.AUTHORITY_MANIFEST_COMMITTED
+                    and str(e.payload.get("manifest_id", "")) == m_id
+                    and int(e.payload.get("manifest_version", 1)) == m_ver
+                    and str(e.payload.get("payload_digest", "")) == m_dig
+                    and (target_seq is None or e.sequence_number == target_seq)
+                    and (target_eid is None or e.event_id == target_eid)
+                ]
 
-                if "canonical_d2_store_path" in payload:
-                    persisted_d2_path = payload["canonical_d2_store_path"]
-                    if persisted_d2_path != self.d2_store_path:
-                        self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
-                        raise RuntimeError(
-                            f"Broker D2 store binding mismatch on restart: state was bound to '{persisted_d2_path}', "
-                            f"current configuration is '{self.d2_store_path}'. Failing closed."
-                        )
+                if matching_events:
+                    # PENDING + exact matching D2 commit -> PROVISIONED
+                    target_event = matching_events[-1]
+                    self.status = DeploymentStatus.PROVISIONED
+                    self.current_installation = {
+                        "installation_id": str(pending.get("installation_id", "")),
+                        "manifest_id": str(target_event.payload.get("manifest_id")),
+                        "manifest_version": int(target_event.payload.get("manifest_version", 1)),
+                        "payload_digest": str(target_event.payload.get("payload_digest")),
+                        "event_id": str(target_event.event_id),
+                        "sequence_number": int(target_event.sequence_number),
+                        "event_digest": str(target_event.digest),
+                        "head_digest": str(target_event.digest),
+                        "root_fingerprint": str(pending.get("root_fingerprint", "")),
+                    }
+                    self.pending_provisioning = None
+                    self._persist_state()
+                    return
+                else:
+                    # PENDING + no matching D2 commit -> non-authoritative recovery
+                    if self.status == DeploymentStatus.RECOVERY_PENDING:
+                        self.status = DeploymentStatus.RECOVERY_AUTHORIZED
+                    else:
+                        self.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+                    self.pending_provisioning = None
+                    self.current_installation = None
+                    self._persist_state()
+                    return
 
-                self.deployment_id = payload.get("deployment_id", self.deployment_id)
-                self.status = DeploymentStatus(payload.get("status", default_status.value))
-                self.consumed_authorizations: Set[str] = set(payload.get("consumed_authorizations", []))
-                self.current_installation = payload.get("current_installation")
-                self.pending_provisioning = payload.get("pending_provisioning")
-                self.active_initial_authorization = payload.get("active_initial_authorization")
-
-                from domain.types import EventType
-                from events.store import FileAppendEventStore
-
-                # Recovery Matrix: PENDING states (PROVISIONING_PENDING, BROKER_COMMIT_PENDING, RECOVERY_PENDING)
-                if self.status in (DeploymentStatus.PROVISIONING_PENDING, DeploymentStatus.BROKER_COMMIT_PENDING, DeploymentStatus.RECOVERY_PENDING):
-                    pending = self.pending_provisioning or self.current_installation
-                    if not pending or not isinstance(pending, dict):
-                        # Non-authoritative deterministic recovery
-                        if self.status == DeploymentStatus.RECOVERY_PENDING:
-                            self.status = DeploymentStatus.RECOVERY_AUTHORIZED
-                        else:
-                            self.status = DeploymentStatus.PROVISIONING_AUTHORIZED
-                        self.pending_provisioning = None
-                        self.current_installation = None
-                        self._persist_state()
-                        return
-
-                    if not os.path.exists(self.d2_store_path) or os.path.getsize(self.d2_store_path) == 0:
-                        # PENDING + no matching D2 commit -> non-authoritative recovery
-                        if self.status == DeploymentStatus.RECOVERY_PENDING:
-                            self.status = DeploymentStatus.RECOVERY_AUTHORIZED
-                        else:
-                            self.status = DeploymentStatus.PROVISIONING_AUTHORIZED
-                        self.pending_provisioning = None
-                        self.current_installation = None
-                        self._persist_state()
-                        return
-
+            elif self.status == DeploymentStatus.PROVISIONED and self.current_installation:
+                if os.path.exists(self.d2_store_path) and os.path.getsize(self.d2_store_path) > 0:
                     try:
                         event_store = FileAppendEventStore(self.d2_store_path)
                         events = event_store.get_events()
+                        target_seq = self.current_installation.get("sequence_number")
+                        matching = [e for e in events if e.sequence_number == target_seq] if target_seq is not None else []
+                        if matching:
+                            target_event = matching[0]
+                            if (
+                                target_event.event_id != str(self.current_installation.get("event_id", target_event.event_id))
+                                or target_event.digest != str(self.current_installation.get("event_digest", target_event.digest))
+                            ):
+                                self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                                raise RuntimeError(f"Accepted D2 authority event {target_seq} was altered or corrupted on disk. Failing closed.")
+                        elif target_seq is not None:
+                            self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                            raise RuntimeError(f"Accepted D2 authority event sequence {target_seq} missing from D2 store. Failing closed.")
+                    except RuntimeError:
+                        raise
                     except Exception as e:
                         self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
-                        raise RuntimeError(f"Cannot recover from pending state: D2 store unreadable or corrupt: {e}. Failing closed.")
-
-                    # Look for exact matching D2 commit
-                    m_id = str(pending.get("manifest_id", ""))
-                    m_ver = int(pending.get("manifest_version", 1))
-                    m_dig = str(pending.get("manifest_digest", pending.get("payload_digest", "")))
-                    target_seq = pending.get("sequence_number")
-                    target_eid = pending.get("event_id")
-
-                    matching_events = [
-                        e for e in events
-                        if e.event_type == EventType.AUTHORITY_MANIFEST_COMMITTED
-                        and str(e.payload.get("manifest_id", "")) == m_id
-                        and int(e.payload.get("manifest_version", 1)) == m_ver
-                        and str(e.payload.get("payload_digest", "")) == m_dig
-                        and (target_seq is None or e.sequence_number == target_seq)
-                        and (target_eid is None or e.event_id == target_eid)
-                    ]
-
-                    if matching_events:
-                        # PENDING + exact matching D2 commit -> PROVISIONED
-                        target_event = matching_events[-1]
-                        self.status = DeploymentStatus.PROVISIONED
-                        self.current_installation = {
-                            "installation_id": str(pending.get("installation_id", "")),
-                            "manifest_id": str(target_event.payload.get("manifest_id")),
-                            "manifest_version": int(target_event.payload.get("manifest_version", 1)),
-                            "payload_digest": str(target_event.payload.get("payload_digest")),
-                            "event_id": str(target_event.event_id),
-                            "sequence_number": int(target_event.sequence_number),
-                            "event_digest": str(target_event.digest),
-                            "head_digest": str(target_event.digest),
-                            "root_fingerprint": str(pending.get("root_fingerprint", "")),
-                        }
-                        self.pending_provisioning = None
-                        self._persist_state()
-                        return
-                    else:
-                        # PENDING + no matching D2 commit -> non-authoritative recovery
-                        if self.status == DeploymentStatus.RECOVERY_PENDING:
-                            self.status = DeploymentStatus.RECOVERY_AUTHORIZED
-                        else:
-                            self.status = DeploymentStatus.PROVISIONING_AUTHORIZED
-                        self.pending_provisioning = None
-                        self.current_installation = None
-                        self._persist_state()
-                        return
-
-                elif self.status == DeploymentStatus.PROVISIONED and self.current_installation:
-                    if os.path.exists(self.d2_store_path) and os.path.getsize(self.d2_store_path) > 0:
-                        try:
-                            event_store = FileAppendEventStore(self.d2_store_path)
-                            events = event_store.get_events()
-                            target_seq = self.current_installation.get("sequence_number")
-                            matching = [e for e in events if e.sequence_number == target_seq] if target_seq is not None else []
-                            if matching:
-                                target_event = matching[0]
-                                if (
-                                    target_event.event_id != str(self.current_installation.get("event_id", target_event.event_id))
-                                    or target_event.digest != str(self.current_installation.get("event_digest", target_event.digest))
-                                ):
-                                    self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
-                                    raise RuntimeError(f"Accepted D2 authority event {target_seq} was altered or corrupted on disk. Failing closed.")
-                            elif target_seq is not None:
-                                self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
-                                raise RuntimeError(f"Accepted D2 authority event sequence {target_seq} missing from D2 store. Failing closed.")
-                        except RuntimeError:
-                            raise
-                        except Exception as e:
-                            self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
-                            raise RuntimeError(f"Authoritative D2 store corrupted on restart: {e}. Failing closed.")
-                    else:
-                        self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
-                        raise RuntimeError(f"Authoritative D2 store missing at '{self.d2_store_path}' on restart. Failing closed.")
-
-                return
-
-            self.status = default_status
-            self.consumed_authorizations = set()
-            self.current_installation = None
-            self.pending_provisioning = None
-            self.active_initial_authorization = None
-            self._persist_state()
+                        raise RuntimeError(f"Authoritative D2 store corrupted on restart: {e}. Failing closed.")
+                else:
+                    self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
+                    raise RuntimeError(f"Authoritative D2 store missing at '{self.d2_store_path}' on restart. Failing closed.")
 
     def _persist_state(self) -> None:
         with self._lock:
@@ -651,8 +679,8 @@ class TrustedDeploymentAuthorityBroker:
                 return {"success": True, "status": self.status.value}
 
             elif method == "authorize_reprovisioning":
-                if self.status != DeploymentStatus.RECOVERY_REQUIRED:
-                    return {"success": False, "error": f"Cannot authorize reprovisioning from state '{self.status.value}' (RECOVERY_REQUIRED required)."}
+                if self.status not in (DeploymentStatus.RECOVERY_REQUIRED, DeploymentStatus.AUTHORITY_UNAVAILABLE):
+                    return {"success": False, "error": f"Cannot authorize reprovisioning from state '{self.status.value}' (RECOVERY_REQUIRED or AUTHORITY_UNAVAILABLE required)."}
 
                 if "root_public_key" in params and params["root_public_key"] is not None:
                     return {"success": False, "error": "Caller-supplied root public key is rejected; broker uses canonical authority root."}
