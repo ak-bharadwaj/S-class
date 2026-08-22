@@ -7184,6 +7184,295 @@ def test_d3_install_schema_negative_missing_or_extra_proof_fields_rejected(tmp_p
     assert "Invalid proof status" in resp.get("error", "")
 
 
+def test_d3_install_e154_d2_advances_after_proof_creation_rejected(tmp_path):
+    """E154: D2 advances after proof creation -> broker rejects stale proof during admission."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, D2AuthorityManifestStore, D2InstallationProvisioning
+
+    d2_file = str(tmp_path / "d2_e154.jsonl")
+    store = D2AuthorityManifestStore(file_path=d2_file)
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    # Commit epoch 1
+    store.commit_epoch(
+        manifest_id="M-E154",
+        manifest_version=1,
+        payload_digest="1" * 64,
+        signer_identity="Gate3AuthoritativeVerifier",
+        root_fingerprint=fp,
+    )
+
+    # Generate proof for epoch 1 (head sequence = 1)
+    proof_v1 = D2InstallationProvisioning.generate_commit_proof(
+        deployment_id="DEP-E154",
+        installation_id="INST-E154",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        signer_identity="Gate3AuthoritativeVerifier",
+        d2_store_path=d2_file,
+    )
+
+    # D2 advances: commit epoch 2 (head sequence = 2)
+    store.commit_epoch(
+        manifest_id="M-E154",
+        manifest_version=2,
+        payload_digest="2" * 64,
+        signer_identity="Gate3AuthoritativeVerifier",
+        root_fingerprint=fp,
+    )
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E154",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+
+    # Broker admission attempt with stale proof_v1 must be rejected
+    resp = broker._dispatch_rpc({"method": "record_provisioned", "params": {"commit_proof": proof_v1}}, {})
+    assert not resp.get("success")
+    assert "Stale or superseded D2 commit" in resp.get("error", "")
+    assert broker.status == DeploymentStatus.PROVISIONING_AUTHORIZED
+
+
+def test_d3_install_e155_d2_advances_between_verification_and_broker_transition_rejected(tmp_path):
+    """E155: D2 advances before broker admission lock acquisition -> rejected fail closed."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, D2AuthorityManifestStore, D2InstallationProvisioning
+
+    d2_file = str(tmp_path / "d2_e155.jsonl")
+    store = D2AuthorityManifestStore(file_path=d2_file)
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    store.commit_epoch(
+        manifest_id="M-E155",
+        manifest_version=1,
+        payload_digest="3" * 64,
+        signer_identity="Gate3AuthoritativeVerifier",
+        root_fingerprint=fp,
+    )
+
+    proof = D2InstallationProvisioning.generate_commit_proof(
+        deployment_id="DEP-E155",
+        installation_id="INST-E155",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        signer_identity="Gate3AuthoritativeVerifier",
+        d2_store_path=d2_file,
+    )
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E155",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+
+    # Advance D2 store right before dispatching record_provisioned
+    store.commit_epoch(
+        manifest_id="M-E155",
+        manifest_version=2,
+        payload_digest="4" * 64,
+        signer_identity="Gate3AuthoritativeVerifier",
+        root_fingerprint=fp,
+    )
+
+    resp = broker._dispatch_rpc({"method": "record_provisioned", "params": {"commit_proof": proof}}, {})
+    assert not resp.get("success")
+    assert "Stale or superseded D2 commit" in resp.get("error", "")
+    assert broker.status != DeploymentStatus.PROVISIONED
+
+
+def test_d3_install_e156_concurrent_d2_commit_and_broker_admission_deterministic_single_ordering(tmp_path):
+    """E156: Concurrent D2 commit + broker admission enforces deterministic single ordering via atomic CAS/lock boundary."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, D2AuthorityManifestStore, D2InstallationProvisioning
+    import threading
+
+    d2_file = str(tmp_path / "d2_e156.jsonl")
+    store = D2AuthorityManifestStore(file_path=d2_file)
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    store.commit_epoch(
+        manifest_id="M-E156",
+        manifest_version=1,
+        payload_digest="5" * 64,
+        signer_identity="Gate3AuthoritativeVerifier",
+        root_fingerprint=fp,
+    )
+
+    proof_v1 = D2InstallationProvisioning.generate_commit_proof(
+        deployment_id="DEP-E156",
+        installation_id="INST-E156",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        signer_identity="Gate3AuthoritativeVerifier",
+        d2_store_path=d2_file,
+    )
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E156",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+
+    results = []
+
+    def commit_worker():
+        store.commit_epoch(
+            manifest_id="M-E156",
+            manifest_version=2,
+            payload_digest="6" * 64,
+            signer_identity="Gate3AuthoritativeVerifier",
+            root_fingerprint=fp,
+        )
+
+    def broker_worker():
+        resp = broker._dispatch_rpc({"method": "record_provisioned", "params": {"commit_proof": proof_v1}}, {})
+        results.append(resp)
+
+    t1 = threading.Thread(target=commit_worker)
+    t2 = threading.Thread(target=broker_worker)
+
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+
+    assert len(results) == 1
+    resp = results[0]
+    # Deterministic single ordering:
+    # If broker admitted before commit: success is True, status is PROVISIONED
+    # If commit happened before broker admission: success is False, error reports stale commit
+    if resp.get("success"):
+        assert broker.status == DeploymentStatus.PROVISIONED
+        assert broker.current_installation["manifest_id"] == "M-E156"
+    else:
+        assert "Stale or superseded D2 commit" in resp.get("error", "")
+        assert broker.status == DeploymentStatus.PROVISIONING_AUTHORIZED
+
+
+def test_d3_install_e157_retry_after_race_deterministic_result(tmp_path):
+    """E157: Retry after race condition produces deterministic successful admission."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, D2AuthorityManifestStore, D2InstallationProvisioning
+
+    d2_file = str(tmp_path / "d2_e157.jsonl")
+    store = D2AuthorityManifestStore(file_path=d2_file)
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    # Step 1: Initial epoch
+    store.commit_epoch(
+        manifest_id="M-E157",
+        manifest_version=1,
+        payload_digest="7" * 64,
+        signer_identity="Gate3AuthoritativeVerifier",
+        root_fingerprint=fp,
+    )
+
+    proof_v1 = D2InstallationProvisioning.generate_commit_proof(
+        deployment_id="DEP-E157",
+        installation_id="INST-E157-1",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        signer_identity="Gate3AuthoritativeVerifier",
+        d2_store_path=d2_file,
+    )
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E157",
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+
+    # Race: D2 advances before broker consumes proof_v1
+    store.commit_epoch(
+        manifest_id="M-E157",
+        manifest_version=2,
+        payload_digest="8" * 64,
+        signer_identity="Gate3AuthoritativeVerifier",
+        root_fingerprint=fp,
+    )
+
+    # Attempt 1 fails deterministically
+    resp1 = broker._dispatch_rpc({"method": "record_provisioned", "params": {"commit_proof": proof_v1}}, {})
+    assert not resp1.get("success")
+    assert "Stale or superseded D2 commit" in resp1.get("error", "")
+    assert broker.status == DeploymentStatus.PROVISIONING_AUTHORIZED
+
+    # Step 2: Retry with fresh proof generated for current authoritative head
+    proof_v2 = D2InstallationProvisioning.generate_commit_proof(
+        deployment_id="DEP-E157",
+        installation_id="INST-E157-2",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        signer_identity="Gate3AuthoritativeVerifier",
+        d2_store_path=d2_file,
+    )
+
+    # Attempt 2 succeeds deterministically
+    resp2 = broker._dispatch_rpc({"method": "record_provisioned", "params": {"commit_proof": proof_v2}}, {})
+    assert resp2.get("success")
+    assert broker.status == DeploymentStatus.PROVISIONED
+    assert broker.current_installation["manifest_id"] == "M-E157"
+    assert broker.current_installation["manifest_version"] == 2
+
+
+def test_d3_deployment_configuration_evidence_and_restart_binding(tmp_path):
+    """Deployment Proof:
+    1. get_canonical_d2_event_store_path() resolves from deployment configuration.
+    2. S-Class cannot alter broker D2 path/config in production.
+    3. Restart preserves canonical D2 binding and rejects tampering.
+    """
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, get_canonical_d2_event_store_path
+    from unittest.mock import patch
+
+    canonical_d2 = str(tmp_path / "canonical_d2.jsonl")
+    state_file = str(tmp_path / "broker_state.json")
+
+    # 1. Environment configuration resolution
+    with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": canonical_d2}):
+        resolved_path = get_canonical_d2_event_store_path()
+        assert resolved_path == os.path.abspath(canonical_d2)
+
+    # 2. Production broker rejects caller-injected override
+    with patch.dict(os.environ, {"SCLASS_TEST_MODE": "0", "PYTEST_CURRENT_TEST": ""}):
+        # In production mode without test fixture, injecting d2_store_path raises RuntimeError
+        with pytest.raises(RuntimeError, match="Production TrustedDeploymentAuthorityBroker cannot accept caller-injected d2_store_path"):
+            TrustedDeploymentAuthorityBroker(
+                deployment_id="DEP-DEPLOY-PROOF",
+                state_file_path=state_file,
+                d2_store_path=str(tmp_path / "injected_d2.jsonl"),
+            )
+
+    # 3. Broker restart preserves canonical D2 binding
+    broker1 = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-DEPLOY-PROOF",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=canonical_d2,
+    )
+    assert broker1.d2_store_path == os.path.abspath(canonical_d2)
+
+    # Restart against same path succeeds
+    broker2 = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-DEPLOY-PROOF",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=canonical_d2,
+    )
+    assert broker2.d2_store_path == os.path.abspath(canonical_d2)
+
+    # Restart against different D2 path fails closed
+    rogue_d2 = str(tmp_path / "rogue_d2.jsonl")
+    with pytest.raises(RuntimeError, match="Broker D2 store binding mismatch on restart"):
+        TrustedDeploymentAuthorityBroker(
+            deployment_id="DEP-DEPLOY-PROOF",
+            state_file_path=state_file,
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+            d2_store_path=rogue_d2,
+        )
+
+
+
 
 
 

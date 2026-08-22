@@ -49,7 +49,7 @@ class TrustedDeploymentAuthorityBroker:
         self.allowed_uid = allowed_uid
         self.auth_secret = auth_secret
         if d2_store_path is not None:
-            if os.environ.get("SCLASS_TEST_MODE") != "1" and os.environ.get("PYTEST_CURRENT_TEST") is None and os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1":
+            if os.environ.get("SCLASS_TEST_MODE") != "1" and not os.environ.get("PYTEST_CURRENT_TEST") and os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1":
                 raise RuntimeError(
                     "Production TrustedDeploymentAuthorityBroker cannot accept caller-injected d2_store_path; "
                     "canonical deployment store configuration required."
@@ -70,7 +70,7 @@ class TrustedDeploymentAuthorityBroker:
 
         # Canonical root key binding: in production, self-loaded from canonical Gate3 keystore
         if root_public_key is not None:
-            if os.environ.get("SCLASS_TEST_MODE") != "1" and os.environ.get("PYTEST_CURRENT_TEST") is None and os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1":
+            if os.environ.get("SCLASS_TEST_MODE") != "1" and not os.environ.get("PYTEST_CURRENT_TEST") and os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1":
                 raise RuntimeError(
                     "Production TrustedDeploymentAuthorityBroker cannot accept caller-injected root key; "
                     "canonical deployment keystore required."
@@ -204,6 +204,9 @@ class TrustedDeploymentAuthorityBroker:
             return False, "Malformed RPC parameters: must be a JSON object."
 
         proof = params.get("commit_proof")
+        if hasattr(proof, "to_dict"):
+            proof = proof.to_dict()
+            params["commit_proof"] = proof
         if not proof or not isinstance(proof, dict):
             return False, "Missing required 'commit_proof' object in RPC parameters. Single canonical schema D2CommitProofV1 required."
 
@@ -374,21 +377,28 @@ class TrustedDeploymentAuthorityBroker:
                 if self.status != DeploymentStatus.PROVISIONING_AUTHORIZED:
                     return {"success": False, "error": f"Cannot transition to PROVISIONED from state '{self.status.value}' without prior PROVISIONING_AUTHORIZED."}
 
-                valid, err = self._verify_d2_commit_proof(params)
-                if not valid:
-                    return {"success": False, "error": f"D2 commit validation failed: {err}"}
+                from file_lock import FileLock
+                d2_lock_path = self.d2_store_path + ".lock"
+                try:
+                    with FileLock(d2_lock_path, timeout=10.0):
+                        # Atomic D2 authority admission transaction
+                        valid, err = self._verify_d2_commit_proof(params)
+                        if not valid:
+                            return {"success": False, "error": f"D2 commit validation failed: {err}"}
 
-                proof = params["commit_proof"]
-                self.status = DeploymentStatus.PROVISIONED
-                self.current_installation = {
-                    "installation_id": proof["installation_id"],
-                    "manifest_id": proof["manifest_id"],
-                    "manifest_version": proof["manifest_version"],
-                    "payload_digest": proof["manifest_digest"],
-                    "root_fingerprint": proof["root_fingerprint"],
-                }
-                self._persist_state()
-                return {"success": True, "status": self.status.value}
+                        proof = params["commit_proof"]
+                        self.status = DeploymentStatus.PROVISIONED
+                        self.current_installation = {
+                            "installation_id": proof["installation_id"],
+                            "manifest_id": proof["manifest_id"],
+                            "manifest_version": proof["manifest_version"],
+                            "payload_digest": proof["manifest_digest"],
+                            "root_fingerprint": proof["root_fingerprint"],
+                        }
+                        self._persist_state()
+                        return {"success": True, "status": self.status.value}
+                except Exception as e:
+                    return {"success": False, "error": f"D2 admission transaction error: {e}"}
 
             elif method == "notify_local_state_loss":
                 self.status = DeploymentStatus.RECOVERY_REQUIRED
@@ -442,21 +452,28 @@ class TrustedDeploymentAuthorityBroker:
                 if self.status != DeploymentStatus.RECOVERY_AUTHORIZED:
                     return {"success": False, "error": f"Cannot transition to PROVISIONED from state '{self.status.value}' without authorized recovery."}
 
-                valid, err = self._verify_d2_commit_proof(params)
-                if not valid:
-                    return {"success": False, "error": f"D2 recovery commit validation failed: {err}"}
+                from file_lock import FileLock
+                d2_lock_path = self.d2_store_path + ".lock"
+                try:
+                    with FileLock(d2_lock_path, timeout=10.0):
+                        # Atomic D2 authority admission transaction
+                        valid, err = self._verify_d2_commit_proof(params)
+                        if not valid:
+                            return {"success": False, "error": f"D2 recovery commit validation failed: {err}"}
 
-                proof = params["commit_proof"]
-                self.status = DeploymentStatus.PROVISIONED
-                self.current_installation = {
-                    "installation_id": proof["installation_id"],
-                    "manifest_id": proof["manifest_id"],
-                    "manifest_version": proof["manifest_version"],
-                    "payload_digest": proof["manifest_digest"],
-                    "root_fingerprint": proof["root_fingerprint"],
-                }
-                self._persist_state()
-                return {"success": True, "status": self.status.value}
+                        proof = params["commit_proof"]
+                        self.status = DeploymentStatus.PROVISIONED
+                        self.current_installation = {
+                            "installation_id": proof["installation_id"],
+                            "manifest_id": proof["manifest_id"],
+                            "manifest_version": proof["manifest_version"],
+                            "payload_digest": proof["manifest_digest"],
+                            "root_fingerprint": proof["root_fingerprint"],
+                        }
+                        self._persist_state()
+                        return {"success": True, "status": self.status.value}
+                except Exception as e:
+                    return {"success": False, "error": f"D2 recovery admission transaction error: {e}"}
 
             else:
                 return {"success": False, "error": f"Unknown RPC method: {method}"}

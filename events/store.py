@@ -955,6 +955,7 @@ class D2InstallationProvisioning:
         manifest_version: Optional[int] = None,
         signer_identity: str = "Gate3AuthoritativeVerifier",
         installed_at: Optional[str] = None,
+        d2_store_path: Optional[str] = None,
     ) -> D2CommitProof:
         """Generates an immutable D2CommitProof cryptographically bound to the current authoritative D2 state."""
         import hashlib
@@ -967,11 +968,11 @@ class D2InstallationProvisioning:
         root_fp = hashlib.sha256(root_private_key.public_key().public_bytes_raw()).hexdigest()
 
         from events.store import D2AuthorityManifestStore, FileAppendEventStore
-        store = D2AuthorityManifestStore()
-        if not os.path.exists(store.file_path) or os.path.getsize(store.file_path) == 0:
-            raise RuntimeError(f"Cannot generate D2CommitProof: D2 event store missing or empty at '{store.file_path}'.")
+        target_path = os.path.abspath(d2_store_path) if d2_store_path else get_canonical_d2_event_store_path()
+        if not os.path.exists(target_path) or os.path.getsize(target_path) == 0:
+            raise RuntimeError(f"Cannot generate D2CommitProof: D2 event store missing or empty at '{target_path}'.")
 
-        event_store = FileAppendEventStore(store.file_path)
+        event_store = FileAppendEventStore(target_path)
         events = event_store.get_events()
         if not events:
             raise RuntimeError(f"Cannot generate D2CommitProof: D2 event store at '{store.file_path}' contains no events.")
