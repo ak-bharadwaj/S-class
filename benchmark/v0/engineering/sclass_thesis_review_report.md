@@ -28,8 +28,8 @@
 ## 3. Evaluation of Six Core Research Hypotheses
 
 ### H1_Raw_Task_Success: S-Class increases end-to-end task completion rate over plain test repair (B4 > B2).
-- **Verdict**: 🔴 NOT SUPPORTED
-- **Evidence**: B2 achieved 97.50% (39/40) vs B4 at 95.00% (38/40), Delta = -2.50 pp, exact McNemar p = 1.0000, 95% CI [-10.81%, +5.81%]. The empirical data does not reject the null hypothesis; on standard modular tasks, governed S-Class does not demonstrate raw completion rate superiority over a pure model+pytest test-repair loop.
+- **Verdict**: 🟡 INCONCLUSIVE (Sample Floor < 45 per Arm)
+- **Evidence**: B2 achieved 97.50% (39/40) vs B4 at 95.00% (38/40), Delta = -2.50 pp, exact McNemar p = 1.0000, 95% CI [-10.81%, +5.81%]. The sample size n=40 is below the preregistered minimum sample floor (>= 45 completed task instances per arm, target 60); under the master research protocol, underpowered results are strictly classified as INCONCLUSIVE.
 
 ### H2_Specification_Correctness: S-Class prevents specification ambiguity and requirement misinterpretations.
 - **Verdict**: 🟢 MECHANISM DEMONSTRATED (Empirical Efficacy Open)
