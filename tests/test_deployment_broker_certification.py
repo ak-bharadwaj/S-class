@@ -3904,6 +3904,16 @@ def test_dc82_production_cannot_force_test_mode_via_environment_variable(monkeyp
             allowed_uid=1002 if sys.platform != "win32" else None,
         )
 
+    # In production, same UID is rejected even if SCLASS_TEST_MODE=1
+    if sys.platform != "win32":
+        with pytest.raises(RuntimeError, match="authority and client OS identities must be distinct"):
+            ExternalDeploymentAuthorityServer(
+                endpoint_path=endpoint,
+                store_path=ext_store,
+                auth_secret="SEC82",
+                allowed_uid=os.getuid(),
+            )
+
     # In production, caller-injected root key is rejected even if SCLASS_TEST_MODE=1
     rogue_key = ed25519.Ed25519PrivateKey.generate().public_key()
     with pytest.raises(RuntimeError, match="Production ExternalDeploymentAuthorityServer cannot accept caller-selected root key"):

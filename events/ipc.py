@@ -39,6 +39,8 @@ def decode_frame(sock: socket.socket) -> Dict[str, Any]:
 
 
 def _is_test_env() -> bool:
+    if os.environ.get("SCLASS_ENVIRONMENT") == "production":
+        return False
     return bool(
         os.environ.get("SCLASS_TEST_MODE") == "1"
         or os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") == "1"

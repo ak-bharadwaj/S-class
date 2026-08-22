@@ -153,7 +153,7 @@ class DurableDeploymentAuthorityStore:
             return auth_id in data.get("consumed_authorizations", {})
 
     def clear_for_testing(self) -> None:
-        if os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1" and os.environ.get("PYTEST_CURRENT_TEST") is None and os.environ.get("SCLASS_TEST_MODE") != "1":
+        if not _is_test_mode():
             raise RuntimeError("clear_for_testing prohibited outside test harness.")
         from file_lock import FileLock
         with FileLock(self.lock_path, timeout=10.0):
@@ -402,7 +402,7 @@ class TrustedDeploymentBootstrapAuthority:
     @classmethod
     def reset_for_testing(cls) -> None:
         """Controlled reset strictly for test harness."""
-        if os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1" and os.environ.get("PYTEST_CURRENT_TEST") is None and os.environ.get("SCLASS_TEST_MODE") != "1":
+        if not _is_test_mode():
             raise RuntimeError("reset_for_testing prohibited outside test harness.")
         cls.get_store().clear_for_testing()
 
@@ -427,7 +427,7 @@ class TrustedDeploymentBootstrap:
         Requires valid root-signed bootstrap authorization and mandatory external authority service in production.
         Fails closed if the deployment already has existing state or D2 history.
         """
-        is_test = bool(os.environ.get("SCLASS_TEST_MODE") == "1" or os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") == "1")
+        is_test = _is_test_mode()
 
         state_file_path = os.path.abspath(state_file_path)
         if os.path.exists(state_file_path) and os.path.getsize(state_file_path) > 0:
@@ -599,13 +599,13 @@ class TrustedDeploymentAuthorityBroker:
         self.allowed_uid = allowed_uid
         self.auth_secret = auth_secret
         if initial_status != DeploymentStatus.CATASTROPHIC_LOSS:
-            if os.environ.get("SCLASS_TEST_MODE") != "1" and not os.environ.get("PYTEST_CURRENT_TEST") and os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1":
+            if not _is_test_mode():
                 raise RuntimeError(
                     "Production TrustedDeploymentAuthorityBroker cannot accept caller-selected initial_status; "
                     "authority state is strictly managed by canonical broker lifecycle."
                 )
         if d2_store_path is not None:
-            if os.environ.get("SCLASS_TEST_MODE") != "1" and not os.environ.get("PYTEST_CURRENT_TEST") and os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1":
+            if not _is_test_mode():
                 raise RuntimeError(
                     "Production TrustedDeploymentAuthorityBroker cannot accept caller-injected d2_store_path; "
                     "canonical deployment store configuration required."
@@ -626,7 +626,7 @@ class TrustedDeploymentAuthorityBroker:
 
         # Canonical root key binding: in production, self-loaded from canonical Gate3 keystore
         if root_public_key is not None:
-            if os.environ.get("SCLASS_TEST_MODE") != "1" and not os.environ.get("PYTEST_CURRENT_TEST") and os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1":
+            if not _is_test_mode():
                 raise RuntimeError(
                     "Production TrustedDeploymentAuthorityBroker cannot accept caller-injected root key; "
                     "canonical deployment keystore required."
@@ -730,7 +730,7 @@ class TrustedDeploymentAuthorityBroker:
                     self._persist_state()
                     raise RuntimeError("Broker state tampering detected: invalid bootstrap provenance for NEVER_PROVISIONED. Failing closed.")
 
-                is_test = bool(os.environ.get("SCLASS_TEST_MODE") == "1" or os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") == "1")
+                is_test = _is_test_mode()
                 bootstrap_auth = data.get("bootstrap_authorization")
                 if not is_test or bootstrap_auth is not None:
                     if not bootstrap_auth or not isinstance(bootstrap_auth, dict):
