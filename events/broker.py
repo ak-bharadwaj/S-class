@@ -16,6 +16,19 @@ from events.store import DeploymentStatus
 from events.serializer import canonicalize_json
 
 
+def _is_test_mode() -> bool:
+    """Returns True only when the runtime is unambiguously executing within a test harness.
+    Production environment (SCLASS_ENVIRONMENT=production) strictly forces False and cannot be bypassed.
+    """
+    if os.environ.get("SCLASS_ENVIRONMENT") == "production":
+        return False
+    return bool(
+        os.environ.get("SCLASS_TEST_MODE") == "1"
+        or os.environ.get("PYTEST_CURRENT_TEST")
+        or os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") == "1"
+    )
+
+
 class DurableDeploymentAuthorityStore:
     """External durable authority storage for deployment lifecycle and one-time authorization records.
     Survives broker restart, S-Class restart, local broker-state destruction, D2 store destruction,
@@ -23,11 +36,7 @@ class DurableDeploymentAuthorityStore:
     Enforces cryptographic integrity seal and fail-closed state on loss, corruption, or tampering.
     """
     def __init__(self, store_path: Optional[str] = None):
-        is_test = bool(
-            os.environ.get("SCLASS_TEST_MODE") == "1"
-            or os.environ.get("PYTEST_CURRENT_TEST")
-            or os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") == "1"
-        )
+        is_test = _is_test_mode()
         if store_path is None:
             store_path = os.environ.get("SCLASS_EXTERNAL_AUTHORITY_STORE_PATH")
             if store_path is None:
@@ -52,11 +61,7 @@ class DurableDeploymentAuthorityStore:
                 self._save_data({"consumed_authorizations": {}, "bootstrapped_deployments": {}})
 
     def _load_data(self) -> Dict[str, Any]:
-        is_test = bool(
-            os.environ.get("SCLASS_TEST_MODE") == "1"
-            or os.environ.get("PYTEST_CURRENT_TEST")
-            or os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") == "1"
-        )
+        is_test = _is_test_mode()
         if not os.path.exists(self.store_path) or os.path.getsize(self.store_path) == 0:
             if not is_test:
                 raise RuntimeError(
@@ -171,11 +176,7 @@ class ExternalDeploymentAuthorityServer:
         allowed_uid: Optional[int] = None,
         root_public_key: Optional[ed25519.Ed25519PublicKey] = None,
     ):
-        is_test = bool(
-            os.environ.get("SCLASS_TEST_MODE") == "1"
-            or os.environ.get("PYTEST_CURRENT_TEST")
-            or os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") == "1"
-        )
+        is_test = _is_test_mode()
         if endpoint_path is None:
             endpoint_path = os.environ.get("SCLASS_EXTERNAL_AUTHORITY_ENDPOINT")
             if endpoint_path is None:
@@ -212,9 +213,9 @@ class ExternalDeploymentAuthorityServer:
                     "startup rejected."
                 )
 
-        # In production on POSIX, authority OS identity must not equal client OS identity unless explicitly testing
+        # In production on POSIX, authority OS identity must not equal client OS identity
         if not is_test and sys.platform != "win32" and allowed_uid is not None and hasattr(os, "getuid"):
-            if allowed_uid == os.getuid() and os.environ.get("SCLASS_ALLOW_SAME_UID_TEST") != "1":
+            if allowed_uid == os.getuid():
                 raise RuntimeError(
                     "Production ExternalDeploymentAuthorityServer cannot accept authority server's own UID as client allowed_uid; "
                     "authority and client OS identities must be distinct."
@@ -362,11 +363,7 @@ class TrustedDeploymentBootstrapAuthority:
                 f"Bootstrap authorization deployment mismatch: expected '{deployment_id}', got '{auth_dep_id}'."
             )
 
-        is_test = bool(
-            os.environ.get("SCLASS_TEST_MODE") == "1"
-            or os.environ.get("PYTEST_CURRENT_TEST")
-            or os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") == "1"
-        )
+        is_test = _is_test_mode()
         endpoint = ipc_endpoint or os.environ.get("SCLASS_EXTERNAL_AUTHORITY_ENDPOINT")
 
         # In production, external authority service is strictly mandatory; local-mode fallback prohibited

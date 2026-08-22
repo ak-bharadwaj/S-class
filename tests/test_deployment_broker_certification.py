@@ -1,4 +1,4 @@
-"""End-to-End Deployment-Level Trust Topology Certification Suite (DC01 - DC78).
+"""End-to-End Deployment-Level Trust Topology Certification Suite (DC01 - DC82).
 Defines and executes the complete out-of-process authority boundary certification:
 
 DC01: production root cannot be caller-selected
@@ -79,6 +79,10 @@ DC75: S-Class cannot modify authority store
 DC76: authority restart preserves consumed authorization
 DC77: complete broker + D2 loss does not affect external consumed authorization
 DC78: replay after fresh authority-process restart -> rejected
+DC79: production same UID -> reject
+DC80: production SCLASS_ALLOW_SAME_UID_TEST=1 + same UID -> STILL reject
+DC81: test harness same UID -> allowed
+DC82: production cannot force test-mode via environment variable
 """
 import os
 import sys
@@ -1690,7 +1694,7 @@ def test_dc38_legitimate_fresh_production_deployment_bootstrap_end_to_end(monkey
         monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
         monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
         monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
-        monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
+        
 
         # 1. External Deployment Authority Service
         ext_server = ExternalDeploymentAuthorityServer(
@@ -2100,7 +2104,7 @@ def test_dc44_only_trusted_deployment_bootstrap_can_create_never_provisioned(mon
         monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
         monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
         monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
-        monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
+        
 
         ext_server = ExternalDeploymentAuthorityServer(
             endpoint_path=ext_endpoint,
@@ -2182,7 +2186,7 @@ def test_dc45_bootstrap_is_single_use_and_survives_process_restart(monkeypatch):
         monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
         monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
         monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
-        monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
+        
 
         ext_server = ExternalDeploymentAuthorityServer(
             endpoint_path=ext_endpoint,
@@ -2279,7 +2283,7 @@ def test_dc46_virgin_bootstrap_authorization_replay_rejected(monkeypatch):
         monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
         monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
         monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
-        monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
+        
 
         ext_server = ExternalDeploymentAuthorityServer(
             endpoint_path=ext_endpoint,
@@ -2337,7 +2341,7 @@ def test_dc47_replay_after_complete_local_state_destruction_rejected(monkeypatch
         monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
         monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
         monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
-        monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
+        
 
         ext_server = ExternalDeploymentAuthorityServer(
             endpoint_path=ext_endpoint,
@@ -2417,7 +2421,7 @@ def test_dc48_same_authorization_concurrently_used_twice_exactly_one_succeeds(mo
     monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
     monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
     monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
-    monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
+    
 
     ext_server = ExternalDeploymentAuthorityServer(
         endpoint_path=ext_endpoint,
@@ -2482,7 +2486,7 @@ def test_dc49_fresh_authorization_for_different_deployment_rejected(monkeypatch)
     monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
     monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
     monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
-    monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
+    
 
     ext_server = ExternalDeploymentAuthorityServer(
         endpoint_path=ext_endpoint,
@@ -2581,7 +2585,7 @@ def test_dc51_consumed_authorization_survives_process_kill_and_fresh_process_rep
         monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
         monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
         monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
-        monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
+        
 
         ext_server = ExternalDeploymentAuthorityServer(
             endpoint_path=ext_endpoint,
@@ -2649,7 +2653,7 @@ def test_dc52_consume_delete_all_local_state_restart_replay_rejected(monkeypatch
         monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
         monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
         monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
-        monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
+        
 
         ext_server = ExternalDeploymentAuthorityServer(
             endpoint_path=ext_endpoint,
@@ -2833,7 +2837,7 @@ def test_dc55_authorization_consumed_crash_before_bootstrap_state_write_administ
         monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
         monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
         monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
-        monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
+        
 
         ext_server = ExternalDeploymentAuthorityServer(
             endpoint_path=ext_endpoint,
@@ -3154,7 +3158,7 @@ def test_dc61_delete_external_authority_registry_fails_closed(monkeypatch):
     monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
     monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
     monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
-    monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
+    
 
     server = ExternalDeploymentAuthorityServer(
         endpoint_path=endpoint,
@@ -3198,7 +3202,7 @@ def test_dc62_corrupt_external_authority_registry_fails_closed(monkeypatch):
     monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
     monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
     monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
-    monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
+    
 
     server = ExternalDeploymentAuthorityServer(
         endpoint_path=endpoint,
@@ -3241,7 +3245,7 @@ def test_dc63_restart_after_authority_state_loss_enters_authority_unavailable(mo
     monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
     monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
     monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
-    monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
+    
 
     # 1. Start server 1 and consume auth
     server1 = ExternalDeploymentAuthorityServer(
@@ -3300,7 +3304,7 @@ def test_dc64_authorization_cannot_be_replayed_after_authority_state_destruction
         monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
         monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
         monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
-        monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
+        
 
         server = ExternalDeploymentAuthorityServer(
             endpoint_path=endpoint,
@@ -3795,3 +3799,110 @@ def test_dc78_replay_after_fresh_authority_process_restart_rejected(monkeypatch)
         for p in (ext_store, ext_store + ".lock", endpoint, state_file, d2_file):
             if os.path.exists(p):
                 os.remove(p)
+
+
+def test_dc79_production_same_uid_rejected(monkeypatch):
+    """DC79: In production on POSIX, allowed_uid == os.getuid() is unconditionally rejected."""
+    if sys.platform == "win32":
+        pytest.skip("POSIX allowed_uid check not applicable on Windows")
+
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+    ext_store = os.path.join(tempfile.gettempdir(), f"dc79_ext_{os.getpid()}.json")
+    endpoint = os.path.join(tempfile.gettempdir(), f"dc79_auth_{os.getpid()}.sock")
+    for p in (ext_store, ext_store + ".lock", endpoint):
+        if os.path.exists(p):
+            os.remove(p)
+
+    with pytest.raises(RuntimeError, match="authority and client OS identities must be distinct"):
+        ExternalDeploymentAuthorityServer(
+            endpoint_path=endpoint,
+            store_path=ext_store,
+            auth_secret="SEC79",
+            allowed_uid=os.getuid(),
+        )
+
+
+def test_dc80_production_cannot_bypass_same_uid_via_environment_variable(monkeypatch):
+    """DC80: SCLASS_ALLOW_SAME_UID_TEST cannot weaken production same-UID rejection."""
+    if sys.platform == "win32":
+        pytest.skip("POSIX allowed_uid check not applicable on Windows")
+
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+    monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
+
+    ext_store = os.path.join(tempfile.gettempdir(), f"dc80_ext_{os.getpid()}.json")
+    endpoint = os.path.join(tempfile.gettempdir(), f"dc80_auth_{os.getpid()}.sock")
+    for p in (ext_store, ext_store + ".lock", endpoint):
+        if os.path.exists(p):
+            os.remove(p)
+
+    with pytest.raises(RuntimeError, match="authority and client OS identities must be distinct"):
+        ExternalDeploymentAuthorityServer(
+            endpoint_path=endpoint,
+            store_path=ext_store,
+            auth_secret="SEC80",
+            allowed_uid=os.getuid(),
+        )
+
+
+def test_dc81_test_harness_same_uid_allowed(monkeypatch):
+    """DC81: In test harness mode, same UID is allowed for local test fixtures."""
+    monkeypatch.setenv("SCLASS_TEST_MODE", "1")
+    ext_store = os.path.join(tempfile.gettempdir(), f"dc81_ext_{os.getpid()}.json")
+    endpoint = os.path.join(tempfile.gettempdir(), f"dc81_auth_{os.getpid()}.sock")
+    for p in (ext_store, ext_store + ".lock", endpoint):
+        if os.path.exists(p):
+            os.remove(p)
+
+    server = ExternalDeploymentAuthorityServer(
+        endpoint_path=endpoint,
+        store_path=ext_store,
+        auth_secret="SEC81",
+        allowed_uid=os.getuid() if hasattr(os, "getuid") else None,
+    )
+    server.start()
+    try:
+        assert server.allowed_uid == (os.getuid() if hasattr(os, "getuid") else None)
+    finally:
+        server.stop()
+        for p in (ext_store, ext_store + ".lock", endpoint):
+            if os.path.exists(p):
+                os.remove(p)
+
+
+def test_dc82_production_cannot_force_test_mode_via_environment_variable(monkeypatch):
+    """DC82: When SCLASS_ENVIRONMENT=production, SCLASS_TEST_MODE=1 cannot bypass production security checks."""
+    monkeypatch.setenv("SCLASS_ENVIRONMENT", "production")
+    monkeypatch.setenv("SCLASS_TEST_MODE", "1")
+    monkeypatch.setenv("SCLASS_TEST_FIXTURE_ACTIVE", "1")
+
+    ext_store = os.path.join(tempfile.gettempdir(), f"dc82_ext_{os.getpid()}.json")
+    endpoint = os.path.join(tempfile.gettempdir(), f"dc82_auth_{os.getpid()}.sock")
+    for p in (ext_store, ext_store + ".lock", endpoint):
+        if os.path.exists(p):
+            os.remove(p)
+
+    # In production, missing auth_secret is rejected even if SCLASS_TEST_MODE=1
+    with pytest.raises(RuntimeError, match="Production ExternalDeploymentAuthorityServer requires explicit authentication secret"):
+        ExternalDeploymentAuthorityServer(
+            endpoint_path=endpoint,
+            store_path=ext_store,
+            auth_secret=None,
+            allowed_uid=1002 if sys.platform != "win32" else None,
+        )
+
+    # In production, caller-injected root key is rejected even if SCLASS_TEST_MODE=1
+    rogue_key = ed25519.Ed25519PrivateKey.generate().public_key()
+    with pytest.raises(RuntimeError, match="Production ExternalDeploymentAuthorityServer cannot accept caller-selected root key"):
+        ExternalDeploymentAuthorityServer(
+            endpoint_path=endpoint,
+            store_path=ext_store,
+            auth_secret="SEC82",
+            allowed_uid=1002 if sys.platform != "win32" else None,
+            root_public_key=rogue_key,
+        )
