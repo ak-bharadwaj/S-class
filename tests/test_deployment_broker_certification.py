@@ -1,4 +1,4 @@
-"""End-to-End Deployment-Level Trust Topology Certification Suite (DC01 - DC32).
+"""End-to-End Deployment-Level Trust Topology Certification Suite (DC01 - DC37).
 Defines and executes the complete out-of-process authority boundary certification:
 
 DC01: production root cannot be caller-selected
@@ -33,6 +33,11 @@ DC29: fabricated fresh local state -> rejected
 DC30: externally authorized recovery -> succeeds once
 DC31: recovery authorization replay -> rejected
 DC32: broker restart after recovery -> PROVISIONED
+DC33: production initial_status=UNPROVISIONED -> reject
+DC34: production initial_status=RECOVERY_REQUIRED -> reject
+DC35: production initial_status=PROVISIONED -> reject
+DC36: fresh production broker -> CATASTROPHIC_LOSS
+DC37: constructor state override cannot bypass catastrophic-loss
 """
 import os
 import sys
@@ -1535,3 +1540,91 @@ def test_dc32_broker_restart_after_recovery_preserves_provisioned():
             os.remove(state_file)
         if os.path.exists(d2_file):
             os.remove(d2_file)
+
+
+def test_dc33_production_initial_status_unprovisioned_rejected(monkeypatch):
+    """DC33: In production mode, caller cannot select initial_status=UNPROVISIONED."""
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+    with pytest.raises(RuntimeError, match="Production TrustedDeploymentAuthorityBroker cannot accept caller-selected initial_status"):
+        TrustedDeploymentAuthorityBroker(
+            deployment_id="DC33-DEP",
+            auth_secret="SEC33",
+            initial_status=DeploymentStatus.UNPROVISIONED,
+        )
+
+
+def test_dc34_production_initial_status_recovery_required_rejected(monkeypatch):
+    """DC34: In production mode, caller cannot select initial_status=RECOVERY_REQUIRED."""
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+    with pytest.raises(RuntimeError, match="Production TrustedDeploymentAuthorityBroker cannot accept caller-selected initial_status"):
+        TrustedDeploymentAuthorityBroker(
+            deployment_id="DC34-DEP",
+            auth_secret="SEC34",
+            initial_status=DeploymentStatus.RECOVERY_REQUIRED,
+        )
+
+
+def test_dc35_production_initial_status_provisioned_rejected(monkeypatch):
+    """DC35: In production mode, caller cannot select initial_status=PROVISIONED."""
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+    with pytest.raises(RuntimeError, match="Production TrustedDeploymentAuthorityBroker cannot accept caller-selected initial_status"):
+        TrustedDeploymentAuthorityBroker(
+            deployment_id="DC35-DEP",
+            auth_secret="SEC35",
+            initial_status=DeploymentStatus.PROVISIONED,
+        )
+
+
+def test_dc36_fresh_production_broker_defaults_to_catastrophic_loss(monkeypatch):
+    """DC36: Fresh production broker without state file strictly defaults to CATASTROPHIC_LOSS."""
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+    state_file = os.path.join(tempfile.gettempdir(), f"dc36_state_{os.getpid()}.json")
+    if os.path.exists(state_file):
+        os.remove(state_file)
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DC36-DEP",
+        state_file_path=state_file,
+        auth_secret="SEC36",
+    )
+    assert broker.status == DeploymentStatus.CATASTROPHIC_LOSS
+    assert broker.status != DeploymentStatus.UNPROVISIONED
+    if os.path.exists(state_file):
+        os.remove(state_file)
+
+
+def test_dc37_constructor_state_override_cannot_bypass_catastrophic_loss(monkeypatch):
+    """DC37: Constructor state override attempts in production cannot bypass catastrophic-loss fail-closed boundary."""
+    monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+
+    for unauthorized_status in [
+        DeploymentStatus.UNPROVISIONED,
+        DeploymentStatus.PROVISIONING_AUTHORIZED,
+        DeploymentStatus.PROVISIONING_PENDING,
+        DeploymentStatus.BROKER_COMMIT_PENDING,
+        DeploymentStatus.PROVISIONED,
+        DeploymentStatus.RECOVERY_REQUIRED,
+        DeploymentStatus.RECOVERY_AUTHORIZED,
+        DeploymentStatus.RECOVERY_PENDING,
+        DeploymentStatus.AUTHORITY_UNAVAILABLE,
+    ]:
+        with pytest.raises(RuntimeError, match="Production TrustedDeploymentAuthorityBroker cannot accept caller-selected initial_status"):
+            TrustedDeploymentAuthorityBroker(
+                deployment_id="DC37-DEP",
+                auth_secret="SEC37",
+                initial_status=unauthorized_status,
+            )

@@ -48,6 +48,12 @@ class TrustedDeploymentAuthorityBroker:
 
         self.allowed_uid = allowed_uid
         self.auth_secret = auth_secret
+        if initial_status != DeploymentStatus.CATASTROPHIC_LOSS:
+            if os.environ.get("SCLASS_TEST_MODE") != "1" and not os.environ.get("PYTEST_CURRENT_TEST") and os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1":
+                raise RuntimeError(
+                    "Production TrustedDeploymentAuthorityBroker cannot accept caller-selected initial_status; "
+                    "authority state is strictly managed by canonical broker lifecycle."
+                )
         if d2_store_path is not None:
             if os.environ.get("SCLASS_TEST_MODE") != "1" and not os.environ.get("PYTEST_CURRENT_TEST") and os.environ.get("SCLASS_TEST_FIXTURE_ACTIVE") != "1":
                 raise RuntimeError(
