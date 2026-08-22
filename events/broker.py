@@ -203,13 +203,23 @@ class ExternalDeploymentAuthorityServer:
                     allowed_uid = int(env_uid)
                 except ValueError:
                     pass
-            elif hasattr(os, "getuid"):
+            elif is_test and hasattr(os, "getuid"):
                 allowed_uid = os.getuid()
+
             if allowed_uid is None and not is_test:
                 raise RuntimeError(
                     "Production ExternalDeploymentAuthorityServer requires explicit peer OS identity (allowed_uid); "
                     "startup rejected."
                 )
+
+        # In production on POSIX, authority OS identity must not equal client OS identity unless explicitly testing
+        if not is_test and sys.platform != "win32" and allowed_uid is not None and hasattr(os, "getuid"):
+            if allowed_uid == os.getuid() and os.environ.get("SCLASS_ALLOW_SAME_UID_TEST") != "1":
+                raise RuntimeError(
+                    "Production ExternalDeploymentAuthorityServer cannot accept authority server's own UID as client allowed_uid; "
+                    "authority and client OS identities must be distinct."
+                )
+
         self.allowed_uid = allowed_uid
 
         # Root key binding: caller-injection strictly prohibited in production
