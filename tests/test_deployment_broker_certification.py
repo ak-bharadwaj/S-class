@@ -547,8 +547,16 @@ def test_dc16_broker_restart_preserves_authority_state():
     )
     broker1.start_ipc_server()
     try:
+        SignedAuthorityManifestLoader.clear_for_testing()
+        D2InstallationProvisioning.clear_for_testing()
+        store = D2AuthorityManifestStore()
+        if os.path.exists(store.file_path):
+            os.remove(store.file_path)
+
+        DeploymentProvisionerRegistry.reset_for_testing()
         client = IPCDeploymentProvisioner(ipc_endpoint=broker1.ipc_endpoint, auth_secret="SEC16")
-        client.authorize_initial_provisioning()
+        SClassApplication(provisioner=client)
+
         manifest = SignedAuthorityManifestLoader.sign_manifest(
             manifest_id="M-DC16",
             manifest_version=1,
@@ -557,18 +565,7 @@ def test_dc16_broker_restart_preserves_authority_state():
             revoked_fingerprints=[],
             root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
         )
-        expected_fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
-        client.record_provisioned(
-            installation_id="INST-16",
-            manifest_id="M-DC16",
-            manifest_version=1,
-            root_fingerprint=expected_fp,
-            payload_digest=manifest["root_signature"]["payload_digest"],
-            root_signature=manifest["root_signature"],
-            actors=manifest["actors"],
-            revoked_fingerprints=manifest["revoked_fingerprints"],
-            issued_at=manifest["issued_at"],
-        )
+        SignedAuthorityManifestLoader.bootstrap_genesis_manifest(manifest)
         assert broker1.status == DeploymentStatus.PROVISIONED
     finally:
         broker1.stop_ipc_server()

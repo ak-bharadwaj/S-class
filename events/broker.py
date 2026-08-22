@@ -30,6 +30,7 @@ class TrustedDeploymentAuthorityBroker:
         auth_secret: Optional[str] = None,
         root_public_key: Optional[ed25519.Ed25519PublicKey] = None,
         initial_status: DeploymentStatus = DeploymentStatus.UNPROVISIONED,
+        d2_store_path: Optional[str] = None,
     ):
         self.deployment_id = deployment_id
         if state_file_path is None:
@@ -47,6 +48,11 @@ class TrustedDeploymentAuthorityBroker:
 
         self.allowed_uid = allowed_uid
         self.auth_secret = auth_secret
+        if d2_store_path is not None:
+            self.d2_store_path = os.path.abspath(d2_store_path)
+        else:
+            from events.store import get_canonical_d2_event_store_path
+            self.d2_store_path = get_canonical_d2_event_store_path()
 
         # Secure state directory with strict OS permissions (0o700)
         self.state_dir = os.path.dirname(os.path.abspath(self.state_file_path))
@@ -124,29 +130,32 @@ class TrustedDeploymentAuthorityBroker:
                 "current_installation": self.current_installation,
             }
             seal = hashlib.sha256(canonicalize_json(state_payload)).hexdigest()
-            record = {
+            wrapper = {
                 "payload": state_payload,
                 "integrity_seal": seal,
             }
-            tmp = self.state_file_path + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(record, f, indent=2)
+            raw = canonicalize_json(wrapper)
+
+            # Atomic write + sync
+            tmp_path = f"{self.state_file_path}.tmp_{os.getpid()}_{threading.get_ident()}"
+            with open(tmp_path, "wb") as f:
+                f.write(raw + b"\n")
+                f.flush()
+                os.fsync(f.fileno())
+
             if hasattr(os, "chmod"):
                 try:
-                    os.chmod(tmp, 0o600)
+                    os.chmod(tmp_path, 0o600)
                 except OSError:
                     pass
-            if os.path.exists(self.state_file_path):
-                os.replace(tmp, self.state_file_path)
-            else:
-                os.rename(tmp, self.state_file_path)
+
+            os.replace(tmp_path, self.state_file_path)
 
     def start_ipc_server(self) -> None:
         with self._lock:
             if self._server is not None:
                 return
 
-            # Mandatory authentication enforcement:
             # If no auth_secret and transport is not a secured POSIX domain socket with UID check -> refuse startup
             if self.auth_secret is None:
                 if sys.platform == "win32" or self.allowed_uid is None:
@@ -175,12 +184,19 @@ class TrustedDeploymentAuthorityBroker:
         from cryptography.exceptions import InvalidSignature
         from events.serializer import canonicalize_json
 
-        installation_id = params.get("installation_id")
-        manifest_id = params.get("manifest_id")
-        manifest_version = params.get("manifest_version")
-        payload_digest = params.get("payload_digest")
-        root_fingerprint = params.get("root_fingerprint")
-        root_sig = params.get("root_signature")
+        # Support both explicit commit_proof object and parameter block
+        proof = params.get("commit_proof") if isinstance(params.get("commit_proof"), dict) else params
+
+        proof_dep_id = proof.get("deployment_id")
+        if proof_dep_id and proof_dep_id != self.deployment_id:
+            return False, f"Deployment ID mismatch: proof is for deployment '{proof_dep_id}', but broker is for '{self.deployment_id}'."
+
+        installation_id = proof.get("installation_id")
+        manifest_id = proof.get("manifest_id") or proof.get("initial_manifest_id")
+        manifest_version = proof.get("manifest_version") if proof.get("manifest_version") is not None else proof.get("initial_manifest_version")
+        payload_digest = proof.get("manifest_digest") or proof.get("initial_manifest_digest") or proof.get("payload_digest")
+        root_fingerprint = proof.get("root_fingerprint")
+        root_sig = proof.get("signature") or proof.get("root_signature")
 
         if not installation_id or not manifest_id:
             return False, "Missing installation_id or manifest_id in commit record."
@@ -204,13 +220,53 @@ class TrustedDeploymentAuthorityBroker:
         if not sig_hex or len(sig_hex) != 128:
             return False, "Missing or malformed signature_hex in root_signature block (must be 128 hex chars)."
 
-        # Determine preimage type: Installation Seal Preimage or Manifest Preimage
-        if "initial_manifest_id" in params or "initial_manifest_version" in params or "installed_at" in params or params.get("status") == "SEALED":
-            # Installation seal proof
-            initial_m_id = params.get("initial_manifest_id", manifest_id)
+        # Determine preimage type: D2CommitProof, Manifest Preimage, or Installation Seal Preimage
+        if "sequence_number" in proof or "event_id" in proof or "event_digest" in proof or "head_digest" in proof:
+            event_id = proof.get("event_id", "")
+            seq_num = int(proof.get("sequence_number", 1))
+            parent_digest = proof.get("parent_digest", "")
+            event_digest = proof.get("event_digest", "")
+            head_digest = proof.get("head_digest", "")
+            status = proof.get("status", "SEALED")
+            installed_at = str(proof.get("installed_at", root_sig.get("timestamp", "")))
+
+            preimage_dict = {
+                "deployment_id": str(proof_dep_id or self.deployment_id),
+                "installation_id": str(installation_id),
+                "manifest_id": str(manifest_id),
+                "manifest_version": int(manifest_version),
+                "manifest_digest": str(payload_digest),
+                "event_id": str(event_id),
+                "sequence_number": int(seq_num),
+                "parent_digest": str(parent_digest),
+                "event_digest": str(event_digest),
+                "head_digest": str(head_digest),
+                "root_fingerprint": str(expected_fp),
+                "installed_at": str(installed_at),
+                "status": str(status),
+            }
+            preimage_bytes = canonicalize_json(preimage_dict)
+        elif "actors" in proof:
+            from policy.evaluator import canonicalize_authority_manifest_preimage
+            if proof.get("manifest_id") != manifest_id:
+                return False, f"Manifest ID mismatch: expected '{manifest_id}', got '{proof.get('manifest_id')}'."
+            if proof.get("manifest_version") != manifest_version:
+                return False, f"Manifest version mismatch: expected {manifest_version}, got {proof.get('manifest_version')}."
+
+            manifest_dict = {
+                "manifest_id": manifest_id,
+                "manifest_version": manifest_version,
+                "issued_at": proof.get("issued_at", root_sig.get("timestamp", "")),
+                "actors": proof.get("actors", {}),
+                "revoked_fingerprints": proof.get("revoked_fingerprints", []),
+                "root_signature": root_sig,
+            }
+            preimage_bytes = canonicalize_authority_manifest_preimage(manifest_dict)
+        elif "initial_manifest_digest" in proof or proof.get("status") == "SEALED" or "installed_at" in proof:
+            initial_m_id = proof.get("initial_manifest_id", manifest_id)
             if initial_m_id != manifest_id:
                 return False, f"Manifest ID mismatch: expected '{manifest_id}', got '{initial_m_id}'."
-            initial_m_ver = params.get("initial_manifest_version", manifest_version)
+            initial_m_ver = proof.get("initial_manifest_version", manifest_version)
             if initial_m_ver != manifest_version:
                 return False, f"Manifest version mismatch: expected {manifest_version}, got {initial_m_ver}."
 
@@ -218,40 +274,20 @@ class TrustedDeploymentAuthorityBroker:
                 "installation_id": installation_id,
                 "initial_manifest_id": manifest_id,
                 "initial_manifest_version": manifest_version,
-                "initial_manifest_digest": params.get("initial_manifest_digest", payload_digest),
+                "initial_manifest_digest": proof.get("initial_manifest_digest", payload_digest),
                 "root_fingerprint": root_fingerprint,
-                "provisioning_epoch": params.get("provisioning_epoch", 1),
+                "provisioning_epoch": proof.get("provisioning_epoch", 1),
                 "status": "SEALED",
-                "installed_at": root_sig.get("timestamp") or params.get("installed_at", ""),
+                "installed_at": root_sig.get("timestamp") or proof.get("installed_at", ""),
             }
             preimage_bytes = canonicalize_json(preimage_dict)
-        elif "actors" in params:
-            from policy.evaluator import canonicalize_authority_manifest_preimage
-            if params.get("manifest_id") != manifest_id:
-                return False, f"Manifest ID mismatch: expected '{manifest_id}', got '{params.get('manifest_id')}'."
-            if params.get("manifest_version") != manifest_version:
-                return False, f"Manifest version mismatch: expected {manifest_version}, got {params.get('manifest_version')}."
-
-            manifest_dict = {
-                "manifest_id": manifest_id,
-                "manifest_version": manifest_version,
-                "issued_at": params.get("issued_at", root_sig.get("timestamp", "")),
-                "actors": params.get("actors", {}),
-                "revoked_fingerprints": params.get("revoked_fingerprints", []),
-                "root_signature": root_sig,
-            }
-            preimage_bytes = canonicalize_authority_manifest_preimage(manifest_dict)
         else:
-            # Fallback to seal preimage using commit fields
             preimage_dict = {
                 "installation_id": installation_id,
-                "initial_manifest_id": manifest_id,
-                "initial_manifest_version": manifest_version,
-                "initial_manifest_digest": params.get("initial_manifest_digest", payload_digest),
+                "manifest_id": manifest_id,
+                "manifest_version": manifest_version,
+                "payload_digest": payload_digest,
                 "root_fingerprint": root_fingerprint,
-                "provisioning_epoch": params.get("provisioning_epoch", 1),
-                "status": "SEALED",
-                "installed_at": root_sig.get("timestamp") or params.get("installed_at", ""),
             }
             preimage_bytes = canonicalize_json(preimage_dict)
 
@@ -265,6 +301,65 @@ class TrustedDeploymentAuthorityBroker:
             return False, "Ed25519 signature verification failed against broker canonical root authority key."
         except Exception as e:
             return False, f"Cryptographic verification error: {e}"
+
+        # Independent Authoritative D2 Store Inspection & State Binding
+        if not os.path.exists(self.d2_store_path) or os.path.getsize(self.d2_store_path) == 0:
+            return False, f"Canonical D2 event store missing or empty at '{self.d2_store_path}'; commit rejected (non-existent D2 commit)."
+
+        from events.store import FileAppendEventStore
+        try:
+            event_store = FileAppendEventStore(self.d2_store_path)
+            events = event_store.get_events()
+        except Exception as e:
+            return False, f"Failed to read canonical D2 event store: {e}"
+
+        if not events:
+            return False, f"No committed events found in canonical D2 event store at '{self.d2_store_path}'."
+
+        latest_event = events[-1]
+
+        if "sequence_number" in proof or "event_id" in proof or "event_digest" in proof:
+            proof_seq = int(proof.get("sequence_number", 1))
+            # E142, E147, E148: proof sequence must match the current latest event in D2
+            if proof_seq != latest_event.sequence_number:
+                return False, f"Stale or superseded D2 commit: proof sequence {proof_seq} does not match current D2 head sequence {latest_event.sequence_number}."
+
+            matching_events = [e for e in events if e.sequence_number == proof_seq]
+            if not matching_events:
+                return False, f"Commit event with sequence {proof_seq} does not exist in D2 event store."
+            target_event = matching_events[0]
+
+            # E143: Altered event_id
+            if "event_id" in proof and target_event.event_id != str(proof["event_id"]):
+                return False, f"Event ID mismatch in D2 commit proof: expected '{target_event.event_id}', got '{proof['event_id']}'."
+
+            # E144: Parent and event digest checks
+            if "parent_digest" in proof and target_event.parent_digest != str(proof["parent_digest"]):
+                return False, f"Parent digest mismatch in D2 commit proof: expected '{target_event.parent_digest}', got '{proof['parent_digest']}'."
+
+            if "event_digest" in proof and target_event.digest != str(proof["event_digest"]):
+                return False, f"Event digest mismatch in D2 commit proof: expected '{target_event.digest}', got '{proof['event_digest']}'."
+
+            # E147, E148: Head digest check
+            if "head_digest" in proof and latest_event.digest != str(proof["head_digest"]):
+                return False, f"Head digest mismatch in D2 commit proof: expected '{latest_event.digest}', got '{proof['head_digest']}'."
+
+            # E145: Manifest payload presence in D2
+            evt_payload = target_event.payload
+            if evt_payload.get("manifest_id") != str(manifest_id):
+                return False, f"Manifest ID mismatch between D2 event payload '{evt_payload.get('manifest_id')}' and commit proof '{manifest_id}'."
+            if evt_payload.get("manifest_version") != int(manifest_version):
+                return False, f"Manifest version mismatch between D2 event payload '{evt_payload.get('manifest_version')}' and commit proof '{manifest_version}'."
+            if payload_digest and evt_payload.get("payload_digest") != str(payload_digest):
+                return False, f"Manifest digest mismatch: D2 event payload digest '{evt_payload.get('payload_digest')}' does not match proof manifest digest '{payload_digest}'."
+        else:
+            state = event_store.replay()
+            if state.active_manifest_id != str(manifest_id):
+                return False, f"Active manifest ID in D2 state '{state.active_manifest_id}' does not match commit proof '{manifest_id}'."
+            if state.active_manifest_version != int(manifest_version):
+                return False, f"Active manifest version in D2 state '{state.active_manifest_version}' does not match commit proof '{manifest_version}'."
+            if payload_digest and state.active_manifest_digest != str(payload_digest):
+                return False, f"Active manifest digest in D2 state '{state.active_manifest_digest}' does not match commit proof '{payload_digest}'."
 
         return True, ""
 
