@@ -41,7 +41,7 @@ from controller.token import (
     verify_execution_envelope,
 )
 
-from controller.authority import LeaseAuthority, StateAuthority, ProposalAuthorityContext
+from controller.authority import LeaseAuthority, StateAuthority, ProposalAuthorityContext, resolve_proposal_authority_context
 
 
 @dataclass(frozen=True)
@@ -106,6 +106,16 @@ class SClassController:
     ) -> bool:
         """Cryptographically verifies AuthorizedSessionExecutionBinding against controller's trusted authority root."""
         return verify_authorized_session_binding(binding, self._authority_signer)
+
+    def resolve_proposal_authority_context(self, task_id: str) -> ProposalAuthorityContext:
+        """Authoritatively resolves ProposalAuthorityContext for the given task_id from configured typed authority providers.
+        Fails closed with typed exceptions if lease or state authority is missing, invalid, inactive, or corrupted.
+        """
+        return resolve_proposal_authority_context(
+            lease_authority=self._lease_authority,
+            state_authority=self._state_authority,
+            task_id=task_id,
+        )
 
     def submit_proposal(
         self,

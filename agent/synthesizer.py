@@ -12,6 +12,7 @@ from typing import Tuple, Optional, Any, Mapping, Sequence
 from controller.authorization import ActionProposal
 from controller.token import ExecutionContext, AuthorizedSessionExecutionBinding
 from controller.controller import SClassController
+from controller.authority import ProposalAuthorityContext
 from agent.models import AgentToolCall
 
 
@@ -90,30 +91,20 @@ class ActionProposalSynthesizer:
                 f"do not match execution context capability set {sorted_caps}."
             )
 
-        # Extract active lease and state coordinates from authoritative controller providers
-        fencing_token = 0
-        lease_epoch = 0
-        owner_id = ""
-        state_version = 0
-        state_digest = ""
+        # 5. Authoritatively resolve ProposalAuthorityContext from Controller boundary (Strict Fail-Closed)
+        try:
+            auth_ctx = controller.resolve_proposal_authority_context(active_task_id)
+        except Exception as e:
+            return None, f"AUTHORITY_RESOLUTION_FAILED: Failed to resolve authoritative coordinates from Controller: {e}"
 
-        if getattr(controller, "_lease_authority", None) is not None:
-            try:
-                active_lease = controller._lease_authority.get_active_lease(active_task_id)
-                if active_lease is not None and getattr(active_lease, "is_active", False):
-                    fencing_token = active_lease.fencing_token
-                    lease_epoch = active_lease.lease_epoch
-                    owner_id = active_lease.owner_id
-            except Exception:
-                pass
+        if not isinstance(auth_ctx, ProposalAuthorityContext):
+            return None, "AUTHORITY_RESOLUTION_FAILED: Controller returned an invalid ProposalAuthorityContext instance."
 
-        if getattr(controller, "_state_authority", None) is not None:
-            try:
-                state_coords = controller._state_authority.get_authoritative_state()
-                if isinstance(state_coords, tuple) and len(state_coords) == 2:
-                    state_version, state_digest = state_coords
-            except Exception:
-                pass
+        owner_id = auth_ctx.owner_id
+        fencing_token = auth_ctx.fencing_token
+        lease_epoch = auth_ctx.lease_epoch
+        state_version = auth_ctx.state_version
+        state_digest = auth_ctx.state_digest
 
         args = tool_call.arguments
         proposal_id = f"PROP-{uuid.uuid4().hex[:8].upper()}"

@@ -14,6 +14,7 @@
 - **Observed Difference ($\Delta = p_{B4} - p_{B2}$)**: `-2.50 percentage points`
 - **95% Confidence Interval**: `[-10.81%, +5.81%]`
 - **Exact Binomial McNemar Test**: `p = 1.0000` ($a=38, b=1, c=0, d=1$, **Discordant Pairs = 1**)
+- **Preregistered Sample-Size Rule**: Evaluated under preregistered $n=40$ benchmark holdout protocol.
 
 ## 2. Domain Stratification Analysis
 
@@ -27,26 +28,25 @@
 ## 3. Evaluation of Six Core Research Hypotheses
 
 ### H1_Raw_Task_Success: S-Class increases end-to-end task completion rate over plain test repair (B4 > B2).
-- **Verdict**: 🟢 SUPPORTED
-- **Evidence**: B2 achieved 97.5% (39/40) vs B4 at 95.0% (38/40), Delta = -2.50 pp, exact McNemar p = 1.000, 95% CI [-10.81%, +5.81%].
+- **Verdict**: 🔴 NOT SUPPORTED
+- **Evidence**: B2 achieved 97.50% (39/40) vs B4 at 95.00% (38/40), Delta = -2.50 pp, exact McNemar p = 1.0000, 95% CI [-10.81%, +5.81%]. The empirical data does not reject the null hypothesis; on standard modular tasks, governed S-Class does not demonstrate raw completion rate superiority over a pure model+pytest test-repair loop.
 
 ### H2_Specification_Correctness: S-Class prevents specification ambiguity and requirement misinterpretations.
-- **Verdict**: 🟢 SUPPORTED
-- **Evidence**: F-001 legacy synthesis + candidate authority eliminates requirement misinterpretation failures across benchmarks.
+- **Verdict**: 🟢 MECHANISM DEMONSTRATED (Empirical Efficacy Open)
+- **Evidence**: The architectural mechanism of structured requirement IR, AST verification, and candidate authority prevents ungrounded drift within the synthesis pipeline. However, statistically significant empirical superiority on specification-dense holdouts remains an open research question requiring larger stratified benchmarks.
 
 ### H3_Epistemic_Discipline: S-Class bounds unsupported hallucinated assumptions.
-- **Verdict**: 🟢 SUPPORTED
-- **Evidence**: Strict semantic gate weight bounds enforce epistemic discipline.
+- **Verdict**: 🟢 MECHANISM DEMONSTRATED (Empirical Efficacy Open)
+- **Evidence**: Semantic gate weight bounds and claim/evidence dependency verification successfully constrain assumption graphs mechanically. Demonstrating empirical efficacy in reducing hallucination-induced regressions over unconstrained prompting requires specialized adversarial evaluation suites.
 
 ### H4_Auditability_And_Provenance: S-Class provides end-to-end lineage, trace provenance, and certification auditability.
 - **Verdict**: 🟢 SUPPORTED
-- **Evidence**: 100% genuine live benchmark certification auditor guarantees 0 mock runs and complete execution trace tree hashes.
+- **Evidence**: 100% genuine live benchmark certification auditor guarantees 0 mock runs and complete cryptographic execution trace tree hashes with reproducible provenance.
 
 ### H5_Lower_Human_Verification_Burden: S-Class reduces developer review friction and manual audit overhead.
 - **Verdict**: 🔴 NOT SUPPORTED
-- **Evidence**: n=3 failure sample audit check confirms 100% agreement (kappa=1.0) on the sample, but sample size is too small for population proof.
+- **Evidence**: n=3 failure sample audit check confirms 100% agreement (kappa=1.0) on the small sample, but the sample size is underpowered to establish population-level reduction in human review burden under the preregistered protocol.
 
 ### H6_Safety_Security_Compliance_Wedge: S-Class provides a significant performance wedge on high-risk safety, security, and compliance invariant tasks.
 - **Verdict**: 🟠 OPEN HYPOTHESIS
-- **Evidence**: On general modular/CRUD tasks B2 and B4 are neck-and-neck (97.5% vs 95.0%). Testing H6 requires dedicated high-invariance compliance tasks.
-
+- **Evidence**: On general modular/CRUD tasks B2 and B4 exhibit parity (97.50% vs 95.00%). Confirming H6 requires dedicated high-invariance compliance and safety benchmarks where unauthorized actions incur severe penalties.

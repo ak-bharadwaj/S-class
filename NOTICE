@@ -1,0 +1,38 @@
+S-Class Governance & Autonomous Execution Substrate
+Copyright (c) 2026 ak-bharadwaj. All Rights Reserved.
+
+This product includes software developed by ak-bharadwaj and components
+adapted from or verified against standard open-source protocols and specifications.
+
+===============================================================================
+THIRD-PARTY ACKNOWLEDGMENTS & LICENSES
+===============================================================================
+
+1. Python Cryptography Library
+   - Upstream: Python Cryptographic Authority (PyCA)
+   - License: Apache License 2.0 / BSD 3-Clause License
+   - Use: Ed25519 asymmetric signing, key serialization, and SHA-256 primitives.
+
+2. Portalocker OS File Locking Reference
+   - Upstream: Rick van Hattem / Portalocker
+   - License: PSF 2.0 / MIT License
+   - Note: S-Class FileLock implements clean-room OS kernel locking semantics
+     via msvcrt (Windows) and fcntl.flock (POSIX).
+
+3. Schemathesis Property-Based API Testing Harness
+   - Upstream: Dmitry Dygalo / Schemathesis
+   - License: MIT License
+   - Use: External black-box invariant fuzzing harness.
+
+4. RFC 8785 JSON Canonicalization Scheme (JCS)
+   - Reference Specification: IETF RFC 8785
+   - Use: Clean-room implementation of deterministic canonical JSON serialization.
+
+===============================================================================
+NO AGPL / COPYLEFT DERIVATION CONFIRMATION
+===============================================================================
+
+Explicit confirmation: No source code, algorithms, structures, or intellectual
+property in S-Class have been derived, copied, or adapted from AGPLv3, GPLv3, or
+any reciprocal copyleft licensed projects. All components are proprietary or
+clean-room implementations adhering to standard open specifications.

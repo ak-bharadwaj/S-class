@@ -1423,3 +1423,218 @@ def test_read_file_chunk_execution_and_errors(tmp_path):
     assert res_valid.result_data["lines"] == ("line 1\n", "line 2\n")
 
     ws.cleanup()
+
+
+# =====================================================================
+# 5. D7 ADVERSARIAL AUTHORITY RESOLUTION & FAIL-CLOSED BOUNDARY TESTS
+# =====================================================================
+
+def test_d7_lease_authority_unavailable_rejects_synthesis(default_authority_signer, default_exec_ctx, tmp_path):
+    """Proves that missing lease authority causes synthesizer to fail closed immediately."""
+    call = AgentToolCall("C1", "propose_test_run", {"obligation_id": "OBL-001", "target_test": "t.py", "purpose": "P"})
+    ctrl = SClassController(
+        authority_signer=default_authority_signer,
+        nonce_store=D2NonceStore(file_path=str(tmp_path / "n1.log")),
+        lease_authority=None,
+        state_authority=StaticStateAuthority(1, "1" * 64),
+    )
+    binding = ctrl.issue_session_binding(
+        session_id=DEFAULT_SESSION_ID,
+        repository_id=DEFAULT_REPO_ID,
+        source_sha=DEFAULT_SHA,
+        task_id=DEFAULT_TASK_ID,
+        execution_context=default_exec_ctx,
+    )
+
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(
+        tool_call=call,
+        session_execution_context=default_exec_ctx,
+        session_binding=binding,
+        controller=ctrl,
+        active_session_id=DEFAULT_SESSION_ID,
+        authoritative_repo_id=DEFAULT_REPO_ID,
+        authoritative_source_sha=DEFAULT_SHA,
+        active_task_id=DEFAULT_TASK_ID,
+    )
+    assert prop is None
+    assert "AUTHORITY_RESOLUTION_FAILED" in (err or "")
+    assert "MISSING_LEASE_AUTHORITY" in (err or "")
+
+
+def test_d7_state_authority_unavailable_rejects_synthesis(default_authority_signer, default_exec_ctx, tmp_path):
+    """Proves that missing state authority causes synthesizer to fail closed immediately."""
+    call = AgentToolCall("C1", "propose_test_run", {"obligation_id": "OBL-001", "target_test": "t.py", "purpose": "P"})
+    ctrl = SClassController(
+        authority_signer=default_authority_signer,
+        nonce_store=D2NonceStore(file_path=str(tmp_path / "n2.log")),
+        lease_authority=StaticLeaseAuthority({
+            DEFAULT_TASK_ID: PlanningLease(
+                task_id=DEFAULT_TASK_ID,
+                owner_id="worker",
+                lease_epoch=1,
+                fencing_token=1,
+                acquired_at=TIMESTAMP_NOW,
+                expires_at=TIMESTAMP_EXPIRY,
+                is_active=True,
+            )
+        }),
+        state_authority=None,
+    )
+    binding = ctrl.issue_session_binding(
+        session_id=DEFAULT_SESSION_ID,
+        repository_id=DEFAULT_REPO_ID,
+        source_sha=DEFAULT_SHA,
+        task_id=DEFAULT_TASK_ID,
+        execution_context=default_exec_ctx,
+    )
+
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(
+        tool_call=call,
+        session_execution_context=default_exec_ctx,
+        session_binding=binding,
+        controller=ctrl,
+        active_session_id=DEFAULT_SESSION_ID,
+        authoritative_repo_id=DEFAULT_REPO_ID,
+        authoritative_source_sha=DEFAULT_SHA,
+        active_task_id=DEFAULT_TASK_ID,
+    )
+    assert prop is None
+    assert "AUTHORITY_RESOLUTION_FAILED" in (err or "")
+    assert "MISSING_STATE_AUTHORITY" in (err or "")
+
+
+def test_d7_malformed_authority_rejects_synthesis(default_authority_signer, default_exec_ctx, tmp_path):
+    """Proves that malformed state coordinates (e.g. empty digest or invalid format) fail closed."""
+    call = AgentToolCall("C1", "propose_test_run", {"obligation_id": "OBL-001", "target_test": "t.py", "purpose": "P"})
+    
+    class MalformedStateAuthority:
+        def get_authoritative_state(self):
+            return (1, "")  # Empty digest is invalid
+
+    ctrl = SClassController(
+        authority_signer=default_authority_signer,
+        nonce_store=D2NonceStore(file_path=str(tmp_path / "n3.log")),
+        lease_authority=StaticLeaseAuthority({
+            DEFAULT_TASK_ID: PlanningLease(
+                task_id=DEFAULT_TASK_ID,
+                owner_id="worker",
+                lease_epoch=1,
+                fencing_token=1,
+                acquired_at=TIMESTAMP_NOW,
+                expires_at=TIMESTAMP_EXPIRY,
+                is_active=True,
+            )
+        }),
+        state_authority=MalformedStateAuthority(),
+    )
+    binding = ctrl.issue_session_binding(
+        session_id=DEFAULT_SESSION_ID,
+        repository_id=DEFAULT_REPO_ID,
+        source_sha=DEFAULT_SHA,
+        task_id=DEFAULT_TASK_ID,
+        execution_context=default_exec_ctx,
+    )
+
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(
+        tool_call=call,
+        session_execution_context=default_exec_ctx,
+        session_binding=binding,
+        controller=ctrl,
+        active_session_id=DEFAULT_SESSION_ID,
+        authoritative_repo_id=DEFAULT_REPO_ID,
+        authoritative_source_sha=DEFAULT_SHA,
+        active_task_id=DEFAULT_TASK_ID,
+    )
+    assert prop is None
+    assert "AUTHORITY_RESOLUTION_FAILED" in (err or "")
+
+
+def test_d7_missing_authority_for_task_rejects_synthesis(default_authority_signer, default_exec_ctx, tmp_path):
+    """Proves that when no active lease exists for the requested task, synthesis fails closed."""
+    call = AgentToolCall("C1", "propose_test_run", {"obligation_id": "OBL-001", "target_test": "t.py", "purpose": "P"})
+    ctrl = SClassController(
+        authority_signer=default_authority_signer,
+        nonce_store=D2NonceStore(file_path=str(tmp_path / "n4.log")),
+        lease_authority=StaticLeaseAuthority({}),  # Empty lease map
+        state_authority=StaticStateAuthority(1, "1" * 64),
+    )
+    binding = ctrl.issue_session_binding(
+        session_id=DEFAULT_SESSION_ID,
+        repository_id=DEFAULT_REPO_ID,
+        source_sha=DEFAULT_SHA,
+        task_id="TASK-MISSING-LEASE",
+        execution_context=default_exec_ctx,
+    )
+
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(
+        tool_call=call,
+        session_execution_context=default_exec_ctx,
+        session_binding=binding,
+        controller=ctrl,
+        active_session_id=DEFAULT_SESSION_ID,
+        authoritative_repo_id=DEFAULT_REPO_ID,
+        authoritative_source_sha=DEFAULT_SHA,
+        active_task_id="TASK-MISSING-LEASE",
+    )
+    assert prop is None
+    assert "AUTHORITY_RESOLUTION_FAILED" in (err or "")
+    assert "NO_ACTIVE_LEASE" in (err or "")
+
+
+def test_d7_cross_runtime_authority_mismatch_rejects_synthesis(fresh_controller, default_exec_ctx):
+    """Proves that cross-runtime authority mismatches (e.g. binding task != active task) are rejected."""
+    call = AgentToolCall("C1", "propose_test_run", {"obligation_id": "OBL-001", "target_test": "t.py", "purpose": "P"})
+    binding = fresh_controller.issue_session_binding(
+        session_id=DEFAULT_SESSION_ID,
+        repository_id=DEFAULT_REPO_ID,
+        source_sha=DEFAULT_SHA,
+        task_id="TASK-A",
+        execution_context=default_exec_ctx,
+    )
+
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(
+        tool_call=call,
+        session_execution_context=default_exec_ctx,
+        session_binding=binding,
+        controller=fresh_controller,
+        active_session_id=DEFAULT_SESSION_ID,
+        authoritative_repo_id=DEFAULT_REPO_ID,
+        authoritative_source_sha=DEFAULT_SHA,
+        active_task_id="TASK-B",
+    )
+    assert prop is None
+    assert "BINDING_MISMATCH: task_id mismatch" in (err or "")
+
+
+def test_d7_zero_default_coordinate_fallback_impossible(default_authority_signer, default_exec_ctx, tmp_path):
+    """Proves that zero/default authority coordinates (0, 0, '', 0, '') can NEVER be manufactured or fallen back to."""
+    call = AgentToolCall("C1", "propose_test_run", {"obligation_id": "OBL-001", "target_test": "t.py", "purpose": "P"})
+    ctrl = SClassController(
+        authority_signer=default_authority_signer,
+        nonce_store=D2NonceStore(file_path=str(tmp_path / "n5.log")),
+        lease_authority=None,
+        state_authority=None,
+    )
+    binding = ctrl.issue_session_binding(
+        session_id=DEFAULT_SESSION_ID,
+        repository_id=DEFAULT_REPO_ID,
+        source_sha=DEFAULT_SHA,
+        task_id=DEFAULT_TASK_ID,
+        execution_context=default_exec_ctx,
+    )
+
+    prop, err = ActionProposalSynthesizer.synthesize_proposal(
+        tool_call=call,
+        session_execution_context=default_exec_ctx,
+        session_binding=binding,
+        controller=ctrl,
+        active_session_id=DEFAULT_SESSION_ID,
+        authoritative_repo_id=DEFAULT_REPO_ID,
+        authoritative_source_sha=DEFAULT_SHA,
+        active_task_id=DEFAULT_TASK_ID,
+    )
+    # Must fail closed with error, not construct proposal with zero coordinates
+    assert prop is None
+    assert err is not None
+    assert "AUTHORITY_RESOLUTION_FAILED" in err
+
