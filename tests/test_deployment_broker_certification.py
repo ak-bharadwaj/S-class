@@ -1690,12 +1690,14 @@ def test_dc38_legitimate_fresh_production_deployment_bootstrap_end_to_end(monkey
         monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
         monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
         monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+        monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
 
         # 1. External Deployment Authority Service
         ext_server = ExternalDeploymentAuthorityServer(
             endpoint_path=ext_endpoint,
             store_path=ext_store,
             auth_secret="EXT_SEC38",
+            allowed_uid=os.getuid() if sys.platform != "win32" else None,
         )
         ext_server.store.initialize_store_if_missing()
         ext_server.start()
@@ -2098,11 +2100,13 @@ def test_dc44_only_trusted_deployment_bootstrap_can_create_never_provisioned(mon
         monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
         monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
         monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+        monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
 
         ext_server = ExternalDeploymentAuthorityServer(
             endpoint_path=ext_endpoint,
             store_path=ext_store,
             auth_secret="EXT_SEC44",
+            allowed_uid=os.getuid() if sys.platform != "win32" else None,
         )
         ext_server.store.initialize_store_if_missing()
         ext_server.start()
@@ -2178,11 +2182,13 @@ def test_dc45_bootstrap_is_single_use_and_survives_process_restart(monkeypatch):
         monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
         monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
         monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+        monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
 
         ext_server = ExternalDeploymentAuthorityServer(
             endpoint_path=ext_endpoint,
             store_path=ext_store,
             auth_secret="EXT_SEC45",
+            allowed_uid=os.getuid() if sys.platform != "win32" else None,
         )
         ext_server.store.initialize_store_if_missing()
         ext_server.start()
@@ -2273,11 +2279,13 @@ def test_dc46_virgin_bootstrap_authorization_replay_rejected(monkeypatch):
         monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
         monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
         monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+        monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
 
         ext_server = ExternalDeploymentAuthorityServer(
             endpoint_path=ext_endpoint,
             store_path=ext_store,
             auth_secret="EXT_SEC46",
+            allowed_uid=os.getuid() if sys.platform != "win32" else None,
         )
         ext_server.store.initialize_store_if_missing()
         ext_server.start()
@@ -2329,11 +2337,13 @@ def test_dc47_replay_after_complete_local_state_destruction_rejected(monkeypatch
         monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
         monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
         monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+        monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
 
         ext_server = ExternalDeploymentAuthorityServer(
             endpoint_path=ext_endpoint,
             store_path=ext_store,
             auth_secret="EXT_SEC47",
+            allowed_uid=os.getuid() if sys.platform != "win32" else None,
         )
         ext_server.store.initialize_store_if_missing()
         ext_server.start()
@@ -2407,11 +2417,13 @@ def test_dc48_same_authorization_concurrently_used_twice_exactly_one_succeeds(mo
     monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
     monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
     monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+    monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
 
     ext_server = ExternalDeploymentAuthorityServer(
         endpoint_path=ext_endpoint,
         store_path=ext_store,
         auth_secret="EXT_SEC48",
+        allowed_uid=os.getuid() if sys.platform != "win32" else None,
     )
     ext_server.store.initialize_store_if_missing()
     ext_server.start()
@@ -2470,11 +2482,13 @@ def test_dc49_fresh_authorization_for_different_deployment_rejected(monkeypatch)
     monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
     monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
     monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+    monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
 
     ext_server = ExternalDeploymentAuthorityServer(
         endpoint_path=ext_endpoint,
         store_path=ext_store,
         auth_secret="EXT_SEC49",
+        allowed_uid=os.getuid() if sys.platform != "win32" else None,
     )
     ext_server.store.initialize_store_if_missing()
     ext_server.start()
@@ -2567,11 +2581,13 @@ def test_dc51_consumed_authorization_survives_process_kill_and_fresh_process_rep
         monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
         monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
         monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+        monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
 
         ext_server = ExternalDeploymentAuthorityServer(
             endpoint_path=ext_endpoint,
             store_path=ext_store,
             auth_secret="EXT_SEC51",
+            allowed_uid=os.getuid() if sys.platform != "win32" else None,
         )
         ext_server.store.initialize_store_if_missing()
         ext_server.start()
@@ -2633,11 +2649,13 @@ def test_dc52_consume_delete_all_local_state_restart_replay_rejected(monkeypatch
         monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
         monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
         monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+        monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
 
         ext_server = ExternalDeploymentAuthorityServer(
             endpoint_path=ext_endpoint,
             store_path=ext_store,
             auth_secret="EXT_SEC52",
+            allowed_uid=os.getuid() if sys.platform != "win32" else None,
         )
         ext_server.store.initialize_store_if_missing()
         ext_server.start()
@@ -2713,6 +2731,7 @@ def test_dc53_two_independent_processes_race_same_authorization_exactly_one_succ
         endpoint_path=ext_endpoint,
         store_path=ext_store,
         auth_secret="EXT_SEC53",
+        allowed_uid=os.getuid() if sys.platform != "win32" else None,
     )
     ext_server.store.initialize_store_if_missing()
     ext_server.start()
@@ -2814,11 +2833,13 @@ def test_dc55_authorization_consumed_crash_before_bootstrap_state_write_administ
         monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
         monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
         monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+        monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
 
         ext_server = ExternalDeploymentAuthorityServer(
             endpoint_path=ext_endpoint,
             store_path=ext_store,
             auth_secret="EXT_SEC55",
+            allowed_uid=os.getuid() if sys.platform != "win32" else None,
         )
         ext_server.store.initialize_store_if_missing()
         ext_server.start()
@@ -3133,11 +3154,13 @@ def test_dc61_delete_external_authority_registry_fails_closed(monkeypatch):
     monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
     monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
     monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+    monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
 
     server = ExternalDeploymentAuthorityServer(
         endpoint_path=endpoint,
         store_path=ext_store,
         auth_secret="SEC61",
+        allowed_uid=os.getuid() if sys.platform != "win32" else None,
     )
     server.store.initialize_store_if_missing()
     server.start()
@@ -3175,11 +3198,13 @@ def test_dc62_corrupt_external_authority_registry_fails_closed(monkeypatch):
     monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
     monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
     monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+    monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
 
     server = ExternalDeploymentAuthorityServer(
         endpoint_path=endpoint,
         store_path=ext_store,
         auth_secret="SEC62",
+        allowed_uid=os.getuid() if sys.platform != "win32" else None,
     )
     server.store.initialize_store_if_missing()
     server.start()
@@ -3216,12 +3241,14 @@ def test_dc63_restart_after_authority_state_loss_enters_authority_unavailable(mo
     monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
     monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
     monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+    monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
 
     # 1. Start server 1 and consume auth
     server1 = ExternalDeploymentAuthorityServer(
         endpoint_path=endpoint,
         store_path=ext_store,
         auth_secret="SEC63",
+        allowed_uid=os.getuid() if sys.platform != "win32" else None,
     )
     server1.store.initialize_store_if_missing()
     server1.start()
@@ -3244,6 +3271,7 @@ def test_dc63_restart_after_authority_state_loss_enters_authority_unavailable(mo
         endpoint_path=endpoint,
         store_path=ext_store,
         auth_secret="SEC63",
+        allowed_uid=os.getuid() if sys.platform != "win32" else None,
     )
     server2.start()
     try:
@@ -3272,11 +3300,13 @@ def test_dc64_authorization_cannot_be_replayed_after_authority_state_destruction
         monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
         monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
         monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
+        monkeypatch.setenv("SCLASS_ALLOW_SAME_UID_TEST", "1")
 
         server = ExternalDeploymentAuthorityServer(
             endpoint_path=endpoint,
             store_path=ext_store,
             auth_secret="SEC64",
+            allowed_uid=os.getuid() if sys.platform != "win32" else None,
         )
         server.store.initialize_store_if_missing()
         server.start()
@@ -3406,6 +3436,7 @@ def test_dc68_caller_injected_authority_root_rejected_in_production(monkeypatch)
             endpoint_path=endpoint,
             store_path=ext_store,
             auth_secret="SEC68",
+            allowed_uid=1002 if sys.platform != "win32" else None,
             root_public_key=rogue_key,
         )
 
