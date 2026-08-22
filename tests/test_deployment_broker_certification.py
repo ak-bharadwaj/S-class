@@ -385,6 +385,13 @@ def test_dc12_d2_broker_manifest_mismatch_rejected():
     try:
         client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC12")
         client.authorize_initial_provisioning()
+        client.register_pending_provisioning(
+            installation_id="INST-12",
+            manifest_id="M-12",
+            manifest_version=1,
+            manifest_digest="0" * 64,
+            root_fingerprint="FORGED_FP",
+        )
         resp = client._client.call("record_provisioned", {
             "commit_proof": {
                 "proof_version": "D2CommitProofV1",

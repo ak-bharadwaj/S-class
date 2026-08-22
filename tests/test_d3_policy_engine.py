@@ -5654,14 +5654,14 @@ def test_d3_install_e124_record_provisioned_from_unprovisioned_rejected():
             "root_fingerprint": "ROOT-FP",
         })
         assert not resp.get("success")
-        assert "without prior PROVISIONING_AUTHORIZED" in resp.get("error", "")
+        assert "PROVISIONING_PENDING required" in resp.get("error", "")
         client.close()
     finally:
         broker.stop_ipc_server()
 
 
 def test_d3_install_e125_record_reprovisioned_without_recovery_authorized_rejected():
-    """E125: Calling record_reprovisioned without RECOVERY_AUTHORIZED is rejected."""
+    """E125: Calling record_reprovisioned without RECOVERY_AUTHORIZED / RECOVERY_PENDING is rejected."""
     from events.broker import TrustedDeploymentAuthorityBroker
     from events.ipc import OSIPCClient
 
@@ -5682,7 +5682,7 @@ def test_d3_install_e125_record_reprovisioned_without_recovery_authorized_reject
             "root_fingerprint": "ROOT-FP",
         })
         assert not resp.get("success")
-        assert "without authorized recovery" in resp.get("error", "")
+        assert "RECOVERY_PENDING required" in resp.get("error", "")
         client.close()
     finally:
         broker.stop_ipc_server()
@@ -5964,7 +5964,15 @@ def test_d3_install_e135_payload_digest_substitution_rejected(tmp_path):
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+    broker.status = DeploymentStatus.PROVISIONING_PENDING
+    broker.pending_provisioning = {
+        "deployment_id": "DEP-E136",
+        "installation_id": "INST-E136",
+        "manifest_id": "M-E136",
+        "manifest_version": 1,
+        "manifest_digest": "1" * 64,
+        "root_fingerprint": fp,
+    }
 
     proof_dict = {
         "proof_version": "D2CommitProofV1",
@@ -6031,7 +6039,15 @@ def test_d3_install_e136_signature_substitution_rejected(tmp_path):
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+    broker.status = DeploymentStatus.PROVISIONING_PENDING
+    broker.pending_provisioning = {
+        "deployment_id": "DEP-E136",
+        "installation_id": "INST-E136",
+        "manifest_id": "M-E136",
+        "manifest_version": 1,
+        "manifest_digest": "1" * 64,
+        "root_fingerprint": fp,
+    }
 
     proof_dict = {
         "proof_version": "D2CommitProofV1",
@@ -6168,7 +6184,15 @@ def test_d3_install_e138_manifest_id_mismatch_rejected(tmp_path):
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+    broker.status = DeploymentStatus.PROVISIONING_PENDING
+    broker.pending_provisioning = {
+        "deployment_id": "DEP-E136",
+        "installation_id": "INST-E136",
+        "manifest_id": "M-E136",
+        "manifest_version": 1,
+        "manifest_digest": "1" * 64,
+        "root_fingerprint": fp,
+    }
 
     proof_dict = {
         "proof_version": "D2CommitProofV1",
@@ -6235,7 +6259,15 @@ def test_d3_install_e139_manifest_version_mismatch_rejected(tmp_path):
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+    broker.status = DeploymentStatus.PROVISIONING_PENDING
+    broker.pending_provisioning = {
+        "deployment_id": "DEP-E136",
+        "installation_id": "INST-E136",
+        "manifest_id": "M-E136",
+        "manifest_version": 1,
+        "manifest_digest": "1" * 64,
+        "root_fingerprint": fp,
+    }
 
     proof_dict = {
         "proof_version": "D2CommitProofV1",
@@ -6303,7 +6335,15 @@ def test_d3_install_e140_fake_d2_commit_proof_with_correct_fingerprint_rejected(
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+    broker.status = DeploymentStatus.PROVISIONING_PENDING
+    broker.pending_provisioning = {
+        "deployment_id": "DEP-E136",
+        "installation_id": "INST-E136",
+        "manifest_id": "M-E136",
+        "manifest_version": 1,
+        "manifest_digest": "1" * 64,
+        "root_fingerprint": fp,
+    }
 
     proof_dict = {
         "proof_version": "D2CommitProofV1",
@@ -6355,14 +6395,22 @@ def test_d3_install_e141_valid_signed_proof_non_existent_d2_commit_rejected(tmp_
     from events.serializer import canonicalize_json
 
     non_existent_store = str(tmp_path / "non_existent_d2.jsonl")
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
     broker = TrustedDeploymentAuthorityBroker(
         deployment_id="DEP-E141",
         auth_secret="SEC-E141",
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=non_existent_store,
     )
-    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
-    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+    broker.status = DeploymentStatus.PROVISIONING_PENDING
+    broker.pending_provisioning = {
+        "deployment_id": "DEP-E141",
+        "installation_id": "INST-E141",
+        "manifest_id": "M-E141",
+        "manifest_version": 1,
+        "manifest_digest": "1" * 64,
+        "root_fingerprint": fp,
+    }
 
     proof_dict = {
         "proof_version": "D2CommitProofV1",
@@ -6440,7 +6488,15 @@ def test_d3_install_e142_valid_signed_proof_old_d2_commit_rejected(tmp_path):
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+    broker.status = DeploymentStatus.PROVISIONING_PENDING
+    broker.pending_provisioning = {
+        "deployment_id": "DEP-E142",
+        "installation_id": "INST-E142",
+        "manifest_id": "M-E142",
+        "manifest_version": 1,
+        "manifest_digest": "1" * 64,
+        "root_fingerprint": fp,
+    }
 
     # Construct and sign proof for old commit (v1, sequence 1)
     old_proof = {
@@ -6508,7 +6564,15 @@ def test_d3_install_e143_valid_signature_altered_event_id_rejected(tmp_path):
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+    broker.status = DeploymentStatus.PROVISIONING_PENDING
+    broker.pending_provisioning = {
+        "deployment_id": "DEP-E136",
+        "installation_id": "INST-E136",
+        "manifest_id": "M-E136",
+        "manifest_version": 1,
+        "manifest_digest": "1" * 64,
+        "root_fingerprint": fp,
+    }
 
     proof_dict = {
         "proof_version": "D2CommitProofV1",
@@ -6575,7 +6639,15 @@ def test_d3_install_e144_valid_signature_altered_sequence_rejected(tmp_path):
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+    broker.status = DeploymentStatus.PROVISIONING_PENDING
+    broker.pending_provisioning = {
+        "deployment_id": "DEP-E136",
+        "installation_id": "INST-E136",
+        "manifest_id": "M-E136",
+        "manifest_version": 1,
+        "manifest_digest": "1" * 64,
+        "root_fingerprint": fp,
+    }
 
     proof_dict = {
         "proof_version": "D2CommitProofV1",
@@ -6642,7 +6714,15 @@ def test_d3_install_e145_valid_signature_manifest_digest_not_in_d2_rejected(tmp_
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+    broker.status = DeploymentStatus.PROVISIONING_PENDING
+    broker.pending_provisioning = {
+        "deployment_id": "DEP-E136",
+        "installation_id": "INST-E136",
+        "manifest_id": "M-E136",
+        "manifest_version": 1,
+        "manifest_digest": "1" * 64,
+        "root_fingerprint": fp,
+    }
 
     proof_dict = {
         "proof_version": "D2CommitProofV1",
@@ -6709,7 +6789,15 @@ def test_d3_install_e146_valid_proof_another_deployment_rejected(tmp_path):
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+    broker.status = DeploymentStatus.PROVISIONING_PENDING
+    broker.pending_provisioning = {
+        "deployment_id": "DEP-E136",
+        "installation_id": "INST-E136",
+        "manifest_id": "M-E136",
+        "manifest_version": 1,
+        "manifest_digest": "1" * 64,
+        "root_fingerprint": fp,
+    }
 
     proof_dict = {
         "proof_version": "D2CommitProofV1",
@@ -6776,7 +6864,15 @@ def test_d3_install_e147_valid_proof_previous_d2_head_rejected(tmp_path):
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+    broker.status = DeploymentStatus.PROVISIONING_PENDING
+    broker.pending_provisioning = {
+        "deployment_id": "DEP-E136",
+        "installation_id": "INST-E136",
+        "manifest_id": "M-E136",
+        "manifest_version": 1,
+        "manifest_digest": "1" * 64,
+        "root_fingerprint": fp,
+    }
 
     proof_dict = {
         "proof_version": "D2CommitProofV1",
@@ -6883,7 +6979,15 @@ def test_d3_install_e148_d2_head_changes_after_proof_creation_rejected(tmp_path)
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+    broker.status = DeploymentStatus.PROVISIONING_PENDING
+    broker.pending_provisioning = {
+        "deployment_id": "DEP-E148",
+        "installation_id": "INST-E148",
+        "manifest_id": "M-E148",
+        "manifest_version": 1,
+        "manifest_digest": "1" * 64,
+        "root_fingerprint": fp,
+    }
 
     resp = broker._dispatch_rpc({
         "method": "record_provisioned",
@@ -6942,7 +7046,15 @@ def test_d3_install_e149_wrong_event_type_with_matching_payload_rejected(tmp_pat
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+    broker.status = DeploymentStatus.PROVISIONING_PENDING
+    broker.pending_provisioning = {
+        "deployment_id": "DEP-E136",
+        "installation_id": "INST-E136",
+        "manifest_id": "M-E136",
+        "manifest_version": 1,
+        "manifest_digest": "1" * 64,
+        "root_fingerprint": fp,
+    }
 
     proof_dict = {
         "proof_version": "D2CommitProofV1",
@@ -7009,7 +7121,15 @@ def test_d3_install_e150_generic_event_impersonating_authority_commit_rejected(t
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+    broker.status = DeploymentStatus.PROVISIONING_PENDING
+    broker.pending_provisioning = {
+        "deployment_id": "DEP-E136",
+        "installation_id": "INST-E136",
+        "manifest_id": "M-E136",
+        "manifest_version": 1,
+        "manifest_digest": "1" * 64,
+        "root_fingerprint": fp,
+    }
 
     proof_dict = {
         "proof_version": "D2CommitProofV1",
@@ -7136,7 +7256,15 @@ def test_d3_install_schema_negative_missing_or_extra_proof_fields_rejected(tmp_p
         root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
         d2_store_path=d2_file,
     )
-    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+    broker.status = DeploymentStatus.PROVISIONING_PENDING
+    broker.pending_provisioning = {
+        "deployment_id": "DEP-SCHEMA",
+        "installation_id": "INST-1",
+        "manifest_id": "M-SCHEMA",
+        "manifest_version": 1,
+        "manifest_digest": "1" * 64,
+        "root_fingerprint": fp,
+    }
 
     # Case 1: Missing commit_proof completely
     resp = broker._dispatch_rpc({"method": "record_provisioned", "params": {}}, {})
@@ -7226,12 +7354,13 @@ def test_d3_install_e154_d2_advances_after_proof_creation_rejected(tmp_path):
         d2_store_path=d2_file,
     )
     broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    broker._dispatch_rpc({"method": "register_pending_provisioning", "params": {"installation_id": "INST-E154", "manifest_id": "M-E154", "manifest_version": 1, "manifest_digest": "1" * 64, "root_fingerprint": fp}}, {})
 
     # Broker admission attempt with stale proof_v1 must be rejected
     resp = broker._dispatch_rpc({"method": "record_provisioned", "params": {"commit_proof": proof_v1}}, {})
     assert not resp.get("success")
     assert "Stale or superseded D2 commit" in resp.get("error", "")
-    assert broker.status == DeploymentStatus.PROVISIONING_AUTHORIZED
+    assert broker.status == DeploymentStatus.PROVISIONING_PENDING
 
 
 def test_d3_install_e155_d2_advances_between_verification_and_broker_transition_rejected(tmp_path):
@@ -7265,6 +7394,7 @@ def test_d3_install_e155_d2_advances_between_verification_and_broker_transition_
         d2_store_path=d2_file,
     )
     broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    broker._dispatch_rpc({"method": "register_pending_provisioning", "params": {"installation_id": "INST-E155", "manifest_id": "M-E155", "manifest_version": 1, "manifest_digest": "3" * 64, "root_fingerprint": fp}}, {})
 
     # Advance D2 store right before dispatching record_provisioned
     store.commit_epoch(
@@ -7313,6 +7443,7 @@ def test_d3_install_e156_concurrent_d2_commit_and_broker_admission_deterministic
         d2_store_path=d2_file,
     )
     broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    broker._dispatch_rpc({"method": "register_pending_provisioning", "params": {"installation_id": "INST-E156", "manifest_id": "M-E156", "manifest_version": 1, "manifest_digest": "5" * 64, "root_fingerprint": fp}}, {})
 
     results = []
 
@@ -7347,7 +7478,7 @@ def test_d3_install_e156_concurrent_d2_commit_and_broker_admission_deterministic
         assert broker.current_installation["manifest_id"] == "M-E156"
     else:
         assert "Stale or superseded D2 commit" in resp.get("error", "")
-        assert broker.status == DeploymentStatus.PROVISIONING_AUTHORIZED
+        assert broker.status == DeploymentStatus.PROVISIONING_PENDING
 
 
 def test_d3_install_e157_retry_after_race_deterministic_result(tmp_path):
@@ -7382,6 +7513,16 @@ def test_d3_install_e157_retry_after_race_deterministic_result(tmp_path):
         d2_store_path=d2_file,
     )
     broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    broker._dispatch_rpc({
+        "method": "register_pending_provisioning",
+        "params": {
+            "installation_id": "INST-E157-1",
+            "manifest_id": "M-E157",
+            "manifest_version": 1,
+            "manifest_digest": "7" * 64,
+            "root_fingerprint": fp,
+        }
+    }, {})
 
     # Race: D2 advances before broker consumes proof_v1
     store.commit_epoch(
@@ -7396,7 +7537,7 @@ def test_d3_install_e157_retry_after_race_deterministic_result(tmp_path):
     resp1 = broker._dispatch_rpc({"method": "record_provisioned", "params": {"commit_proof": proof_v1}}, {})
     assert not resp1.get("success")
     assert "Stale or superseded D2 commit" in resp1.get("error", "")
-    assert broker.status == DeploymentStatus.PROVISIONING_AUTHORIZED
+    assert broker.status == DeploymentStatus.PROVISIONING_PENDING
 
     # Step 2: Retry with fresh proof generated for current authoritative head
     proof_v2 = D2InstallationProvisioning.generate_commit_proof(
@@ -7406,6 +7547,19 @@ def test_d3_install_e157_retry_after_race_deterministic_result(tmp_path):
         signer_identity="Gate3AuthoritativeVerifier",
         d2_store_path=d2_file,
     )
+
+    # Register updated pending intent for epoch 2
+    broker.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+    broker._dispatch_rpc({
+        "method": "register_pending_provisioning",
+        "params": {
+            "installation_id": "INST-E157-2",
+            "manifest_id": "M-E157",
+            "manifest_version": 2,
+            "manifest_digest": "8" * 64,
+            "root_fingerprint": fp,
+        }
+    }, {})
 
     # Attempt 2 succeeds deterministically
     resp2 = broker._dispatch_rpc({"method": "record_provisioned", "params": {"commit_proof": proof_v2}}, {})
@@ -7520,7 +7674,8 @@ def test_d3_install_e158_crash_after_d2_commit_before_broker_persistence_determi
     )
     assert broker_recovered.status == DeploymentStatus.PROVISIONING_AUTHORIZED
 
-    # Retry admission with valid proof succeeds deterministically
+    # Register pending intent and retry admission with valid proof succeeds deterministically
+    broker_recovered._dispatch_rpc({"method": "register_pending_provisioning", "params": {"installation_id": "INST-E158", "manifest_id": "M-E158", "manifest_version": 1, "manifest_digest": "a" * 64, "root_fingerprint": fp}}, {})
     resp = broker_recovered._dispatch_rpc({"method": "record_provisioned", "params": {"commit_proof": proof}}, {})
     assert resp.get("success")
     assert broker_recovered.status == DeploymentStatus.PROVISIONED
@@ -7626,6 +7781,7 @@ def test_d3_install_e160_later_d2_event_after_admission_does_not_invalidate_auth
         d2_store_path=d2_file,
     )
     broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    broker._dispatch_rpc({"method": "register_pending_provisioning", "params": {"installation_id": "INST-E160", "manifest_id": "M-E160", "manifest_version": 1, "manifest_digest": "c" * 64, "root_fingerprint": fp}}, {})
     resp = broker._dispatch_rpc({"method": "record_provisioned", "params": {"commit_proof": proof}}, {})
     assert resp.get("success")
     assert broker.status == DeploymentStatus.PROVISIONED
@@ -7724,6 +7880,7 @@ def test_d3_install_e161_referenced_d2_event_deleted_or_corrupted_fails_closed(t
         d2_store_path=d2_file,
     )
     broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    broker._dispatch_rpc({"method": "register_pending_provisioning", "params": {"installation_id": "INST-E161", "manifest_id": "M-E161", "manifest_version": 1, "manifest_digest": "f" * 64, "root_fingerprint": fp}}, {})
     resp = broker._dispatch_rpc({"method": "record_provisioned", "params": {"commit_proof": proof}}, {})
     assert resp.get("success")
     assert broker.status == DeploymentStatus.PROVISIONED
@@ -8157,3 +8314,270 @@ def test_d3_install_e168_repeated_recovery_is_idempotent(tmp_path):
 
 
 
+
+
+
+def test_d3_install_e169_direct_record_provisioned_from_provisioning_authorized_rejected(tmp_path):
+    """E169: Direct record_provisioned from PROVISIONING_AUTHORIZED without register_pending_provisioning is rejected."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, D2AuthorityManifestStore, D2InstallationProvisioning
+
+    d2_file = str(tmp_path / "d2_e169.jsonl")
+    state_file = str(tmp_path / "broker_state_e169.json")
+    store = D2AuthorityManifestStore(file_path=d2_file)
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    store.commit_epoch(
+        manifest_id="M-E169",
+        manifest_version=1,
+        payload_digest="9" * 64,
+        signer_identity="Gate3AuthoritativeVerifier",
+        root_fingerprint=fp,
+    )
+
+    proof = D2InstallationProvisioning.generate_commit_proof(
+        deployment_id="DEP-E169",
+        installation_id="INST-E169",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        signer_identity="Gate3AuthoritativeVerifier",
+        d2_store_path=d2_file,
+    )
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E169",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+    assert broker.status == DeploymentStatus.PROVISIONING_AUTHORIZED
+
+    # Direct call to record_provisioned without register_pending_provisioning must be rejected
+    resp = broker._dispatch_rpc({"method": "record_provisioned", "params": {"commit_proof": proof}}, {})
+    assert not resp.get("success")
+    assert "PROVISIONING_PENDING required" in resp.get("error", "")
+    assert broker.status == DeploymentStatus.PROVISIONING_AUTHORIZED
+
+
+def test_d3_install_e170_record_provisioned_without_pending_intent_rejected(tmp_path):
+    """E170: record_provisioned with no pending intent in state is rejected."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus
+
+    d2_file = str(tmp_path / "d2_e170.jsonl")
+    state_file = str(tmp_path / "broker_state_e170.json")
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E170",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    # Force status to PROVISIONING_PENDING but with pending_provisioning = None
+    broker.status = DeploymentStatus.PROVISIONING_PENDING
+    broker.pending_provisioning = None
+
+    resp = broker._dispatch_rpc({"method": "record_provisioned", "params": {"commit_proof": {}}}, {})
+    assert not resp.get("success")
+    assert "missing pending provisioning intent" in resp.get("error", "")
+
+
+def test_d3_install_e171_crash_non_pending_path_impossible(tmp_path):
+    """E171: Direct non-pending path cannot persist or transition to PROVISIONED on crash/restart."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, D2AuthorityManifestStore
+
+    d2_file = str(tmp_path / "d2_e171.jsonl")
+    state_file = str(tmp_path / "broker_state_e171.json")
+    store = D2AuthorityManifestStore(file_path=d2_file)
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E171",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+
+    # Attacker tries to write D2 commit without pending intent registered
+    store.commit_epoch(
+        manifest_id="M-E171",
+        manifest_version=1,
+        payload_digest="a" * 64,
+        signer_identity="Gate3AuthoritativeVerifier",
+        root_fingerprint=fp,
+    )
+
+    # Crash occurs before any pending registration
+    del broker
+
+    # Restart broker
+    restarted_broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E171",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    # Broker remains PROVISIONING_AUTHORIZED and does not grant PROVISIONED authority
+    assert restarted_broker.status == DeploymentStatus.PROVISIONING_AUTHORIZED
+    assert restarted_broker.current_installation is None
+
+
+def test_d3_install_e172_recovery_requires_recovery_pending(tmp_path):
+    """E172: Recovery flow strictly requires register_pending_reprovisioning / RECOVERY_PENDING."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus, D2AuthorityManifestStore, D2InstallationProvisioning
+    from events.serializer import canonicalize_json
+
+    d2_file = str(tmp_path / "d2_e172.jsonl")
+    state_file = str(tmp_path / "broker_state_e172.json")
+    store = D2AuthorityManifestStore(file_path=d2_file)
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E172",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    broker.notify_local_state_loss()
+    assert broker.status == DeploymentStatus.RECOVERY_REQUIRED
+
+    # Authorize recovery
+    auth_data = {
+        "authorization_id": "AUTH-172",
+        "deployment_id": "DEP-E172",
+        "target_manifest_id": "M-E172",
+        "authorized_at": "2026-08-22T10:00:00Z",
+        "reason": "Catastrophic recovery",
+        "root_fingerprint": fp,
+        "is_administrative_reprovisioning": False,
+    }
+    sig = TEST_AUTHORITY_PRIVATE_KEY.sign(canonicalize_json(auth_data))
+    auth_data["signature"] = {"signature_hex": sig.hex()}
+
+    auth_resp = broker._dispatch_rpc({
+        "method": "authorize_reprovisioning",
+        "params": {"reprovisioning_authorization": auth_data}
+    }, {})
+    assert auth_resp.get("success")
+    assert broker.status == DeploymentStatus.RECOVERY_AUTHORIZED
+
+    # Commit epoch to D2
+    store.commit_epoch(
+        manifest_id="M-E172",
+        manifest_version=1,
+        payload_digest="b" * 64,
+        signer_identity="Gate3AuthoritativeVerifier",
+        root_fingerprint=fp,
+    )
+    proof = D2InstallationProvisioning.generate_commit_proof(
+        deployment_id="DEP-E172",
+        installation_id="INST-E172",
+        root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+        signer_identity="Gate3AuthoritativeVerifier",
+        d2_store_path=d2_file,
+    )
+
+    # 1. Direct record_reprovisioned from RECOVERY_AUTHORIZED without RECOVERY_PENDING -> rejected
+    direct_resp = broker._dispatch_rpc({"method": "record_reprovisioned", "params": {"commit_proof": proof}}, {})
+    assert not direct_resp.get("success")
+    assert "RECOVERY_PENDING required" in direct_resp.get("error", "")
+    assert broker.status == DeploymentStatus.RECOVERY_AUTHORIZED
+
+    # 2. Register pending reprovisioning -> transitions to RECOVERY_PENDING
+    reg_resp = broker._dispatch_rpc({
+        "method": "register_pending_reprovisioning",
+        "params": {
+            "installation_id": "INST-E172",
+            "manifest_id": "M-E172",
+            "manifest_version": 1,
+            "manifest_digest": "b" * 64,
+            "root_fingerprint": fp,
+        }
+    }, {})
+    assert reg_resp.get("success")
+    assert broker.status == DeploymentStatus.RECOVERY_PENDING
+
+    # 3. Now record_reprovisioned succeeds into PROVISIONED
+    rec_resp = broker._dispatch_rpc({"method": "record_reprovisioned", "params": {"commit_proof": proof}}, {})
+    assert rec_resp.get("success")
+    assert broker.status == DeploymentStatus.PROVISIONED
+
+
+def test_d3_install_e173_pending_intent_substitution_rejected(tmp_path):
+    """E173: Pending intent is immutable; differing second registration is rejected."""
+    from events.broker import TrustedDeploymentAuthorityBroker
+    from events.store import DeploymentStatus
+
+    d2_file = str(tmp_path / "d2_e173.jsonl")
+    state_file = str(tmp_path / "broker_state_e173.json")
+    fp = hashlib.sha256(TEST_AUTHORITY_PUBLIC_KEY.public_bytes_raw()).hexdigest()
+
+    broker = TrustedDeploymentAuthorityBroker(
+        deployment_id="DEP-E173",
+        state_file_path=state_file,
+        root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        d2_store_path=d2_file,
+    )
+    broker._dispatch_rpc({"method": "authorize_initial_provisioning"}, {})
+
+    # Register initial pending intent
+    reg1 = broker._dispatch_rpc({
+        "method": "register_pending_provisioning",
+        "params": {
+            "installation_id": "INST-E173",
+            "manifest_id": "M-E173",
+            "manifest_version": 1,
+            "manifest_digest": "1" * 64,
+            "root_fingerprint": fp,
+            "transaction_id": "TX-1",
+        }
+    }, {})
+    assert reg1.get("success")
+    assert broker.status == DeploymentStatus.PROVISIONING_PENDING
+
+    # 1. Idempotent identical retry -> succeeds
+    reg_idem = broker._dispatch_rpc({
+        "method": "register_pending_provisioning",
+        "params": {
+            "installation_id": "INST-E173",
+            "manifest_id": "M-E173",
+            "manifest_version": 1,
+            "manifest_digest": "1" * 64,
+            "root_fingerprint": fp,
+            "transaction_id": "TX-1",
+        }
+    }, {})
+    assert reg_idem.get("success")
+
+    # 2. Differing manifest_id -> rejected
+    reg_diff_id = broker._dispatch_rpc({
+        "method": "register_pending_provisioning",
+        "params": {
+            "installation_id": "INST-E173",
+            "manifest_id": "M-SUBSTITUTED",
+            "manifest_version": 1,
+            "manifest_digest": "1" * 64,
+            "root_fingerprint": fp,
+            "transaction_id": "TX-1",
+        }
+    }, {})
+    assert not reg_diff_id.get("success")
+    assert "Pending provisioning intent is immutable" in reg_diff_id.get("error", "")
+
+    # 3. Differing digest -> rejected
+    reg_diff_dig = broker._dispatch_rpc({
+        "method": "register_pending_provisioning",
+        "params": {
+            "installation_id": "INST-E173",
+            "manifest_id": "M-E173",
+            "manifest_version": 1,
+            "manifest_digest": "2" * 64,
+            "root_fingerprint": fp,
+            "transaction_id": "TX-1",
+        }
+    }, {})
+    assert not reg_diff_dig.get("success")
+    assert "Pending provisioning intent is immutable" in reg_diff_dig.get("error", "")

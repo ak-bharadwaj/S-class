@@ -487,12 +487,25 @@ class TrustedDeploymentAuthorityBroker:
 
             elif method == "register_pending_provisioning":
                 if self.status not in (DeploymentStatus.PROVISIONING_AUTHORIZED, DeploymentStatus.PROVISIONING_PENDING):
-                    return {"success": False, "error": f"Cannot register pending provisioning from state '{self.status.value}'."}
+                    return {"success": False, "error": f"Cannot register pending provisioning from state '{self.status.value}' (PROVISIONING_AUTHORIZED required)."}
 
                 params_dict = params or {}
                 m_digest = str(params_dict.get("manifest_digest", params_dict.get("payload_digest", "")))
                 if not m_digest:
                     return {"success": False, "error": "Missing manifest_digest/payload_digest for pending provisioning."}
+
+                if self.status == DeploymentStatus.PROVISIONING_PENDING and self.pending_provisioning is not None:
+                    p = self.pending_provisioning
+                    if (
+                        str(params_dict.get("manifest_id", "")) != str(p.get("manifest_id", ""))
+                        or int(params_dict.get("manifest_version", 1)) != int(p.get("manifest_version", 1))
+                        or m_digest != str(p.get("manifest_digest", ""))
+                        or (params_dict.get("root_fingerprint") and str(params_dict["root_fingerprint"]) != str(p.get("root_fingerprint", "")))
+                        or (params_dict.get("installation_id") and str(params_dict["installation_id"]) != str(p.get("installation_id", "")))
+                        or (params_dict.get("transaction_id") and str(params_dict["transaction_id"]) != str(p.get("transaction_id", "")))
+                    ):
+                        return {"success": False, "error": "Pending provisioning intent is immutable; differing second intent rejected."}
+                    return {"success": True, "status": self.status.value, "pending_provisioning": self.pending_provisioning}
 
                 self.status = DeploymentStatus.PROVISIONING_PENDING
                 self.pending_provisioning = {
@@ -508,8 +521,11 @@ class TrustedDeploymentAuthorityBroker:
                 return {"success": True, "status": self.status.value, "pending_provisioning": self.pending_provisioning}
 
             elif method == "record_provisioned":
-                if self.status not in (DeploymentStatus.PROVISIONING_AUTHORIZED, DeploymentStatus.PROVISIONING_PENDING):
-                    return {"success": False, "error": f"Cannot transition to PROVISIONED from state '{self.status.value}' without prior PROVISIONING_AUTHORIZED."}
+                if self.status != DeploymentStatus.PROVISIONING_PENDING:
+                    return {"success": False, "error": f"Cannot transition to PROVISIONED from state '{self.status.value}': PROVISIONING_PENDING required."}
+
+                if self.pending_provisioning is None:
+                    return {"success": False, "error": "Cannot transition to PROVISIONED: missing pending provisioning intent."}
 
                 from file_lock import FileLock
                 d2_lock_path = self.d2_store_path + ".lock"
@@ -522,17 +538,16 @@ class TrustedDeploymentAuthorityBroker:
 
                         proof = params["commit_proof"]
 
-                        if self.pending_provisioning is not None:
-                            p = self.pending_provisioning
-                            if (
-                                str(proof["manifest_id"]) != str(p.get("manifest_id", ""))
-                                or int(proof["manifest_version"]) != int(p.get("manifest_version", 1))
-                                or str(proof["manifest_digest"]) != str(p.get("manifest_digest", ""))
-                                or (p.get("root_fingerprint") and str(proof["root_fingerprint"]) != str(p["root_fingerprint"]))
-                                or (p.get("installation_id") and str(proof["installation_id"]) != str(p["installation_id"]))
-                                or (p.get("deployment_id") and str(proof["deployment_id"]) != str(p["deployment_id"]))
-                            ):
-                                return {"success": False, "error": "Commit proof does not match pending provisioning intent."}
+                        p = self.pending_provisioning
+                        if (
+                            str(proof["manifest_id"]) != str(p.get("manifest_id", ""))
+                            or int(proof["manifest_version"]) != int(p.get("manifest_version", 1))
+                            or str(proof["manifest_digest"]) != str(p.get("manifest_digest", ""))
+                            or (p.get("root_fingerprint") and str(proof["root_fingerprint"]) != str(p["root_fingerprint"]))
+                            or (p.get("installation_id") and str(proof["installation_id"]) != str(p["installation_id"]))
+                            or (p.get("deployment_id") and str(proof["deployment_id"]) != str(p["deployment_id"]))
+                        ):
+                            return {"success": False, "error": "Commit proof does not match pending provisioning intent."}
 
                         # Finalize to PROVISIONED
                         self.status = DeploymentStatus.PROVISIONED
@@ -603,10 +618,26 @@ class TrustedDeploymentAuthorityBroker:
 
             elif method == "register_pending_reprovisioning":
                 if self.status not in (DeploymentStatus.RECOVERY_AUTHORIZED, DeploymentStatus.RECOVERY_PENDING):
-                    return {"success": False, "error": f"Cannot register pending reprovisioning from state '{self.status.value}'."}
+                    return {"success": False, "error": f"Cannot register pending reprovisioning from state '{self.status.value}' (RECOVERY_AUTHORIZED required)."}
 
                 params_dict = params or {}
                 m_digest = str(params_dict.get("manifest_digest", params_dict.get("payload_digest", "")))
+                if not m_digest:
+                    return {"success": False, "error": "Missing manifest_digest/payload_digest for pending reprovisioning."}
+
+                if self.status == DeploymentStatus.RECOVERY_PENDING and self.pending_provisioning is not None:
+                    p = self.pending_provisioning
+                    if (
+                        str(params_dict.get("manifest_id", "")) != str(p.get("manifest_id", ""))
+                        or int(params_dict.get("manifest_version", 1)) != int(p.get("manifest_version", 1))
+                        or m_digest != str(p.get("manifest_digest", ""))
+                        or (params_dict.get("root_fingerprint") and str(params_dict["root_fingerprint"]) != str(p.get("root_fingerprint", "")))
+                        or (params_dict.get("installation_id") and str(params_dict["installation_id"]) != str(p.get("installation_id", "")))
+                        or (params_dict.get("transaction_id") and str(params_dict["transaction_id"]) != str(p.get("transaction_id", "")))
+                    ):
+                        return {"success": False, "error": "Pending reprovisioning intent is immutable; differing second intent rejected."}
+                    return {"success": True, "status": self.status.value, "pending_provisioning": self.pending_provisioning}
+
                 self.status = DeploymentStatus.RECOVERY_PENDING
                 self.pending_provisioning = {
                     "deployment_id": self.deployment_id,
@@ -621,8 +652,11 @@ class TrustedDeploymentAuthorityBroker:
                 return {"success": True, "status": self.status.value, "pending_provisioning": self.pending_provisioning}
 
             elif method == "record_reprovisioned":
-                if self.status not in (DeploymentStatus.RECOVERY_AUTHORIZED, DeploymentStatus.RECOVERY_PENDING):
-                    return {"success": False, "error": f"Cannot transition to PROVISIONED from state '{self.status.value}' without authorized recovery."}
+                if self.status != DeploymentStatus.RECOVERY_PENDING:
+                    return {"success": False, "error": f"Cannot transition to PROVISIONED from state '{self.status.value}': RECOVERY_PENDING required."}
+
+                if self.pending_provisioning is None:
+                    return {"success": False, "error": "Cannot transition to PROVISIONED: missing pending reprovisioning intent."}
 
                 from file_lock import FileLock
                 d2_lock_path = self.d2_store_path + ".lock"
@@ -635,17 +669,16 @@ class TrustedDeploymentAuthorityBroker:
 
                         proof = params["commit_proof"]
 
-                        if self.pending_provisioning is not None:
-                            p = self.pending_provisioning
-                            if (
-                                str(proof["manifest_id"]) != str(p.get("manifest_id", ""))
-                                or int(proof["manifest_version"]) != int(p.get("manifest_version", 1))
-                                or str(proof["manifest_digest"]) != str(p.get("manifest_digest", ""))
-                                or (p.get("root_fingerprint") and str(proof["root_fingerprint"]) != str(p["root_fingerprint"]))
-                                or (p.get("installation_id") and str(proof["installation_id"]) != str(p["installation_id"]))
-                                or (p.get("deployment_id") and str(proof["deployment_id"]) != str(p["deployment_id"]))
-                            ):
-                                return {"success": False, "error": "Commit proof does not match pending reprovisioning intent."}
+                        p = self.pending_provisioning
+                        if (
+                            str(proof["manifest_id"]) != str(p.get("manifest_id", ""))
+                            or int(proof["manifest_version"]) != int(p.get("manifest_version", 1))
+                            or str(proof["manifest_digest"]) != str(p.get("manifest_digest", ""))
+                            or (p.get("root_fingerprint") and str(proof["root_fingerprint"]) != str(p["root_fingerprint"]))
+                            or (p.get("installation_id") and str(proof["installation_id"]) != str(p["installation_id"]))
+                            or (p.get("deployment_id") and str(proof["deployment_id"]) != str(p["deployment_id"]))
+                        ):
+                            return {"success": False, "error": "Commit proof does not match pending reprovisioning intent."}
 
                         # Finalize to PROVISIONED
                         self.status = DeploymentStatus.PROVISIONED

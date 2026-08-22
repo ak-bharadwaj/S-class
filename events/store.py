@@ -1366,6 +1366,27 @@ class IPCDeploymentProvisioner(TrustedDeploymentProvisioner):
             if not resp.get("success"):
                 raise RuntimeError(f"Authority broker rejected initial provisioning: {resp.get('error')}")
 
+    def register_pending_provisioning(
+        self,
+        installation_id: str,
+        manifest_id: str,
+        manifest_version: int,
+        manifest_digest: str,
+        root_fingerprint: str,
+        transaction_id: Optional[str] = None,
+    ) -> None:
+        with self._lock:
+            resp = self._client.call("register_pending_provisioning", {
+                "installation_id": installation_id,
+                "manifest_id": manifest_id,
+                "manifest_version": manifest_version,
+                "manifest_digest": manifest_digest,
+                "root_fingerprint": root_fingerprint,
+                "transaction_id": transaction_id or installation_id,
+            })
+            if not resp.get("success"):
+                raise RuntimeError(f"Authority broker rejected register_pending_provisioning: {resp.get('error')}")
+
     def record_provisioned(
         self,
         installation_id: str,
@@ -1378,6 +1399,21 @@ class IPCDeploymentProvisioner(TrustedDeploymentProvisioner):
         **kwargs: Any,
     ) -> None:
         with self._lock:
+            status_resp = self._client.call("get_deployment_status")
+            if status_resp.get("status") == DeploymentStatus.PROVISIONING_AUTHORIZED.value:
+                proof_dict = commit_proof.to_dict() if isinstance(commit_proof, D2CommitProof) else (commit_proof or {})
+                m_digest = proof_dict.get("manifest_digest") or kwargs.get("initial_manifest_digest") or payload_digest or ""
+                reg_resp = self._client.call("register_pending_provisioning", {
+                    "installation_id": installation_id,
+                    "manifest_id": manifest_id,
+                    "manifest_version": manifest_version,
+                    "manifest_digest": m_digest,
+                    "root_fingerprint": root_fingerprint,
+                    "transaction_id": installation_id,
+                })
+                if not reg_resp.get("success"):
+                    raise RuntimeError(f"Authority broker rejected register_pending_provisioning: {reg_resp.get('error')}")
+
             params = {
                 "installation_id": installation_id,
                 "manifest_id": manifest_id,
@@ -1419,6 +1455,27 @@ class IPCDeploymentProvisioner(TrustedDeploymentProvisioner):
                 raise RuntimeError(f"Authority broker rejected reprovisioning: {err}")
             return resp.get("authorization", reprovisioning_authorization)
 
+    def register_pending_reprovisioning(
+        self,
+        installation_id: str,
+        manifest_id: str,
+        manifest_version: int,
+        manifest_digest: str,
+        root_fingerprint: str,
+        transaction_id: Optional[str] = None,
+    ) -> None:
+        with self._lock:
+            resp = self._client.call("register_pending_reprovisioning", {
+                "installation_id": installation_id,
+                "manifest_id": manifest_id,
+                "manifest_version": manifest_version,
+                "manifest_digest": manifest_digest,
+                "root_fingerprint": root_fingerprint,
+                "transaction_id": transaction_id or installation_id,
+            })
+            if not resp.get("success"):
+                raise RuntimeError(f"Authority broker rejected register_pending_reprovisioning: {resp.get('error')}")
+
     def record_reprovisioned(
         self,
         installation_id: str,
@@ -1431,6 +1488,21 @@ class IPCDeploymentProvisioner(TrustedDeploymentProvisioner):
         **kwargs: Any,
     ) -> None:
         with self._lock:
+            status_resp = self._client.call("get_deployment_status")
+            if status_resp.get("status") == DeploymentStatus.RECOVERY_AUTHORIZED.value:
+                proof_dict = commit_proof.to_dict() if isinstance(commit_proof, D2CommitProof) else (commit_proof or {})
+                m_digest = proof_dict.get("manifest_digest") or kwargs.get("initial_manifest_digest") or payload_digest or ""
+                reg_resp = self._client.call("register_pending_reprovisioning", {
+                    "installation_id": installation_id,
+                    "manifest_id": manifest_id,
+                    "manifest_version": manifest_version,
+                    "manifest_digest": m_digest,
+                    "root_fingerprint": root_fingerprint,
+                    "transaction_id": installation_id,
+                })
+                if not reg_resp.get("success"):
+                    raise RuntimeError(f"Authority broker rejected register_pending_reprovisioning: {reg_resp.get('error')}")
+
             params = {
                 "installation_id": installation_id,
                 "manifest_id": manifest_id,
