@@ -1691,9 +1691,6 @@ def test_dc38_legitimate_fresh_production_deployment_bootstrap_end_to_end(monkey
         DeploymentProvisionerRegistry.reset_for_testing()
 
         # Switch to production mode
-        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
-        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
-        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
         
 
         # 1. External Deployment Authority Service
@@ -1705,6 +1702,11 @@ def test_dc38_legitimate_fresh_production_deployment_bootstrap_end_to_end(monkey
         )
         ext_server.store.initialize_store_if_missing()
         ext_server.start()
+
+        # Switch S-Class client / broker to production mode
+        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
         broker = None
 
         try:
@@ -2101,9 +2103,6 @@ def test_dc44_only_trusted_deployment_bootstrap_can_create_never_provisioned(mon
         DeploymentProvisionerRegistry.reset_for_testing()
 
         # Switch to production mode
-        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
-        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
-        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
         
 
         ext_server = ExternalDeploymentAuthorityServer(
@@ -2114,6 +2113,11 @@ def test_dc44_only_trusted_deployment_bootstrap_can_create_never_provisioned(mon
         )
         ext_server.store.initialize_store_if_missing()
         ext_server.start()
+
+        # Switch S-Class client / broker to production mode
+        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
 
         try:
             bootstrap_auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
@@ -2183,9 +2187,6 @@ def test_dc45_bootstrap_is_single_use_and_survives_process_restart(monkeypatch):
         DeploymentProvisionerRegistry.reset_for_testing()
 
         # Switch to production mode
-        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
-        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
-        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
         
 
         ext_server = ExternalDeploymentAuthorityServer(
@@ -2196,6 +2197,11 @@ def test_dc45_bootstrap_is_single_use_and_survives_process_restart(monkeypatch):
         )
         ext_server.store.initialize_store_if_missing()
         ext_server.start()
+
+        # Switch S-Class client / broker to production mode
+        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
 
         try:
             bootstrap_auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
@@ -2280,9 +2286,6 @@ def test_dc46_virgin_bootstrap_authorization_replay_rejected(monkeypatch):
             os.remove(p)
 
     with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
-        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
-        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
-        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
         
 
         ext_server = ExternalDeploymentAuthorityServer(
@@ -2293,6 +2296,11 @@ def test_dc46_virgin_bootstrap_authorization_replay_rejected(monkeypatch):
         )
         ext_server.store.initialize_store_if_missing()
         ext_server.start()
+
+        # Switch S-Class client / broker to production mode
+        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
 
         try:
             auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
@@ -2338,9 +2346,6 @@ def test_dc47_replay_after_complete_local_state_destruction_rejected(monkeypatch
             os.remove(p)
 
     with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
-        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
-        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
-        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
         
 
         ext_server = ExternalDeploymentAuthorityServer(
@@ -2351,6 +2356,11 @@ def test_dc47_replay_after_complete_local_state_destruction_rejected(monkeypatch
         )
         ext_server.store.initialize_store_if_missing()
         ext_server.start()
+
+        # Switch S-Class client / broker to production mode
+        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
 
         try:
             auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
@@ -2582,9 +2592,6 @@ def test_dc51_consumed_authorization_survives_process_kill_and_fresh_process_rep
         "SCLASS_EXTERNAL_AUTHORITY_STORE_PATH": ext_store,
         "SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file),
     }):
-        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
-        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
-        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
         
 
         ext_server = ExternalDeploymentAuthorityServer(
@@ -2595,6 +2602,11 @@ def test_dc51_consumed_authorization_survives_process_kill_and_fresh_process_rep
         )
         ext_server.store.initialize_store_if_missing()
         ext_server.start()
+
+        # Switch S-Class client / broker to production mode
+        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
 
         try:
             auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
@@ -2650,9 +2662,6 @@ def test_dc52_consume_delete_all_local_state_restart_replay_rejected(monkeypatch
         "SCLASS_EXTERNAL_AUTHORITY_STORE_PATH": ext_store,
         "SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file),
     }):
-        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
-        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
-        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
         
 
         ext_server = ExternalDeploymentAuthorityServer(
@@ -2663,6 +2672,11 @@ def test_dc52_consume_delete_all_local_state_restart_replay_rejected(monkeypatch
         )
         ext_server.store.initialize_store_if_missing()
         ext_server.start()
+
+        # Switch S-Class client / broker to production mode
+        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
 
         try:
             auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
@@ -2834,9 +2848,6 @@ def test_dc55_authorization_consumed_crash_before_bootstrap_state_write_administ
         "SCLASS_EXTERNAL_AUTHORITY_STORE_PATH": ext_store,
         "SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file),
     }):
-        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
-        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
-        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
         
 
         ext_server = ExternalDeploymentAuthorityServer(
@@ -2847,6 +2858,11 @@ def test_dc55_authorization_consumed_crash_before_bootstrap_state_write_administ
         )
         ext_server.store.initialize_store_if_missing()
         ext_server.start()
+
+        # Switch S-Class client / broker to production mode
+        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
 
         try:
             auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
@@ -3301,9 +3317,6 @@ def test_dc64_authorization_cannot_be_replayed_after_authority_state_destruction
             os.remove(p)
 
     with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
-        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
-        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
-        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
         
 
         server = ExternalDeploymentAuthorityServer(
@@ -3314,6 +3327,11 @@ def test_dc64_authorization_cannot_be_replayed_after_authority_state_destruction
         )
         server.store.initialize_store_if_missing()
         server.start()
+
+        # Switch S-Class client / broker to production mode
+        monkeypatch.delenv("SCLASS_TEST_MODE", raising=False)
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        monkeypatch.delenv("SCLASS_TEST_FIXTURE_ACTIVE", raising=False)
         try:
             auth = SignedAuthorityManifestLoader.create_virgin_bootstrap_authorization(
                 deployment_id="DC64-DEP",
