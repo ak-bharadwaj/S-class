@@ -1,7 +1,7 @@
 {
   "certificate_id": "OSS-PARITY-GATE-1-FILELOCK-WIN32",
   "platform_scope": "WIN32 / Python 3.14.5",
-  "timestamp_utc": 1787373537.406629,
+  "timestamp_utc": 1787374023.5088387,
   "final_verdict": "PASS",
   "provenance": {
     "os_platform": "win32",
@@ -13,12 +13,12 @@
     "total_ram_bytes": 16396091392,
     "portalocker_version": "4.1.0",
     "hostname": "AK",
-    "tested_source_sha": "deeb826c8c1555f04e5531a920f9ef3e31aa619d",
-    "benchmark_harness_sha": "deeb826c8c1555f04e5531a920f9ef3e31aa619d",
-    "certificate_commit_sha": "deeb826c8c1555f04e5531a920f9ef3e31aa619d",
+    "tested_source_sha": "d5115cfb4bfb98a459fdd4e19c6abd25d5f740db",
+    "benchmark_harness_sha": "d5115cfb4bfb98a459fdd4e19c6abd25d5f740db",
+    "certificate_commit_sha": "d5115cfb4bfb98a459fdd4e19c6abd25d5f740db",
     "workflow_run_id": "LOCAL",
-    "git_commit_sha": "deeb826c8c1555f04e5531a920f9ef3e31aa619d",
-    "timestamp_utc": 1787373537.406629
+    "git_commit_sha": "d5115cfb4bfb98a459fdd4e19c6abd25d5f740db",
+    "timestamp_utc": 1787374023.5088387
   },
   "acceptance_criteria": {
     "primitive_latency_median_upper_ci_max": 1.005,
@@ -37,69 +37,69 @@
     "differential_semantic_correctness": "100_PERCENT_MATCHED"
   },
   "layer_a_primitive": {
-    "reference_median_us": 129.3,
-    "sclass_median_us": 104.6,
-    "median_ratio": 0.809,
+    "reference_median_us": 138.25,
+    "sclass_median_us": 109.9,
+    "median_ratio": 0.7949,
     "median_ratio_95_ci": [
-      0.8048,
-      0.8124
+      0.7868,
+      0.8004
     ],
-    "p95_ratio": 0.844,
+    "p95_ratio": 0.7959,
     "p95_ratio_95_ci": [
-      0.8089,
-      0.8794
+      0.7489,
+      0.8598
     ],
-    "throughput_ratio": 1.2306,
+    "throughput_ratio": 1.2354,
     "throughput_ratio_95_ci": [
-      1.2188,
-      1.2429
+      1.2119,
+      1.261
     ],
     "verdict": "PASS"
   },
   "layer_a_same_path_primitive": {
-    "reference_median_us": 137.1,
-    "sclass_median_us": 109.4,
-    "median_ratio": 0.798,
+    "reference_median_us": 140.7,
+    "sclass_median_us": 111.9,
+    "median_ratio": 0.7953,
     "median_ratio_95_ci": [
-      0.793,
-      0.8026
+      0.7873,
+      0.802
     ],
-    "p95_ratio": 0.8145,
+    "p95_ratio": 0.8463,
     "p95_ratio_95_ci": [
-      0.7891,
-      0.8598
+      0.8052,
+      0.8745
     ],
-    "throughput_ratio": 1.2435,
+    "throughput_ratio": 1.2334,
     "throughput_ratio_95_ci": [
-      1.2281,
-      1.2598
+      1.2175,
+      1.251
     ],
     "verdict": "PASS"
   },
   "layer_c_1to1_lifecycle": {
-    "reference_median_us": 347.45,
-    "sclass_median_us": 299.0,
-    "median_ratio": 0.8606,
+    "reference_median_us": 349.5,
+    "sclass_median_us": 303.1,
+    "median_ratio": 0.8672,
     "median_ratio_95_ci": [
-      0.8516,
-      0.8689
+      0.8555,
+      0.8788
     ],
-    "p95_ratio": 0.8681,
+    "p95_ratio": 0.8547,
     "p95_ratio_95_ci": [
-      0.8239,
-      0.895
+      0.8092,
+      0.9239
     ],
-    "throughput_ratio": 1.1834,
+    "throughput_ratio": 1.1434,
     "throughput_ratio_95_ci": [
-      1.157,
-      1.2224
+      1.1184,
+      1.1664
     ],
     "verdict": "PASS"
   },
   "long_soak_memory": {
     "soak_cycles": 5000,
-    "initial_rss_bytes": 31289344,
-    "final_rss_bytes": 31297536,
+    "initial_rss_bytes": 31444992,
+    "final_rss_bytes": 31453184,
     "rss_growth_ratio": 1.0003,
     "classification": "BOUNDED_RSS_DRIFT_LE_5PCT_5000_CYCLES",
     "verdict": "PASS"

@@ -127,47 +127,88 @@ class TrustedDeploymentAuthorityBroker:
                 self.status = DeploymentStatus(payload.get("status", default_status.value))
                 self.consumed_authorizations: Set[str] = set(payload.get("consumed_authorizations", []))
                 self.current_installation = payload.get("current_installation")
+                self.pending_provisioning = payload.get("pending_provisioning")
 
                 from domain.types import EventType
                 from events.store import FileAppendEventStore
 
-                if self.status == DeploymentStatus.BROKER_COMMIT_PENDING:
-                    if not self.current_installation or not isinstance(self.current_installation, dict):
-                        self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
-                        raise RuntimeError("Cannot recover from BROKER_COMMIT_PENDING: missing commit coordinates. Failing closed.")
+                # Recovery Matrix: PENDING states (PROVISIONING_PENDING, BROKER_COMMIT_PENDING, RECOVERY_PENDING)
+                if self.status in (DeploymentStatus.PROVISIONING_PENDING, DeploymentStatus.BROKER_COMMIT_PENDING, DeploymentStatus.RECOVERY_PENDING):
+                    pending = self.pending_provisioning or self.current_installation
+                    if not pending or not isinstance(pending, dict):
+                        # Non-authoritative deterministic recovery
+                        if self.status == DeploymentStatus.RECOVERY_PENDING:
+                            self.status = DeploymentStatus.RECOVERY_AUTHORIZED
+                        else:
+                            self.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+                        self.pending_provisioning = None
+                        self.current_installation = None
+                        self._persist_state()
+                        return
 
                     if not os.path.exists(self.d2_store_path) or os.path.getsize(self.d2_store_path) == 0:
-                        self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
-                        raise RuntimeError(f"Cannot recover from BROKER_COMMIT_PENDING: D2 store missing at '{self.d2_store_path}'. Failing closed.")
+                        # PENDING + no matching D2 commit -> non-authoritative recovery
+                        if self.status == DeploymentStatus.RECOVERY_PENDING:
+                            self.status = DeploymentStatus.RECOVERY_AUTHORIZED
+                        else:
+                            self.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+                        self.pending_provisioning = None
+                        self.current_installation = None
+                        self._persist_state()
+                        return
 
                     try:
                         event_store = FileAppendEventStore(self.d2_store_path)
                         events = event_store.get_events()
                     except Exception as e:
                         self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
-                        raise RuntimeError(f"Cannot recover from BROKER_COMMIT_PENDING: D2 store unreadable or corrupt: {e}. Failing closed.")
+                        raise RuntimeError(f"Cannot recover from pending state: D2 store unreadable or corrupt: {e}. Failing closed.")
 
-                    target_seq = self.current_installation.get("sequence_number")
-                    matching = [e for e in events if e.sequence_number == target_seq]
-                    if not matching:
-                        self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
-                        raise RuntimeError(f"Cannot recover from BROKER_COMMIT_PENDING: referenced D2 event sequence {target_seq} not found. Failing closed.")
+                    # Look for exact matching D2 commit
+                    m_id = str(pending.get("manifest_id", ""))
+                    m_ver = int(pending.get("manifest_version", 1))
+                    m_dig = str(pending.get("manifest_digest", pending.get("payload_digest", "")))
+                    target_seq = pending.get("sequence_number")
+                    target_eid = pending.get("event_id")
 
-                    target_event = matching[0]
-                    if (
-                        target_event.event_id != str(self.current_installation.get("event_id"))
-                        or target_event.digest != str(self.current_installation.get("event_digest"))
-                        or target_event.event_type != EventType.AUTHORITY_MANIFEST_COMMITTED
-                        or target_event.payload.get("manifest_id") != str(self.current_installation.get("manifest_id"))
-                        or target_event.payload.get("manifest_version") != int(self.current_installation.get("manifest_version"))
-                        or target_event.payload.get("payload_digest") != str(self.current_installation.get("payload_digest"))
-                    ):
-                        self.status = DeploymentStatus.AUTHORITY_UNAVAILABLE
-                        raise RuntimeError(f"Cannot recover from BROKER_COMMIT_PENDING: referenced D2 event {target_seq} corrupted or tampered. Failing closed.")
+                    matching_events = [
+                        e for e in events
+                        if e.event_type == EventType.AUTHORITY_MANIFEST_COMMITTED
+                        and str(e.payload.get("manifest_id", "")) == m_id
+                        and int(e.payload.get("manifest_version", 1)) == m_ver
+                        and str(e.payload.get("payload_digest", "")) == m_dig
+                        and (target_seq is None or e.sequence_number == target_seq)
+                        and (target_eid is None or e.event_id == target_eid)
+                    ]
 
-                    self.status = DeploymentStatus.PROVISIONED
-                    self._persist_state()
-                    return
+                    if matching_events:
+                        # PENDING + exact matching D2 commit -> PROVISIONED
+                        target_event = matching_events[-1]
+                        self.status = DeploymentStatus.PROVISIONED
+                        self.current_installation = {
+                            "installation_id": str(pending.get("installation_id", "")),
+                            "manifest_id": str(target_event.payload.get("manifest_id")),
+                            "manifest_version": int(target_event.payload.get("manifest_version", 1)),
+                            "payload_digest": str(target_event.payload.get("payload_digest")),
+                            "event_id": str(target_event.event_id),
+                            "sequence_number": int(target_event.sequence_number),
+                            "event_digest": str(target_event.digest),
+                            "head_digest": str(target_event.digest),
+                            "root_fingerprint": str(pending.get("root_fingerprint", "")),
+                        }
+                        self.pending_provisioning = None
+                        self._persist_state()
+                        return
+                    else:
+                        # PENDING + no matching D2 commit -> non-authoritative recovery
+                        if self.status == DeploymentStatus.RECOVERY_PENDING:
+                            self.status = DeploymentStatus.RECOVERY_AUTHORIZED
+                        else:
+                            self.status = DeploymentStatus.PROVISIONING_AUTHORIZED
+                        self.pending_provisioning = None
+                        self.current_installation = None
+                        self._persist_state()
+                        return
 
                 elif self.status == DeploymentStatus.PROVISIONED and self.current_installation:
                     if os.path.exists(self.d2_store_path) and os.path.getsize(self.d2_store_path) > 0:
@@ -201,6 +242,7 @@ class TrustedDeploymentAuthorityBroker:
             self.status = default_status
             self.consumed_authorizations = set()
             self.current_installation = None
+            self.pending_provisioning = None
             self._persist_state()
 
     def _persist_state(self) -> None:
@@ -212,6 +254,7 @@ class TrustedDeploymentAuthorityBroker:
                 "status": self.status.value,
                 "consumed_authorizations": sorted(list(self.consumed_authorizations)),
                 "current_installation": self.current_installation,
+                "pending_provisioning": getattr(self, "pending_provisioning", None),
             }
             seal = hashlib.sha256(canonicalize_json(state_payload)).hexdigest()
             wrapper = {
@@ -442,8 +485,30 @@ class TrustedDeploymentAuthorityBroker:
                 self._persist_state()
                 return {"success": True, "status": self.status.value}
 
+            elif method == "register_pending_provisioning":
+                if self.status not in (DeploymentStatus.PROVISIONING_AUTHORIZED, DeploymentStatus.PROVISIONING_PENDING):
+                    return {"success": False, "error": f"Cannot register pending provisioning from state '{self.status.value}'."}
+
+                params_dict = params or {}
+                m_digest = str(params_dict.get("manifest_digest", params_dict.get("payload_digest", "")))
+                if not m_digest:
+                    return {"success": False, "error": "Missing manifest_digest/payload_digest for pending provisioning."}
+
+                self.status = DeploymentStatus.PROVISIONING_PENDING
+                self.pending_provisioning = {
+                    "deployment_id": self.deployment_id,
+                    "installation_id": str(params_dict.get("installation_id", "")),
+                    "manifest_id": str(params_dict.get("manifest_id", "")),
+                    "manifest_version": int(params_dict.get("manifest_version", 1)),
+                    "manifest_digest": m_digest,
+                    "root_fingerprint": str(params_dict.get("root_fingerprint", "")),
+                    "transaction_id": str(params_dict.get("transaction_id", params_dict.get("installation_id", ""))),
+                }
+                self._persist_state()
+                return {"success": True, "status": self.status.value, "pending_provisioning": self.pending_provisioning}
+
             elif method == "record_provisioned":
-                if self.status != DeploymentStatus.PROVISIONING_AUTHORIZED:
+                if self.status not in (DeploymentStatus.PROVISIONING_AUTHORIZED, DeploymentStatus.PROVISIONING_PENDING):
                     return {"success": False, "error": f"Cannot transition to PROVISIONED from state '{self.status.value}' without prior PROVISIONING_AUTHORIZED."}
 
                 from file_lock import FileLock
@@ -456,8 +521,21 @@ class TrustedDeploymentAuthorityBroker:
                             return {"success": False, "error": f"D2 commit validation failed: {err}"}
 
                         proof = params["commit_proof"]
-                        # Stage 1: Durable intermediate state BROKER_COMMIT_PENDING with immutable D2 coordinates
-                        self.status = DeploymentStatus.BROKER_COMMIT_PENDING
+
+                        if self.pending_provisioning is not None:
+                            p = self.pending_provisioning
+                            if (
+                                str(proof["manifest_id"]) != str(p.get("manifest_id", ""))
+                                or int(proof["manifest_version"]) != int(p.get("manifest_version", 1))
+                                or str(proof["manifest_digest"]) != str(p.get("manifest_digest", ""))
+                                or (p.get("root_fingerprint") and str(proof["root_fingerprint"]) != str(p["root_fingerprint"]))
+                                or (p.get("installation_id") and str(proof["installation_id"]) != str(p["installation_id"]))
+                                or (p.get("deployment_id") and str(proof["deployment_id"]) != str(p["deployment_id"]))
+                            ):
+                                return {"success": False, "error": "Commit proof does not match pending provisioning intent."}
+
+                        # Finalize to PROVISIONED
+                        self.status = DeploymentStatus.PROVISIONED
                         self.current_installation = {
                             "installation_id": str(proof["installation_id"]),
                             "manifest_id": str(proof["manifest_id"]),
@@ -469,10 +547,7 @@ class TrustedDeploymentAuthorityBroker:
                             "head_digest": str(proof["head_digest"]),
                             "root_fingerprint": str(proof["root_fingerprint"]),
                         }
-                        self._persist_state()
-
-                        # Stage 2: Finalize to PROVISIONED
-                        self.status = DeploymentStatus.PROVISIONED
+                        self.pending_provisioning = None
                         self._persist_state()
                         return {"success": True, "status": self.status.value}
                 except Exception as e:
@@ -526,8 +601,27 @@ class TrustedDeploymentAuthorityBroker:
                 self._persist_state()
                 return {"success": True, "status": self.status.value, "authorization": auth_data}
 
+            elif method == "register_pending_reprovisioning":
+                if self.status not in (DeploymentStatus.RECOVERY_AUTHORIZED, DeploymentStatus.RECOVERY_PENDING):
+                    return {"success": False, "error": f"Cannot register pending reprovisioning from state '{self.status.value}'."}
+
+                params_dict = params or {}
+                m_digest = str(params_dict.get("manifest_digest", params_dict.get("payload_digest", "")))
+                self.status = DeploymentStatus.RECOVERY_PENDING
+                self.pending_provisioning = {
+                    "deployment_id": self.deployment_id,
+                    "installation_id": str(params_dict.get("installation_id", "")),
+                    "manifest_id": str(params_dict.get("manifest_id", "")),
+                    "manifest_version": int(params_dict.get("manifest_version", 1)),
+                    "manifest_digest": m_digest,
+                    "root_fingerprint": str(params_dict.get("root_fingerprint", "")),
+                    "transaction_id": str(params_dict.get("transaction_id", params_dict.get("installation_id", ""))),
+                }
+                self._persist_state()
+                return {"success": True, "status": self.status.value, "pending_provisioning": self.pending_provisioning}
+
             elif method == "record_reprovisioned":
-                if self.status != DeploymentStatus.RECOVERY_AUTHORIZED:
+                if self.status not in (DeploymentStatus.RECOVERY_AUTHORIZED, DeploymentStatus.RECOVERY_PENDING):
                     return {"success": False, "error": f"Cannot transition to PROVISIONED from state '{self.status.value}' without authorized recovery."}
 
                 from file_lock import FileLock
@@ -540,8 +634,21 @@ class TrustedDeploymentAuthorityBroker:
                             return {"success": False, "error": f"D2 recovery commit validation failed: {err}"}
 
                         proof = params["commit_proof"]
-                        # Stage 1: Durable intermediate state BROKER_COMMIT_PENDING with immutable D2 coordinates
-                        self.status = DeploymentStatus.BROKER_COMMIT_PENDING
+
+                        if self.pending_provisioning is not None:
+                            p = self.pending_provisioning
+                            if (
+                                str(proof["manifest_id"]) != str(p.get("manifest_id", ""))
+                                or int(proof["manifest_version"]) != int(p.get("manifest_version", 1))
+                                or str(proof["manifest_digest"]) != str(p.get("manifest_digest", ""))
+                                or (p.get("root_fingerprint") and str(proof["root_fingerprint"]) != str(p["root_fingerprint"]))
+                                or (p.get("installation_id") and str(proof["installation_id"]) != str(p["installation_id"]))
+                                or (p.get("deployment_id") and str(proof["deployment_id"]) != str(p["deployment_id"]))
+                            ):
+                                return {"success": False, "error": "Commit proof does not match pending reprovisioning intent."}
+
+                        # Finalize to PROVISIONED
+                        self.status = DeploymentStatus.PROVISIONED
                         self.current_installation = {
                             "installation_id": str(proof["installation_id"]),
                             "manifest_id": str(proof["manifest_id"]),
@@ -553,10 +660,7 @@ class TrustedDeploymentAuthorityBroker:
                             "head_digest": str(proof["head_digest"]),
                             "root_fingerprint": str(proof["root_fingerprint"]),
                         }
-                        self._persist_state()
-
-                        # Stage 2: Finalize to PROVISIONED
-                        self.status = DeploymentStatus.PROVISIONED
+                        self.pending_provisioning = None
                         self._persist_state()
                         return {"success": True, "status": self.status.value}
                 except Exception as e:
