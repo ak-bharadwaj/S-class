@@ -1,4 +1,4 @@
-"""End-to-End Deployment-Level Trust Topology Certification Suite (DC01 - DC20).
+"""End-to-End Deployment-Level Trust Topology Certification Suite (DC01 - DC25).
 Defines and executes the complete out-of-process authority boundary certification:
 
 DC01: production root cannot be caller-selected
@@ -21,6 +21,11 @@ DC17: S-Class restart preserves authority state
 DC18: complete S-Class local-state loss -> RECOVERY_REQUIRED
 DC19: complete broker-state loss -> fail closed
 DC20: complete trust-topology end-to-end verification
+DC21: broker restart after state deletion -> still AUTHORITY_UNAVAILABLE
+DC22: state recreation with fabricated UNPROVISIONED data -> rejected
+DC23: complete broker-state loss cannot trigger ordinary initial provisioning
+DC24: authorized external recovery is required to return to provisioning-capable state
+DC25: missing broker state + unrelated D2 history -> AUTHORITY_UNAVAILABLE, initial provisioning impossible
 """
 import os
 import sys
@@ -1090,4 +1095,71 @@ def test_dc24_authorized_external_recovery_required_to_return_to_provisioning_ca
                 os.remove(state_file)
             if os.path.exists(d2_file):
                 os.remove(d2_file)
+
+
+def test_dc25_missing_broker_state_with_unrelated_d2_history_fails_closed():
+    """DC25: Missing broker state + unrelated D2 history -> AUTHORITY_UNAVAILABLE, initial provisioning impossible."""
+    state_file = os.path.join(tempfile.gettempdir(), f"dc25_state_{os.getpid()}.json")
+    d2_file = os.path.join(tempfile.gettempdir(), f"dc25_d2_{os.getpid()}.jsonl")
+    for p in (state_file, d2_file):
+        if os.path.exists(p):
+            os.remove(p)
+
+    with patch.dict(os.environ, {"SCLASS_EVENT_STORE_PATH": os.path.abspath(d2_file)}):
+        D2InstallationProvisioning.clear_for_testing()
+        SignedAuthorityManifestLoader.clear_for_testing()
+
+        # Populate D2 store with unrelated historical events (e.g. from an old or foreign deployment)
+        store = D2AuthorityManifestStore(file_path=d2_file)
+        fp_foreign = "a" * 64
+        store.commit_epoch(
+            manifest_id="M-UNRELATED-OLD",
+            manifest_version=1,
+            payload_digest="f" * 64,
+            signer_identity="ForeignAuthorityVerifier",
+            root_fingerprint=fp_foreign,
+        )
+        assert os.path.exists(d2_file) and os.path.getsize(d2_file) > 0
+        assert not os.path.exists(state_file)
+
+        # Broker initializes on host with missing state file but existing D2 store history
+        broker = TrustedDeploymentAuthorityBroker(
+            deployment_id="DC25-DEP-TARGET",
+            state_file_path=state_file,
+            d2_store_path=d2_file,
+            auth_secret="SEC25",
+            root_public_key=TEST_AUTHORITY_PUBLIC_KEY,
+        )
+        # Invariant: Must initialize directly into AUTHORITY_UNAVAILABLE, NEVER UNPROVISIONED
+        assert broker.status == DeploymentStatus.AUTHORITY_UNAVAILABLE
+        assert broker.status != DeploymentStatus.UNPROVISIONED
+
+        broker.start_ipc_server()
+        try:
+            client = IPCDeploymentProvisioner(ipc_endpoint=broker.ipc_endpoint, auth_secret="SEC25")
+
+            # Client attempts initial provisioning authorization on the deployment
+            init_auth = InMemoryTestDeploymentProvisioner.create_initial_provisioning_authorization(
+                deployment_id="DC25-DEP-TARGET",
+                target_manifest_id="M-DC25-FRESH",
+                target_manifest_version=1,
+                target_manifest_digest="1" * 64,
+                root_private_key=TEST_AUTHORITY_PRIVATE_KEY,
+            )
+
+            # Initial provisioning must be completely rejected fail-closed from AUTHORITY_UNAVAILABLE
+            with pytest.raises(RuntimeError, match="Cannot authorize initial provisioning from state 'AUTHORITY_UNAVAILABLE'"):
+                client.authorize_initial_provisioning(init_auth)
+
+            # Status remains strictly AUTHORITY_UNAVAILABLE
+            assert broker.status == DeploymentStatus.AUTHORITY_UNAVAILABLE
+            assert broker.status != DeploymentStatus.UNPROVISIONED
+            assert broker.status != DeploymentStatus.PROVISIONING_AUTHORIZED
+        finally:
+            broker.stop_ipc_server()
+            if os.path.exists(state_file):
+                os.remove(state_file)
+            if os.path.exists(d2_file):
+                os.remove(d2_file)
+
 
