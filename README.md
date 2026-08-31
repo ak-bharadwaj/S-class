@@ -26,13 +26,25 @@ When autonomous AI coding agents execute software engineering tasks, they suffer
 **S-Class EOS V11.2 fixes this completely.** Operating as a **Central Deterministic Orchestration Kernel**, S-Class intercepts all agent actions, routes engineering goals through a strict Finite State Machine (FSM), enforces evidence-driven Specification Synthesis before design/coding, red-teams plans before writing code, and verifies execution authenticity through sovereign test runners and cryptographic evidence receipts before release is allowed.
 
 > [!NOTE]
-> **V11.2 LTS Release Attestation**: Formally verified across 397 product regression tests (49 test suites) covering:
+> **V11.2 LTS Release Attestation**: Formally verified across 422 product regression tests (54 test suites) covering:
 > 1. Single-authority Layer-0 `FileLock` with kernel advisory locks, persistent inode identity validation, and empirical subprocess crash resilience.
 > 2. Fail-closed `ArtifactGovernor` security configuration handling and non-destructive GC stale lock reclamation.
 > 3. Multi-step semantic event log replay and natural runtime checkpoint equivalence.
 > 4. Static AST dependency Directed Acyclic Graph (DAG) with zero circular imports across all core modules.
 > 5. Sovereign `SClassTestRunner` subprocess authorization, path-traversal prevention, and shell injection blocking.
 > 6. Frozen supply-chain plugin boundaries and formal `HARD_CONSTRAINT` vs. `PREFERENCE` separation.
+
+---
+
+## 🔀 Release Branch Architecture & Version Provenance
+
+S-Class provides distinct release branches tailored for production runtime stability vs. formal benchmark certification:
+
+| Branch Name | Version & Scope | Target Commit SHA | Test Suite Status | Key Features & Capabilities |
+| :--- | :--- | :--- | :---: | :--- |
+| **`master`** | **V11.2 (D0 Provider & Parity Track)** | [`c7f27a3`](https://github.com/ak-bharadwaj/S-class/commit/c7f27a347a848cde513387501bd42fa8b93afd57) | **100% Green (422 Tests)** | Dual-boundary D0 Keyed HMAC Provider Contract, Schemathesis/Hypothesis isolation, POSIX/Win32 FileLock Parity Gates, strict authoritative revision binding. |
+| **`working-pre-d0`** | **V12.1 (V9.5.3 Pre-D0 Release)** | [`95143b3`](https://github.com/ak-bharadwaj/S-class/commit/95143b3) | **100% Green (200 Tests)** | Spec Synthesis V9.5.3, Universal Domain Decomposition Algebra, Fable-5 Reliability, Claim-Level Debate Engine, Epistemic Grounding Engine, 118 skills. |
+| **`working-1c350c7`** | **V12.1 (Early Baseline)** | [`1c350c7`](https://github.com/ak-bharadwaj/S-class/commit/1c350c78ef683c4cf4638045dd8916b39f658833) | **100% Green (113 Tests)** | `SClassProactiveDoctor`, `LearningEngine` context compressor integration, 19-state FSM, 118-skill catalog baseline. |
 
 ---
 
