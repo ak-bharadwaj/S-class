@@ -7,7 +7,7 @@
 
 [![Version](https://img.shields.io/badge/version-12.1.0--pre--d0-blue.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-pre-d0)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-green.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-pre-d0)
-[![Build](https://img.shields.io/badge/tests-200%2F200%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-pre-d0)
+[![Build](https://img.shields.io/badge/tests-204%2F204%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-pre-d0)
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 
 [Quick Start](#-quick-start) • [Architecture](#-system-architecture) • [Features](#-core-architectural-innovations) • [Python SDK](#-30-second-python-sdk-quickstart) • [Benchmark Comparison](#-framework-architectural-comparison) • [License](#-license)
@@ -26,7 +26,7 @@ When autonomous AI coding agents (such as Claude Code, Cursor, or OpenHands) exe
 **S-Class EOS V12.1 fixes this completely.** Operating as an **Authoritative Execution Microkernel**, S-Class intercepts all agent actions, routes engineering goals through a strict 19-state Finite State Machine (FSM), enforces evidence-driven Specification Synthesis before design/coding, red-teams plans before writing code, and verifies live web applications visually using Chrome DevTools MCP before release is allowed.
 
 > [!IMPORTANT]
-> **Release Branch Attestation (`working-pre-d0`)**: Formally verified across 200 product regression tests passing with 100% green status at commit [`95143b3`](https://github.com/ak-bharadwaj/S-class/commit/95143b3). Contains the complete Spec Synthesis V5.0, Domain Decomposition Algebra, Fable-5 Reliability, Claim-Level Debate Engine, Epistemic Grounding Engine, and 118-skill catalog prior to the D0 Parity Benchmark track.
+> **Release Branch Attestation (`working-pre-d0`)**: Formally verified across 204 product regression test cases passing 100% green. Resolves import ordering evaluation bug in `spec_compiler.py`. Contains the complete Spec Synthesis V5.0, Domain Decomposition Algebra, Fable-5 Reliability, Claim-Level Debate Engine, Epistemic Grounding Engine, and 118-skill catalog prior to the D0 Parity Benchmark track.
 
 > [!NOTE]
 > **V12.1 Zero-Defect Guarantee**: Passed a rigorous 22-subsystem architectural audit resolving all edge-case logic gaps, pub/sub graph topic bindings, database fallbacks, profile-driven knowledge retrieval, event sourcing projections, and hardware resource scheduling.

@@ -11,6 +11,7 @@ import os
 import re
 import json
 import hashlib
+from typing import Dict, List, Set, Any, Optional, Tuple
 
 def load_json(path: str) -> Any:
     try:
@@ -24,7 +25,6 @@ def write_json_atomic(path: str, data: Any) -> None:
     with open(temp_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
     os.replace(temp_path, path)
-from typing import Dict, List, Set, Any, Optional, Tuple
 from domain_primitives import (
     DomainPrimitiveType,
     DomainNode,
