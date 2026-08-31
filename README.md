@@ -5,9 +5,9 @@
 
 *Enterprise-grade execution microkernel that eliminates AI agent drift, blocks broken UI releases, and enforces multi-page visual evidence verification.*
 
-[![Version](https://img.shields.io/badge/version-12.1.0-blue.svg)](https://github.com/ak-bharadwaj/S-class)
-[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-green.svg)](https://github.com/ak-bharadwaj/S-class)
-[![Build](https://img.shields.io/badge/tests-113%2F113%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class)
+[![Version](https://img.shields.io/badge/version-12.1.0--baseline-blue.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-1c350c7)
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-green.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-1c350c7)
+[![Build](https://img.shields.io/badge/tests-113%2F113%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-1c350c7)
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 
 [Quick Start](#-quick-start) • [Architecture](#-system-architecture) • [Features](#-core-architectural-innovations) • [Python SDK](#-30-second-python-sdk-quickstart) • [Benchmark Comparison](#-framework-architectural-comparison) • [License](#-license)
@@ -24,6 +24,9 @@ When autonomous AI coding agents (such as Claude Code, Cursor, or OpenHands) exe
 3. **Sparse & Amateur UIs:** They build unstyled HTML templates with default browser fonts and empty 1-row data tables.
 
 **S-Class EOS V12.1 fixes this completely.** Operating as an **Authoritative Execution Microkernel**, S-Class intercepts all agent actions, routes engineering goals through a strict 19-state Finite State Machine (FSM), enforces evidence-driven Specification Synthesis before design/coding, red-teams plans before writing code, and verifies live web applications visually using Chrome DevTools MCP before release is allowed.
+
+> [!IMPORTANT]
+> **Release Branch Attestation (`working-1c350c7`)**: Formally verified across 113 product regression tests passing with 100% green status at commit [`1c350c7`](https://github.com/ak-bharadwaj/S-class/commit/1c350c78ef683c4cf4638045dd8916b39f658833). Contains the baseline Proactive Doctor (`SClassProactiveDoctor`), `LearningEngine` context compressor integration, 19 FSM states, and 118-skill catalog.
 
 > [!NOTE]
 > **V12.1 Zero-Defect Guarantee**: Passed a rigorous 22-subsystem architectural audit resolving all edge-case logic gaps, pub/sub graph topic bindings, database fallbacks, profile-driven knowledge retrieval, event sourcing projections, and hardware resource scheduling.
