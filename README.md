@@ -42,9 +42,8 @@ S-Class provides distinct release branches tailored for production runtime stabi
 
 | Branch Name | Version & Scope | Target Commit SHA | Test Suite Status | Key Features & Capabilities |
 | :--- | :--- | :--- | :---: | :--- |
-| **`master`** | **V11.2 (D0 Provider & Parity Track)** | [`c7f27a3`](https://github.com/ak-bharadwaj/S-class/commit/c7f27a347a848cde513387501bd42fa8b93afd57) | **100% Green (422 Tests)** | Dual-boundary D0 Keyed HMAC Provider Contract, Schemathesis/Hypothesis isolation, POSIX/Win32 FileLock Parity Gates, strict authoritative revision binding. |
-| **`working-pre-d0`** | **V12.1 (V9.5.3 Pre-D0 Release)** | [`95143b3`](https://github.com/ak-bharadwaj/S-class/commit/95143b3) | **100% Green (200 Tests)** | Spec Synthesis V9.5.3, Universal Domain Decomposition Algebra, Fable-5 Reliability, Claim-Level Debate Engine, Epistemic Grounding Engine, 118 skills. |
-| **`working-1c350c7`** | **V12.1 (Early Baseline)** | [`1c350c7`](https://github.com/ak-bharadwaj/S-class/commit/1c350c78ef683c4cf4638045dd8916b39f658833) | **100% Green (113 Tests)** | `SClassProactiveDoctor`, `LearningEngine` context compressor integration, 19-state FSM, 118-skill catalog baseline. |
+| **`master`** | **Current Upgrading Track** | [`c7f27a3`](https://github.com/ak-bharadwaj/S-class/commit/c7f27a347a848cde513387501bd42fa8b93afd57) | **100% Green (422 Tests)** | Dual-boundary D0 Keyed HMAC Provider Contract, Schemathesis/Hypothesis isolation, POSIX/Win32 FileLock Parity Gates, strict authoritative revision binding. |
+| **`working-pre-d0`** | **Complete Working Pre-D0 Release** | [`ae505cc`](https://github.com/ak-bharadwaj/S-class/commit/ae505cc) | **100% Green (200 Tests)** | Complete feature build (V9.5.3): Spec Synthesis V5.0, Universal Domain Decomposition Algebra, Fable-5 Reliability, Claim-Level Debate Engine, Epistemic Grounding Engine, 118 skills. |
 
 ---
 
