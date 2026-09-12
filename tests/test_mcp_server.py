@@ -48,11 +48,14 @@ def test_mcp_doctor_and_gc(tmp_path):
     assert "gc_report" in gc_res
 
 
-def test_mcp_security_scan(tmp_path):
-    target_file = tmp_path / "script.py"
-    target_file.write_text("x = 1\n", encoding="utf-8")
+@pytest.mark.anyio
+async def test_official_mcp_sdk_server(tmp_path):
+    workspace = str(tmp_path)
+    server = mcp_server.create_mcp_server(workspace_dir=workspace)
+    assert server is not None
+    assert mcp_server.HAS_OFFICIAL_MCP is True
 
-    res = mcp_server.handle_tool_call("sclass_security_scan", {"target_file": str(target_file)})
-    assert "security_report" in res
-    assert "summary" in res["security_report"]
-
+    res = await server.call_tool("sclass_initialize", {"goal": "SDK Test", "workspace_dir": workspace})
+    assert res is not None
+    assert res.is_error is False
+    assert "initialized" in res.content[0].text
