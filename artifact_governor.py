@@ -11,6 +11,7 @@ CONFIRMED / APPROVED (with HMAC content-bound signed ApprovalRecord) -> CAN comp
 import os
 import sys
 import json
+import rfc8785
 import hmac
 import hashlib
 import secrets
@@ -185,21 +186,52 @@ class ArtifactGovernor:
         return new_secret
 
     @classmethod
-    def compute_canonical_adr_hash(cls, adr: ADRRecord) -> str:
-        """Computes SHA-256 digest over canonical JSON representation of core ADR decision content."""
-        ev_serialized = [e if isinstance(e, str) else json.dumps(e, sort_keys=True) for e in (adr.evidence or [])]
+    def compute_canonical_adr_hash(cls, adr: Any) -> str:
+        """Computes SHA-256 digest over RFC 8785 compliant canonical JSON serialization of core ADR decision content."""
+        if isinstance(adr, dict):
+            adr_id = adr.get("id", "")
+            title = adr.get("title", "")
+            decision = adr.get("decision", "")
+            alternatives = adr.get("alternatives", [])
+            evidence = adr.get("evidence", [])
+            affected_modules = adr.get("affected_modules", [])
+            rejected_options = adr.get("rejected_options", [])
+            reason = adr.get("reason", "")
+        else:
+            adr_id = getattr(adr, "id", "")
+            title = getattr(adr, "title", "")
+            decision = getattr(adr, "decision", "")
+            alternatives = getattr(adr, "alternatives", [])
+            evidence = getattr(adr, "evidence", [])
+            affected_modules = getattr(adr, "affected_modules", [])
+            rejected_options = getattr(adr, "rejected_options", [])
+            reason = getattr(adr, "reason", "")
+
+        ev_serialized = []
+        for e in (evidence or []):
+            if isinstance(e, str):
+                ev_serialized.append(e)
+            else:
+                item = e.to_dict() if hasattr(e, "to_dict") and callable(e.to_dict) else (
+                    e.model_dump() if hasattr(e, "model_dump") and callable(e.model_dump) else e
+                )
+                try:
+                    ev_serialized.append(rfc8785.dumps(item).decode("utf-8"))
+                except Exception:
+                    ev_serialized.append(json.dumps(item, sort_keys=True, default=str))
+
         adr_dict = {
-            "id": adr.id,
-            "title": adr.title,
-            "decision": adr.decision,
-            "alternatives": sorted(list(adr.alternatives)) if adr.alternatives else [],
+            "id": adr_id,
+            "title": title,
+            "decision": decision,
+            "alternatives": sorted([str(x) for x in alternatives]) if alternatives else [],
             "evidence": sorted(ev_serialized),
-            "affected_modules": sorted(list(adr.affected_modules)) if adr.affected_modules else [],
-            "rejected_options": sorted(list(adr.rejected_options)) if adr.rejected_options else [],
-            "reason": adr.reason
+            "affected_modules": sorted([str(x) for x in affected_modules]) if affected_modules else [],
+            "rejected_options": sorted([str(x) for x in rejected_options]) if rejected_options else [],
+            "reason": reason
         }
-        canonical_json = json.dumps(adr_dict, sort_keys=True)
-        return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+        canonical_bytes = rfc8785.dumps(adr_dict)
+        return hashlib.sha256(canonical_bytes).hexdigest()
 
     @classmethod
     def _load_verified_approval_records(cls, workspace_dir: Optional[str] = None) -> Dict[str, ApprovalRecord]:
@@ -772,7 +804,7 @@ class ArtifactGovernor:
                             "behavior_id": beh_node.id,
                             "requirement_hashes": sorted([r.canonical_hash() if hasattr(r, "canonical_hash") else r.id for r in matching_req_nodes])
                         }
-                        expected_req_hash = hashlib.sha256(json.dumps(req_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+                        expected_req_hash = hashlib.sha256(rfc8785.dumps(req_payload)).hexdigest()
                         if binding.source_requirement_hash != expected_req_hash:
                             reasons.append(
                                 f"Task {t.id} ({t.title}) stale/tampered source_requirement_hash in binding: expected '{expected_req_hash}', got '{binding.source_requirement_hash}'."
@@ -982,7 +1014,7 @@ class ArtifactGovernor:
 
         # 2. Source Tasks Cryptographic Reconciliation (Blocker 3)
         expected_source_tasks_hash = hashlib.sha256(
-            json.dumps(sorted([t.task_hash for t in tasks]), sort_keys=True, separators=(',', ':')).encode('utf-8')
+            rfc8785.dumps(sorted([t.task_hash for t in tasks]))
         ).hexdigest()
         if not getattr(plan, "source_tasks_hash", ""):
             reasons.append("ExecutionPlan is missing mandatory source_tasks_hash.")
@@ -1400,7 +1432,7 @@ class ArtifactGovernor:
                         reasons.append("UPSTREAM_PIPELINE_STRUCTURE_INVALID: Persisted refinement pipeline is not a valid dictionary.")
                     else:
                         current_pipe_canonical_hash = hashlib.sha256(
-                            json.dumps(pipe_data, sort_keys=True, separators=(",", ":")).encode("utf-8")
+                            rfc8785.dumps(pipe_data)
                         ).hexdigest()
 
                         if epoch_lock_data:
@@ -1588,7 +1620,7 @@ class ArtifactGovernor:
             pipe_data = json.load(pf)
 
         pipe_canonical_hash = hashlib.sha256(
-            json.dumps(pipe_data, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            rfc8785.dumps(pipe_data)
         ).hexdigest()
 
         exec_plan_data = pipe_data.get("execution_plan", {})

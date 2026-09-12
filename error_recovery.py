@@ -1,6 +1,14 @@
 import re
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any
+from tenacity import (
+    wait_exponential,
+    wait_incrementing,
+    wait_fixed,
+    stop_after_attempt,
+    RetryCallState,
+    Retrying,
+)
 
 @dataclass
 class ErrorPath:
@@ -24,15 +32,17 @@ class ErrorPath:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'ErrorPath':
+    def from_dict(cls, data: Any) -> 'ErrorPath':
+        if not isinstance(data, dict):
+            return cls(trigger_pattern=".*", root_cause_hint="", recovery_action="retry")
         return cls(
-            trigger_pattern=data["trigger_pattern"],
-            root_cause_hint=data["root_cause_hint"],
-            recovery_action=data["recovery_action"],
-            max_retries=data.get("max_retries", 3),
-            backoff_seconds=data.get("backoff_seconds", 1.0),
-            backoff_multiplier=data.get("backoff_multiplier", 2.0),
-            stop_condition=data.get("stop_condition", ""),
+            trigger_pattern=str(data.get("trigger_pattern", ".*")),
+            root_cause_hint=str(data.get("root_cause_hint", "")),
+            recovery_action=str(data.get("recovery_action", "retry")),
+            max_retries=int(data.get("max_retries", 3)),
+            backoff_seconds=float(data.get("backoff_seconds", 1.0)),
+            backoff_multiplier=float(data.get("backoff_multiplier", 2.0)),
+            stop_condition=str(data.get("stop_condition", "")),
         )
 
 class RecoveryEngine:
@@ -43,13 +53,19 @@ class RecoveryEngine:
         return None
 
     def calculate_backoff(self, attempt: int, error_path: ErrorPath, strategy: str = "exponential") -> float:
+        """Calculates backoff delay using tenacity strategy primitives."""
+        state = RetryCallState(None, None, (), {})
+        state.attempt_number = attempt + 1
         if strategy == "exponential":
-            return error_path.backoff_seconds * (error_path.backoff_multiplier ** attempt)
+            waiter = wait_exponential(multiplier=error_path.backoff_seconds, exp_base=error_path.backoff_multiplier)
+            return float(waiter(state))
         elif strategy == "linear":
-            return error_path.backoff_seconds * (attempt + 1)
+            waiter = wait_incrementing(start=error_path.backoff_seconds, increment=error_path.backoff_seconds)
+            return float(waiter(state))
         elif strategy == "fixed":
-            return error_path.backoff_seconds
-        return error_path.backoff_seconds
+            waiter = wait_fixed(error_path.backoff_seconds)
+            return float(waiter(state))
+        return float(error_path.backoff_seconds)
 
     def classify_failure_target_phase(self, error_output: str) -> str:
         """Determines exact target phase based on error categorization (Smart Multi-Tier Recovery)."""
@@ -71,4 +87,19 @@ class RecoveryEngine:
         return "CODING"
 
     def should_stop(self, attempt: int, error_path: ErrorPath) -> bool:
-        return attempt >= error_path.max_retries
+        """Determines retry termination using tenacity stop strategy."""
+        state = RetryCallState(None, None, (), {})
+        state.attempt_number = attempt
+        stopper = stop_after_attempt(error_path.max_retries)
+        return bool(stopper(state))
+
+    def get_retry_controller(self, error_path: ErrorPath, strategy: str = "exponential") -> Retrying:
+        """Constructs a tenacity Retrying instance configured with error_path parameters."""
+        if strategy == "exponential":
+            waiter = wait_exponential(multiplier=error_path.backoff_seconds, exp_base=error_path.backoff_multiplier)
+        elif strategy == "linear":
+            waiter = wait_incrementing(start=error_path.backoff_seconds, increment=error_path.backoff_seconds)
+        else:
+            waiter = wait_fixed(error_path.backoff_seconds)
+        stopper = stop_after_attempt(error_path.max_retries)
+        return Retrying(wait=waiter, stop=stopper, reraise=True)

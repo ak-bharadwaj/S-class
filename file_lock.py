@@ -85,36 +85,44 @@ _META_PREFIX = f'{{"status": "active", "pid": {_CACHED_PID}, "host": "{_CACHED_H
 try:
     import portalocker
     HAS_PORTALOCKER = True
+    _LOCK_ERRORS = (portalocker.exceptions.BaseLockException, OSError, IOError)
 except ImportError:
     HAS_PORTALOCKER = False
+    _LOCK_ERRORS = (OSError, IOError)
 
 
 def _lock_fd(fd: int) -> bool:
-    """Acquires non-blocking kernel advisory lock via OS-native kernel primitive."""
+    """Acquires non-blocking kernel advisory lock via portalocker with OS-native fallback."""
     try:
-        if sys.platform == "win32":
+        if HAS_PORTALOCKER:
+            portalocker.lock(fd, portalocker.LOCK_EX | portalocker.LOCK_NB)
+            return True
+        elif sys.platform == "win32":
             import msvcrt
             os.lseek(fd, 0, os.SEEK_SET)
             msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+            return True
         else:
             import fcntl
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        return True
-    except (OSError, IOError):
+            return True
+    except _LOCK_ERRORS:
         return False
 
 
 def _unlock_fd(fd: int) -> None:
-    """Releases kernel advisory lock via OS-native kernel primitive."""
+    """Releases kernel advisory lock via portalocker with OS-native fallback."""
     try:
-        if sys.platform == "win32":
+        if HAS_PORTALOCKER:
+            portalocker.unlock(fd)
+        elif sys.platform == "win32":
             import msvcrt
             os.lseek(fd, 0, os.SEEK_SET)
             msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
         else:
             import fcntl
             fcntl.flock(fd, fcntl.LOCK_UN)
-    except (OSError, IOError):
+    except _LOCK_ERRORS:
         pass
 
 
