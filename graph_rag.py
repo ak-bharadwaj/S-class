@@ -18,22 +18,52 @@ from graph_traversal import GraphTraversalEngine
 
 logger = logging.getLogger("sclass_graph_rag")
 
+# Optional local ONNX embedding upgrade path
+HAS_FASTEMBED = False
+try:
+    from fastembed import TextEmbedding
+    HAS_FASTEMBED = True
+except ImportError:
+    TextEmbedding = None
+
+HAS_SQLITE_VEC = False
+try:
+    import sqlite_vec
+    HAS_SQLITE_VEC = True
+except ImportError:
+    sqlite_vec = None
+
 
 class GraphRAGEngine:
     """
     Semantic Retrieval and Subgraph Expansion Engine for S-Class Knowledge Graph.
+    Uses local ONNX fastembed when installed; falls back to sub-5ms deterministic TF-IDF/cosine KNN.
     """
 
     def __init__(
         self,
         graph_db: Optional[CodebaseGraphDB] = None,
         traversal_engine: Optional[GraphTraversalEngine] = None,
+        use_embeddings: bool = True
     ):
         self.graph_db = graph_db or CodebaseGraphDB()
         self.traversal = traversal_engine or GraphTraversalEngine(self.graph_db)
         self._doc_vectors: Dict[str, Dict[str, float]] = {}
+        self._dense_embeddings: Dict[str, List[float]] = {}
         self._idf: Dict[str, float] = {}
         self._is_indexed = False
+        self.embedding_model = None
+        self.backend = "tfidf_cosine"
+
+        if use_embeddings and HAS_FASTEMBED:
+            try:
+                self.embedding_model = TextEmbedding()
+                self.backend = "fastembed_onnx"
+                logger.info("[GraphRAG] Initialized local ONNX TextEmbedding engine.")
+            except Exception as ex:
+                logger.debug(f"[GraphRAG] Could not initialize TextEmbedding: {ex}")
+                self.embedding_model = None
+                self.backend = "tfidf_cosine"
 
     @staticmethod
     def _tokenize(text: str) -> List[str]:

@@ -111,7 +111,7 @@ alwaysApply: true
 
 ## Primary Verification Commands
 - **Run Pytest Regression**: `python -m pytest tests/`
-- **Knowledge Graph Query**: Use FastMCP tool `graph_query` or `impact_analysis`
+- **Knowledge Graph Query**: Use MCP tool `graph_query` or `impact_analysis`
 - **FSM State Advance**: `python -m runtime advance`
 
 ## Negative Invariants (NEVER DO THIS)

@@ -14,6 +14,7 @@ import json
 import hmac
 import hashlib
 import secrets
+import rfc8785
 from datetime import datetime, timezone
 from dataclasses import dataclass, field, asdict
 from enum import Enum
@@ -158,20 +159,52 @@ class ArtifactGovernor:
         return new_secret
 
     @classmethod
-    def compute_canonical_adr_hash(cls, adr: ADRRecord) -> str:
-        """Computes SHA-256 digest over canonical JSON representation of core ADR decision content."""
+    def compute_canonical_adr_hash(cls, adr: Any) -> str:
+        """Computes SHA-256 digest over RFC 8785 canonical JSON representation of core ADR decision content."""
+        if isinstance(adr, dict):
+            adr_id = adr.get("id", "")
+            title = adr.get("title", "")
+            decision = adr.get("decision", "")
+            alternatives = adr.get("alternatives", [])
+            evidence = adr.get("evidence", [])
+            affected_modules = adr.get("affected_modules", [])
+            rejected_options = adr.get("rejected_options", [])
+            reason = adr.get("reason", "")
+        else:
+            adr_id = getattr(adr, "id", "")
+            title = getattr(adr, "title", "")
+            decision = getattr(adr, "decision", "")
+            alternatives = getattr(adr, "alternatives", [])
+            evidence = getattr(adr, "evidence", [])
+            affected_modules = getattr(adr, "affected_modules", [])
+            rejected_options = getattr(adr, "rejected_options", [])
+            reason = getattr(adr, "reason", "")
+
+        ev_serialized = []
+        for e in (evidence or []):
+            if isinstance(e, str):
+                ev_serialized.append(e)
+            else:
+                item = e.to_dict() if hasattr(e, "to_dict") and callable(e.to_dict) else (
+                    e.model_dump() if hasattr(e, "model_dump") and callable(e.model_dump) else e
+                )
+                try:
+                    ev_serialized.append(rfc8785.dumps(item).decode("utf-8"))
+                except Exception:
+                    ev_serialized.append(json.dumps(item, sort_keys=True, default=str))
+
         adr_dict = {
-            "id": adr.id,
-            "title": adr.title,
-            "decision": adr.decision,
-            "alternatives": sorted(list(adr.alternatives)) if adr.alternatives else [],
-            "evidence": sorted(list(adr.evidence)) if adr.evidence else [],
-            "affected_modules": sorted(list(adr.affected_modules)) if adr.affected_modules else [],
-            "rejected_options": sorted(list(adr.rejected_options)) if adr.rejected_options else [],
-            "reason": adr.reason
+            "id": adr_id,
+            "title": title,
+            "decision": decision,
+            "alternatives": sorted([str(x) for x in alternatives]) if alternatives else [],
+            "evidence": sorted(ev_serialized),
+            "affected_modules": sorted([str(x) for x in affected_modules]) if affected_modules else [],
+            "rejected_options": sorted([str(x) for x in rejected_options]) if rejected_options else [],
+            "reason": reason
         }
-        canonical_json = json.dumps(adr_dict, sort_keys=True)
-        return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+        canonical_bytes = rfc8785.dumps(adr_dict)
+        return hashlib.sha256(canonical_bytes).hexdigest()
 
     @classmethod
     def _load_verified_approval_records(cls, workspace_dir: Optional[str] = None) -> Dict[str, ApprovalRecord]:

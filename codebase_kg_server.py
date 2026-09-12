@@ -2,7 +2,7 @@
 S-Class V12: Model Context Protocol (MCP) Codebase Knowledge Graph Server
 (codebase_kg_server.py)
 
-FastMCP daemon exposing 7 core graph tools over stdio/JSON-RPC:
+Standard Model Context Protocol (MCP) stdio/JSON-RPC server exposing 7 core graph tools:
 1. graph_query
 2. find_dependencies
 3. impact_analysis
