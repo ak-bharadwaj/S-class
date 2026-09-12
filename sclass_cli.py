@@ -56,6 +56,24 @@ def extract_workspace_arg(argv: List[str]) -> Tuple[Optional[str], List[str]]:
     return workspace_dir, remaining
 
 
+def print_result_with_epistemic_provenance(res: Dict[str, Any]) -> None:
+    """Prints result JSON and highlights epistemic provenance warning if synthetic."""
+    print(json.dumps(res, indent=2))
+    provenance = res.get("provenance", {})
+    if provenance.get("synthetic"):
+        print("\n" + "=" * 70)
+        print(" [!] S-CLASS EPISTEMIC NOTICE: SYNTHETIC SIMULATION RUN")
+        print(f"     Authority: {provenance.get('authority', 'UNKNOWN')}")
+        print(f"     Mode:      {provenance.get('execution_mode', 'TEST')}")
+        if provenance.get("epistemic_warning"):
+            print(f"     Warning:   {provenance.get('epistemic_warning')}")
+        if provenance.get("source_files"):
+            print(f"     Synthesized Starter Code: {', '.join(provenance.get('source_files', []))}")
+        else:
+            print("     Source Code: None generated (pipeline simulation only)")
+        print("=" * 70 + "\n")
+
+
 def print_help() -> None:
     print("S-Class V13 Control Plane CLI")
     print("Supported slash commands: /goal, /boost, /learn, /status, /advance, /grill, /doubt, /inquire")
@@ -110,14 +128,14 @@ def run_cli(argv: Optional[List[str]] = None) -> int:
         goal_text = rest or "Autonomous Objective"
         print(f"[*] Executing S-Class /goal in workspace: {sdk.workspace_dir}")
         res = sdk.execute_goal(goal=goal_text)
-        print(json.dumps(res, indent=2))
+        print_result_with_epistemic_provenance(res)
         return 0
 
     elif cmd == "/boost":
         boost_task = rest or "High-Velocity Task"
         print(f"[*] Executing S-Class /boost in workspace: {sdk.workspace_dir}")
         res = sdk.execute_boost(goal_or_task=boost_task)
-        print(json.dumps(res, indent=2))
+        print_result_with_epistemic_provenance(res)
         return 0
 
     elif cmd == "/learn":

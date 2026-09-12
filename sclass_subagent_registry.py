@@ -99,35 +99,71 @@ class SubagentRegistry:
     }
 
     @classmethod
-    def prepare_full_8_subagent_dispatch(cls, goal_text: str, fsm_phase: str, workspace_dir: Optional[str] = None) -> Dict[str, Any]:
+    def prepare_full_8_subagent_dispatch(
+        cls,
+        goal_text: str,
+        fsm_phase: str,
+        workspace_dir: Optional[str] = None,
+        task_domain: Optional[str] = None,
+        requires_frontend_ui: Optional[bool] = None
+    ) -> Dict[str, Any]:
         cwd = workspace_dir if workspace_dir else os.getcwd()
         
-        # 1. Run upfront Skill Discovery
+        # 1. Infer task domain if not provided
+        if task_domain is None or requires_frontend_ui is None:
+            try:
+                from task_classifier import TaskClassifier
+                tc = TaskClassifier.classify(goal_text, workspace_dir=cwd)
+                task_domain = task_domain or tc.domain.value
+                requires_frontend_ui = requires_frontend_ui if requires_frontend_ui is not None else tc.requires_frontend_ui
+            except Exception:
+                task_domain = task_domain or "fullstack"
+                requires_frontend_ui = requires_frontend_ui if requires_frontend_ui is not None else True
+
+        is_non_ui = task_domain in ("algorithm", "library", "cli") or requires_frontend_ui is False
+
+        # 2. Run upfront Skill Discovery
         discovery_res = SkillDiscoveryEngine.find_and_bind_required_skills(goal_text, cwd)
 
-        # 2. Resolve Phase Topology Router Targets
+        # 3. Resolve Phase Topology Router Targets
         from topology import TopologyRouter, SwarmTopology
         topo_router = TopologyRouter(SwarmTopology.STAR)
         phase_topology = topo_router.resolve_phase_topology(fsm_phase, {})
         all_agent_ids = list(cls.SUBAGENTS.keys())
         
+        UI_AGENTS = {"dss_ui_ux", "dss_frontend_dev", "dss_qa_frontend", "dss_user_alias_v2"}
+        UI_SKILL_PATTERNS = {"frontend", "react", "design", "aesthetic", "taste", "apple", "visual", "dom", "responsive", "animation", "motion", "a11y"}
+
         dispatched_subagents = []
         for sa_id, sa in cls.SUBAGENTS.items():
             targets = topo_router.get_communication_targets(sa_id, all_agent_ids)
-            # Resolve dynamic skill stack for subagent
-            subagent_skills = SClassSkillOrchestrator.resolve_active_skills(fsm_phase, goal_text, cwd)
-            skill_ids = [s.id for s in subagent_skills]
-            discovered_skills = discovery_res.get("bound_skill_ids", []) if isinstance(discovery_res, dict) else []
-            combined_skills = list(dict.fromkeys(sa.assigned_skills + skill_ids + discovered_skills))
+            
+            if is_non_ui and sa_id in UI_AGENTS:
+                status = "STANDBY_NON_UI"
+                combined_skills = []
+            else:
+                status = "DISPATCHED_CONCURRENTLY"
+                # Resolve dynamic skill stack for subagent
+                subagent_skills = SClassSkillOrchestrator.resolve_active_skills(
+                    fsm_phase, goal_text, cwd, task_domain=task_domain
+                )
+                skill_ids = [s.id for s in subagent_skills]
+                discovered_skills = discovery_res.get("bound_skill_ids", []) if isinstance(discovery_res, dict) else []
+                
+                base_skills = [
+                    sk for sk in sa.assigned_skills
+                    if not (is_non_ui and any(p in sk.lower() for p in UI_SKILL_PATTERNS))
+                ]
+                combined_skills = list(dict.fromkeys(base_skills + skill_ids + discovered_skills))
             
             dispatched_subagents.append({
                 "subagent_id": sa.id,
                 "name": sa.name,
                 "role_title": sa.role_title,
                 "domain": sa.domain,
-                "status": "DISPATCHED_CONCURRENTLY",
+                "status": status,
                 "assigned_skills": combined_skills,
-                "find_skill_enabled": sa.has_find_skill_capability
+                "find_skill_enabled": sa.has_find_skill_capability if status != "STANDBY_NON_UI" else False
             })
 
         # Save Full 8 Dispatch Receipt
@@ -135,10 +171,14 @@ class SubagentRegistry:
         os.makedirs(state_dir, exist_ok=True)
         dispatch_file = os.path.join(state_dir, "full_8_subagent_dispatch.json")
         
+        active_count = len([s for s in dispatched_subagents if s["status"] == "DISPATCHED_CONCURRENTLY"])
         receipt = {
             "fsm_phase": fsm_phase,
             "goal": goal_text,
-            "total_subagents_dispatched": len(dispatched_subagents),
+            "task_domain": task_domain,
+            "total_subagents_registered": len(dispatched_subagents),
+            "total_subagents_dispatched": active_count if is_non_ui else len(dispatched_subagents),
+            "active_subagents_count": active_count,
             "concurrent_execution": True,
             "skill_discovery_active": True,
             "subagents": dispatched_subagents

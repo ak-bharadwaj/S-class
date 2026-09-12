@@ -172,6 +172,69 @@ class SClassSDK:
         return LocalAuditLogger.log_event(event_type, message, payload, workspace_dir=self.workspace_dir)
 
     # 7. High-Level Slash Command Execution (/goal, /boost, /learn)
+    def _audit_execution_provenance(self) -> Dict[str, Any]:
+        """
+        Epistemic Integrity Audit:
+        Inspects whether the run relied on synthetic receipts (FSM_TEST_RUNNER / simulation mode)
+        and whether actual production source code was generated on disk.
+        Surfaces honest epistemic metadata to the top-level response.
+        """
+        qa_file = os.path.join(self.workspace_dir, ".agents", "qa_report.json")
+        is_synthetic = False
+        authority = "AGENT_VERIFIED"
+        execution_mode = os.getenv("SCLASS_EXECUTION_MODE", "PRODUCTION")
+
+        if os.path.exists(qa_file):
+            try:
+                qa_data = runtime.load_json(qa_file)
+                prov = qa_data.get("provenance_metadata", {})
+                if prov.get("synthetic") or prov.get("authority") == "FSM_TEST_RUNNER":
+                    is_synthetic = True
+                    authority = prov.get("authority", "FSM_TEST_RUNNER")
+                    execution_mode = prov.get("mode", execution_mode)
+            except Exception:
+                pass
+        elif execution_mode in ("TEST", "SIMULATION"):
+            is_synthetic = True
+            authority = "FSM_TEST_RUNNER"
+
+        # Check for real source code files on disk (excluding metadata/scaffolding dirs)
+        EXCLUDE_DIRS = {".agents", ".git", ".cursor", ".claude", "__pycache__", "node_modules", ".venv", "scratch"}
+        source_files = []
+        try:
+            for root, dirs, files in os.walk(self.workspace_dir):
+                dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
+                for f in files:
+                    ext = os.path.splitext(f)[1].lower()
+                    if ext in (".py", ".ts", ".js", ".tsx", ".jsx", ".go", ".rs", ".java", ".c", ".cpp", ".cs", ".rb") and not f.startswith("test_"):
+                        source_files.append(os.path.relpath(os.path.join(root, f), self.workspace_dir))
+        except Exception:
+            pass
+
+        has_code = len(source_files) > 0
+        warning = None
+
+        if is_synthetic and not has_code:
+            warning = (
+                "EPISTEMIC CAVEAT: S-Class executed in SYNTHETIC SIMULATION mode (Authority: FSM_TEST_RUNNER). "
+                "Architectural specifications and state transitions succeeded, but NO live coding agent credentials "
+                "were attached, so NO production source code was written to disk."
+            )
+        elif is_synthetic:
+            warning = (
+                "EPISTEMIC CAVEAT: Source code was generated, but QA verification was performed using SYNTHETIC "
+                "receipts under authority 'FSM_TEST_RUNNER'."
+            )
+
+        return {
+            "synthetic": is_synthetic,
+            "authority": authority,
+            "execution_mode": execution_mode,
+            "code_generated": has_code,
+            "source_files": source_files,
+            "epistemic_warning": warning
+        }
+
     def execute_goal(self, goal: str, profile: str = "full", max_steps: int = 25) -> Dict[str, Any]:
         """
         Executes autonomous /goal workflow:
@@ -182,15 +245,36 @@ class SClassSDK:
         history = runtime.FSMGoalSequenceRunner.run_full_sequence(self.workspace_dir, max_steps=max_steps)
         curr = runtime.get_state(self.workspace_dir)
         self.create_session_handoff()
-        return {
+
+        prov = self._audit_execution_provenance()
+        if curr.currentPhase == "DONE":
+            if prov["synthetic"] and not prov["code_generated"]:
+                status = "SIMULATED"
+            elif prov["synthetic"]:
+                status = "COMPLETED_SYNTHETIC"
+            else:
+                status = "COMPLETED"
+        else:
+            status = "IN_PROGRESS"
+
+        res = {
             "mode": "goal",
             "workspace": self.workspace_dir,
-            "status": "COMPLETED" if curr.currentPhase == "DONE" else "IN_PROGRESS",
+            "status": status,
             "current_phase": curr.currentPhase,
             "goal": curr.goal,
+            "synthetic": prov["synthetic"],
+            "authority": prov["authority"],
+            "execution_mode": prov["execution_mode"],
+            "code_generated": prov["code_generated"],
+            "source_files": prov["source_files"],
+            "provenance": prov,
             "steps_executed": len(history),
             "history": history,
         }
+        if prov["epistemic_warning"]:
+            res["epistemic_warning"] = prov["epistemic_warning"]
+        return res
 
     def execute_boost(self, goal_or_task: str, max_steps: int = 25) -> Dict[str, Any]:
         """
@@ -205,17 +289,38 @@ class SClassSDK:
         history = runtime.FSMGoalSequenceRunner.run_full_sequence(self.workspace_dir, max_steps=max_steps)
         curr = runtime.get_state(self.workspace_dir)
         self.create_session_handoff()
-        return {
+
+        prov = self._audit_execution_provenance()
+        if curr.currentPhase == "DONE":
+            if prov["synthetic"] and not prov["code_generated"]:
+                status = "SIMULATED"
+            elif prov["synthetic"]:
+                status = "COMPLETED_SYNTHETIC"
+            else:
+                status = "COMPLETED"
+        else:
+            status = "IN_PROGRESS"
+
+        res = {
             "mode": "boost",
             "workspace": self.workspace_dir,
-            "status": "COMPLETED" if curr.currentPhase == "DONE" else "IN_PROGRESS",
+            "status": status,
             "current_phase": curr.currentPhase,
             "goal": curr.goal,
             "skills_loaded": [s.name for s in skills],
             "nodes_indexed": index_res.get("nodes_indexed", 0),
+            "synthetic": prov["synthetic"],
+            "authority": prov["authority"],
+            "execution_mode": prov["execution_mode"],
+            "code_generated": prov["code_generated"],
+            "source_files": prov["source_files"],
+            "provenance": prov,
             "steps_executed": len(history),
             "history": history,
         }
+        if prov["epistemic_warning"]:
+            res["epistemic_warning"] = prov["epistemic_warning"]
+        return res
 
     def execute_learn(
         self,

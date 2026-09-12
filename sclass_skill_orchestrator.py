@@ -1271,7 +1271,7 @@ class SClassSkillOrchestrator:
     }
 
     @classmethod
-    def resolve_skill_combos(cls, goal_text: str) -> List[Dict[str, Any]]:
+    def resolve_skill_combos(cls, goal_text: str, task_domain: Optional[str] = None) -> List[Dict[str, Any]]:
         """Resolves active synergistic skill combos matching goal keywords or scope."""
         goal_lower = goal_text.lower()
         matched_combos = []
@@ -1289,8 +1289,11 @@ class SClassSkillOrchestrator:
             matched_combos.append(cls.SKILL_COMBOS["TASTE_AESTHETIC_REBRAND_COMBO"])
             
         if not matched_combos:
-            matched_combos.append(cls.SKILL_COMBOS["ENTERPRISE_FULLSTACK_COMBO"])
-            matched_combos.append(cls.SKILL_COMBOS["APPLE_FLUID_UI_COMBO"])
+            if task_domain in ("algorithm", "library", "cli"):
+                matched_combos.append(cls.SKILL_COMBOS["SECURE_HARDENED_BACKEND_COMBO"])
+            else:
+                matched_combos.append(cls.SKILL_COMBOS["ENTERPRISE_FULLSTACK_COMBO"])
+                matched_combos.append(cls.SKILL_COMBOS["APPLE_FLUID_UI_COMBO"])
 
         return matched_combos
 
@@ -1361,9 +1364,24 @@ class SClassSkillOrchestrator:
         return skill
 
     @classmethod
-    def resolve_active_skills(cls, fsm_phase: str, goal_text: str, workspace_dir: Optional[str] = None) -> List[SkillDefinition]:
+    def resolve_active_skills(
+        cls,
+        fsm_phase: str,
+        goal_text: str,
+        workspace_dir: Optional[str] = None,
+        task_domain: Optional[str] = None
+    ) -> List[SkillDefinition]:
         goal_lower = goal_text.lower()
         active_skills: List[SkillDefinition] = []
+
+        # Auto-infer task_domain if not provided
+        if not task_domain:
+            try:
+                from task_classifier import TaskClassifier
+                tc = TaskClassifier.classify(goal_text, workspace_dir=workspace_dir)
+                task_domain = tc.domain.value
+            except Exception:
+                task_domain = "fullstack"
 
         # 1. Collect Default Active Core Skills & Auto-Populate Configurations
         for skill_id, skill in SkillTaxonomy.SKILLS.items():
@@ -1377,7 +1395,30 @@ class SClassSkillOrchestrator:
                 if any(kw in goal_lower for kw in skill.conditional_keywords):
                     active_skills.append(skill)
 
-        # 3. Filter & Prioritize by FSM Phase
+        # 3. Domain-Aware Skill Filtering: Strip UI/Frontend and unrequested Enterprise-Auth for non-UI tasks
+        if task_domain in ("algorithm", "library", "cli"):
+            UI_PATTERNS = {"frontend", "react", "design", "aesthetic", "taste", "apple", "visual", "dom", "responsive", "animation", "motion", "a11y"}
+            UNREQUESTED_ENTERPRISE = {"oauth-sso-saml-auth", "tenant-isolation-multi-tenancy", "elasticsearch-vector-search", "db-sharding-read-replicas"}
+            filtered = []
+            for s in active_skills:
+                # Keep if explicitly requested by prompt keywords
+                if s.conditional_keywords and any(kw in goal_lower for kw in s.conditional_keywords):
+                    filtered.append(s)
+                    continue
+                # Exclude presentation tier
+                if getattr(s, "tier", "") == "presentation":
+                    continue
+                # Exclude UI patterns
+                sid = s.id.lower()
+                if any(p in sid for p in UI_PATTERNS):
+                    continue
+                # Exclude unrequested heavy enterprise skills
+                if sid in UNREQUESTED_ENTERPRISE and not any(kw in goal_lower for kw in ["oauth", "sso", "saml", "tenant", "elastic"]):
+                    continue
+                filtered.append(s)
+            active_skills = filtered
+
+        # 4. Filter & Prioritize by FSM Phase
         phase_filtered = cls._filter_skills_for_phase(active_skills, fsm_phase)
         
         # Save Active Skill Stack Receipt
@@ -1385,7 +1426,7 @@ class SClassSkillOrchestrator:
         state_dir = os.path.join(cwd, ".agents")
         os.makedirs(state_dir, exist_ok=True)
         
-        active_combos = cls.resolve_skill_combos(goal_text)
+        active_combos = cls.resolve_skill_combos(goal_text, task_domain=task_domain)
         
         stack_file = os.path.join(state_dir, "active_skill_stack.json")
         receipt = {
