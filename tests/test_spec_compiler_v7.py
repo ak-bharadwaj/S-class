@@ -174,24 +174,33 @@ def test_v8_dynamic_execution_architecture_and_transports():
 
 def test_v8_end_to_end_refinement_compiler_pipeline():
     """Verify end-to-end compile_v7_refinement_pipeline execution in V8 when ADRs are confirmed."""
-    d_graph = SemanticDomainGraph()
-    d_graph.add_node(DomainNode("actor_sensor", "Sensor", DomainPrimitiveType.ACTOR))
-    d_graph.add_node(DomainNode("entity_reading", "Reading", DomainPrimitiveType.ENTITY))
+    import os
+    old_mode = os.environ.get("SCLASS_EXECUTION_MODE")
+    os.environ["SCLASS_EXECUTION_MODE"] = "PRODUCTION"
+    try:
+        d_graph = SemanticDomainGraph()
+        d_graph.add_node(DomainNode("actor_sensor", "Sensor", DomainPrimitiveType.ACTOR))
+        d_graph.add_node(DomainNode("entity_reading", "Reading", DomainPrimitiveType.ENTITY))
 
-    res = SpecificationCompiler.compile_v7_refinement_pipeline(
-        graph=d_graph,
-        intent_features=["reading", "ingest"],
-        raw_request="Sensor is authorized to ingest reading using distributed microservices architecture.",
-        archetypes=["data_pipeline"]
-    )
+        res = SpecificationCompiler.compile_v7_refinement_pipeline(
+            graph=d_graph,
+            intent_features=["reading", "ingest"],
+            raw_request="Sensor is authorized to ingest reading using distributed microservices architecture.",
+            archetypes=["data_pipeline"]
+        )
 
-    assert "behavior_graph" in res
-    assert "requirement_graph" in res
-    assert "hld_design" in res
-    assert "hld_validation" in res
-    assert "lld_components" in res
-    assert "tasks" in res
+        assert "behavior_graph" in res
+        assert "requirement_graph" in res
+        assert "hld_design" in res
+        assert "hld_validation" in res
+        assert "lld_components" in res
+        assert "tasks" in res
 
-    assert res["hld_validation"]["passed"] is True
-    assert res["blocked"] is True
-    assert res["target_fsm_state"] == "DEBATE"
+        assert res["hld_validation"]["passed"] is True
+        assert res["blocked"] is True
+        assert res["target_fsm_state"] == "DEBATE"
+    finally:
+        if old_mode is None:
+            os.environ.pop("SCLASS_EXECUTION_MODE", None)
+        else:
+            os.environ["SCLASS_EXECUTION_MODE"] = old_mode

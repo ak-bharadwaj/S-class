@@ -864,7 +864,8 @@ class ArchitectureDebateEngine:
         b_graph: BehaviorGraph,
         raw_request: str = "",
         workspace_dir: Optional[str] = None,
-        is_debate_phase: bool = False
+        is_debate_phase: bool = False,
+        task_domain: str = "fullstack"
     ) -> DebateResult:
         """
         Executes full V9.4 Multi-Dimensional Risk & Architecture Satisfaction Hardened Cycle:
@@ -889,6 +890,12 @@ class ArchitectureDebateEngine:
         existing_approvals = ArtifactGovernor._load_verified_approval_records(workspace_dir)
         new_approval_records: List[ApprovalRecord] = list(existing_approvals.values())
 
+        # Domain-adaptive perspective filtering: non-UI tasks only need critical perspectives
+        if task_domain in ("algorithm", "library", "cli"):
+            active_perspectives = {DebatePerspective.SECURITY_AUDIT, DebatePerspective.SKEPTIC_GROUNDING}
+        else:
+            active_perspectives = set(DebatePerspective)
+
         for adr in hld.adrs:
             # 1. Compositional Multi-Dimensional Risk Profile
             risk_prof = GenericDebateEvaluator.evaluate_risk_profile(adr, r_graph, b_graph, raw_request=raw_request)
@@ -909,6 +916,9 @@ class ArchitectureDebateEngine:
                 raw_request=raw_request,
                 is_debate_phase=is_debate_phase
             )
+
+            # Filter challenges to active perspectives for domain-adaptive debate
+            challenges = [c for c in challenges if c.perspective in active_perspectives]
 
             # Initial Candidate Check
             if (adr.status == "PROPOSED" or adr.epistemic_status == EpistemicStatus.PROPOSED) and adr.id not in existing_approvals:
@@ -1118,7 +1128,8 @@ class ArchitectureDebateEngine:
         hld: HLDDesign,
         r_graph: RequirementGraph,
         b_graph: BehaviorGraph,
-        raw_request: str = ""
+        raw_request: str = "",
+        task_domain: str = "fullstack"
     ) -> DebateResult:
         """Backwards-compatible wrapper delegating to run_debate_cycle."""
-        return cls.run_debate_cycle(hld, r_graph, b_graph, raw_request=raw_request)
+        return cls.run_debate_cycle(hld, r_graph, b_graph, raw_request=raw_request, task_domain=task_domain)

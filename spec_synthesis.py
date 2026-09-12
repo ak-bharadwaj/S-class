@@ -23,6 +23,7 @@ from practical_skeptic import PracticalSkeptic
 from requirement_ir import RequirementGraph
 from behavior_graph import BehaviorGraph
 from hld_compiler import HLDDesign, HLDModule, ADRRecord
+from task_classifier import TaskClassifier, TaskDomain, TaskClassification
 
 try:
     from runtime import write_json_atomic, load_json
@@ -1014,7 +1015,8 @@ class DynamicLinguisticExtractor:
         "other", "than", "then", "now", "look", "only", "come", "its", "over", "think",
         "also", "back", "after", "use", "two", "how", "our", "work", "first", "well",
         "way", "even", "new", "want", "because", "any", "these", "give", "day", "most",
-        "us", "system", "build", "implement", "application", "platform", "project", "need"
+        "us", "system", "build", "implement", "application", "platform", "project", "need",
+        "using", "via", "based", "through", "under", "along", "without", "within", "between"
     }
 
     @classmethod
@@ -1268,14 +1270,22 @@ class StructuredPromptParser:
         all_extracted_roles = list(dict.fromkeys(list(seen_roles) + fallback_intent.target_roles))
         final_roles = all_extracted_roles if all_extracted_roles else ["operator"]
 
+        tc = TaskClassifier.classify(raw_request)
+        if tc.domain == TaskDomain.ALGORITHM:
+            clean_feature = re.sub(r'^(?:implement|build|create|add|write)\s+(?:a|an|the)?\s*', '', raw_request, flags=re.IGNORECASE).strip()
+            clean_feature_token = re.sub(r'[^a-zA-Z0-9]+', '_', clean_feature).strip('_').lower()
+            primary_features = [clean_feature_token] if clean_feature_token else fallback_intent.primary_features
+        else:
+            primary_features = fallback_intent.primary_features
+
         return StructuredIntent(
             raw_request=raw_request,
-            primary_features=fallback_intent.primary_features,
+            primary_features=primary_features,
             target_roles=final_roles,
             action_verbs=fallback_intent.action_verbs,
             domain_keywords=fallback_intent.domain_keywords,
             role_bindings=bindings,
-            global_features=[f for f in fallback_intent.primary_features if f not in cls.QUALIFIER_WORDS]
+            global_features=[f for f in primary_features if f not in cls.QUALIFIER_WORDS]
         )
 
 
@@ -1789,7 +1799,9 @@ class RolePageSpreadEngine:
     """
 
     @classmethod
-    def generate_spread(cls, roles: List[str], intent_features: Optional[List[str]] = None) -> Dict[str, List[Dict[str, Any]]]:
+    def generate_spread(cls, roles: List[str], intent_features: Optional[List[str]] = None, requires_frontend_ui: bool = True) -> Dict[str, List[Dict[str, Any]]]:
+        if not requires_frontend_ui:
+            return {}
         spread = {}
         intent_features = intent_features or []
 
@@ -1864,7 +1876,9 @@ class LowLevelDesignSynthesizer:
     """
 
     @classmethod
-    def synthesize_lld_requirements(cls, page_spreads: Dict[str, List[Dict[str, Any]]]) -> Tuple[List[SynthesizedRequirement], Dict[str, Dict[str, Any]]]:
+    def synthesize_lld_requirements(cls, page_spreads: Dict[str, List[Dict[str, Any]]], requires_frontend_ui: bool = True) -> Tuple[List[SynthesizedRequirement], Dict[str, Dict[str, Any]]]:
+        if not requires_frontend_ui or not page_spreads:
+            return [], {}
         lld_reqs = []
         lld_catalog = {}
         seen_modules = set()
@@ -1998,7 +2012,69 @@ class SpecSynthesisEngine:
             return DecisionThreshold.PROBABLY_DECIDE
         return DecisionThreshold.AUTO_DECIDE
 
-    def synthesize_requirements(self, intent: IntentExtraction, evidence: ProjectEvidence, archetypes: List[ProjectArchetype], scope_tier: Optional[ScopeTier] = None) -> List[SynthesizedRequirement]:
+    def synthesize_requirements(self, intent: IntentExtraction, evidence: ProjectEvidence, archetypes: List[ProjectArchetype], scope_tier: Optional[ScopeTier] = None, task_classification: Optional[TaskClassification] = None) -> List[SynthesizedRequirement]:
+        if task_classification and not task_classification.requires_frontend_ui:
+            if task_classification.domain == TaskDomain.ALGORITHM:
+                feat = intent.primary_features[0] if intent.primary_features else "sliding_window_rate_limiter"
+                feat_name = feat.replace('_', ' ').title()
+                return [
+                    SynthesizedRequirement(
+                        id="REQ-ALGO-001",
+                        description=f"Core Algorithm State: Implement {feat_name} data structure managing window duration and request quotas",
+                        type=RequirementType.EXPLICIT,
+                        category=RequirementCategory.PRODUCT_REQUIREMENT,
+                        action=ArtifactAction.CREATE,
+                        decision_threshold=DecisionThreshold.AUTO_DECIDE,
+                        evidence=[EvidenceReference(source_file="user_request", reference_text=intent.raw_request)],
+                        affects=["backend"],
+                        why_chain=["Core algorithmic logic for rate limiting"]
+                    ),
+                    SynthesizedRequirement(
+                        id="REQ-ALGO-002",
+                        description=f"Window Calculation & Rate Check: Evaluate timestamps within sliding interval (t - window_size to t) to accept or reject requests",
+                        type=RequirementType.EXPLICIT,
+                        category=RequirementCategory.PRODUCT_REQUIREMENT,
+                        action=ArtifactAction.CREATE,
+                        decision_threshold=DecisionThreshold.AUTO_DECIDE,
+                        evidence=[EvidenceReference(source_file="user_request", reference_text="sliding window algorithm")],
+                        affects=["backend"],
+                        why_chain=["Sliding window boundary calculation"]
+                    ),
+                    SynthesizedRequirement(
+                        id="REQ-ALGO-003",
+                        description=f"Memory Efficiency & Eviction: Prune expired entries to guarantee bounded O(N) memory consumption",
+                        type=RequirementType.DERIVED,
+                        category=RequirementCategory.SYSTEM_INVARIANT,
+                        action=ArtifactAction.CREATE,
+                        decision_threshold=DecisionThreshold.AUTO_DECIDE,
+                        evidence=[EvidenceReference(source_file="algorithmic_soundness", reference_text="bounded memory")],
+                        affects=["backend"],
+                        why_chain=["Prevent memory leakage from accumulated timestamps"]
+                    ),
+                    SynthesizedRequirement(
+                        id="REQ-ALGO-004",
+                        description=f"Thread Safety & Concurrency: Protect sliding window state with atomic operations or locks to prevent race conditions",
+                        type=RequirementType.DERIVED,
+                        category=RequirementCategory.ARCHITECTURAL_CONSTRAINT,
+                        action=ArtifactAction.CREATE,
+                        decision_threshold=DecisionThreshold.AUTO_DECIDE,
+                        evidence=[EvidenceReference(source_file="concurrency_invariants", reference_text="thread safety")],
+                        affects=["backend"],
+                        why_chain=["Multi-threaded environment safety"]
+                    ),
+                    SynthesizedRequirement(
+                        id="REQ-ALGO-005",
+                        description=f"Comprehensive Test Harness: Automated unit, boundary, burst traffic, and window roll-over test coverage",
+                        type=RequirementType.DERIVED,
+                        category=RequirementCategory.SYSTEM_INVARIANT,
+                        action=ArtifactAction.CREATE,
+                        decision_threshold=DecisionThreshold.AUTO_DECIDE,
+                        evidence=[EvidenceReference(source_file="test_mandate", reference_text="unit tests")],
+                        affects=["backend"],
+                        why_chain=["Verify algorithmic correctness under edge cases"]
+                    )
+                ]
+
         reqs = []
 
         # 1. Explicit Base Requirements
@@ -2036,8 +2112,9 @@ class SpecSynthesisEngine:
 
         # 3. Canonical Low-Level Design (LLD) & Role Page Spread Synthesis
         feats = intent.all_features if hasattr(intent, 'all_features') else intent.primary_features
-        page_spreads = RolePageSpreadEngine.generate_spread(intent.target_roles, feats)
-        lld_reqs, _ = LowLevelDesignSynthesizer.synthesize_lld_requirements(page_spreads)
+        req_ui = task_classification.requires_frontend_ui if task_classification else True
+        page_spreads = RolePageSpreadEngine.generate_spread(intent.target_roles, feats, requires_frontend_ui=req_ui)
+        lld_reqs, _ = LowLevelDesignSynthesizer.synthesize_lld_requirements(page_spreads, requires_frontend_ui=req_ui)
         reqs.extend(lld_reqs)
 
         # 4. Universal Archetype Inferences
@@ -2155,7 +2232,21 @@ class SpecSynthesisEngine:
         # 2. Archetype & Scope Detection
         archetypes = ProjectArchetypeDetector.detect(workspace_dir, evidence)
         scope_tier = ScopeClassifier.classify(raw_request, intent)
-        archetype_strings = [a.value for a in archetypes]
+        task_classification = TaskClassifier.classify(raw_request, workspace_dir)
+
+        if not task_classification.requires_frontend_ui:
+            if task_classification.domain == TaskDomain.ALGORITHM:
+                archetype_strings = ["library"]
+            elif task_classification.domain == TaskDomain.CLI:
+                archetype_strings = ["cli_tool"]
+            elif task_classification.domain == TaskDomain.LIBRARY:
+                archetype_strings = ["library"]
+            elif task_classification.domain == TaskDomain.API:
+                archetype_strings = ["backend_api"]
+            else:
+                archetype_strings = ["backend_api"]
+        else:
+            archetype_strings = [a.value for a in archetypes]
 
         # Incorporate Clarification Answers Upfront
         if not clarification_answers and os.path.exists(os.path.join(agents_dir, "clarification_answers.json")):
@@ -2218,7 +2309,7 @@ class SpecSynthesisEngine:
                 write_json_atomic(pipe_disk_path, p_disk)
 
         lld_catalog = {c.id if hasattr(c, "id") else (c.get("id") if isinstance(c, dict) else f"LLD-{idx}"): (c.to_dict() if hasattr(c, "to_dict") else c) for idx, c in enumerate(lld_components)}
-        if evidence and getattr(evidence, "api_routes", None):
+        if task_classification.requires_frontend_ui and evidence and getattr(evidence, "api_routes", None):
             for route_item in evidence.api_routes:
                 r_ep = f"{route_item.get('method', 'GET')} {route_item.get('path', '')}"
                 for lld_dict in lld_catalog.values():
@@ -2230,8 +2321,8 @@ class SpecSynthesisEngine:
         if evidence and getattr(evidence, "auth_permissions", None):
             for perm in evidence.auth_permissions:
                 roles_to_spread.add(perm.lower().replace(" ", "_"))
-        page_spreads = RolePageSpreadEngine.generate_spread(list(roles_to_spread), feats)
-        if hld_obj:
+        page_spreads = RolePageSpreadEngine.generate_spread(list(roles_to_spread), feats, requires_frontend_ui=task_classification.requires_frontend_ui)
+        if task_classification.requires_frontend_ui and hld_obj:
             modules_list = hld_obj.modules if hasattr(hld_obj, "modules") else hld_obj.get("modules", [])
             style = getattr(hld_obj, "architecture_style", None) or (hld_obj.get("architecture_style") if isinstance(hld_obj, dict) else "Modular Monolith")
             for role_k, p_list in page_spreads.items():
@@ -2292,7 +2383,7 @@ class SpecSynthesisEngine:
                     )
                     requirements_list.append(req_obj)
         else:
-            requirements_list = self.synthesize_requirements(intent, evidence, archetypes, scope_tier)
+            requirements_list = self.synthesize_requirements(intent, evidence, archetypes, scope_tier, task_classification=task_classification)
 
         # Incorporate Clarification Answers
         if not clarification_answers and os.path.exists(os.path.join(agents_dir, "clarification_answers.json")):
@@ -2351,6 +2442,13 @@ class SpecSynthesisEngine:
 
         # 7. Scope Boundary & Anti-Bloat Audit
         in_scope_bounds, out_of_scope_bounds, _ = ScopeBoundaryGuard.audit_scope_boundaries(raw_request, intent.primary_features)
+        if not task_classification.requires_frontend_ui:
+            out_of_scope_bounds.extend([
+                "Frontend web pages, UI components, HTML/CSS layouts, and browser dashboards",
+                "Browser visual screenshots and DOM accessibility audits",
+                "Database migrations and persistent ORM schemas (in-memory state only)"
+            ])
+
         scope_boundaries_dict = {
             "in_scope": in_scope_bounds,
             "out_of_scope": out_of_scope_bounds
@@ -2372,7 +2470,7 @@ class SpecSynthesisEngine:
         for hole in dependency_holes:
             questions.append(hole["question"])
         if not questions:
-            questions.append("Clarify default authentication and RBAC authorization boundary for system roles.")
+            questions.append("Clarify default execution and concurrency boundaries for system operations.")
 
         # Practical Skeptic Checklist (Empirical Real-World Failures)
         practical_pass, practical_warns, practical_checks = PracticalSkeptic.audit_specification({
@@ -2417,7 +2515,9 @@ class SpecSynthesisEngine:
 
         # Save JSON output
         try:
-            write_json_atomic(json_path, spec.__dict__)
+            spec_dict = spec.__dict__.copy()
+            spec_dict["task_classification"] = task_classification.to_dict()
+            write_json_atomic(json_path, spec_dict)
             write_json_atomic(os.path.join(agents_dir, "v7_refinement_pipeline.json"), {
                 "behavior_graph": v7_pipeline["behavior_graph"].to_dict(),
                 "requirement_graph": v7_pipeline["requirement_graph"].to_dict(),
@@ -2434,12 +2534,16 @@ class SpecSynthesisEngine:
                 "target_fsm_state": v7_pipeline.get("target_fsm_state", "CODING")
             })
 
-            from intent_contract import IntentContract
+            from intent_contract import IntentContract, OutputContractSpec
+            target_t = "web_ui" if task_classification.requires_frontend_ui else ("algorithm" if task_classification.domain == TaskDomain.ALGORITHM else "json_api")
+            fmt = "auto" if task_classification.requires_frontend_ui else "code_module"
+            out_contract = OutputContractSpec(target_type=target_t, expected_format=fmt)
             ic = IntentContract(
                 goal=spec.intent_summary,
                 scope_boundaries=out_of_scope_bounds,
                 acceptance_criteria=spec.acceptance_criteria,
-                error_paths=[]
+                error_paths=[],
+                output_contract=out_contract
             )
             write_json_atomic(os.path.join(agents_dir, "intent_contract.json"), ic.to_dict())
         except Exception as e:

@@ -153,12 +153,26 @@ class SpecGrillerEngine:
                         }
                     }
 
+        # Determine task classification
+        is_ui_req = True
+        is_db_req = True
+        task_domain = "fullstack"
+        state_file = os.path.join(agents_dir, "orchestration_state.json")
+        if os.path.exists(state_file):
+            try:
+                st = cls._load_json(state_file)
+                is_ui_req = st.get("requiresFrontendUi", True)
+                task_domain = st.get("taskDomain", "fullstack")
+                is_db_req = task_domain in ["fullstack", "backend_logic", "api"]
+            except Exception:
+                pass
+
         vector_results: List[ThreatVectorResult] = []
         critical_count = 0
 
         for vector in cls.THREAT_VECTORS:
             check_func = getattr(cls, vector["check"])
-            res: ThreatVectorResult = check_func(blueprint, matrix, intent)
+            res: ThreatVectorResult = check_func(blueprint, matrix, intent, is_ui_req=is_ui_req, is_db_req=is_db_req, task_domain=task_domain)
             vector_results.append(res)
             if not res.passed and res.risk_level in ["HIGH", "CRITICAL"]:
                 critical_count += 1
@@ -190,8 +204,24 @@ class SpecGrillerEngine:
         return cls.grill_specification(workspace_dir=workspace_dir)
 
     @classmethod
-    def _audit_concurrency(cls, blueprint: Dict[str, Any], matrix: Dict[str, Any], intent: Dict[str, Any]) -> ThreatVectorResult:
+    def _audit_concurrency(cls, blueprint: Dict[str, Any], matrix: Dict[str, Any], intent: Dict[str, Any], is_ui_req: bool = True, is_db_req: bool = True, task_domain: str = "fullstack") -> ThreatVectorResult:
         findings = []
+        if not is_ui_req:
+            algo_spec = str(blueprint.get("algorithm_spec", {})).lower()
+            backend_str = str(blueprint.get("backend_spec", {})).lower()
+            combined = algo_spec + " " + backend_str
+            if "thread" not in combined and "lock" not in combined and "atomic" not in combined and "concurrency" not in combined and "mutex" not in combined:
+                findings.append("Algorithm/backend design lacks explicit concurrency or thread-safety policy declaration.")
+            passed = len(findings) == 0
+            return ThreatVectorResult(
+                vector_id="concurrency_race_conditions",
+                name="Concurrency & State Race Conditions",
+                passed=passed,
+                risk_level="HIGH" if findings else "LOW",
+                findings=findings if findings else ["Thread-safety and concurrency policy verified."],
+                remediation_recommendation="Declare concurrency/thread-safety guarantees (e.g. threading.Lock, thread-safe deque)."
+            )
+
         fe_layout = blueprint.get("frontend_layout", {})
         components = str(fe_layout)
         backend_str = str(blueprint.get("backend_spec", {})).lower()
@@ -213,7 +243,17 @@ class SpecGrillerEngine:
         )
 
     @classmethod
-    def _audit_database_integrity(cls, blueprint: Dict[str, Any], matrix: Dict[str, Any], intent: Dict[str, Any]) -> ThreatVectorResult:
+    def _audit_database_integrity(cls, blueprint: Dict[str, Any], matrix: Dict[str, Any], intent: Dict[str, Any], is_ui_req: bool = True, is_db_req: bool = True, task_domain: str = "fullstack") -> ThreatVectorResult:
+        if not is_db_req:
+            return ThreatVectorResult(
+                vector_id="database_integrity",
+                name="Database Schema Integrity & Migration Boundaries",
+                passed=True,
+                risk_level="LOW",
+                findings=["Database schema integrity bypassed: In-memory/non-database task domain requires no persistent database."],
+                remediation_recommendation="N/A (In-memory execution domain)"
+            )
+
         findings = []
         db_schema = blueprint.get("db_schema", {})
         if not db_schema:
@@ -234,7 +274,17 @@ class SpecGrillerEngine:
         )
 
     @classmethod
-    def _audit_ui_safety(cls, blueprint: Dict[str, Any], matrix: Dict[str, Any], intent: Dict[str, Any]) -> ThreatVectorResult:
+    def _audit_ui_safety(cls, blueprint: Dict[str, Any], matrix: Dict[str, Any], intent: Dict[str, Any], is_ui_req: bool = True, is_db_req: bool = True, task_domain: str = "fullstack") -> ThreatVectorResult:
+        if not is_ui_req:
+            return ThreatVectorResult(
+                vector_id="ui_null_undefined_safety",
+                name="UI Null, Undefined & Exception Fallback Safety",
+                passed=True,
+                risk_level="LOW",
+                findings=["UI null safety bypassed: Headless / backend task domain has no user-facing UI."],
+                remediation_recommendation="N/A (Headless execution domain)"
+            )
+
         findings = []
         fe_layout = blueprint.get("frontend_layout", {})
         components = str(fe_layout)
@@ -252,7 +302,22 @@ class SpecGrillerEngine:
         )
 
     @classmethod
-    def _audit_api_contracts(cls, blueprint: Dict[str, Any], matrix: Dict[str, Any], intent: Dict[str, Any]) -> ThreatVectorResult:
+    def _audit_api_contracts(cls, blueprint: Dict[str, Any], matrix: Dict[str, Any], intent: Dict[str, Any], is_ui_req: bool = True, is_db_req: bool = True, task_domain: str = "fullstack") -> ThreatVectorResult:
+        if task_domain in ["algorithm", "library", "cli"]:
+            algo_spec = blueprint.get("algorithm_spec", {})
+            backend = blueprint.get("backend_spec", {})
+            has_interfaces = bool(algo_spec.get("interfaces") or backend.get("interfaces") or backend.get("services") or algo_spec.get("algorithm"))
+            passed = has_interfaces
+            findings = [] if has_interfaces else ["Algorithm/library spec lacks public interface or algorithm method definitions."]
+            return ThreatVectorResult(
+                vector_id="api_contract_breaking_changes",
+                name="API Signature & Interface Completeness",
+                passed=passed,
+                risk_level="HIGH" if findings else "LOW",
+                findings=findings if findings else ["Public interface and algorithm signatures complete."],
+                remediation_recommendation="Define explicit public callable methods and argument/return types."
+            )
+
         findings = []
         backend = blueprint.get("backend_spec", {})
         if not backend:
@@ -273,7 +338,23 @@ class SpecGrillerEngine:
         )
 
     @classmethod
-    def _audit_security(cls, blueprint: Dict[str, Any], matrix: Dict[str, Any], intent: Dict[str, Any]) -> ThreatVectorResult:
+    def _audit_security(cls, blueprint: Dict[str, Any], matrix: Dict[str, Any], intent: Dict[str, Any], is_ui_req: bool = True, is_db_req: bool = True, task_domain: str = "fullstack") -> ThreatVectorResult:
+        if task_domain in ["algorithm", "library", "cli"]:
+            algo_spec = str(blueprint.get("algorithm_spec", {})).lower()
+            backend = str(blueprint.get("backend_spec", {})).lower()
+            combined = algo_spec + " " + backend
+            has_boundary_guard = any(k in combined for k in ["exception", "boundary", "error", "validation", "guard", "limit"])
+            passed = has_boundary_guard
+            findings = [] if has_boundary_guard else ["Algorithm/library spec lacks input validation or boundary error handling specifications."]
+            return ThreatVectorResult(
+                vector_id="security_input_injection",
+                name="Input Validation & Boundary Guarding",
+                passed=passed,
+                risk_level="HIGH" if findings else "LOW",
+                findings=findings if findings else ["Input parameter boundaries and error handling verified."],
+                remediation_recommendation="Specify boundary checks and exception handling for invalid caller inputs."
+            )
+
         findings = []
         backend = str(blueprint.get("backend_spec", {}))
         if "auth" not in backend.lower() and "middleware" not in backend.lower() and "guard" not in backend.lower():

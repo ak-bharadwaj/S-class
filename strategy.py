@@ -771,12 +771,18 @@ class StrategyEngine:
             return ReviewDepth.STANDARD
 
     @staticmethod
-    def resolve_debate_squad(domains: List[str], review_depth: ReviewDepth) -> List[str]:
-        """Dynamically matches debate panel agents based on capability taxonomy and review depth."""
+    def resolve_debate_squad(domains: List[str], review_depth: ReviewDepth, task_domain: str = "fullstack") -> List[str]:
+        """Dynamically matches debate panel agents based on capability taxonomy, review depth, and task domain."""
         squad = set()
 
         # Always include Lead & Governor for architecture review
         squad.add("dss_governor")
+
+        # For algorithm/library/CLI tasks, limit to essential agents only
+        if task_domain in ("algorithm", "library", "cli"):
+            squad.add("dss_backend_dev")
+            squad.add("dss_cso_v2")
+            return sorted(list(squad))  # 3 agents max for non-UI tasks
 
         # Map detected domains to capabilities
         if "ui" in domains:

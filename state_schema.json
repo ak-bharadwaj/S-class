@@ -20,6 +20,12 @@
     "workflowProfile": {
       "type": "string"
     },
+    "taskDomain": {
+      "type": "string"
+    },
+    "requiresFrontendUi": {
+      "type": "boolean"
+    },
     "planRationale": {
       "type": "string"
     },

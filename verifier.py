@@ -169,10 +169,112 @@ class EvidenceVerifier:
     """Audits phase execution evidence before allowing FSM state transitions."""
 
     @staticmethod
+    def _is_frontend_ui_required(cwd: str, state_dir: str) -> bool:
+        """Determines if the current task or workspace strictly requires frontend UI & visual QA."""
+        # 1. Check sclass.config.json override
+        config_file = os.path.join(cwd, "sclass.config.json")
+        if os.path.exists(config_file):
+            try:
+                with open(config_file, "r", encoding="utf-8") as cf:
+                    cdata = json.load(cf)
+                if cdata.get("skipVisualQA") is True or cdata.get("requiresFrontendUi") is False:
+                    return False
+                if cdata.get("requiresFrontendUi") is True:
+                    return True
+                if cdata.get("taskDomain") in ["algorithm", "cli", "library", "backend_logic", "api"]:
+                    return False
+                if cdata.get("taskDomain") in ["frontend", "fullstack"]:
+                    return True
+            except Exception:
+                pass
+
+        # 2. Check orchestration_state.json
+        state_file = os.path.join(state_dir, "orchestration_state.json")
+        if os.path.exists(state_file):
+            try:
+                with open(state_file, "r", encoding="utf-8") as sf:
+                    sdata = json.load(sf)
+                if sdata.get("requiresFrontendUi") is False:
+                    return False
+                if sdata.get("requiresFrontendUi") is True:
+                    return True
+                if sdata.get("taskDomain") in ["algorithm", "cli", "library", "backend_logic", "api"]:
+                    return False
+                if sdata.get("taskDomain") in ["frontend", "fullstack"]:
+                    return True
+                goal = sdata.get("goal", "")
+                if goal:
+                    from task_classifier import TaskClassifier
+                    tc = TaskClassifier.classify(goal, workspace_dir=cwd)
+                    return tc.requires_frontend_ui
+            except Exception:
+                pass
+
+        # 3. Check synthesized_spec.json
+        spec_file = os.path.join(state_dir, "synthesized_spec.json")
+        if os.path.exists(spec_file):
+            try:
+                with open(spec_file, "r", encoding="utf-8") as spf:
+                    sp_data = json.load(spf)
+                tc_data = sp_data.get("task_classification", {})
+                if "requires_frontend_ui" in tc_data:
+                    return bool(tc_data.get("requires_frontend_ui"))
+                archs = sp_data.get("archetypes", [])
+                if archs and all(a in ["library", "cli_tool", "backend_api", "data_pipeline", "ml_ai"] for a in archs):
+                    if not os.path.exists(os.path.join(cwd, "frontend")):
+                        return False
+            except Exception:
+                pass
+
+        # 4. Check if screenshots directory already exists with screenshots
+        screenshots_dir = os.path.join(state_dir, "screenshots")
+        if os.path.exists(screenshots_dir) and len([f for f in os.listdir(screenshots_dir) if f.endswith(('.png', '.jpg', '.jpeg', '.webp'))]) > 0:
+            return True
+
+        # Default: In S-Class, UI is required by default for all fullstack/web applications
+        return True
+
+    @staticmethod
     def _verify_qa_evidence_shared(cwd: str, state_dir: str, state_file: str, allow_soft: bool) -> Tuple[List[str], List[str], int]:
         errors = []
         real_screenshots = []
         required_min_screenshots = 1
+
+        is_ui_req = EvidenceVerifier._is_frontend_ui_required(cwd, state_dir)
+        if not is_ui_req:
+            # Backend QA Verification: Test execution receipts, assertions, and zero regressions
+            test_dirs = [os.path.join(cwd, "tests"), os.path.join(cwd, "backend", "test"), os.path.join(cwd, "test")]
+            empty_test_stubs = False
+            for td in test_dirs:
+                if os.path.exists(td):
+                    for root, _, files in os.walk(td):
+                        for tf in files:
+                            if tf.endswith(('.py', '.ts', '.js')):
+                                tfp = os.path.join(root, tf)
+                                try:
+                                    with open(tfp, "r", encoding="utf-8") as tff:
+                                        t_content = tff.read()
+                                    if ("def test_" in t_content or "it(" in t_content or "test(" in t_content) and not ("assert" in t_content or "expect(" in t_content):
+                                        empty_test_stubs = True
+                                except Exception:
+                                    pass
+
+            if empty_test_stubs and not allow_soft:
+                errors.append("QA verification failed: Empty or unasserted test stubs detected! Backend test files must contain real assertions ('assert' or 'expect(').")
+
+            qa_report_file = os.path.join(state_dir, "qa_report.json")
+            if os.path.exists(qa_report_file):
+                try:
+                    with open(qa_report_file, "r", encoding="utf-8") as qf:
+                        qdata = json.load(qf)
+                    if not qdata.get("overall_passed", False) or qdata.get("failed_tests", 0) > 0:
+                        errors.append(f"QA verification failed: Automated test suite reported failure ({qdata.get('failed_tests', 1)} failed).")
+                except Exception as e:
+                    errors.append(f"QA verification failed: Corrupt qa_report.json: {e}")
+            elif not allow_soft:
+                errors.append("QA verification failed: Missing backend QA test execution receipt in '.agents/qa_report.json'. Run automated tests and log verification receipt before passing QA.")
+
+            return errors, [], 0
 
         screenshots_dir = os.path.join(state_dir, "screenshots")
         
@@ -698,30 +800,36 @@ class EvidenceVerifier:
             role_matrix_file = os.path.join(state_dir, "role_interaction_matrix.json")
             has_design = os.path.exists(design_file)
             has_role_matrix = os.path.exists(role_matrix_file)
+            is_ui_req = EvidenceVerifier._is_frontend_ui_required(cwd, state_dir)
             has_valid_tiers = False
             missing_tiers = []
             if has_design:
                 try:
                     with open(design_file, "r", encoding="utf-8") as f:
                         ddata = json.load(f)
-                    has_backend = bool(ddata.get("backend_spec"))
+                    has_backend = bool(ddata.get("backend_spec") or ddata.get("algorithm_spec") or ddata.get("core_spec"))
                     has_db = bool(ddata.get("db_schema"))
                     has_frontend = bool(ddata.get("frontend_layout"))
-                    has_valid_tiers = has_backend and has_db and has_frontend
-                    if not has_backend: missing_tiers.append("backend_spec")
-                    if not has_db: missing_tiers.append("db_schema")
-                    if not has_frontend: missing_tiers.append("frontend_layout")
+                    if is_ui_req:
+                        has_valid_tiers = has_backend and has_db and has_frontend
+                        if not has_backend: missing_tiers.append("backend_spec")
+                        if not has_db: missing_tiers.append("db_schema")
+                        if not has_frontend: missing_tiers.append("frontend_layout")
+                    else:
+                        has_valid_tiers = has_backend
+                        if not has_backend: missing_tiers.append("backend_spec / algorithm_spec")
                 except Exception:
                     pass
 
             artifacts.append(EvidenceArtifact(current_phase, "design_blueprint_3tier", design_file, has_valid_tiers or allow_soft))
-            artifacts.append(EvidenceArtifact(current_phase, "role_interaction_matrix", role_matrix_file, has_role_matrix or allow_soft))
+            if is_ui_req:
+                artifacts.append(EvidenceArtifact(current_phase, "role_interaction_matrix", role_matrix_file, has_role_matrix or allow_soft))
+                if not has_role_matrix and not allow_soft:
+                    errors.append("DESIGN verification failed: Missing '.agents/role_interaction_matrix.json'. Architect and Analyst must save role-coupled interaction matrix mapping User Roles -> Actions -> API Endpoints -> DB Entities -> Frontend Views.")
             if not has_design and not allow_soft:
-                errors.append("DESIGN verification failed: Missing '.agents/design_blueprint.json'. Architect must save full-stack design blueprint covering backend_spec, db_schema, and frontend_layout.")
+                errors.append("DESIGN verification failed: Missing '.agents/design_blueprint.json'. Architect must save design blueprint.")
             elif missing_tiers and not allow_soft:
                 errors.append(f"DESIGN verification failed: Design blueprint in '.agents/design_blueprint.json' is missing required SDLC tiers: {', '.join(missing_tiers)}.")
-            if not has_role_matrix and not allow_soft:
-                errors.append("DESIGN verification failed: Missing '.agents/role_interaction_matrix.json'. Architect and Analyst must save role-coupled interaction matrix mapping User Roles -> Actions -> API Endpoints -> DB Entities -> Frontend Views.")
 
         elif current_phase == "DEBATE":
             if os.path.exists(state_file):
@@ -782,8 +890,9 @@ class EvidenceVerifier:
                 logger.warning(f"[Verifier] S-Class V12 resolution engine warning: {ex}")
 
             # Programmatic Frontend AST / Code Quality Verification
+            is_ui_req = EvidenceVerifier._is_frontend_ui_required(cwd, state_dir)
             frontend_dir = os.path.join(cwd, "frontend")
-            if os.path.exists(frontend_dir) and not allow_soft:
+            if is_ui_req and os.path.exists(frontend_dir) and not allow_soft:
                 code_files = []
                 for root, _, files in os.walk(os.path.join(frontend_dir, "src")):
                     for f in files:
@@ -817,16 +926,26 @@ class EvidenceVerifier:
             shared_errors, real_screenshots, required_min_screenshots = EvidenceVerifier._verify_qa_evidence_shared(cwd, state_dir, state_file, allow_soft)
             errors.extend(shared_errors)
             
-            screenshots_dir = os.path.join(state_dir, "screenshots")
-            has_visual = len(real_screenshots) > 0
-            
-            artifacts.append(EvidenceArtifact(
-                current_phase,
-                "visual_output_check",
-                screenshots_dir,
-                has_visual and len(real_screenshots) >= required_min_screenshots and len(shared_errors) == 0,
-                strength=EvidenceStrength.HIGH_PLAYWRIGHT_VISUAL
-            ))
+            is_ui_req = EvidenceVerifier._is_frontend_ui_required(cwd, state_dir)
+            if is_ui_req:
+                screenshots_dir = os.path.join(state_dir, "screenshots")
+                has_visual = len(real_screenshots) > 0
+                artifacts.append(EvidenceArtifact(
+                    current_phase,
+                    "visual_output_check",
+                    screenshots_dir,
+                    has_visual and len(real_screenshots) >= required_min_screenshots and len(shared_errors) == 0,
+                    strength=EvidenceStrength.HIGH_PLAYWRIGHT_VISUAL
+                ))
+            else:
+                qa_report_file = os.path.join(state_dir, "qa_report.json")
+                artifacts.append(EvidenceArtifact(
+                    current_phase,
+                    "backend_qa_verification",
+                    qa_report_file,
+                    len(shared_errors) == 0,
+                    strength=EvidenceStrength.HIGH_TEST_PASSED
+                ))
 
         elif current_phase == "DESIGN_REVISION":
             design_file = os.path.join(state_dir, "design_blueprint.json")

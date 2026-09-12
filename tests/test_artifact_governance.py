@@ -56,22 +56,31 @@ def test_artifact_governance_blocks_lld_on_invalid_hld():
 
 def test_artifact_governance_blocks_lld_on_proposed_adr():
     """Verify ArtifactGovernor hard gate blocks LLD compilation if an ADR is PROPOSED or PENDING approval."""
-    d_graph = SemanticDomainGraph()
-    d_graph.add_node(DomainNode("actor_doctor", "Doctor", DomainPrimitiveType.ACTOR))
-    d_graph.add_node(DomainNode("entity_prescription", "Prescription", DomainPrimitiveType.ENTITY))
+    import os
+    old_mode = os.environ.get("SCLASS_EXECUTION_MODE")
+    os.environ["SCLASS_EXECUTION_MODE"] = "PRODUCTION"
+    try:
+        d_graph = SemanticDomainGraph()
+        d_graph.add_node(DomainNode("actor_doctor", "Doctor", DomainPrimitiveType.ACTOR))
+        d_graph.add_node(DomainNode("entity_prescription", "Prescription", DomainPrimitiveType.ENTITY))
 
-    prompt = "Doctor approves prescription."
-    res = SpecificationCompiler.compile_v7_refinement_pipeline(
-        graph=d_graph,
-        intent_features=["prescription", "approve"],
-        raw_request=prompt
-    )
+        prompt = "Doctor approves prescription."
+        res = SpecificationCompiler.compile_v7_refinement_pipeline(
+            graph=d_graph,
+            intent_features=["prescription", "approve"],
+            raw_request=prompt
+        )
 
-    assert res["blocked"] is True
-    assert res["target_fsm_state"] == "DEBATE"
-    assert len(res["lld_components"]) == 0
-    assert len(res["tasks"]) == 0
-    assert res["hld_governance"]["is_blocked"] is True
+        assert res["blocked"] is True
+        assert res["target_fsm_state"] == "DEBATE"
+        assert len(res["lld_components"]) == 0
+        assert len(res["tasks"]) == 0
+        assert res["hld_governance"]["is_blocked"] is True
+    finally:
+        if old_mode is None:
+            os.environ.pop("SCLASS_EXECUTION_MODE", None)
+        else:
+            os.environ["SCLASS_EXECUTION_MODE"] = old_mode
 
 
 def test_artifact_governance_allows_compilation_on_confirmed_adr():

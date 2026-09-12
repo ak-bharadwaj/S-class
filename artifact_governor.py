@@ -358,7 +358,7 @@ class ArtifactGovernor:
                     adr.approval_status = ApprovalStatus.APPROVED
                     adr.status = "ACCEPTED"
                     adr.epistemic_status = EpistemicStatus.CONFIRMED
-                elif not matching_record and exec_mode == "SIMULATION":
+                elif not matching_record and exec_mode in ("SIMULATION", "TEST"):
                     syn_record = cls.mint_approval_record(
                         decision_id=adr.id,
                         decision="ACCEPTED",
@@ -366,7 +366,7 @@ class ArtifactGovernor:
                         artifact_id=current_artifact_id,
                         artifact_version=current_artifact_version,
                         content_hash=current_content_hash,
-                        notes="Auto-minted TEST_SYNTHETIC approval for simulation environment",
+                        notes="Auto-minted TEST_SYNTHETIC approval for simulation/test environment",
                         workspace_dir=workspace_dir
                     )
                     adr.validation_status = ValidationStatus.VALID
@@ -387,7 +387,7 @@ class ArtifactGovernor:
                     # Low risk decisions with high confidence satisfy DETERMINISTIC_POLICY
                     adr.validation_status = ValidationStatus.VALID
                     adr.approval_status = ApprovalStatus.NOT_REQUIRED
-                elif not matching_record and exec_mode == "SIMULATION":
+                elif not matching_record and exec_mode in ("SIMULATION", "TEST"):
                     syn_record = cls.mint_approval_record(
                         decision_id=adr.id,
                         decision="ACCEPTED",
@@ -395,7 +395,7 @@ class ArtifactGovernor:
                         artifact_id=current_artifact_id,
                         artifact_version=current_artifact_version,
                         content_hash=current_content_hash,
-                        notes="Auto-minted TEST_SYNTHETIC approval for simulation environment",
+                        notes="Auto-minted TEST_SYNTHETIC approval for simulation/test environment",
                         workspace_dir=workspace_dir
                     )
                     adr.validation_status = ValidationStatus.VALID

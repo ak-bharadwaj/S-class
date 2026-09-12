@@ -19,6 +19,7 @@ class WorkflowProfile(Enum):
     REFACTOR = "refactor"    # Structuring (TRIAGE -> ANALYSIS -> DESIGN -> CODING -> INTEGRATION -> QA -> RELEASE -> DONE)
     HOTFIX = "hotfix"        # Emergency patch (TRIAGE -> CODING -> QA -> RELEASE -> DONE)
     FAST = "fast"            # High-velocity accelerated pipeline (/boost workflow)
+    CORE = "core"            # Minimal build path for algorithm/library/CLI tasks (7 states)
 
 
 @dataclass
@@ -74,6 +75,10 @@ PROFILE_SEQUENCES: Dict[WorkflowProfile, List[str]] = {
     WorkflowProfile.FAST: [
         "TRIAGE", "ANALYSIS", "SPECIFICATION_SYNTHESIS", "CODING",
         "TASK_VERIFICATION", "MERGE", "INTEGRATION", "QA", "RELEASE", "MONITORING", "DONE"
+    ],
+    WorkflowProfile.CORE: [
+        "TRIAGE", "ANALYSIS", "SPECIFICATION_SYNTHESIS",
+        "CODING", "TASK_VERIFICATION", "QA", "DONE"
     ]
 }
 
@@ -104,6 +109,20 @@ PROFILE_TRANSITIONS: Dict[WorkflowProfile, Dict[str, Dict[str, str]]] = {
         "SPECIFICATION_SYNTHESIS": {
             "spec_synthesized": "CODING",     # Accelerated bypass: DESIGN, DEBATE, DESIGN_REVISION, TASK_COMPILATION
             "spec_conflict_detected": "CLARIFICATION"
+        }
+    },
+    WorkflowProfile.CORE: {
+        "SPECIFICATION_SYNTHESIS": {
+            "spec_synthesized": "CODING",      # Skip DESIGN → DEBATE → REVISION → COMPILATION
+            "spec_conflict_detected": "CLARIFICATION"
+        },
+        "TASK_VERIFICATION": {
+            "task_verified": "QA",             # Skip MERGE → INTEGRATION
+            "task_verification_failed": "CODING"
+        },
+        "QA": {
+            "qa_passed": "DONE",               # Skip RELEASE → MONITORING
+            "qa_failed": "CODING"              # Recovery goes straight back to CODING
         }
     }
 }
@@ -151,6 +170,12 @@ class MetaPlanner:
             elif _match_keywords(["research", "investigate", "audit", "survey", "explain", "analyze", "compare"]):
                 profile = WorkflowProfile.RESEARCH
                 rationale = "Goal indicates a research/audit request. Bypassing build and release execution."
+            elif _match_keywords(["algorithm", "data structure", "sorting", "binary search", "sliding window",
+                                  "linked list", "tree traversal", "graph algorithm", "dynamic programming",
+                                  "implement a", "write a function", "cli tool", "command line",
+                                  "library", "sdk", "package", "module", "utility"]):
+                profile = WorkflowProfile.CORE
+                rationale = "Goal indicates algorithm/library/CLI task. Using minimal CORE profile (7 states, no debate/deploy)."
             else:
                 profile = WorkflowProfile.FULL
                 rationale = "Goal requires comprehensive feature development through full 11-state pipeline."

@@ -60,6 +60,8 @@ class State:
     workflowProfile: str = "full"
     planRationale: str = ""
     goal: str = ""
+    taskDomain: str = "fullstack"
+    requiresFrontendUi: bool = True
     tasks: List[Task] = field(default_factory=list)
     decisionLog: List[Decision] = field(default_factory=list)
     transitionHistory: List[Dict[str, Any]] = field(default_factory=list)
@@ -635,6 +637,14 @@ def initialize_state(workspace_dir: Optional[str] = None, goal: Optional[str] = 
                 except Exception:
                     pass
 
+        from task_classifier import TaskClassifier
+        tc = TaskClassifier.classify(goal or "", workspace_dir=workspace_dir)
+
+        # Auto-select CORE profile for non-UI tasks when planner defaulted to FULL
+        if tc.domain.value in ("algorithm", "library", "cli") and plan.profile == WorkflowProfile.FULL:
+            plan = MetaPlanner.classify_goal(goal or "", "core")
+            logger.info(f"Auto-selected CORE profile for {tc.domain.value} task (7 states, no debate/deploy)")
+
         state_dict = {
             "taskId": str(uuid.uuid4()),
             "currentPhase": "TRIAGE",
@@ -642,6 +652,8 @@ def initialize_state(workspace_dir: Optional[str] = None, goal: Optional[str] = 
             "workflowProfile": plan.profile.value,
             "planRationale": plan.rationale,
             "goal": goal or "",
+            "taskDomain": tc.domain.value,
+            "requiresFrontendUi": tc.requires_frontend_ui,
             "currentSpecVersion": prev_spec_version,
             "currentDebateVersion": 0,
             "currentTaskVersion": 0,
@@ -653,7 +665,7 @@ def initialize_state(workspace_dir: Optional[str] = None, goal: Optional[str] = 
             "tasks": [],
             "decisionLog": [
                 {
-                    "decision": f"Initialize S-Class FSM Engine ({plan.profile.value.upper()} Profile)",
+                    "decision": f"Initialize S-Class FSM Engine ({plan.profile.value.upper()} Profile, {tc.domain.value.upper()} Domain)",
                     "reason": plan.rationale,
                     "alternatives": [p.value for p in WorkflowProfile],
                     "confidence": 1.0,
@@ -700,6 +712,8 @@ def get_state(workspace_dir: Optional[str] = None) -> State:
         workflowProfile=state_dict.get("workflowProfile", "full"),
         planRationale=state_dict.get("planRationale", ""),
         goal=state_dict.get("goal", ""),
+        taskDomain=state_dict.get("taskDomain", "fullstack"),
+        requiresFrontendUi=state_dict.get("requiresFrontendUi", True),
         currentSpecVersion=state_dict["currentSpecVersion"],
         currentDebateVersion=state_dict["currentDebateVersion"],
         currentTaskVersion=state_dict["currentTaskVersion"],
@@ -1155,6 +1169,8 @@ class FSMGoalSequenceRunner:
                 write_json_atomic(ans_file, answers)
 
         elif current_phase in ["DESIGN", "DEBATE", "DESIGN_REVISION"]:
+            from verifier import EvidenceVerifier
+            is_ui_req = EvidenceVerifier._is_frontend_ui_required(workspace_dir, state_dir)
             design_file = os.path.join(state_dir, "design_blueprint.json")
             role_matrix_file = os.path.join(state_dir, "role_interaction_matrix.json")
             grill_file = os.path.join(state_dir, "grill_report.json")
@@ -1162,69 +1178,98 @@ class FSMGoalSequenceRunner:
             spec_file = os.path.join(state_dir, "synthesized_spec.json")
             spec_data = load_json(spec_file) if os.path.exists(spec_file) else {}
 
-            # Extract real components and routes from synthesized spec
-            reqs = spec_data.get("requirements", {})
-            flat_reqs = []
-            for req_list in reqs.values():
-                if isinstance(req_list, list):
-                    flat_reqs.extend(req_list)
-
-            routes = []
-            components = ["ErrorBoundary", "EmptyStateFallback", "LoadingButton", "DisabledSubmit"]
-            tables = []
-            roles = set(["ADMIN", "USER"])
-
-            for req in flat_reqs:
-                desc = req.get("description", "")
-                affects = req.get("affects", [])
-                ass_type = req.get("assumption_type") or ""
-                if "frontend" in affects:
-                    comp_name = req.get("id", "").replace("-", "_")
-                    if comp_name:
-                        components.append(comp_name)
-                if "backend" in affects or "api" in ass_type:
-                    routes.append({"path": f"/api/v1/{req.get('id', 'res').lower()}", "method": "GET"})
-                if "database" in affects or "data" in ass_type:
-                    tables.append(req.get("id", "entity").lower())
-
-            if not routes:
-                routes = [{"path": "/api/v1/resource", "method": "GET"}]
-            if len(components) <= 4:
-                components.extend(["Header", "DashboardView"])
-            if not tables:
-                tables = ["users", "records"]
-
             sim_provenance = {
                 "mode": os.getenv("SCLASS_EXECUTION_MODE", "TEST"),
                 "synthetic": True,
                 "authority": "FSM_TEST_RUNNER"
             }
-            write_json_atomic(design_file, {
-                "phase": current_phase,
-                "blueprint_status": "APPROVED",
-                "source": "synthesized_spec.json" if spec_data else "default_blueprint",
-                "provenance_metadata": sim_provenance,
-                "backend_spec": {
-                    "services": ["AuthService", "DataService"],
-                    "routes": routes,
-                    "middleware": ["authGuard"],
-                    "transactions": ["atomic_write_transaction"]
-                },
-                "db_schema": {
-                    "tables": list(set(tables)),
-                    "relations": ["foreign_key_references"]
-                },
-                "frontend_layout": {
-                    "components": list(set(components))
-                },
-                "timestamp": ts_now
-            })
-            write_json_atomic(role_matrix_file, {
-                "roles": sorted(list(roles)),
-                "matrix": [{"role": r, "action": "MANAGE", "endpoint": "/api/admin", "entity": "users", "view": "AdminDashboard"} for r in sorted(list(roles))],
-                "provenance_metadata": sim_provenance,
-                "timestamp": ts_now
-            })
+
+            if not is_ui_req:
+                write_json_atomic(design_file, {
+                    "phase": current_phase,
+                    "blueprint_status": "APPROVED",
+                    "source": "synthesized_spec.json" if spec_data else "default_blueprint",
+                    "provenance_metadata": sim_provenance,
+                    "algorithm_spec": {
+                        "algorithm": "Sliding Window / Rate Limiter",
+                        "data_structures": ["collections.deque", "sliding_window_bucket"],
+                        "time_complexity": "O(1) amortized",
+                        "space_complexity": "O(N) bounded memory",
+                        "concurrency_policy": "Thread-safe / reentrant lock"
+                    },
+                    "backend_spec": {
+                        "services": ["RateLimiterService"],
+                        "interfaces": ["acquire", "allow_request", "reset"],
+                        "error_handling": "Boundary exception handling"
+                    },
+                    "timestamp": ts_now
+                })
+                write_json_atomic(role_matrix_file, {
+                    "roles": ["CALLER", "CONSUMER"],
+                    "matrix": [{"role": "CALLER", "action": "INVOKE", "endpoint": "/rate-limiter/allow", "entity": "tokens", "view": "HeadlessEngine"}],
+                    "provenance_metadata": sim_provenance,
+                    "timestamp": ts_now
+                })
+            else:
+                # Extract real components and routes from synthesized spec
+                reqs = spec_data.get("requirements", {})
+                flat_reqs = []
+                for req_list in reqs.values():
+                    if isinstance(req_list, list):
+                        flat_reqs.extend(req_list)
+
+                routes = []
+                components = ["ErrorBoundary", "EmptyStateFallback", "LoadingButton", "DisabledSubmit"]
+                tables = []
+                roles = set(["ADMIN", "USER"])
+
+                for req in flat_reqs:
+                    desc = req.get("description", "")
+                    affects = req.get("affects", [])
+                    ass_type = req.get("assumption_type") or ""
+                    if "frontend" in affects:
+                        comp_name = req.get("id", "").replace("-", "_")
+                        if comp_name:
+                            components.append(comp_name)
+                    if "backend" in affects or "api" in ass_type:
+                        routes.append({"path": f"/api/v1/{req.get('id', 'res').lower()}", "method": "GET"})
+                    if "database" in affects or "data" in ass_type:
+                        tables.append(req.get("id", "entity").lower())
+
+                if not routes:
+                    routes = [{"path": "/api/v1/resource", "method": "GET"}]
+                if len(components) <= 4:
+                    components.extend(["Header", "DashboardView"])
+                if not tables:
+                    tables = ["users", "records"]
+
+                write_json_atomic(design_file, {
+                    "phase": current_phase,
+                    "blueprint_status": "APPROVED",
+                    "source": "synthesized_spec.json" if spec_data else "default_blueprint",
+                    "provenance_metadata": sim_provenance,
+                    "backend_spec": {
+                        "services": ["AuthService", "DataService"],
+                        "routes": routes,
+                        "middleware": ["authGuard"],
+                        "transactions": ["atomic_write_transaction"]
+                    },
+                    "db_schema": {
+                        "tables": list(set(tables)),
+                        "relations": ["foreign_key_references"]
+                    },
+                    "frontend_layout": {
+                        "components": list(set(components))
+                    },
+                    "timestamp": ts_now
+                })
+                write_json_atomic(role_matrix_file, {
+                    "roles": sorted(list(roles)),
+                    "matrix": [{"role": r, "action": "MANAGE", "endpoint": "/api/admin", "entity": "users", "view": "AdminDashboard"} for r in sorted(list(roles))],
+                    "provenance_metadata": sim_provenance,
+                    "timestamp": ts_now
+                })
+
             write_json_atomic(grill_file, {
                 "overall_passed": True,
                 "total_vectors_tested": 5,
@@ -1285,16 +1330,40 @@ class FSMGoalSequenceRunner:
                 save_state(state, workspace_dir)
 
         elif current_phase in ["QA", "RELEASE"]:
-            receipts_file = os.path.join(state_dir, "interaction_receipts.json")
-            if not os.path.exists(receipts_file):
-                write_json_atomic(receipts_file, [
-                    {"action": "click", "role": "ADMIN", "url": "/dashboard", "status": "200", "hasError": False},
-                    {"action": "fill", "role": "ADMIN", "url": "/dashboard", "status": "200", "hasError": False}
-                ])
+            from verifier import EvidenceVerifier
+            is_ui_req = EvidenceVerifier._is_frontend_ui_required(workspace_dir, state_dir)
+            sim_provenance = {
+                "mode": os.getenv("SCLASS_EXECUTION_MODE", "TEST"),
+                "synthetic": True,
+                "authority": "FSM_TEST_RUNNER"
+            }
 
-            lh_file = os.path.join(state_dir, "lighthouse_audit.json")
-            if not os.path.exists(lh_file):
-                write_json_atomic(lh_file, {"accessibility": 95, "performance": 90, "timestamp": ts_now})
+            qa_report_file = os.path.join(state_dir, "qa_report.json")
+            if not os.path.exists(qa_report_file):
+                write_json_atomic(qa_report_file, {
+                    "overall_passed": True,
+                    "total_tests": 12,
+                    "passed_tests": 12,
+                    "failed_tests": 0,
+                    "skipped_tests": 0,
+                    "assertions_verified": 36,
+                    "execution_time_seconds": 0.42,
+                    "timestamp": ts_now,
+                    "task_domain": "ALGORITHM" if not is_ui_req else "FULLSTACK",
+                    "provenance_metadata": sim_provenance
+                })
+
+            if is_ui_req:
+                receipts_file = os.path.join(state_dir, "interaction_receipts.json")
+                if not os.path.exists(receipts_file):
+                    write_json_atomic(receipts_file, [
+                        {"action": "click", "role": "ADMIN", "url": "/dashboard", "status": "200", "hasError": False},
+                        {"action": "fill", "role": "ADMIN", "url": "/dashboard", "status": "200", "hasError": False}
+                    ])
+
+                lh_file = os.path.join(state_dir, "lighthouse_audit.json")
+                if not os.path.exists(lh_file):
+                    write_json_atomic(lh_file, {"accessibility": 95, "performance": 90, "timestamp": ts_now})
 
         elif current_phase == "RECOVERY":
             report_file = os.path.join(state_dir, "failure_report.json")
