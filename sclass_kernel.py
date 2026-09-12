@@ -243,7 +243,7 @@ class MinimalDeterministicKernel:
             # 3. Policy-Driven Verification Engine (QA & RELEASE phases strictly block soft evidence bypass)
             enforce_ev = payload.get("enforce_evidence", True)
             allow_soft = False if current_phase in ["QA", "RELEASE", "VERIFYING"] else not enforce_ev
-            v_res = verifier.EvidenceVerifier.verify_phase(current_phase, workspace_dir=cwd, allow_soft=allow_soft)
+            v_res = verifier.EvidenceVerifier.verify_phase(current_phase, workspace_dir=cwd, allow_soft=allow_soft, target_phase=next_phase)
             if not v_res.passed:
                 raise verifier.VerificationError(f"[Kernel VerificationEngine] Evidence check failed for '{current_phase}': {'; '.join(v_res.errors)}")
 

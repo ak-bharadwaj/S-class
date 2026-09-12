@@ -1,1 +1,8 @@
 pytest>=8.0.0
+models
+sclass_state
+psutil
+networkx
+codebase
+tiktoken
+user

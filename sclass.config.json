@@ -1,0 +1,13 @@
+{
+  "pipeline": "sclass-v5",
+  "executionMode": "Closed Loop",
+  "loopMode": "closed-loop",
+  "projectType": "unknown",
+  "topology": "hierarchical",
+  "commands": {
+    "devServer": "",
+    "apiServer": "",
+    "test": "",
+    "dbMigration": ""
+  }
+}

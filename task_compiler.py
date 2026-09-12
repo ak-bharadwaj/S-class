@@ -38,6 +38,8 @@ class TaskRecord:
     parent_reqs: List[str]
     parent_behaviors: List[str]
     verification_criteria: List[str] = field(default_factory=list)
+    wave_index: int = 1
+    depends_on: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -49,7 +51,9 @@ class TaskRecord:
             "parent_hld": self.parent_hld,
             "parent_reqs": self.parent_reqs,
             "parent_behaviors": self.parent_behaviors,
-            "verification_criteria": self.verification_criteria
+            "verification_criteria": self.verification_criteria,
+            "wave_index": self.wave_index,
+            "depends_on": self.depends_on,
         }
 
     @classmethod
@@ -63,7 +67,9 @@ class TaskRecord:
             parent_hld=data.get("parent_hld", ""),
             parent_reqs=data.get("parent_reqs", []),
             parent_behaviors=data.get("parent_behaviors", []),
-            verification_criteria=data.get("verification_criteria", [])
+            verification_criteria=data.get("verification_criteria", []),
+            wave_index=data.get("wave_index", 1),
+            depends_on=data.get("depends_on", []),
         )
 
 
@@ -169,5 +175,42 @@ class TaskCompiler:
                         "Connects action triggers to backend transport contracts"
                     ]
                 ))
+
+        cls.assign_waves(tasks)
+        return tasks
+
+    @classmethod
+    def assign_waves(cls, tasks: List[TaskRecord]) -> List[TaskRecord]:
+        """Assigns OpenGSD wave indices using ArtifactDAG topological leveling."""
+        from artifact_dag import ArtifactDAG
+        dag = ArtifactDAG()
+
+        wave1_ids = []
+        wave2_ids = []
+
+        for t in tasks:
+            if t.category in [TaskCategory.STATE_TRANSITION, TaskCategory.AUDIT_LOG]:
+                wave1_ids.append(t.id)
+            elif t.category in [TaskCategory.API_ENDPOINT, TaskCategory.AUTHORIZATION_GUARD]:
+                wave2_ids.append(t.id)
+
+        for t in tasks:
+            deps = []
+            if t.category in [TaskCategory.API_ENDPOINT, TaskCategory.AUTHORIZATION_GUARD]:
+                deps = list(wave1_ids)
+            elif t.category == TaskCategory.UI_COMPONENT:
+                deps = list(wave2_ids) if wave2_ids else list(wave1_ids)
+            elif t.category == TaskCategory.INTEGRATION_TEST:
+                deps = [o.id for o in tasks if o.id != t.id]
+
+            t.depends_on = deps
+            dag.add_node(t.id, category=t.category.value, dependencies=deps)
+
+        try:
+            assignments = dag.get_wave_assignments()
+            for t in tasks:
+                t.wave_index = assignments.get(t.id, 1)
+        except Exception:
+            pass
 
         return tasks

@@ -104,6 +104,23 @@ class LLDComponent:
         }
 
 
+IRREGULAR_PLURALS: Dict[str, str] = {
+    "alumni": "alumni", "alumnus": "alumni", "staff": "staff", "faculty": "faculty",
+    "data": "data", "equipment": "equipment", "telemetry": "telemetry", "category": "categories"
+}
+
+
+def pluralize_entity(ent: str) -> str:
+    p = ent.lower()
+    if p in IRREGULAR_PLURALS:
+        return IRREGULAR_PLURALS[p]
+    if p.endswith('s') or p.endswith('ss'):
+        return p
+    if p.endswith('y') and len(p) > 2 and p[-2] not in 'aeiou':
+        return f"{p[:-1]}ies"
+    return f"{p}s"
+
+
 class LLDCompiler:
     """Compiles HLDDesign, RequirementGraph, and BehaviorGraph into architecture-specific LLD components."""
 
@@ -164,12 +181,13 @@ class LLDCompiler:
                         "dailies": "schedules"
                     }
                     verb_noun = VERB_TO_NOUN.get(verb, verb)
+                    ent_plural = pluralize_entity(ent_stem)
                     if exec_arch == ExecutionArchitecture.CLI_DISPATCHER:
                         ep = f"cli://{verb}-{ent_stem}"
                     elif exec_arch in [ExecutionArchitecture.DATA_PIPELINE_WORKER, ExecutionArchitecture.EVENT_DRIVEN_MICROSERVICE]:
                         ep = f"event://{ent_stem}-events/{verb}"
                     else:
-                        ep = f"POST /api/{ent_stem}s/{{id}}/{verb_noun}" if b_node.behavior_type != BehaviorNodeType.QUERY else f"GET /api/{ent_stem}s/{{id}}"
+                        ep = f"POST /api/{ent_plural}/{{id}}/{verb_noun}" if b_node.behavior_type != BehaviorNodeType.QUERY else f"GET /api/{ent_plural}/{{id}}"
 
                     if ep not in mod_endpoints:
                         mod_endpoints.append(ep)
@@ -234,19 +252,7 @@ class LLDCompiler:
             else:
                 # FULLSTACK_APP / BACKEND_SERVICE
                 ent_raw = mod.owned_entities[0] if mod.owned_entities else 'core'
-                p_ent = ent_raw.lower()
-                IRREGULAR_PLURALS = {
-                    "alumni": "alumni", "alumnus": "alumni", "staff": "staff", "faculty": "faculty",
-                    "data": "data", "equipment": "equipment", "telemetry": "telemetry", "category": "categories"
-                }
-                if p_ent in IRREGULAR_PLURALS:
-                    p_route = IRREGULAR_PLURALS[p_ent]
-                elif p_ent.endswith('s') or p_ent.endswith('ss'):
-                    p_route = p_ent
-                elif p_ent.endswith('y') and len(p_ent) > 2 and p_ent[-2] not in 'aeiou':
-                    p_route = f"{p_ent[:-1]}ies"
-                else:
-                    p_route = f"{p_ent}s"
+                p_route = pluralize_entity(ent_raw)
 
                 lld_components.append(LLDComponent(
                     id=f"ctrl_{mod.id}",

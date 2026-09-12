@@ -854,6 +854,8 @@ class StrategyEngine:
         # 7. Resolve Profile
         if urgency == Urgency.EMERGENCY:
             profile = WorkflowProfile.HOTFIX
+        elif any(kw in goal_lower for kw in ["fast", "boost", "accelerate"]):
+            profile = WorkflowProfile.FAST
         elif risk == RiskLevel.LOW and any(kw in goal_lower for kw in ["fix", "bug", "error", "align", "color"]):
             profile = WorkflowProfile.BUG_FIX
         elif any(kw in goal_lower for kw in ["audit", "research", "investigate", "explain"]):

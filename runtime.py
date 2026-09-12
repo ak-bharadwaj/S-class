@@ -745,13 +745,7 @@ def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce
         
         current_phase = state.currentPhase
 
-        # 1. Evidence Verification Gate (QA & RELEASE phases strictly block soft evidence bypass)
-        allow_soft = False if current_phase in ["QA", "RELEASE", "VERIFYING"] else not enforce_evidence
-        v_res = EvidenceVerifier.verify_phase(current_phase, workspace_dir, allow_soft=allow_soft)
-        if not v_res.passed:
-            raise VerificationError(f"Cannot transition from state '{current_phase}': {'; '.join(v_res.errors)}")
-
-        # 2. Continuous Self-Evaluation Gate
+        # 1. Continuous Self-Evaluation Gate
         weighted_conf = state.confidenceMatrix.weightedScore if state.confidenceMatrix else 1.0
         eval_res = SelfEvaluator.evaluate_phase(
             phase=current_phase,
@@ -785,6 +779,12 @@ def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce
             raise ValueError(f"Transition '{event_name}' is invalid from current state '{current_phase}' under '{state.workflowProfile}' profile")
             
         next_phase = valid_transitions[event_name]
+
+        # 2. Evidence Verification Gate (QA & RELEASE phases strictly block soft evidence bypass)
+        allow_soft = False if current_phase in ["QA", "RELEASE", "VERIFYING"] else not enforce_evidence
+        v_res = EvidenceVerifier.verify_phase(current_phase, workspace_dir, allow_soft=allow_soft, target_phase=next_phase)
+        if not v_res.passed:
+            raise VerificationError(f"Cannot transition from state '{current_phase}': {'; '.join(v_res.errors)}")
 
         # Authoritative Control Plane Enforcement
         from artifact_governor import ArtifactGovernor
@@ -881,7 +881,7 @@ def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce
         if next_phase == "INTEGRATION":
             try:
                 from port_resolver import PortConflictResolver
-                PortConflictResolver.audit_and_resolve_ports(workspace_dir)
+                PortConflictResolver.audit_and_resolve_ports()
             except Exception as p_ex:
                 logger.warning(f"[Runtime] Port resolver note: {p_ex}")
 
@@ -889,7 +889,7 @@ def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce
             try:
                 from monitoring import MultiStreamMonitor
                 mon = MultiStreamMonitor(workspace_dir)
-                mon.record_event("monitoring_heartbeat", {"phase": "MONITORING", "status": "ACTIVE", "timestamp": ts_now})
+                mon.ingest_telemetry("metrics", "INFO", "runtime", "monitoring_heartbeat", metadata={"phase": "MONITORING", "status": "ACTIVE", "timestamp": ts_now})
                 state_dir = os.path.join(workspace_dir, ".agents")
                 os.makedirs(state_dir, exist_ok=True)
                 write_json_atomic(os.path.join(state_dir, "monitoring_heartbeat.json"), {
@@ -1285,15 +1285,6 @@ class FSMGoalSequenceRunner:
                 save_state(state, workspace_dir)
 
         elif current_phase in ["QA", "RELEASE"]:
-            screenshots_dir = os.path.join(state_dir, "screenshots")
-            os.makedirs(screenshots_dir, exist_ok=True)
-            mock_img = os.path.join(screenshots_dir, "dashboard.png")
-            if not os.path.exists(mock_img) or os.path.getsize(mock_img) < 10240:
-                png_header = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x01\x00\x00\x00\x01\x00\x08\x06\x00\x00\x00\x5c\x72\xa8\x66"
-                padding = b"\x00" * 11000
-                with open(mock_img, "wb") as f:
-                    f.write(png_header + padding)
-
             receipts_file = os.path.join(state_dir, "interaction_receipts.json")
             if not os.path.exists(receipts_file):
                 write_json_atomic(receipts_file, [
@@ -1350,7 +1341,17 @@ class FSMGoalSequenceRunner:
             return {"status": "BLOCKED", "current_phase": current_phase, "message": f"No happy path event defined for state '{current_phase}'."}
 
         # 2. Dispatch Event (Transitions FSM state & invokes all 8 subagents)
-        dispatch_event(event_name=event_to_fire, workspace_dir=cwd, agent_name="meta_planner")
+        try:
+            dispatch_event(event_name=event_to_fire, workspace_dir=cwd, agent_name="meta_planner")
+        except Exception as e:
+            logger.warning(f"[FSMGoalSequenceRunner] Event '{event_to_fire}' blocked in phase '{current_phase}': {e}")
+            return {
+                "status": "BLOCKED",
+                "current_phase": current_phase,
+                "event_fired": event_to_fire,
+                "error": str(e),
+                "message": f"Phase '{current_phase}' blocked: {e}",
+            }
 
         new_state = get_state(cwd)
         return {
@@ -1381,3 +1382,45 @@ class FSMGoalSequenceRunner:
                 break
 
         return history
+
+
+if __name__ == "__main__":
+    import sys
+
+    cmd = sys.argv[1].lower() if len(sys.argv) > 1 else "status"
+    target_dir = os.getcwd()
+
+    if cmd in ("advance", "next"):
+        res = FSMGoalSequenceRunner.advance_one_state(target_dir)
+        print(json.dumps(res, indent=2))
+    elif cmd in ("run", "sequence", "goal"):
+        goal_arg = sys.argv[2] if len(sys.argv) > 2 else None
+        if goal_arg and not os.path.exists(os.path.join(target_dir, ".agents", "orchestration_state.json")):
+            initialize_state(target_dir, goal=goal_arg, profile="full")
+        hist = FSMGoalSequenceRunner.run_full_sequence(target_dir)
+        curr = get_state(target_dir)
+        print(json.dumps({
+            "status": "COMPLETED" if curr.currentPhase == "DONE" else "PAUSED",
+            "current_phase": curr.currentPhase,
+            "steps_executed": len(hist),
+            "history": hist,
+        }, indent=2))
+    elif cmd == "status":
+        st = get_state(target_dir)
+        print(json.dumps({
+            "taskId": st.taskId,
+            "currentPhase": st.currentPhase,
+            "goal": st.goal,
+            "workflowProfile": st.workflowProfile,
+            "tasksCount": len(st.tasks),
+            "transitionCount": len(st.transitionHistory),
+        }, indent=2))
+    elif cmd == "init":
+        init_goal = sys.argv[2] if len(sys.argv) > 2 else "System Goal"
+        prof = sys.argv[3] if len(sys.argv) > 3 else "full"
+        initialize_state(target_dir, goal=init_goal, profile=prof)
+        st = get_state(target_dir)
+        print(json.dumps({"initialized": True, "goal": st.goal, "phase": st.currentPhase}, indent=2))
+    else:
+        print(f"Unknown runtime command: {cmd}")
+        print("Usage: python -m runtime [advance|run|status|init <goal>]")

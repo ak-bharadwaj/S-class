@@ -1,0 +1,18 @@
+# TDD-WORKFLOW PLAYBOOK
+
+# Test-Driven Development (TDD) Playbook
+
+## Phase 1: Red (Failing Test)
+1. Write a minimal reproduction test asserting the expected behavior before touching implementation code.
+2. Run the single targeted test command. Confirm it fails with the expected assertion error.
+3. NEVER write implementation code before observing a failing test.
+
+## Phase 2: Green (Minimal Implementation)
+1. Write the minimum code required to satisfy the failing assertion.
+2. Avoid over-engineering, premature abstractions, or speculative generalizations.
+3. Re-run the targeted test. Confirm it passes.
+
+## Phase 3: Refactor & Boundary Check
+1. Clean up code duplication and improve naming without breaking tests.
+2. Run property/boundary tests to verify edge cases (null, empty strings, overflows, invalid inputs).
+3. Confirm all existing unit and regression suites remain green.

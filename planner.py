@@ -18,6 +18,7 @@ class WorkflowProfile(Enum):
     RESEARCH = "research"    # Read-only audit (TRIAGE -> ANALYSIS -> DEBATE -> DONE)
     REFACTOR = "refactor"    # Structuring (TRIAGE -> ANALYSIS -> DESIGN -> CODING -> INTEGRATION -> QA -> RELEASE -> DONE)
     HOTFIX = "hotfix"        # Emergency patch (TRIAGE -> CODING -> QA -> RELEASE -> DONE)
+    FAST = "fast"            # High-velocity accelerated pipeline (/boost workflow)
 
 
 @dataclass
@@ -69,6 +70,10 @@ PROFILE_SEQUENCES: Dict[WorkflowProfile, List[str]] = {
     WorkflowProfile.HOTFIX: [
         "TRIAGE", "CODING", "TASK_VERIFICATION", "MERGE", "INTEGRATION",
         "QA", "RELEASE", "MONITORING", "DONE"
+    ],
+    WorkflowProfile.FAST: [
+        "TRIAGE", "ANALYSIS", "SPECIFICATION_SYNTHESIS", "CODING",
+        "TASK_VERIFICATION", "MERGE", "INTEGRATION", "QA", "RELEASE", "MONITORING", "DONE"
     ]
 }
 
@@ -93,6 +98,12 @@ PROFILE_TRANSITIONS: Dict[WorkflowProfile, Dict[str, Dict[str, str]]] = {
     WorkflowProfile.HOTFIX: {
         "TRIAGE": {
             "triage_done": "CODING",          # Direct emergency patch jump from TRIAGE to CODING
+        }
+    },
+    WorkflowProfile.FAST: {
+        "SPECIFICATION_SYNTHESIS": {
+            "spec_synthesized": "CODING",     # Accelerated bypass: DESIGN, DEBATE, DESIGN_REVISION, TASK_COMPILATION
+            "spec_conflict_detected": "CLARIFICATION"
         }
     }
 }
@@ -128,6 +139,9 @@ class MetaPlanner:
             if _match_keywords(["hotfix", "urgent patch", "emergency", "crash fix"]):
                 profile = WorkflowProfile.HOTFIX
                 rationale = "Goal indicates an emergency hotfix requiring immediate patch execution."
+            elif _match_keywords(["fast", "boost", "accelerate", "quick", "speed"]):
+                profile = WorkflowProfile.FAST
+                rationale = "Goal indicates high-velocity execution. Using accelerated FAST profile."
             elif _match_keywords(["refactor", "clean up", "restructure", "optimize", "rename", "format"]):
                 profile = WorkflowProfile.REFACTOR
                 rationale = "Goal indicates internal code refactoring. Bypassing multi-agent spec debate."

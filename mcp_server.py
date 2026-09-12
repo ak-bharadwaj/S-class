@@ -27,9 +27,10 @@ from strategy import StrategyEngine
 logger = logging.getLogger("sclass_mcp_server")
 
 
-def handle_tool_call(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+def handle_tool_call(tool_name: str, arguments: Dict[str, Any], workspace_dir: Optional[str] = None) -> Dict[str, Any]:
     """Routes MCP tool calls to S-Class EOS python APIs."""
-    workspace_dir = arguments.get("workspace_dir", os.getcwd())
+    ws = workspace_dir or arguments.get("workspace_dir", os.getcwd())
+    workspace_dir = ws
 
     if tool_name == "sclass_initialize":
         goal = arguments.get("goal", "")
@@ -106,15 +107,24 @@ def handle_tool_call(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any
         advance_res = runtime.FSMGoalSequenceRunner.advance_one_state(workspace_dir)
         return {"advance_result": advance_res}
 
-    elif tool_name == "sclass_run_goal_sequence":
-        history = runtime.FSMGoalSequenceRunner.run_full_sequence(workspace_dir)
-        state = runtime.get_state(workspace_dir)
-        return {
-            "status": "SEQUENCE_RUN_FINISHED",
-            "active_phase": state.currentPhase,
-            "steps_executed": len(history),
-            "sequence_history": history
-        }
+    elif tool_name == "sclass_run_goal_sequence" or tool_name == "sclass_goal":
+        from sdk_interface import SClassSDK
+        sdk = SClassSDK(workspace_dir=workspace_dir)
+        goal = arguments.get("goal", "Autonomous Objective")
+        return sdk.execute_goal(goal=goal)
+
+    elif tool_name == "sclass_boost":
+        from sdk_interface import SClassSDK
+        sdk = SClassSDK(workspace_dir=workspace_dir)
+        task = arguments.get("task", arguments.get("goal", "High-Velocity Task"))
+        return sdk.execute_boost(goal_or_task=task)
+
+    elif tool_name == "sclass_learn":
+        from sdk_interface import SClassSDK
+        sdk = SClassSDK(workspace_dir=workspace_dir)
+        pattern = arguments.get("pattern")
+        fix = arguments.get("fix_description")
+        return sdk.execute_learn(pattern=pattern, fix_description=fix)
 
     else:
         raise ValueError(f"Unknown MCP tool: {tool_name}")
@@ -149,7 +159,11 @@ def main():
                             {"name": "sclass_security_scan", "description": "Scan file for secrets & vulnerabilities"},
                             {"name": "sclass_strategy_planner", "description": "Infer workflow profile and execution strategy"},
                             {"name": "sclass_spec_synthesis", "description": "Synthesize evidence-driven specification and semantic gate"},
-                            {"name": "sclass_preflight_scan", "description": "Run 100% upfront workspace AST and project discovery"}
+                            {"name": "sclass_preflight_scan", "description": "Run 100% upfront workspace AST and project discovery"},
+                            {"name": "sclass_advance_fsm", "description": "Advance FSM one step forward"},
+                            {"name": "sclass_goal", "description": "Execute full autonomous goal sequence (/goal)"},
+                            {"name": "sclass_boost", "description": "Execute high-velocity swarm execution (/boost)"},
+                            {"name": "sclass_learn", "description": "Capture or inspect learned principles and promote candidates (/learn)"}
                         ]
                     }
                 }

@@ -36,3 +36,14 @@ class PortConflictResolver:
                 logger.info(f"[PortResolver] Preferred port {preferred_port} resolved to available port {port}")
                 return port
         return preferred_port
+
+    @classmethod
+    def audit_and_resolve_ports(cls, preferred_ports: Optional[list] = None) -> dict:
+        """Audits ports and returns resolved available ports for dev servers."""
+        if isinstance(preferred_ports, str):
+            preferred_ports = None
+        ports = preferred_ports or [3000, 5173, 8000, 8080]
+        resolved = {}
+        for p in ports:
+            resolved[str(p)] = cls.find_available_port(p)
+        return resolved

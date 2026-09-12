@@ -41,5 +41,5 @@ Write-Host "⚡ S-Class V12.1 Installation Complete!" -ForegroundColor Green
 Write-Host "Active Plugin Path: $PluginDir" -ForegroundColor Yellow
 Write-Host "Cataloged Skills: 118 (Impeccable, Taste, Emil Kowalski, Specification Synthesis, Heavy Backend)" -ForegroundColor Cyan
 Write-Host "Subagent Matrix: 8 Concurrent Subagents (find-skill Enabled) | PracticalSkeptic: 9 Empirical Rules (159 Tests Passing)" -ForegroundColor Cyan
-Write-Host "Commands: /goal, /grill, /doubt, /inquire" -ForegroundColor Magenta
+Write-Host "Commands: /goal, /boost, /learn, /grill, /doubt, /inquire" -ForegroundColor Magenta
 Write-Host "==========================================================" -ForegroundColor Green

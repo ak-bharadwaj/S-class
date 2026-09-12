@@ -392,3 +392,9 @@ The phase also produces `.agents/synthesized_spec.md` — a human-readable markd
 
 ## 31. Semantic Gate & Implementation Contract Enforcement
 All implementations must satisfy the constraints generated during the SPECIFICATION_SYNTHESIS phase. Any gaps require human review before coding begins.
+
+## 32. Execution Modes & Slash Commands (/goal, /boost, /learn)
+* **/goal [objective]**: Triggers full autonomous goal convergence across all 11 FSM states. Initializes state with the user's objective, compiles SDD delta specs, projects rules to host agents, and advances phases through multi-tier verification gates.
+* **/boost [task]**: High-velocity swarm execution mode. Immediately indexes the codebase into the zero-infra Codebase Knowledge Graph (CKG), primes Graph RAG, activates all 8 concurrent subagents with optimized token budgets, and accelerates goal delivery.
+* **/learn [pattern] [fix]**: Epistemic learning and continuous improvement engine. Records verified bug fixes and architectural solutions into `.agents/learning_memory.json`, promotes approved candidates to the permanent Knowledge Base, and updates CKG semantic embeddings.
+

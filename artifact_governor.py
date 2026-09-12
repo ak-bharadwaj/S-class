@@ -247,6 +247,11 @@ class ArtifactGovernor:
         if env_mode in ["TEST", "SIMULATION", "PRODUCTION"]:
             return env_mode
 
+        # If no explicit workspace is specified and pytest is active, default to TEST
+        # (prevents leaking repo-root sclass.config.json into unit tests)
+        if not workspace_dir and ("pytest" in sys.modules or "PYTEST_CURRENT_TEST" in os.environ):
+            return "TEST"
+
         cwd = workspace_dir if workspace_dir else os.getcwd()
         cfg_file = os.path.join(cwd, "sclass.config.json")
         if os.path.exists(cfg_file):
@@ -260,12 +265,6 @@ class ArtifactGovernor:
                     return "SIMULATION"
             except Exception:
                 pass
-
-        if workspace_dir:
-            return "PRODUCTION"
-
-        if "pytest" in sys.modules or "PYTEST_CURRENT_TEST" in os.environ:
-            return "TEST"
 
         return "PRODUCTION"
 

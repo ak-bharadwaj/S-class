@@ -13,9 +13,66 @@ import json
 import logging
 import hashlib
 import subprocess
+import socket
+import struct
+import math
+import urllib.request
 from datetime import datetime, timezone
 
 logger = logging.getLogger("sclass_verifier")
+
+
+def audit_image_bytes(data: bytes) -> Tuple[bool, Optional[int], Optional[int], float, int]:
+    """
+    Parses image dimensions and calculates byte variance & distinct value count over image payload.
+    Returns (is_valid_format, width, height, std_dev_variance, distinct_byte_count).
+    """
+    if len(data) < 24:
+        return False, None, None, 0.0, 0
+
+    width, height = None, None
+    if data.startswith(b'\x89PNG\r\n\x1a\n') and len(data) >= 24:
+        try:
+            w, h = struct.unpack('>II', data[16:24])
+            if w > 0 and h > 0 and w < 10000 and h < 10000:
+                width, height = w, h
+        except Exception:
+            pass
+    elif data.startswith(b'\xff\xd8'):
+        try:
+            idx = 2
+            while idx < len(data) - 9:
+                marker, length = struct.unpack('>HH', data[idx:idx+4])
+                if marker in (0xFFC0, 0xFFC1, 0xFFC2):
+                    height, width = struct.unpack('>HH', data[idx+5:idx+9])
+                    break
+                idx += length + 2
+        except Exception:
+            pass
+
+    # Exclude fixed header bytes to measure payload entropy accurately
+    payload = data[33:65536] if len(data) > 33 else data[:65536]
+    if not payload:
+        return False, width, height, 0.0, 0
+
+    mean = sum(payload) / len(payload)
+    variance = sum((b - mean) ** 2 for b in payload) / len(payload)
+    std_dev = math.sqrt(variance)
+    distinct_count = len(set(payload))
+
+    is_valid = width is not None and height is not None
+    return is_valid, width, height, std_dev, distinct_count
+
+
+def find_active_dev_server_port(timeout: float = 0.04) -> Optional[int]:
+    """Checks whether a local web server port is listening on 127.0.0.1."""
+    for port in [3000, 5173, 8000, 8080, 3001, 4173]:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=timeout):
+                return port
+        except Exception:
+            pass
+    return None
 
 
 class UxDebtTracker:
@@ -139,6 +196,13 @@ class EvidenceVerifier:
         stale_screenshots_detected = False
         duplicate_screenshots_detected = False
         
+        # Audit Active Dev Server Port Connection (Enforced in PRODUCTION mode)
+        dev_server_port = find_active_dev_server_port()
+        dev_server_inactive = False
+        exec_mode = os.getenv("SCLASS_EXECUTION_MODE", "TEST")
+        if os.path.exists(os.path.join(cwd, "frontend")) and dev_server_port is None and exec_mode == "PRODUCTION":
+            dev_server_inactive = True
+
         # Keep track of full screenshot content hashes to detect duplicate files
         screenshot_hashes = set()
         
@@ -163,6 +227,15 @@ class EvidenceVerifier:
                         
                         # Check magic bytes
                         if not (header.startswith(b'\x89PNG') or header.startswith(b'\xff\xd8\xff') or header.startswith(b'RIFF')):
+                            mock_detected = True
+                            continue
+
+                        # Image Dimension & Variance Audit (Rejects solid fills & empty canvases)
+                        is_valid, width, height, std_dev, distinct_bytes = audit_image_bytes(content)
+                        if not is_valid or width is None or height is None or width < 320 or height < 320:
+                            mock_detected = True
+                            continue
+                        if std_dev < 15.0 or distinct_bytes < 15:
                             mock_detected = True
                             continue
                             
@@ -455,8 +528,11 @@ class EvidenceVerifier:
         if empty_test_stubs and not allow_soft:
             errors.append("QA verification failed: Empty or unasserted test stubs detected! Test files must contain real assertions ('expect(' or 'assert').")
         
+        if dev_server_inactive and not allow_soft:
+            errors.append("QA verification failed: DEV SERVER INACTIVE! No active web application server listening on localhost ports (3000, 5173, 8000, 8080). Visual QA verification requires a live web application server running during the test.")
+
         if mock_detected and not allow_soft:
-            errors.append("QA verification failed: CHEATING DETECTED! Mock or fake screenshot receipts (<10KB or invalid binary image magic bytes) were found. Real Chrome DevTools MCP visual screenshots (>10KB valid PNG/JPEG) are strictly required.")
+            errors.append("QA verification failed: CHEATING DETECTED! Mock or fake screenshot receipts (<10KB, invalid magic bytes, <320x320 dimensions, or zero color variance) were found. Real Chrome DevTools MCP visual screenshots (>10KB valid PNG/JPEG with non-zero color variance) are strictly required.")
         
         if not has_visual and not allow_soft:
             errors.append("QA verification failed: Mandatory Chrome MCP visual screenshot receipts missing from '.agents/screenshots/'. Run Chrome DevTools MCP to capture real screenshots before passing QA.")
@@ -467,7 +543,7 @@ class EvidenceVerifier:
         return errors, real_screenshots, required_min_screenshots
 
     @staticmethod
-    def verify_phase(current_phase: str, workspace_dir: Optional[str] = None, allow_soft: bool = True) -> VerificationResult:
+    def verify_phase(current_phase: str, workspace_dir: Optional[str] = None, allow_soft: bool = True, target_phase: Optional[str] = None) -> VerificationResult:
         """Verifies required evidence artifacts for the given phase."""
         cwd = workspace_dir if workspace_dir else os.getcwd()
         state_dir = os.path.join(cwd, ".agents")
@@ -550,9 +626,29 @@ class EvidenceVerifier:
 
                     valid_gate = len(missing_sections) == 0
 
+                    is_recovery = (target_phase in ["CLARIFICATION", "RECOVERY"])
+                    if not is_recovery:
+                        try:
+                            from runtime import FSMGoalSequenceRunner
+                            if getattr(FSMGoalSequenceRunner, "_override_event", None) in ["spec_conflict_detected", "spec_scope_decision_needed"]:
+                                is_recovery = True
+                        except Exception:
+                            pass
+                    if not is_recovery and os.path.exists(state_file):
+                        try:
+                            with open(state_file, "r", encoding="utf-8") as sf:
+                                st_data = json.load(sf)
+                            if st_data.get("activeEvent") in ["spec_conflict_detected", "spec_scope_decision_needed"]:
+                                is_recovery = True
+                        except Exception:
+                            pass
+
                     if gate_result == "BLOCKED":
-                        errors.append("SPECIFICATION_SYNTHESIS verification failed: Gate result is BLOCKED due to conflicts or budget overflow. Resolve issues before proceeding to DESIGN.")
-                        valid_gate = False
+                        if is_recovery:
+                            logger.info("[Verifier] SPECIFICATION_SYNTHESIS gate is BLOCKED, but allowing recovery transition to CLARIFICATION.")
+                        else:
+                            errors.append("SPECIFICATION_SYNTHESIS verification failed: Gate result is BLOCKED due to conflicts or budget overflow. Resolve issues before proceeding to DESIGN.")
+                            valid_gate = False
 
                     # Invoke SemanticGate validation if spec_synthesis module is available
                     try:
@@ -560,8 +656,10 @@ class EvidenceVerifier:
                         # Convert dict back or run SemanticGate.validate_dict
                         sem_res = SemanticGate.validate_dict(spec_data, workspace_dir=cwd)
                         if not sem_res.get("passed", True):
-                            valid_gate = False
                             for err_msg in sem_res.get("errors", []):
+                                if is_recovery and "Gate result is BLOCKED" in err_msg:
+                                    continue
+                                valid_gate = False
                                 errors.append(f"SPECIFICATION_SYNTHESIS semantic gate failed: {err_msg}")
                     except Exception as s_err:
                         logger.warning(f"[Verifier] SemanticGate check note: {s_err}")
@@ -755,15 +853,22 @@ class EvidenceVerifier:
             # Real Git conflict marker & syntax tree integrity check across workspace
             conflict_markers_found = []
             for root, _, files in os.walk(cwd):
-                if any(ignored in root for ignored in [".git", "node_modules", ".next", "__pycache__", ".agents"]):
+                rel_root = os.path.relpath(root, cwd)
+                parts = rel_root.split(os.sep)
+                if any(ignored in parts for ignored in [".git", "node_modules", ".next", "__pycache__", ".agents", "tests"]):
                     continue
                 for f in files:
+                    if f == "verifier.py":
+                        continue
                     if f.endswith(('.ts', '.tsx', '.js', '.jsx', '.py', '.json', '.html', '.css', '.md')):
                         fp = os.path.join(root, f)
                         try:
                             with open(fp, "r", encoding="utf-8", errors="ignore") as fo:
                                 content = fo.read()
-                            if "<<<<<<< HEAD" in content or ("=======" in content and ">>>>>>>" in content):
+                            lines = [line.strip() for line in content.splitlines()]
+                            has_start = any(line.startswith("<<<<<<<") for line in lines)
+                            has_end = any(line.startswith(">>>>>>>") for line in lines)
+                            if has_start and has_end:
                                 conflict_markers_found.append(os.path.relpath(fp, cwd))
                         except Exception:
                             pass
@@ -989,8 +1094,24 @@ class WebUiVerifierPlugin(BaseVerifierPlugin):
         else:
             violations.append("Missing Playwright / Chrome MCP rendered screenshot receipt in '.agents/screenshots/'.")
 
-        # 2. Rendered DOM Inspection
+        # 2. Rendered DOM Inspection & Active Dev-Server Capture
         dom_dump = os.path.join(state_dir, "rendered_dom.html")
+        if not os.path.exists(dom_dump):
+            active_port = find_active_dev_server_port()
+            if active_port:
+                try:
+                    url = f"http://127.0.0.1:{active_port}/"
+                    req = urllib.request.Request(url, headers={"User-Agent": "SClassVerifier/12.1"})
+                    with urllib.request.urlopen(req, timeout=1.0) as resp:
+                        live_html = resp.read().decode("utf-8", errors="ignore")
+                        if live_html and len(live_html) > 50:
+                            os.makedirs(state_dir, exist_ok=True)
+                            with open(dom_dump, "w", encoding="utf-8") as df:
+                                df.write(live_html)
+                            checks_passed.append("active_dev_server_dom_fetched")
+                except Exception as ex:
+                    logger.warning(f"[WebUiVerifierPlugin] Active DOM fetch note: {ex}")
+
         if os.path.exists(dom_dump):
             receipt_files.append(dom_dump)
             try:

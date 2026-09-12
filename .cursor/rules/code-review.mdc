@@ -1,0 +1,18 @@
+---
+description: "Skeptical code review and security audit playbook for code diffs and PR verification"
+globs: "**/*,**/*.py,**/*.ts,**/*.js,**/*.go"
+alwaysApply: false
+---
+
+# Skeptical Code Review & Security Playbook
+
+## 1. Dialectical Review Checklist
+- **Soundness over Speed**: Reject quick hacks that degrade long-term maintainability.
+- **Contract Adherence**: Confirm all inputs and parameters are validated against boundary schemas.
+- **Error Handling**: Verify no exceptions are swallowed or silently suppressed (`except: pass` is prohibited).
+- **Resource Cleanup**: Ensure all database connections, file handles, and network sockets are closed deterministically (`with` blocks).
+
+## 2. Supply-Chain & Secret Audit
+- Never introduce dependencies without checking legitimacy against public registries.
+- Never commit hardcoded secrets, private keys, or API tokens.
+- Review diffs for debug statements, mock stubs, or commented-out validation logic.

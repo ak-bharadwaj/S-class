@@ -1401,6 +1401,21 @@ class SClassSkillOrchestrator:
             ],
             "active_skills": [asdict(s) for s in phase_filtered]
         }
+
+        # 4. S-Class V12 Dynamic Playbook Auto-Loading & Platform Projection
+        try:
+            from skill_auto_loader import SkillAutoLoader
+            auto_loader = SkillAutoLoader(workspace_dir=cwd)
+            detected_playbooks = auto_loader.detect_active_skills(
+                current_phase=fsm_phase,
+                goal_text=goal_text
+            )
+            if detected_playbooks:
+                auto_loader.project_skills_to_platforms(detected_playbooks, workspace_dir=cwd)
+                receipt["auto_loaded_playbooks"] = [p.name for p in detected_playbooks]
+        except Exception as e_auto:
+            logger.debug(f"[SkillOrchestrator] Auto-loader note: {e_auto}")
+
         try:
             with open(stack_file, "w", encoding="utf-8") as f:
                 json.dump(receipt, f, indent=2)

@@ -115,6 +115,10 @@ class MultiStreamMonitor:
         logger.info(f"[MultiStreamMonitor] Telemetry Ingested & Persisted [{stream.upper()} - {severity}]: {message}")
         return event
 
+    def record_event(self, event_name: str, payload: Optional[Dict[str, Any]] = None) -> TelemetryEvent:
+        """Helper to record event with default telemetry stream and severity."""
+        return self.ingest_telemetry(stream="metrics", severity="INFO", source="runtime", message=event_name, metadata=payload or {})
+
     def evaluate_production_health(self) -> Dict[str, Any]:
         """Evaluates active telemetry events to determine if an issue should be triggered."""
         critical_count = sum(1 for e in self.events if e.severity == "CRITICAL")

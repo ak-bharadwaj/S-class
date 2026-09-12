@@ -104,7 +104,8 @@ class ZeroInfraDbEngine:
                 else:
                     new_lines.append(line)
             
-            if not updated:
+            has_fallback = any(line.strip().startswith("USE_SQLITE_FALLBACK=") for line in existing_lines)
+            if not updated and not has_fallback:
                 new_lines.append("\n# Added by S-Class V12 ZeroInfraDbEngine\n")
                 for k, v in fallback_vars.items():
                     new_lines.append(f'{k}="{v}"\n')
