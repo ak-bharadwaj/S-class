@@ -46,3 +46,13 @@ def test_mcp_doctor_and_gc(tmp_path):
     
     gc_res = mcp_server.handle_tool_call("sclass_gc", {"workspace_dir": workspace})
     assert "gc_report" in gc_res
+
+
+def test_mcp_security_scan(tmp_path):
+    target_file = tmp_path / "script.py"
+    target_file.write_text("x = 1\n", encoding="utf-8")
+
+    res = mcp_server.handle_tool_call("sclass_security_scan", {"target_file": str(target_file)})
+    assert "security_report" in res
+    assert "summary" in res["security_report"]
+

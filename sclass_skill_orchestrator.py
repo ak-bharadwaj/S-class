@@ -1,11 +1,11 @@
 """
-S-Class EOS Complete 70-Skill Catalog Orchestrator (sclass_skill_orchestrator.py)
+S-Class EOS Complete 118-Skill Catalog Orchestrator (sclass_skill_orchestrator.py)
 
-Exhaustively catalogs, initializes, and orchestrates ALL 70 specialized skills across:
-1. Paul Bakaus Impeccable (35 Playbooks & Commands: adapt, adapt-native, android, animate, audit, audit-native, bolder, clarify, colorize, craft-floor, craft, critique, delight, distill, doctor, document, extract, harden, hooks, init, ios, layout, live-setup, live, new-work, onboard, operate, optimize, overdrive, polish, quieter, routing, shape, typeset, visualize).
-2. Leon Taste-Skill (13 Aesthetic Engines: brandkit, brutalist-skill, gpt-tasteskill, image-to-code-skill, imagegen-frontend-mobile, imagegen-frontend-web, minimalist-skill, output-skill, redesign-skill, soft-skill, stitch-skill, taste-skill, taste-skill-v1).
-3. Emil Kowalski Skills (10 Animation Directives: animate, animation-vocabulary, apple-design, ask-sonner, emil-design-eng, find-animation-opportunities, improve-animations, pick-ui-library, prototype, review-animations).
-4. Builtin Foundation & ERP Domain Suite (12 Core Skills).
+Exhaustively catalogs, initializes, and orchestrates ALL 118 specialized skills across:
+1. Paul Bakaus Impeccable (32 Playbooks & Commands).
+2. Leon Taste-Skill (13 Aesthetic Engines).
+3. Emil Kowalski Skills (10 Animation Directives).
+4. Builtin Foundation, Interaction, Data, Quality & Domain Suites (63 Core Skills across 5 Tiers).
 """
 
 import os
@@ -35,7 +35,7 @@ class SkillDefinition:
 
 
 class SkillTaxonomy:
-    """Complete Canonical Catalog of 70 Modular Skills in S-Class EOS."""
+    """Complete Canonical Catalog of 118 Modular Skills in S-Class EOS."""
 
     PLUGIN_BASE: str = os.path.dirname(os.path.abspath(__file__))
     IMPECCABLE_REF: str = os.path.join(PLUGIN_BASE, "capability_plugins", "impeccable", "skill", "reference")

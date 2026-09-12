@@ -39,6 +39,15 @@ class TestSkillDiscovery(unittest.TestCase):
         self.assertEqual(res["connected_skills"][0]["recommended_agent_id"], "dss_ui_ux")
         self.assertTrue(os.path.exists(os.path.join(self.test_dir, ".agents", "skill_auto_connection_receipt.json")))
 
+    def test_degraded_offline_mode(self):
+        res = SkillDiscoveryEngine.find_and_bind_required_skills(
+            goal_text="Need apple animation and 3d webgl graphics",
+            workspace_dir=self.test_dir
+        )
+        self.assertTrue(res["degraded_mode_active"])
+        self.assertIn("emil-skills", res["repos_degraded_offline"])
+        self.assertIn("Built-in SkillTaxonomy directives active", res["degraded_mode_fallback"])
+
 
 if __name__ == "__main__":
     unittest.main()

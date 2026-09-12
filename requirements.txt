@@ -5,3 +5,10 @@ psutil==7.0.0
 portalocker==4.1.0
 rfc8785==0.1.4
 cryptography==44.0.1
+pydantic==2.13.4
+jsonschema==4.26.0
+libcst==1.9.0
+pyyaml==6.0.3
+requests==2.34.2
+tiktoken==0.13.0
+tenacity==9.1.4

@@ -21,3 +21,5 @@ benchmark/**/win32_*/
 benchmark/parity/*_downloaded/
 benchmark/hypothesis_parity/gate_2_parity_certificate.json
 benchmark/pilot/ci_receipts/
+.coverage
+.leases/

@@ -1,38 +1,70 @@
 <div align="center">
 
 # ⚡ S-CLASS EOS V11.2
-### The Deterministic AI Systems Runtime & Safety-Case Engine
+### The Empirical Skeptic Corpus & Deterministic AI Systems Runtime
 
-*Enterprise-grade central deterministic orchestration kernel that eliminates AI agent drift, blocks broken UI releases, and enforces cryptographic verification evidence.*
+*Eliminates AI agent drift, blocks broken releases through an adversarial debate engine, and grows an empirical failure corpus with sovereign cryptographic verification.*
 
 [![Version](https://img.shields.io/badge/version-11.2.0--frozen-blue.svg)](https://github.com/ak-bharadwaj/S-class)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-green.svg)](https://github.com/ak-bharadwaj/S-class)
-[![Build](https://img.shields.io/badge/tests-397%2F397%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class)
+[![Build](https://img.shields.io/badge/tests-1376%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class)
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 
-[Quick Start](#-quick-start) • [Architecture](#-system-architecture) • [Features](#-core-architectural-innovations) • [Python SDK](#-30-second-python-sdk-quickstart) • [Benchmark Comparison](#-framework-architectural-comparison) • [License](#-license)
+[The Core Moat](#-the-core-moat-empirical-skepticism--adversarial-debate) • [Architecture](#-system-architecture) • [S-Class CLI](#-s-class-developer-cli) • [Design Principles](#-core-design-principles) • [Python SDK](#-30-second-python-sdk-quickstart) • [Test Suite](#-comprehensive-automated-test-suite)
 
 ---
 
 </div>
 
-## 📌 Executive Overview
+## 📌 Executive Overview: Why S-Class?
 
-When autonomous AI coding agents execute software engineering tasks, they suffer from 3 critical failure modes:
-1. **Agent Drift & Invention:** They get stuck in repetitive loops, invent unrequested features, or perform unverified direct file edits.
-2. **Fake Verification:** They claim *"Everything works cleanly!"* based on superficial unit tests or build logs, while the actual runtime state or interface renders errors.
-3. **Sparse & Amateur Implementation:** Unstructured mutations without epistemic grounding or verified ChangeSets.
+Autonomous AI coding agents fail repeatedly in predictable, painful ways:
+1. **Agent Drift & Invention:** They get stuck in hallucination loops, invent unrequested features, or generate vibecoded UI mockups disconnected from real database schemas.
+2. **Fake Verification:** They claim *"All tests pass cleanly!"* based on superficial unit tests while actual runtime flows crash.
+3. **Amnesia Across Runs:** An agent that breaks a distributed saga or omits an async DB session commit makes the exact same mistake again next week.
 
-**S-Class EOS V11.2 fixes this completely.** Operating as a **Central Deterministic Orchestration Kernel**, S-Class intercepts all agent actions, routes engineering goals through a strict Finite State Machine (FSM), enforces evidence-driven Specification Synthesis before design/coding, red-teams plans before writing code, and verifies execution authenticity through sovereign test runners and cryptographic evidence receipts before release is allowed.
+**S-Class EOS V11.2 replaces stochastic guessing with empirical rigor.** 
 
 > [!NOTE]
-> **V11.2 LTS Release Attestation**: Formally verified across 422 product regression tests (54 test suites) covering:
+> **Release Attestation**: Formally verified across 1,394 product regression tests (54 test suites) covering:
 > 1. Single-authority Layer-0 `FileLock` with kernel advisory locks, persistent inode identity validation, and empirical subprocess crash resilience.
-> 2. Fail-closed `ArtifactGovernor` security configuration handling and non-destructive GC stale lock reclamation.
-> 3. Multi-step semantic event log replay and natural runtime checkpoint equivalence.
-> 4. Static AST dependency Directed Acyclic Graph (DAG) with zero circular imports across all core modules.
-> 5. Sovereign `SClassTestRunner` subprocess authorization, path-traversal prevention, and shell injection blocking.
-> 6. Frozen supply-chain plugin boundaries and formal `HARD_CONSTRAINT` vs. `PREFERENCE` separation.
+> 2. Growable Empirical Skeptic Corpus (`regression_cases.json` & `sclass learn`) compiling bad-run failures into release invariants.
+> 3. 3-Way Adversarial Architecture Debate (`architecture_debate.py`) before code is written.
+> 4. Deterministic Over Adaptive classification with sub-millisecond execution and zero token waste.
+> 5. Cross-platform rule projection (`AGENTS.md`) with CI drift detection (`sclass rules --check`).
+
+Instead of treating agent orchestration as a generic swarm, S-Class builds an **unbypassable empirical moat**:
+- **The Empirical Skeptic Corpus (`regression_cases.json`)**: A first-class, growable failure corpus capturing real-world engineering defects (vibecoded UI mocks, shallow CRUD, async session leaks) and compiling them into active verification invariants.
+- **3-Way Adversarial Architecture Debate (`architecture_debate.py`)**: Before code is written, a Proponent, Practical Skeptic, and Formal Verifier debate every architectural proposal, exposing flaws before execution begins.
+- **Deterministic Over Adaptive**: Guaranteed reproducibility, sub-millisecond classification, zero token waste, and immunity to prompt injection.
+
+---
+
+## 🛡️ The Core Moat: Empirical Skepticism & Adversarial Debate
+
+### 1. Growable Empirical Skeptic Corpus (`regression_cases.json` + `sclass learn`)
+The center of S-Class is not a generic state graph—it is a **compounding dataset of verified failure modes**. When an agent fails during execution, developers do not hand-edit JSON or hope an LLM remembers:
+```bash
+# Capture a bad run into the permanent empirical regression corpus
+sclass learn --project "SGDA" --from-run-log pytest_output.log
+```
+Every recorded failure case automatically synthesizes:
+- Concrete **missing contracts** that must be proven before future release candidates pass.
+- Active **skeptic rules** injected into subsequent architectural debates.
+- Permanent regression assertions that run across all CI test suites.
+
+### 2. Multi-Round Adversarial Architecture Debate Engine (`architecture_debate.py`)
+No code is written based on a single agent's proposal. S-Class routes all technical designs through a structured, multi-round adversarial debate:
+- **The Proponent**: Argues for feature completeness and architectural alignment.
+- **The Practical Skeptic**: Weaponizes historical failure cases from `regression_cases.json` to challenge assumptions (e.g. missing async session commits, role privilege escalations, unhandled database concurrency).
+- **The Formal Verifier**: Evaluates arguments against formal contracts, producing an authoritative Architectural Decision Record (ADR).
+
+### 3. "Deterministic Over Adaptive" Design Principle (`task_classifier.py`)
+S-Class intentionally prioritizes explicit, deterministic pattern matching over stochastic LLM classification:
+- **100% Reproducibility**: Identical inputs yield identical task categorization and routing across all runs and environments.
+- **Sub-Millisecond Execution**: Instantaneous pattern matching (< 0.1ms) with zero cloud dependencies and zero API costs.
+- **Prompt-Injection Immunity**: Untrusted inputs cannot subvert task classification or safety checks through conversational manipulation.
+- **Offline Semantic Fallback**: When keyword confidence is low (< 0.5), a local token similarity fallback assists routing without network calls.
 
 ---
 
@@ -50,94 +82,108 @@ S-Class provides distinct release branches tailored for production runtime stabi
 ## 🏛 System Architecture
 
 ```
-                                RELEASE CANDIDATE
-                                        │
-                                        ▼
-                   Central Deterministic Orchestration Kernel
-                             (sclass_kernel.py FSM)
-                                        │
-  ┌───────────────────────┬─────────────┴────────────┬───────────────────────┐
-  ▼                       ▼                          ▼                       ▼
-Specification Synthesis  Spec Griller      8-Subagent Dispatch      Safety-Case Engine
- Engine (spec_synthesis) Engine            Registry                  (verifier.py)
- (Inspect Before Infer)  (sclass_grill)    (sclass_subagent_reg)             │
-  │                       │                          │                       │
-  └───────────────────────┴─────────────┬────────────┴───────────────────────┘
-                                        │
-                                        ▼
-                     Sovereign Cryptographic Verification
-                         (100% Authentic Execution Proofs)
+                      HUMAN GOAL / BAD RUN FAILURE
+                                  │
+                                  ▼
+             ┌──────────────────────────────────────────┐
+             │   EMPIRICAL SKEPTIC CORPUS & FAILURE LOG │
+             │      (regression_cases.json / sclass learn)│
+             └────────────────────┬─────────────────────┘
+                                  │ active skeptic rules & failure invariants
+                                  ▼
+             ┌──────────────────────────────────────────┐
+             │    3-WAY ADVERSARIAL DEBATE ENGINE       │
+             │   (Proponent vs Practical Skeptic vs QA) │
+             └────────────────────┬─────────────────────┘
+                                  │ authoritative ADR & verified contracts
+                                  ▼
+             ┌──────────────────────────────────────────┐
+             │    DETERMINISTIC FSM ORCHESTRATION KERNEL│
+             │       (Layer 0 FileLock + Event Sourcing)│
+             └────────────────────┬─────────────────────┘
+                                  │
+      ┌───────────────────────────┼───────────────────────────┐
+      ▼                           ▼                           ▼
+Specification Synthesis       Modular Skill Catalog        Cross-Platform Rule
+(spec_synthesis.py)           (118 Skills / Degraded Mode) Projector & CI Drift Linter
+(Inspect Before Infer)        (sclass_skill_orchestrator)  (AGENTS.md Single Source)
+      │                           │                           │
+      └───────────────────────────┼───────────────────────────┘
+                                  ▼
+                 Sovereign Cryptographic Verification
+                   (100% Authentic Execution Proofs)
 ```
+
+---
+
+## 💻 S-Class Developer CLI (`sclass`)
+
+S-Class provides a sovereign CLI for local development and CI pipelines:
+
+```bash
+# 1. Capture a failure from a bad run directly into regression_cases.json
+sclass learn --project "PaymentService" --from-run-log failed_run.log
+
+# 2. Check for cross-platform rule drift against canonical AGENTS.md in CI
+sclass rules --check
+
+# 3. Synchronize canonical AGENTS.md across CLAUDE.md, .cursorrules, .windsurfrules
+sclass rules --sync
+
+# 4. Deterministically classify an engineering task
+sclass classify "Implement FastAPI router endpoint for student registration"
+
+# 5. Run system preflight diagnostics and health checks
+sclass doctor
+```
+
+### Dedicated Slash Commands
+| Command | Mode | Action Performed |
+| :--- | :--- | :--- |
+| **`/goal [objective]`** | **Autonomous Goal** | Launches full 19-state FSM execution with verified debate and release gates. |
+| **`/grill [spec/plan]`** | **Spec Red-Teaming** | Runs `sclass_grill.py` to stress-test specifications across 5 threat vectors. |
+| **`/doubt [question]`** | **Non-Interrupting** | Answers technical questions read-only without pausing or resetting active tasks. |
+| **`/inquire [question]`**| **Read-Only Audit** | Safely inspects workspace symbols and active FSM state in parallel. |
 
 ---
 
 ## 🚀 Core Architectural Innovations
 
-### 1. Canonical Single-Authority FileLock (`file_lock.py` - Layer 0)
-Hardware-level and OS-native kernel advisory mutual exclusion file lock (`msvcrt.locking` on Windows, `fcntl.flock` on POSIX) serving as the SOLE authoritative gate for cross-process synchronization. Process crash resilience is guaranteed natively by the OS kernel automatically releasing file descriptors upon process termination. Emits atomic diagnostic owner metadata (PID, UUID token, hostname, timestamp) for audit trails and monitoring without creating unsafe secondary bypass authorities.
+### 1. Cross-Platform Rule Projector with CI Drift Linter (`rule_projector.py`)
+Adopts `AGENTS.md` as the canonical single source of truth for repository agent behavior, projecting to `.cursorrules`, `CLAUDE.md`, `.windsurfrules`, and `.github/copilot-instructions.md`. Running `sclass rules --check` in CI automatically flags configuration drift before PRs merge.
 
-### 2. Strict Central Orchestration Kernel (`sclass_kernel.py` - Layer 5)
-Exclusive state mutator enforcing the deterministic FSM state graph under OS `FileLock`. Enforces strict API contract invariants:
-* `request_transition(event_name="triage_done")` $\to$ Valid (derives current state authoritatively from disk).
-* `request_transition(event_name="triage_done", from_state="TRIAGE")` $\to$ Valid if state matches; blocks with `ValueError` on state mismatch.
-* `request_transition(from_state="TRIAGE")` or empty `event_name` $\to$ **Strictly blocks with `ValueError`**. Never reinterprets `from_state` as an event name.
+### 2. Offline & Degraded-Mode Capability Plugins (`sclass_skill_discovery.py`)
+To preserve strict zero-cloud supply-chain boundaries, external capability plugin repositories (e.g. `emil-skills`, `impeccable`, `taste-skill`) are never cloned dynamically at runtime. If external playbooks are unavailable or network access is offline, S-Class seamlessly activates **Degraded Mode**, executing core directives, guidelines, and validation rules from its built-in catalog of 118 cataloged skills.
 
-### 3. Multi-Step Semantic Event Replay & Natural Checkpoint Equivalence (`event_store.py`)
-Append-only immutable event sourcing using canonical `EventRecord` schema. Evaluated by replaying multi-transition sequences from scratch and verifying reconstructed `currentPhase` matches live runtime state. Proves that snapshots captured naturally from disk at event offsets reconstruct identical system states to full log replays.
+### 3. Hybrid Static Security Shield (`security_shield.py`)
+Combines a zero-dependency, sub-millisecond regex pre-pass for immediate credential and anti-pattern filtering with a local offline SAST subprocess integration (Semgrep / Bandit) for multi-language AST vulnerability scanning.
 
-### 4. Specification Synthesis Engine & Anti-Bypass Gate (`spec_synthesis.py` - Layer 3)
-Mandatory FSM state sitting between `ANALYSIS` and `DESIGN`. Performs multi-stage requirement expansion (`EXPLICIT`, `SUPPORTED`, `DERIVED`, `OPTIONAL`, `UNKNOWN`, `CONFLICT`, `REUSE`), runs evidence-driven capability expansion (`Role → Capability → Entity → Action → Page → UX`), enforces conservative derived rules, calculates a weighted assumption budget, and enforces an unbypassable hard gate in `verifier.py`.
+### 4. Canonical Single-Authority FileLock (`file_lock.py` - Layer 0)
+Hardware-level OS-native advisory mutual exclusion (`msvcrt.locking` on Windows, `fcntl.flock` on POSIX) serving as the exclusive gate for cross-process synchronization with empirical subprocess crash resilience.
 
-### 5. Modular Production Skill Catalog & Orchestrator (`sclass_skill_orchestrator.py`)
-S-Class organizes modular skill capabilities across integrated suites (Impeccable UI craft, Taste aesthetic engines, Emil animation guidelines, enterprise backend architecture, database modeling, and domain workflows), providing structured playbooks for specialized subagents.
+### 5. Deterministic FSM Microkernel & Replay Engine (`sclass_kernel.py`)
+Exclusive state mutator enforcing the deterministic FSM state graph under OS `FileLock`. Multi-step semantic event log replay guarantees identical state reconstruction across all test suites.
 
-### 6. Rule-Based Skill Discovery & Supply-Chain Boundary (`sclass_skill_discovery.py`)
-Analyzes project goals and domain keywords upfront to bind approved local capability plugins. Enforces strict supply-chain boundaries by freezing arbitrary runtime cloning or external network execution.
-
-### 7. 8-Subagent Dispatch Registry (`sclass_subagent_registry.py`)
-Provides cataloged subagent profiles (`dss_governor`, `dss_ui_ux`, `dss_frontend_dev`, `dss_backend_dev`, `dss_db_architect`, `dss_cso_v2`, `dss_qa_frontend`, `dss_user_alias_v2`) equipped with specialized skill stacks and scoped role capabilities.
-
-### 8. Zero-Infrastructure Database Fallback Guard (`zero_infra_db.py`)
-Tests host database port reachability (PostgreSQL 5432, MongoDB 27017, Redis 6379). If host databases are not running on the user's computer, it automatically injects an **In-Memory SQLite** (`file:./dev.db`) driver so applications build and run out of the box with zero manual DB setup.
-
----
-
-## 💻 Dedicated Execution Modes & Slash Commands
-
-S-Class V11.2 introduces dedicated command execution modes for developer workflows:
-
-| Slash Command / Mode | Execution Purpose | Action Performed |
-| :--- | :--- | :--- |
-| **`/goal [objective]`** | **Autonomous Goal Execution** | Launches full 19-state FSM execution lifecycle with subagent worker swarms and visual release gates. |
-| **`/grill [spec/plan]`** | **Plan Red-Teaming Audit** | Runs `sclass_grill.py` to stress-test design specifications across 5 threat vectors before coding. |
-| **`/doubt [question]`** | **Non-Interrupting Inquiry** | Answers user questions about code or architecture using read-only tools **without pausing or resetting the main task**. |
-| **`/inquire [question]`** | **Read-Only Code Audit** | Queries workspace AST symbols and active FSM state safely in parallel with ongoing background tasks. |
+### 6. Zero-Infrastructure Database Fallback Guard (`zero_infra_db.py`)
+Tests host database reachability (PostgreSQL 5432, MongoDB 27017, Redis 6379). If host databases are not running, it automatically injects an **In-Memory SQLite** driver (`file:./dev.db`) so applications build and run out-of-the-box with zero manual setup.
 
 ---
 
 ## ⚡ Quick Start
 
-### Step 1: Install or Update S-Class V11.2 (One-Line Command)
-
-#### Windows (PowerShell):
+### Installation
 ```powershell
+# Windows (PowerShell)
 iex (irm -useb https://raw.githubusercontent.com/ak-bharadwaj/S-class/master/install.ps1)
 ```
-
-#### Linux / macOS (Terminal):
 ```bash
+# Linux / macOS (Terminal)
 curl -fsSL https://raw.githubusercontent.com/ak-bharadwaj/S-class/master/install.sh | bash
 ```
 
----
-
-### Step 2: Add S-Class Configuration to Your Workspace
-
-Create or open `.cursorrules`, `AGENTS.md`, or `CLAUDE.md` in your project root directory:
-
-```markdown
-pipeline: sclass-v5
-CRITICAL DIRECTIVE: You MUST route all engineering goals strictly through S-Class EOS FSM (runtime.initialize_state & sclass_kernel.kernel_instance.request_transition). Direct parent code edits are strictly forbidden (Rule 17). Subagents MUST enforce Rule 27 No-Laziness Directive, Rule 28 Subagent Deployment Dashboard, Rule 29 Full 8 Concurrent Subagent Swarms, Rule 30 Specification Synthesis, Rule 31 Semantic Gate, and Chrome MCP multi-page visual screenshots (Rule 14 & 15).
+### Python Dependencies
+```bash
+pip install -r requirements.txt
 ```
 
 ---
@@ -147,73 +193,54 @@ CRITICAL DIRECTIVE: You MUST route all engineering goals strictly through S-Clas
 ```python
 import runtime
 from sclass_kernel import kernel_instance
-from sclass_grill import SpecGrillerEngine
+from failure_log import FailureLogManager
+from task_classifier import TaskClassifier
 from sclass_skill_orchestrator import SClassSkillOrchestrator
 from sclass_skill_discovery import SkillDiscoveryEngine
-from sclass_subagent_registry import SubagentRegistry
 from spec_synthesis import SpecSynthesisEngine
 
-# 1. Initialize S-Class FSM State
-state = runtime.initialize_state(goal="Build Enterprise Application", workspace_dir="./")
+# 1. Deterministic Task Classification (Deterministic Over Adaptive)
+classification = TaskClassifier.classify_task("Build student lesson progress tracker with Prisma schema")
+print(f"Task Category: {classification['category']} (Confidence: {classification['confidence']:.2f})")
 
-# 2. Execute Specification Synthesis Engine (Inspect Before Inferring)
+# 2. Learn New Failure Case into Empirical Skeptic Corpus
+case = FailureLogManager.log_failure(
+    project="SGDA",
+    stack="nextjs_prisma",
+    summary="UI rendered placeholder cards instead of binding to Prisma curriculum model",
+    root_cause="vibecoded_ui_scaffolding",
+    missing_contracts=["student_lesson_progress_tracker", "rto_test_readiness_scorecard"],
+    skeptic_rule_id="SKEPTIC-PRISMA-SCHEMA-GROUNDING"
+)
+print(f"Logged Empirical Failure Invariant: {case.id}")
+
+# 3. Upfront Skill Discovery & Degraded Mode Resilience
+discovery = SkillDiscoveryEngine.find_and_bind_required_skills(goal_text="Build Enterprise Application", workspace_dir="./")
+print(f"Bound Skills: Discovered={discovery['discovered_skills_count']}, DegradedMode={discovery['degraded_mode_active']}")
+
+# 4. Specification Synthesis (Inspect Before Infer)
 synth_engine = SpecSynthesisEngine()
 synthesized_spec = synth_engine.run_synthesis("Build student dashboard with profile", workspace_dir="./")
-print(f"Synthesized Spec Gate Result: {synthesized_spec.gate_result} (Assumption Weight: {synthesized_spec.total_assumption_weight}/10)")
-
-# 3. Run Upfront Skill Discovery & Auto-Bind Skill Catalog
-discovery = SkillDiscoveryEngine.find_and_bind_required_skills(goal_text="Build Enterprise Application", workspace_dir="./")
-print(f"Bound Skills: Discovered={discovery['discovered_skills_count']}, Active={discovery['total_active_skills_bound']}")
-
-# 4. Dispatch Full 8 Concurrent Subagent Matrix with find-skill Capability
-dispatch = SubagentRegistry.prepare_full_8_subagent_dispatch(goal_text="Build Enterprise Application", fsm_phase="DEBATE", workspace_dir="./")
-print(f"Dispatched {dispatch['total_subagents_dispatched']} Subagents Concurrently (Skill Discovery Active={dispatch['skill_discovery_active']})")
-
-# 5. Dispatch FSM Transition via Central Deterministic Orchestration Kernel
-res = kernel_instance.request_transition(event_name="triage_done", from_state="TRIAGE", workspace_dir="./")
-print(f"Kernel Approved Mutation: '{res['previousPhase']}' ➔ '{res['currentPhase']}'")
+print(f"Synthesized Spec Gate Result: {synthesized_spec.gate_result}")
 ```
-
----
-
-## 📊 Framework Architectural Comparison
-
-| Architectural Layer | OpenHands | Claude Code | Meta Muse Code | **S-Class EOS V11.2 (Deterministic Runtime)** |
-| :--- | :--- | :--- | :--- | :--- |
-| **System Philosophy** | Sandbox Harness | CLI Agent Loop | Model Co-Trained CLI | **Central Orchestration Kernel & Safety-Case Engine** |
-| **State Mutation Guard** | File System Writes | File System Writes | File System Writes | **✅ Exclusive Kernel Mutator under OS `FileLock`** |
-| **Specification Synthesis** | Generic Prompting | Generic Prompting | Generic Prompting | **✅ `SpecSynthesisEngine` + `SemanticGate` Anti-Bypass (`spec_synthesis.py`)** |
-| **Modular Skill Stack** | Single Prompt Dump | Single Prompt Dump | Single Prompt Dump | **✅ Modular Skill Catalog (`sclass_skill_orchestrator.py`)** |
-| **Skill Discovery Engine** | None | None | None | **✅ `SkillDiscoveryEngine` (Rule-Based Discovery)** |
-| **Subagent Dispatch** | Single Worker | Single Worker | Single Worker | **✅ 8-Subagent Dispatch Registry (`SubagentRegistry`)** |
-| **Verification Gate** | Heuristic | None | Heuristic | **✅ Sovereign Crypto Authority & Subprocess Runner** |
-| **Zero-Infra DB Fallback** | Host DB Dependent | Host DB Dependent | Host DB Dependent | **✅ Automated `ZeroInfraDbEngine` (SQLite File Driver)** |
-| **Model Independence** | Provider Dependent | Locked to Anthropic | Locked to Meta API | **✅ 100% Model Agnostic (Gemini, Claude, GPT, DeepSeek)** |
-| **OS Compatibility** | Docker / Unix | Linux / macOS | Linux / macOS | **✅ Windows PowerShell, macOS, Linux Native** |
 
 ---
 
 ## 🧪 Comprehensive Automated Test Suite
 
-S-Class EOS V11.2 contains **422 product regression test cases across 54 test suites** passing with 100% success across Python 3.10–3.14 (historical and research benchmarks isolated in `benchmark/v0/`):
+S-Class EOS V11.2 maintains an exhaustive automated test suite with **1,376 tests passing across 54 test suites**:
 
-| Test Module Category | Test Count | Functionality Tested |
-| :--- | :--- | :--- |
-| **Cross-Process Concurrency & Locks** | 5 tests | Portalocker/native advisory cross-process mutual exclusion, termination release, multi-process contention, and GC race safety (`tests/test_file_lock_concurrency.py`). |
-| **Property & Invariant Verification** | 8 tests | Hypothesis property campaigns verifying external target callables against SPIFFE authority, PHI/PII sanitizer, and ledger conservation with counterexample capture (`tests/test_property_verifier.py`). |
-| **API Contract Verification** | 5 tests | Schemathesis live HTTP behavioral campaigns against reference and flawed APIs, curl reproduction, schema validation, and server error detection (`tests/test_api_contract_verifier.py`). |
-| **Static & Type Verification** | 7 tests | Microsoft Pyright type checking & Astral Ruff static analysis evidence generation, EpistemicStatus tracking, and EvidenceIR unification with provenance hashes (`tests/test_static_and_type_providers.py`). |
-| **Audit Hardening & Concurrency** | 10 tests | Live planner/MCP dispatch, fail-closed governor security, multi-process GC lock reclamation race safety (`tests/test_audit_hardening_verification.py`). |
-| **V11.2 Stabilization Pass** | 12 tests | Canonical event replay, LibCST AST dependency DAG, kernel API contract strictness, subprocess crash resilience, SClassTestRunner boundaries, supply-chain freeze (`tests/test_v11_stabilization.py`). |
-| **Master Production Closure** | 6 tests | Whole-system V9.6 $\to$ V11.2 master closure: task compiler, execution planner, repository snapshot, ChangeSet reconciliation, implementation/verification evidence (`tests/test_v11_master_closure.py`). |
-| **World Model & Adapters** | 33 tests | Sovereign PromotionEngine, LanguageAdapters (Python, JS/TS, Fallback), GroundedSpecWeaver, Evidence Verification (`tests/test_v11_world_model.py`). |
-| **ChangeSet Governance** | 28 tests | Sovereign ChangeSet issuance, boundary enforcement, atomic diff reconciliation (`tests/test_v11_changeset_governance.py`). |
-| **Repository Snapshot** | 18 tests | Deterministic tree hashing, file classification, language discovery, ChangeSet diffing (`tests/test_v11_repository_snapshot.py`). |
-| **Execution Planner (V10)** | 26 tests | Topological task ordering, concurrency barriers, resource locking, batch compilation (`tests/test_v10_execution_planner.py`). |
-| **Epistemic & Adversarial Matrix** | 45 tests | Red-team audits, adversarial FSM transitions, metamorphic debate, failure injection (`tests/test_v9_6_*.py`). |
-| **Specification Synthesis** | 30 tests | Evidence-driven expansion, conservative inference, semantic gate, assumption budget (`tests/test_spec_synthesis.py`). |
-| **Kernel & Event Sourcing** | 15 tests | Central deterministic kernel state mutator, event sourcing replay, natural snapshot checkpointing (`tests/test_kernel.py`, `tests/test_replay.py`, `tests/test_eos_core.py`). |
-| **Core Architecture & QA** | 44 tests | Multi-subagent dispatch, skill orchestrator, Chrome QA, security shield, runtime FSM (`tests/test_runtime.py`, `tests/test_subagent_registry.py`, `tests/test_robust_qa.py`). |
+| Test Suite Category | Functionality Verified |
+| :--- | :--- |
+| **Adversarial Architecture Debate** | Proponent vs Practical Skeptic vs Formal Verifier 3-way debate, metamorphic consistency, failure injection (`tests/test_v9_6_metamorphic_debate.py`, `tests/test_v9_debate_engine.py`). |
+| **Empirical Skeptic Corpus & Learning** | `sclass learn` CLI, run log parsing, regression case mutation, contract synthesis (`tests/test_sclass_learn.py`, `tests/test_practical_regression.py`). |
+| **Deterministic Task Classification** | Pattern classification, scope tiering, zero non-determinism, local token fallback (`tests/test_task_classifier.py`). |
+| **Cross-Platform Rule Projection** | Single-source `AGENTS.md` projection, CI drift detection, synchronization (`tests/test_rule_projector.py`). |
+| **Hybrid Security Shield** | Fast regex pre-pass, Semgrep/Bandit SAST subprocess parsing, zero-cloud fallback (`tests/test_security_shield.py`). |
+| **Offline Skill Resilience** | Degraded mode activation, built-in directive fallback, 118-skill catalog taxonomy (`tests/test_skill_discovery.py`, `tests/test_skill_orchestrator.py`). |
+| **Concurrency & Kernel FileLock** | Advisory cross-process locks, crash resilience, process race safety (`tests/test_file_lock_concurrency.py`, `tests/test_kernel.py`). |
+| **Property & Invariant Verification** | Hypothesis property campaigns, SPIFFE router, double-entry ledger invariants (`tests/test_property_verifier.py`). |
+| **API Contract Verification** | Schemathesis live HTTP behavioral campaigns against reference APIs (`tests/test_api_contract_verifier.py`). |
 
 ---
 
@@ -221,6 +248,4 @@ S-Class EOS V11.2 contains **422 product regression test cases across 54 test su
 
 **Copyright (c) 2026 ak-bharadwaj. All Rights Reserved.**
 
-S-Class EOS V11.2 is **Proprietary and Confidential Software**. 
-
-Unauthorized copying, modification, redistribution, sublicensing, deployment, or public hosting of this Software, via any medium, is strictly prohibited. Access and usage are granted exclusively under explicit written authorization by the copyright holder (`ak-bharadwaj`). See [LICENSE](LICENSE) for full details.
+S-Class EOS V11.2 is **Proprietary and Confidential Software**. Unauthorized copying, modification, redistribution, sublicensing, deployment, or public hosting of this Software, via any medium, is strictly prohibited. See [LICENSE](LICENSE) for full details.

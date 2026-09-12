@@ -53,6 +53,7 @@ class SkillDiscoveryEngine:
             "erp": ("academic-workflows", "builtin")
         }
 
+        degraded_repos: List[str] = []
         for keyword, (skill_id, repo_key) in domain_skill_triggers.items():
             if re.search(r"\b" + re.escape(keyword) + r"\b", goal_lower):
                 discovered_skills.append(skill_id)
@@ -62,9 +63,10 @@ class SkillDiscoveryEngine:
                     if os.path.exists(repo_dir):
                         installed_repos.append(repo_key)
                     else:
+                        degraded_repos.append(repo_key)
                         logger.info(
                             f"[SkillDiscovery] External plugin repository '{repo_key}' not present locally. "
-                            f"Dynamic runtime cloning is disabled under supply-chain boundary policy."
+                            f"Activating offline degraded mode: relying on built-in SkillTaxonomy fallback directives."
                         )
 
         # 2. Auto-connect all workspace SKILL.md files into S-Class
@@ -88,6 +90,9 @@ class SkillDiscoveryEngine:
             "discovered_skills_count": len(discovered_skills),
             "discovered_skills": discovered_skills,
             "repos_installed": installed_repos,
+            "repos_degraded_offline": degraded_repos,
+            "degraded_mode_active": len(degraded_repos) > 0,
+            "degraded_mode_fallback": "Built-in SkillTaxonomy directives active; zero-cloud/offline execution preserved.",
             "total_active_skills_bound": len(active_skills)
         }
 
@@ -97,7 +102,7 @@ class SkillDiscoveryEngine:
         except Exception as e:
             logger.error(f"[SkillDiscovery] Failed to write discovery receipt: {e}")
 
-        logger.info(f"[SkillDiscovery] Discovered and bound {len(discovered_skills)} skills for goal.")
+        logger.info(f"[SkillDiscovery] Discovered and bound {len(discovered_skills)} skills for goal (degraded_mode={len(degraded_repos) > 0}).")
         return receipt
 
     @classmethod
