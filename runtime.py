@@ -190,7 +190,8 @@ class ContextBudgetOptimizer:
 
 
 def _resolve_paths(workspace_dir: Optional[str] = None) -> tuple:
-    cwd = workspace_dir if workspace_dir else os.getcwd()
+    cwd = workspace_dir if workspace_dir else os.environ.get("SCLASS_WORKSPACE") or os.getcwd()
+    cwd = os.path.abspath(cwd)
     state_dir = os.path.join(cwd, ".agents")
     state_file = os.path.join(state_dir, "orchestration_state.json")
     lock_file = os.path.join(state_dir, "state.lock")
@@ -304,8 +305,8 @@ class MemoryManager:
 
     @staticmethod
     def get_memory_file(workspace_dir: Optional[str] = None) -> str:
-        cwd = workspace_dir if workspace_dir else os.getcwd()
-        return os.path.join(cwd, ".agents", "learning_memory.json")
+        state_dir, _, _, _ = _resolve_paths(workspace_dir)
+        return os.path.join(state_dir, "learning_memory.json")
 
     @staticmethod
     def _load_memory(workspace_dir: Optional[str] = None) -> Dict[str, Any]:
@@ -534,7 +535,7 @@ def _sync_spec_decisions_to_state(workspace_dir: Optional[str] = None) -> None:
     """Syncs low-confidence assumptions and inferred requirements directly into state.decisionLog for transparent provenance."""
     try:
         state = get_state(workspace_dir)
-        state_dir = os.path.join(workspace_dir if workspace_dir else os.getcwd(), ".agents")
+        state_dir, _, _, _ = _resolve_paths(workspace_dir)
         spec_file = os.path.join(state_dir, "synthesized_spec.json")
         if not os.path.exists(spec_file):
             return
@@ -879,7 +880,6 @@ def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce
                 backoff = rec_engine.calculate_backoff(state.retryCount, matched_path) if matched_path else 1.0
                 
                 # Write Failure Report for RECOVERY evidence gate
-                state_dir = os.path.join(workspace_dir, ".agents")
                 os.makedirs(state_dir, exist_ok=True)
                 write_json_atomic(os.path.join(state_dir, "failure_report.json"), {
                     "error_log": last_error,
@@ -904,7 +904,6 @@ def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce
                 from monitoring import MultiStreamMonitor
                 mon = MultiStreamMonitor(workspace_dir)
                 mon.ingest_telemetry("metrics", "INFO", "runtime", "monitoring_heartbeat", metadata={"phase": "MONITORING", "status": "ACTIVE", "timestamp": ts_now})
-                state_dir = os.path.join(workspace_dir, ".agents")
                 os.makedirs(state_dir, exist_ok=True)
                 write_json_atomic(os.path.join(state_dir, "monitoring_heartbeat.json"), {
                     "phase": "MONITORING",
@@ -1392,7 +1391,7 @@ class FSMGoalSequenceRunner:
     @classmethod
     def advance_one_state(cls, workspace_dir: Optional[str] = None) -> Dict[str, Any]:
         """Advances FSM state 1 step forward in the canonical happy path or gate override."""
-        cwd = workspace_dir if workspace_dir else os.getcwd()
+        cwd = os.path.abspath(workspace_dir if workspace_dir else os.environ.get("SCLASS_WORKSPACE") or os.getcwd())
         state = get_state(cwd)
         current_phase = state.currentPhase
 
@@ -1435,7 +1434,7 @@ class FSMGoalSequenceRunner:
     @classmethod
     def run_full_sequence(cls, workspace_dir: Optional[str] = None, max_steps: int = 20) -> List[Dict[str, Any]]:
         """Sequentially advances FSM state across all 19 goal states until reaching DONE."""
-        cwd = workspace_dir if workspace_dir else os.getcwd()
+        cwd = os.path.abspath(workspace_dir if workspace_dir else os.environ.get("SCLASS_WORKSPACE") or os.getcwd())
         history = []
 
         for step in range(max_steps):

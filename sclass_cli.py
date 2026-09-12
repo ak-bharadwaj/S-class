@@ -1,8 +1,8 @@
 """
-S-Class V12: Dedicated CLI & Slash Command Dispatcher (sclass_cli.py)
+S-Class V13: Dedicated CLI & Slash Command Dispatcher (sclass_cli.py)
 
 Exposes command-line and interactive interfaces for S-Class slash commands:
-- /goal [objective]   : Autonomous Goal Execution across the 11-state FSM
+- /goal [objective]   : Autonomous Goal Execution across the FSM
 - /boost [task]       : High-velocity swarm execution with CKG pre-indexing and parallel agents
 - /learn [pattern]    : Automated learning capture, memory inspection, and KB promotion
 - /status             : Current FSM state and task pipeline summary
@@ -10,56 +10,120 @@ Exposes command-line and interactive interfaces for S-Class slash commands:
 - /grill [spec]       : Red-teaming plan stress test across 5 threat vectors
 - /doubt [question]   : Non-interrupting read-only architectural inquiry
 - /inquire [query]    : Read-only symbol and dependency query
+
+External Workspace Options (can be placed before or after command):
+- -w, --workspace <path> : Target external workspace directory
+- --target <path>        : Target external workspace directory
+- --dir <path>           : Target external workspace directory
+- -C <path>              : Target external workspace directory
+Environment variable fallback: SCLASS_WORKSPACE or WORKSPACE_DIR
 """
 
 import sys
 import os
 import json
-import argparse
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 
 from sdk_interface import SClassSDK
 
 
+def extract_workspace_arg(argv: List[str]) -> Tuple[Optional[str], List[str]]:
+    """
+    Extracts --workspace/-w/--target/--dir/-C from argv without interfering with slash commands.
+    Returns (workspace_dir, remaining_argv).
+    """
+    workspace_dir = None
+    remaining = []
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg in ("--workspace", "-w", "--target", "--dir", "-C"):
+            if i + 1 < len(argv):
+                workspace_dir = argv[i + 1]
+                i += 2
+                continue
+            else:
+                # Flag with no value
+                i += 1
+                continue
+        elif any(arg.startswith(prefix) for prefix in ("--workspace=", "-w=", "--target=", "--dir=", "-C=")):
+            workspace_dir = arg.split("=", 1)[1]
+            i += 1
+            continue
+        else:
+            remaining.append(arg)
+            i += 1
+    return workspace_dir, remaining
+
+
+def print_help() -> None:
+    print("S-Class V13 Control Plane CLI")
+    print("Supported slash commands: /goal, /boost, /learn, /status, /advance, /grill, /doubt, /inquire")
+    print("\nUsage:")
+    print("  python sclass_cli.py [-w <workspace>] </command> [arguments...]")
+    print("  python sclass_cli.py </command> [arguments...] [-w <workspace>]")
+    print("\nWorkspace Options:")
+    print("  -w, --workspace <path>    Target external project workspace directory")
+    print("  --target <path>           Alias for --workspace")
+    print("  --dir <path>              Alias for --workspace")
+    print("  -C <path>                 Git-style directory switch")
+    print("  Environment variable:     SCLASS_WORKSPACE or WORKSPACE_DIR")
+    print("\nExamples:")
+    print("  python sclass_cli.py -w /path/to/my-project /status")
+    print("  python sclass_cli.py /goal \"implement rate limiter\" --workspace /path/to/my-project")
+    print("  python sclass_cli.py -w ./backend /boost \"optimize database pool\"")
+
+
 def run_cli(argv: Optional[List[str]] = None) -> int:
-    args = argv if argv is not None else sys.argv[1:]
-    if not args:
-        print("S-Class V12 Control Plane CLI")
-        print("Supported slash commands: /goal, /boost, /learn, /status, /advance, /grill, /doubt, /inquire")
-        print("Usage: python sclass_cli.py </command> [arguments...]")
+    raw_args = argv if argv is not None else sys.argv[1:]
+
+    # Extract workspace flag if present
+    parsed_ws, remaining = extract_workspace_arg(raw_args)
+
+    if not remaining:
+        print_help()
         return 0
 
-    command_raw = args[0]
+    command_raw = remaining[0]
     if command_raw in ("-h", "--help", "help"):
-        print("S-Class V12 Control Plane CLI")
-        print("Supported slash commands: /goal, /boost, /learn, /status, /advance, /grill, /doubt, /inquire")
-        print("Usage: python sclass_cli.py </command> [arguments...]")
+        print_help()
         return 0
+
+    # Resolve target workspace
+    resolved_ws = (
+        parsed_ws
+        or os.environ.get("SCLASS_WORKSPACE")
+        or os.environ.get("WORKSPACE_DIR")
+        or os.getcwd()
+    )
+    target_workspace = os.path.abspath(resolved_ws)
+    os.makedirs(target_workspace, exist_ok=True)
+    os.environ["SCLASS_WORKSPACE"] = target_workspace
 
     # Normalize command: accept either '/goal' or 'goal'
     cmd = command_raw if command_raw.startswith("/") else f"/{command_raw}"
-    rest = " ".join(args[1:]) if len(args) > 1 else ""
+    rest = " ".join(remaining[1:]) if len(remaining) > 1 else ""
 
-    sdk = SClassSDK()
+    sdk = SClassSDK(workspace_dir=target_workspace)
 
     if cmd == "/goal":
         goal_text = rest or "Autonomous Objective"
-        print(f"[*] Executing S-Class /goal: {goal_text}")
+        print(f"[*] Executing S-Class /goal in workspace: {sdk.workspace_dir}")
         res = sdk.execute_goal(goal=goal_text)
         print(json.dumps(res, indent=2))
         return 0
 
     elif cmd == "/boost":
         boost_task = rest or "High-Velocity Task"
-        print(f"[*] Executing S-Class /boost: {boost_task}")
+        print(f"[*] Executing S-Class /boost in workspace: {sdk.workspace_dir}")
         res = sdk.execute_boost(goal_or_task=boost_task)
         print(json.dumps(res, indent=2))
         return 0
 
     elif cmd == "/learn":
-        pattern = args[1] if len(args) > 1 else None
-        fix = args[2] if len(args) > 2 else "Learned engineering principle"
-        print(f"[*] Executing S-Class /learn (pattern: {pattern or 'all'})")
+        pattern = remaining[1] if len(remaining) > 1 else None
+        fix = remaining[2] if len(remaining) > 2 else "Learned engineering principle"
+        print(f"[*] Executing S-Class /learn in workspace: {sdk.workspace_dir} (pattern: {pattern or 'all'})")
         res = sdk.execute_learn(pattern=pattern, fix_description=fix if pattern else None)
         print(json.dumps(res, indent=2))
         return 0
@@ -70,14 +134,17 @@ def run_cli(argv: Optional[List[str]] = None) -> int:
         return 0
 
     elif cmd == "/advance":
+        print(f"[*] S-Class Advancing phase in workspace: {sdk.workspace_dir}")
         res = sdk.advance_phase()
         print(json.dumps(res, indent=2))
         return 0
 
     elif cmd == "/grill":
         from sclass_grill import SpecGrillerEngine
+        print(f"[*] S-Class Red-Teaming Plan (SpecGriller) in workspace: {sdk.workspace_dir}")
         report = SpecGrillerEngine.grill_specification(workspace_dir=sdk.workspace_dir)
         print(json.dumps({
+            "workspace": sdk.workspace_dir,
             "overall_passed": report.overall_passed,
             "critical_defects": report.critical_defects_found,
             "vectors_tested": report.total_vectors_tested,
@@ -86,9 +153,10 @@ def run_cli(argv: Optional[List[str]] = None) -> int:
 
     elif cmd in ("/doubt", "/inquire"):
         query = rest or ""
-        print(f"[*] S-Class Read-Only Inquiry: {query}")
+        print(f"[*] S-Class Inquiry in workspace: {sdk.workspace_dir} (query: {query})")
         nodes = sdk.query_graph(pattern=query)
         print(json.dumps({
+            "workspace": sdk.workspace_dir,
             "query": query,
             "matching_symbols_count": len(nodes),
             "symbols": nodes[:10],

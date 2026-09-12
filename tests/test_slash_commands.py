@@ -219,3 +219,66 @@ def test_audit_image_bytes_rejection_boundary():
     assert h == 1080
     assert std >= 15.0
     assert dist >= 15
+
+
+def test_cli_external_workspace_targeting():
+    """
+    Verifies that CLI can target an external workspace without chdir,
+    and all state/artifact writes land in the external workspace.
+    """
+    with tempfile.TemporaryDirectory() as caller_dir, tempfile.TemporaryDirectory() as target_dir:
+        old_cwd = os.getcwd()
+        os.chdir(caller_dir)
+        try:
+            # 1. Run /status targeting target_dir with -w flag
+            code = run_cli(["-w", target_dir, "/status"])
+            assert code == 0
+
+            # 2. Run /goal targeting target_dir with --workspace flag
+            code = run_cli(["--workspace", target_dir, "/goal", "Implement External Worker Task"])
+            assert code == 0
+
+            # Target directory MUST contain the state and handoff files
+            target_state = os.path.join(target_dir, ".agents", "orchestration_state.json")
+            target_handoff = os.path.join(target_dir, ".agents", "session_handoff.json")
+            target_continue = os.path.join(target_dir, "CONTINUE_HERE.md")
+            assert os.path.exists(target_state), "State file must exist in target directory"
+            assert os.path.exists(target_handoff), "Handoff file must exist in target directory"
+            assert os.path.exists(target_continue), "CONTINUE_HERE.md must exist in target directory"
+
+            # Caller directory MUST NOT have received any state files
+            caller_agents = os.path.join(caller_dir, ".agents")
+            assert not os.path.exists(caller_agents), "Caller directory must not have .agents folder written"
+        finally:
+            os.chdir(old_cwd)
+
+
+def test_cli_workspace_flag_variants():
+    """
+    Verifies flag variations: trailing flag, --target, -C, and SCLASS_WORKSPACE env var.
+    """
+    with tempfile.TemporaryDirectory() as target_dir:
+        # 1. Trailing flag
+        code = run_cli(["/status", "-w", target_dir])
+        assert code == 0
+
+        # 2. --target flag
+        code = run_cli(["--target", target_dir, "/status"])
+        assert code == 0
+
+        # 3. -C git-style flag
+        code = run_cli(["-C", target_dir, "/status"])
+        assert code == 0
+
+        # 4. SCLASS_WORKSPACE env var
+        old_env = os.environ.get("SCLASS_WORKSPACE")
+        os.environ["SCLASS_WORKSPACE"] = target_dir
+        try:
+            code = run_cli(["/status"])
+            assert code == 0
+        finally:
+            if old_env is None:
+                os.environ.pop("SCLASS_WORKSPACE", None)
+            else:
+                os.environ["SCLASS_WORKSPACE"] = old_env
+

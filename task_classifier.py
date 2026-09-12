@@ -84,6 +84,7 @@ class TaskClassifier:
 
     LIBRARY_KEYWORDS: Set[str] = {
         "sdk", "library", "helper function", "utility function", "utils", "utility module",
+        "utility", "utilities", "logger", "logging", "helper", "helpers",
         "npm package", "pip package", "crate", "middleware", "decorator", "wrapper"
     }
 

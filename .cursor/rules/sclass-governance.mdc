@@ -8,9 +8,9 @@ alwaysApply: true
 
 ## Active Session Context
 - **FSM Phase**: `TRIAGE`
-- **Active Goal**: Autonomous Build Feature
+- **Active Goal**: implement binary search tree
 - **Pending Tasks**: 0 active
-- **Knowledge Graph**: 3307 nodes, 4911 edges
+- **Knowledge Graph**: 3323 nodes, 4837 edges
 
 ## Non-Negotiable Engineering Directives
 1. **Zero Hallucinated APIs**: Always verify existing symbols in `.agents/codebase_graph.db` or via MCP `graph_query` before inventing method names or endpoints.

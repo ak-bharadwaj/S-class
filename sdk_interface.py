@@ -46,7 +46,8 @@ class SClassSDK:
     """
 
     def __init__(self, workspace_dir: Optional[str] = None):
-        self.workspace_dir = workspace_dir or os.getcwd()
+        self.workspace_dir = os.path.abspath(workspace_dir or os.environ.get("SCLASS_WORKSPACE") or os.getcwd())
+        os.environ["SCLASS_WORKSPACE"] = self.workspace_dir
         self.graph_db = CodebaseGraphDB(workspace_dir=self.workspace_dir)
         self.extractor = ASTGraphExtractor(graph_db=self.graph_db, workspace_dir=self.workspace_dir)
         self.traversal = GraphTraversalEngine(graph_db=self.graph_db)
@@ -75,6 +76,7 @@ class SClassSDK:
             state = runtime.get_state(self.workspace_dir)
             return {
                 "initialized": True,
+                "workspace": self.workspace_dir,
                 "currentPhase": state.currentPhase,
                 "goal": state.goal,
                 "workflowProfile": state.workflowProfile,
@@ -84,6 +86,7 @@ class SClassSDK:
         except (FileNotFoundError, Exception):
             return {
                 "initialized": False,
+                "workspace": self.workspace_dir,
                 "currentPhase": "UNINITIALIZED",
                 "goal": "",
                 "workflowProfile": "unknown",
@@ -181,6 +184,7 @@ class SClassSDK:
         self.create_session_handoff()
         return {
             "mode": "goal",
+            "workspace": self.workspace_dir,
             "status": "COMPLETED" if curr.currentPhase == "DONE" else "IN_PROGRESS",
             "current_phase": curr.currentPhase,
             "goal": curr.goal,
@@ -203,6 +207,7 @@ class SClassSDK:
         self.create_session_handoff()
         return {
             "mode": "boost",
+            "workspace": self.workspace_dir,
             "status": "COMPLETED" if curr.currentPhase == "DONE" else "IN_PROGRESS",
             "current_phase": curr.currentPhase,
             "goal": curr.goal,
@@ -263,6 +268,7 @@ class SClassSDK:
 
         return {
             "mode": "learn",
+            "workspace": self.workspace_dir,
             "learned_record": learned_record,
             "total_learned_rules": len(rules_list),
             "recent_rules": rules_list[-5:],
