@@ -106,3 +106,17 @@ def test_mermaid_synthesizer():
     seq = MermaidSynthesizer.generate_sequence_diagram(nodes)
     assert "sequenceDiagram" in seq
     assert "call Service()" in seq
+
+
+@pytest.mark.anyio
+async def test_official_codebase_kg_mcp_sdk_server(seeded_mcp_server):
+    from codebase_kg_server import create_codebase_kg_mcp_server, HAS_OFFICIAL_MCP
+    assert HAS_OFFICIAL_MCP is True
+
+    server = create_codebase_kg_mcp_server(workspace_dir=seeded_mcp_server.workspace_dir)
+    assert server is not None
+
+    res = await server.call_tool("graph_query", {"pattern": "users"})
+    assert res is not None
+    assert res.is_error is False
+    assert "GET /users" in res.content[0].text

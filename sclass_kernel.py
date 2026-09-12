@@ -108,9 +108,12 @@ class MinimalDeterministicKernel:
 
     # === Formal Kernel API Methods ===
 
-    def request_transition(self, from_state: str, event_name: str, workspace_dir: Optional[str] = None, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def request_transition(self, from_state: Optional[str] = None, event_name: Optional[str] = None, workspace_dir: Optional[str] = None, payload: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
         """Formal Kernel API method for requesting state transition."""
-        return self._execute_kernel_pipeline(event_name, workspace_dir=workspace_dir, payload=payload)
+        actual_event = event_name or kwargs.get("event_name")
+        if not actual_event:
+            actual_event = from_state
+        return self._execute_kernel_pipeline(actual_event or "", workspace_dir=workspace_dir, payload=payload)
 
     def request_task_verification(self, task_id: str, workspace_dir: Optional[str] = None) -> Dict[str, Any]:
         """Formal Kernel API method for verifying an isolated task builder sandbox."""

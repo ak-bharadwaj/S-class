@@ -22,7 +22,84 @@ from graph_traversal import GraphTraversalEngine
 from graph_rag import GraphRAGEngine
 from mermaid_synthesizer import MermaidSynthesizer
 
+try:
+    from mcp.server.mcpserver import MCPServer
+    HAS_OFFICIAL_MCP = True
+except ImportError:
+    try:
+        from mcp.server.fastmcp import FastMCP as MCPServer
+        HAS_OFFICIAL_MCP = True
+    except ImportError:
+        HAS_OFFICIAL_MCP = False
+        MCPServer = None
+
 logger = logging.getLogger("sclass_codebase_kg_server")
+
+
+def create_codebase_kg_mcp_server(workspace_dir: Optional[str] = None) -> Optional[Any]:
+    """
+    Creates and returns an official Model Context Protocol (MCP) server instance
+    for Codebase Knowledge Graph operations using the official mcp SDK.
+    """
+    if not HAS_OFFICIAL_MCP or MCPServer is None:
+        return None
+
+    ws = workspace_dir or os.getcwd()
+    kg_backend = CodebaseKGServer(workspace_dir=ws)
+    server = MCPServer("sclass-codebase-kg", instructions="S-Class Codebase Knowledge Graph MCP Server")
+
+    @server.tool(name="graph_query", description="Queries nodes by name pattern or type")
+    def graph_query_tool(pattern: str = "", node_type: Optional[str] = None, limit: int = 20) -> str:
+        res = kg_backend.handle_tool_call("graph_query", {"pattern": pattern, "node_type": node_type, "limit": limit})
+        return json.dumps(res, indent=2)
+
+    @server.tool(name="find_dependencies", description="Incoming/outgoing traversal and circular dependency check")
+    def find_dependencies_tool(node_id: str, direction: str = "outgoing") -> str:
+        res = kg_backend.handle_tool_call("find_dependencies", {"node_id": node_id, "direction": direction})
+        return json.dumps(res, indent=2)
+
+    @server.tool(name="impact_analysis", description="Computes blast radius with risk score and affected tests")
+    def impact_analysis_tool(node_id: str, max_hops: int = 3) -> str:
+        res = kg_backend.handle_tool_call("impact_analysis", {"node_id": node_id, "max_hops": max_hops})
+        return json.dumps(res, indent=2)
+
+    @server.tool(name="trace_execution_path", description="Finds path from entrypoint to sink with sequence diagram")
+    def trace_execution_path_tool(source_id: str, target_id: str) -> str:
+        res = kg_backend.handle_tool_call("trace_execution_path", {"source_id": source_id, "target_id": target_id})
+        return json.dumps(res, indent=2)
+
+    @server.tool(name="explain_architecture_slice", description="Semantic architecture retrieval with Mermaid flowchart")
+    def explain_architecture_slice_tool(query: str, top_k: int = 3) -> str:
+        res = kg_backend.handle_tool_call("explain_architecture_slice", {"query": query, "top_k": top_k})
+        return json.dumps(res, indent=2)
+
+    @server.tool(name="record_decision", description="Records ADR into Knowledge Graph")
+    def record_decision_tool(
+        adr_id: str,
+        title: str,
+        status: str = "ACCEPTED",
+        rationale: str = "",
+        rejected_alternatives: Optional[List[str]] = None,
+        affected_symbols: Optional[List[str]] = None,
+        affected_files: Optional[List[str]] = None
+    ) -> str:
+        res = kg_backend.handle_tool_call("record_decision", {
+            "adr_id": adr_id,
+            "title": title,
+            "status": status,
+            "rationale": rationale,
+            "rejected_alternatives": rejected_alternatives,
+            "affected_symbols": affected_symbols,
+            "affected_files": affected_files
+        })
+        return json.dumps(res, indent=2)
+
+    @server.tool(name="get_symbol_neighborhood", description="Precision 1-hop AST context")
+    def get_symbol_neighborhood_tool(node_id: str) -> str:
+        res = kg_backend.handle_tool_call("get_symbol_neighborhood", {"node_id": node_id})
+        return json.dumps(res, indent=2)
+
+    return server
 
 
 class CodebaseKGServer:
@@ -197,7 +274,19 @@ class CodebaseKGServer:
 
 
 def run_stdio_server():
-    """Stdio runner for MCP JSON-RPC protocol."""
+    """Stdio runner for MCP JSON-RPC protocol using official MCP SDK with fallback."""
+    if HAS_OFFICIAL_MCP and not os.environ.get("SCLASS_LEGACY_MCP"):
+        server = create_codebase_kg_mcp_server()
+        if server is not None:
+            logger.info("Starting official Codebase Knowledge Graph MCP SDK Server on stdio...")
+            server.run(transport="stdio")
+            return
+
+    _legacy_stdio_server()
+
+
+def _legacy_stdio_server():
+    """Fallback Stdio runner for MCP JSON-RPC protocol."""
     server = CodebaseKGServer()
     for line in sys.stdin:
         if not line.strip():

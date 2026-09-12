@@ -1,0 +1,93 @@
+{
+  "name": "sclass-governor",
+  "displayName": "S-Class Governance Control Plane",
+  "description": "Deterministic Multi-Agent Governance, Evidence Gates, and Live FSM Sidebar for VS Code",
+  "version": "1.0.0",
+  "publisher": "sclass-ai",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Testing",
+    "Other"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onStartupFinished",
+    "workspaceContains:.agents/orchestration_state.json",
+    "workspaceContains:sclass.config.json"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "sclass-sidebar",
+          "title": "S-Class",
+          "icon": "$(shield)"
+        }
+      ]
+    },
+    "views": {
+      "sclass-sidebar": [
+        {
+          "id": "sclass.dashboardView",
+          "name": "Live Control Plane",
+          "type": "webview"
+        },
+        {
+          "id": "sclass.fsmView",
+          "name": "FSM State & Gates",
+          "type": "tree"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "sclass.watch",
+        "title": "S-Class: Open Live Watch Terminal",
+        "category": "S-Class",
+        "icon": "$(play)"
+      },
+      {
+        "command": "sclass.status",
+        "title": "S-Class: Show Current Status",
+        "category": "S-Class",
+        "icon": "$(info)"
+      },
+      {
+        "command": "sclass.goal",
+        "title": "S-Class: Run Goal (/goal)",
+        "category": "S-Class",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "sclass.boost",
+        "title": "S-Class: Run Boost (/boost)",
+        "category": "S-Class",
+        "icon": "$(zap)"
+      },
+      {
+        "command": "sclass.refresh",
+        "title": "S-Class: Refresh FSM State",
+        "category": "S-Class",
+        "icon": "$(refresh)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "sclass.refresh",
+          "when": "view == sclass.fsmView || view == sclass.dashboardView",
+          "group": "navigation"
+        },
+        {
+          "command": "sclass.watch",
+          "when": "view == sclass.dashboardView",
+          "group": "navigation"
+        }
+      ]
+    }
+  }
+}

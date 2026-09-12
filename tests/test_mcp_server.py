@@ -46,3 +46,16 @@ def test_mcp_doctor_and_gc(tmp_path):
     
     gc_res = mcp_server.handle_tool_call("sclass_gc", {"workspace_dir": workspace})
     assert "gc_report" in gc_res
+
+
+@pytest.mark.anyio
+async def test_official_mcp_sdk_server(tmp_path):
+    workspace = str(tmp_path)
+    server = mcp_server.create_mcp_server(workspace_dir=workspace)
+    assert server is not None
+    assert mcp_server.HAS_OFFICIAL_MCP is True
+
+    res = await server.call_tool("sclass_initialize", {"goal": "SDK Test", "workspace_dir": workspace})
+    assert res is not None
+    assert res.is_error is False
+    assert "initialized" in res.content[0].text

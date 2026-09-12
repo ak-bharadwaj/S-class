@@ -247,7 +247,13 @@ def run_cli(argv: Optional[List[str]] = None) -> int:
         print(json.dumps(state, indent=2))
         return 0
 
-    elif cmd == "/watch":
+    elif cmd in ("/watch", "watch"):
+        try:
+            import sclass_watch_tui
+            if sclass_watch_tui.HAS_TEXTUAL and sys.stdout.isatty():
+                return sclass_watch_tui.launch_watch_tui(workspace_dir=sdk.workspace_dir)
+        except Exception:
+            pass
         return run_watch_dashboard(workspace=sdk.workspace_dir)
 
     elif cmd == "/advance":
