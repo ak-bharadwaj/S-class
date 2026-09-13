@@ -118,8 +118,32 @@ def _record_hook_lifecycle(
 
 
 def _record_last_verified(workspace_dir: str, platform: str) -> None:
-    """Records ISO-8601 timestamp in .agents/sclass_hooks.json under last_verified[platform]."""
-    _record_hook_lifecycle(workspace_dir, platform)
+    """Records ISO-8601 timestamp in .agents/sclass_hooks.json under last_verified[platform] when evidence verification succeeds."""
+    try:
+        cfg_path = os.path.join(workspace_dir, ".agents", "sclass_hooks.json")
+        if not os.path.exists(cfg_path):
+            return
+
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        if "last_verified" not in cfg or not isinstance(cfg["last_verified"], dict):
+            cfg["last_verified"] = {}
+        cfg["last_verified"][platform] = now_iso
+
+        if "platforms" in cfg and isinstance(cfg["platforms"], dict):
+            if platform in cfg["platforms"] and isinstance(cfg["platforms"][platform], dict):
+                cfg["platforms"][platform]["verified"] = True
+                cfg["platforms"][platform]["last_verified"] = now_iso
+
+        with open(cfg_path, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2)
+    except Exception:
+        pass
+
+
+record_last_verified = _record_last_verified
 
 
 def _serialize_cursor_response(event_type: str, verdict: HookVerdict) -> str:

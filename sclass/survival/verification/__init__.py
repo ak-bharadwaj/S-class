@@ -1,8 +1,7 @@
 """
-S-Class Survival v0: Modular Verification Facade (sclass/survival/verification.py)
+S-Class Survival v0: Verification Package Core (sclass/survival/verification/__init__.py)
 
 Implements Phase 9:
-Extracted survival verifier:
 verification/
     execution.py
     claims.py
@@ -22,5 +21,3 @@ __all__ = [
     "_get_git_commit_hash",
     "_get_git_changed_files",
 ]
-
-

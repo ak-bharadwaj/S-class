@@ -11,6 +11,7 @@ Stored under .agents/ledger/audit_ledger.jsonl (SCLASS_ONLY authority).
 
 from __future__ import annotations
 import os
+import re
 import json
 import hashlib
 from datetime import datetime, timezone
@@ -18,6 +19,35 @@ from typing import Dict, Any, Optional, Tuple, List
 
 
 GENESIS_PREVIOUS_HASH = "0" * 64
+
+
+_HIGH_CONFIDENCE_PATTERNS = [
+    re.compile(r"-----BEGIN (?:RSA|OPENSSH|EC|PGP|DSA|PRIVATE) KEY-----[\s\S]*?-----END (?:RSA|OPENSSH|EC|PGP|DSA|PRIVATE) KEY-----"),
+    re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
+    re.compile(r"\bghp_[A-Za-z0-9]{20,}\b"),
+    re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}\b"),
+    re.compile(r"\bsk-[A-Za-z0-9_-]{20,}\b"),
+    re.compile(r"""((?:api[_-]?key|secret[_-]?key|auth[_-]?token|password|token|credential)\s*[:=]\s*['"])[A-Za-z0-9_.-]{16,}(['"])""", re.IGNORECASE),
+]
+
+
+def sanitize_secrets_in_obj(obj: Any) -> Any:
+    """Recursively redacts high-confidence secret material from ledger payloads."""
+    if isinstance(obj, str):
+        result = obj
+        for pat in _HIGH_CONFIDENCE_PATTERNS:
+            if "api" in pat.pattern:
+                result = pat.sub(r"\1[REDACTED]\2", result)
+            else:
+                result = pat.sub("[REDACTED]", result)
+        return result
+    elif isinstance(obj, dict):
+        return {k: sanitize_secrets_in_obj(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_secrets_in_obj(item) for item in obj]
+    elif isinstance(obj, tuple):
+        return tuple(sanitize_secrets_in_obj(item) for item in obj)
+    return obj
 
 
 class LocalLedger:
@@ -51,7 +81,8 @@ class LocalLedger:
         return None
 
     def append(self, event_type: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """Appends a new cryptographically chained event to the local ledger."""
+        """Appends a new cryptographically chained event to the local ledger (with zero secret leakage)."""
+        clean_payload = sanitize_secrets_in_obj(payload)
         last_entry = self._get_last_entry()
         if last_entry:
             seq = last_entry["sequence"] + 1
@@ -61,7 +92,7 @@ class LocalLedger:
             prev_hash = GENESIS_PREVIOUS_HASH
 
         ts = datetime.now(timezone.utc).isoformat()
-        payload_serialized = json.dumps(payload, sort_keys=True)
+        payload_serialized = json.dumps(clean_payload, sort_keys=True)
         payload_hash = hashlib.sha256(payload_serialized.encode("utf-8")).hexdigest()
 
         sig_content = f"{seq}:{event_type}:{prev_hash}:{payload_hash}:{ts}"
@@ -74,7 +105,7 @@ class LocalLedger:
             "payload_hash": payload_hash,
             "timestamp": ts,
             "signature": sig,
-            "payload": payload,
+            "payload": clean_payload,
         }
 
         os.makedirs(os.path.dirname(os.path.abspath(self.ledger_file)), exist_ok=True)

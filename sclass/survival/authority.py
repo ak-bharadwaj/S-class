@@ -51,33 +51,56 @@ AGENT_PROPOSAL_DIRS = (
 
 
 def get_path_authority(target_path: str, workspace_dir: str = "") -> PathAuthority:
-    """Determines the authority class for a given file or directory path."""
+    """
+    Determines the canonical authority class for a given file or directory path.
+    
+    Authority Model (Phase 8):
+    - .agents/claims/ and .agents/proposals/ -> AGENT_WRITABLE (agent may propose)
+    - All other paths under .agents/ -> SCLASS_ONLY (kernel controlled)
+    - SCLASS protected filenames -> SCLASS_ONLY
+    - General repository files outside .agents/ -> USER_WRITABLE
+    """
     if not target_path:
         return PathAuthority.USER_WRITABLE
 
-    norm = target_path.replace("\\", "/").strip()
+    raw_norm = target_path.replace("\\", "/").strip()
+    norm = os.path.normpath(raw_norm).replace("\\", "/")
+
     if workspace_dir:
-        ws_norm = workspace_dir.replace("\\", "/").rstrip("/")
-        if norm.lower().startswith(ws_norm.lower()):
-            norm = norm[len(ws_norm):].lstrip("/")
+        ws_clean = os.path.normpath(workspace_dir).replace("\\", "/").rstrip("/")
+        if os.path.isabs(norm):
+            try:
+                rel = os.path.relpath(target_path, workspace_dir).replace("\\", "/")
+                if not rel.startswith("../"):
+                    norm = rel
+            except Exception:
+                if norm.lower().startswith(ws_clean.lower()):
+                    norm = norm[len(ws_clean):].lstrip("/")
+        elif norm.lower().startswith(ws_clean.lower()):
+            norm = norm[len(ws_clean):].lstrip("/")
 
     if norm.startswith("./"):
         norm = norm[2:]
+
+    parts = [p for p in norm.split("/") if p and p != "."]
+
+    # Check if target is inside .agents
+    if ".agents" in parts:
+        agents_idx = parts.index(".agents")
+        subparts = parts[agents_idx + 1:]
+        if subparts and subparts[0] in ("claims", "proposals"):
+            return PathAuthority.AGENT_WRITABLE
+        return PathAuthority.SCLASS_ONLY
+
+    # Check SCLASS_ONLY protected filenames
+    basename = os.path.basename(norm)
+    if basename in PROTECTED_SCLASS_FILES:
+        return PathAuthority.SCLASS_ONLY
 
     # Check SCLASS_ONLY directories
     for sdir in PROTECTED_SCLASS_DIRS:
         if norm.startswith(sdir) or f"/{sdir}/" in f"/{norm}/":
             return PathAuthority.SCLASS_ONLY
-
-    # Check SCLASS_ONLY protected filenames under .agents
-    basename = os.path.basename(norm)
-    if ".agents" in norm and basename in PROTECTED_SCLASS_FILES:
-        return PathAuthority.SCLASS_ONLY
-
-    # Check AGENT_WRITABLE proposal directories
-    for adir in AGENT_PROPOSAL_DIRS:
-        if norm.startswith(adir) or f"/{adir}/" in f"/{norm}/":
-            return PathAuthority.AGENT_WRITABLE
 
     return PathAuthority.USER_WRITABLE
 
@@ -161,7 +184,7 @@ def authorize(
             auth_class = get_path_authority(target, ws)
             is_write_or_delete = request.action in ("file_edit", "delete", "write", "pre_file_edit") or any(
                 k in request.parameters for k in ("content", "file_text", "new_str", "delete")
-            ) or (request.tool or "").lower() in ("delete", "remove", "rm", "unlink", "write_to_file", "replace_file_content")
+            ) or (request.tool or "").lower() in ("delete", "remove", "rm", "unlink", "write_to_file", "replace_file_content", "edit", "edit_file")
 
             if auth_class == PathAuthority.SCLASS_ONLY and is_write_or_delete:
                 decision = AuthorizationDecision(

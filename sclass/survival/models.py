@@ -106,6 +106,10 @@ class EvidenceReceipt:
     verified: bool = False
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        if self.files_changed:
+            self.files_changed = sorted([f.replace("\\", "/").strip() for f in self.files_changed if f])
+
     def compute_hash(self) -> str:
         payload = {
             "receipt_id": self.receipt_id,

@@ -144,8 +144,17 @@ class HookCore:
         self._rules.append(rule)
         self.pipeline.register_hook(stage, rule)
 
+    DEFAULT_RULE_POLICIES = {
+        "SCLASS-SEC-001": "deny",
+        "SCLASS-EVID-001": "deny",
+        "SCLASS-FSM-002": "deny",
+        "SCLASS-SEC-002": "warn",
+        "SCLASS-BLAST-001": "warn",
+        "SCLASS-FSM-001": "warn",
+    }
+
     def _get_enforcement_mode(self, platform: str) -> str:
-        """Resolves effective enforcement mode: 'warn', 'block', or 'off'."""
+        """Resolves effective enforcement mode: 'enforce', 'audit', 'warn', 'block', or 'off'."""
         if self._custom_enforcement:
             return self._custom_enforcement
 
@@ -154,10 +163,30 @@ class HookCore:
             try:
                 with open(cfg_path, "r", encoding="utf-8") as f:
                     cfg = json.load(f)
-                return cfg.get("enforcement_mode", {}).get(platform, "warn")
+                mode = cfg.get("enforcement_mode", {})
+                if isinstance(mode, dict):
+                    return mode.get(platform, "enforce")
+                elif isinstance(mode, str):
+                    return mode
             except Exception:
                 pass
-        return "warn"
+        return "enforce"
+
+    def _get_rule_action(self, rule_id: str) -> str:
+        """Resolves configured rule-level policy action: 'deny' or 'warn'."""
+        cfg_path = os.path.join(self.workspace_dir, ".agents", "sclass_hooks.json")
+        if os.path.exists(cfg_path):
+            try:
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                policies = cfg.get("policies", {})
+                if rule_id in policies and isinstance(policies[rule_id], dict):
+                    action = policies[rule_id].get("action")
+                    if action in ("deny", "warn"):
+                        return action
+            except Exception:
+                pass
+        return self.DEFAULT_RULE_POLICIES.get(rule_id, "deny")
 
     def evaluate_event(self, event: HookEvent) -> HookVerdict:
         """
@@ -193,9 +222,11 @@ class HookCore:
                 if not verdict:
                     continue
 
+                rule_action = self._get_rule_action(verdict.rule_id)
+
                 if verdict.decision == HookDecision.DENY:
                     if mode == "warn":
-                        # In legacy warn mode, demote DENY to WARN
+                        # Legacy backward-compatibility mode: demote DENY to WARN
                         demoted = HookVerdict(
                             decision=HookDecision.WARN,
                             reason=f"[WARN-MODE DEMOTION] {verdict.reason}",
@@ -218,8 +249,20 @@ class HookCore:
                         )
                         if not first_warn:
                             first_warn = audit_verdict
+                    elif rule_action == "warn":
+                        # Rule-level policy override configured to warn
+                        rule_warn = HookVerdict(
+                            decision=HookDecision.WARN,
+                            reason=f"[RULE-WARN] {verdict.reason}",
+                            fix_hint=verdict.fix_hint,
+                            rule_id=verdict.rule_id,
+                            enforcement_level="advisory",
+                            diagnostics=verdict.diagnostics,
+                        )
+                        if not first_warn:
+                            first_warn = rule_warn
                     else:
-                        # Enforce / blocking mode: policy decision has full authority
+                        # Enforce / blocking mode: rule policy decision has full authority
                         self.pipeline.run_stage(LifecycleStage.PRE_EXECUTE, context)
                         return verdict
 

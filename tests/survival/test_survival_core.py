@@ -257,3 +257,131 @@ def test_audit_mode_does_not_interfere(temp_ws):
     assert dec.outcome == "warn"
     assert dec.is_denied is False
 
+
+def test_sclass_package_exports():
+    """Verify top-level sclass package exports the canonical survival interface and models."""
+    import sclass
+    for sym in ("authorize", "verify", "record", "AuthorizationRequest", "AuthorizationDecision", "EvidenceReceipt", "Claim", "VerificationResult", "LocalLedger"):
+        assert hasattr(sclass, sym), f"Symbol '{sym}' not exported from top-level sclass package"
+
+
+def test_modular_verifier_submodules(temp_ws):
+    """Verify Phase 9 modular verifier architecture: execution.py, claims.py, evidence.py."""
+    from sclass.survival.verification.execution import execute_and_record
+    from sclass.survival.verification.claims import verify_claim
+    from sclass.survival.verification.evidence import check_verification_staleness
+
+    assert callable(execute_and_record)
+    assert callable(verify_claim)
+    assert callable(check_verification_staleness)
+
+
+def test_agents_authority_blocks_sclass_hooks_and_state_tampering(temp_ws):
+    """Verify that ANY file under .agents outside claims/proposals is SCLASS_ONLY and blocked from edits."""
+    for sensitive_file in (".agents/sclass_hooks.json", ".agents/orchestration_state.json", ".agents/config.json"):
+        assert get_path_authority(sensitive_file, temp_ws) == PathAuthority.SCLASS_ONLY
+        req = AuthorizationRequest(
+            agent="claude",
+            platform="claude_code",
+            action="file_edit",
+            tool="Edit",
+            target=sensitive_file,
+            parameters={"content": '{"enforcement_mode": "off"}'},
+            workspace=temp_ws,
+        )
+        dec = authorize(req, mode="enforce", workspace_dir=temp_ws)
+        assert dec.is_denied is True
+        assert "Tampering with protected S-Class authority artifact" in dec.reason
+
+
+def test_path_traversal_into_agents_blocked(temp_ws):
+    """Verify path traversal attempts using relative components cannot escape into .agents."""
+    traversal_path = "src/../../.agents/receipts/rcpt_secret.json"
+    assert get_path_authority(traversal_path, temp_ws) == PathAuthority.SCLASS_ONLY
+    req = AuthorizationRequest(
+        agent="cursor",
+        platform="cursor",
+        action="file_edit",
+        target=traversal_path,
+        parameters={"delete": True},
+        workspace=temp_ws,
+    )
+    dec = authorize(req, mode="enforce", workspace_dir=temp_ws)
+    assert dec.is_denied is True
+
+
+def test_ledger_sanitizes_secrets(temp_ws):
+    """Verify LocalLedger automatically redacts secrets so they NEVER appear in audit_ledger.jsonl."""
+    ledger = LocalLedger(workspace_dir=temp_ws)
+    raw_secret = "sk-ant-1234567890abcdef1234567890abcdef"
+    payload = {
+        "user_input": f"Use key: {raw_secret}",
+        "config": {"token": "ghp_1234567890abcdef1234567890abcdef"},
+    }
+    entry = ledger.append("security_event", payload)
+    assert raw_secret not in json.dumps(entry)
+    assert "[REDACTED]" in json.dumps(entry)
+
+    # Inspect raw file on disk
+    with open(ledger.ledger_file, "r", encoding="utf-8") as f:
+        disk_content = f.read()
+    assert raw_secret not in disk_content
+    assert "ghp_1234567890abcdef1234567890abcdef" not in disk_content
+
+
+def test_last_verified_lifecycle_separation(temp_ws):
+    """
+    Phase 6: Verify hook execution does NOT update top-level last_verified,
+    while successful verification does update it.
+    """
+    hooks_file = os.path.join(temp_ws, ".agents", "sclass_hooks.json")
+    os.makedirs(os.path.dirname(hooks_file), exist_ok=True)
+    with open(hooks_file, "w", encoding="utf-8") as f:
+        json.dump({"installed": True}, f)
+
+    from hook_runner import _record_hook_lifecycle, _record_last_verified
+
+    # 1. Runner execution updates last_hook_seen, NOT top-level last_verified
+    _record_hook_lifecycle(temp_ws, "claude_code")
+    with open(hooks_file, "r", encoding="utf-8") as f:
+        cfg = json.load(f)
+    assert "last_hook_seen" in cfg
+    assert "last_verified" not in cfg or "claude_code" not in cfg.get("last_verified", {})
+
+    # 2. Evidence verification updates last_verified
+    _record_last_verified(temp_ws, "claude_code")
+    with open(hooks_file, "r", encoding="utf-8") as f:
+        cfg2 = json.load(f)
+    assert "last_verified" in cfg2
+    assert "claude_code" in cfg2["last_verified"]
+
+
+def test_rule_level_policy_authority_override(temp_ws):
+    """Phase 2: Verify rule-level policy override configuration."""
+    from hook_core import HookCore, HookEvent, HookEventType, HookDecision
+    from hook_rules import SecretScannerRule
+
+    # Write rule override policy: make SCLASS-SEC-001 warn instead of deny
+    hooks_file = os.path.join(temp_ws, ".agents", "sclass_hooks.json")
+    os.makedirs(os.path.dirname(hooks_file), exist_ok=True)
+    with open(hooks_file, "w", encoding="utf-8") as f:
+        json.dump({
+            "enforcement_mode": "enforce",
+            "policies": {
+                "SCLASS-SEC-001": {"action": "warn"},
+            },
+        }, f)
+
+    core = HookCore(workspace_dir=temp_ws)
+    core.register_rule(SecretScannerRule())
+    event = HookEvent(
+        event_type=HookEventType.PRE_TOOL_USE,
+        workspace_dir=temp_ws,
+        platform="claude_code",
+        tool_args={"content": "api_key = 'sk-1234567890abcdef1234567890abcdef'"},
+    )
+    verdict = core.evaluate_event(event)
+    assert verdict.decision == HookDecision.WARN
+    assert "[RULE-WARN]" in verdict.reason
+
+

@@ -317,33 +317,44 @@ class EvidenceIntegrityRule(HookRule):
     )
 
     def evaluate(self, event: HookEvent) -> Optional[HookVerdict]:
-        target = (event.file_path or event.tool_args.get("path") or event.tool_args.get("file_path") or "").replace("\\", "/")
-        norm_name = os.path.basename(target)
+        raw_target = (event.file_path or event.tool_args.get("path") or event.tool_args.get("file_path") or "").replace("\\", "/")
+        if not raw_target:
+            return None
 
-        # Check if target is inside .agents SCLASS_ONLY directories or matches protected artifacts
-        is_protected_dir = any(p in target for p in self.PROTECTED_DIRS)
-        is_protected_file = norm_name in self.PROTECTED_ARTIFACTS and ".agents" in target
+        norm_target = os.path.normpath(raw_target).replace("\\", "/")
+        norm_name = os.path.basename(norm_target)
+        parts = [p for p in norm_target.split("/") if p and p != "."]
 
-        if is_protected_dir or is_protected_file:
+        is_in_agents = ".agents" in parts or any(p in norm_target for p in self.PROTECTED_DIRS)
+        is_protected_file = norm_name in self.PROTECTED_ARTIFACTS
+        is_claim_proposal = False
+
+        if is_in_agents:
+            if ".agents" in parts:
+                idx = parts.index(".agents")
+                subparts = parts[idx + 1:]
+                if subparts and subparts[0] in ("claims", "proposals"):
+                    is_claim_proposal = True
+
+        is_sclass_only = (is_in_agents and not is_claim_proposal) or is_protected_file
+
+        if is_sclass_only:
             tool = (event.tool_name or "").lower()
             is_write_or_delete = (
-                tool in ("delete", "remove", "rm", "unlink", "write_to_file", "replace_file_content", "edit")
+                tool in ("delete", "remove", "rm", "unlink", "write_to_file", "replace_file_content", "edit", "edit_file")
                 or event.tool_args.get("delete")
                 or any(k in event.tool_args for k in ("content", "file_text", "new_str"))
                 or event.event_type in (HookEventType.PRE_TOOL_USE, HookEventType.PRE_FILE_EDIT, HookEventType.POST_FILE_EDIT)
             )
-            # Claims directory is AGENT_WRITABLE (proposals)
-            if ".agents/claims" in target:
-                return None
 
             if is_write_or_delete:
                 return HookVerdict(
                     decision=HookDecision.DENY,
                     reason=f"Tampering with evidence artifact '{norm_name}' is prohibited",
-                    fix_hint="Evidence artifacts may only be updated by the S-Class kernel verification engine",
+                    fix_hint="Evidence artifacts and .agents governance records may only be updated by the S-Class kernel verification engine",
                     rule_id=self.rule_id,
                     enforcement_level="blocking",
-                    diagnostics=(f"ProtectedTarget: {target}", f"Rule: {self.rule_id}"),
+                    diagnostics=(f"ProtectedTarget: {norm_target}", f"Rule: {self.rule_id}"),
                 )
 
         return None
