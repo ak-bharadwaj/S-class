@@ -7,9 +7,18 @@ from __future__ import annotations
 import os
 import shutil
 import hashlib
+from enum import Enum
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
+
+
+class ExecutionMode(str, Enum):
+    """Execution environment mode for process invocation."""
+    HOST_ARGV = "HOST_ARGV"
+    HOST_SHELL = "HOST_SHELL"
+    CONTAINER = "CONTAINER"
+    SANDBOX = "SANDBOX"
 
 
 @dataclass(frozen=True)
@@ -27,6 +36,7 @@ class ExecutionIdentity:
     parent_pid: Optional[int] = None
     pid: Optional[int] = None
     start_time: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    execution_mode: str = ExecutionMode.HOST_ARGV.value
 
     @classmethod
     def capture(
@@ -36,6 +46,7 @@ class ExecutionIdentity:
         env: Optional[Dict[str, str]] = None,
         pid: Optional[int] = None,
         parent_pid: Optional[int] = None,
+        mode: ExecutionMode | str = ExecutionMode.HOST_ARGV,
     ) -> ExecutionIdentity:
         """Captures execution identity from real process parameters and binary inspection."""
         exe_name = command_argv[0] if command_argv else ""
@@ -60,6 +71,8 @@ class ExecutionIdentity:
         env_payload = "".join(f"{k}={env_dict.get(k, '')};" for k in critical_keys)
         env_digest = hashlib.sha256(env_payload.encode("utf-8")).hexdigest()
 
+        mode_val = mode.value if isinstance(mode, ExecutionMode) else str(mode)
+
         return cls(
             executable=exe_name,
             resolved_path=resolved,
@@ -67,13 +80,14 @@ class ExecutionIdentity:
             argv=tuple(command_argv),
             cwd=os.path.abspath(cwd) if cwd else os.getcwd(),
             environment_digest=env_digest,
-            parent_pid=parent_pid or os.getppid() if hasattr(os, "getppid") else None,
+            parent_pid=parent_pid or (os.getppid() if hasattr(os, "getppid") else None),
             pid=pid or os.getpid(),
+            execution_mode=mode_val,
         )
 
     def compute_identity_hash(self) -> str:
         """Computes canonical hash of the execution identity."""
-        payload = f"{self.resolved_path}|{self.executable_hash}|{' '.join(self.argv)}|{self.cwd}|{self.environment_digest}"
+        payload = f"{self.resolved_path}|{self.executable_hash}|{' '.join(self.argv)}|{self.cwd}|{self.environment_digest}|{self.execution_mode}"
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
     def to_dict(self) -> Dict[str, Any]:
@@ -87,6 +101,7 @@ class ExecutionIdentity:
             "parent_pid": self.parent_pid,
             "pid": self.pid,
             "start_time": self.start_time,
+            "execution_mode": self.execution_mode,
             "identity_hash": self.compute_identity_hash(),
         }
 
@@ -102,4 +117,5 @@ class ExecutionIdentity:
             parent_pid=data.get("parent_pid"),
             pid=data.get("pid"),
             start_time=data.get("start_time", datetime.now(timezone.utc).isoformat()),
+            execution_mode=data.get("execution_mode", ExecutionMode.HOST_ARGV.value),
         )

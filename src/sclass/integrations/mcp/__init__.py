@@ -1,5 +1,5 @@
 """
-S-Class MCP Integration: Interceptors and tool policies.
+S-Class MCP Integration: Interceptors and tool policies (STRUCTURALLY COMPLETE protocol interceptor prototype).
 """
 
 from sclass.integrations.mcp.tool_policy import MCPToolPolicy

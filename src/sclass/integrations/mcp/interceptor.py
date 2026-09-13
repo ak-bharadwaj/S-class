@@ -1,5 +1,5 @@
 """
-S-Class MCP Integration: Tool Interceptor.
+S-Class MCP Integration: Tool Interceptor (STRUCTURALLY COMPLETE protocol interceptor prototype).
 Enforces S-Class authorization boundaries across Model Context Protocol tool execution.
 """
 

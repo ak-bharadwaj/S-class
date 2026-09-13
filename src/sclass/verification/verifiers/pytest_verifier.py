@@ -18,9 +18,9 @@ class PytestVerifier(Verifier):
     verifier_id = "pytest"
 
     def can_verify(self, claim: Claim, evidence: EvidenceReceipt) -> bool:
-        if claim.claim_type == "test_pass":
+        if claim.claim_type in ("test_pass", "test", "tests"):
             return True
-        if evidence.verifier == "pytest" or "pytest" in evidence.command.lower():
+        if evidence.verifier == "pytest":
             return True
         return False
 

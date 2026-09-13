@@ -47,10 +47,36 @@ class GenericVerifier(Verifier):
                 receipt_id=evidence.receipt_id,
             )
 
+        # Test claims routed here without an authorized test runner must be rejected
+        if claim.claim_type in ("test_pass", "test", "tests") and evidence.execution_kind not in ("test_runner", "test_executor"):
+            return VerificationResult(
+                status="REJECT",
+                claim_id=claim.claim_id,
+                reason=f"Claim asserts test results, but command was not executed by an authorized test runner (execution_kind='{evidence.execution_kind}').",
+                observed_exit_code=evidence.exit_code,
+                observed_files_changed=tuple(evidence.files_changed),
+                receipt_id=evidence.receipt_id,
+            )
+
+        # Strict semantic claim verification: distinguish EXECUTION_VERIFIED from CLAIM_VERIFIED
+        semantic_claim_types = ("feature", "behavior", "semantic", "security", "correctness", "functionality")
+        if claim.claim_type in semantic_claim_types and evidence.execution_kind not in ("test_runner", "test_executor"):
+            return VerificationResult(
+                status="INCONCLUSIVE",
+                claim_id=claim.claim_id,
+                reason=(
+                    "Execution completed successfully (EXECUTION_VERIFIED), but generic command "
+                    "evidence is inconclusive for semantic feature claim. Dedicated test runner verification required."
+                ),
+                observed_exit_code=evidence.exit_code,
+                observed_files_changed=tuple(evidence.files_changed),
+                receipt_id=evidence.receipt_id,
+            )
+
         return VerificationResult(
             status="ACCEPT",
             claim_id=claim.claim_id,
-            reason="Command execution completed successfully.",
+            reason="Command execution completed successfully (EXECUTION_VERIFIED).",
             observed_exit_code=0,
             observed_files_changed=tuple(evidence.files_changed),
             receipt_id=evidence.receipt_id,
