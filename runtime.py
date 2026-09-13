@@ -680,6 +680,47 @@ def initialize_state(workspace_dir: Optional[str] = None, goal: Optional[str] = 
         validate_state_types(state_dict)
         write_json_atomic(state_file, state_dict)
 
+    # Cross-Platform IDE Hook Auto-Installation
+    try:
+        from adapters import detect_platforms
+        from adapters.claude_code import ClaudeCodeAdapter
+        from adapters.cursor import CursorAdapter
+        from adapters.codex_cli import CodexCliAdapter
+        from adapters.antigravity import AntigravityAdapter
+        from adapters.copilot import CopilotAdapter
+        from adapters.windsurf import WindsurfAdapter
+
+        detected = detect_platforms(workspace_dir)
+        hooks_cfg_path = os.path.join(state_dir, "sclass_hooks.json")
+        if not os.path.exists(hooks_cfg_path):
+            cfg_init = {
+                "version": 1,
+                "installed_at": datetime.now(timezone.utc).isoformat(),
+                "platforms_detected": list(detected.keys()),
+                "enforcement_mode": {p: "warn" for p in detected.keys()},
+                "last_verified": {p: None for p in detected.keys()},
+            }
+            write_json_atomic(hooks_cfg_path, cfg_init)
+
+            # Auto-install detected adapter configs
+            for plat in detected.keys():
+                if plat == "claude_code":
+                    ClaudeCodeAdapter(workspace_dir=workspace_dir).install_hooks()
+                elif plat == "cursor":
+                    CursorAdapter(workspace_dir=workspace_dir).install_hooks()
+                elif plat == "codex":
+                    CodexCliAdapter(workspace_dir=workspace_dir).install_hooks()
+                elif plat == "antigravity":
+                    AntigravityAdapter(workspace_dir=workspace_dir).install_hooks()
+                elif plat == "copilot":
+                    CopilotAdapter(workspace_dir=workspace_dir).install_hooks()
+                elif plat == "windsurf":
+                    WindsurfAdapter(workspace_dir=workspace_dir).install_hooks()
+
+            logger.info(f"[InitializeState] Cross-Platform IDE hooks installed for: {list(detected.keys())}")
+    except Exception as h_ex:
+        logger.warning(f"[InitializeState] Platform hook auto-installation notice: {h_ex}")
+
     # Upfront Spec Synthesis & Project Discovery Guarantee
     if goal:
         try:

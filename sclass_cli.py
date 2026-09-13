@@ -22,6 +22,7 @@ Environment variable fallback: SCLASS_WORKSPACE or WORKSPACE_DIR
 import sys
 import os
 import json
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any, Tuple
 
 from sdk_interface import SClassSDK
@@ -125,6 +126,153 @@ if cli_app is not None:
         print(f"[*] S-Class Advancing phase in workspace: {sdk.workspace_dir}")
         res = sdk.advance_phase()
         print(json.dumps(res, indent=2))
+
+
+
+    @cli_app.command(name="init", help="Detects platforms and installs IDE hooks with optional rule projection")
+    def _typer_init(
+        no_rules: bool = typer.Option(False, "--no-rules", help="Install hooks only; skip rule projection"),
+        workspace: Optional[str] = typer.Option(None, "--workspace", "-w", "--dir", "-C", help="Target external workspace directory")
+    ):
+        ws = _resolve_workspace(workspace)
+        res = execute_init_command(workspace_dir=ws, no_rules=no_rules)
+        print(json.dumps(res, indent=2))
+
+    @cli_app.command(name="strict", help="Upgrades an adapter from warn mode to blocking enforcement")
+    def _typer_strict(
+        platform: str = typer.Option(..., "--platform", "-p", help="Target platform name (claude_code, cursor, codex, antigravity, copilot, windsurf)"),
+        workspace: Optional[str] = typer.Option(None, "--workspace", "-w", "--dir", "-C", help="Target external workspace directory")
+    ):
+        ws = _resolve_workspace(workspace)
+        res = execute_strict_command(workspace_dir=ws, platform=platform)
+        print(json.dumps(res, indent=2))
+
+    @cli_app.command(name="hooks", help="Inspects platform hook installation and verification status")
+    def _typer_hooks(
+        subcommand: str = typer.Argument("status", help="Subcommand (status)"),
+        workspace: Optional[str] = typer.Option(None, "--workspace", "-w", "--dir", "-C", help="Target external workspace directory")
+    ):
+        ws = _resolve_workspace(workspace)
+        if subcommand == "status":
+            res = execute_hooks_status_command(workspace_dir=ws)
+            print(json.dumps(res, indent=2))
+        else:
+            print(f"[-] Unknown hooks subcommand: {subcommand}. Expected 'status'.")
+
+
+
+def execute_init_command(workspace_dir: str, no_rules: bool = False) -> Dict[str, Any]:
+    """Detects platforms, initializes .agents/sclass_hooks.json, installs hook configs, and projects rules."""
+    from adapters import detect_platforms
+    from adapters.claude_code import ClaudeCodeAdapter
+    from adapters.cursor import CursorAdapter
+    from adapters.codex_cli import CodexCliAdapter
+    from adapters.antigravity import AntigravityAdapter
+    from adapters.copilot import CopilotAdapter
+    from adapters.windsurf import WindsurfAdapter
+    from rule_generator import PlatformRuleGenerator
+
+    state_dir = os.path.join(workspace_dir, ".agents")
+    os.makedirs(state_dir, exist_ok=True)
+    detected = detect_platforms(workspace_dir)
+
+    hooks_cfg_path = os.path.join(state_dir, "sclass_hooks.json")
+    installed_at = datetime.now(timezone.utc).isoformat()
+    existing_enforcement = {}
+    existing_verified = {}
+
+    if os.path.exists(hooks_cfg_path):
+        try:
+            with open(hooks_cfg_path, "r", encoding="utf-8") as f:
+                old = json.load(f)
+            installed_at = old.get("installed_at", installed_at)
+            existing_enforcement = old.get("enforcement_mode", {})
+            existing_verified = old.get("last_verified", {})
+        except Exception:
+            pass
+
+    installed_adapters = {}
+    for plat in detected.keys():
+        mode = existing_enforcement.get(plat, "warn")
+        strict_mode = mode == "block"
+        if plat == "claude_code":
+            installed_adapters[plat] = ClaudeCodeAdapter(workspace_dir=workspace_dir).install_hooks(strict=strict_mode)
+        elif plat == "cursor":
+            installed_adapters[plat] = CursorAdapter(workspace_dir=workspace_dir).install_hooks(strict=strict_mode)
+        elif plat == "codex":
+            installed_adapters[plat] = CodexCliAdapter(workspace_dir=workspace_dir).install_hooks(strict=strict_mode)
+        elif plat == "antigravity":
+            installed_adapters[plat] = AntigravityAdapter(workspace_dir=workspace_dir).install_hooks(strict=strict_mode)
+        elif plat == "copilot":
+            installed_adapters[plat] = CopilotAdapter(workspace_dir=workspace_dir).install_hooks(strict=strict_mode)
+        elif plat == "windsurf":
+            installed_adapters[plat] = WindsurfAdapter(workspace_dir=workspace_dir).install_hooks(strict=strict_mode)
+
+    cfg = {
+        "version": 1,
+        "installed_at": installed_at,
+        "platforms_detected": list(detected.keys()),
+        "enforcement_mode": {p: existing_enforcement.get(p, "warn") for p in detected.keys()},
+        "last_verified": {p: existing_verified.get(p, None) for p in detected.keys()},
+    }
+    with open(hooks_cfg_path, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=2)
+
+    rule_projections = {}
+    if not no_rules:
+        rg = PlatformRuleGenerator(workspace_dir=workspace_dir)
+        rule_projections = rg.generate_all_projections(platforms=list(detected.keys()), no_rules=False)
+
+    return {
+        "workspace": workspace_dir,
+        "status": "SUCCESS",
+        "platforms_detected": list(detected.keys()),
+        "installed_adapters": installed_adapters,
+        "rules_projected": list(rule_projections.keys()) if not no_rules else "SKIPPED (--no-rules)",
+        "enforcement_mode": cfg["enforcement_mode"],
+        "initial_status": "UNVERIFIED (awaiting first real event)",
+    }
+
+
+def execute_strict_command(workspace_dir: str, platform: str) -> Dict[str, Any]:
+    """Upgrades platform enforcement mode from warn to block."""
+    from adapters import detect_platforms
+    state_dir = os.path.join(workspace_dir, ".agents")
+    hooks_cfg_path = os.path.join(state_dir, "sclass_hooks.json")
+    if not os.path.exists(hooks_cfg_path):
+        return {"error": "Hooks not initialized. Run sclass init first."}
+
+    with open(hooks_cfg_path, "r", encoding="utf-8") as f:
+        cfg = json.load(f)
+
+    norm_plat = platform.lower().strip()
+    if norm_plat not in cfg.get("enforcement_mode", {}):
+        return {"error": f"Platform '{platform}' not configured in {hooks_cfg_path}"}
+
+    cfg["enforcement_mode"][norm_plat] = "block"
+    with open(hooks_cfg_path, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=2)
+
+    # Re-apply adapter with strict=True
+    execute_init_command(workspace_dir=workspace_dir, no_rules=True)
+
+    return {
+        "workspace": workspace_dir,
+        "platform": norm_plat,
+        "mode": "block",
+        "message": f"Upgraded {norm_plat} to blocking enforcement mode.",
+    }
+
+
+def execute_hooks_status_command(workspace_dir: str) -> Dict[str, Any]:
+    """Inspects platform hook status, separating static capabilities from dynamic verified state."""
+    from adapters import detect_platforms
+    detections = detect_platforms(workspace_dir)
+    return {
+        "workspace": workspace_dir,
+        "platforms": {p: info.to_dict() for p, info in detections.items()},
+        "active_enforcement_targets": len(detections),
+    }
 
 
 def extract_workspace_arg(argv: List[str]) -> Tuple[Optional[str], List[str]]:
@@ -361,6 +509,40 @@ def run_cli(argv: Optional[List[str]] = None) -> int:
         res = sdk.advance_phase()
         print(json.dumps(res, indent=2))
         return 0
+
+    elif cmd in ("init", "/init"):
+        no_rules = "--no-rules" in remaining
+        res = execute_init_command(workspace_dir=sdk.workspace_dir, no_rules=no_rules)
+        print(json.dumps(res, indent=2))
+        return 0
+
+    elif cmd in ("strict", "/strict"):
+        plat = None
+        for i, a in enumerate(remaining):
+            if a in ("--platform", "-p") and i + 1 < len(remaining):
+                plat = remaining[i + 1]
+            elif a.startswith("--platform="):
+                plat = a.split("=", 1)[1]
+        if not plat and len(remaining) > 1 and not remaining[1].startswith("-"):
+            plat = remaining[1]
+        if not plat:
+            print("[-] Error: --platform/-p argument is required for strict command.")
+            return 1
+        res = execute_strict_command(workspace_dir=sdk.workspace_dir, platform=plat)
+        print(json.dumps(res, indent=2))
+        return 0
+
+    elif cmd in ("hooks", "/hooks"):
+        sub = "status"
+        if len(remaining) > 1 and not remaining[1].startswith("-"):
+            sub = remaining[1]
+        if sub == "status":
+            res = execute_hooks_status_command(workspace_dir=sdk.workspace_dir)
+            print(json.dumps(res, indent=2))
+            return 0
+        else:
+            print(f"[-] Unknown hooks subcommand: {sub}. Expected 'status'.")
+            return 1
 
     elif cmd == "/grill":
         from sclass_grill import SpecGrillerEngine
