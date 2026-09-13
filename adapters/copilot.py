@@ -28,8 +28,9 @@ class CopilotAdapter:
 
     def install_hooks(self, runner_path: Optional[str] = None, strict: bool = False) -> str:
         """Writes .github/hooks/sclass.json executable hook configuration."""
+        from adapters import resolve_runner_path
         os.makedirs(self.hooks_dir, exist_ok=True)
-        r_path = runner_path or os.path.join(self.workspace_dir, "hook_runner.py")
+        r_path = resolve_runner_path(self.workspace_dir, runner_path)
         norm_runner = r_path.replace("\\", "/")
 
         cfg: Dict[str, Any] = {
