@@ -515,7 +515,11 @@ def save_receipt(receipt: EvidenceReceipt, workspace_dir: str) -> str:
 
 def load_receipt(receipt_id: str, workspace_dir: str) -> Optional[EvidenceReceipt]:
     """Loads and validates a receipt from disk. Missing or invalid hash returns None."""
-    target = os.path.join(workspace_dir, ".agents", "receipts", f"{receipt_id}.json")
+    if os.path.isabs(receipt_id) and os.path.isfile(receipt_id):
+        target = receipt_id
+    else:
+        clean_id = receipt_id[:-5] if receipt_id.endswith(".json") else receipt_id
+        target = os.path.join(workspace_dir, ".agents", "receipts", f"{clean_id}.json")
     if not os.path.exists(target):
         return None
     try:
@@ -544,6 +548,7 @@ def observe_command(
     action: str = "run_command",
     timeout: float = 60.0,
     allow_shell: bool = False,
+    ledger: Optional[Any] = None,
 ) -> ObservedReceipt:
     """
     Independently executes and observes a command, recording its true exit code,
@@ -625,7 +630,7 @@ def observe_command(
     snapshot_after = compute_workspace_snapshot(ws)
     fingerprint_after = compute_workspace_fingerprint(snapshot_after)
 
-    return _create_observed_receipt(
+    receipt = _create_observed_receipt(
         task_id=task_id,
         claim_id=claim_id,
         agent=agent,
@@ -646,4 +651,30 @@ def observe_command(
         workspace_snapshot_before=snapshot_before,
         workspace_fingerprint_before=fingerprint_before,
     )
+
+    if ledger is None:
+        try:
+            from sclass.survival.ledger import LocalLedger
+            ledger = LocalLedger(workspace_dir=ws)
+        except Exception:
+            ledger = None
+
+    if ledger is not None:
+        try:
+            ledger.append(
+                "OBSERVATION",
+                {
+                    "receipt_id": receipt.receipt_id,
+                    "receipt_hash": receipt.receipt_hash,
+                    "fingerprint_before": fingerprint_before,
+                    "fingerprint_after": fingerprint_after,
+                    "command": command,
+                    "exit_code": exit_code,
+                    "timestamp": finished_at,
+                },
+            )
+        except Exception:
+            pass
+
+    return receipt
 

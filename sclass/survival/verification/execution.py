@@ -37,6 +37,7 @@ def execute_and_record(
     action: str = "run_command",
     timeout: float = 60.0,
     allow_shell: bool = False,
+    ledger: Optional[Any] = None,
 ) -> ObservedReceipt:
     """
     Independently executes a command, captures exit code, hashes stdout/stderr,
@@ -116,7 +117,7 @@ def execute_and_record(
     snapshot_after = compute_workspace_snapshot(ws)
     fingerprint_after = compute_workspace_fingerprint(snapshot_after)
 
-    return _create_observed_receipt(
+    receipt = _create_observed_receipt(
         task_id=task_id,
         claim_id=claim_id,
         agent=agent,
@@ -137,3 +138,29 @@ def execute_and_record(
         workspace_snapshot_before=snapshot_before,
         workspace_fingerprint_before=fingerprint_before,
     )
+
+    if ledger is None:
+        try:
+            from sclass.survival.ledger import LocalLedger
+            ledger = LocalLedger(workspace_dir=ws)
+        except Exception:
+            ledger = None
+
+    if ledger is not None:
+        try:
+            ledger.append(
+                "OBSERVATION",
+                {
+                    "receipt_id": receipt.receipt_id,
+                    "receipt_hash": receipt.receipt_hash,
+                    "fingerprint_before": fingerprint_before,
+                    "fingerprint_after": fingerprint_after,
+                    "command": command,
+                    "exit_code": exit_code,
+                    "timestamp": finished_at,
+                },
+            )
+        except Exception:
+            pass
+
+    return receipt

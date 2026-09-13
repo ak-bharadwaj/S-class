@@ -1461,5 +1461,191 @@ def test_adversarial_symlink_replaced_with_file_or_dir_detected(test_workspace):
     assert verdict.status == "REJECT"
 
 
+def test_observe_save_load_verify_accepts(test_workspace):
+    """
+    Regression test:
+    observe -> save -> load -> verify == ACCEPT
+    An authentic command observation records an OBSERVATION event in the ledger,
+    saves the receipt to disk, loads it via load_receipt(), and verify_claim()
+    accepts it using ledger provenance.
+    """
+    # 1. Observe genuine command execution
+    receipt = observe_command(
+        command="python -c \"print('observe_save_load_verify')\"",
+        workspace_dir=test_workspace,
+        task_id="task_obs_001",
+        claim_id="claim_obs_001",
+    )
+    assert receipt.exit_code == 0
+    assert receipt.receipt_hash is not None
+
+    # 2. Receipt is saved to disk
+    save_receipt(receipt, test_workspace)
+
+    # 3. Load receipt from disk
+    loaded = load_receipt(receipt.receipt_id, test_workspace)
+    assert loaded is not None
+    assert loaded.receipt_id == receipt.receipt_id
+    assert loaded.receipt_hash == receipt.receipt_hash
+    # Untrusted persisted data has no in-memory capability token
+    assert loaded.is_observed is False
+
+    # 4. Verify claim using loaded receipt against ledger provenance
+    claim = Claim(
+        claim_id="claim_obs_001",
+        task_id="task_obs_001",
+        statement="Command execution completed successfully.",
+        claim_type="completion",
+    )
+    ledger = LocalLedger(workspace_dir=test_workspace)
+    result = verify_claim(claim, loaded, workspace_dir=test_workspace, ledger=ledger)
+
+    assert result.status == "ACCEPT"
+    assert result.is_accepted is True
+    assert result.receipt_id == receipt.receipt_id
+    assert result.verification_event is not None
+    assert result.verification_event.result == "CLAIM_VERIFIED"
+
+
+def test_fabricated_json_with_valid_hash_no_ledger_event_rejects(test_workspace):
+    """
+    Opposite test:
+    fabricated JSON + valid self-hash + no observation event == REJECT
+    An attacker crafts a fake receipt JSON with a self-consistent hash but never
+    performed an authentic observation (no OBSERVATION event in ledger).
+    Verification must REJECT.
+    """
+    ledger = LocalLedger(workspace_dir=test_workspace)
+    # Ensure ledger exists and has valid chain integrity
+    ledger.append("authorization", {"action": "execute", "target": "safe_command"})
+    assert ledger.verify_chain() is True
+
+    # Attacker crafts receipt JSON with self-consistent hash
+    fake_id = f"rcpt_fabricated_{uuid.uuid4().hex[:8]}"
+    raw_data = {
+        "receipt_id": fake_id,
+        "task_id": "task_fake",
+        "claim_id": "claim_fake",
+        "agent": "attacker",
+        "action": "run_command",
+        "workspace": test_workspace,
+        "base_commit": "",
+        "result_commit": "",
+        "command": "python -c \"print('fake')\"",
+        "exit_code": 0,
+        "started_at": "2026-09-13T10:00:00Z",
+        "finished_at": "2026-09-13T10:01:00Z",
+        "stdout_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "files_changed": [],
+        "file_hashes": {},
+        "evidence": [{"passed_tests": 1}],
+        "metadata": {},
+        "is_observed": True,
+        "lifecycle_state": LIFECYCLE_OBSERVED,
+        "verified": False,
+    }
+    tmp_receipt = EvidenceReceipt.from_dict(raw_data)
+    valid_hash = tmp_receipt.compute_hash()
+    raw_data["receipt_hash"] = valid_hash
+
+    # Save to .agents/receipts
+    receipts_dir = os.path.join(test_workspace, ".agents", "receipts")
+    os.makedirs(receipts_dir, exist_ok=True)
+    with open(os.path.join(receipts_dir, f"{fake_id}.json"), "w", encoding="utf-8") as f:
+        json.dump(raw_data, f, indent=2)
+
+    # load_receipt loads it because self-hash matches
+    loaded = load_receipt(fake_id, test_workspace)
+    assert loaded is not None
+    assert loaded.receipt_hash == valid_hash
+    assert loaded.is_observed is False
+
+    # verify_claim MUST reject because no OBSERVATION event exists in the ledger
+    claim = Claim(
+        claim_id="claim_fake",
+        task_id="task_fake",
+        statement="All tests pass",
+        claim_type="test_pass",
+    )
+    result = verify_claim(claim, loaded, workspace_dir=test_workspace, ledger=ledger)
+    assert result.status == "REJECT"
+    assert result.is_rejected is True
+    assert "provenance" in result.reason.lower() or "missing observation" in result.reason.lower() or "unobserved" in result.reason.lower()
+
+
+def test_genuine_receipt_with_replaced_ledger_entry_rejects(test_workspace):
+    """
+    genuine receipt + replaced ledger entry == REJECT
+    An authentic observation is recorded and saved, but the ledger entry is
+    tampered with / replaced (or receipt_hash modified in the ledger entry).
+    Verification must REJECT.
+    """
+    # 1. Observe genuine command
+    receipt = observe_command(
+        command="python -c \"print('genuine_obs')\"",
+        workspace_dir=test_workspace,
+        task_id="task_gen_001",
+        claim_id="claim_gen_001",
+    )
+    assert receipt.exit_code == 0
+
+    loaded = load_receipt(receipt.receipt_id, test_workspace)
+    assert loaded is not None
+
+    ledger = LocalLedger(workspace_dir=test_workspace)
+    ledger_file = ledger.ledger_file
+
+    # Vector A: Direct file edit of the ledger entry payload receipt_hash
+    with open(ledger_file, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    tampered_lines = []
+    for line in lines:
+        entry = json.loads(line)
+        if entry.get("event") == "OBSERVATION" and entry.get("payload", {}).get("receipt_id") == receipt.receipt_id:
+            entry["payload"]["receipt_hash"] = "f" * 64
+            tampered_lines.append(json.dumps(entry) + "\n")
+        else:
+            tampered_lines.append(line)
+
+    with open(ledger_file, "w", encoding="utf-8") as f:
+        f.writelines(tampered_lines)
+
+    claim = Claim(
+        claim_id="claim_gen_001",
+        task_id="task_gen_001",
+        statement="Completed task with genuine receipt.",
+        claim_type="completion",
+    )
+    result_tampered = verify_claim(claim, loaded, workspace_dir=test_workspace, ledger=ledger)
+    assert result_tampered.status == "REJECT"
+    assert result_tampered.is_rejected is True
+
+    # Vector B: Rewrite ledger with valid hash chain but replaced/mismatched receipt_hash in OBSERVATION payload
+    os.remove(ledger_file)
+    rebuilt_ledger = LocalLedger(workspace_dir=test_workspace)
+    # Append observation with replaced hash
+    rebuilt_ledger.append(
+        "OBSERVATION",
+        {
+            "receipt_id": receipt.receipt_id,
+            "receipt_hash": "a" * 64,  # Replaced / wrong hash
+            "fingerprint_before": receipt.metadata.get("workspace_fingerprint_before", ""),
+            "fingerprint_after": receipt.workspace_fingerprint,
+            "command": receipt.command,
+            "exit_code": 0,
+            "timestamp": receipt.finished_at,
+        },
+    )
+    assert rebuilt_ledger.verify_chain() is True
+
+    result_replaced = verify_claim(claim, loaded, workspace_dir=test_workspace, ledger=rebuilt_ledger)
+    assert result_replaced.status == "REJECT"
+    assert result_replaced.is_rejected is True
+    assert "mismatch" in result_replaced.reason.lower() or "tampering" in result_replaced.reason.lower()
+
+
+
 
 
