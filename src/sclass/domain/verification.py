@@ -1,12 +1,68 @@
 """
-S-Class Domain: VerificationResult and VerificationEvent.
+S-Class Domain: VerificationResult, VerificationEvent, VerifierScope, and TestSelection.
 """
 
 from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
+
+
+@dataclass(frozen=True)
+class VerifierScope:
+    """Declared or observed scope of a verifier invocation."""
+    target_paths: tuple[str, ...] = field(default_factory=tuple)
+    test_targets: tuple[str, ...] = field(default_factory=tuple)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "target_paths": list(self.target_paths),
+            "test_targets": list(self.test_targets),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> VerifierScope:
+        return cls(
+            target_paths=tuple(data.get("target_paths", [])),
+            test_targets=tuple(data.get("test_targets", [])),
+        )
+
+
+@dataclass(frozen=True)
+class TestSelection:
+    """Observed tests and targets executed by a verifier."""
+    selected_tests: tuple[str, ...] = field(default_factory=tuple)
+    test_files: tuple[str, ...] = field(default_factory=tuple)
+
+    def covers_scope(self, claim_scope: Optional[Any]) -> Tuple[bool, Optional[str]]:
+        """Verifies whether this test selection satisfies the required claim scope."""
+        if not claim_scope or not getattr(claim_scope, "test_targets", None):
+            return True, None
+
+        combined = [t.replace("\\", "/").lower() for t in (list(self.selected_tests) + list(self.test_files))]
+        for req in claim_scope.test_targets:
+            norm_req = req.replace("\\", "/").lower().rstrip("/")
+            match = any(norm_req in item for item in combined)
+            if not match:
+                return False, (
+                    f"Required test target '{req}' was not executed in observed test run. "
+                    f"Observed targets: {combined}"
+                )
+        return True, None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "selected_tests": list(self.selected_tests),
+            "test_files": list(self.test_files),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> TestSelection:
+        return cls(
+            selected_tests=tuple(data.get("selected_tests", [])),
+            test_files=tuple(data.get("test_files", [])),
+        )
 
 
 @dataclass(frozen=True)
@@ -43,7 +99,7 @@ class VerificationEvent:
 @dataclass
 class VerificationResult:
     """The authoritative verdict of an agent claim evaluated against observed evidence."""
-    status: str  # ACCEPT | REJECT | INVALID
+    status: str  # ACCEPT | REJECT | INVALID | INCONCLUSIVE
     claim_id: str
     reason: str
     observed_exit_code: Optional[int] = None
@@ -61,7 +117,15 @@ class VerificationResult:
 
     @property
     def is_rejected(self) -> bool:
-        return self.status in ("REJECT", "INVALID")
+        return self.status == "REJECT"
+
+    @property
+    def is_invalid(self) -> bool:
+        return self.status == "INVALID"
+
+    @property
+    def is_inconclusive(self) -> bool:
+        return self.status == "INCONCLUSIVE"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -75,5 +139,5 @@ class VerificationResult:
             "invalidation_reason": self.invalidation_reason,
             "receipt_id": self.receipt_id,
             "verification_event": self.verification_event.to_dict() if self.verification_event else None,
-            "metadata": self.metadata,
+            "metadata": dict(self.metadata),
         }

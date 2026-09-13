@@ -1,0 +1,36 @@
+name: S-Class Packaging & Distribution
+
+on:
+  push:
+    branches: [ master, main, survival-v0 ]
+  pull_request:
+    branches: [ master, main, survival-v0 ]
+
+permissions:
+  contents: read
+
+jobs:
+  packaging:
+    name: Build Wheel & Package Distribution
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install build tools
+      run: |
+        python -m pip install --upgrade pip build wheel
+
+    - name: Build sdist and wheel
+      run: |
+        python -m build
+
+    - name: Verify package installation
+      run: |
+        pip install dist/*.whl
+        python -c "import sclass; print(sclass.__name__, 'installed successfully')"

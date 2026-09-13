@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ExecutionIdentity",
+  "schema_version": "1.0",
+  "type": "object",
+  "required": [
+    "requested_argv",
+    "actual_argv",
+    "executable_name",
+    "executable_path",
+    "executable_hash",
+    "cwd",
+    "environment_digest",
+    "execution_mode",
+    "identity_state"
+  ],
+  "properties": {
+    "requested_argv": { "type": "array", "items": { "type": "string" } },
+    "actual_argv": { "type": "array", "items": { "type": "string" } },
+    "executable_name": { "type": "string" },
+    "executable_path": { "type": "string" },
+    "executable_hash": { "type": "string" },
+    "pid": { "type": ["integer", "null"] },
+    "parent_pid": { "type": ["integer", "null"] },
+    "process_start_time": { "type": "string" },
+    "cwd": { "type": "string" },
+    "environment_digest": { "type": "string" },
+    "execution_mode": { "type": "string", "enum": ["HOST_ARGV", "HOST_SHELL", "CONTAINER", "SANDBOX"] },
+    "launcher_identity": { "type": ["string", "null"] },
+    "wrapper_identity": { "type": ["string", "null"] },
+    "identity_state": { "type": "string", "enum": ["REQUESTED", "SPAWNED", "IDENTIFIED", "COMPLETED", "IDENTITY_UNCERTAIN"] },
+    "execution_chain": { "type": ["object", "null"] },
+    "identity_hash": { "type": "string" }
+  }
+}

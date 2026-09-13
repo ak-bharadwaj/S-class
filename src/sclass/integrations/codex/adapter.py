@@ -3,18 +3,37 @@ S-Class Integration: OpenAI Codex CLI Platform Adapter.
 """
 
 from __future__ import annotations
+import shutil
 from typing import Dict, Any, Optional
 
 from sclass.domain.action import ActionRequest, AuthorizationDecision
 from sclass.control.authorization import authorize
+from sclass.integrations.base import AdapterCapabilities, AdapterStatus
 
 
 class CodexAdapter:
-    """Adapts OpenAI Codex CLI tool calls and bash commands."""
+    """Adapts OpenAI Codex CLI tool calls and commands."""
 
     def __init__(self, workspace_dir: str, mode: str = "enforce"):
         self.workspace_dir = workspace_dir
         self.mode = mode
+        self.capabilities = AdapterCapabilities(
+            pre_action_enforcement=True,
+            post_action_observation=True,
+            approval=True,
+            verification=True,
+            session_events=True,
+            native_protocol="acp",
+        )
+
+    def inspect_status(self) -> AdapterStatus:
+        if shutil.which("codex"):
+            return AdapterStatus.INSTALLED
+        return AdapterStatus.SUPPORTED
+
+    @property
+    def status(self) -> AdapterStatus:
+        return self.inspect_status()
 
     def on_command(self, command: str, task_id: Optional[str] = None) -> AuthorizationDecision:
         req = ActionRequest(

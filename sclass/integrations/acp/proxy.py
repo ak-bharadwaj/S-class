@@ -1,5 +1,5 @@
 """
-S-Class ACP Integration: JSON-RPC Proxy.
+S-Class ACP Integration: JSON-RPC Proxy (STRUCTURALLY COMPLETE protocol interceptor prototype).
 Monitors and intercepts Agent Client Protocol traffic between client IDE and agent backend.
 """
 

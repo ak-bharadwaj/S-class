@@ -1,6 +1,7 @@
 """
 S-Class Execution: Managed Subprocess Execution.
 Executes processes with captured ExecutionIdentity, timeouts, sandboxing, and output streaming.
+Enforces execution mode policy, shell gating, and protected resource defenses.
 """
 
 from __future__ import annotations
@@ -13,7 +14,13 @@ from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
 
-from sclass.domain.execution import ExecutionIdentity, ExecutionMode
+from sclass.execution.modes import (
+    ExecutionMode,
+    ExecutionPolicy,
+    check_protected_resource_targeting,
+)
+from sclass.execution.identity import ExecutionIdentity, ExecutionIdentityState
+from sclass.execution.launcher import BaseLauncher, HostLauncher, detect_wrapper_executable
 from sclass.execution.sandbox import SandboxBackend, HostSandbox, get_sandbox_backend
 from sclass.core.errors import SecurityViolationError
 
@@ -44,10 +51,11 @@ class ProcessExecutionResult:
 
 
 class ProcessRunner:
-    """Manages secure process invocations."""
+    """Manages secure process invocations with execution identity and security gating."""
 
-    def __init__(self, sandbox: Optional[SandboxBackend] = None):
+    def __init__(self, sandbox: Optional[SandboxBackend] = None, launcher: Optional[BaseLauncher] = None):
         self.sandbox = sandbox or HostSandbox()
+        self.launcher = launcher or HostLauncher()
 
     def run(
         self,
@@ -57,8 +65,9 @@ class ProcessRunner:
         timeout: float = 60.0,
         mode: ExecutionMode = ExecutionMode.HOST_ARGV,
         allow_shell: Optional[bool] = None,
+        task_id: Optional[str] = None,
     ) -> ProcessExecutionResult:
-        """Executes a command safely, capturing child execution identity and resource metrics."""
+        """Executes a command safely, capturing child execution identity and enforcing security policy."""
         ws = os.path.abspath(cwd)
 
         if allow_shell is not None:
@@ -66,19 +75,29 @@ class ProcessRunner:
 
         if isinstance(command, str):
             try:
-                tokens = shlex.split(command)
+                requested_tokens = shlex.split(command)
             except ValueError as ve:
                 raise SecurityViolationError(f"Unparseable command string: {ve}") from ve
         else:
-            tokens = list(command)
+            requested_tokens = list(command)
 
-        if not tokens:
+        if not requested_tokens:
             raise SecurityViolationError("Empty command tokens provided.")
+
+        # Evaluate execution mode policy and protected resource targeting
+        eval_result = ExecutionPolicy.evaluate(
+            mode=mode,
+            command=command,
+            cwd=ws,
+            task_id=task_id,
+        )
+        if not eval_result.allowed:
+            raise SecurityViolationError(f"Execution policy violation: {eval_result.reason}")
 
         is_shell = (mode == ExecutionMode.HOST_SHELL)
 
         # Apply sandbox wrapper
-        wrapped_tokens = self.sandbox.wrap_command(tokens, cwd=ws)
+        wrapped_tokens = self.sandbox.wrap_command(requested_tokens, cwd=ws)
 
         started_dt = datetime.now(timezone.utc)
         start_mono = time.monotonic()
@@ -87,6 +106,13 @@ class ProcessRunner:
         run_env = os.environ.copy()
         if env:
             run_env.update(env)
+
+        # Detect wrapper identity if present
+        wrapper_id = None
+        if wrapped_tokens:
+            is_wrap, wrap_details = detect_wrapper_executable(wrapped_tokens[0])
+            if is_wrap:
+                wrapper_id = wrap_details
 
         proc = None
         try:
@@ -107,12 +133,15 @@ class ProcessRunner:
             parent_pid = os.getpid()
 
             identity = ExecutionIdentity.capture(
-                tokens,
+                wrapped_tokens,
                 cwd=ws,
                 env=env,
                 pid=child_pid,
                 parent_pid=parent_pid,
                 mode=mode,
+                requested_argv=requested_tokens,
+                launcher_identity=self.launcher.name,
+                wrapper_identity=wrapper_id,
             )
 
             stdout_val, stderr_val = proc.communicate(timeout=timeout)
@@ -136,24 +165,30 @@ class ProcessRunner:
                 stderr = f"\nProcess execution timed out after {timeout} seconds."
             if "identity" not in locals():
                 identity = ExecutionIdentity.capture(
-                    tokens,
+                    wrapped_tokens,
                     cwd=ws,
                     env=env,
                     pid=proc.pid if proc else None,
                     parent_pid=os.getpid(),
                     mode=mode,
+                    requested_argv=requested_tokens,
+                    launcher_identity=self.launcher.name,
+                    wrapper_identity=wrapper_id,
                 )
         except FileNotFoundError as fnf:
             exit_code = 127
             stdout = ""
             stderr = f"Executable not found: {fnf}"
             identity = ExecutionIdentity.capture(
-                tokens,
+                wrapped_tokens,
                 cwd=ws,
                 env=env,
                 pid=None,
                 parent_pid=os.getpid(),
                 mode=mode,
+                requested_argv=requested_tokens,
+                launcher_identity=self.launcher.name,
+                wrapper_identity=wrapper_id,
             )
         except Exception as exc:
             exit_code = 1
@@ -161,12 +196,15 @@ class ProcessRunner:
             stderr = f"Execution exception: {exc}"
             if "identity" not in locals():
                 identity = ExecutionIdentity.capture(
-                    tokens,
+                    wrapped_tokens,
                     cwd=ws,
                     env=env,
                     pid=None,
                     parent_pid=os.getpid(),
                     mode=mode,
+                    requested_argv=requested_tokens,
+                    launcher_identity=self.launcher.name,
+                    wrapper_identity=wrapper_id,
                 )
 
         duration_ms = (time.monotonic() - start_mono) * 1000.0

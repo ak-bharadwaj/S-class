@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ExecutionResult",
+  "schema_version": "1.0",
+  "type": "object",
+  "required": ["exit_code", "stdout", "stderr", "identity", "duration_ms", "started_at", "finished_at"],
+  "properties": {
+    "exit_code": { "type": "integer" },
+    "stdout": { "type": "string" },
+    "stderr": { "type": "string" },
+    "identity": { "type": "object" },
+    "duration_ms": { "type": "number" },
+    "started_at": { "type": "string", "format": "date-time" },
+    "finished_at": { "type": "string", "format": "date-time" },
+    "timed_out": { "type": "boolean" }
+  }
+}

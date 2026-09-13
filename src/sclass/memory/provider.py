@@ -5,9 +5,17 @@ Enforces the architectural invariant:
 """
 
 from __future__ import annotations
+from enum import Enum
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Protocol, List, Dict, Any, Optional
+
+
+class MemoryScope(str, Enum):
+    WORKSPACE = "workspace"
+    PROJECT = "project"
+    SESSION = "session"
+    GLOBAL = "global"
 
 
 @dataclass(frozen=True)

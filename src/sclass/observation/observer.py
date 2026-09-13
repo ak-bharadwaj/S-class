@@ -1,21 +1,25 @@
 """
 S-Class Observation: Independent Command Observer.
-Executes processes under observation, captures execution identity, and anchors provenance into LocalLedger.
+Executes processes under observation, captures execution identity,
+and anchors provenance into LocalLedger via ObservationFactory.
+Eliminates caller-chosen verifiers and execution kinds (Invariant 3).
 """
 
 from __future__ import annotations
 import os
 import sys
 import shlex
-import subprocess
-import re
-from datetime import datetime, timezone
 from typing import Optional, Any, Dict, List, Tuple
 
 from sclass.domain.evidence import ObservedReceipt
-from sclass.domain.execution import ExecutionIdentity, ExecutionMode
+from sclass.execution.modes import (
+    ExecutionMode,
+    ExecutionPolicy,
+    check_protected_resource_targeting,
+)
+from sclass.execution.process import ProcessRunner, ProcessExecutionResult
 from sclass.observation.fingerprint import compute_workspace_snapshot, compute_workspace_fingerprint
-from sclass.observation.receipt import create_observed_receipt
+from sclass.observation.factory import ObservationFactory
 from sclass.trust.ledger import LocalLedger
 from sclass.core.errors import ObservationIntegrityError, SecurityViolationError
 
@@ -106,11 +110,13 @@ def observe_command(
     ledger: Optional[LocalLedger] = None,
     execution_kind: Optional[str] = None,
     verifier: Optional[str] = None,
+    requested_verifier: Optional[str] = None,
 ) -> ObservedReceipt:
     """
-    Independently executes and observes a command, recording its child execution identity,
+    Independently executes and observes a command, recording child execution identity,
     exit code, stdout/stderr hashes, and workspace state fingerprints.
-    Anchors an immutable OBSERVATION event in the LocalLedger.
+    Eliminates caller-supplied verifier authority (Invariant 3).
+    Atomically commits an immutable OBSERVATION event in the LocalLedger.
     """
     ws = os.path.abspath(workspace_dir)
 
@@ -126,154 +132,57 @@ def observe_command(
     if not tokens:
         raise SecurityViolationError("Empty command string provided for observation.")
 
+    # 1. Protected resource analysis (Part V, #12)
+    is_targeted, reason = check_protected_resource_targeting(command)
+    if is_targeted:
+        raise SecurityViolationError(f"Security policy violation: {reason}")
+
     is_shell = (mode == ExecutionMode.HOST_SHELL)
 
     # Disallow shell injection tokens if not explicitly HOST_SHELL
     if not is_shell:
         for t in tokens:
-            if any(c in t for c in (";", "&&", "||", "|", "`", "$(")):
+            if t in (";", "&&", "||", "|") or any(c in t for c in ("&&", "||", "`", "$(")):
                 raise SecurityViolationError(f"Command contains forbidden shell chaining characters: {t}")
-
-    # Structured detection of execution kind from parsed tokens
-    det_kind, det_ver = detect_execution_kind(tokens)
-    kind = execution_kind or det_kind
-    ver = verifier or det_ver
 
     # Capture before fingerprint
     snapshot_before = compute_workspace_snapshot(ws)
     fingerprint_before = compute_workspace_fingerprint(snapshot_before)
 
-    started_at = datetime.now(timezone.utc).isoformat()
-    proc = None
-    try:
-        cmd_args = tokens if not is_shell else command
-        proc = subprocess.Popen(
-            cmd_args,
-            cwd=ws,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            errors="replace",
-            shell=is_shell,
-        )
-        child_pid = proc.pid
-        parent_pid = os.getpid()
-        exec_id = ExecutionIdentity.capture(
-            tokens,
-            cwd=ws,
-            pid=child_pid,
-            parent_pid=parent_pid,
-            mode=mode,
-        )
-
-        stdout_val, stderr_val = proc.communicate(timeout=timeout)
-        exit_code = proc.returncode
-        stdout = stdout_val or ""
-        stderr = stderr_val or ""
-    except subprocess.TimeoutExpired:
-        exit_code = 124
-        if proc:
-            try:
-                proc.kill()
-                out, err = proc.communicate()
-                stdout = out or ""
-                stderr = (err or "") + "\nCommand timed out."
-            except Exception:
-                stdout = ""
-                stderr = "\nCommand timed out."
-        else:
-            stdout = ""
-            stderr = "\nCommand timed out."
-        if "exec_id" not in locals():
-            exec_id = ExecutionIdentity.capture(
-                tokens,
-                cwd=ws,
-                pid=proc.pid if proc else None,
-                parent_pid=os.getpid(),
-                mode=mode,
-            )
-    except FileNotFoundError as fnf:
-        exit_code = 127
-        stdout = ""
-        stderr = f"Executable not found: {fnf}"
-        exec_id = ExecutionIdentity.capture(
-            tokens,
-            cwd=ws,
-            pid=None,
-            parent_pid=os.getpid(),
-            mode=mode,
-        )
-    except Exception as exc:
-        exit_code = 1
-        stdout = ""
-        stderr = f"Execution exception: {exc}"
-        if "exec_id" not in locals():
-            exec_id = ExecutionIdentity.capture(
-                tokens,
-                cwd=ws,
-                pid=None,
-                parent_pid=os.getpid(),
-                mode=mode,
-            )
-
-    finished_at = datetime.now(timezone.utc).isoformat()
-
-    # Capture after fingerprint
-    snapshot_after = compute_workspace_snapshot(ws)
-    fingerprint_after = compute_workspace_fingerprint(snapshot_after)
-
-    meta = {
-        "execution_identity": exec_id.to_dict(),
-    }
-
-    receipt = create_observed_receipt(
-        task_id=task_id,
-        claim_id=claim_id,
-        agent=agent,
-        action=action,
-        workspace=ws,
-        command=command,
-        exit_code=exit_code,
-        started_at=started_at,
-        finished_at=finished_at,
-        stdout_content=stdout,
-        stderr_content=stderr,
-        execution_kind=kind,
-        verifier=ver,
-        workspace_snapshot=snapshot_after,
-        workspace_fingerprint=fingerprint_after,
-        workspace_fingerprint_before=fingerprint_before,
-        metadata=meta,
-    )
-
-    # Fail closed: anchor in LocalLedger
+    # Initialize ledger early if needed
     if ledger is None:
         try:
             ledger = LocalLedger(workspace_dir=ws)
         except Exception as l_err:
             raise ObservationIntegrityError(
-                f"Observation completed but local ledger could not be initialized: {l_err}"
+                f"Local ledger could not be initialized for observation: {l_err}"
             ) from l_err
 
-    try:
-        ledger.append(
-            "OBSERVATION",
-            {
-                "receipt_id": receipt.receipt_id,
-                "receipt_hash": receipt.receipt_hash,
-                "fingerprint_before": fingerprint_before,
-                "fingerprint_after": fingerprint_after,
-                "command": command,
-                "exit_code": exit_code,
-                "execution_kind": receipt.execution_kind,
-                "verifier": receipt.verifier,
-                "execution_identity": exec_id.to_dict(),
-                "timestamp": finished_at,
-            },
-        )
-    except Exception as append_err:
-        raise ObservationIntegrityError(
-            f"Observation completed but provenance could not be anchored in ledger: {append_err}"
-        ) from append_err
+    # 2. Execute process using ProcessRunner
+    runner = ProcessRunner()
+    result = runner.run(
+        command=tokens,
+        cwd=ws,
+        timeout=timeout,
+        mode=mode,
+        task_id=task_id,
+    )
+
+    # 3. Caller-supplied verifier is treated strictly as an untrusted request (Invariant 3)
+    req_v = requested_verifier or verifier
+
+    # 4. Use ObservationFactory to derive authoritative verifier and atomically anchor receipt
+    receipt = ObservationFactory.create_observation(
+        execution_result=result,
+        workspace_dir=ws,
+        task_id=task_id,
+        claim_id=claim_id,
+        agent=agent,
+        action=action,
+        fingerprint_before=fingerprint_before,
+        snapshot_before=snapshot_before,
+        ledger=ledger,
+        requested_verifier=req_v,
+    )
 
     return receipt

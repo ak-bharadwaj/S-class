@@ -1,5 +1,15 @@
 """
 S-Class CLI: Developer and Agent Control Plane Interface.
+Freezes the authoritative initial CLI surface:
+- sclass init
+- sclass doctor
+- sclass status
+- sclass task (create, list, verify)
+- sclass verify
+- sclass handoff
+- sclass adapter
+- sclass logs
+- sclass trust
 """
 
 from __future__ import annotations
@@ -19,7 +29,14 @@ from sclass.domain.claim import Claim
 from sclass.observation.receipt import load_receipt
 from sclass.verification.engine import verify_claim
 from sclass.trust.ledger import LocalLedger
+from sclass.trust.integrity import LedgerIntegrityAuditor
 from sclass.context.handoff import HandoffAssembler
+from sclass.integrations.claude.adapter import ClaudeCodeAdapter
+from sclass.integrations.codex.adapter import CodexAdapter
+from sclass.integrations.cursor.adapter import CursorAdapter
+from sclass.integrations.opencode.adapter import OpenCodeAdapter
+from sclass.integrations.generic.adapter import GenericProcessAdapter
+from sclass.state.events import EventJournal
 
 
 def cmd_init(args: argparse.Namespace) -> int:
@@ -118,6 +135,39 @@ def cmd_task_create(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_task_list(args: argparse.Namespace) -> int:
+    """Lists all registered tasks."""
+    ws = os.path.abspath(args.workspace)
+    repo = StateRepository(ws)
+    proj_name = os.path.basename(ws)
+    tasks = repo.list_tasks(project_id=proj_name)
+    if not tasks:
+        print("[S-Class] No tasks found.")
+        return 0
+    print(f"=== S-Class Tasks ({len(tasks)}) ===")
+    for t in tasks:
+        print(f"  [{t.state.value.upper():^11}] {t.task_id}: {t.title}")
+    return 0
+
+
+def cmd_task_verify(args: argparse.Namespace) -> int:
+    """Verifies state and verification status for a task."""
+    ws = os.path.abspath(args.workspace)
+    repo = StateRepository(ws)
+    task = repo.get_task(args.task_id)
+    if not task:
+        print(f"[S-Class] Task '{args.task_id}' not found.")
+        return 1
+    print(f"Task: {task.task_id} ({task.title})")
+    print(f"Status: {task.state.value}")
+    if task.state == TaskState.VERIFIED:
+        print(f"Verified Receipt: {task.verified_receipt_id}")
+        return 0
+    else:
+        print("Task is NOT verified.")
+        return 1
+
+
 def cmd_verify(args: argparse.Namespace) -> int:
     """Verifies a claim against an observed evidence receipt."""
     ws = os.path.abspath(args.workspace)
@@ -152,6 +202,52 @@ def cmd_handoff(args: argparse.Namespace) -> int:
     else:
         print(ctx.to_markdown())
     return 0
+
+
+def cmd_adapter(args: argparse.Namespace) -> int:
+    """Reports available platform adapters and honest status."""
+    ws = os.path.abspath(args.workspace)
+    adapters = [
+        ("Generic Process", GenericProcessAdapter(ws)),
+        ("Claude Code", ClaudeCodeAdapter(ws)),
+        ("OpenAI Codex", CodexAdapter(ws)),
+        ("Cursor IDE", CursorAdapter(ws)),
+        ("OpenCode", OpenCodeAdapter(ws)),
+    ]
+
+    print("=== S-Class Agent Platform Adapters ===")
+    for name, ad in adapters:
+        status_val = ad.status.value if hasattr(ad, "status") else "SUPPORTED"
+        caps = ad.capabilities.native_protocol if hasattr(ad, "capabilities") else "unknown"
+        print(f"  - {name:.<25} [{status_val}] (protocol: {caps})")
+    return 0
+
+
+def cmd_logs(args: argparse.Namespace) -> int:
+    """Displays event journal and ledger activity."""
+    ws = os.path.abspath(args.workspace)
+    ledger = LocalLedger(ws)
+    entries = ledger.read_all_entries()
+    limit = args.limit or 20
+    shown = entries[-limit:]
+    print(f"=== S-Class Audit Logs (Showing last {len(shown)} of {len(entries)}) ===")
+    for e in shown:
+        print(f"  [{e.get('sequence')}] {e.get('timestamp')[:19]} | {e.get('event'):<14} | Hash: {e.get('hash')[:12]}...")
+    return 0
+
+
+def cmd_trust(args: argparse.Namespace) -> int:
+    """Audits local trust root and cryptographic ledger."""
+    ws = os.path.abspath(args.workspace)
+    audit = LedgerIntegrityAuditor.audit_workspace(ws)
+    print("=== S-Class Trust Integrity Audit ===")
+    print(f"Ledger Path:   {audit['ledger_path']}")
+    print(f"Chain Valid:   {audit['valid']}")
+    if not audit["valid"]:
+        print(f"Chain Error:   {audit['error']}")
+    print(f"Entry Count:   {audit['entry_count']}")
+    print(f"Head Hash:     {audit['head_hash']}")
+    return 0 if audit["valid"] else 1
 
 
 def cmd_map(args: argparse.Namespace) -> int:
@@ -199,10 +295,18 @@ def build_parser() -> argparse.ArgumentParser:
     # task
     p_task = subparsers.add_parser("task", help="Task management")
     task_subs = p_task.add_subparsers(dest="task_command")
+    
     p_tc = task_subs.add_parser("create", help="Create a task")
     p_tc.add_argument("title", help="Task title")
     p_tc.add_argument("-d", "--description", default="", help="Task description")
     p_tc.add_argument("-w", "--workspace", default=".", help="Target workspace path")
+
+    p_tl = task_subs.add_parser("list", help="List registered tasks")
+    p_tl.add_argument("-w", "--workspace", default=".", help="Target workspace path")
+
+    p_tv = task_subs.add_parser("verify", help="Verify task status")
+    p_tv.add_argument("task_id", help="Task ID to verify")
+    p_tv.add_argument("-w", "--workspace", default=".", help="Target workspace path")
 
     # verify
     p_ver = subparsers.add_parser("verify", help="Verify claim against evidence receipt")
@@ -216,6 +320,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_hand.add_argument("--next", default=None, help="Next recommended action")
     p_hand.add_argument("--json", action="store_true", help="Output JSON instead of Markdown")
     p_hand.add_argument("-w", "--workspace", default=".", help="Target workspace path")
+
+    # adapter
+    p_ad = subparsers.add_parser("adapter", help="List platform adapters and status")
+    p_ad.add_argument("-w", "--workspace", default=".", help="Target workspace path")
+
+    # logs
+    p_log = subparsers.add_parser("logs", help="Display event journal logs")
+    p_log.add_argument("-n", "--limit", type=int, default=20, help="Number of entries to show")
+    p_log.add_argument("-w", "--workspace", default=".", help="Target workspace path")
+
+    # trust
+    p_trust = subparsers.add_parser("trust", help="Audit trust ledger integrity")
+    p_trust.add_argument("-w", "--workspace", default=".", help="Target workspace path")
 
     # map
     p_map = subparsers.add_parser("map", help="Build repository symbol map")
@@ -246,6 +363,9 @@ def main() -> None:
         "doctor": cmd_doctor,
         "verify": cmd_verify,
         "handoff": cmd_handoff,
+        "adapter": cmd_adapter,
+        "logs": cmd_logs,
+        "trust": cmd_trust,
         "map": cmd_map,
         "impact": cmd_impact,
     }
@@ -253,6 +373,10 @@ def main() -> None:
     if args.command == "task":
         if getattr(args, "task_command", None) == "create":
             sys.exit(cmd_task_create(args))
+        elif getattr(args, "task_command", None) == "list":
+            sys.exit(cmd_task_list(args))
+        elif getattr(args, "task_command", None) == "verify":
+            sys.exit(cmd_task_verify(args))
         else:
             parser.parse_args(["task", "--help"])
             sys.exit(0)

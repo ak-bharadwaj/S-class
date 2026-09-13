@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HandoffContext",
+  "schema_version": "1.0",
+  "type": "object",
+  "required": ["project_id", "verified_tasks", "failed_attempts", "relevant_files", "created_at"],
+  "properties": {
+    "project_id": { "type": "string" },
+    "active_task": { "type": ["object", "null"] },
+    "verified_tasks": { "type": "array", "items": { "type": "object" } },
+    "failed_attempts": { "type": "array", "items": { "type": "object" } },
+    "relevant_files": { "type": "array", "items": { "type": "string" } },
+    "recent_decisions": { "type": "array", "items": { "type": "object" } },
+    "next_action": { "type": ["string", "null"] },
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AuthorizationDecision",
+  "schema_version": "1.0",
+  "type": "object",
+  "required": ["outcome", "policy_id", "risk_level", "reason"],
+  "properties": {
+    "outcome": { "type": "string", "enum": ["allow", "warn", "require_approval", "deny"] },
+    "policy_id": { "type": "string" },
+    "risk_level": { "type": "string" },
+    "reason": { "type": "string" },
+    "remediation": { "type": ["string", "null"] },
+    "eval_time_ms": { "type": "number" },
+    "evaluated_at": { "type": "string", "format": "date-time" }
+  }
+}

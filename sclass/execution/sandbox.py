@@ -67,7 +67,7 @@ class BubblewrapSandbox:
             "--ro-bind", "/usr", "/usr",
             "--ro-bind", "/lib", "/lib",
             "--ro-bind", "/lib64", "/lib64",
-            "--bin", "/bin",
+            "--ro-bind", "/bin", "/bin",
             "--ro-bind", "/etc/resolv.conf", "/etc/resolv.conf",
             "--proc", "/proc",
             "--dev", "/dev",

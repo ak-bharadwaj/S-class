@@ -1,5 +1,5 @@
 """
-S-Class ACP Integration: Agent Client Protocol proxy and bridge.
+S-Class ACP Integration: Agent Client Protocol proxy and bridge (STRUCTURALLY COMPLETE protocol interceptor prototype).
 """
 
 from sclass.integrations.acp.decision_bridge import ACPDecisionBridge

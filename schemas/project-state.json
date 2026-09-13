@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ProjectState",
+  "schema_version": "1.0",
+  "type": "object",
+  "required": ["goal", "active_plan", "verified_tasks", "rejected_claims", "blocked_tasks", "next_action"],
+  "properties": {
+    "goal": { "type": "string" },
+    "active_plan": { "type": "array", "items": { "type": "string" } },
+    "active_task": { "type": ["string", "null"] },
+    "verified_tasks": { "type": "array", "items": { "type": "string" } },
+    "rejected_claims": { "type": "array", "items": { "type": "string" } },
+    "blocked_tasks": { "type": "array", "items": { "type": "string" } },
+    "recent_decisions": { "type": "array", "items": { "type": "object" } },
+    "repository_checkpoint": { "type": ["string", "null"] },
+    "verification_checkpoint": { "type": ["string", "null"] },
+    "next_action": { "type": "string" }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ClaimEvidencePolicy",
+  "schema_version": "1.0",
+  "type": "object",
+  "required": ["version", "matrix"],
+  "properties": {
+    "version": { "type": "string" },
+    "matrix": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["minimum_evidence", "default_missing_verdict"],
+        "properties": {
+          "minimum_evidence": { "type": "string" },
+          "default_missing_verdict": { "type": "string", "enum": ["ACCEPT", "REJECT", "INCONCLUSIVE"] },
+          "description": { "type": "string" }
+        }
+      }
+    }
+  }
+}

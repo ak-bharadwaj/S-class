@@ -9,6 +9,7 @@ import sqlite3
 from typing import Dict, Any, Optional, List
 
 from sclass.storage.paths import WorkspacePaths
+from sclass.storage.migrations import apply_migrations
 from sclass.core.errors import StorageError
 
 
@@ -81,7 +82,7 @@ CREATE INDEX IF NOT EXISTS idx_verifications_claim ON verifications(claim_id);
 
 
 class SQLiteStateStore:
-    """Authoritative local relational store for project and task state."""
+    """Authoritative local relational store for project and task state with schema migrations."""
 
     def __init__(self, workspace_dir: str):
         self.paths = WorkspacePaths(workspace_dir)
@@ -98,7 +99,7 @@ class SQLiteStateStore:
         return conn
 
     def _init_db(self) -> None:
-        """Initializes database tables and verifies schema."""
+        """Initializes database tables, verifies schema, and applies versioned migrations."""
         try:
             with self.get_connection() as conn:
                 conn.executescript(SCHEMA_V1)
@@ -106,5 +107,7 @@ class SQLiteStateStore:
                     "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (1, datetime('now'))"
                 )
                 conn.commit()
+                # Run versioned schema migrations
+                apply_migrations(conn)
         except sqlite3.Error as e:
             raise StorageError(f"Failed to initialize SQLite state database at {self.db_path}: {e}") from e

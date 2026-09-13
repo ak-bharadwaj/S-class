@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "VerifierResult",
+  "schema_version": "1.0",
+  "type": "object",
+  "required": ["status", "claim_id", "reason"],
+  "properties": {
+    "status": { "type": "string", "enum": ["ACCEPT", "REJECT", "INVALID", "INCONCLUSIVE"] },
+    "claim_id": { "type": "string" },
+    "reason": { "type": "string" },
+    "observed_exit_code": { "type": ["integer", "null"] },
+    "observed_files_changed": { "type": "array", "items": { "type": "string" } },
+    "passed_tests": { "type": "integer" },
+    "failed_tests": { "type": "integer" },
+    "receipt_id": { "type": ["string", "null"] },
+    "metadata": { "type": "object" }
+  }
+}

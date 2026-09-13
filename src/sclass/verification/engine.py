@@ -1,6 +1,7 @@
 """
 S-Class Verification: Verification Engine.
-Orchestrates claim-to-evidence verification, ledger provenance anchoring, and pluggable verifier evaluation.
+Orchestrates claim-to-evidence verification, ledger provenance anchoring,
+claim acceptance matrix evaluation, and pluggable verifier execution.
 """
 
 from __future__ import annotations
@@ -15,15 +16,16 @@ from sclass.domain.verification import VerificationResult, VerificationEvent
 from sclass.trust.ledger import LocalLedger
 from sclass.observation.fingerprint import compute_workspace_snapshot, compute_workspace_fingerprint
 from sclass.verification.registry import get_verifier_registry
+from sclass.verification.acceptance import ClaimAcceptanceMatrix
 
 
-def check_staleness(evidence: EvidenceReceipt, workspace_dir: str) -> Tuple[bool, Optional[str]]:
+def check_staleness(evidence: Any, workspace_dir: str) -> Tuple[bool, Optional[str]]:
     """Detects whether repository state was modified after the evidence was observed."""
     ws = os.path.abspath(workspace_dir)
     current_snapshot = compute_workspace_snapshot(ws)
     current_fp = compute_workspace_fingerprint(current_snapshot)
 
-    recorded_fp = evidence.workspace_fingerprint
+    recorded_fp = getattr(evidence, "workspace_fingerprint", None)
     if recorded_fp and current_fp != recorded_fp:
         return False, "Workspace files or content modified after observation."
 
@@ -51,7 +53,7 @@ def _update_hooks_verified(workspace_dir: str, agent: str = "") -> None:
 def _record_rejection(
     claim: Claim,
     reason: str,
-    evidence: Optional[EvidenceReceipt],
+    evidence: Optional[Any],
     ledger: Optional[LocalLedger],
     exit_code: Optional[int] = None,
     failed_tests: int = 0,
@@ -94,15 +96,15 @@ def _record_rejection(
 
 def verify_claim(
     claim: Claim,
-    evidence: Optional[EvidenceReceipt],
+    evidence: Optional[Any],
     workspace_dir: Optional[str] = None,
     ledger: Optional[LocalLedger] = None,
 ) -> VerificationResult:
     """
     Authoritatively verifies an agent claim against observed evidence.
-    Returns VerificationResult (ACCEPT | REJECT | INVALID).
+    Returns VerificationResult (ACCEPT | REJECT | INVALID | INCONCLUSIVE).
     """
-    ws = os.path.abspath(workspace_dir or (evidence.workspace if evidence else os.getcwd()))
+    ws = os.path.abspath(workspace_dir or (getattr(evidence, "workspace", None) if evidence else os.getcwd()))
     if ledger is None:
         try:
             ledger = LocalLedger(workspace_dir=ws)
@@ -134,7 +136,7 @@ def verify_claim(
             ledger=ledger,
         )
 
-    if recorded_hash != evidence.compute_hash():
+    if hasattr(evidence, "compute_hash") and recorded_hash != evidence.compute_hash():
         return _record_rejection(
             claim=claim,
             reason="Claim rejected: Evidence receipt hash mismatch. Tampering detected.",
@@ -184,7 +186,7 @@ def verify_claim(
         )
 
     # Check fingerprint consistency between receipt and ledger
-    receipt_meta = evidence.metadata if isinstance(evidence.metadata, dict) else {}
+    receipt_meta = evidence.metadata if isinstance(getattr(evidence, "metadata", None), dict) else {}
     receipt_fp_before = receipt_meta.get("workspace_fingerprint_before")
     receipt_fp_after = getattr(evidence, "workspace_fingerprint", None) or receipt_meta.get("workspace_fingerprint")
 
@@ -217,6 +219,40 @@ def verify_claim(
             ledger=ledger,
         )
 
+    # Invariant 3: Validate caller-requested verifier against actual detected verifier
+    requested_v = getattr(claim, "requested_verifier", None) or getattr(claim, "verifier", None)
+    actual_v = getattr(evidence, "verifier", "")
+    if requested_v and requested_v not in ("generic", ""):
+        if actual_v in ("generic", "", "none") or (actual_v != requested_v and not actual_v.startswith(requested_v)):
+            return _record_rejection(
+                claim=claim,
+                reason=(
+                    f"Verifier mismatch: Claim requested verifier '{requested_v}', but actual observed "
+                    f"process identity ran verifier '{actual_v or 'none'}'. Agent cannot upgrade unverified execution."
+                ),
+                evidence=evidence,
+                ledger=ledger,
+            )
+
+    # Evaluate ClaimAcceptanceMatrix sufficiency
+    is_suff, def_verdict, matrix_reason = ClaimAcceptanceMatrix.evaluate_evidence_sufficiency(claim, evidence)
+    if not is_suff:
+        if def_verdict == "REJECT":
+            return _record_rejection(
+                claim=claim,
+                reason=f"Claim rejected per acceptance matrix: {matrix_reason}",
+                evidence=evidence,
+                ledger=ledger,
+            )
+        elif def_verdict == "INCONCLUSIVE":
+            return VerificationResult(
+                status="INCONCLUSIVE",
+                claim_id=claim.claim_id,
+                reason=matrix_reason,
+                observed_exit_code=getattr(evidence, "exit_code", None),
+                receipt_id=evidence.receipt_id,
+            )
+
     # Select and invoke pluggable verifier
     registry = get_verifier_registry()
     verifier = registry.select(claim, evidence)
@@ -232,7 +268,10 @@ def verify_claim(
             failed_tests=verdict.failed_tests,
         )
 
-    # Emit VerificationEvent
+    if verdict.is_inconclusive:
+        return verdict
+
+    # Emit VerificationEvent for accepted claims
     prev_hash = matching_obs.get("previous_hash") or ledger.get_last_hash()
     event = VerificationEvent(
         claim_id=claim.claim_id,
@@ -242,13 +281,13 @@ def verify_claim(
         verification_time=datetime.now(timezone.utc).isoformat(),
         result="CLAIM_VERIFIED",
         reason=verdict.reason,
-        repository_fingerprint=evidence.workspace_fingerprint,
+        repository_fingerprint=getattr(evidence, "workspace_fingerprint", ""),
         previous_ledger_hash=prev_hash,
-        metadata={"exit_code": evidence.exit_code, "agent": evidence.agent},
+        metadata={"exit_code": getattr(evidence, "exit_code", 0), "agent": getattr(evidence, "agent", "agent")},
     )
 
     verdict.verification_event = event
-    _update_hooks_verified(ws, evidence.agent)
+    _update_hooks_verified(ws, getattr(evidence, "agent", ""))
 
     if ledger:
         event_dict = verdict.to_dict()

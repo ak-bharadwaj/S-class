@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AdapterCapabilities",
+  "schema_version": "1.0",
+  "type": "object",
+  "required": [
+    "pre_action_enforcement",
+    "post_action_observation",
+    "approval",
+    "verification",
+    "session_events",
+    "native_protocol"
+  ],
+  "properties": {
+    "pre_action_enforcement": { "type": "boolean" },
+    "post_action_observation": { "type": "boolean" },
+    "approval": { "type": "boolean" },
+    "verification": { "type": "boolean" },
+    "session_events": { "type": "boolean" },
+    "native_protocol": { "type": "string" }
+  }
+}

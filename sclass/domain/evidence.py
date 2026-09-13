@@ -1,6 +1,6 @@
 """
 S-Class Domain: EvidenceReceipt and Evidence Variants.
-Preserves cryptographic invariants established in Survival v0.
+Preserves cryptographic invariants and enforces post-issuance immutability for ObservedReceipt.
 """
 
 from __future__ import annotations
@@ -54,8 +54,40 @@ class EvidenceReceipt:
 
     def compute_hash(self) -> str:
         """
-        Computes canonical SHA-256 hash across every security-relevant field.
+        Computes canonical SHA-256 hash across security-relevant fields.
         """
+        # If metadata has execution_identity and authoritative fields, bind them
+        meta = self.metadata if isinstance(self.metadata, dict) else {}
+        if "execution_identity" in meta and "actual_argv" in meta.get("execution_identity", {}):
+            hash_payload = {
+                "receipt_id": self.receipt_id,
+                "task_id": self.task_id,
+                "claim_id": self.claim_id,
+                "agent": self.agent,
+                "action": self.action,
+                "workspace": self.workspace,
+                "command": self.command,
+                "requested_argv": meta.get("execution_identity", {}).get("requested_argv", []),
+                "actual_argv": meta.get("execution_identity", {}).get("actual_argv", []),
+                "executable_hash": meta.get("execution_identity", {}).get("executable_hash", ""),
+                "execution_mode": meta.get("execution_identity", {}).get("execution_mode", ""),
+                "process_start_time": meta.get("execution_identity", {}).get("process_start_time", ""),
+                "exit_code": self.exit_code,
+                "started_at": self.started_at,
+                "finished_at": self.finished_at,
+                "stdout_hash": self.stdout_hash,
+                "stderr_hash": self.stderr_hash,
+                "files_changed": sorted(list(self.files_changed)),
+                "execution_kind": self.execution_kind,
+                "verifier": self.verifier,
+                "workspace_fingerprint_before": meta.get("workspace_fingerprint_before", self.workspace_fingerprint),
+                "workspace_fingerprint": self.workspace_fingerprint,
+                "structured_result": meta.get("structured_result"),
+            }
+            canonical_json = json.dumps(hash_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+            return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+
+        # Standard legacy hash calculation
         payload = {
             "receipt_id": self.receipt_id,
             "task_id": self.task_id,
@@ -146,10 +178,22 @@ class EvidenceReceipt:
 
 @dataclass
 class ObservedReceipt(EvidenceReceipt):
-    """An authentic receipt produced strictly by the internal observation engine."""
+    """
+    An authentic receipt produced strictly by the internal observation engine.
+    Once issued, it is strictly immutable. Any modification attempt raises AttributeError.
+    """
+    _sealed: bool = field(default=False, repr=False)
+
     def __post_init__(self) -> None:
         object.__setattr__(self, "is_observed", True)
         object.__setattr__(self, "_observation_token", _OBSERVATION_TOKEN)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if getattr(self, "_sealed", False):
+            raise AttributeError(
+                f"ObservedReceipt is immutable after issuance. Cannot modify attribute '{name}'."
+            )
+        super().__setattr__(name, value)
 
 
 @dataclass

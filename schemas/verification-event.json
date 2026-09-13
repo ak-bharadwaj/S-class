@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "VerificationEvent",
+  "schema_version": "1.0",
+  "type": "object",
+  "required": [
+    "event_id",
+    "claim_id",
+    "receipt_id",
+    "receipt_hash",
+    "verifier",
+    "verification_time",
+    "result",
+    "reason",
+    "repository_fingerprint",
+    "previous_ledger_hash"
+  ],
+  "properties": {
+    "event_id": { "type": "string" },
+    "claim_id": { "type": "string" },
+    "receipt_id": { "type": "string" },
+    "receipt_hash": { "type": "string" },
+    "verifier": { "type": "string" },
+    "verification_time": { "type": "string", "format": "date-time" },
+    "result": { "type": "string" },
+    "reason": { "type": "string" },
+    "repository_fingerprint": { "type": "string" },
+    "previous_ledger_hash": { "type": "string" },
+    "metadata": { "type": "object" }
+  }
+}

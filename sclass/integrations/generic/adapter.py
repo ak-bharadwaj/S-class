@@ -1,14 +1,16 @@
 """
 S-Class Integration: Generic POSIX / Shell Process Adapter.
+First-class integration interface for arbitrary or unknown agent runners.
 """
 
 from __future__ import annotations
 import os
 import sys
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 from sclass.domain.action import ActionRequest, AuthorizationDecision
 from sclass.control.authorization import authorize
+from sclass.integrations.base import AdapterCapabilities, AdapterStatus
 
 
 class GenericProcessAdapter:
@@ -18,6 +20,22 @@ class GenericProcessAdapter:
         self.workspace_dir = workspace_dir
         self.mode = mode
         self.agent_name = agent_name
+        self.capabilities = AdapterCapabilities(
+            pre_action_enforcement=True,
+            post_action_observation=True,
+            approval=True,
+            verification=True,
+            session_events=True,
+            native_protocol="cli",
+        )
+
+    def inspect_status(self) -> AdapterStatus:
+        # Generic adapter is always installed and ready on any supported system
+        return AdapterStatus.INSTALLED
+
+    @property
+    def status(self) -> AdapterStatus:
+        return self.inspect_status()
 
     def authorize_command(self, command: str, task_id: Optional[str] = None) -> AuthorizationDecision:
         req = ActionRequest(

@@ -4,10 +4,12 @@ Thin translation layer mapping Claude Code tool use and session hooks into S-Cla
 """
 
 from __future__ import annotations
+import shutil
 from typing import Dict, Any, Optional
 
 from sclass.domain.action import ActionRequest, AuthorizationDecision
 from sclass.control.authorization import authorize
+from sclass.integrations.base import AdapterCapabilities, AdapterStatus
 
 
 class ClaudeCodeAdapter:
@@ -16,6 +18,24 @@ class ClaudeCodeAdapter:
     def __init__(self, workspace_dir: str, mode: str = "enforce"):
         self.workspace_dir = workspace_dir
         self.mode = mode
+        self.capabilities = AdapterCapabilities(
+            pre_action_enforcement=True,
+            post_action_observation=True,
+            approval=True,
+            verification=True,
+            session_events=True,
+            native_protocol="acp",
+        )
+
+    def inspect_status(self) -> AdapterStatus:
+        """Determines honest installation status of Claude Code."""
+        if shutil.which("claude"):
+            return AdapterStatus.INSTALLED
+        return AdapterStatus.SUPPORTED
+
+    @property
+    def status(self) -> AdapterStatus:
+        return self.inspect_status()
 
     def on_pre_tool_use(self, tool_name: str, tool_input: Dict[str, Any], task_id: Optional[str] = None) -> AuthorizationDecision:
         """Translates Claude Code PreToolUse into an ActionRequest and evaluates policy."""
