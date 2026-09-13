@@ -29,7 +29,7 @@ from sclass.survival.models import (
 )
 from sclass.survival.authority import authorize
 from sclass.survival.verification import verify_claim
-from sclass.survival.evidence import create_receipt, observe_command
+from sclass.survival.evidence import _create_observed_receipt, observe_command
 from sclass.survival.ledger import LocalLedger
 
 
@@ -117,7 +117,7 @@ def test_fake_success_golden_flow(fake_agent_workspace):
     assert observed_exit_code != 0, "Test should fail due to the introduced bug"
 
     # Step 6: Create canonical EvidenceReceipt from independent observation
-    evidence_receipt = create_receipt(
+    evidence_receipt = _create_observed_receipt(
         task_id="task_golden_001",
         claim_id="claim_golden_001",
         agent="fake_claude",

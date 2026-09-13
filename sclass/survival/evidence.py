@@ -28,6 +28,7 @@ from sclass.survival.models import (
     ProposedEvidence,
     ClaimedEvidence,
     LIFECYCLE_OBSERVED,
+    _OBSERVATION_TOKEN,
 )
 
 UNSAFE_SHELL_PATTERNS = [";", "&&", "||", "|", "`", "$(", "${", "\n", "\r", ">", "<"]
@@ -336,6 +337,8 @@ def _create_observed_receipt(
     metadata: Optional[Dict[str, Any]] = None,
     workspace_snapshot: Optional[Dict[str, Any]] = None,
     workspace_fingerprint: Optional[str] = None,
+    workspace_snapshot_before: Optional[Dict[str, Any]] = None,
+    workspace_fingerprint_before: Optional[str] = None,
     is_observed: bool = True,
     **kwargs: Any,
 ) -> ObservedReceipt:
@@ -362,6 +365,10 @@ def _create_observed_receipt(
     meta = dict(metadata or {})
     meta["workspace_snapshot"] = workspace_snapshot
     meta["workspace_fingerprint"] = workspace_fingerprint
+    if workspace_snapshot_before is not None:
+        meta["workspace_snapshot_before"] = workspace_snapshot_before
+    if workspace_fingerprint_before is not None:
+        meta["workspace_fingerprint_before"] = workspace_fingerprint_before
     if stderr_content:
         meta["stderr"] = stderr_content
 
@@ -395,13 +402,87 @@ def _create_observed_receipt(
     return receipt
 
 
-def create_receipt(*args: Any, **kwargs: Any) -> ObservedReceipt:
+def create_receipt(
+    task_id: str = "task_default",
+    claim_id: str = "claim_default",
+    agent: str = "agent",
+    action: str = "custom",
+    workspace: str = "",
+    command: str = "",
+    exit_code: int = 0,
+    started_at: Optional[str] = None,
+    finished_at: Optional[str] = None,
+    stdout_content: str = "",
+    stderr_content: str = "",
+    base_commit: Optional[str] = None,
+    result_commit: Optional[str] = None,
+    files_changed: Optional[List[str]] = None,
+    file_hashes: Optional[Dict[str, str]] = None,
+    evidence: Optional[List[Dict[str, Any]]] = None,
+    verified: bool = False,
+    metadata: Optional[Dict[str, Any]] = None,
+    workspace_snapshot: Optional[Dict[str, Any]] = None,
+    workspace_fingerprint: Optional[str] = None,
+    is_observed: bool = False,
+    **kwargs: Any,
+) -> EvidenceReceipt:
     """
-    Deprecated / privatized creation path forwarding to _create_observed_receipt.
-    External callers should use observe_command() for trusted observation
+    Deprecated and privatized creation path. Public callers cannot establish observation capability.
+    Strictly returns an unobserved EvidenceReceipt (is_observed is False).
+    External callers must use observe_command() for authentic observation
     or create_proposed_evidence() for untrusted assertions.
     """
-    return _create_observed_receipt(*args, **kwargs)
+    ws = os.path.abspath(workspace or os.getcwd())
+    b_commit = base_commit or _get_git_commit_hash(ws)
+    r_commit = result_commit or _get_git_commit_hash(ws)
+    f_changed = files_changed if files_changed is not None else _get_git_changed_files(ws, b_commit)
+    f_hashes = file_hashes if file_hashes is not None else compute_file_hashes(ws, f_changed)
+
+    stdout_hash = hashlib.sha256((stdout_content or "").encode("utf-8")).hexdigest()
+    stderr_hash = hashlib.sha256((stderr_content or "").encode("utf-8")).hexdigest()
+
+    if workspace_snapshot is None and ws and os.path.exists(ws):
+        workspace_snapshot = compute_workspace_snapshot(ws)
+    if workspace_fingerprint is None and workspace_snapshot:
+        workspace_fingerprint = compute_workspace_fingerprint(workspace_snapshot)
+
+    receipt_id = f"rcpt_{uuid.uuid4().hex[:12]}"
+    meta = dict(metadata or {})
+    if workspace_snapshot:
+        meta["workspace_snapshot"] = workspace_snapshot
+    if workspace_fingerprint:
+        meta["workspace_fingerprint"] = workspace_fingerprint
+    if stderr_content:
+        meta["stderr"] = stderr_content
+
+    now = datetime.now(timezone.utc).isoformat()
+    receipt = EvidenceReceipt(
+        receipt_id=receipt_id,
+        task_id=task_id,
+        claim_id=claim_id,
+        agent=agent,
+        action=action,
+        workspace=ws,
+        base_commit=b_commit,
+        result_commit=r_commit,
+        command=command,
+        exit_code=exit_code,
+        started_at=started_at or now,
+        finished_at=finished_at or now,
+        stdout_hash=stdout_hash,
+        stderr_hash=stderr_hash,
+        files_changed=f_changed,
+        file_hashes=f_hashes,
+        evidence=evidence or [],
+        metadata=meta,
+        workspace_fingerprint=workspace_fingerprint or "",
+        lifecycle_state=LIFECYCLE_OBSERVED,
+        verified=False,
+        is_observed=False,
+        _observation_token=None,
+    )
+    receipt.receipt_hash = receipt.compute_hash()
+    return receipt
 
 
 def create_proposed_evidence(
@@ -473,6 +554,10 @@ def observe_command(
     ws = os.path.abspath(workspace_dir)
     started_at = datetime.now(timezone.utc).isoformat()
     base_commit = _get_git_commit_hash(ws)
+
+    # Phase 9 & Requirement 4: Snapshot workspace state before execution (TOCTOU protection)
+    snapshot_before = compute_workspace_snapshot(ws)
+    fingerprint_before = compute_workspace_fingerprint(snapshot_before)
 
     try:
         if allow_shell:
@@ -558,5 +643,7 @@ def observe_command(
         file_hashes=file_hashes,
         workspace_snapshot=snapshot_after,
         workspace_fingerprint=fingerprint_after,
+        workspace_snapshot_before=snapshot_before,
+        workspace_fingerprint_before=fingerprint_before,
     )
 

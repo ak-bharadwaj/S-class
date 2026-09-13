@@ -18,7 +18,6 @@ from typing import List, Optional, Dict, Any
 from sclass.survival.models import EvidenceReceipt, ObservedReceipt
 from sclass.survival.evidence import (
     _create_observed_receipt,
-    create_receipt,
     _get_git_commit_hash,
     _get_git_changed_files,
     compute_file_hashes,
@@ -47,6 +46,10 @@ def execute_and_record(
     ws = os.path.abspath(workspace_dir)
     started_at = datetime.now(timezone.utc).isoformat()
     base_commit = _get_git_commit_hash(ws)
+
+    # TOCTOU protection: snapshot workspace before execution
+    snapshot_before = compute_workspace_snapshot(ws)
+    fingerprint_before = compute_workspace_fingerprint(snapshot_before)
 
     try:
         if allow_shell:
@@ -131,4 +134,6 @@ def execute_and_record(
         file_hashes=file_hashes,
         workspace_snapshot=snapshot_after,
         workspace_fingerprint=fingerprint_after,
+        workspace_snapshot_before=snapshot_before,
+        workspace_fingerprint_before=fingerprint_before,
     )

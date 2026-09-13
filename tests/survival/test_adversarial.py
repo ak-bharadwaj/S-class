@@ -35,7 +35,14 @@ from sclass.survival.models import (
 )
 from sclass.survival.authority import authorize, get_path_authority, PathAuthority
 from sclass.survival.verification import verify_claim, check_verification_staleness
-from sclass.survival.evidence import create_receipt, save_receipt, load_receipt, create_proposed_evidence, observe_command
+from sclass.survival.evidence import (
+    _create_observed_receipt,
+    create_receipt,
+    save_receipt,
+    load_receipt,
+    create_proposed_evidence,
+    observe_command,
+)
 from sclass.survival.ledger import LocalLedger
 from hook_core import HookCore, HookEvent, HookEventType, HookDecision, HookRule
 from hook_rules import (
@@ -73,7 +80,7 @@ def test_attack_1_agent_claims_tests_pass_but_exit_code_is_1(test_workspace):
         claim_type="test_pass",
     )
 
-    evidence = create_receipt(
+    evidence = _create_observed_receipt(
         task_id="task_001",
         claim_id="claim_001",
         agent="claude",
@@ -347,7 +354,7 @@ def test_attack_8_evidence_is_stale(test_workspace):
     )
 
     old_commit = "1111111111111111111111111111111111111111"
-    evidence = create_receipt(
+    evidence = _create_observed_receipt(
         task_id="task_stale",
         claim_id="claim_stale",
         agent="claude",
@@ -383,7 +390,7 @@ def test_attack_9_agent_changes_repository_after_verification(test_workspace):
     were introduced after verification.
     Expected: check_verification_staleness flags the receipt as invalidated.
     """
-    evidence = create_receipt(
+    evidence = _create_observed_receipt(
         task_id="task_009",
         claim_id="claim_009",
         agent="claude",
@@ -496,7 +503,7 @@ def test_attack_family_a_tamper_evidence_payload_rejected(test_workspace):
         claim_type="test_pass",
     )
 
-    receipt = create_receipt(
+    receipt = _create_observed_receipt(
         task_id="task_tamper_ev",
         claim_id="claim_tamper_ev",
         agent="claude",
@@ -532,7 +539,7 @@ def test_attack_family_a_tamper_metadata_rejected(test_workspace):
         claim_type="test_pass",
     )
 
-    receipt = create_receipt(
+    receipt = _create_observed_receipt(
         task_id="task_tamper_meta",
         claim_id="claim_tamper_meta",
         agent="claude",
@@ -568,7 +575,7 @@ def test_attack_family_a_tamper_security_relevant_fields_rejected(test_workspace
         claim_type="test_pass",
     )
 
-    receipt = create_receipt(
+    receipt = _create_observed_receipt(
         task_id="task_multi_tamper",
         claim_id="claim_multi_tamper",
         agent="claude",
@@ -625,7 +632,7 @@ def test_attack_family_a_tamper_security_relevant_fields_rejected(test_workspace
     assert verify_claim(claim, receipt, workspace_dir=test_workspace).status == "REJECT"
 
     # 9. Mutate is_observed from True to False (or False to True)
-    receipt = create_receipt(
+    receipt = _create_observed_receipt(
         task_id="task_obs",
         claim_id="claim_obs",
         agent="claude",
@@ -662,7 +669,7 @@ def test_attack_family_b_same_file_modification_staleness(test_workspace):
     )
 
     # Create receipt which fingerprints src/auth.py content hash
-    receipt = create_receipt(
+    receipt = _create_observed_receipt(
         task_id="task_same_file",
         claim_id="claim_same_file",
         agent="claude",
@@ -710,7 +717,7 @@ def test_attack_family_b_same_file_deletion_staleness(test_workspace):
     with open(svc_file, "w", encoding="utf-8") as f:
         f.write("def service(): pass\n")
 
-    receipt = create_receipt(
+    receipt = _create_observed_receipt(
         task_id="task_del",
         claim_id="claim_del",
         agent="claude",
@@ -797,7 +804,7 @@ def test_attack_family_d_lifecycle_immutability(test_workspace):
         claim_type="completion",
     )
 
-    receipt = create_receipt(
+    receipt = _create_observed_receipt(
         task_id="task_life",
         claim_id="claim_life",
         agent="claude",
@@ -849,7 +856,7 @@ def test_attack_family_e_structured_claim_classification(test_workspace):
         statement="I changed the test documentation in README.md",
         claim_type="completion",
     )
-    doc_receipt = create_receipt(
+    doc_receipt = _create_observed_receipt(
         task_id="task_doc",
         claim_id="claim_doc",
         agent="claude",
@@ -905,7 +912,7 @@ def test_attack_family_e_all_contradictory_claim_attacks(test_workspace):
     - "verified"
     MUST be rejected when presented with contradictory evidence (exit_code != 0 or failed_tests > 0).
     """
-    contradictory_receipt = create_receipt(
+    contradictory_receipt = _create_observed_receipt(
         task_id="task_e_attack",
         claim_id="claim_e_attack",
         agent="claude",
@@ -947,7 +954,7 @@ def test_attack_family_b_unfingerprinted_file_detected(test_workspace):
     Finding #3: Attacker creates a file that was recorded in files_changed
     without a fingerprint (or omitted). Content check must flag it as modified.
     """
-    receipt = create_receipt(
+    receipt = _create_observed_receipt(
         task_id="task_unfp",
         claim_id="claim_unfp",
         agent="claude",
@@ -991,69 +998,81 @@ def test_attack_family_f_newlines_and_redirections_rejected(test_workspace):
 # Phase 15 & Task 10: Advanced Adversarial Red-Team Tests
 # ==============================================================================
 
-def test_forged_observed_receipt_is_not_trusted(test_workspace):
-    """
-    Finding #1 & Task 10:
-    An attacker attempts to construct an EvidenceReceipt or forge an ObservedReceipt,
-    bypassing the trusted observation path.
-    Verification must REJECT the receipt because ordinary construction / untrusted
-    provenance cannot establish observation capability.
-    """
-    claim = Claim(
-        claim_id="claim_forge",
-        task_id="task_forge",
-        statement="All tests pass",
-        claim_type="test_pass",
-    )
+def test_forged_observed_receipt_is_not_trusted(tmp_path):
+    ws = str(tmp_path)
 
-    # 1. Attacker constructs EvidenceReceipt with is_observed=True
-    forged = EvidenceReceipt(
-        receipt_id="rcpt_forged_01",
-        task_id="task_forge",
-        claim_id="claim_forge",
+    fake = EvidenceReceipt(
+        receipt_id="attacker",
+        task_id="task",
+        claim_id="claim",
         agent="attacker",
-        action="test",
-        workspace=test_workspace,
-        base_commit="aaa",
-        result_commit="aaa",
+        action="fake",
+        workspace=ws,
         command="pytest",
         exit_code=0,
         started_at="2026-09-13T10:00:00Z",
         finished_at="2026-09-13T10:01:00Z",
-        stdout_hash="h1",
-        stderr_hash="h2",
         is_observed=True,
     )
-    # The public constructor silently ignores is_observed=True because token is missing
-    assert forged.is_observed is False
-    forged.receipt_hash = forged.compute_hash()
 
-    verdict = verify_claim(claim, forged, workspace_dir=test_workspace)
-    assert verdict.status == "REJECT"
-    assert "unobserved or untrusted evidence" in verdict.reason.lower() or "proposed/claimed" in verdict.reason.lower()
+    fake.receipt_hash = fake.compute_hash()
 
-    # 2. Attacker attempts to forge with a fake observation token
-    forged_fake_token = EvidenceReceipt(
+    result = verify_claim(
+        Claim(
+            claim_id="claim",
+            task_id="task",
+            statement="all tests pass",
+            claim_type="test_pass",
+        ),
+        fake,
+        workspace_dir=ws,
+    )
+
+    assert result.status == "REJECT"
+
+
+def test_public_create_receipt_cannot_produce_observed_receipt(test_workspace):
+    """
+    Trust boundary:
+    Calling public create_receipt() strictly produces an unobserved EvidenceReceipt,
+    preventing callers from faking observation status.
+    """
+    receipt = create_receipt(
+        workspace=test_workspace,
+        command="pytest",
+        exit_code=0,
+        is_observed=True,
+    )
+    assert receipt.is_observed is False
+    assert not isinstance(receipt, ObservedReceipt)
+
+    claim = Claim(claim_id="c_pub", task_id="t_pub", statement="all tests pass", claim_type="test_pass")
+    res = verify_claim(claim, receipt, workspace_dir=test_workspace)
+    assert res.status == "REJECT"
+    assert any(w in res.reason.lower() for w in ("unobserved", "untrusted", "proposed", "independently observed"))
+
+
+def test_forged_token_injection_fails(test_workspace):
+    """
+    Attacker attempts to pass a fake _observation_token string or object.
+    Only the module-internal private object identity is accepted.
+    """
+    fake = EvidenceReceipt(
         receipt_id="rcpt_forged_02",
         task_id="task_forge",
         claim_id="claim_forge",
         agent="attacker",
         action="test",
         workspace=test_workspace,
-        base_commit="aaa",
-        result_commit="aaa",
         command="pytest",
         exit_code=0,
-        started_at="2026-09-13T10:00:00Z",
-        finished_at="2026-09-13T10:01:00Z",
-        stdout_hash="h1",
-        stderr_hash="h2",
         _observation_token="FAKE_INJECTED_TOKEN",
     )
-    assert forged_fake_token.is_observed is False
-    forged_fake_token.receipt_hash = forged_fake_token.compute_hash()
-    verdict2 = verify_claim(claim, forged_fake_token, workspace_dir=test_workspace)
-    assert verdict2.status == "REJECT"
+    assert fake.is_observed is False
+    fake.receipt_hash = fake.compute_hash()
+    claim = Claim(claim_id="claim_forge", task_id="task_forge", statement="all tests pass", claim_type="test_pass")
+    verdict = verify_claim(claim, fake, workspace_dir=test_workspace)
+    assert verdict.status == "REJECT"
 
 
 def test_persisted_json_cannot_forge_observed_receipt(test_workspace):
@@ -1351,6 +1370,95 @@ def test_allow_shell_policy_restriction(test_workspace):
     )
     assert allowed_receipt.exit_code == 0
     assert allowed_receipt.is_observed is True
+
+
+def test_adversarial_file_replaced_with_symlink_detected(test_workspace, monkeypatch):
+    """
+    Task 5 Adversarial Test:
+    trusted.py -> replace with symlink
+    Attacker replaces verified regular file with a symlink.
+    Snapshot staleness detects the file type change and invalidates verification.
+    """
+    trusted_file = os.path.join(test_workspace, "trusted.py")
+    with open(trusted_file, "w", encoding="utf-8") as f:
+        f.write("def auth(): return True\n")
+
+    receipt = observe_command("python -c \"print('verified')\"", workspace_dir=test_workspace)
+    assert check_verification_staleness(receipt, test_workspace)[0] is True
+
+    # Attacker removes trusted.py and replaces with a symlink
+    os.remove(trusted_file)
+    target_payload = os.path.join(test_workspace, "..", "external_payload.py")
+    with open(target_payload, "w", encoding="utf-8") as f:
+        f.write("def auth(): return False # Backdoor\n")
+
+    import sys
+    import subprocess
+    symlink_created = False
+    try:
+        os.symlink(target_payload, trusted_file)
+        symlink_created = True
+    except (OSError, NotImplementedError):
+        # On Windows without developer mode/admin privilege, mock symlink inspection for trusted.py
+        with open(trusted_file, "w", encoding="utf-8") as f:
+            f.write("def auth(): return False\n")
+        import sclass.survival.evidence as ev_mod
+        orig_is_link = ev_mod._is_symlink_or_reparse
+        orig_read_link = ev_mod._safe_read_link
+        monkeypatch.setattr(ev_mod, "_is_symlink_or_reparse", lambda p: True if os.path.abspath(p) == os.path.abspath(trusted_file) else orig_is_link(p))
+        monkeypatch.setattr(ev_mod, "_safe_read_link", lambda p: "external_payload.py" if os.path.abspath(p) == os.path.abspath(trusted_file) else orig_read_link(p))
+
+    is_fresh, reason = check_verification_staleness(receipt, test_workspace)
+    assert is_fresh is False
+    assert any(w in reason.lower() for w in ("type altered", "symlink", "content changed", "fingerprint", "uncommitted"))
+
+    claim = Claim(claim_id="c_symlink", task_id="t_symlink", statement="All pass", claim_type="test_pass")
+    verdict = verify_claim(claim, receipt, workspace_dir=test_workspace)
+    assert verdict.status == "REJECT"
+
+
+def test_adversarial_symlink_replaced_with_file_or_dir_detected(test_workspace):
+    """
+    Task 5 Adversarial Test:
+    trusted.py -> replace symlink with regular file/directory
+    Attacker replaces verified symlink/junction with a regular directory/file.
+    Snapshot staleness detects the type divergence and rejects the claim.
+    """
+    import sys
+    import shutil
+    import subprocess
+
+    target_dir = os.path.join(test_workspace, "..", "external_target")
+    os.makedirs(target_dir, exist_ok=True)
+    with open(os.path.join(target_dir, "lib.py"), "w", encoding="utf-8") as f:
+        f.write("LIB = 1\n")
+
+    link_dir = os.path.join(test_workspace, "linked_module")
+    if sys.platform == "win32":
+        subprocess.run(["cmd", "/c", "mklink", "/J", link_dir, target_dir], check=True, capture_output=True)
+    else:
+        os.symlink(target_dir, link_dir)
+
+    receipt = observe_command("python -c \"print('lib verified')\"", workspace_dir=test_workspace)
+    assert check_verification_staleness(receipt, test_workspace)[0] is True
+
+    # Attacker removes symlink/junction and replaces with a regular directory
+    if sys.platform == "win32":
+        os.rmdir(link_dir)
+    else:
+        os.unlink(link_dir)
+
+    os.makedirs(link_dir, exist_ok=True)
+    with open(os.path.join(link_dir, "lib.py"), "w", encoding="utf-8") as f:
+        f.write("LIB = 'TAMPERED'\n")
+
+    is_fresh, reason = check_verification_staleness(receipt, test_workspace)
+    assert is_fresh is False
+    assert any(w in reason.lower() for w in ("type altered", "symlink", "content changed", "fingerprint"))
+
+    claim = Claim(claim_id="c_link_swap", task_id="t_link_swap", statement="All pass", claim_type="test_pass")
+    verdict = verify_claim(claim, receipt, workspace_dir=test_workspace)
+    assert verdict.status == "REJECT"
 
 
 

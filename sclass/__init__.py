@@ -49,8 +49,6 @@ __all__ = [
     "AdapterCapabilities",
     "PathAuthority",
     "get_path_authority",
-    "_create_observed_receipt",
-    "create_receipt",
     "create_proposed_evidence",
     "load_receipt",
     "save_receipt",
