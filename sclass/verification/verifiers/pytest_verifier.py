@@ -160,17 +160,29 @@ class PytestVerifier(Verifier):
         test_selection = TestSelection(selected_tests=tuple(targets), test_files=tuple(targets))
 
         if claim.scope:
-            covers, scope_reason = test_selection.covers_scope(claim.scope)
-            if not covers:
+            from sclass.verification.claim_scope import ScopeEvaluator, CoverageRelation
+            relation, scope_diag = ScopeEvaluator.evaluate(claim.scope, test_selection)
+            if relation == CoverageRelation.NONE:
                 return VerificationResult(
                     status="REJECT",
                     claim_id=claim.claim_id,
-                    reason=f"Claim-to-test-target scope mismatch: {scope_reason}",
+                    reason=f"Claim-to-test-target scope mismatch: {scope_diag}",
                     observed_exit_code=exit_code,
                     passed_tests=norm_result.passed,
                     receipt_id=getattr(evidence, "receipt_id", None),
-                    metadata={"claim_scope": claim.scope.to_dict(), "test_selection": test_selection.to_dict()},
+                    metadata={"claim_scope": claim.scope.to_dict(), "test_selection": test_selection.to_dict(), "coverage_relation": relation.value},
                 )
+            elif relation == CoverageRelation.PARTIAL:
+                return VerificationResult(
+                    status="INCONCLUSIVE",
+                    claim_id=claim.claim_id,
+                    reason=f"Claim scope is only partially satisfied: {scope_diag}",
+                    observed_exit_code=exit_code,
+                    passed_tests=norm_result.passed,
+                    receipt_id=getattr(evidence, "receipt_id", None),
+                    metadata={"claim_scope": claim.scope.to_dict(), "test_selection": test_selection.to_dict(), "coverage_relation": relation.value},
+                )
+
 
         passed = norm_result.passed or sum(item.get("passed_tests", 0) for item in ev_items)
 

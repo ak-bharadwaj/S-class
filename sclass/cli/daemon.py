@@ -9,6 +9,7 @@ import time
 import logging
 from typing import Optional
 
+import json
 from sclass.storage.paths import WorkspacePaths
 from sclass.state.tasks import StateRepository
 from sclass.trust.ledger import LocalLedger
@@ -37,11 +38,21 @@ class SClassDaemon:
             "ledger_error": err,
             "active_tasks_count": len(tasks),
             "status": "healthy" if is_valid else "degraded",
+            "updated_at": time.time(),
+            "tasks": [t.to_dict() for t in tasks],
         }
+
+    def write_ipc_state(self, health: dict) -> None:
+        ipc_dir = os.path.join(self.paths.sclass_dir, "daemon")
+        os.makedirs(ipc_dir, exist_ok=True)
+        ipc_file = os.path.join(ipc_dir, "ipc.json")
+        with open(ipc_file, "w", encoding="utf-8") as f:
+            json.dump(health, f, indent=2)
 
     def run_once(self) -> None:
         """Single tick of daemon monitoring."""
         health = self.check_health()
+        self.write_ipc_state(health)
         if not health["ledger_valid"]:
             logger.warning(f"Ledger integrity error detected: {health['ledger_error']}")
 
@@ -59,3 +70,4 @@ class SClassDaemon:
 
     def stop(self) -> None:
         self._running = False
+

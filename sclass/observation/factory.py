@@ -23,6 +23,7 @@ from sclass.observation.fingerprint import compute_workspace_snapshot, compute_w
 from sclass.observation.receipt import save_receipt
 from sclass.trust.ledger import LocalLedger
 from sclass.core.errors import ObservationIntegrityError, SecurityViolationError
+from sclass.observation.lifecycle import ObservationLifecycleTracker, ObservationLifecycleState
 
 
 def compute_authoritative_receipt_hash(fields: Dict[str, Any]) -> str:
@@ -62,6 +63,16 @@ class ObservationFactory:
 
         ws = os.path.abspath(workspace_dir)
         identity = execution_result.identity
+
+        # Observation State Machine
+        tracker = ObservationLifecycleTracker(ObservationLifecycleState.REQUESTED)
+        tracker.transition_to(ObservationLifecycleState.SPAWNED, "Subprocess successfully spawned")
+
+        if identity.identity_state == ExecutionIdentityState.IDENTITY_UNCERTAIN.value:
+            tracker.transition_to(ObservationLifecycleState.IDENTITY_UNCERTAIN, "Process binary or identity uncertain")
+        else:
+            tracker.transition_to(ObservationLifecycleState.IDENTIFIED, f"Process identified: {identity.executable_name}")
+            tracker.transition_to(ObservationLifecycleState.OBSERVED, "Process completed and outputs captured")
 
         # 1. Authoritative verifier detection (Invariant 3: derived from process identity, never supplied)
         detector = StandardVerifierDetector()
@@ -113,6 +124,8 @@ class ObservationFactory:
             "workspace_fingerprint_before": fp_before,
             "structured_result": structured_res.to_dict() if structured_res else None,
             "duration_ms": execution_result.duration_ms,
+            "lifecycle_state": tracker.current_state.value,
+            "lifecycle_history": tracker.to_dict()["history"],
         }
 
         # 6. Bind authoritative hash across all execution and observation parameters
@@ -167,8 +180,19 @@ class ObservationFactory:
         object.__setattr__(receipt, "receipt_hash", receipt_hash)
 
         # 8. Atomically anchor into LocalLedger before publishing
+        if tracker.is_failed:
+            # Failure states are never silently converted into trusted evidence!
+            save_receipt(receipt, ws)
+            object.__setattr__(receipt, "_sealed", True)
+            return receipt
+
         if ledger is None:
             ledger = LocalLedger(workspace_dir=ws)
+
+        try:
+            tracker.transition_to(ObservationLifecycleState.ANCHORED, "Committing observation to LocalLedger")
+        except Exception:
+            pass
 
         def write_receipt_hook(entry: Dict[str, Any]) -> None:
             save_receipt(receipt, ws)
@@ -184,11 +208,21 @@ class ObservationFactory:
             "verifier": authoritative_verifier,
             "execution_identity": identity.to_dict(),
             "timestamp": execution_result.finished_at,
+            "lifecycle_state": tracker.current_state.value,
         }
 
         try:
             ledger.append_atomic("OBSERVATION", ledger_payload, commit_hook=write_receipt_hook)
+            try:
+                tracker.transition_to(ObservationLifecycleState.PUBLISHED, "Observation atomically anchored and published")
+                meta["lifecycle_state"] = tracker.current_state.value
+            except Exception:
+                pass
         except Exception as err:
+            try:
+                tracker.transition_to(ObservationLifecycleState.ANCHOR_FAILED, str(err))
+            except Exception:
+                pass
             raise ObservationIntegrityError(
                 f"Atomic commit of observation failed. Observation not published: {err}"
             ) from err
@@ -197,6 +231,7 @@ class ObservationFactory:
         object.__setattr__(receipt, "_sealed", True)
 
         return receipt
+
 
 
 TrustedObservationRuntime = ObservationFactory

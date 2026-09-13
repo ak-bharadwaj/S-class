@@ -153,6 +153,10 @@ class HandoffPackage:
     relevant_files: Tuple[str, ...]
     next_action: Optional[str]
     package_hash: str
+
+    @property
+    def package_id(self) -> str:
+        return self.package_hash
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> Dict[str, Any]:

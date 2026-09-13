@@ -32,8 +32,10 @@ class VerifierScope:
 @dataclass(frozen=True)
 class TestSelection:
     """Observed tests and targets executed by a verifier."""
+    __test__ = False
     selected_tests: tuple[str, ...] = field(default_factory=tuple)
     test_files: tuple[str, ...] = field(default_factory=tuple)
+
 
     def covers_scope(self, claim_scope: Optional[Any]) -> Tuple[bool, Optional[str]]:
         """Verifies whether this test selection satisfies the required claim scope."""
@@ -126,6 +128,11 @@ class VerificationResult:
     @property
     def is_inconclusive(self) -> bool:
         return self.status == "INCONCLUSIVE"
+
+    @property
+    def is_unsupported(self) -> bool:
+        return self.status == "UNSUPPORTED"
+
 
     def to_dict(self) -> Dict[str, Any]:
         return {

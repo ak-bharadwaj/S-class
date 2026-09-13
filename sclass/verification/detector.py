@@ -72,6 +72,27 @@ class StandardVerifierDetector:
         if exe_base.endswith(".exe"):
             exe_base = exe_base[:-4]
 
+        # Check trust registry policy authority
+        try:
+            from sclass.verification.trust_registry import get_trust_registry, VerifierTrustMode
+            matched_defn, trust_mode, status_code = get_trust_registry().evaluate_verifier(execution)
+            if trust_mode == VerifierTrustMode.UNTRUSTED and matched_defn:
+                return DetectionResult(
+                    verifier_id=matched_defn.verifier_id,
+                    confidence=VerifierConfidence.CONTRADICTED,
+                    evidence={
+                        "status": status_code,
+                        "reason": f"Binary '{raw_exe}' matched verifier '{matched_defn.verifier_id}' but is UNTRUSTED under trust policy.",
+                        "trust_mode": trust_mode.value,
+                    },
+                    executable_match=False,
+                    argv_match=True,
+                    interpreter_match=False,
+                )
+        except Exception:
+            pass
+
+
         # 1. Python Interpreters
         if exe_base in ("python", "python3", "py"):
             args = tokens[1:]
