@@ -42,9 +42,24 @@ class VerificationPlan:
         """
         Coordinates multiple independent evidence items across all target claims in this plan.
         Returns a mapping of claim_id -> VerificationResult.
+        Authoritatively enforces required evidence kinds and verifier IDs declared by the plan.
         """
         ws = os.path.abspath(workspace_dir or os.getcwd())
         results: Dict[str, VerificationResult] = {}
+
+        # 1. Determine present evidence kinds and verifier sources
+        present_kinds = set()
+        present_sources = set()
+        for ev in evidence_items:
+            kind = getattr(ev, "evidence_kind", None)
+            if kind:
+                present_kinds.add(str(kind).lower())
+            src = getattr(ev, "source", None) or getattr(ev, "verifier", None)
+            if src:
+                present_sources.add(str(src).lower())
+
+        missing_kinds = [k for k in self.required_evidence_kinds if str(k).lower() not in present_kinds]
+        missing_verifiers = [v for v in self.verifier_ids if not any(str(v).lower() in s for s in present_sources)]
 
         for claim in self.target_claims:
             verdict = ClaimAcceptanceMatrix.evaluate_multi_evidence(
@@ -52,6 +67,24 @@ class VerificationPlan:
                 evidence_items=evidence_items,
                 workspace_dir=ws,
             )
+
+            # If evidence satisfies claim locally, but plan-level required evidence kinds or verifiers are missing:
+            if verdict.is_accepted:
+                if missing_kinds:
+                    verdict = VerificationResult(
+                        status="INCONCLUSIVE",
+                        claim_id=claim.claim_id,
+                        reason=f"Plan requires evidence kinds {self.required_evidence_kinds}, but missing: {missing_kinds}",
+                        metadata={**verdict.metadata, "missing_evidence_kinds": missing_kinds},
+                    )
+                elif missing_verifiers:
+                    verdict = VerificationResult(
+                        status="INCONCLUSIVE",
+                        claim_id=claim.claim_id,
+                        reason=f"Plan requires verifier IDs {self.verifier_ids}, but missing: {missing_verifiers}",
+                        metadata={**verdict.metadata, "missing_verifiers": missing_verifiers},
+                    )
+
             results[claim.claim_id] = verdict
 
         return results

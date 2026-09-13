@@ -33,6 +33,8 @@ from sclass.domain.evidence import (
 )
 from sclass.domain.capability import (
     Capability,
+    CapabilityDecision,
+    CapabilityEvaluator,
     RiskTier,
     NetworkAccessLevel,
     FilesystemAccessLevel,
@@ -58,6 +60,8 @@ __all__ = [
     "AuthorizationDecision",
     "DecisionOutcome",
     "Capability",
+    "CapabilityDecision",
+    "CapabilityEvaluator",
     "RiskTier",
     "NetworkAccessLevel",
     "FilesystemAccessLevel",

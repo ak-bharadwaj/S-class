@@ -14,7 +14,7 @@ from typing import List, Dict, Any, Optional, Union
 from sclass.execution.process import ProcessRunner, ProcessExecutionResult
 from sclass.execution.modes import ExecutionMode
 from sclass.execution.launcher import BaseLauncher, HostLauncher, SandboxLauncher, ContainerLauncher
-from sclass.execution.sandbox import HostSandbox, BubblewrapSandbox, ContainerSandbox
+from sclass.execution.sandbox import HostSandbox, BubblewrapSandbox, ContainerSandbox, GVisorSandbox
 
 
 @dataclass
@@ -249,7 +249,7 @@ class SandboxBackend(ExecutionBackend):
         self,
         backend_type: str = "bubblewrap",
         compiler: Optional[SandboxConfigCompiler] = None,
-        fallback_to_host: bool = True,
+        fallback_to_host: bool = False,
     ):
         self.backend_type = backend_type.lower()
         self.compiler = compiler or SandboxConfigCompiler()
@@ -261,9 +261,15 @@ class SandboxBackend(ExecutionBackend):
         elif self.backend_type in ("container", "docker", "podman"):
             self._underlying_sandbox = ContainerSandbox()
             self._launcher = ContainerLauncher()
-        else:
+        elif self.backend_type in ("gvisor", "runsc"):
+            self._underlying_sandbox = GVisorSandbox()
+            self._launcher = SandboxLauncher()
+        elif self.backend_type in ("host", "direct", "native"):
             self._underlying_sandbox = HostSandbox()
             self._launcher = HostLauncher()
+        else:
+            from sclass.core.errors import SecurityViolationError
+            raise SecurityViolationError(f"Unsupported sandbox backend type: '{self.backend_type}'")
 
         self.runner = ProcessRunner(sandbox=self._underlying_sandbox, launcher=self._launcher)
 
@@ -302,7 +308,10 @@ class SandboxBackend(ExecutionBackend):
     ) -> ProcessExecutionResult:
         t_id = task_id or (getattr(request, "session", None) if request else None)
 
-        # If chosen sandbox is not available on host OS (e.g., bwrap on Windows)
+        # 1. Authoritative sandbox configuration compilation
+        sandbox_config = self.compile_config(request=request, capability=capability, workspace_dir=cwd)
+
+        # 2. If chosen sandbox is not available on host OS (e.g., bwrap on Windows)
         if not self.is_available():
             if self.fallback_to_host:
                 host_runner = ProcessRunner(sandbox=HostSandbox(), launcher=HostLauncher())
@@ -318,13 +327,18 @@ class SandboxBackend(ExecutionBackend):
             else:
                 from sclass.core.errors import SecurityViolationError
                 raise SecurityViolationError(
-                    f"Requested sandbox backend '{self.backend_type}' is not available on this host."
+                    f"Requested sandbox backend '{self.backend_type}' is not available on this host. Fail-closed policy denies host fallback."
                 )
+
+        # 3. Apply compiled environment
+        merged_env = dict(sandbox_config.env_whitelist)
+        if env:
+            merged_env.update(env)
 
         return self.runner.run(
             command=command,
             cwd=cwd,
-            env=env,
+            env=merged_env,
             timeout=timeout,
             mode=mode,
             allow_shell=allow_shell,

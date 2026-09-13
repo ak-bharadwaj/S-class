@@ -36,12 +36,32 @@ class ObservationConvergence:
         ledger: Optional[LocalLedger] = None,
         timeout: float = 60.0,
         claim_id: Optional[str] = None,
+        authorization: Optional[Any] = None,
+        policy_engine: Optional[Any] = None,
         **kwargs,
     ) -> Tuple[ProcessExecutionResult, ObservedReceipt]:
         """
         Executes an ActionRequest through the backend and seals observed evidence in LocalLedger.
+        Strictly enforces that the action is authorized before dispatching to execution backend.
         """
         ws = os.path.abspath(request.workspace or os.getcwd())
+
+        # 0. Authoritative authorization enforcement
+        decision = authorization
+        if decision is None:
+            if policy_engine is not None:
+                decision = policy_engine.evaluate(request, ws)
+            else:
+                from sclass.control.policy import DefaultPolicyEngine
+                decision = DefaultPolicyEngine().evaluate(request, ws)
+
+        if not getattr(decision, "is_allowed", False):
+            from sclass.core.errors import SecurityViolationError
+            pol_id = getattr(decision, "policy_id", "UNKNOWN")
+            reason = getattr(decision, "reason", "Action is not permitted by security policy")
+            raise SecurityViolationError(
+                f"ActionRequest unauthorized under policy [{pol_id}]: {reason}"
+            )
 
         # 1. Resolve target command
         if command is not None:
@@ -96,6 +116,8 @@ def converge_execution(
     backend: Optional[ExecutionBackend] = None,
     ledger: Optional[LocalLedger] = None,
     timeout: float = 60.0,
+    authorization: Optional[Any] = None,
+    policy_engine: Optional[Any] = None,
     **kwargs,
 ) -> Tuple[ProcessExecutionResult, ObservedReceipt]:
     """Convenience functional interface for execution observation convergence."""
@@ -105,5 +127,8 @@ def converge_execution(
         backend=backend,
         ledger=ledger,
         timeout=timeout,
+        authorization=authorization,
+        policy_engine=policy_engine,
         **kwargs,
     )
+

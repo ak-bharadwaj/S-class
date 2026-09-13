@@ -44,6 +44,25 @@ class FilesystemAccessLevel(str, Enum):
 
 
 @dataclass(frozen=True)
+class CapabilityDecision:
+    """Evaluated outcome of an ActionRequest against a multidimensional Capability."""
+    allowed: bool
+    failed_constraints: List[str] = field(default_factory=list)
+    matched_policy: str = ""
+    explanation: str = ""
+    requires_approval: bool = False
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "allowed": self.allowed,
+            "failed_constraints": list(self.failed_constraints),
+            "matched_policy": self.matched_policy,
+            "explanation": self.explanation,
+            "requires_approval": self.requires_approval,
+        }
+
+
+@dataclass(frozen=True)
 class Capability:
     """
     Multidimensional capability specification defining explicit permissions
@@ -79,44 +98,81 @@ class Capability:
         return fnmatch.fnmatch(requested_actor, self.actor)
 
     def allows_resource(self, requested_resource: str, workspace_dir: str = "") -> bool:
-        """Evaluates whether the resource target matches allowed resource patterns."""
-        if self.resource == "*":
-            return True
+        """
+        Evaluates whether the resource target matches allowed resource patterns
+        without wildcard bypasses.
+        """
         if not requested_resource:
             return True
 
-        norm_req = requested_resource.replace("\\", "/")
-        norm_res = self.resource.replace("\\", "/")
+        norm_req = requested_resource.replace("\\", "/").strip()
+        norm_res = self.resource.replace("\\", "/").strip()
 
-        if fnmatch.fnmatch(norm_req, norm_res):
+        # If resource pattern is universal
+        if norm_res == "*":
+            # If scoped to workspace, ensure it doesn't escape workspace root
+            if self.scope == "workspace" and workspace_dir:
+                ws_norm = os.path.abspath(workspace_dir).replace("\\", "/").rstrip("/")
+                if os.path.isabs(requested_resource):
+                    req_abs = os.path.abspath(requested_resource).replace("\\", "/")
+                    if not (req_abs == ws_norm or req_abs.startswith(ws_norm + "/")):
+                        return False
+                else:
+                    joined = os.path.abspath(os.path.join(workspace_dir, requested_resource)).replace("\\", "/")
+                    if not (joined == ws_norm or joined.startswith(ws_norm + "/")):
+                        return False
             return True
 
-        # Check path prefix containment if both are absolute or relative
-        if self.scope == "workspace" and workspace_dir:
+        # Check relative normalization against workspace
+        rel_target = norm_req
+        if workspace_dir:
             ws_norm = os.path.abspath(workspace_dir).replace("\\", "/").rstrip("/")
-            req_abs = os.path.abspath(os.path.join(workspace_dir, requested_resource)).replace("\\", "/")
-            if req_abs.startswith(ws_norm):
+            if os.path.isabs(requested_resource):
+                req_abs = os.path.abspath(requested_resource).replace("\\", "/")
+                if req_abs == ws_norm:
+                    rel_target = "."
+                elif req_abs.startswith(ws_norm + "/"):
+                    rel_target = req_abs[len(ws_norm) + 1:]
+                elif self.scope == "workspace":
+                    # Target is outside the workspace
+                    return False
+            else:
+                joined = os.path.abspath(os.path.join(workspace_dir, requested_resource)).replace("\\", "/")
+                if self.scope == "workspace" and not (joined == ws_norm or joined.startswith(ws_norm + "/")):
+                    return False
+                if joined.startswith(ws_norm + "/"):
+                    rel_target = joined[len(ws_norm) + 1:]
+
+        # Test both raw and workspace-relative against pattern
+        for candidate in (norm_req, rel_target):
+            if fnmatch.fnmatch(candidate, norm_res):
                 return True
+            if fnmatch.fnmatch(candidate.strip("/"), norm_res.strip("/")):
+                return True
+            if norm_res.endswith("/**"):
+                prefix = norm_res[:-3].strip("/")
+                cand_clean = candidate.strip("/")
+                if cand_clean == prefix or cand_clean.startswith(prefix + "/"):
+                    return True
+            elif norm_res.endswith("/*"):
+                prefix = norm_res[:-2].strip("/")
+                cand_clean = candidate.strip("/")
+                if cand_clean == prefix or cand_clean.startswith(prefix + "/"):
+                    return True
 
         return False
 
     def allows_request(self, request: Any, workspace_dir: str = "") -> bool:
         """
         Evaluates whether an ActionRequest is fully permitted by this capability.
+        Delegates authoritatively to CapabilityEvaluator.
         """
-        req_actor = getattr(request, "actor", None) or getattr(request, "agent", "unknown")
-        req_op = getattr(request, "capability", None) or getattr(request, "action", "")
-        req_target = getattr(request, "target", "")
-        ws = workspace_dir or getattr(request, "workspace", "")
+        decision = CapabilityEvaluator.evaluate(self, request, workspace_dir)
+        return decision.allowed
 
-        if not self.allows_actor(req_actor):
-            return False
-        if not self.allows_operation(req_op):
-            return False
-        if not self.allows_resource(req_target, ws):
-            return False
-
-        return True
+    def evaluate_request(self, request: Any, workspace_dir: str = "") -> CapabilityDecision:
+        """Evaluates ActionRequest returning full CapabilityDecision."""
+        return CapabilityEvaluator.evaluate(self, request, workspace_dir)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -151,4 +207,135 @@ class Capability:
             credentials=list(data.get("credentials", [])),
             approval=data.get("approval", False),
             metadata=dict(data.get("metadata", {})),
+        )
+
+
+class CapabilityEvaluator:
+    """
+    Authoritative evaluator enforcing multidimensional capability constraints
+    across all 11 security dimensions:
+    1. Actor
+    2. Operation
+    3. Resource pattern
+    4. Workspace containment boundary
+    5. Arguments / Parameters
+    6. Filesystem access level (read vs write)
+    7. Network access level
+    8. Credential / Secret access
+    9. Execution duration / timeout limit
+    10. Risk tier
+    11. Approval requirements
+    """
+
+    @classmethod
+    def evaluate(
+        cls,
+        capability: Capability,
+        request: Any,
+        workspace_dir: str = "",
+    ) -> CapabilityDecision:
+        failed: List[str] = []
+        requires_approval: bool = False
+
+        # 1. Actor
+        req_actor = getattr(request, "actor", None) or getattr(request, "agent", "unknown")
+        if not capability.allows_actor(req_actor):
+            failed.append(f"actor_mismatch: actor '{req_actor}' does not match allowed pattern '{capability.actor}'")
+
+        # 2. Operation
+        req_op = getattr(request, "capability", None) or getattr(request, "action", "")
+        if not capability.allows_operation(req_op):
+            failed.append(f"operation_mismatch: operation '{req_op}' does not match allowed pattern '{capability.operation}'")
+
+        # 3. Resource & 4. Workspace Boundary
+        req_target = getattr(request, "target", "")
+        ws = workspace_dir or getattr(request, "workspace", "")
+        if not capability.allows_resource(req_target, ws):
+            failed.append(f"resource_mismatch: target '{req_target}' violates resource constraint '{capability.resource}' or workspace boundary")
+
+        # Check path traversal if workspace scope
+        if capability.scope == "workspace" and ws and req_target:
+            try:
+                ws_abs = os.path.abspath(ws).replace("\\", "/").rstrip("/")
+                if os.path.isabs(req_target):
+                    target_abs = os.path.abspath(req_target).replace("\\", "/")
+                else:
+                    target_abs = os.path.abspath(os.path.join(ws, req_target)).replace("\\", "/")
+                if not (target_abs == ws_abs or target_abs.startswith(ws_abs + "/")):
+                    failed.append(f"workspace_escape: target '{req_target}' escapes workspace root '{ws}'")
+            except Exception as e:
+                failed.append(f"path_error: invalid path traversal '{req_target}': {e}")
+
+        # 5. Arguments
+        params = getattr(request, "parameters", {}) or {}
+        if capability.arguments:
+            for k, expected_v in capability.arguments.items():
+                if k in params and params[k] != expected_v:
+                    failed.append(f"argument_constraint: parameter '{k}' value '{params[k]}' does not match expected '{expected_v}'")
+
+        # 6. Filesystem access level
+        fs_level = str(capability.filesystem).lower()
+        is_write_op = (
+            req_op in (CAP_FILESYSTEM_WRITE, CAP_GIT_WRITE, "write_file", "delete_file", "edit_file", "modify", "truncate", "create")
+            or params.get("mode") in ("write", "w", "append", "a", "truncate")
+        )
+        if fs_level in ("read", "read_only", "none") and is_write_op:
+            failed.append(f"filesystem_violation: operation requires write access but capability restricts filesystem to '{fs_level}'")
+        if fs_level == "none" and req_op in (CAP_FILESYSTEM_READ, "read_file", "cat"):
+            failed.append("filesystem_violation: capability specifies no filesystem access ('none')")
+
+        # 7. Network access level
+        cap_net = capability.network
+        req_is_net = (
+            req_op in (CAP_NETWORK_REQUEST, "fetch", "download", "http", "curl", "wget")
+            or bool(params.get("network", False))
+        )
+        if cap_net in (False, "none", "NONE") and req_is_net:
+            failed.append(f"network_violation: network access is prohibited by capability (network={cap_net})")
+
+        # 8. Credentials
+        req_creds = params.get("credentials") or []
+        if isinstance(req_creds, str):
+            req_creds = [req_creds]
+        if req_op == CAP_SECRET_READ and not capability.credentials:
+            failed.append("credential_violation: secret.read operation attempted but no credentials allowed in capability")
+        for c in req_creds:
+            if c not in capability.credentials:
+                failed.append(f"credential_violation: credential '{c}' is not permitted by capability whitelist {capability.credentials}")
+
+        # 9. Duration
+        if capability.duration is not None:
+            req_duration = params.get("timeout") or params.get("duration") or getattr(request, "timeout", None)
+            if req_duration is not None:
+                try:
+                    if float(req_duration) > float(capability.duration):
+                        failed.append(f"duration_exceeded: requested duration/timeout {req_duration}s exceeds capability max {capability.duration}s")
+                except (ValueError, TypeError):
+                    pass
+
+        # 10. Risk
+        risk_levels = {"low": 1, "medium": 2, "high": 3, "critical": 4}
+        cap_risk_num = risk_levels.get(str(capability.risk).lower(), 2)
+        req_risk = getattr(request, "risk_level", None) or params.get("risk", "low")
+        req_risk_num = risk_levels.get(str(req_risk).lower(), 1)
+        if req_risk_num > cap_risk_num:
+            failed.append(f"risk_tier_exceeded: requested risk '{req_risk}' exceeds capability max tier '{capability.risk}'")
+
+        # 11. Approval
+        if capability.approval in (True, "required", "require"):
+            approved = params.get("approved", False) or getattr(request, "approved", False) or bool(params.get("approval_token"))
+            if not approved:
+                requires_approval = True
+                failed.append("approval_required: operation requires explicit authorization approval")
+
+        allowed = len(failed) == 0
+        policy_name = f"CAP:{capability.operation}"
+        explanation = "Operation fully permitted by capability" if allowed else "; ".join(failed)
+
+        return CapabilityDecision(
+            allowed=allowed,
+            failed_constraints=failed,
+            matched_policy=policy_name,
+            explanation=explanation,
+            requires_approval=requires_approval,
         )

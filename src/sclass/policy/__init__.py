@@ -5,6 +5,7 @@ from sclass.control.policy import PolicyEngine, DefaultPolicyEngine, OPAEngine, 
 from sclass.domain.action import ActionRequest, AuthorizationDecision, DecisionOutcome
 from sclass.control.capabilities import Capability
 from sclass.control.resources import ResourceKind, classify_resource
+from sclass.policy.opa import OPAInputCompiler, OPAClient, OPAPolicyAdapter
 
 # Aliases for naming consistency
 InternalPolicyEngine = DefaultPolicyEngine
@@ -17,6 +18,9 @@ __all__ = [
     "InternalPolicyEngine",
     "OPAEngine",
     "OPAPolicyEngine",
+    "OPAInputCompiler",
+    "OPAClient",
+    "OPAPolicyAdapter",
     "PolicyContext",
     "SecurityDecision",
     "AuthorizationDecision",

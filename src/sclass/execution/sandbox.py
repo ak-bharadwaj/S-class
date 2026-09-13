@@ -108,7 +108,10 @@ class ContainerSandbox:
     ) -> List[str]:
         runtime = "docker" if shutil.which("docker") else "podman"
         if not self.is_available():
-            return list(command)
+            from sclass.core.errors import SecurityViolationError
+            raise SecurityViolationError(
+                f"Container runtime ({runtime}) is not installed or available on this system."
+            )
 
         args = [
             runtime, "run", "--rm",
@@ -121,15 +124,64 @@ class ContainerSandbox:
         return args
 
 
-def get_sandbox_backend(name: str = "host") -> SandboxBackend:
-    """Factory retrieving requested sandbox backend with fallback to host."""
+class GVisorSandbox:
+    """gVisor (runsc) user-space virtualization application kernel sandbox."""
+    def __init__(self, platform: str = "ptrace", network: str = "none"):
+        self.platform = platform
+        self.network = network
+
+    @property
+    def name(self) -> str:
+        return "gvisor"
+
+    def is_available(self) -> bool:
+        return shutil.which("runsc") is not None
+
+    def wrap_command(
+        self,
+        command: List[str],
+        cwd: str,
+        writable_paths: Optional[List[str]] = None,
+        readonly_paths: Optional[List[str]] = None,
+    ) -> List[str]:
+        if not self.is_available():
+            from sclass.core.errors import SecurityViolationError
+            raise SecurityViolationError(
+                "gVisor (runsc) sandbox is not installed or available on this system. "
+                "Fail-closed policy prevents uncontained execution."
+            )
+        args = [
+            "runsc",
+            "--rootless",
+            f"--network={self.network}",
+            "exec",
+            "--cwd", os.path.abspath(cwd),
+        ]
+        args.extend(command)
+        return args
+
+
+def get_sandbox_backend(name: str = "host", allow_fallback: bool = False) -> SandboxBackend:
+    """Factory retrieving requested sandbox backend without silent host fallback."""
     name_clean = name.lower()
     if name_clean in ("bwrap", "bubblewrap"):
         bw = BubblewrapSandbox()
-        if bw.is_available():
+        if bw.is_available() or not allow_fallback:
             return bw
+    elif name_clean in ("gvisor", "runsc"):
+        gv = GVisorSandbox()
+        if gv.is_available() or not allow_fallback:
+            return gv
     elif name_clean in ("docker", "container", "podman"):
         cont = ContainerSandbox()
-        if cont.is_available():
+        if cont.is_available() or not allow_fallback:
             return cont
-    return HostSandbox()
+    elif name_clean in ("host", "direct", "native"):
+        return HostSandbox()
+
+    if allow_fallback:
+        return HostSandbox()
+
+    from sclass.core.errors import SecurityViolationError
+    raise SecurityViolationError(f"Requested sandbox backend '{name}' is not supported or available.")
+

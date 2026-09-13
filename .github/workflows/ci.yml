@@ -38,3 +38,9 @@ jobs:
         PYTHONPATH: src:.
       run: |
         python -m pytest tests/ -v
+
+    - name: Run Flagship Product Demos
+      env:
+        PYTHONPATH: src:.
+      run: |
+        python demos/run_all_demos.py
