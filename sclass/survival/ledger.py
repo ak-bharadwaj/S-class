@@ -1,5 +1,5 @@
 """
-S-Class Survival v0: Tamper-Resistant Local Ledger (sclass/survival/ledger.py)
+S-Class Survival v0: Tamper-Evident Local Audit Log (sclass/survival/ledger.py)
 
 Implements Phase 7: Local append-only cryptographic ledger.
 Minimum chain:

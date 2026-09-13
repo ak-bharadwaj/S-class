@@ -12,14 +12,67 @@ The agent is NEVER authoritative for:
 
 from __future__ import annotations
 import os
+import sys
 import json
 import uuid
+import shlex
 import hashlib
 import subprocess
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List, Tuple
 
-from sclass.survival.models import EvidenceReceipt
+from sclass.survival.models import (
+    EvidenceReceipt,
+    ObservedReceipt,
+    ProposedEvidence,
+    ClaimedEvidence,
+    LIFECYCLE_OBSERVED,
+)
+
+UNSAFE_SHELL_PATTERNS = [";", "&&", "||", "|", "`", "$(", "${"]
+
+
+def sanitize_verification_command(command: str) -> List[str]:
+    """
+    Validates and securely tokenizes a verification command, preventing shell injection.
+    """
+    for pat in UNSAFE_SHELL_PATTERNS:
+        if pat in command:
+            raise ValueError(f"Security boundary violation: shell injection or chaining operator '{pat}' detected in verification command.")
+
+    tokens = shlex.split(command, posix=(sys.platform != "win32"))
+    if not tokens:
+        raise ValueError("Empty verification command.")
+    return tokens
+
+
+def compute_file_hash(abs_path: str) -> Optional[str]:
+    """Computes SHA256 of a file if it exists and is a regular file."""
+    if not os.path.exists(abs_path) or os.path.isdir(abs_path):
+        return None
+    try:
+        h = hashlib.sha256()
+        with open(abs_path, "rb") as f:
+            while chunk := f.read(65536):
+                h.update(chunk)
+        return h.hexdigest()
+    except Exception:
+        return None
+
+
+def compute_file_hashes(workspace_dir: str, files: List[str]) -> Dict[str, str]:
+    """Computes path -> sha256 content hash mapping for given files in workspace."""
+    hashes: Dict[str, str] = {}
+    ws = os.path.abspath(workspace_dir)
+    for rel_path in sorted(files):
+        clean_rel = rel_path.replace("\\", "/").strip()
+        if not clean_rel or clean_rel.startswith(".agents"):
+            continue
+        full_path = os.path.join(ws, clean_rel)
+        f_hash = compute_file_hash(full_path)
+        if f_hash is not None:
+            hashes[clean_rel] = f_hash
+    return hashes
 
 
 def _get_git_commit_hash(workspace_dir: str) -> str:
@@ -89,24 +142,29 @@ def create_receipt(
     base_commit: Optional[str] = None,
     result_commit: Optional[str] = None,
     files_changed: Optional[List[str]] = None,
+    file_hashes: Optional[Dict[str, str]] = None,
     evidence: Optional[List[Dict[str, Any]]] = None,
     verified: bool = False,
     metadata: Optional[Dict[str, Any]] = None,
+    is_observed: bool = True,
 ) -> EvidenceReceipt:
     """
-    Creates a canonical EvidenceReceipt with cryptographic hashes of stdout/stderr.
+    Creates a canonical EvidenceReceipt with cryptographic hashes of stdout/stderr and file states.
     """
     ws = os.path.abspath(workspace)
     b_commit = base_commit or _get_git_commit_hash(ws)
     r_commit = result_commit or _get_git_commit_hash(ws)
     f_changed = files_changed if files_changed is not None else _get_git_changed_files(ws, b_commit)
+    f_hashes = file_hashes if file_hashes is not None else compute_file_hashes(ws, f_changed)
 
     stdout_hash = hashlib.sha256(stdout_content.encode("utf-8")).hexdigest()
     stderr_hash = hashlib.sha256(stderr_content.encode("utf-8")).hexdigest()
 
     receipt_id = f"rcpt_{uuid.uuid4().hex[:12]}"
+    meta = dict(metadata or {})
 
-    receipt = EvidenceReceipt(
+    receipt_cls = ObservedReceipt if is_observed else EvidenceReceipt
+    receipt = receipt_cls(
         receipt_id=receipt_id,
         task_id=task_id,
         claim_id=claim_id,
@@ -122,14 +180,36 @@ def create_receipt(
         stdout_hash=stdout_hash,
         stderr_hash=stderr_hash,
         files_changed=f_changed,
+        file_hashes=f_hashes,
         evidence=evidence or [],
         verified=verified,
-        metadata=metadata or {},
+        metadata=meta,
+        is_observed=is_observed,
+        lifecycle_state=LIFECYCLE_OBSERVED,
     )
+    receipt.receipt_hash = receipt.compute_hash()
 
     # Save receipt to S-Class protected receipts directory
     save_receipt(receipt, ws)
     return receipt
+
+
+def create_proposed_evidence(
+    statement: str = "",
+    exit_code: Optional[int] = None,
+    files_changed: Optional[List[str]] = None,
+    evidence: Optional[List[Dict[str, Any]]] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> ProposedEvidence:
+    """Creates caller- or agent-proposed evidence (explicitly unobserved and non-authoritative)."""
+    return ProposedEvidence(
+        statement=statement,
+        exit_code=exit_code,
+        files_changed=tuple(files_changed or []),
+        evidence=tuple(evidence or []),
+        metadata=dict(metadata or {}),
+        is_observed=False,
+    )
 
 
 def save_receipt(receipt: EvidenceReceipt, workspace_dir: str) -> str:
@@ -143,17 +223,21 @@ def save_receipt(receipt: EvidenceReceipt, workspace_dir: str) -> str:
 
 
 def load_receipt(receipt_id: str, workspace_dir: str) -> Optional[EvidenceReceipt]:
-    """Loads and validates a receipt from disk."""
+    """Loads and validates a receipt from disk. Missing or invalid hash returns None."""
     target = os.path.join(workspace_dir, ".agents", "receipts", f"{receipt_id}.json")
     if not os.path.exists(target):
         return None
     try:
         with open(target, "r", encoding="utf-8") as f:
             data = json.load(f)
+
+        recorded_hash = data.get("receipt_hash") or (data.get("metadata", {}).get("receipt_hash") if isinstance(data.get("metadata"), dict) else None)
+        if not recorded_hash:
+            return None
+
         receipt = EvidenceReceipt.from_dict(data)
         # Validate integrity hash
-        recorded_hash = data.get("receipt_hash")
-        if recorded_hash and receipt.compute_hash() != recorded_hash:
+        if receipt.compute_hash() != recorded_hash:
             return None
         return receipt
     except Exception:
@@ -168,31 +252,52 @@ def observe_command(
     agent: str = "agent",
     action: str = "run_command",
     timeout: float = 60.0,
+    allow_shell: bool = False,
 ) -> EvidenceReceipt:
     """
     Independently executes and observes a command, recording its true exit code,
-    runtime, stdout/stderr hashes, and repository changes.
+    runtime, stdout/stderr hashes, and repository state fingerprints.
+    Uses strict tokenization to prevent uncontrolled shell injection.
     """
     ws = os.path.abspath(workspace_dir)
     started_at = datetime.now(timezone.utc).isoformat()
     base_commit = _get_git_commit_hash(ws)
 
     try:
-        proc = subprocess.run(
-            command,
-            cwd=ws,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
+        if allow_shell:
+            proc = subprocess.run(
+                command,
+                cwd=ws,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+        else:
+            cmd_tokens = sanitize_verification_command(command)
+            proc = subprocess.run(
+                cmd_tokens,
+                cwd=ws,
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
         exit_code = proc.returncode
         stdout = proc.stdout
         stderr = proc.stderr
+    except ValueError as ve:
+        exit_code = 126
+        stdout = ""
+        stderr = f"Command execution rejected by S-Class security policy: {str(ve)}"
     except subprocess.TimeoutExpired as te:
         exit_code = 124
         stdout = te.stdout or "" if isinstance(te.stdout, str) else ""
         stderr = (te.stderr or "") + "\nCommand timed out after timeout limit"
+    except FileNotFoundError as fnf:
+        exit_code = 127
+        stdout = ""
+        stderr = f"Command executable not found: {str(fnf)}"
     except Exception as e:
         exit_code = 1
         stdout = ""
@@ -201,6 +306,7 @@ def observe_command(
     finished_at = datetime.now(timezone.utc).isoformat()
     result_commit = _get_git_commit_hash(ws)
     files_changed = _get_git_changed_files(ws, base_commit)
+    file_hashes = compute_file_hashes(ws, files_changed)
 
     return create_receipt(
         task_id=task_id,
@@ -217,5 +323,7 @@ def observe_command(
         base_commit=base_commit,
         result_commit=result_commit,
         files_changed=files_changed,
+        file_hashes=file_hashes,
+        is_observed=True,
     )
 

@@ -11,14 +11,58 @@ Implements Phase 5, Phase 6, Phase 9:
 
 from __future__ import annotations
 import os
+import re
 import json
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Tuple, List
 
-from sclass.survival.models import Claim, EvidenceReceipt, VerificationResult
+from sclass.survival.models import (
+    Claim,
+    EvidenceReceipt,
+    VerificationResult,
+    ProposedEvidence,
+    ClaimedEvidence,
+    LIFECYCLE_INTEGRITY_VERIFIED,
+    LIFECYCLE_CLAIM_VERIFIED,
+)
 from sclass.survival.evidence import save_receipt, load_receipt
 from sclass.survival.ledger import LocalLedger
 from sclass.survival.verification.evidence import check_verification_staleness
+
+
+TEST_PASS_PATTERNS = [
+    re.compile(r"\b(tests?)\s+(?:are\s+)?(?:pass|passed|passing|green|succeeded)\b", re.IGNORECASE),
+    re.compile(r"\b(?:all\s+)?tests?\s+pass\b", re.IGNORECASE),
+    re.compile(r"\bpytest\b(?:\s+(?:pass|passed|clean|green|succeed))?", re.IGNORECASE),
+    re.compile(r"\b(?:all\s+)?(?:green|passing)\b.*\btests?\b", re.IGNORECASE),
+    re.compile(r"\b(?:implementation|build|suite)\s+is\s+green\b", re.IGNORECASE),
+    re.compile(r"\b100%\s+(?:pass|success|tests)\b", re.IGNORECASE),
+    re.compile(r"\bunit\s+tests?\s+(?:pass|passed)\b", re.IGNORECASE),
+]
+
+DOC_PATTERNS = [
+    re.compile(r"\b(?:documentation|docs?|readme|comments?|docstring)\b", re.IGNORECASE),
+]
+
+
+def is_test_assertion(claim: Claim) -> bool:
+    """Determines if a claim asserts test execution results with structured precedence."""
+    if claim.claim_type == "test_pass":
+        return True
+    if claim.claim_type in ("documentation", "doc_change", "docs"):
+        return False
+
+    stmt = claim.statement.strip()
+    if any(p.search(stmt) for p in DOC_PATTERNS):
+        has_pass_assertion = any(p.search(stmt) for p in TEST_PASS_PATTERNS)
+        if not has_pass_assertion:
+            return False
+
+    for p in TEST_PASS_PATTERNS:
+        if p.search(stmt):
+            return True
+
+    return False
 
 
 def _update_sclass_hooks_verified(workspace_dir: str, agent: str = "") -> None:
@@ -74,10 +118,36 @@ def verify_claim(
             ledger.append("rejection", result.to_dict())
         return result
 
-    # Attack 2: Fabricated or tampered evidence receipt
+    # Finding #4: Distinguish Observed Receipt vs Proposed/Claimed Evidence
+    if isinstance(evidence, (ProposedEvidence, ClaimedEvidence)) or not getattr(evidence, "is_observed", True):
+        result = VerificationResult(
+            status="REJECT",
+            claim_id=claim.claim_id,
+            reason="Claim rejected: Agent supplied proposed/claimed evidence, but verification requires an independently observed receipt.",
+            receipt_id=getattr(evidence, "receipt_id", None),
+        )
+        if ledger:
+            ledger.append("rejection", result.to_dict())
+        return result
+
+    # Finding #2: Missing receipt hash must be REJECT. No third state (missing -> REJECT, invalid -> REJECT, valid -> continue).
+    recorded_hash = getattr(evidence, "receipt_hash", None) or (
+        evidence.metadata.get("receipt_hash") if isinstance(evidence.metadata, dict) else None
+    )
+    if not recorded_hash:
+        result = VerificationResult(
+            status="REJECT",
+            claim_id=claim.claim_id,
+            reason="Claim rejected: Missing evidence receipt hash. Persisted authoritative receipt must have cryptographic receipt_hash.",
+            receipt_id=evidence.receipt_id,
+        )
+        if ledger:
+            ledger.append("rejection", result.to_dict())
+        return result
+
+    # Finding #1: Hash integrity verification across all security-relevant fields
     expected_hash = evidence.compute_hash()
-    recorded_hash = evidence.metadata.get("receipt_hash") or getattr(evidence, "receipt_hash", None)
-    if recorded_hash and recorded_hash != expected_hash:
+    if recorded_hash != expected_hash:
         result = VerificationResult(
             status="REJECT",
             claim_id=claim.claim_id,
@@ -88,11 +158,11 @@ def verify_claim(
             ledger.append("rejection", result.to_dict())
         return result
 
-    # Attack 1: Agent claims tests passed, actual exit code != 0 or tests failed
-    is_test_claim = (
-        claim.claim_type == "test_pass"
-        or any(w in claim.statement.lower() for w in ("test", "pytest", "tests pass", "all passed"))
-    )
+    # Finding #6: Lifecycle transition to INTEGRITY_VERIFIED
+    evidence.lifecycle_state = LIFECYCLE_INTEGRITY_VERIFIED
+
+    # Finding #7: Structured claim evaluation
+    is_test_claim = is_test_assertion(claim)
 
     if is_test_claim:
         if evidence.exit_code != 0:
@@ -124,7 +194,7 @@ def verify_claim(
                     ledger.append("rejection", result.to_dict())
                 return result
 
-    # Attack 8: Evidence is stale
+    # Finding #3: Staleness check (including repository state & same-file fingerprints)
     is_fresh, staleness_reason = check_verification_staleness(evidence, ws)
     if not is_fresh:
         result = VerificationResult(
@@ -157,8 +227,9 @@ def verify_claim(
     for ev in evidence.evidence:
         passed += ev.get("passed_tests", 0)
 
-    # All gates cleared: ACCEPT
+    # Finding #6: All gates cleared -> CLAIM_VERIFIED lifecycle transition
     evidence.verified = True
+    evidence.lifecycle_state = LIFECYCLE_CLAIM_VERIFIED
     save_receipt(evidence, ws)
 
     # Update last_verified in sclass_hooks.json

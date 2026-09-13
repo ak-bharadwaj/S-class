@@ -16,9 +16,14 @@ from sclass.survival.models import (
     AuthorizationRequest,
     AuthorizationDecision,
     EvidenceReceipt,
+    ObservedReceipt,
+    ProposedEvidence,
+    ClaimedEvidence,
     Claim,
     VerificationResult,
     AdapterCapabilities,
+    LIFECYCLE_OBSERVED,
+    LIFECYCLE_CLAIM_VERIFIED,
 )
 from sclass.survival.authority import (
     PathAuthority,
@@ -86,6 +91,9 @@ def test_evidence_receipt_hashing():
         stdout_hash="h1",
         stderr_hash="h2",
         files_changed=["a.py"],
+        file_hashes={"a.py": "112233"},
+        evidence=[{"passed_tests": 10}],
+        metadata={"runner": "pytest"},
     )
     h1 = receipt.compute_hash()
     assert isinstance(h1, str)
@@ -95,6 +103,71 @@ def test_evidence_receipt_hashing():
     d = receipt.to_dict()
     deserialized = EvidenceReceipt.from_dict(d)
     assert deserialized.compute_hash() == h1
+
+    # Finding #1: Evidence payload changes canonical hash
+    receipt.evidence = [{"passed_tests": 999}]
+    assert receipt.compute_hash() != h1
+    receipt.evidence = [{"passed_tests": 10}]
+
+    # Finding #1: Metadata changes canonical hash
+    receipt.metadata = {"runner": "modified"}
+    assert receipt.compute_hash() != h1
+    receipt.metadata = {"runner": "pytest"}
+
+    # Finding #1: File hashes change canonical hash
+    receipt.file_hashes = {"a.py": "999999"}
+    assert receipt.compute_hash() != h1
+    receipt.file_hashes = {"a.py": "112233"}
+
+    # Finding #6: Mutable lifecycle & verified states do NOT change observation hash
+    assert receipt.compute_hash() == h1
+    receipt.verified = True
+    assert receipt.compute_hash() == h1
+    receipt.lifecycle_state = LIFECYCLE_CLAIM_VERIFIED
+    assert receipt.compute_hash() == h1
+
+
+def test_proposed_vs_observed_evidence_models():
+    """Finding #4: Explicit distinction between ProposedEvidence and ObservedReceipt."""
+    prop = ProposedEvidence(
+        statement="All 20 tests pass",
+        exit_code=0,
+        files_changed=("src/foo.py",),
+        evidence=({"passed_tests": 20},),
+    )
+    assert prop.is_observed is False
+    d = prop.to_dict()
+    assert d["is_observed"] is False
+    assert d["files_changed"] == ["src/foo.py"]
+
+    # Claim accepts ProposedEvidence
+    claim = Claim(
+        claim_id="c_prop",
+        task_id="t_prop",
+        statement="Done",
+        proposed_evidence=prop,
+    )
+    cd = claim.to_dict()
+    assert cd["proposed_evidence"]["statement"] == "All 20 tests pass"
+
+    # ObservedReceipt has is_observed=True by default
+    obs = ObservedReceipt(
+        receipt_id="rcpt_obs",
+        task_id="t1",
+        claim_id="c1",
+        agent="sclass",
+        action="observe",
+        workspace="/tmp",
+        base_commit="000",
+        result_commit="000",
+        command="pytest",
+        exit_code=0,
+        started_at="",
+        finished_at="",
+        stdout_hash="h1",
+        stderr_hash="h2",
+    )
+    assert obs.is_observed is True
 
 
 def test_ledger_chaining_and_tampering_detection(temp_ws):

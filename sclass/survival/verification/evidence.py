@@ -34,6 +34,18 @@ def check_verification_staleness(receipt: EvidenceReceipt, workspace_dir: str) -
         if receipt.result_commit != current_head:
             return (False, f"Repository HEAD advanced from {receipt.result_commit[:8]} to {current_head[:8]}")
 
+    ws = os.path.abspath(workspace_dir)
+
+    # Finding #3: Content hash fingerprint check for recorded files (same-file staleness hole defense)
+    if receipt.file_hashes:
+        for rel_path, recorded_hash in sorted(receipt.file_hashes.items()):
+            full_path = os.path.join(ws, rel_path)
+            current_hash = ev_mod.compute_file_hash(full_path)
+            if current_hash is None:
+                return (False, f"Recorded file was deleted after verification: {rel_path}")
+            if current_hash != recorded_hash:
+                return (False, f"Recorded file content changed after verification: {rel_path} (expected hash {recorded_hash[:8]}, got {current_hash[:8]})")
+
     # Check for uncommitted changes introduced after execution
     changed = get_changed_fn(workspace_dir, receipt.result_commit)
     # Filter out .agents directory changes
