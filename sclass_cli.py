@@ -26,6 +26,106 @@ from typing import Optional, List, Dict, Any, Tuple
 
 from sdk_interface import SClassSDK
 
+try:
+    import typer
+    HAS_TYPER = True
+except ImportError:
+    typer = None
+    HAS_TYPER = False
+
+cli_app = typer.Typer(
+    name="sclass",
+    help="S-Class: Authoritative AI Coding Control Plane & Execution Microkernel",
+    add_completion=False,
+    no_args_is_help=False
+) if HAS_TYPER else None
+
+
+def _resolve_workspace(workspace: Optional[str] = None) -> str:
+    """Authoritatively resolves target workspace directory and sets SCLASS_WORKSPACE env var."""
+    resolved = (
+        workspace
+        or os.environ.get("SCLASS_WORKSPACE")
+        or os.environ.get("WORKSPACE_DIR")
+        or os.getcwd()
+    )
+    target = os.path.abspath(resolved)
+    os.makedirs(target, exist_ok=True)
+    os.environ["SCLASS_WORKSPACE"] = target
+    return target
+
+
+if cli_app is not None:
+    @cli_app.command(name="goal", help="Autonomous Goal Execution across the FSM (/goal)")
+    def _typer_goal(
+        objective: str = typer.Argument("Autonomous Objective", help="Objective description to execute"),
+        workspace: Optional[str] = typer.Option(None, "--workspace", "-w", "--dir", "-C", help="Target external workspace directory")
+    ):
+        ws = _resolve_workspace(workspace)
+        sdk = SClassSDK(workspace_dir=ws)
+        print(f"[*] Executing S-Class /goal in workspace: {sdk.workspace_dir}")
+        res = sdk.execute_goal(goal=objective)
+        print_result_with_epistemic_provenance(res)
+
+    @cli_app.command(name="boost", help="High-velocity swarm execution with CKG pre-indexing (/boost)")
+    def _typer_boost(
+        task: str = typer.Argument("High-Velocity Task", help="Task description to execute"),
+        workspace: Optional[str] = typer.Option(None, "--workspace", "-w", "--dir", "-C", help="Target external workspace directory")
+    ):
+        ws = _resolve_workspace(workspace)
+        sdk = SClassSDK(workspace_dir=ws)
+        print(f"[*] Executing S-Class /boost in workspace: {sdk.workspace_dir}")
+        res = sdk.execute_boost(goal_or_task=task)
+        print_result_with_epistemic_provenance(res)
+
+    @cli_app.command(name="learn", help="Automated learning capture and memory promotion (/learn)")
+    def _typer_learn(
+        pattern: Optional[str] = typer.Argument(None, help="Failure pattern to capture"),
+        fix: str = typer.Argument("Learned engineering principle", help="Fix description"),
+        workspace: Optional[str] = typer.Option(None, "--workspace", "-w", "--dir", "-C", help="Target external workspace directory")
+    ):
+        ws = _resolve_workspace(workspace)
+        sdk = SClassSDK(workspace_dir=ws)
+        print(f"[*] Executing S-Class /learn in workspace: {sdk.workspace_dir} (pattern: {pattern or 'all'})")
+        res = sdk.execute_learn(pattern=pattern, fix_description=fix if pattern else None)
+        print(json.dumps(res, indent=2))
+
+    @cli_app.command(name="status", help="Current FSM state and task pipeline summary (/status)")
+    def _typer_status(
+        json_output: bool = typer.Option(False, "--json", help="Output raw JSON state only"),
+        workspace: Optional[str] = typer.Option(None, "--workspace", "-w", "--dir", "-C", help="Target external workspace directory")
+    ):
+        ws = _resolve_workspace(workspace)
+        sdk = SClassSDK(workspace_dir=ws)
+        state = sdk.get_fsm_state()
+        if not json_output:
+            render_rich_status(state, sdk.workspace_dir)
+        print(json.dumps(state, indent=2))
+
+    @cli_app.command(name="watch", help="Real-time FSM watch monitor & terminal dashboard (/watch)")
+    def _typer_watch(
+        workspace: Optional[str] = typer.Option(None, "--workspace", "-w", "--dir", "-C", help="Target external workspace directory")
+    ):
+        ws = _resolve_workspace(workspace)
+        sdk = SClassSDK(workspace_dir=ws)
+        try:
+            import sclass_watch_tui
+            if sclass_watch_tui.HAS_TEXTUAL and sys.stdout.isatty():
+                return sclass_watch_tui.launch_watch_tui(workspace_dir=sdk.workspace_dir)
+        except Exception:
+            pass
+        return run_watch_dashboard(workspace=sdk.workspace_dir)
+
+    @cli_app.command(name="advance", help="Step FSM forward one state (/advance)")
+    def _typer_advance(
+        workspace: Optional[str] = typer.Option(None, "--workspace", "-w", "--dir", "-C", help="Target external workspace directory")
+    ):
+        ws = _resolve_workspace(workspace)
+        sdk = SClassSDK(workspace_dir=ws)
+        print(f"[*] S-Class Advancing phase in workspace: {sdk.workspace_dir}")
+        res = sdk.advance_phase()
+        print(json.dumps(res, indent=2))
+
 
 def extract_workspace_arg(argv: List[str]) -> Tuple[Optional[str], List[str]]:
     """

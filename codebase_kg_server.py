@@ -99,6 +99,53 @@ def create_codebase_kg_mcp_server(workspace_dir: Optional[str] = None) -> Option
         res = kg_backend.handle_tool_call("get_symbol_neighborhood", {"node_id": node_id})
         return json.dumps(res, indent=2)
 
+    # === MCP Resources ===
+    @server.resource("sclass://graph/stats")
+    def get_graph_stats_resource() -> str:
+        """Exposes Codebase Knowledge Graph summary statistics as an MCP resource."""
+        stats = kg_backend.graph_db.get_stats()
+        return json.dumps(stats, indent=2)
+
+    @server.resource("sclass://graph/nodes")
+    def get_graph_nodes_resource() -> str:
+        """Exposes indexed AST symbols and nodes as a browsable MCP resource."""
+        res = kg_backend.tool_graph_query(pattern="", limit=100)
+        return json.dumps(res, indent=2)
+
+    @server.resource("sclass://graph/adrs")
+    def get_graph_adrs_resource() -> str:
+        """Exposes recorded Architectural Decision Records (ADRs) as an MCP resource."""
+        res = kg_backend.tool_graph_query(pattern="", node_type="ADR", limit=50)
+        return json.dumps(res, indent=2)
+
+    # === MCP Prompts ===
+    @server.prompt(name="sclass_architecture_review", description="Guided codebase architecture review and slice explanation")
+    def sclass_architecture_review_prompt(query: str = "core architecture and data flow"):
+        slice_info = kg_backend.tool_explain_architecture_slice(query=query, top_k=3)
+        return [
+            {
+                "role": "user",
+                "content": {
+                    "type": "text",
+                    "text": f"Perform a comprehensive architecture review for query '{query}' based on this Codebase Knowledge Graph slice:\n\n{json.dumps(slice_info, indent=2)}"
+                }
+            }
+        ]
+
+    @server.prompt(name="sclass_blast_radius_investigation", description="Deep blast radius and dependency risk investigation")
+    def sclass_blast_radius_investigation_prompt(node_id: str):
+        impact = kg_backend.tool_impact_analysis(node_id=node_id, max_hops=3)
+        neighborhood = kg_backend.tool_get_symbol_neighborhood(node_id=node_id)
+        return [
+            {
+                "role": "user",
+                "content": {
+                    "type": "text",
+                    "text": f"Analyze the blast radius and potential regressions for modifying symbol '{node_id}':\n\nImpact Analysis:\n{json.dumps(impact, indent=2)}\n\n1-Hop Neighborhood:\n{json.dumps(neighborhood, indent=2)}"
+                }
+            }
+        ]
+
     return server
 
 

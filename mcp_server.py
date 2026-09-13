@@ -134,6 +134,45 @@ def create_mcp_server(workspace_dir: Optional[str] = None) -> Optional[Any]:
         res = handle_tool_call("sclass_learn", {"pattern": pattern, "fix_description": fix_description}, workspace_dir=workspace_dir or ws)
         return json.dumps(res, indent=2)
 
+    # === MCP Resources ===
+    @server.resource("sclass://orchestration/state")
+    def get_orchestration_state_resource() -> str:
+        """Exposes current authoritative FSM orchestration state as an MCP resource."""
+        state = runtime.get_state(ws)
+        return json.dumps(asdict(state), indent=2)
+
+    @server.resource("sclass://orchestration/history")
+    def get_orchestration_history_resource() -> str:
+        """Exposes complete FSM state transition and decision audit history."""
+        state = runtime.get_state(ws)
+        return json.dumps(state.transitionHistory, indent=2)
+
+    # === MCP Prompts ===
+    @server.prompt(name="sclass_goal_workflow", description="Autonomous goal execution playbook under S-Class governance")
+    def sclass_goal_workflow_prompt(goal: str = "Implement feature with end-to-end testing"):
+        return [
+            {
+                "role": "user",
+                "content": {
+                    "type": "text",
+                    "text": f"You are executing under S-Class governance microkernel.\nTarget Goal: {goal}\n\nPlease inspect current state via sclass://orchestration/state, synthesize spec via sclass_spec_synthesis, and advance through FSM phases with rigorous evidence verification."
+                }
+            }
+        ]
+
+    @server.prompt(name="sclass_audit_investigation", description="Replay audit and evidence verification investigation")
+    def sclass_audit_investigation_prompt():
+        replay_res = replay.ReplayEngine.audit_replay(ws)
+        return [
+            {
+                "role": "user",
+                "content": {
+                    "type": "text",
+                    "text": f"Perform an audit investigation on S-Class execution trail.\nReplay Report:\n{json.dumps(asdict(replay_res), indent=2)}"
+                }
+            }
+        ]
+
     return server
 
 
