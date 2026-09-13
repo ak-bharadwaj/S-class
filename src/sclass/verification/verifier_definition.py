@@ -55,7 +55,7 @@ class VerifierDefinition:
         base = os.path.basename(interpreter_name).lower()
         if base.endswith(".exe"):
             base = base[:-4]
-        if base in ("python", "python3", "py"):
+        if base in ("python", "python3", "py") or base.startswith("python3.") or base.startswith("python2.") or base.startswith("pypy"):
             for rule in self.interpreter_rules:
                 rule_lower = rule.lower()
                 for i, arg in enumerate(args):

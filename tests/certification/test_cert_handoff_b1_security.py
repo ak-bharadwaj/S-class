@@ -533,3 +533,364 @@ def test_capability_evaluator_all_11_dimensions(test_ws):
     assert dec_no_appr.allowed is False
     assert dec_no_appr.requires_approval is True
     assert any("approval_required" in f for f in dec_no_appr.failed_constraints)
+
+
+# ==============================================================================
+# 8. B.1.2 ADVERSARIAL TRUST-BOUNDARY AND PROVENANCE TESTS
+# ==============================================================================
+
+def test_fake_caller_authorization_decision_blocked(test_ws):
+    """
+    Adversarial Attack: Caller manufactures a dummy object with is_allowed=True.
+    Invariant: Agent/caller cannot manufacture authorization evidence.
+    ObservationConvergence must reject the fake decision and raise SecurityViolationError.
+    """
+    from sclass.observation.convergence import ObservationConvergence
+    from sclass.core.errors import SecurityViolationError
+
+    class FakeDecision:
+        is_allowed = True
+        outcome = "allow"
+        policy_id = "FORGED-POLICY"
+        reason = "I authorized myself"
+
+    req = ActionRequest(
+        actor="untrusted_agent",
+        capability=CAP_TERMINAL_EXECUTE,
+        action="run_command",
+        target="echo 'pwned'",
+        workspace=test_ws,
+    )
+
+    with pytest.raises(SecurityViolationError) as exc_info:
+        ObservationConvergence.execute_and_observe(
+            request=req,
+            authorization=FakeDecision(),
+            command="echo 'pwned'",
+        )
+
+    assert "unauthentic" in str(exc_info.value).lower() or "not bound" in str(exc_info.value).lower()
+
+
+def test_authorization_bound_to_request_hash(test_ws):
+    """
+    Adversarial Attack: Decision minted for Request A is transplanted to execute Request B.
+    Invariant: Authorization must be cryptographically bound to canonical request hash.
+    ObservationConvergence must detect the hash mismatch and raise SecurityViolationError.
+    """
+    from sclass.observation.convergence import ObservationConvergence
+    from sclass.policy.authorization_service import AuthorizationService
+    from sclass.core.errors import SecurityViolationError
+
+    service = AuthorizationService()
+
+    req_a = ActionRequest(
+        actor="dev",
+        capability=CAP_TERMINAL_EXECUTE,
+        action="run_command",
+        target="echo 'harmless'",
+        workspace=test_ws,
+    )
+    decision_a = service.authorize(req_a, workspace_dir=test_ws)
+    assert decision_a.is_allowed is True
+
+    # Hostile Request B attempting to reuse Decision A
+    req_b = ActionRequest(
+        actor="dev",
+        capability=CAP_TERMINAL_EXECUTE,
+        action="run_command",
+        target="rm -rf /",
+        workspace=test_ws,
+    )
+
+    with pytest.raises(SecurityViolationError) as exc_info:
+        ObservationConvergence.execute_and_observe(
+            request=req_b,
+            authorization=decision_a,
+            command="rm -rf /",
+        )
+
+    assert "mismatch" in str(exc_info.value).lower() or "not bound" in str(exc_info.value).lower()
+
+
+def test_tampered_authorization_decision_blocked(test_ws):
+    """
+    Adversarial Attack: Caller takes a DENY decision and tampers with outcome to ALLOW.
+    Invariant: HMAC integrity token verification must fail on tampered decision.
+    """
+    from sclass.observation.convergence import ObservationConvergence
+    from sclass.policy.authorization_service import AuthorizationService
+    from sclass.domain.action import DecisionOutcome
+    from sclass.core.errors import SecurityViolationError
+
+    service = AuthorizationService()
+
+    req = ActionRequest(
+        actor="dev",
+        capability=CAP_TERMINAL_EXECUTE,
+        action="run_command",
+        target="secrets/api.key",
+        workspace=test_ws,
+    )
+    # Mint legitimate decision
+    sealed = service.seal_decision(
+        request=req,
+        outcome=DecisionOutcome.DENY,
+        policy_id="SEC-DENY",
+        risk_level="critical",
+        reason="Target is secret",
+    )
+
+    # Attacker tampers with decision outcome
+    tampered = AuthorizationDecision(
+        outcome=DecisionOutcome.ALLOW,
+        policy_id=sealed.policy_id,
+        risk_level=sealed.risk_level,
+        reason=sealed.reason,
+        evaluated_at=sealed.evaluated_at,
+        issuer=sealed.issuer,
+        request_hash=sealed.request_hash,
+        capability_hash=sealed.capability_hash,
+        policy_version=sealed.policy_version,
+        integrity_token=sealed.integrity_token,  # Old token for DENY!
+    )
+
+    with pytest.raises(SecurityViolationError) as exc_info:
+        ObservationConvergence.execute_and_observe(
+            request=req,
+            authorization=tampered,
+            command="cat secrets/api.key",
+        )
+
+    assert "tamper" in str(exc_info.value).lower() or "forged" in str(exc_info.value).lower()
+
+
+def test_sandbox_backend_fallback_to_host_strictly_refused(monkeypatch, test_ws):
+    """
+    Invariant: NO SANDBOX -> NO SANDBOXED EXECUTION.
+    Even with fallback_to_host=True passed to SandboxBackend, missing sandbox MUST fail closed.
+    """
+    from sclass.execution.backend import SandboxBackend
+    from sclass.core.errors import SecurityViolationError
+
+    # Force bwrap to be unavailable
+    monkeypatch.setattr("shutil.which", lambda prog: None)
+
+    backend = SandboxBackend(backend_type="bubblewrap", fallback_to_host=True)
+    assert backend.is_available() is False
+
+    with pytest.raises(SecurityViolationError) as exc_info:
+        backend.execute(
+            command=["echo", "uncontained"],
+            cwd=test_ws,
+        )
+
+    assert "no sandbox -> no sandboxed execution" in str(exc_info.value).lower()
+
+
+def test_direct_bubblewrap_wrap_command_fails_closed(monkeypatch):
+    """
+    Invariant: Lower primitive BubblewrapSandbox.wrap_command() must fail closed
+    and raise SecurityViolationError when unavailable, never return raw uncontained command.
+    """
+    from sclass.execution.sandbox import BubblewrapSandbox
+    from sclass.core.errors import SecurityViolationError
+
+    monkeypatch.setattr("shutil.which", lambda prog: None)
+    bwrap = BubblewrapSandbox()
+    assert bwrap.is_available() is False
+
+    with pytest.raises(SecurityViolationError) as exc_info:
+        bwrap.wrap_command(["rm", "-rf", "/tmp/test"], cwd="/tmp")
+
+    assert "no sandbox -> no sandboxed execution" in str(exc_info.value).lower()
+
+
+def test_direct_container_wrap_command_fails_closed(monkeypatch):
+    """
+    Invariant: ContainerSandbox.wrap_command() must fail closed when docker/podman is missing.
+    """
+    from sclass.execution.sandbox import ContainerSandbox
+    from sclass.core.errors import SecurityViolationError
+
+    monkeypatch.setattr("shutil.which", lambda prog: None)
+    cs = ContainerSandbox()
+    assert cs.is_available() is False
+
+    with pytest.raises(SecurityViolationError) as exc_info:
+        cs.wrap_command(["echo", "hello"], cwd="/tmp")
+
+    assert "no sandbox -> no sandboxed execution" in str(exc_info.value).lower()
+
+
+def test_container_wrap_command_authoritatively_applies_network_none(monkeypatch):
+    """
+    Invariant: ContainerSandbox must authoritatively respect SandboxConfig.network_mode='none'
+    and never hardcode '--network host'.
+    """
+    from sclass.execution.sandbox import ContainerSandbox
+    from sclass.execution.backend import SandboxConfig
+
+    monkeypatch.setattr("shutil.which", lambda prog: "/usr/bin/docker" if prog == "docker" else None)
+    cs = ContainerSandbox()
+    assert cs.is_available() is True
+
+    cfg = SandboxConfig(
+        backend_type="container",
+        network_mode="none",
+        resource_limits={"max_memory_mb": 512},
+    )
+
+    args = cs.wrap_command(["pytest"], cwd="/tmp", config=cfg)
+    assert "--network" in args
+    net_idx = args.index("--network")
+    assert args[net_idx + 1] == "none"
+    assert "host" not in args
+    assert "--memory" in args
+    assert "512m" in args
+
+
+def test_fake_is_observed_evidence_without_provenance_rejected(test_ws):
+    """
+    Invariant: NO AUTHENTIC EVIDENCE -> NO ACCEPTANCE.
+    A forged evidence object claiming is_observed=True without authentic S-Class provenance
+    must be demoted to REJECT.
+    """
+    from sclass.verification.plan import VerificationPlan
+    from sclass.domain.claim import Claim
+
+    plan = VerificationPlan(
+        plan_id="plan_auth_test",
+        target_claims=[Claim(claim_id="clm_fake", task_id="t_auth", statement="All tests pass", claim_type="test_pass")],
+        required_evidence_kinds=["test"],
+    )
+
+    # Forged object with is_fake flag or unverified hash
+    fake_ev = {
+        "evidence_kind": "test",
+        "source": "pytest",
+        "is_observed": True,
+        "is_fake": True,
+        "passed_count": 10,
+    }
+
+    results = plan.coordinate(evidence_items=[fake_ev], workspace_dir=test_ws)
+    assert results["clm_fake"].status == "REJECT"
+    assert "unauthentic" in results["clm_fake"].reason.lower() or "independently observed" in results["clm_fake"].reason.lower()
+
+
+
+
+def test_fake_approval_token_denied(test_ws):
+    """
+    Invariant: Presence of an arbitrary approval_token string is not proof of approval.
+    Unverified or forged tokens must fail closed with unverified_approval.
+    """
+    cap = Capability(
+        operation=CAP_TERMINAL_EXECUTE,
+        approval=True,
+    )
+    req = ActionRequest(
+        capability=CAP_TERMINAL_EXECUTE,
+        action="run_command",
+        target="deploy.sh",
+        parameters={"approval_token": "arbitrary_fake_token_12345"},
+        workspace=test_ws,
+    )
+
+    dec = cap.evaluate_request(req, test_ws)
+    assert dec.allowed is False
+    assert any("unverified_approval" in f for f in dec.failed_constraints)
+
+
+def test_malformed_risk_fails_closed(test_ws):
+    """
+    Invariant: UNKNOWN SECURITY METADATA -> DENY.
+    Malformed or unrecognized risk levels must fail closed, never default to low risk.
+    """
+    cap = Capability(
+        operation=CAP_TERMINAL_EXECUTE,
+        risk="medium",
+    )
+    req = ActionRequest(
+        capability=CAP_TERMINAL_EXECUTE,
+        action="run_command",
+        target="test.sh",
+        parameters={"risk": "ultra_mega_critical_unknown"},
+        workspace=test_ws,
+    )
+
+    dec = cap.evaluate_request(req, test_ws)
+    assert dec.allowed is False
+    assert any("malformed_risk" in f for f in dec.failed_constraints)
+
+
+def test_malformed_duration_fails_closed(test_ws):
+    """
+    Invariant: Malformed duration/timeout must fail closed, never silently ignored.
+    """
+    cap = Capability(
+        operation=CAP_TERMINAL_EXECUTE,
+        duration=30.0,
+    )
+    req = ActionRequest(
+        capability=CAP_TERMINAL_EXECUTE,
+        action="run_command",
+        target="test.sh",
+        parameters={"timeout": "not-a-number-duration"},
+        workspace=test_ws,
+    )
+
+    dec = cap.evaluate_request(req, test_ws)
+    assert dec.allowed is False
+    assert any("malformed_duration" in f for f in dec.failed_constraints)
+
+
+def test_credential_target_mismatch_fails_closed(test_ws):
+    """
+    Invariant: Accessing credentialed target with unauthorized/mismatched credentials must fail closed.
+    """
+    cap = Capability(
+        operation=CAP_SECRET_READ,
+        credentials=["DEV_CREDENTIAL"],
+    )
+    req = ActionRequest(
+        capability=CAP_SECRET_READ,
+        action="read_file",
+        target=".env",
+        parameters={"credentials": ["PROD_AWS_SECRET_KEY"]},
+        workspace=test_ws,
+    )
+
+    dec = cap.evaluate_request(req, test_ws)
+    assert dec.allowed is False
+    assert any("credential_violation" in f for f in dec.failed_constraints)
+
+
+def test_exact_verifier_identity_no_substring_spoof(test_ws):
+    """
+    Invariant: Verifier identity must be canonical and exact.
+    Substring matching is strictly forbidden: 'test' must not satisfy required verifier 'pytest'.
+    """
+    from sclass.verification.plan import VerificationPlan
+    from sclass.domain.claim import Claim
+
+    plan = VerificationPlan(
+        plan_id="plan_verifier_exact",
+        target_claims=[Claim(claim_id="c_test", task_id="t_verifier", statement="Tests passed", claim_type="test_pass")],
+        required_evidence_kinds=["test"],
+        verifier_ids=["pytest"],
+    )
+
+    # Provider is 'test', which contains in 'pytest', but is NOT an exact match
+    ev_substring_spoof = TestEvidence(
+        source="test",
+        is_observed=True,
+        passed_count=5,
+        failed_count=0,
+    )
+
+    results = plan.coordinate(evidence_items=[ev_substring_spoof], workspace_dir=test_ws)
+    # Since required verifier 'pytest' was not satisfied by 'test', verdict must be INCONCLUSIVE
+    assert results["c_test"].status == "INCONCLUSIVE"
+    assert "missing: ['pytest']" in results["c_test"].reason

@@ -58,31 +58,40 @@ class BubblewrapSandbox:
         cwd: str,
         writable_paths: Optional[List[str]] = None,
         readonly_paths: Optional[List[str]] = None,
+        config: Optional[Any] = None,
     ) -> List[str]:
         if not self.is_available():
-            return list(command)
+            from sclass.core.errors import SecurityViolationError
+            raise SecurityViolationError(
+                "NO SANDBOX -> NO SANDBOXED EXECUTION: Bubblewrap (bwrap) is not installed or available on this system. "
+                "Fail-closed: cannot wrap command without sandbox containment."
+            )
 
-        args = [
-            "bwrap",
-            "--ro-bind", "/usr", "/usr",
-            "--ro-bind", "/lib", "/lib",
-            "--ro-bind", "/lib64", "/lib64",
-            "--ro-bind", "/bin", "/bin",
-            "--ro-bind", "/etc/resolv.conf", "/etc/resolv.conf",
-            "--proc", "/proc",
-            "--dev", "/dev",
-            "--unshare-all",
-            "--share-net",
-            "--bind", cwd, cwd,
-            "--chdir", cwd,
-        ]
-        if writable_paths:
-            for p in writable_paths:
-                args.extend(["--bind", p, p])
+        net_mode = getattr(config, "network_mode", "none") if config else "none"
+        ro_binds = list(getattr(config, "read_only_binds", [])) if config else ["/usr", "/lib", "/lib64", "/bin", "/etc/resolv.conf"]
+        wr_binds = list(getattr(config, "writable_binds", [])) if config else [cwd]
+
         if readonly_paths:
-            for p in readonly_paths:
-                args.extend(["--ro-bind", p, p])
+            ro_binds.extend(readonly_paths)
+        if writable_paths:
+            wr_binds.extend(writable_paths)
 
+        args = ["bwrap"]
+        for ro in sorted(set(ro_binds)):
+            if os.path.exists(ro):
+                args.extend(["--ro-bind", ro, ro])
+
+        for wr in sorted(set(wr_binds)):
+            if os.path.exists(wr):
+                args.extend(["--bind", wr, wr])
+
+        args.extend(["--proc", "/proc", "--dev", "/dev", "--unshare-all"])
+        if net_mode == "host":
+            args.append("--share-net")
+        else:
+            args.append("--unshare-net")
+
+        args.extend(["--chdir", cwd])
         args.extend(command)
         return args
 
@@ -105,21 +114,51 @@ class ContainerSandbox:
         cwd: str,
         writable_paths: Optional[List[str]] = None,
         readonly_paths: Optional[List[str]] = None,
+        config: Optional[Any] = None,
     ) -> List[str]:
         runtime = "docker" if shutil.which("docker") else "podman"
         if not self.is_available():
             from sclass.core.errors import SecurityViolationError
             raise SecurityViolationError(
-                f"Container runtime ({runtime}) is not installed or available on this system."
+                f"NO SANDBOX -> NO SANDBOXED EXECUTION: Container runtime ({runtime}) is not installed or available on this system. "
+                "Fail-closed: cannot wrap command without sandbox containment."
             )
+
+        net_mode = getattr(config, "network_mode", "none") if config else "none"
+        ro_binds = list(getattr(config, "read_only_binds", [])) if config else []
+        wr_binds = list(getattr(config, "writable_binds", [])) if config else [os.path.abspath(cwd)]
+
+        if readonly_paths:
+            ro_binds.extend(readonly_paths)
+        if writable_paths:
+            wr_binds.extend(writable_paths)
 
         args = [
             runtime, "run", "--rm",
-            "-v", f"{os.path.abspath(cwd)}:{os.path.abspath(cwd)}:rw",
             "-w", os.path.abspath(cwd),
-            "--network", "host",
-            self.image,
         ]
+
+        if net_mode == "host":
+            args.extend(["--network", "host"])
+        else:
+            args.extend(["--network", "none"])
+
+        for wr in sorted(set(wr_binds)):
+            abs_wr = os.path.abspath(wr)
+            args.extend(["-v", f"{abs_wr}:{abs_wr}:rw"])
+
+        for ro in sorted(set(ro_binds)):
+            if os.path.exists(ro):
+                abs_ro = os.path.abspath(ro)
+                args.extend(["-v", f"{abs_ro}:{abs_ro}:ro"])
+
+        # Resource limits from SandboxConfig
+        res_limits = getattr(config, "resource_limits", {}) if config else {}
+        if isinstance(res_limits, dict):
+            if "max_memory_mb" in res_limits:
+                args.extend(["--memory", f"{res_limits['max_memory_mb']}m"])
+
+        args.append(self.image)
         args.extend(command)
         return args
 
@@ -143,22 +182,26 @@ class GVisorSandbox:
         cwd: str,
         writable_paths: Optional[List[str]] = None,
         readonly_paths: Optional[List[str]] = None,
+        config: Optional[Any] = None,
     ) -> List[str]:
         if not self.is_available():
             from sclass.core.errors import SecurityViolationError
             raise SecurityViolationError(
-                "gVisor (runsc) sandbox is not installed or available on this system. "
+                "NO SANDBOX -> NO SANDBOXED EXECUTION: gVisor (runsc) sandbox is not installed or available on this system. "
                 "Fail-closed policy prevents uncontained execution."
             )
+        net_mode = getattr(config, "network_mode", self.network) if config else self.network
+        final_net = "host" if net_mode == "host" else "none"
         args = [
             "runsc",
             "--rootless",
-            f"--network={self.network}",
+            f"--network={final_net}",
             "exec",
             "--cwd", os.path.abspath(cwd),
         ]
         args.extend(command)
         return args
+
 
 
 def get_sandbox_backend(name: str = "host", allow_fallback: bool = False) -> SandboxBackend:

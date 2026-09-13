@@ -66,6 +66,7 @@ class ProcessRunner:
         mode: ExecutionMode = ExecutionMode.HOST_ARGV,
         allow_shell: Optional[bool] = None,
         task_id: Optional[str] = None,
+        config: Optional[Any] = None,
     ) -> ProcessExecutionResult:
         """Executes a command safely, capturing child execution identity and enforcing security policy."""
         ws = os.path.abspath(cwd)
@@ -97,7 +98,10 @@ class ProcessRunner:
         is_shell = (mode == ExecutionMode.HOST_SHELL)
 
         # Apply sandbox wrapper
-        wrapped_tokens = self.sandbox.wrap_command(requested_tokens, cwd=ws)
+        try:
+            wrapped_tokens = self.sandbox.wrap_command(requested_tokens, cwd=ws, config=config)
+        except TypeError:
+            wrapped_tokens = self.sandbox.wrap_command(requested_tokens, cwd=ws)
 
         started_dt = datetime.now(timezone.utc)
         start_mono = time.monotonic()
@@ -116,9 +120,13 @@ class ProcessRunner:
 
         proc = None
         try:
-            cmd_args = wrapped_tokens if not is_shell else (
-                subprocess.list2cmdline(wrapped_tokens) if isinstance(wrapped_tokens, list) else str(wrapped_tokens)
-            )
+            if not is_shell:
+                cmd_args = wrapped_tokens
+            elif isinstance(wrapped_tokens, list):
+                cmd_args = shlex.join(wrapped_tokens) if os.name != "nt" else subprocess.list2cmdline(wrapped_tokens)
+            else:
+                cmd_args = str(wrapped_tokens)
+
             proc = subprocess.Popen(
                 cmd_args,
                 cwd=ws,
@@ -129,6 +137,7 @@ class ProcessRunner:
                 shell=is_shell,
                 env=run_env,
             )
+
             child_pid = proc.pid
             parent_pid = os.getpid()
 

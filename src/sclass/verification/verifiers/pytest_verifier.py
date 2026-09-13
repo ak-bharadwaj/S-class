@@ -29,7 +29,7 @@ class PytestVerifier(Verifier):
             exe_base = exe_base[:-4]
 
         # python -m pytest
-        if exe_base in ("python", "python3", "py"):
+        if exe_base in ("python", "python3", "py") or exe_base.startswith("python3.") or exe_base.startswith("python2.") or exe_base.startswith("pypy"):
             args = tokens[1:]
             if "-c" in args:
                 return DetectionResult(

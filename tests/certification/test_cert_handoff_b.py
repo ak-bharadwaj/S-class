@@ -262,15 +262,25 @@ def test_host_and_sandbox_execution_backends(test_ws):
     assert result.exit_code == 0
     assert "backend_ok" in result.stdout
 
-    # SandboxBackend with fallback
-    sandbox_backend = SandboxBackend(backend_type="bubblewrap", fallback_to_host=True)
-    res_sb = sandbox_backend.execute(
-        command="python -c \"print('sandbox_fallback_ok')\"",
-        cwd=test_ws,
-        request=req,
-    )
-    assert res_sb.exit_code == 0
-    assert "sandbox_fallback_ok" in res_sb.stdout
+    # SandboxBackend: NO SANDBOX -> NO SANDBOXED EXECUTION (fail closed)
+    from sclass.core.errors import SecurityViolationError
+    sandbox_backend = SandboxBackend(backend_type="bubblewrap")
+    if not sandbox_backend.is_available():
+        with pytest.raises(SecurityViolationError):
+            sandbox_backend.execute(
+                command="python -c \"print('sandbox_fallback_ok')\"",
+                cwd=test_ws,
+                request=req,
+            )
+    else:
+        res_sb = sandbox_backend.execute(
+            command="python -c \"print('sandbox_fallback_ok')\"",
+            cwd=test_ws,
+            request=req,
+        )
+        assert res_sb.exit_code == 0
+        assert "sandbox_fallback_ok" in res_sb.stdout
+
 
 
 # ==============================================================================

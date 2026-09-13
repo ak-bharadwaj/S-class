@@ -168,6 +168,11 @@ class AuthorizationDecision:
     remediation: Optional[str] = None
     evaluated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     metadata: Dict[str, Any] = field(default_factory=dict)
+    issuer: str = "S_CLASS"
+    request_hash: str = ""
+    capability_hash: str = ""
+    policy_version: str = "1.0.0"
+    integrity_token: str = ""
 
     @property
     def is_allowed(self) -> bool:
@@ -185,6 +190,18 @@ class AuthorizationDecision:
     def requires_approval(self) -> bool:
         return self.outcome == DecisionOutcome.REQUIRE_APPROVAL
 
+    def verify_integrity(self, secret_key: Optional[bytes] = None) -> bool:
+        """Verifies HMAC integrity token of this decision."""
+        if not self.integrity_token:
+            return False
+        import hmac
+        import hashlib
+        key = secret_key or os.environ.get("SCLASS_AUTH_SECRET", "sclass-internal-authoritative-auth-token-secret-v1").encode("utf-8")
+        out_str = self.outcome.value if isinstance(self.outcome, DecisionOutcome) else str(self.outcome)
+        payload = f"{self.issuer}:{self.request_hash}:{self.capability_hash}:{self.policy_id}:{self.policy_version}:{out_str}:{self.risk_level}:{self.evaluated_at}"
+        expected = hmac.new(key, payload.encode("utf-8"), hashlib.sha256).hexdigest()
+        return hmac.compare_digest(self.integrity_token, expected)
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "outcome": self.outcome.value if isinstance(self.outcome, DecisionOutcome) else str(self.outcome),
@@ -194,6 +211,11 @@ class AuthorizationDecision:
             "remediation": self.remediation,
             "evaluated_at": self.evaluated_at,
             "metadata": dict(self.metadata),
+            "issuer": self.issuer,
+            "request_hash": self.request_hash,
+            "capability_hash": self.capability_hash,
+            "policy_version": self.policy_version,
+            "integrity_token": self.integrity_token,
         }
 
     @classmethod
@@ -212,4 +234,10 @@ class AuthorizationDecision:
             remediation=data.get("remediation"),
             evaluated_at=data.get("evaluated_at", datetime.now(timezone.utc).isoformat()),
             metadata=dict(data.get("metadata", {})),
+            issuer=data.get("issuer", "S_CLASS"),
+            request_hash=data.get("request_hash", ""),
+            capability_hash=data.get("capability_hash", ""),
+            policy_version=data.get("policy_version", "1.0.0"),
+            integrity_token=data.get("integrity_token", ""),
         )
+

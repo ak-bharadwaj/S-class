@@ -49,6 +49,19 @@ class TrustPolicy:
         tmp = tempfile.gettempdir()
         if tmp:
             self.untrusted_dirs.add(os.path.normpath(tmp).lower())
+            try:
+                self.untrusted_dirs.add(os.path.normcase(os.path.realpath(tmp)))
+            except Exception:
+                pass
+            # Also add common temp locations on Linux/macOS
+            for t in ("/tmp", "/var/tmp", "/private/tmp"):
+                if os.path.exists(t):
+                    self.untrusted_dirs.add(os.path.normpath(t).lower())
+                    try:
+                        self.untrusted_dirs.add(os.path.normcase(os.path.realpath(t)))
+                    except Exception:
+                        pass
+
 
 
 class TrustRegistry:
@@ -148,8 +161,10 @@ class TrustRegistry:
         if not target_path or not base_dir:
             return False
         try:
-            norm_t = os.path.normcase(os.path.abspath(target_path))
-            norm_b = os.path.normcase(os.path.abspath(base_dir))
+            norm_t = os.path.normcase(os.path.realpath(os.path.abspath(target_path)))
+            norm_b = os.path.normcase(os.path.realpath(os.path.abspath(base_dir)))
+            if norm_b in ("/", "\\") or (os.name == "nt" and len(norm_b) <= 3 and norm_b.endswith(":\\")):
+                return norm_t == norm_b
             return norm_t == norm_b or norm_t.startswith(norm_b.rstrip(os.sep) + os.sep)
         except Exception:
             return False

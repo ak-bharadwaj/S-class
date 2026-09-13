@@ -58,7 +58,7 @@ def detect_execution_kind(command_or_argv: str | List[str], resolved_executable:
         exe_name = exe_name[:-4]
 
     # Check for python invocations: python -m pytest ...
-    if exe_name in ("python", "python3", "py"):
+    if exe_name in ("python", "python3", "py") or exe_name.startswith("python3.") or exe_name.startswith("python2.") or exe_name.startswith("pypy"):
         args = tokens[1:]
         # If -c is present anywhere before -m, it is arbitrary code execution, never a test runner!
         if "-c" in args:

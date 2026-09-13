@@ -312,32 +312,21 @@ class SandboxBackend(ExecutionBackend):
         sandbox_config = self.compile_config(request=request, capability=capability, workspace_dir=cwd)
 
         # 2. If chosen sandbox is not available on host OS (e.g., bwrap on Windows, runsc missing)
+        # Invariant: NO SANDBOX -> NO SANDBOXED EXECUTION
+        # Security-sensitive sandbox backends fail closed regardless of constructor options.
         if not self.is_available():
+            from sclass.core.errors import SecurityViolationError
             if self.backend_type in ("gvisor", "runsc"):
-                from sclass.core.errors import SecurityViolationError
                 raise SecurityViolationError(
                     "NO SANDBOX -> NO SANDBOXED EXECUTION: gVisor (runsc) is not available on this host. "
                     "gVisor isolation cannot be emulated or degraded to host execution."
                 )
-            if self.fallback_to_host:
-                host_runner = ProcessRunner(sandbox=HostSandbox(), launcher=HostLauncher())
-                return host_runner.run(
-                    command=command,
-                    cwd=cwd,
-                    env=env,
-                    timeout=timeout,
-                    mode=mode,
-                    allow_shell=allow_shell,
-                    task_id=t_id,
-                )
-            else:
-                from sclass.core.errors import SecurityViolationError
-                raise SecurityViolationError(
-                    f"NO SANDBOX -> NO SANDBOXED EXECUTION: Requested sandbox backend '{self.backend_type}' is not available on this host. "
-                    "Fail-closed policy strictly denies uncontained host execution."
-                )
+            raise SecurityViolationError(
+                f"NO SANDBOX -> NO SANDBOXED EXECUTION: Requested sandbox backend '{self.backend_type}' is not available on this host. "
+                "Fail-closed policy strictly denies uncontained host execution."
+            )
 
-        # 3. Apply compiled environment
+        # 3. Apply compiled environment and authoritative config
         merged_env = dict(sandbox_config.env_whitelist)
         if env:
             merged_env.update(env)
@@ -350,7 +339,9 @@ class SandboxBackend(ExecutionBackend):
             mode=mode,
             allow_shell=allow_shell,
             task_id=t_id,
+            config=sandbox_config,
         )
+
 
 
 def get_execution_backend(name: str = "host", **kwargs) -> ExecutionBackend:

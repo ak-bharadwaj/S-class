@@ -6,6 +6,13 @@ from sclass.domain.action import ActionRequest, AuthorizationDecision, DecisionO
 from sclass.control.capabilities import Capability
 from sclass.control.resources import ResourceKind, classify_resource
 from sclass.policy.opa import OPAInputCompiler, OPAClient, OPAPolicyAdapter
+from sclass.policy.authorization_service import (
+    AuthorizationService,
+    compute_canonical_request_hash,
+    compute_canonical_capability_hash,
+    verify_decision_integrity,
+    generate_integrity_token,
+)
 
 # Aliases for naming consistency
 InternalPolicyEngine = DefaultPolicyEngine
@@ -21,6 +28,11 @@ __all__ = [
     "OPAInputCompiler",
     "OPAClient",
     "OPAPolicyAdapter",
+    "AuthorizationService",
+    "compute_canonical_request_hash",
+    "compute_canonical_capability_hash",
+    "verify_decision_integrity",
+    "generate_integrity_token",
     "PolicyContext",
     "SecurityDecision",
     "AuthorizationDecision",
@@ -30,3 +42,4 @@ __all__ = [
     "ResourceKind",
     "classify_resource",
 ]
+

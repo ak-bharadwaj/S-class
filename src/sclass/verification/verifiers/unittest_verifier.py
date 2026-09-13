@@ -26,7 +26,7 @@ class UnittestVerifier(Verifier):
         if exe_base.endswith(".exe"):
             exe_base = exe_base[:-4]
 
-        if exe_base in ("python", "python3", "py"):
+        if exe_base in ("python", "python3", "py") or exe_base.startswith("python3.") or exe_base.startswith("python2.") or exe_base.startswith("pypy"):
             args = tokens[1:]
             for i, arg in enumerate(args):
                 if arg == "-m" and i + 1 < len(args) and args[i + 1].lower() == "unittest":

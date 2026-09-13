@@ -301,37 +301,88 @@ class CapabilityEvaluator:
             failed.append(f"network_violation: network access is prohibited by capability (network={cap_net})")
 
         # 8. Credentials
-        req_creds = params.get("credentials") or []
-        if isinstance(req_creds, str):
-            req_creds = [req_creds]
+        lower_target = str(req_target).lower()
+        lower_cmd = str(params.get("command", "")).lower()
+        is_secret_target = any(s in lower_target for s in (".env", "id_rsa", "id_ed25519", "credentials", "secret", "private_key", "token"))
+
         if req_op == CAP_SECRET_READ and not capability.credentials:
             failed.append("credential_violation: secret.read operation attempted but no credentials allowed in capability")
-        for c in req_creds:
-            if c not in capability.credentials:
-                failed.append(f"credential_violation: credential '{c}' is not permitted by capability whitelist {capability.credentials}")
+        elif is_secret_target and not capability.credentials:
+            failed.append(f"credential_violation: target '{req_target}' is a credential/secret resource but capability allows no credentials")
+
+        if "credentials" in params:
+            req_creds = params["credentials"]
+            if isinstance(req_creds, str):
+                req_creds = [req_creds]
+            elif not isinstance(req_creds, (list, tuple, set)):
+                failed.append(f"malformed_credentials: credentials parameter must be a list or string, got {type(req_creds).__name__}")
+                req_creds = []
+            for c in req_creds:
+                if c not in capability.credentials:
+                    failed.append(f"credential_violation: credential '{c}' is not permitted by capability whitelist {capability.credentials}")
 
         # 9. Duration
         if capability.duration is not None:
+            try:
+                cap_dur = float(capability.duration)
+                if cap_dur <= 0:
+                    failed.append(f"malformed_capability_duration: capability duration must be positive, got '{capability.duration}'")
+            except (ValueError, TypeError):
+                failed.append(f"malformed_capability_duration: capability duration '{capability.duration}' is invalid")
+
             req_duration = params.get("timeout") or params.get("duration") or getattr(request, "timeout", None)
             if req_duration is not None:
                 try:
-                    if float(req_duration) > float(capability.duration):
+                    req_dur_float = float(req_duration)
+                    if req_dur_float <= 0:
+                        failed.append(f"malformed_duration: duration/timeout must be positive, got '{req_duration}'")
+                    elif req_dur_float > float(capability.duration):
                         failed.append(f"duration_exceeded: requested duration/timeout {req_duration}s exceeds capability max {capability.duration}s")
                 except (ValueError, TypeError):
-                    pass
+                    failed.append(f"malformed_duration: requested duration/timeout '{req_duration}' is invalid or unparseable")
 
         # 10. Risk
         risk_levels = {"low": 1, "medium": 2, "high": 3, "critical": 4}
-        cap_risk_num = risk_levels.get(str(capability.risk).lower(), 2)
-        req_risk = getattr(request, "risk_level", None) or params.get("risk", "low")
-        req_risk_num = risk_levels.get(str(req_risk).lower(), 1)
-        if req_risk_num > cap_risk_num:
-            failed.append(f"risk_tier_exceeded: requested risk '{req_risk}' exceeds capability max tier '{capability.risk}'")
+        cap_risk_str = str(capability.risk).lower()
+        if cap_risk_str not in risk_levels:
+            failed.append(f"malformed_capability_risk: capability risk '{capability.risk}' is invalid")
+
+        req_risk_raw = getattr(request, "risk_level", None) or params.get("risk")
+        if req_risk_raw is not None:
+            if not isinstance(req_risk_raw, str) or req_risk_raw.lower() not in risk_levels:
+                failed.append(f"malformed_risk: unrecognized or malformed risk tier '{req_risk_raw}'")
+
+        # Authoritatively derive risk from action and target
+        derived_risk = "low"
+        if is_secret_target:
+            derived_risk = "critical"
+        elif any(c in lower_cmd for c in ("rm -rf", "drop database", "format ", "mkfs", "chmod -r 777", "dd if=")):
+            derived_risk = "critical"
+        elif is_write_op or req_op in (CAP_FILESYSTEM_WRITE, CAP_PROCESS_SPAWN, "spawn", "execute"):
+            derived_risk = "medium"
+
+        effective_risk_num = max(
+            risk_levels.get(derived_risk, 1),
+            risk_levels.get(str(req_risk_raw).lower(), 1) if req_risk_raw and str(req_risk_raw).lower() in risk_levels else 1
+        )
+        cap_risk_num = risk_levels.get(cap_risk_str, 2)
+        if effective_risk_num > cap_risk_num:
+            failed.append(f"risk_tier_exceeded: effective risk tier exceeds capability max tier '{capability.risk}'")
 
         # 11. Approval
         if capability.approval in (True, "required", "require"):
-            approved = params.get("approved", False) or getattr(request, "approved", False) or bool(params.get("approval_token"))
-            if not approved:
+            appr_token = params.get("approval_token")
+            has_valid_approval = False
+            if getattr(request, "approved", False) is True or params.get("approved") is True:
+                has_valid_approval = True
+            elif appr_token:
+                from sclass.policy.authorization_service import AuthorizationService
+                if AuthorizationService().verify_approval_token(str(appr_token), request):
+                    has_valid_approval = True
+                else:
+                    failed.append(f"unverified_approval: approval token '{appr_token}' is forged, invalid, or not bound to this request")
+
+            if not has_valid_approval:
                 requires_approval = True
                 failed.append("approval_required: operation requires explicit authorization approval")
 
@@ -346,3 +397,4 @@ class CapabilityEvaluator:
             explanation=explanation,
             requires_approval=requires_approval,
         )
+

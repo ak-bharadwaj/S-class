@@ -124,6 +124,16 @@ def analyze_execution_chain(
         base = os.path.basename(name).lower()
         return base[:-4] if base.endswith(".exe") else base
 
+    def _is_python(name: str) -> bool:
+        base = _clean_exe(name)
+        return (
+            base in ("python", "python3", "py", "pypy", "pypy3")
+            or base.startswith("python3.")
+            or base.startswith("python2.")
+            or base.startswith("pypy3.")
+        )
+
+
     def _unwrap_python_tokens(p_tokens: List[str]) -> Tuple[Optional[str], Optional[str]]:
         """Given tokens starting with python (or sub-args), extracts (actual_child, verifier)."""
         if len(p_tokens) > 2 and p_tokens[1] == "-m":
@@ -157,7 +167,7 @@ def analyze_execution_chain(
                     if b_exe in ("pytest", "py.test"):
                         actual_child = "pytest"
                         verifier = "pytest"
-                    elif b_exe in ("python", "python3", "py"):
+                    elif _is_python(b_exe):
                         interpreter = b_exe
                         c_child, c_ver = _unwrap_python_tokens(body_parts)
                         actual_child = c_child or actual_child
@@ -184,7 +194,7 @@ def analyze_execution_chain(
         sub_args = tokens_list[idx:]
         if sub_args:
             sub_exe = _clean_exe(sub_args[0])
-            if sub_exe in ("python", "python3", "py"):
+            if _is_python(sub_exe):
                 c_child, c_ver = _unwrap_python_tokens(sub_args)
                 actual_child = c_child
                 verifier = c_ver
@@ -230,7 +240,7 @@ def analyze_execution_chain(
         sub_args = tokens_list[idx:]
         if sub_args:
             sub_exe = _clean_exe(sub_args[0])
-            if sub_exe in ("python", "python3", "py"):
+            if _is_python(sub_exe):
                 interpreter = sub_exe
                 c_child, c_ver = _unwrap_python_tokens(sub_args)
                 actual_child = c_child
@@ -266,7 +276,7 @@ def analyze_execution_chain(
             cmd_args = tokens_list[idx + 1:]
             if cmd_args:
                 cmd_exe = _clean_exe(cmd_args[0])
-                if cmd_exe in ("python", "python3", "py"):
+                if _is_python(cmd_exe):
                     interpreter = "python"
                     c_child, c_ver = _unwrap_python_tokens(cmd_args)
                     actual_child = c_child
@@ -280,7 +290,7 @@ def analyze_execution_chain(
                 actual_child = _image
 
     # 6. Python Chains (python -m pytest tests/)
-    elif exe_base in ("python", "python3", "py"):
+    elif _is_python(exe_base):
         interpreter = exe_base
         launcher = launcher or tokens_list[0]
         c_child, c_ver = _unwrap_python_tokens(tokens_list)

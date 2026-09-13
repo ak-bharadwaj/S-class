@@ -51,9 +51,29 @@ class VerificationPlan:
         present_kinds = set()
         present_sources = set()
         has_unobserved = False
+        has_unauthentic = False
+
         for ev in evidence_items:
-            if not getattr(ev, "is_observed", True):
+            # Validate observation status
+            is_obs = getattr(ev, "is_observed", True)
+            if not is_obs:
                 has_unobserved = True
+
+            # Validate provenance integrity
+            if isinstance(ev, dict):
+                if ev.get("is_observed") and not (ev.get("receipt_id") and ev.get("receipt_hash")):
+                    has_unauthentic = True
+                if ev.get("is_fake") or ev.get("forged"):
+                    has_unauthentic = True
+            elif getattr(ev, "is_fake", False) or getattr(ev, "forged", False):
+                has_unauthentic = True
+            elif hasattr(ev, "compute_hash") and getattr(ev, "receipt_hash", None):
+                try:
+                    if ev.receipt_hash != ev.compute_hash():
+                        has_unauthentic = True
+                except Exception:
+                    has_unauthentic = True
+
             kind = getattr(ev, "evidence_kind", None)
             if kind:
                 present_kinds.add(str(kind).lower())
@@ -61,8 +81,24 @@ class VerificationPlan:
             if src:
                 present_sources.add(str(src).lower())
 
+        def _match_verifier(req_id: str, sources: set) -> bool:
+            """Canonical exact matching for verifier identity, preventing substring spoofing."""
+            req_clean = str(req_id).lower().strip()
+            for s in sources:
+                s_clean = s.lower().strip()
+                if req_clean == s_clean:
+                    return True
+                # Canonical provider/version tags: e.g. pytest@7.4, pytest==7.4, pytest:7.4
+                if "@" in s_clean and s_clean.split("@")[0].strip() == req_clean:
+                    return True
+                if "==" in s_clean and s_clean.split("==")[0].strip() == req_clean:
+                    return True
+                if ":" in s_clean and s_clean.split(":")[0].strip() == req_clean:
+                    return True
+            return False
+
         missing_kinds = [k for k in self.required_evidence_kinds if str(k).lower() not in present_kinds]
-        missing_verifiers = [v for v in self.verifier_ids if not any(str(v).lower() in s for s in present_sources)]
+        missing_verifiers = [v for v in self.verifier_ids if not _match_verifier(v, present_sources)]
 
         for claim in self.target_claims:
             verdict = ClaimAcceptanceMatrix.evaluate_multi_evidence(
@@ -94,17 +130,18 @@ class VerificationPlan:
                         reason=f"MISSING REQUIRED EVIDENCE -> NO ACCEPTED CLAIM: Plan requires verifier IDs {self.verifier_ids}, but missing: {missing_verifiers}",
                         metadata={**verdict.metadata, "missing_verifiers": missing_verifiers},
                     )
-                elif has_unobserved:
+                elif has_unobserved or has_unauthentic:
                     verdict = VerificationResult(
                         status="REJECT",
                         claim_id=claim.claim_id,
-                        reason="UNAUTHENTIC EVIDENCE: Provided evidence contains unobserved or agent-authored receipts.",
-                        metadata={**verdict.metadata, "unobserved_evidence": True},
+                        reason="UNAUTHENTIC EVIDENCE: Provided evidence contains unobserved, forged, or unauthentic receipts.",
+                        metadata={**verdict.metadata, "unobserved_evidence": True, "unauthentic_evidence": has_unauthentic},
                     )
 
             results[claim.claim_id] = verdict
 
         return results
+
 
     def execute_and_verify(
         self,

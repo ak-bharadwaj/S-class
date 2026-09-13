@@ -393,15 +393,18 @@ class ExecutionIdentity:
         # 2. Path resolution fallback if child PID inspection did not yield executable
         if not resolved and exe_name:
             # If exe_name is a python interpreter, prefer sys.executable over WindowsApps stub
-            if exe_name.lower() in ("python", "python3", "py") and not os.path.isabs(exe_name):
+            exe_clean = exe_name.lower()[:-4] if exe_name.lower().endswith(".exe") else exe_name.lower()
+            if (exe_clean in ("python", "python3", "py", "pypy") or exe_clean.startswith("python3.") or exe_clean.startswith("python2.")) and not os.path.isabs(exe_name):
                 resolved = sys.executable
             else:
                 resolved = shutil.which(exe_name, path=cwd + os.pathsep + os.environ.get("PATH", "")) or ""
                 if not resolved and os.path.exists(exe_name):
                     resolved = os.path.abspath(exe_name)
 
-        if resolved and "WindowsApps" in resolved and exe_name.lower() in ("python", "python3", "py"):
+        exe_clean = exe_name.lower()[:-4] if exe_name.lower().endswith(".exe") else exe_name.lower()
+        if resolved and "WindowsApps" in resolved and (exe_clean in ("python", "python3", "py", "pypy") or exe_clean.startswith("python3.")):
             resolved = sys.executable
+
 
         # 3. Cryptographic executable hashing
         exe_hash = ""

@@ -94,7 +94,7 @@ class StandardVerifierDetector:
 
 
         # 1. Python Interpreters
-        if exe_base in ("python", "python3", "py"):
+        if exe_base in ("python", "python3", "py") or exe_base.startswith("python3.") or exe_base.startswith("python2.") or exe_base.startswith("pypy"):
             args = tokens[1:]
             # If -c is present, it is arbitrary code execution, NEVER an authorized test runner
             if "-c" in args:
