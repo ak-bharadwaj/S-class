@@ -15,6 +15,7 @@ from sclass.survival.models import (
     AuthorizationDecision,
     EvidenceReceipt,
     ObservedReceipt,
+    VerificationEvent,
     ProposedEvidence,
     ClaimedEvidence,
     Claim,
@@ -23,11 +24,14 @@ from sclass.survival.models import (
 )
 from sclass.survival.authority import authorize, PathAuthority, get_path_authority
 from sclass.survival.evidence import (
+    _create_observed_receipt,
     create_receipt,
     create_proposed_evidence,
     load_receipt,
     save_receipt,
     observe_command,
+    compute_workspace_snapshot,
+    compute_workspace_fingerprint,
 )
 from sclass.survival.verification import verify_claim, check_verification_staleness
 from sclass.survival.ledger import LocalLedger
@@ -69,6 +73,7 @@ __all__ = [
     "AuthorizationDecision",
     "EvidenceReceipt",
     "ObservedReceipt",
+    "VerificationEvent",
     "ProposedEvidence",
     "ClaimedEvidence",
     "Claim",
@@ -76,11 +81,14 @@ __all__ = [
     "AdapterCapabilities",
     "PathAuthority",
     "get_path_authority",
+    "_create_observed_receipt",
     "create_receipt",
     "create_proposed_evidence",
     "load_receipt",
     "save_receipt",
     "observe_command",
+    "compute_workspace_snapshot",
+    "compute_workspace_fingerprint",
     "verify_claim",
     "check_verification_staleness",
     "LocalLedger",

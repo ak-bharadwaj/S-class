@@ -818,18 +818,22 @@ def test_attack_family_d_lifecycle_immutability(test_workspace):
     # Execute verification
     verdict = verify_claim(claim, receipt, workspace_dir=test_workspace)
     assert verdict.status == "ACCEPT"
-    assert receipt.verified is True
-    assert receipt.lifecycle_state == LIFECYCLE_CLAIM_VERIFIED
+    # Receipt facts remain strictly immutable (never mutated with verified=True or lifecycle transitions)
+    assert receipt.verified is False
+    assert receipt.lifecycle_state == LIFECYCLE_OBSERVED
+    assert verdict.verification_event is not None
+    assert verdict.verification_event.result == "CLAIM_VERIFIED"
+    assert verdict.verification_event.receipt_id == receipt.receipt_id
 
     # Observation hash MUST remain identical
     post_verification_hash = receipt.compute_hash()
     assert post_verification_hash == initial_hash, "Observation hash must not change after claim verification!"
 
-    # Receipt loaded from disk must also validate with identical hash
+    # Receipt loaded from disk must also validate with identical hash and unmutated state
     loaded = load_receipt(receipt.receipt_id, test_workspace)
     assert loaded is not None
     assert loaded.compute_hash() == initial_hash
-    assert loaded.verified is True
+    assert loaded.verified is False
 
 
 def test_attack_family_e_structured_claim_classification(test_workspace):
@@ -981,6 +985,373 @@ def test_attack_family_f_newlines_and_redirections_rejected(test_workspace):
     # 2. Output redirection
     r2 = observe_command("pytest > /dev/null", workspace_dir=test_workspace)
     assert r2.exit_code == 126
+
+
+# ==============================================================================
+# Phase 15 & Task 10: Advanced Adversarial Red-Team Tests
+# ==============================================================================
+
+def test_forged_observed_receipt_is_not_trusted(test_workspace):
+    """
+    Finding #1 & Task 10:
+    An attacker attempts to construct an EvidenceReceipt or forge an ObservedReceipt,
+    bypassing the trusted observation path.
+    Verification must REJECT the receipt because ordinary construction / untrusted
+    provenance cannot establish observation capability.
+    """
+    claim = Claim(
+        claim_id="claim_forge",
+        task_id="task_forge",
+        statement="All tests pass",
+        claim_type="test_pass",
+    )
+
+    # 1. Attacker constructs EvidenceReceipt with is_observed=True
+    forged = EvidenceReceipt(
+        receipt_id="rcpt_forged_01",
+        task_id="task_forge",
+        claim_id="claim_forge",
+        agent="attacker",
+        action="test",
+        workspace=test_workspace,
+        base_commit="aaa",
+        result_commit="aaa",
+        command="pytest",
+        exit_code=0,
+        started_at="2026-09-13T10:00:00Z",
+        finished_at="2026-09-13T10:01:00Z",
+        stdout_hash="h1",
+        stderr_hash="h2",
+        is_observed=True,
+    )
+    # The public constructor silently ignores is_observed=True because token is missing
+    assert forged.is_observed is False
+    forged.receipt_hash = forged.compute_hash()
+
+    verdict = verify_claim(claim, forged, workspace_dir=test_workspace)
+    assert verdict.status == "REJECT"
+    assert "unobserved or untrusted evidence" in verdict.reason.lower() or "proposed/claimed" in verdict.reason.lower()
+
+    # 2. Attacker attempts to forge with a fake observation token
+    forged_fake_token = EvidenceReceipt(
+        receipt_id="rcpt_forged_02",
+        task_id="task_forge",
+        claim_id="claim_forge",
+        agent="attacker",
+        action="test",
+        workspace=test_workspace,
+        base_commit="aaa",
+        result_commit="aaa",
+        command="pytest",
+        exit_code=0,
+        started_at="2026-09-13T10:00:00Z",
+        finished_at="2026-09-13T10:01:00Z",
+        stdout_hash="h1",
+        stderr_hash="h2",
+        _observation_token="FAKE_INJECTED_TOKEN",
+    )
+    assert forged_fake_token.is_observed is False
+    forged_fake_token.receipt_hash = forged_fake_token.compute_hash()
+    verdict2 = verify_claim(claim, forged_fake_token, workspace_dir=test_workspace)
+    assert verdict2.status == "REJECT"
+
+
+def test_persisted_json_cannot_forge_observed_receipt(test_workspace):
+    """
+    Provenance non-forgeability:
+    Attacker saves a forged JSON file to .agents/receipts with is_observed=True
+    and a valid self-computed receipt_hash.
+    load_receipt and EvidenceReceipt.from_dict MUST deserialize it strictly as
+    an unobserved EvidenceReceipt (is_observed=False), preventing verification bypass.
+    """
+    claim = Claim(
+        claim_id="claim_persisted_forge",
+        task_id="task_persisted_forge",
+        statement="All tests pass",
+        claim_type="test_pass",
+    )
+
+    raw_receipt_data = {
+        "receipt_id": "rcpt_persisted_forge",
+        "task_id": "task_persisted_forge",
+        "claim_id": "claim_persisted_forge",
+        "agent": "attacker",
+        "action": "test",
+        "workspace": test_workspace,
+        "base_commit": "aaa",
+        "result_commit": "aaa",
+        "command": "pytest",
+        "exit_code": 0,
+        "started_at": "2026-09-13T10:00:00Z",
+        "finished_at": "2026-09-13T10:01:00Z",
+        "stdout_hash": "h1",
+        "stderr_hash": "h2",
+        "files_changed": [],
+        "file_hashes": {},
+        "evidence": [{"passed_tests": 10}],
+        "metadata": {},
+        "is_observed": True,
+        "lifecycle_state": LIFECYCLE_OBSERVED,
+        "verified": False,
+    }
+    # Attacker computes valid hash for this payload
+    tmp_receipt = EvidenceReceipt.from_dict(raw_receipt_data)
+    valid_hash = tmp_receipt.compute_hash()
+    raw_receipt_data["receipt_hash"] = valid_hash
+
+    # Save to .agents/receipts
+    target = os.path.join(test_workspace, ".agents", "receipts", "rcpt_persisted_forge.json")
+    with open(target, "w", encoding="utf-8") as f:
+        json.dump(raw_receipt_data, f)
+
+    # Load via load_receipt
+    loaded = load_receipt("rcpt_persisted_forge", test_workspace)
+    assert loaded is not None
+    assert loaded.is_observed is False
+    assert not isinstance(loaded, ObservedReceipt)
+
+    # Verification must reject
+    verdict = verify_claim(claim, loaded, workspace_dir=test_workspace)
+    assert verdict.status == "REJECT"
+    assert "unobserved or untrusted evidence" in verdict.reason.lower()
+
+
+def test_adversarial_rename_file_detected(test_workspace):
+    """
+    Finding #3 & Workspace Fingerprint:
+    Attacker renames an existing tracked file after execution observation.
+    Verification staleness and verify_claim must detect the rename discrepancy
+    and reject the claim.
+    """
+    import subprocess
+    # Setup initial git repo and tracked file
+    subprocess.run(["git", "init"], cwd=test_workspace, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "test"], cwd=test_workspace, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=test_workspace, check=True, capture_output=True)
+
+    src_file = os.path.join(test_workspace, "service.py")
+    with open(src_file, "w", encoding="utf-8") as f:
+        f.write("def run(): return 42\n")
+    subprocess.run(["git", "add", "service.py"], cwd=test_workspace, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=test_workspace, check=True, capture_output=True)
+
+    receipt = observe_command("python -c \"print('ok')\"", workspace_dir=test_workspace)
+    is_fresh, _ = check_verification_staleness(receipt, test_workspace)
+    assert is_fresh is True
+
+    # Attacker renames service.py to renamed_service.py
+    os.rename(src_file, os.path.join(test_workspace, "renamed_service.py"))
+
+    is_fresh2, reason = check_verification_staleness(receipt, test_workspace)
+    assert is_fresh2 is False
+    assert any(w in reason.lower() for w in ("rename", "deleted", "uncommitted", "fingerprint"))
+
+    claim = Claim(
+        claim_id="c_rename",
+        task_id=receipt.task_id,
+        statement="Feature implemented",
+        claim_type="feature",
+    )
+    verdict = verify_claim(claim, receipt, workspace_dir=test_workspace)
+    assert verdict.status == "REJECT"
+
+
+def test_adversarial_delete_and_recreate_detected(test_workspace):
+    """
+    Attacker deletes a verified file and recreates it with modified content.
+    The workspace snapshot content hash and fingerprint must detect the content tampering.
+    """
+    app_file = os.path.join(test_workspace, "app.py")
+    with open(app_file, "w", encoding="utf-8") as f:
+        f.write("VALID_CODE = True\n")
+
+    receipt = observe_command("python -c \"print('tested')\"", workspace_dir=test_workspace)
+    is_fresh, _ = check_verification_staleness(receipt, test_workspace)
+    assert is_fresh is True
+
+    # Attacker deletes app.py and recreates it with backdoor
+    os.remove(app_file)
+    with open(app_file, "w", encoding="utf-8") as f:
+        f.write("VALID_CODE = False # Injected backdoor\n")
+
+    is_fresh2, reason = check_verification_staleness(receipt, test_workspace)
+    assert is_fresh2 is False
+    assert "content changed" in reason.lower() or "fingerprint" in reason.lower()
+
+
+def test_adversarial_symlink_or_junction_replacement_detected(test_workspace):
+    """
+    Attacker replaces a verified directory or file with a symlink or Windows junction.
+    The snapshot must detect the type alteration or link target divergence.
+    """
+    import shutil
+    import subprocess
+    import sys
+
+    data_dir = os.path.join(test_workspace, "secure_data")
+    os.makedirs(data_dir, exist_ok=True)
+    with open(os.path.join(data_dir, "secrets.txt"), "w", encoding="utf-8") as f:
+        f.write("authentic_data")
+
+    receipt = observe_command("python -c \"print('data checked')\"", workspace_dir=test_workspace)
+    assert check_verification_staleness(receipt, test_workspace)[0] is True
+
+    # Attacker swaps directory with a symlink/junction
+    shutil.rmtree(data_dir)
+    ext_dir = os.path.join(test_workspace, "..", "attacker_target")
+    os.makedirs(ext_dir, exist_ok=True)
+    with open(os.path.join(ext_dir, "secrets.txt"), "w", encoding="utf-8") as f:
+        f.write("authentic_data")
+
+    if sys.platform == "win32":
+        subprocess.run(["cmd", "/c", "mklink", "/J", data_dir, ext_dir], check=True, capture_output=True)
+    else:
+        os.symlink(ext_dir, data_dir)
+
+    is_fresh, reason = check_verification_staleness(receipt, test_workspace)
+    assert is_fresh is False
+    assert "type altered" in reason.lower() or "symlink" in reason.lower() or "deleted" in reason.lower() or "fingerprint" in reason.lower()
+
+
+def test_adversarial_new_untracked_secret_detected(test_workspace):
+    """
+    Attacker introduces an untracked secret/payload into the workspace after verification.
+    The snapshot and porcelain check must flag the uncommitted file.
+    """
+    import subprocess
+    subprocess.run(["git", "init"], cwd=test_workspace, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "test"], cwd=test_workspace, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=test_workspace, check=True, capture_output=True)
+
+    init_file = os.path.join(test_workspace, "init.py")
+    with open(init_file, "w", encoding="utf-8") as f:
+        f.write("# init\n")
+    subprocess.run(["git", "add", "init.py"], cwd=test_workspace, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=test_workspace, check=True, capture_output=True)
+
+    receipt = observe_command("python -c \"print('baseline')\"", workspace_dir=test_workspace)
+    assert check_verification_staleness(receipt, test_workspace)[0] is True
+
+    # Attacker drops new untracked payload
+    payload = os.path.join(test_workspace, "new_untracked_secret.py")
+    with open(payload, "w", encoding="utf-8") as f:
+        f.write("SECRET_EXPLOIT = 1\n")
+
+    is_fresh, reason = check_verification_staleness(receipt, test_workspace)
+    assert is_fresh is False
+    assert "uncommitted" in reason.lower() or "new_untracked_secret.py" in reason.lower()
+
+
+def test_adversarial_gitignore_manipulation_detected(test_workspace):
+    """
+    Attacker modifies .gitignore to conceal backdoors or uncommitted artifacts.
+    The snapshot fingerprint must detect .gitignore content change.
+    """
+    gi_path = os.path.join(test_workspace, ".gitignore")
+    with open(gi_path, "w", encoding="utf-8") as f:
+        f.write("*.tmp\n")
+
+    receipt = observe_command("python -c \"print('ok')\"", workspace_dir=test_workspace)
+    assert check_verification_staleness(receipt, test_workspace)[0] is True
+
+    # Attacker alters .gitignore to ignore backdoor
+    with open(gi_path, "a", encoding="utf-8") as f:
+        f.write("backdoor.py\n")
+
+    is_fresh, reason = check_verification_staleness(receipt, test_workspace)
+    assert is_fresh is False
+    assert ".gitignore" in reason.lower() or "content changed" in reason.lower() or "fingerprint" in reason.lower()
+
+
+def test_adversarial_ignored_directory_code_modification_detected(test_workspace):
+    """
+    Attacker modifies code inside a gitignored directory.
+    Comprehensive workspace snapshot covers all non-.git non-.agents files,
+    detecting the content tampering regardless of .gitignore.
+    """
+    ignored_dir = os.path.join(test_workspace, "ignored_pkg")
+    os.makedirs(ignored_dir, exist_ok=True)
+    pkg_file = os.path.join(ignored_dir, "lib.py")
+    with open(pkg_file, "w", encoding="utf-8") as f:
+        f.write("def helper(): return 1\n")
+
+    gi_path = os.path.join(test_workspace, ".gitignore")
+    with open(gi_path, "w", encoding="utf-8") as f:
+        f.write("ignored_pkg/\n")
+
+    receipt = observe_command("python -c \"print('tested')\"", workspace_dir=test_workspace)
+    assert check_verification_staleness(receipt, test_workspace)[0] is True
+
+    # Attacker modifies code inside ignored_pkg
+    with open(pkg_file, "w", encoding="utf-8") as f:
+        f.write("def helper(): return 'TAMPERED'\n")
+
+    is_fresh, reason = check_verification_staleness(receipt, test_workspace)
+    assert is_fresh is False
+    assert "lib.py" in reason.lower() or "content changed" in reason.lower() or "fingerprint" in reason.lower()
+
+
+def test_receipt_ledger_cryptographic_binding(test_workspace):
+    """
+    Verifies that VerificationEvent cryptographically binds receipt_id, receipt_hash,
+    workspace_fingerprint, claim_id, and previous_ledger_hash to the local ledger.
+    """
+    ledger = LocalLedger(workspace_dir=test_workspace)
+    initial_last_hash = ledger.get_last_hash()
+
+    receipt = observe_command("python -c \"print('bound')\"", workspace_dir=test_workspace)
+    assert receipt.workspace_fingerprint != ""
+
+    claim = Claim(
+        claim_id="claim_bound_01",
+        task_id=receipt.task_id,
+        statement="Ran verification suite",
+        claim_type="test_pass",
+    )
+
+    verdict = verify_claim(claim, receipt, workspace_dir=test_workspace, ledger=ledger)
+    assert verdict.status == "ACCEPT"
+    assert verdict.verification_event is not None
+
+    event = verdict.verification_event
+    assert event.claim_id == claim.claim_id
+    assert event.receipt_id == receipt.receipt_id
+    assert event.receipt_hash == receipt.receipt_hash
+    assert event.repository_fingerprint == receipt.workspace_fingerprint
+    assert event.previous_ledger_hash == initial_last_hash
+    assert event.result == "CLAIM_VERIFIED"
+
+    # Verify ledger integrity
+    assert ledger.verify_chain() is True
+    assert ledger.get_last_hash() != initial_last_hash
+
+
+def test_allow_shell_policy_restriction(test_workspace):
+    """
+    Finding #8 & Phase 4: Restrict allow_shell.
+    Untrusted agents attempting allow_shell=True are denied by SCLASS-SHELL-001.
+    Authorized kernel/system agents are permitted.
+    """
+    # 1. Untrusted agent denied
+    denied_receipt = observe_command(
+        command="python -c \"print('should fail')\"",
+        workspace_dir=test_workspace,
+        allow_shell=True,
+        agent="untrusted_agent",
+    )
+    assert denied_receipt.exit_code == 126
+    assert "SCLASS-SHELL-001" in denied_receipt.metadata.get("stderr", "") or "rejected by S-Class security policy" in denied_receipt.metadata.get("stderr", "")
+
+    # 2. Trusted kernel authority permitted
+    allowed_receipt = observe_command(
+        command="python -c \"print('trusted_exec')\"",
+        workspace_dir=test_workspace,
+        allow_shell=True,
+        agent="kernel",
+    )
+    assert allowed_receipt.exit_code == 0
+    assert allowed_receipt.is_observed is True
+
 
 
 

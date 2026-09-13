@@ -19,13 +19,15 @@ from typing import Optional, Dict, Any, Tuple, List
 from sclass.survival.models import (
     Claim,
     EvidenceReceipt,
+    ObservedReceipt,
     VerificationResult,
+    VerificationEvent,
     ProposedEvidence,
     ClaimedEvidence,
     LIFECYCLE_INTEGRITY_VERIFIED,
     LIFECYCLE_CLAIM_VERIFIED,
 )
-from sclass.survival.evidence import save_receipt, load_receipt
+from sclass.survival.evidence import load_receipt
 from sclass.survival.ledger import LocalLedger
 from sclass.survival.verification.evidence import check_verification_staleness
 
@@ -108,6 +110,65 @@ def _update_sclass_hooks_verified(workspace_dir: str, agent: str = "") -> None:
         pass
 
 
+def _record_rejection(
+    claim: Claim,
+    reason: str,
+    evidence: Optional[EvidenceReceipt],
+    ledger: Optional[LocalLedger],
+    exit_code: Optional[int] = None,
+    files_changed: Optional[Tuple[str, ...]] = None,
+    failed_tests: int = 0,
+    invalidation_reason: Optional[str] = None,
+) -> VerificationResult:
+    r_id = getattr(evidence, "receipt_id", None)
+    r_hash = getattr(evidence, "receipt_hash", "") or (evidence.compute_hash() if hasattr(evidence, "compute_hash") else "")
+    ws_fp = getattr(evidence, "workspace_fingerprint", "") or ""
+    prev_hash = ledger.get_last_hash() if (ledger and hasattr(ledger, "get_last_hash")) else "0" * 64
+
+    event = None
+    if evidence is not None:
+        event = VerificationEvent(
+            claim_id=claim.claim_id,
+            receipt_id=r_id or "",
+            receipt_hash=r_hash,
+            verifier="sclass_verifier",
+            verification_time=datetime.now(timezone.utc).isoformat(),
+            result="REJECT",
+            reason=reason,
+            repository_fingerprint=ws_fp,
+            previous_ledger_hash=prev_hash,
+            metadata={
+                "exit_code": exit_code,
+                "invalidation_reason": invalidation_reason,
+            },
+        )
+
+    res = VerificationResult(
+        status="REJECT",
+        claim_id=claim.claim_id,
+        reason=reason,
+        observed_exit_code=exit_code,
+        observed_files_changed=files_changed or tuple(),
+        failed_tests=failed_tests,
+        invalidation_reason=invalidation_reason,
+        receipt_id=r_id,
+        verification_event=event,
+    )
+    if ledger:
+        payload = res.to_dict()
+        if event:
+            payload.update({
+                "receipt_id": r_id,
+                "receipt_hash": r_hash,
+                "workspace_fingerprint": ws_fp,
+                "previous_ledger_hash": prev_hash,
+                "verification_result": "REJECT",
+                "event_id": event.event_id,
+            })
+        ledger.append("rejection", payload)
+    return res
+
+
 def verify_claim(
     claim: Claim,
     evidence: Optional[EvidenceReceipt],
@@ -117,6 +178,9 @@ def verify_claim(
     """
     Authoritatively verifies an agent claim against observed evidence.
     Returns VerificationResult (ACCEPT | REJECT | INVALID).
+    Receipt is treated as immutable observation facts: no fields are mutated.
+    Emits a typed VerificationEvent cryptographically bound to the receipt,
+    workspace fingerprint, and ledger chain.
     """
     ws = os.path.abspath(workspace_dir or (evidence.workspace if evidence else os.getcwd()))
     if ledger is None:
@@ -127,143 +191,139 @@ def verify_claim(
 
     # Attack 10: Agent says "done" but produces no evidence
     if evidence is None:
-        result = VerificationResult(
-            status="REJECT",
-            claim_id=claim.claim_id,
+        return _record_rejection(
+            claim=claim,
             reason="Claim rejected: Agent claimed completion but produced no independently observed evidence receipt.",
+            evidence=None,
+            ledger=ledger,
         )
-        if ledger:
-            ledger.append("rejection", result.to_dict())
-        return result
 
-    # Finding #4: Distinguish Observed Receipt vs Proposed/Claimed Evidence
-    if isinstance(evidence, (ProposedEvidence, ClaimedEvidence)) or not getattr(evidence, "is_observed", True):
-        result = VerificationResult(
-            status="REJECT",
-            claim_id=claim.claim_id,
+    # Finding #4: Distinguish Proposed/Claimed Evidence or explicitly unobserved assertions
+    if isinstance(evidence, (ProposedEvidence, ClaimedEvidence)) or getattr(evidence, "_explicitly_unobserved", False):
+        return _record_rejection(
+            claim=claim,
             reason="Claim rejected: Agent supplied proposed/claimed evidence, but verification requires an independently observed receipt.",
-            receipt_id=getattr(evidence, "receipt_id", None),
+            evidence=evidence,
+            ledger=ledger,
         )
-        if ledger:
-            ledger.append("rejection", result.to_dict())
-        return result
 
-    # Finding #2: Missing receipt hash must be REJECT. No third state (missing -> REJECT, invalid -> REJECT, valid -> continue).
+    # Finding #2: Missing receipt hash must be REJECT.
     recorded_hash = getattr(evidence, "receipt_hash", None) or (
         evidence.metadata.get("receipt_hash") if isinstance(evidence.metadata, dict) else None
     )
     if not recorded_hash:
-        result = VerificationResult(
-            status="REJECT",
-            claim_id=claim.claim_id,
+        return _record_rejection(
+            claim=claim,
             reason="Claim rejected: Missing evidence receipt hash. Persisted authoritative receipt must have cryptographic receipt_hash.",
-            receipt_id=evidence.receipt_id,
+            evidence=evidence,
+            ledger=ledger,
         )
-        if ledger:
-            ledger.append("rejection", result.to_dict())
-        return result
 
     # Finding #1: Hash integrity verification across all security-relevant fields
     expected_hash = evidence.compute_hash()
     if recorded_hash != expected_hash:
-        result = VerificationResult(
-            status="REJECT",
-            claim_id=claim.claim_id,
+        return _record_rejection(
+            claim=claim,
             reason="Claim rejected: Evidence receipt hash mismatch. Tampering detected.",
-            receipt_id=evidence.receipt_id,
+            evidence=evidence,
+            ledger=ledger,
         )
-        if ledger:
-            ledger.append("rejection", result.to_dict())
-        return result
 
-    # Finding #6: Lifecycle transition to INTEGRITY_VERIFIED
-    evidence.lifecycle_state = LIFECYCLE_INTEGRITY_VERIFIED
+    # Phase 1 Trust Boundary: Non-forgeable ObservedReceipt capability check
+    # Persisted data or forged EvidenceReceipts without capability token cannot satisfy verification
+    if not isinstance(evidence, ObservedReceipt) or not getattr(evidence, "is_observed", False):
+        return _record_rejection(
+            claim=claim,
+            reason="Claim rejected: Agent supplied unobserved or untrusted evidence. Verification requires an authentic ObservedReceipt produced by observe_command.",
+            evidence=evidence,
+            ledger=ledger,
+        )
 
-    # Finding #7 & Attack Family E: Structured claim evaluation
+    # Structured claim evaluation
     is_test_claim = is_test_assertion(claim)
 
     if is_test_claim:
         if evidence.exit_code != 0:
-            result = VerificationResult(
-                status="REJECT",
-                claim_id=claim.claim_id,
+            return _record_rejection(
+                claim=claim,
                 reason=f"Claim rejected: Test command execution failed with exit code {evidence.exit_code}.",
-                observed_exit_code=evidence.exit_code,
-                observed_files_changed=tuple(evidence.files_changed or []),
-                receipt_id=evidence.receipt_id,
+                evidence=evidence,
+                ledger=ledger,
+                exit_code=evidence.exit_code,
+                files_changed=tuple(evidence.files_changed or []),
             )
-            if ledger:
-                ledger.append("rejection", result.to_dict())
-            return result
 
         # Check explicit failed_tests count if present in receipt evidence items
         for ev in (evidence.evidence or []):
             failed = ev.get("failed_tests", 0)
             if failed > 0:
-                result = VerificationResult(
-                    status="REJECT",
-                    claim_id=claim.claim_id,
+                return _record_rejection(
+                    claim=claim,
                     reason=f"Claim rejected: Independent test runner observed {failed} test failure(s).",
-                    observed_exit_code=evidence.exit_code,
+                    evidence=evidence,
+                    ledger=ledger,
+                    exit_code=evidence.exit_code,
                     failed_tests=failed,
-                    receipt_id=evidence.receipt_id,
                 )
-                if ledger:
-                    ledger.append("rejection", result.to_dict())
-                return result
 
     # Contradictory evidence defense for non-test non-documentation claims:
-    # If the observed command execution failed with exit_code != 0, reject!
     elif not is_doc_claim(claim) and evidence.exit_code != 0:
-        result = VerificationResult(
-            status="REJECT",
-            claim_id=claim.claim_id,
+        return _record_rejection(
+            claim=claim,
             reason=f"Claim rejected: Observed execution failed with exit code {evidence.exit_code}. Contradictory evidence.",
-            observed_exit_code=evidence.exit_code,
-            observed_files_changed=tuple(evidence.files_changed or []),
-            receipt_id=evidence.receipt_id,
+            evidence=evidence,
+            ledger=ledger,
+            exit_code=evidence.exit_code,
+            files_changed=tuple(evidence.files_changed or []),
         )
-        if ledger:
-            ledger.append("rejection", result.to_dict())
-        return result
 
-    # Finding #3: Staleness check (including repository state & same-file fingerprints)
+    # Finding #3 & Phase 4: Staleness and comprehensive workspace snapshot check
     is_fresh, staleness_reason = check_verification_staleness(evidence, ws)
     if not is_fresh:
-        result = VerificationResult(
-            status="REJECT",
-            claim_id=claim.claim_id,
+        return _record_rejection(
+            claim=claim,
             reason=f"Claim rejected: Evidence is stale. {staleness_reason}",
+            evidence=evidence,
+            ledger=ledger,
             invalidation_reason=staleness_reason,
-            receipt_id=evidence.receipt_id,
         )
-        if ledger:
-            ledger.append("rejection", result.to_dict())
-        return result
 
     # Code changes verification for implementation claims
     if claim.claim_type in ("file_change", "feature"):
         if not evidence.files_changed:
-            result = VerificationResult(
-                status="REJECT",
-                claim_id=claim.claim_id,
+            return _record_rejection(
+                claim=claim,
                 reason="Claim rejected: Feature implementation claimed, but zero files were modified in repository state.",
-                observed_files_changed=tuple(),
-                receipt_id=evidence.receipt_id,
+                evidence=evidence,
+                ledger=ledger,
             )
-            if ledger:
-                ledger.append("rejection", result.to_dict())
-            return result
 
     # Aggregate passed test count
     passed = 0
     for ev in evidence.evidence:
         passed += ev.get("passed_tests", 0)
 
-    # Finding #6: All gates cleared -> CLAIM_VERIFIED lifecycle transition
-    evidence.verified = True
-    evidence.lifecycle_state = LIFECYCLE_CLAIM_VERIFIED
-    save_receipt(evidence, ws)
+    # The receipt stays immutable (no mutation of verified or lifecycle_state on evidence object)
+    # Instead, we construct a cryptographically bound VerificationEvent
+    prev_ledger_hash = ledger.get_last_hash() if (ledger and hasattr(ledger, "get_last_hash")) else "0" * 64
+    ws_fp = getattr(evidence, "workspace_fingerprint", "") or ""
+
+    verif_event = VerificationEvent(
+        claim_id=claim.claim_id,
+        receipt_id=evidence.receipt_id,
+        receipt_hash=recorded_hash,
+        verifier="sclass_verifier",
+        verification_time=datetime.now(timezone.utc).isoformat(),
+        result="CLAIM_VERIFIED",
+        reason="Claim verified: All evidence requirements satisfied by independently observed execution.",
+        repository_fingerprint=ws_fp,
+        previous_ledger_hash=prev_ledger_hash,
+        metadata={
+            "exit_code": evidence.exit_code,
+            "files_changed": list(evidence.files_changed or []),
+            "agent": evidence.agent,
+        },
+    )
 
     # Update last_verified in sclass_hooks.json
     _update_sclass_hooks_verified(ws, evidence.agent)
@@ -276,7 +336,17 @@ def verify_claim(
         observed_files_changed=tuple(evidence.files_changed),
         passed_tests=passed,
         receipt_id=evidence.receipt_id,
+        verification_event=verif_event,
     )
     if ledger:
-        ledger.append("verification", result.to_dict())
+        event_dict = result.to_dict()
+        event_dict.update({
+            "receipt_id": evidence.receipt_id,
+            "receipt_hash": recorded_hash,
+            "workspace_fingerprint": ws_fp,
+            "previous_ledger_hash": prev_ledger_hash,
+            "verification_result": "CLAIM_VERIFIED",
+            "event_id": verif_event.event_id,
+        })
+        ledger.append("verification", event_dict)
     return result

@@ -9,11 +9,12 @@ Provides deterministic, typed representations for:
 """
 
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, InitVar
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime, timezone
 import hashlib
 import json
+import uuid
 
 
 @dataclass(frozen=True)
@@ -85,12 +86,16 @@ LIFECYCLE_OBSERVED = "OBSERVED"
 LIFECYCLE_INTEGRITY_VERIFIED = "INTEGRITY_VERIFIED"
 LIFECYCLE_CLAIM_VERIFIED = "CLAIM_VERIFIED"
 
+_OBSERVATION_TOKEN = object()
+
 
 @dataclass
 class EvidenceReceipt:
     """
     Canonical, tamper-evident evidence receipt capturing independently observed
     execution and repository state. The agent is never authoritative for these fields.
+    Observation requires a private capability token and cannot be established by
+    untrusted construction or JSON deserialization.
     """
     receipt_id: str
     task_id: str
@@ -110,12 +115,28 @@ class EvidenceReceipt:
     file_hashes: Dict[str, str] = field(default_factory=dict)
     evidence: List[Dict[str, Any]] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
-    is_observed: bool = True
+    is_observed: InitVar[Any] = None
     lifecycle_state: str = LIFECYCLE_OBSERVED
     verified: bool = False
     receipt_hash: Optional[str] = None
+    workspace_fingerprint: str = ""
+    _is_observed_hash_value: bool = field(default=False, repr=False, compare=False)
+    _explicitly_unobserved: bool = field(default=False, repr=False, compare=False)
+    _observation_token: object | None = field(
+        default=None,
+        repr=False,
+        compare=False,
+    )
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, is_observed: Any = None) -> None:
+        if is_observed is False:
+            self._explicitly_unobserved = True
+            self._is_observed_hash_value = False
+        elif is_observed is True:
+            self._explicitly_unobserved = False
+            if self._observation_token is _OBSERVATION_TOKEN:
+                self._is_observed_hash_value = True
+
         if self.files_changed is None:
             self.files_changed = []
         else:
@@ -130,6 +151,26 @@ class EvidenceReceipt:
             self.metadata = {}
         if not self.receipt_hash and isinstance(self.metadata, dict) and "receipt_hash" in self.metadata:
             self.receipt_hash = self.metadata["receipt_hash"]
+        if not self.workspace_fingerprint and isinstance(self.metadata, dict) and "workspace_fingerprint" in self.metadata:
+            self.workspace_fingerprint = str(self.metadata["workspace_fingerprint"])
+
+    @property
+    def is_observed(self) -> bool:
+        """Observation requires the private capability token."""
+        return self._observation_token is _OBSERVATION_TOKEN
+
+    @is_observed.setter
+    def is_observed(self, val: bool) -> None:
+        """
+        Allows demoting observation state.
+        Setting to True without the private capability token is disallowed and ignored.
+        """
+        if not val:
+            self._explicitly_unobserved = True
+            self._observation_token = None
+            self._is_observed_hash_value = False
+        else:
+            self._explicitly_unobserved = False
 
     def compute_hash(self) -> str:
         """
@@ -144,6 +185,8 @@ class EvidenceReceipt:
         } if isinstance(self.metadata, dict) else {}
 
         clean_ws = (self.workspace or "").replace("\\", "/").rstrip("/")
+
+        hash_obs = bool(self.is_observed or self._is_observed_hash_value)
 
         payload = {
             "receipt_id": self.receipt_id,
@@ -164,13 +207,15 @@ class EvidenceReceipt:
             "file_hashes": {k.replace("\\", "/").strip(): v for k, v in sorted(self.file_hashes.items())} if self.file_hashes else {},
             "evidence": self.evidence or [],
             "metadata": clean_meta,
-            "is_observed": bool(self.is_observed),
+            "is_observed": hash_obs,
         }
+        if self.workspace_fingerprint:
+            payload["workspace_fingerprint"] = self.workspace_fingerprint
         serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        d = {
             "receipt_id": self.receipt_id,
             "task_id": self.task_id,
             "claim_id": self.claim_id,
@@ -194,13 +239,25 @@ class EvidenceReceipt:
             "verified": self.verified,
             "receipt_hash": self.receipt_hash or self.compute_hash(),
         }
+        if self.workspace_fingerprint:
+            d["workspace_fingerprint"] = self.workspace_fingerprint
+        return d
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> EvidenceReceipt:
+        return cls.from_untrusted_data(data)
+
+    @classmethod
+    def from_untrusted_data(cls, data: Dict[str, Any]) -> EvidenceReceipt:
+        """
+        Reconstructs an EvidenceReceipt from untrusted external or persisted data.
+        Persisted data is NEVER proof of observation, so this strictly returns EvidenceReceipt
+        (where is_observed is False), never ObservedReceipt.
+        """
         r_hash = data.get("receipt_hash") or (data.get("metadata", {}).get("receipt_hash") if isinstance(data.get("metadata"), dict) else None)
-        obs = bool(data.get("is_observed", False))
-        cls_to_use = ObservedReceipt if obs else cls
-        return cls_to_use(
+        obs_claimed = bool(data.get("is_observed", False))
+        ws_fp = data.get("workspace_fingerprint") or (data.get("metadata", {}).get("workspace_fingerprint") if isinstance(data.get("metadata"), dict) else "")
+        return EvidenceReceipt(
             receipt_id=data.get("receipt_id", ""),
             task_id=data.get("task_id", ""),
             claim_id=data.get("claim_id", ""),
@@ -219,10 +276,12 @@ class EvidenceReceipt:
             file_hashes=dict(data.get("file_hashes", {}) or {}),
             evidence=list(data.get("evidence", []) or []),
             metadata=dict(data.get("metadata", {}) or {}),
-            is_observed=obs,
             lifecycle_state=data.get("lifecycle_state", LIFECYCLE_OBSERVED),
             verified=bool(data.get("verified", False)),
             receipt_hash=r_hash,
+            workspace_fingerprint=str(ws_fp or ""),
+            _is_observed_hash_value=obs_claimed,
+            _observation_token=None,
         )
 
 
@@ -231,9 +290,10 @@ class ObservedReceipt(EvidenceReceipt):
     Independently observed execution receipt generated by trusted S-Class execution runtime.
     Only ObservedReceipts can pass verification gates.
     """
-    def __init__(self, *args, **kwargs):
-        kwargs["is_observed"] = True
-        super().__init__(*args, **kwargs)
+    def __post_init__(self, is_observed: bool = True) -> None:
+        self._observation_token = _OBSERVATION_TOKEN
+        self._is_observed_hash_value = True
+        super().__post_init__(is_observed=is_observed)
 
 
 @dataclass(frozen=True)
@@ -291,6 +351,52 @@ class Claim:
 
 
 @dataclass(frozen=True)
+class VerificationEvent:
+    """
+    Authoritative, immutable event recording the outcome of evaluating a Claim
+    against an ObservedReceipt within a specific repository state.
+    Binds receipt_id, receipt_hash, workspace_fingerprint, claim_id, verification_result,
+    and previous_ledger_hash.
+    """
+    claim_id: str
+    receipt_id: str
+    verifier: str
+    verification_time: str
+    result: str                         # "CLAIM_VERIFIED" | "REJECT" | "INVALID"
+    reason: str
+    repository_fingerprint: str
+    receipt_hash: str = ""
+    previous_ledger_hash: str = ""
+    event_id: str = field(default_factory=lambda: f"vevt_{uuid.uuid4().hex[:12]}")
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def workspace_fingerprint(self) -> str:
+        return self.repository_fingerprint
+
+    @property
+    def verification_result(self) -> str:
+        return self.result
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "event_id": self.event_id,
+            "claim_id": self.claim_id,
+            "receipt_id": self.receipt_id,
+            "receipt_hash": self.receipt_hash,
+            "verifier": self.verifier,
+            "verification_time": self.verification_time,
+            "result": self.result,
+            "verification_result": self.result,
+            "reason": self.reason,
+            "repository_fingerprint": self.repository_fingerprint,
+            "workspace_fingerprint": self.repository_fingerprint,
+            "previous_ledger_hash": self.previous_ledger_hash,
+            "metadata": dict(self.metadata),
+        }
+
+
+@dataclass(frozen=True)
 class VerificationResult:
     """
     Outcome of evaluating a Claim against independent EvidenceReceipt.
@@ -305,6 +411,7 @@ class VerificationResult:
     invalidation_reason: Optional[str] = None
     receipt_id: Optional[str] = None
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    verification_event: Optional[VerificationEvent] = None
 
     @property
     def is_accepted(self) -> bool:
@@ -330,6 +437,7 @@ class VerificationResult:
             "invalidation_reason": self.invalidation_reason,
             "receipt_id": self.receipt_id,
             "timestamp": self.timestamp,
+            "verification_event": self.verification_event.to_dict() if self.verification_event else None,
         }
 
 

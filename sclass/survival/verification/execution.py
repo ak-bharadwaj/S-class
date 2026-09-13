@@ -15,12 +15,15 @@ import subprocess
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 
-from sclass.survival.models import EvidenceReceipt
+from sclass.survival.models import EvidenceReceipt, ObservedReceipt
 from sclass.survival.evidence import (
+    _create_observed_receipt,
     create_receipt,
     _get_git_commit_hash,
     _get_git_changed_files,
     compute_file_hashes,
+    compute_workspace_snapshot,
+    compute_workspace_fingerprint,
     sanitize_verification_command,
     resolve_executable_tokens,
 )
@@ -35,11 +38,11 @@ def execute_and_record(
     action: str = "run_command",
     timeout: float = 60.0,
     allow_shell: bool = False,
-) -> EvidenceReceipt:
+) -> ObservedReceipt:
     """
     Independently executes a command, captures exit code, hashes stdout/stderr,
-    and records repository state changes and file fingerprints into an authoritative EvidenceReceipt.
-    Prevents shell injection vulnerabilities by using tokenized execution.
+    and records repository state changes and file fingerprints into an authoritative ObservedReceipt.
+    Prevents shell injection vulnerabilities by using tokenized execution and policy gating.
     """
     ws = os.path.abspath(workspace_dir)
     started_at = datetime.now(timezone.utc).isoformat()
@@ -47,6 +50,22 @@ def execute_and_record(
 
     try:
         if allow_shell:
+            # Policy authorization decision for shell execution
+            from sclass.survival.authority import authorize
+            from sclass.survival.models import AuthorizationRequest
+            auth_req = AuthorizationRequest(
+                agent=agent,
+                platform="sclass",
+                action="execute",
+                target=command,
+                parameters={"execution_mode": "shell", "command": command},
+                workspace=ws,
+                task_id=task_id,
+            )
+            decision = authorize(auth_req, mode="enforce", workspace_dir=ws)
+            if not decision.is_allowed:
+                raise ValueError(f"Shell execution rejected by S-Class security policy: {decision.reason}")
+
             proc = subprocess.run(
                 command,
                 cwd=ws,
@@ -91,7 +110,10 @@ def execute_and_record(
     files_changed = _get_git_changed_files(ws, base_commit)
     file_hashes = compute_file_hashes(ws, files_changed)
 
-    return create_receipt(
+    snapshot_after = compute_workspace_snapshot(ws)
+    fingerprint_after = compute_workspace_fingerprint(snapshot_after)
+
+    return _create_observed_receipt(
         task_id=task_id,
         claim_id=claim_id,
         agent=agent,
@@ -107,5 +129,6 @@ def execute_and_record(
         result_commit=result_commit,
         files_changed=files_changed,
         file_hashes=file_hashes,
-        is_observed=True,
+        workspace_snapshot=snapshot_after,
+        workspace_fingerprint=fingerprint_after,
     )

@@ -7,6 +7,12 @@ Minimum chain:
   event N+1: hash(event N+1 + hash(event N))
 
 Stored under .agents/ledger/audit_ledger.jsonl (SCLASS_ONLY authority).
+
+Threat Model Boundary:
+LocalLedger provides tamper evidence, NOT tamper resistance.
+An attacker with direct filesystem control over the workspace could delete or rewrite
+the local ledger file and recompute internal hashes. The ledger establishes local tamper
+evidence and non-repudiation between honest evaluations, not an immutable trust anchor.
 """
 
 from __future__ import annotations
@@ -52,7 +58,8 @@ def sanitize_secrets_in_obj(obj: Any) -> Any:
 
 class LocalLedger:
     """
-    Cryptographic append-only local ledger.
+    Cryptographic append-only local ledger providing tamper evidence.
+    Tracks sequential state transitions and binds verification events to the chain.
     """
 
     def __init__(self, workspace_dir: Optional[str] = None, ledger_path: Optional[str] = None):
@@ -79,6 +86,14 @@ class LocalLedger:
         except Exception:
             return None
         return None
+
+    def get_last_hash(self) -> str:
+        """
+        Returns the latest signature/hash in the ledger, or GENESIS_PREVIOUS_HASH if empty.
+        Used to cryptographically bind verification events and incoming receipts to the ledger state.
+        """
+        last = self._get_last_entry()
+        return last["signature"] if last and "signature" in last else GENESIS_PREVIOUS_HASH
 
     def append(self, event_type: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Appends a new cryptographically chained event to the local ledger (with zero secret leakage)."""
@@ -175,4 +190,10 @@ class LocalLedger:
 
         except Exception as e:
             return (False, f"Ledger verification parse exception: {str(e)}")
+
+    def verify_chain(self) -> bool:
+        """Alias returning boolean indicating whether the ledger cryptographic chain is intact."""
+        valid, _ = self.verify_integrity()
+        return valid
+
 

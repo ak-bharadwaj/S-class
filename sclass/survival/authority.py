@@ -179,6 +179,20 @@ def authorize(
     target = request.target or request.parameters.get("path") or request.parameters.get("file_path") or ""
 
     try:
+        # Rule 0: SCLASS-SHELL-001 — Restrict Arbitrary Shell Execution
+        execution_mode = request.parameters.get("execution_mode") or ("shell" if request.parameters.get("allow_shell") else None)
+        if execution_mode == "shell" or request.action in ("shell_command", "shell_execution"):
+            is_trusted = request.agent in ("sclass", "sclass_kernel", "kernel", "trusted_policy")
+            if not is_trusted:
+                return AuthorizationDecision(
+                    outcome="deny" if mode != "audit" else "warn",
+                    policy_id="SCLASS-SHELL-001",
+                    risk_level="critical",
+                    reason=f"Shell execution requested by agent '{request.agent}' is denied by S-Class policy. Shell execution is restricted to trusted policy.",
+                    remediation="Use structured, tokenized non-shell command execution. Shell execution requires kernel capability.",
+                    diagnostics=(f"Agent: {request.agent}", f"Action: {request.action}", f"ExecutionMode: {execution_mode}"),
+                )
+
         # Rule 1: SCLASS-AUTH-001 / SCLASS-EVID-001 — Path Authority Boundary Protection
         if target:
             auth_class = get_path_authority(target, ws)

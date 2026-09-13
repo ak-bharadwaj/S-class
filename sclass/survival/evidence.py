@@ -141,7 +141,181 @@ def _get_git_changed_files(workspace_dir: str, base_commit: str) -> List[str]:
     return sorted(list(changed))
 
 
-def create_receipt(
+def canonical_json(data: Any) -> str:
+    """Serializes data into canonical, deterministic JSON representation."""
+    return json.dumps(data, sort_keys=True, separators=(",", ":"))
+
+
+def _parse_git_status_porcelain(workspace_dir: str) -> Dict[str, List[str]]:
+    """Extracts granular Git worktree and index modifications via porcelain output."""
+    git_state: Dict[str, List[str]] = {
+        "index_state": [],
+        "tracked_modifications": [],
+        "untracked_files": [],
+        "deleted_files": [],
+        "renamed_files": [],
+    }
+    try:
+        proc = subprocess.run(
+            ["git", "status", "--porcelain=v1", "-uall"],
+            cwd=workspace_dir,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if proc.returncode == 0:
+            for line in proc.stdout.splitlines():
+                if len(line) < 4:
+                    continue
+                code = line[:2]
+                path_part = line[3:].strip().replace("\\", "/")
+                if path_part.startswith(".agents"):
+                    continue
+                index_col = code[0]
+                worktree_col = code[1]
+
+                if code == "??":
+                    git_state["untracked_files"].append(path_part)
+                else:
+                    if index_col not in (" ", "?"):
+                        git_state["index_state"].append(f"{index_col}:{path_part}")
+                    if worktree_col in ("M", "A"):
+                        git_state["tracked_modifications"].append(path_part)
+                    if "D" in (index_col, worktree_col):
+                        git_state["deleted_files"].append(path_part)
+                    if "R" in (index_col, worktree_col):
+                        git_state["renamed_files"].append(path_part)
+    except Exception:
+        pass
+    for k in git_state:
+        git_state[k] = sorted(list(set(git_state[k])))
+    return git_state
+
+
+def _is_symlink_or_reparse(path: str) -> bool:
+    if os.path.islink(path):
+        return True
+    try:
+        import stat
+        st = os.lstat(path)
+        if hasattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT") and hasattr(st, "st_file_attributes"):
+            if st.st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT:
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def _safe_read_link(path: str) -> Optional[str]:
+    try:
+        target = os.readlink(path)
+        if target:
+            if target.startswith("\\\\?\\"):
+                target = target[4:]
+            return target.replace("\\", "/")
+    except Exception:
+        pass
+    return None
+
+
+def compute_workspace_snapshot(workspace_dir: str) -> Dict[str, Any]:
+    """
+    Captures a comprehensive filesystem and Git state snapshot of the workspace.
+    Covers regular files, symlinks, directories, permissions/modes, sizes,
+    and Git index/tracked/untracked/deleted/renamed state.
+    Excludes .agents and .git directories.
+    """
+    ws_clean = os.path.abspath(workspace_dir)
+    files: List[Dict[str, Any]] = []
+
+    if os.path.exists(ws_clean):
+        for root, dirs, filenames in os.walk(ws_clean, topdown=True, followlinks=False):
+            # In-place filter out .git and .agents
+            dirs[:] = [d for d in dirs if d not in (".git", ".agents")]
+            rel_root = os.path.relpath(root, ws_clean).replace("\\", "/")
+            if rel_root != ".":
+                is_dir_link = _is_symlink_or_reparse(root)
+                link_target = _safe_read_link(root) if is_dir_link else None
+                try:
+                    st = os.lstat(root) if is_dir_link else os.stat(root)
+                    mode = oct(st.st_mode)[-4:]
+                except Exception:
+                    mode = "0000"
+                files.append({
+                    "path": rel_root,
+                    "type": "symlink" if is_dir_link else "directory",
+                    "content_hash": None,
+                    "link_target": link_target,
+                    "mode": mode,
+                    "size": 0,
+                })
+                if is_dir_link:
+                    dirs[:] = []
+                    continue
+
+            for fname in filenames:
+                full = os.path.join(root, fname)
+                rel = os.path.relpath(full, ws_clean).replace("\\", "/")
+                if rel.startswith(".agents/") or rel.startswith(".git/") or rel in (".agents", ".git"):
+                    continue
+
+                is_link = _is_symlink_or_reparse(full)
+                link_target = _safe_read_link(full) if is_link else None
+                c_hash = None
+                size = 0
+                mode = "0000"
+
+                if not is_link:
+                    c_hash = compute_file_hash(full)
+
+                try:
+                    st = os.lstat(full) if is_link else os.stat(full)
+                    mode = oct(st.st_mode)[-4:]
+                    size = st.st_size
+                except Exception:
+                    pass
+
+                f_type = "symlink" if is_link else ("directory" if os.path.isdir(full) else "file")
+                files.append({
+                    "path": rel,
+                    "type": f_type,
+                    "content_hash": c_hash,
+                    "link_target": link_target,
+                    "mode": mode,
+                    "size": size,
+                })
+
+    files.sort(key=lambda x: x["path"])
+
+    git_state = _parse_git_status_porcelain(ws_clean)
+    git_head = _get_git_commit_hash(ws_clean)
+
+    return {
+        "files": files,
+        "git_state": {
+            "head": git_head,
+            "index_state": git_state["index_state"],
+            "tracked_modifications": git_state["tracked_modifications"],
+            "untracked_files": git_state["untracked_files"],
+            "deleted_files": git_state["deleted_files"],
+            "renamed_files": git_state["renamed_files"],
+        },
+    }
+
+
+def compute_workspace_fingerprint(snapshot_or_workspace: Any) -> str:
+    """Computes canonical SHA256 cryptographic digest of a workspace snapshot."""
+    if isinstance(snapshot_or_workspace, str):
+        snapshot = compute_workspace_snapshot(snapshot_or_workspace)
+    elif isinstance(snapshot_or_workspace, dict):
+        snapshot = snapshot_or_workspace
+    else:
+        snapshot = {}
+    canonical_str = canonical_json(snapshot)
+    return hashlib.sha256(canonical_str.encode("utf-8")).hexdigest()
+
+
+def _create_observed_receipt(
     task_id: str,
     claim_id: str,
     agent: str,
@@ -160,10 +334,15 @@ def create_receipt(
     evidence: Optional[List[Dict[str, Any]]] = None,
     verified: bool = False,
     metadata: Optional[Dict[str, Any]] = None,
+    workspace_snapshot: Optional[Dict[str, Any]] = None,
+    workspace_fingerprint: Optional[str] = None,
     is_observed: bool = True,
-) -> EvidenceReceipt:
+    **kwargs: Any,
+) -> ObservedReceipt:
     """
-    Creates a canonical EvidenceReceipt with cryptographic hashes of stdout/stderr and file states.
+    Creates an authentic ObservedReceipt with cryptographic hashes of stdout/stderr,
+    file states, and comprehensive workspace fingerprint.
+    Private to the observation engine; ordinary callers cannot establish observation.
     """
     ws = os.path.abspath(workspace)
     b_commit = base_commit or _get_git_commit_hash(ws)
@@ -174,11 +353,19 @@ def create_receipt(
     stdout_hash = hashlib.sha256(stdout_content.encode("utf-8")).hexdigest()
     stderr_hash = hashlib.sha256(stderr_content.encode("utf-8")).hexdigest()
 
+    if workspace_snapshot is None:
+        workspace_snapshot = compute_workspace_snapshot(ws)
+    if workspace_fingerprint is None:
+        workspace_fingerprint = compute_workspace_fingerprint(workspace_snapshot)
+
     receipt_id = f"rcpt_{uuid.uuid4().hex[:12]}"
     meta = dict(metadata or {})
+    meta["workspace_snapshot"] = workspace_snapshot
+    meta["workspace_fingerprint"] = workspace_fingerprint
+    if stderr_content:
+        meta["stderr"] = stderr_content
 
-    receipt_cls = ObservedReceipt if is_observed else EvidenceReceipt
-    receipt = receipt_cls(
+    receipt = ObservedReceipt(
         receipt_id=receipt_id,
         task_id=task_id,
         claim_id=claim_id,
@@ -196,16 +383,25 @@ def create_receipt(
         files_changed=f_changed,
         file_hashes=f_hashes,
         evidence=evidence or [],
-        verified=verified,
         metadata=meta,
-        is_observed=is_observed,
+        workspace_fingerprint=workspace_fingerprint,
         lifecycle_state=LIFECYCLE_OBSERVED,
+        verified=False,
     )
     receipt.receipt_hash = receipt.compute_hash()
 
     # Save receipt to S-Class protected receipts directory
     save_receipt(receipt, ws)
     return receipt
+
+
+def create_receipt(*args: Any, **kwargs: Any) -> ObservedReceipt:
+    """
+    Deprecated / privatized creation path forwarding to _create_observed_receipt.
+    External callers should use observe_command() for trusted observation
+    or create_proposed_evidence() for untrusted assertions.
+    """
+    return _create_observed_receipt(*args, **kwargs)
 
 
 def create_proposed_evidence(
@@ -267,11 +463,12 @@ def observe_command(
     action: str = "run_command",
     timeout: float = 60.0,
     allow_shell: bool = False,
-) -> EvidenceReceipt:
+) -> ObservedReceipt:
     """
     Independently executes and observes a command, recording its true exit code,
-    runtime, stdout/stderr hashes, and repository state fingerprints.
+    runtime, stdout/stderr hashes, and comprehensive workspace state fingerprints.
     Uses strict tokenization to prevent uncontrolled shell injection.
+    Shell execution is strictly governed by explicit policy authorization.
     """
     ws = os.path.abspath(workspace_dir)
     started_at = datetime.now(timezone.utc).isoformat()
@@ -279,6 +476,22 @@ def observe_command(
 
     try:
         if allow_shell:
+            # Policy authorization decision for shell execution
+            from sclass.survival.authority import authorize
+            from sclass.survival.models import AuthorizationRequest
+            auth_req = AuthorizationRequest(
+                agent=agent,
+                platform="sclass",
+                action="execute",
+                target=command,
+                parameters={"execution_mode": "shell", "command": command},
+                workspace=ws,
+                task_id=task_id,
+            )
+            decision = authorize(auth_req, mode="enforce", workspace_dir=ws)
+            if not decision.is_allowed:
+                raise ValueError(f"Shell execution rejected by S-Class security policy: {decision.reason}")
+
             proc = subprocess.run(
                 command,
                 cwd=ws,
@@ -323,7 +536,11 @@ def observe_command(
     files_changed = _get_git_changed_files(ws, base_commit)
     file_hashes = compute_file_hashes(ws, files_changed)
 
-    return create_receipt(
+    # Capture after snapshot and compute fingerprint
+    snapshot_after = compute_workspace_snapshot(ws)
+    fingerprint_after = compute_workspace_fingerprint(snapshot_after)
+
+    return _create_observed_receipt(
         task_id=task_id,
         claim_id=claim_id,
         agent=agent,
@@ -339,6 +556,7 @@ def observe_command(
         result_commit=result_commit,
         files_changed=files_changed,
         file_hashes=file_hashes,
-        is_observed=True,
+        workspace_snapshot=snapshot_after,
+        workspace_fingerprint=fingerprint_after,
     )
 
