@@ -15,7 +15,7 @@ import subprocess
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 
-from sclass.survival.models import EvidenceReceipt, ObservedReceipt
+from sclass.survival.models import EvidenceReceipt, ObservedReceipt, ObservationIntegrityError
 from sclass.survival.evidence import (
     _create_observed_receipt,
     _get_git_commit_hash,
@@ -38,6 +38,8 @@ def execute_and_record(
     timeout: float = 60.0,
     allow_shell: bool = False,
     ledger: Optional[Any] = None,
+    execution_kind: Optional[str] = None,
+    verifier: Optional[str] = None,
 ) -> ObservedReceipt:
     """
     Independently executes a command, captures exit code, hashes stdout/stderr,
@@ -137,30 +139,38 @@ def execute_and_record(
         workspace_fingerprint=fingerprint_after,
         workspace_snapshot_before=snapshot_before,
         workspace_fingerprint_before=fingerprint_before,
+        execution_kind=execution_kind,
+        verifier=verifier,
+        skip_ledger=True,
     )
 
     if ledger is None:
         try:
             from sclass.survival.ledger import LocalLedger
             ledger = LocalLedger(workspace_dir=ws)
-        except Exception:
-            ledger = None
+        except Exception as l_err:
+            raise ObservationIntegrityError(
+                f"Observation completed but local ledger could not be initialized: {l_err}"
+            ) from l_err
 
-    if ledger is not None:
-        try:
-            ledger.append(
-                "OBSERVATION",
-                {
-                    "receipt_id": receipt.receipt_id,
-                    "receipt_hash": receipt.receipt_hash,
-                    "fingerprint_before": fingerprint_before,
-                    "fingerprint_after": fingerprint_after,
-                    "command": command,
-                    "exit_code": exit_code,
-                    "timestamp": finished_at,
-                },
-            )
-        except Exception:
-            pass
+    try:
+        ledger.append(
+            "OBSERVATION",
+            {
+                "receipt_id": receipt.receipt_id,
+                "receipt_hash": receipt.receipt_hash,
+                "fingerprint_before": fingerprint_before,
+                "fingerprint_after": fingerprint_after,
+                "command": command,
+                "exit_code": exit_code,
+                "execution_kind": receipt.execution_kind,
+                "verifier": receipt.verifier,
+                "timestamp": finished_at,
+            },
+        )
+    except Exception as append_err:
+        raise ObservationIntegrityError(
+            f"Observation completed but provenance could not be anchored in ledger: {append_err}"
+        ) from append_err
 
     return receipt

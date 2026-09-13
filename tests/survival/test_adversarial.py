@@ -1318,7 +1318,7 @@ def test_receipt_ledger_cryptographic_binding(test_workspace):
     ledger = LocalLedger(workspace_dir=test_workspace)
     initial_last_hash = ledger.get_last_hash()
 
-    receipt = observe_command("python -c \"print('bound')\"", workspace_dir=test_workspace)
+    receipt = observe_command("pytest --version", workspace_dir=test_workspace)
     assert receipt.workspace_fingerprint != ""
 
     claim = Claim(
@@ -1644,6 +1644,137 @@ def test_genuine_receipt_with_replaced_ledger_entry_rejects(test_workspace):
     assert result_replaced.status == "REJECT"
     assert result_replaced.is_rejected is True
     assert "mismatch" in result_replaced.reason.lower() or "tampering" in result_replaced.reason.lower()
+
+
+def test_test_pass_claim_with_echo_command_rejects(test_workspace):
+    """
+    Audit Finding #1:
+    A claim asserting 'test_pass' backed by an observed command that is NOT
+    an authorized test runner (e.g., echo or python -c print) MUST be REJECTED.
+    Proving execution of an arbitrary command does not prove tests passed.
+    """
+    receipt = observe_command(
+        command="python -c \"print('hello')\"",
+        workspace_dir=test_workspace,
+        task_id="task_echo_01",
+        claim_id="claim_echo_01",
+    )
+    assert receipt.exit_code == 0
+    assert receipt.execution_kind == "generic_command"
+    assert receipt.verifier == ""
+
+    claim = Claim(
+        claim_id="claim_echo_01",
+        task_id="task_echo_01",
+        statement="All tests pass",
+        claim_type="test_pass",
+    )
+    ledger = LocalLedger(workspace_dir=test_workspace)
+    verdict = verify_claim(claim, receipt, workspace_dir=test_workspace, ledger=ledger)
+
+    assert verdict.status == "REJECT"
+    assert verdict.is_rejected is True
+    assert "not executed by an authorized test runner" in verdict.reason.lower() or "test runner" in verdict.reason.lower()
+
+
+def test_mutated_observed_receipt_with_recomputed_hash_rejects(test_workspace):
+    """
+    Audit Finding #2:
+    An attacker who gets hold of an in-memory ObservedReceipt mutates its evidence
+    (e.g., asserts 0 failed tests when it actually had failures) AND recomputes
+    the receipt_hash to match the mutated fields.
+    Verification MUST verify against the immutable local ledger OBSERVATION entry
+    and detect the hash discrepancy, rejecting the mutated receipt.
+    """
+    # 1. Authentic execution with test failures
+    receipt = _create_observed_receipt(
+        task_id="task_mutate_01",
+        claim_id="claim_mutate_01",
+        agent="agent",
+        action="run_tests",
+        workspace=test_workspace,
+        command="pytest",
+        exit_code=0,
+        started_at="2026-09-13T10:00:00Z",
+        finished_at="2026-09-13T10:01:00Z",
+        stdout_content="failed",
+        stderr_content="",
+        evidence=[{"passed_tests": 1, "failed_tests": 5}],
+    )
+    assert receipt.receipt_hash is not None
+
+    # 2. Attacker mutates in-memory receipt fields to fake complete success
+    receipt.evidence = [{"passed_tests": 100, "failed_tests": 0}]
+    # Attacker recomputes hash so self-hash check would pass
+    receipt.receipt_hash = receipt.compute_hash()
+
+    claim = Claim(
+        claim_id="claim_mutate_01",
+        task_id="task_mutate_01",
+        statement="All tests pass",
+        claim_type="test_pass",
+    )
+    ledger = LocalLedger(workspace_dir=test_workspace)
+    verdict = verify_claim(claim, receipt, workspace_dir=test_workspace, ledger=ledger)
+
+    assert verdict.status == "REJECT"
+    assert verdict.is_rejected is True
+    assert "hash mismatch between evidence receipt and ledger" in verdict.reason.lower() or "tampering detected" in verdict.reason.lower()
+
+
+def test_observation_without_ledger_anchor_is_not_authoritative(test_workspace):
+    """
+    Audit Finding #3:
+    In-memory capability token alone is not authoritative without an OBSERVATION
+    event anchored in the local ledger. A receipt created with skip_ledger=True
+    (or detached from ledger) MUST be REJECTED by verify_claim().
+    """
+    receipt = _create_observed_receipt(
+        task_id="task_no_ledger_01",
+        claim_id="claim_no_ledger_01",
+        agent="agent",
+        action="run_tests",
+        workspace=test_workspace,
+        command="pytest",
+        exit_code=0,
+        started_at="2026-09-13T10:00:00Z",
+        finished_at="2026-09-13T10:01:00Z",
+        stdout_content="ok",
+        stderr_content="",
+        skip_ledger=True,  # Crucial: observation was never anchored into ledger
+    )
+    assert receipt.receipt_hash is not None
+
+    claim = Claim(
+        claim_id="claim_no_ledger_01",
+        task_id="task_no_ledger_01",
+        statement="All tests pass",
+        claim_type="test_pass",
+    )
+    ledger = LocalLedger(workspace_dir=test_workspace)
+    verdict = verify_claim(claim, receipt, workspace_dir=test_workspace, ledger=ledger)
+
+    assert verdict.status == "REJECT"
+    assert verdict.is_rejected is True
+    assert "missing observation event" in verdict.reason.lower() or "provenance not found" in verdict.reason.lower()
+
+
+def test_load_receipt_rejects_absolute_external_path(test_workspace):
+    """
+    Audit Finding #4:
+    load_receipt() MUST forbid absolute paths and directory traversal,
+    enforcing canonical containment strictly within <workspace>/.agents/receipts/.
+    """
+    # Attempt absolute path on Unix or Windows
+    assert load_receipt("/etc/passwd", test_workspace) is None
+    assert load_receipt("C:\\Windows\\System32\\calc.exe", test_workspace) is None
+    assert load_receipt("C:/Windows/System32/drivers/etc/hosts", test_workspace) is None
+
+    # Attempt path traversal
+    assert load_receipt("../../../secret.json", test_workspace) is None
+    assert load_receipt("..\\..\\secret.json", test_workspace) is None
+    assert load_receipt("subdir/../../secret", test_workspace) is None
+
 
 
 

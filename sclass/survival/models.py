@@ -82,6 +82,11 @@ class AuthorizationDecision:
         }
 
 
+class ObservationIntegrityError(RuntimeError):
+    """Raised when an observation cannot be anchored in the tamper-evident ledger."""
+    pass
+
+
 LIFECYCLE_OBSERVED = "OBSERVED"
 LIFECYCLE_INTEGRITY_VERIFIED = "INTEGRITY_VERIFIED"
 LIFECYCLE_CLAIM_VERIFIED = "CLAIM_VERIFIED"
@@ -115,6 +120,8 @@ class EvidenceReceipt:
     file_hashes: Dict[str, str] = field(default_factory=dict)
     evidence: List[Dict[str, Any]] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    execution_kind: str = "generic_command"
+    verifier: str = ""
     is_observed: InitVar[Any] = None
     lifecycle_state: str = LIFECYCLE_OBSERVED
     verified: bool = False
@@ -207,6 +214,8 @@ class EvidenceReceipt:
             "file_hashes": {k.replace("\\", "/").strip(): v for k, v in sorted(self.file_hashes.items())} if self.file_hashes else {},
             "evidence": self.evidence or [],
             "metadata": clean_meta,
+            "execution_kind": self.execution_kind or "generic_command",
+            "verifier": self.verifier or "",
             "is_observed": hash_obs,
         }
         if self.workspace_fingerprint:
@@ -234,6 +243,8 @@ class EvidenceReceipt:
             "file_hashes": self.file_hashes,
             "evidence": self.evidence,
             "metadata": self.metadata,
+            "execution_kind": self.execution_kind,
+            "verifier": self.verifier,
             "is_observed": self.is_observed,
             "lifecycle_state": self.lifecycle_state,
             "verified": self.verified,
@@ -276,6 +287,8 @@ class EvidenceReceipt:
             file_hashes=dict(data.get("file_hashes", {}) or {}),
             evidence=list(data.get("evidence", []) or []),
             metadata=dict(data.get("metadata", {}) or {}),
+            execution_kind=data.get("execution_kind", "generic_command"),
+            verifier=data.get("verifier", ""),
             lifecycle_state=data.get("lifecycle_state", LIFECYCLE_OBSERVED),
             verified=bool(data.get("verified", False)),
             receipt_hash=r_hash,
@@ -334,6 +347,7 @@ class Claim:
     statement: str
     claim_type: str = "completion"      # "test_pass" | "file_change" | "feature" | "documentation" | "completion"
     proposed_evidence: Optional[Any] = None
+    verifier: Optional[str] = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> Dict[str, Any]:
@@ -346,8 +360,21 @@ class Claim:
             "statement": self.statement,
             "claim_type": self.claim_type,
             "proposed_evidence": prop_ev,
+            "verifier": self.verifier,
             "created_at": self.created_at,
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> Claim:
+        return cls(
+            claim_id=data.get("claim_id", ""),
+            task_id=data.get("task_id", ""),
+            statement=data.get("statement", ""),
+            claim_type=data.get("claim_type", "completion"),
+            proposed_evidence=data.get("proposed_evidence"),
+            verifier=data.get("verifier"),
+            created_at=data.get("created_at") or datetime.now(timezone.utc).isoformat(),
+        )
 
 
 @dataclass(frozen=True)

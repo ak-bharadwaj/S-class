@@ -19,6 +19,7 @@ import shlex
 import shutil
 import hashlib
 import subprocess
+import re
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List, Tuple
 
@@ -29,7 +30,29 @@ from sclass.survival.models import (
     ClaimedEvidence,
     LIFECYCLE_OBSERVED,
     _OBSERVATION_TOKEN,
+    ObservationIntegrityError,
 )
+
+KNOWN_TEST_VERIFIERS = {
+    "pytest": "pytest",
+    "unittest": "unittest",
+    "jest": "jest",
+    "vitest": "vitest",
+    "mocha": "mocha",
+    "playwright": "playwright",
+    "cargo test": "cargo",
+    "go test": "go",
+}
+
+
+def detect_execution_kind(command: str) -> Tuple[str, str]:
+    """Detects execution kind ('test_runner' vs 'generic_command') and verifier name from command."""
+    cmd_lower = (command or "").strip().lower()
+    for pattern, verifier_name in KNOWN_TEST_VERIFIERS.items():
+        if re.search(r"\b" + re.escape(pattern) + r"\b", cmd_lower):
+            return "test_runner", verifier_name
+    return "generic_command", ""
+
 
 UNSAFE_SHELL_PATTERNS = [";", "&&", "||", "|", "`", "$(", "${", "\n", "\r", ">", "<"]
 
@@ -339,6 +362,8 @@ def _create_observed_receipt(
     workspace_fingerprint: Optional[str] = None,
     workspace_snapshot_before: Optional[Dict[str, Any]] = None,
     workspace_fingerprint_before: Optional[str] = None,
+    execution_kind: Optional[str] = None,
+    verifier: Optional[str] = None,
     is_observed: bool = True,
     **kwargs: Any,
 ) -> ObservedReceipt:
@@ -360,15 +385,24 @@ def _create_observed_receipt(
         workspace_snapshot = compute_workspace_snapshot(ws)
     if workspace_fingerprint is None:
         workspace_fingerprint = compute_workspace_fingerprint(workspace_snapshot)
+    if workspace_snapshot_before is None:
+        workspace_snapshot_before = workspace_snapshot
+    if workspace_fingerprint_before is None:
+        workspace_fingerprint_before = workspace_fingerprint
+
+    if not execution_kind or not verifier:
+        det_kind, det_ver = detect_execution_kind(command)
+        if not execution_kind:
+            execution_kind = det_kind
+        if not verifier:
+            verifier = det_ver
 
     receipt_id = f"rcpt_{uuid.uuid4().hex[:12]}"
     meta = dict(metadata or {})
     meta["workspace_snapshot"] = workspace_snapshot
     meta["workspace_fingerprint"] = workspace_fingerprint
-    if workspace_snapshot_before is not None:
-        meta["workspace_snapshot_before"] = workspace_snapshot_before
-    if workspace_fingerprint_before is not None:
-        meta["workspace_fingerprint_before"] = workspace_fingerprint_before
+    meta["workspace_snapshot_before"] = workspace_snapshot_before
+    meta["workspace_fingerprint_before"] = workspace_fingerprint_before
     if stderr_content:
         meta["stderr"] = stderr_content
 
@@ -391,6 +425,8 @@ def _create_observed_receipt(
         file_hashes=f_hashes,
         evidence=evidence or [],
         metadata=meta,
+        execution_kind=execution_kind,
+        verifier=verifier,
         workspace_fingerprint=workspace_fingerprint,
         lifecycle_state=LIFECYCLE_OBSERVED,
         verified=False,
@@ -399,6 +435,36 @@ def _create_observed_receipt(
 
     # Save receipt to S-Class protected receipts directory
     save_receipt(receipt, ws)
+
+    # Automatically anchor in local ledger if not explicitly skipped
+    if not kwargs.get("skip_ledger", False):
+        ledger = kwargs.get("ledger")
+        if ledger is None and ws and os.path.exists(ws):
+            try:
+                from sclass.survival.ledger import LocalLedger
+                ledger = LocalLedger(workspace_dir=ws)
+            except Exception:
+                ledger = None
+        if ledger is not None:
+            try:
+                ledger.append(
+                    "OBSERVATION",
+                    {
+                        "receipt_id": receipt.receipt_id,
+                        "receipt_hash": receipt.receipt_hash,
+                        "fingerprint_before": workspace_fingerprint_before or meta.get("workspace_fingerprint_before", ""),
+                        "fingerprint_after": workspace_fingerprint,
+                        "command": command,
+                        "exit_code": exit_code,
+                        "execution_kind": receipt.execution_kind,
+                        "verifier": receipt.verifier,
+                        "timestamp": finished_at,
+                    },
+                )
+            except Exception as append_err:
+                if kwargs.get("strict_ledger", False):
+                    raise ObservationIntegrityError(f"Observation completed but provenance could not be anchored: {append_err}") from append_err
+
     return receipt
 
 
@@ -514,13 +580,29 @@ def save_receipt(receipt: EvidenceReceipt, workspace_dir: str) -> str:
 
 
 def load_receipt(receipt_id: str, workspace_dir: str) -> Optional[EvidenceReceipt]:
-    """Loads and validates a receipt from disk. Missing or invalid hash returns None."""
-    if os.path.isabs(receipt_id) and os.path.isfile(receipt_id):
-        target = receipt_id
-    else:
-        clean_id = receipt_id[:-5] if receipt_id.endswith(".json") else receipt_id
-        target = os.path.join(workspace_dir, ".agents", "receipts", f"{clean_id}.json")
-    if not os.path.exists(target):
+    """
+    Loads and validates a receipt from .agents/receipts/{receipt_id}.json.
+    Strictly forbids absolute paths and directory traversal.
+    Missing, invalid, or forged hash returns None.
+    """
+    if not receipt_id or not isinstance(receipt_id, str):
+        return None
+    # Reject path traversal and absolute path attempts
+    if ".." in receipt_id or "/" in receipt_id or "\\" in receipt_id or os.path.isabs(receipt_id):
+        return None
+
+    clean_id = receipt_id[:-5] if receipt_id.endswith(".json") else receipt_id
+    receipts_dir = os.path.abspath(os.path.join(workspace_dir, ".agents", "receipts"))
+    target = os.path.abspath(os.path.join(receipts_dir, f"{clean_id}.json"))
+
+    # Canonical containment check: ensure target stays strictly within receipts_dir
+    try:
+        if os.path.commonpath([receipts_dir, target]) != receipts_dir:
+            return None
+    except ValueError:
+        return None
+
+    if not os.path.exists(target) or not os.path.isfile(target):
         return None
     try:
         with open(target, "r", encoding="utf-8") as f:
@@ -549,6 +631,8 @@ def observe_command(
     timeout: float = 60.0,
     allow_shell: bool = False,
     ledger: Optional[Any] = None,
+    execution_kind: Optional[str] = None,
+    verifier: Optional[str] = None,
 ) -> ObservedReceipt:
     """
     Independently executes and observes a command, recording its true exit code,
@@ -650,31 +734,39 @@ def observe_command(
         workspace_fingerprint=fingerprint_after,
         workspace_snapshot_before=snapshot_before,
         workspace_fingerprint_before=fingerprint_before,
+        execution_kind=execution_kind,
+        verifier=verifier,
+        skip_ledger=True,
     )
 
     if ledger is None:
         try:
             from sclass.survival.ledger import LocalLedger
             ledger = LocalLedger(workspace_dir=ws)
-        except Exception:
-            ledger = None
+        except Exception as l_err:
+            raise ObservationIntegrityError(
+                f"Observation completed but local ledger could not be initialized: {l_err}"
+            ) from l_err
 
-    if ledger is not None:
-        try:
-            ledger.append(
-                "OBSERVATION",
-                {
-                    "receipt_id": receipt.receipt_id,
-                    "receipt_hash": receipt.receipt_hash,
-                    "fingerprint_before": fingerprint_before,
-                    "fingerprint_after": fingerprint_after,
-                    "command": command,
-                    "exit_code": exit_code,
-                    "timestamp": finished_at,
-                },
-            )
-        except Exception:
-            pass
+    try:
+        ledger.append(
+            "OBSERVATION",
+            {
+                "receipt_id": receipt.receipt_id,
+                "receipt_hash": receipt.receipt_hash,
+                "fingerprint_before": fingerprint_before,
+                "fingerprint_after": fingerprint_after,
+                "command": command,
+                "exit_code": exit_code,
+                "execution_kind": receipt.execution_kind,
+                "verifier": receipt.verifier,
+                "timestamp": finished_at,
+            },
+        )
+    except Exception as append_err:
+        raise ObservationIntegrityError(
+            f"Observation completed but provenance could not be anchored in ledger: {append_err}"
+        ) from append_err
 
     return receipt
 

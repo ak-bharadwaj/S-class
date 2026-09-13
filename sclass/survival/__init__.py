@@ -21,6 +21,7 @@ from sclass.survival.models import (
     Claim,
     VerificationResult,
     AdapterCapabilities,
+    ObservationIntegrityError,
 )
 from sclass.survival.authority import authorize, PathAuthority, get_path_authority
 from sclass.survival.evidence import (
@@ -79,6 +80,7 @@ __all__ = [
     "Claim",
     "VerificationResult",
     "AdapterCapabilities",
+    "ObservationIntegrityError",
     "PathAuthority",
     "get_path_authority",
     "create_proposed_evidence",

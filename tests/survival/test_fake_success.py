@@ -143,10 +143,11 @@ def test_fake_success_golden_flow(fake_agent_workspace):
 
     # Step 8: Ledger records rejection and maintains cryptographic chain
     ledger_entries = ledger.read_all_entries()
-    assert len(ledger_entries) == 2  # 1. authorization, 2. rejection
+    assert len(ledger_entries) == 3  # 1. authorization, 2. OBSERVATION, 3. rejection
     assert ledger_entries[0]["event"] == "authorization"
-    assert ledger_entries[1]["event"] == "rejection"
-    assert ledger_entries[1]["payload"]["status"] == "REJECT"
+    assert ledger_entries[1]["event"] == "OBSERVATION"
+    assert ledger_entries[2]["event"] == "rejection"
+    assert ledger_entries[2]["payload"]["status"] == "REJECT"
 
     # Step 9: Verify entire ledger chain integrity
     is_valid, error = ledger.verify_integrity()

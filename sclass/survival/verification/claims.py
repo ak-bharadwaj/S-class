@@ -28,9 +28,16 @@ from sclass.survival.models import (
     LIFECYCLE_CLAIM_VERIFIED,
     _OBSERVATION_TOKEN,
 )
-from sclass.survival.evidence import load_receipt
+from sclass.survival.evidence import load_receipt, KNOWN_TEST_VERIFIERS
 from sclass.survival.ledger import LocalLedger
 from sclass.survival.verification.evidence import check_verification_staleness
+
+TEST_VERIFIERS = set(KNOWN_TEST_VERIFIERS.values()) | set(KNOWN_TEST_VERIFIERS.keys()) | {
+    "npm test",
+    "yarn test",
+    "pnpm test",
+    "tox",
+}
 
 
 TEST_PASS_PATTERNS = [
@@ -240,101 +247,121 @@ def verify_claim(
         )
 
     # Phase 1 Trust Boundary & Observation Provenance Verification:
-    # 1. Check if evidence is in-memory observed (has private _OBSERVATION_TOKEN).
-    # 2. OR verify its provenance against the local ledger (e.g. for persisted receipts loaded from disk).
-    is_in_memory_observed = (
-        isinstance(evidence, ObservedReceipt)
-        and getattr(evidence, "is_observed", False)
-        and getattr(evidence, "_observation_token", None) is _OBSERVATION_TOKEN
-        and not getattr(evidence, "_explicitly_unobserved", False)
-    )
+    # Require immutable OBSERVATION ledger entry for ALL receipts (both in-memory and persisted).
+    # This closes in-memory mutation bypasses and ensures an authentic OBSERVATION event anchors every receipt.
+    if ledger is None:
+        return _record_rejection(
+            claim=claim,
+            reason="Claim rejected: Local ledger is required to verify observation provenance.",
+            evidence=evidence,
+            ledger=ledger,
+        )
 
+    # Require valid hash chain in the ledger
+    is_chain_valid, chain_error = ledger.verify_integrity()
+    if not is_chain_valid:
+        return _record_rejection(
+            claim=claim,
+            reason=f"Claim rejected: Local ledger integrity compromised ({chain_error}). Evidence provenance cannot be established.",
+            evidence=evidence,
+            ledger=ledger,
+        )
+
+    # Look up the ledger record for event="OBSERVATION" with matching receipt_id
     matching_obs = None
-    if not is_in_memory_observed:
-        if ledger is None:
-            return _record_rejection(
-                claim=claim,
-                reason="Claim rejected: Agent supplied unobserved or untrusted evidence. No local ledger is available to verify provenance.",
-                evidence=evidence,
-                ledger=ledger,
-            )
+    ledger_entries = ledger.read_all_entries()
+    for entry in ledger_entries:
+        if entry.get("event") == "OBSERVATION":
+            payload = entry.get("payload", {})
+            if payload.get("receipt_id") == evidence.receipt_id:
+                matching_obs = entry
+                break
 
-        # Require valid hash chain in the ledger
-        is_chain_valid, chain_error = ledger.verify_integrity()
-        if not is_chain_valid:
-            return _record_rejection(
-                claim=claim,
-                reason=f"Claim rejected: Local ledger integrity compromised ({chain_error}). Evidence provenance cannot be established.",
-                evidence=evidence,
-                ledger=ledger,
-            )
+    if not matching_obs:
+        return _record_rejection(
+            claim=claim,
+            reason="Claim rejected: Agent supplied unobserved or untrusted evidence. Provenance not found in local ledger (missing OBSERVATION event).",
+            evidence=evidence,
+            ledger=ledger,
+        )
 
-        # Look up the ledger record for event="OBSERVATION" with matching receipt_id
-        ledger_entries = ledger.read_all_entries()
-        for entry in ledger_entries:
-            if entry.get("event") == "OBSERVATION":
-                payload = entry.get("payload", {})
-                if payload.get("receipt_id") == evidence.receipt_id:
-                    matching_obs = entry
-                    break
+    obs_payload = matching_obs.get("payload", {})
 
-        if not matching_obs:
-            return _record_rejection(
-                claim=claim,
-                reason="Claim rejected: Agent supplied unobserved or untrusted evidence. Provenance not found in local ledger (missing OBSERVATION event).",
-                evidence=evidence,
-                ledger=ledger,
-            )
+    # Require receipt <-> observation-event hash equality:
+    # ledger_entry["payload"]["receipt_hash"] == receipt.receipt_hash
+    ledger_receipt_hash = obs_payload.get("receipt_hash")
+    if not ledger_receipt_hash or ledger_receipt_hash != recorded_hash:
+        return _record_rejection(
+            claim=claim,
+            reason="Claim rejected: Receipt hash mismatch between evidence receipt and ledger OBSERVATION event. Tampering detected.",
+            evidence=evidence,
+            ledger=ledger,
+        )
 
-        obs_payload = matching_obs.get("payload", {})
+    # Require before + after workspace fingerprint match between receipt metadata and the ledger entry
+    receipt_meta = evidence.metadata if isinstance(evidence.metadata, dict) else {}
+    receipt_fp_before = receipt_meta.get("workspace_fingerprint_before") or receipt_meta.get("fingerprint_before")
+    receipt_fp_after = getattr(evidence, "workspace_fingerprint", None) or receipt_meta.get("workspace_fingerprint") or receipt_meta.get("fingerprint_after")
 
-        # Require receipt <-> observation-event hash equality:
-        # ledger_entry["payload"]["receipt_hash"] == receipt.receipt_hash
-        ledger_receipt_hash = obs_payload.get("receipt_hash")
-        if not ledger_receipt_hash or ledger_receipt_hash != recorded_hash:
-            return _record_rejection(
-                claim=claim,
-                reason="Claim rejected: Receipt hash mismatch between evidence receipt and ledger OBSERVATION event. Tampering detected.",
-                evidence=evidence,
-                ledger=ledger,
-            )
+    ledger_fp_before = obs_payload.get("fingerprint_before")
+    ledger_fp_after = obs_payload.get("fingerprint_after")
 
-        # Require before + after workspace fingerprint match between receipt metadata and the ledger entry
-        receipt_meta = evidence.metadata if isinstance(evidence.metadata, dict) else {}
-        receipt_fp_before = receipt_meta.get("workspace_fingerprint_before") or receipt_meta.get("fingerprint_before")
-        receipt_fp_after = getattr(evidence, "workspace_fingerprint", None) or receipt_meta.get("workspace_fingerprint") or receipt_meta.get("fingerprint_after")
+    if not ledger_fp_before or not ledger_fp_after:
+        return _record_rejection(
+            claim=claim,
+            reason="Claim rejected: Ledger OBSERVATION event missing required workspace fingerprints.",
+            evidence=evidence,
+            ledger=ledger,
+        )
 
-        ledger_fp_before = obs_payload.get("fingerprint_before")
-        ledger_fp_after = obs_payload.get("fingerprint_after")
+    if not receipt_fp_before or not receipt_fp_after:
+        return _record_rejection(
+            claim=claim,
+            reason="Claim rejected: Evidence receipt missing workspace fingerprints required for provenance verification.",
+            evidence=evidence,
+            ledger=ledger,
+        )
 
-        if not ledger_fp_before or not ledger_fp_after:
-            return _record_rejection(
-                claim=claim,
-                reason="Claim rejected: Ledger OBSERVATION event missing required workspace fingerprints.",
-                evidence=evidence,
-                ledger=ledger,
-            )
-
-        if not receipt_fp_before or not receipt_fp_after:
-            return _record_rejection(
-                claim=claim,
-                reason="Claim rejected: Evidence receipt missing workspace fingerprints required for provenance verification.",
-                evidence=evidence,
-                ledger=ledger,
-            )
-
-        if receipt_fp_before != ledger_fp_before or receipt_fp_after != ledger_fp_after:
-            return _record_rejection(
-                claim=claim,
-                reason="Claim rejected: Workspace fingerprint mismatch between evidence receipt and ledger OBSERVATION event.",
-                evidence=evidence,
-                ledger=ledger,
-            )
+    if receipt_fp_before != ledger_fp_before or receipt_fp_after != ledger_fp_after:
+        return _record_rejection(
+            claim=claim,
+            reason="Claim rejected: Workspace fingerprint mismatch between evidence receipt and ledger OBSERVATION event.",
+            evidence=evidence,
+            ledger=ledger,
+        )
 
     # Structured claim evaluation
     is_test_claim = is_test_assertion(claim)
 
     if is_test_claim:
+        # P0 Fix 1: Bind claim type to authorized verifier/execution kind
+        # Ensure test claims require genuine test verifier execution.
+        ev_kind = getattr(evidence, "execution_kind", "generic_command")
+        ev_ver = (getattr(evidence, "verifier", "") or "").strip().lower()
+
+        if ev_kind not in ("test_runner", "test_executor") or not ev_ver or ev_ver not in TEST_VERIFIERS:
+            return _record_rejection(
+                claim=claim,
+                reason=f"Claim rejected: Claim asserts test results, but command '{evidence.command}' was not executed by an authorized test runner (execution_kind='{ev_kind}', verifier='{ev_ver}').",
+                evidence=evidence,
+                ledger=ledger,
+                exit_code=evidence.exit_code,
+                files_changed=tuple(evidence.files_changed or []),
+            )
+
+        # If claim explicitly specified a required verifier, check for match
+        if getattr(claim, "verifier", None):
+            claim_ver = claim.verifier.strip().lower()
+            if ev_ver != claim_ver:
+                return _record_rejection(
+                    claim=claim,
+                    reason=f"Claim rejected: Verifier mismatch. Claim specified verifier '{claim.verifier}', but evidence was verified by '{evidence.verifier}'.",
+                    evidence=evidence,
+                    ledger=ledger,
+                    exit_code=evidence.exit_code,
+                    files_changed=tuple(evidence.files_changed or []),
+                )
+
         if evidence.exit_code != 0:
             return _record_rejection(
                 claim=claim,
