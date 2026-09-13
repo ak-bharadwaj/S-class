@@ -1,0 +1,13 @@
+# REFACTORING-PATTERNS PLAYBOOK
+
+# Behavior-Preserving Refactoring Playbook
+
+## 1. Non-Negotiable Invariant
+- Refactoring MUST preserve exact observable behavior.
+- Every refactor step MUST be guarded by pre-existing green tests.
+
+## 2. Safe Transformation Steps
+1. **Extract Function / Method**: Decompose large monolithic blocks (>50 lines) into focused, single-responsibility functions.
+2. **Replace Magic Constants**: Replace literal numbers and arbitrary strings with typed constants or enums.
+3. **Encapsulate Field / Primitive**: Group related primitive parameters into structured data objects (dataclass, Pydantic, TypeScript interface).
+4. **Eliminate Dead Code**: Remove unreachable branches, unused imports, and deprecated helper functions.

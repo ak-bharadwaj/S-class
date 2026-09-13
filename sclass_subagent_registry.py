@@ -103,13 +103,15 @@ class SubagentRegistry:
         "responsive", "animation", "motion", "a11y", "theme", "dark-mode", "toast",
         "dialog", "skeleton", "shimmer", "layout", "css", "tailwind", "ui-library",
         "component", "palette", "typeset", "colorize", "delight", "mobile", "android",
-        "ios", "webgl", "3d", "scroll", "creative-interaction", "sonner", "ux", "page-route"
+        "ios", "webgl", "3d", "scroll", "creative-interaction", "sonner", "ux", "page-route",
+        "form-validation", "field-errors", "data-dense-ui", "accessibility"
     }
 
     UNREQUESTED_ENTERPRISE_NON_UI = {
         "oauth-sso-saml-auth", "tenant-isolation-multi-tenancy", "elasticsearch-vector-search",
         "db-sharding-read-replicas", "prisma-drizzle-orm", "stripe-payment-checkout",
-        "seo-metadata-open-graph", "i18n-localization-engine", "background-pdf-excel-exporter"
+        "seo-metadata-open-graph", "i18n-localization-engine", "background-pdf-excel-exporter",
+        "auth-jwt-rbac", "file-upload-storage", "academic-workflows", "approval-workflows"
     }
 
     @classmethod
@@ -137,10 +139,13 @@ class SubagentRegistry:
         tokens = set(s_lower.split("-"))
         if bool(tokens & cls.UI_SKILL_PATTERNS):
             return True
-        if any(p in s_lower for p in ["dark-mode", "toast", "ui-library", "apple-design", "animation", "page-route"]):
+        if any(p in s_lower for p in [
+            "dark-mode", "toast", "ui-library", "apple-design", "animation",
+            "page-route", "data-dense", "form-validation", "accessibility"
+        ]):
             return True
 
-        # 3. Heavy unrequested enterprise/ORM stacks for non-UI tasks
+        # 3. Heavy unrequested enterprise/ORM/auth stacks for non-UI tasks
         if s_lower in cls.UNREQUESTED_ENTERPRISE_NON_UI:
             return True
 
