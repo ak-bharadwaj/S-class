@@ -601,6 +601,45 @@ def test_attack_family_a_tamper_security_relevant_fields_rejected(test_workspace
     # 4. Mutate task_id
     receipt.task_id = "task_hijacked"
     assert verify_claim(claim, receipt, workspace_dir=test_workspace).status == "REJECT"
+    receipt.task_id = "task_multi_tamper"
+
+    # 5. Mutate workspace
+    receipt.workspace = "/tampered/workspace"
+    assert verify_claim(claim, receipt, workspace_dir=test_workspace).status == "REJECT"
+    receipt.workspace = test_workspace
+
+    # 6. Mutate started_at
+    receipt.started_at = "1970-01-01T00:00:00Z"
+    assert verify_claim(claim, receipt, workspace_dir=test_workspace).status == "REJECT"
+    receipt.started_at = "2026-09-13T10:00:00Z"
+
+    # 7. Mutate finished_at
+    receipt.finished_at = "2099-01-01T00:00:00Z"
+    assert verify_claim(claim, receipt, workspace_dir=test_workspace).status == "REJECT"
+    receipt.finished_at = "2026-09-13T10:01:00Z"
+
+    # 8. Mutate stdout_hash
+    receipt.stdout_hash = "0" * 64
+    assert verify_claim(claim, receipt, workspace_dir=test_workspace).status == "REJECT"
+    receipt.stdout_hash = receipt.compute_hash()  # will mismatch
+    assert verify_claim(claim, receipt, workspace_dir=test_workspace).status == "REJECT"
+
+    # 9. Mutate is_observed from True to False (or False to True)
+    receipt = create_receipt(
+        task_id="task_obs",
+        claim_id="claim_obs",
+        agent="claude",
+        action="test",
+        workspace=test_workspace,
+        command="pytest",
+        exit_code=0,
+        started_at="2026-09-13T10:00:00Z",
+        finished_at="2026-09-13T10:01:00Z",
+        stdout_content="ok",
+        stderr_content="",
+    )
+    receipt.is_observed = False
+    assert verify_claim(claim, receipt, workspace_dir=test_workspace).status == "REJECT"
 
 
 def test_attack_family_b_same_file_modification_staleness(test_workspace):
@@ -847,5 +886,101 @@ def test_attack_family_f_shell_injection_thwarted(test_workspace):
     assert receipt.exit_code == 126
     # Protected directory remains intact
     assert os.path.exists(os.path.join(test_workspace, ".agents"))
+
+
+def test_attack_family_e_all_contradictory_claim_attacks(test_workspace):
+    """
+    Finding #7 & Attack Family E: Contradictory evidence attacks.
+    Every one of the 7 audited attack statements:
+    - "tests passed"
+    - "tests are passing"
+    - "green"
+    - "done"
+    - "implemented"
+    - "fixed"
+    - "verified"
+    MUST be rejected when presented with contradictory evidence (exit_code != 0 or failed_tests > 0).
+    """
+    contradictory_receipt = create_receipt(
+        task_id="task_e_attack",
+        claim_id="claim_e_attack",
+        agent="claude",
+        action="test",
+        workspace=test_workspace,
+        command="pytest",
+        exit_code=1,
+        started_at="2026-09-13T10:00:00Z",
+        finished_at="2026-09-13T10:01:00Z",
+        stdout_content="2 failed",
+        stderr_content="AssertionError",
+        evidence=[{"failed_tests": 2, "passed_tests": 0}],
+    )
+
+    attack_statements = [
+        "tests passed",
+        "tests are passing",
+        "green",
+        "done",
+        "implemented",
+        "fixed",
+        "verified",
+    ]
+
+    for stmt in attack_statements:
+        claim = Claim(
+            claim_id="claim_e_attack",
+            task_id="task_e_attack",
+            statement=stmt,
+            claim_type="completion",
+        )
+        verdict = verify_claim(claim, contradictory_receipt, workspace_dir=test_workspace)
+        assert verdict.status == "REJECT", f"Statement '{stmt}' should have been rejected with contradictory evidence!"
+        assert verdict.is_rejected is True
+
+
+def test_attack_family_b_unfingerprinted_file_detected(test_workspace):
+    """
+    Finding #3: Attacker creates a file that was recorded in files_changed
+    without a fingerprint (or omitted). Content check must flag it as modified.
+    """
+    receipt = create_receipt(
+        task_id="task_unfp",
+        claim_id="claim_unfp",
+        agent="claude",
+        action="edit",
+        workspace=test_workspace,
+        command="touch test.py",
+        exit_code=0,
+        started_at="2026-09-13T10:00:00Z",
+        finished_at="2026-09-13T10:01:00Z",
+        stdout_content="ok",
+        stderr_content="",
+        files_changed=["src/unfingerprinted.py"],
+        file_hashes={},  # Intentionally missing hash
+    )
+
+    # Now attacker creates src/unfingerprinted.py on disk
+    target = os.path.join(test_workspace, "src", "unfingerprinted.py")
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    with open(target, "w", encoding="utf-8") as f:
+        f.write("malicious payload")
+
+    is_fresh, reason = check_verification_staleness(receipt, test_workspace)
+    assert is_fresh is False
+    assert "Unfingerprinted file modification detected after verification" in reason
+
+
+def test_attack_family_f_newlines_and_redirections_rejected(test_workspace):
+    """
+    Finding #8: Execution verifier rejects newlines and redirection operators.
+    """
+    # 1. Newline injection
+    r1 = observe_command("pytest\nrm -rf /", workspace_dir=test_workspace)
+    assert r1.exit_code == 126
+
+    # 2. Output redirection
+    r2 = observe_command("pytest > /dev/null", workspace_dir=test_workspace)
+    assert r2.exit_code == 126
+
 
 

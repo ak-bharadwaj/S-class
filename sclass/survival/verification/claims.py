@@ -32,32 +32,45 @@ from sclass.survival.verification.evidence import check_verification_staleness
 
 TEST_PASS_PATTERNS = [
     re.compile(r"\b(tests?)\s+(?:are\s+)?(?:pass|passed|passing|green|succeeded)\b", re.IGNORECASE),
-    re.compile(r"\b(?:all\s+)?tests?\s+pass\b", re.IGNORECASE),
+    re.compile(r"\b(?:all\s+)?tests?\s+pass(?:ed|ing)?\b", re.IGNORECASE),
     re.compile(r"\bpytest\b(?:\s+(?:pass|passed|clean|green|succeed))?", re.IGNORECASE),
     re.compile(r"\b(?:all\s+)?(?:green|passing)\b.*\btests?\b", re.IGNORECASE),
-    re.compile(r"\b(?:implementation|build|suite)\s+is\s+green\b", re.IGNORECASE),
+    re.compile(r"\b(?:implementation|build|suite|code|repo|everything|all)\s+is\s+green\b", re.IGNORECASE),
+    re.compile(r"\b(?:all\s+)?green\b", re.IGNORECASE),
     re.compile(r"\b100%\s+(?:pass|success|tests)\b", re.IGNORECASE),
     re.compile(r"\bunit\s+tests?\s+(?:pass|passed)\b", re.IGNORECASE),
+    re.compile(r"\bpasses\s+all\s+tests\b", re.IGNORECASE),
 ]
 
 DOC_PATTERNS = [
     re.compile(r"\b(?:documentation|docs?|readme|comments?|docstring)\b", re.IGNORECASE),
 ]
 
+IMPLEMENTATION_PATTERNS = [
+    re.compile(r"\b(?:implemented|implementing|fix|fixed|fixing|added|built|created|updated|done|completed|refactored)\b", re.IGNORECASE),
+]
+
+
+def is_doc_claim(claim: Claim) -> bool:
+    """Determines if a claim is purely about documentation."""
+    if claim.claim_type in ("documentation", "doc_change", "docs"):
+        return True
+    stmt = claim.statement.strip()
+    if any(p.search(stmt) for p in DOC_PATTERNS):
+        has_pass_assertion = any(p.search(stmt) for p in TEST_PASS_PATTERNS)
+        if not has_pass_assertion:
+            return True
+    return False
+
 
 def is_test_assertion(claim: Claim) -> bool:
     """Determines if a claim asserts test execution results with structured precedence."""
     if claim.claim_type == "test_pass":
         return True
-    if claim.claim_type in ("documentation", "doc_change", "docs"):
+    if is_doc_claim(claim):
         return False
 
     stmt = claim.statement.strip()
-    if any(p.search(stmt) for p in DOC_PATTERNS):
-        has_pass_assertion = any(p.search(stmt) for p in TEST_PASS_PATTERNS)
-        if not has_pass_assertion:
-            return False
-
     for p in TEST_PASS_PATTERNS:
         if p.search(stmt):
             return True
@@ -106,6 +119,11 @@ def verify_claim(
     Returns VerificationResult (ACCEPT | REJECT | INVALID).
     """
     ws = os.path.abspath(workspace_dir or (evidence.workspace if evidence else os.getcwd()))
+    if ledger is None:
+        try:
+            ledger = LocalLedger(workspace_dir=ws)
+        except Exception:
+            ledger = None
 
     # Attack 10: Agent says "done" but produces no evidence
     if evidence is None:
@@ -161,7 +179,7 @@ def verify_claim(
     # Finding #6: Lifecycle transition to INTEGRITY_VERIFIED
     evidence.lifecycle_state = LIFECYCLE_INTEGRITY_VERIFIED
 
-    # Finding #7: Structured claim evaluation
+    # Finding #7 & Attack Family E: Structured claim evaluation
     is_test_claim = is_test_assertion(claim)
 
     if is_test_claim:
@@ -171,7 +189,7 @@ def verify_claim(
                 claim_id=claim.claim_id,
                 reason=f"Claim rejected: Test command execution failed with exit code {evidence.exit_code}.",
                 observed_exit_code=evidence.exit_code,
-                observed_files_changed=tuple(evidence.files_changed),
+                observed_files_changed=tuple(evidence.files_changed or []),
                 receipt_id=evidence.receipt_id,
             )
             if ledger:
@@ -179,7 +197,7 @@ def verify_claim(
             return result
 
         # Check explicit failed_tests count if present in receipt evidence items
-        for ev in evidence.evidence:
+        for ev in (evidence.evidence or []):
             failed = ev.get("failed_tests", 0)
             if failed > 0:
                 result = VerificationResult(
@@ -193,6 +211,21 @@ def verify_claim(
                 if ledger:
                     ledger.append("rejection", result.to_dict())
                 return result
+
+    # Contradictory evidence defense for non-test non-documentation claims:
+    # If the observed command execution failed with exit_code != 0, reject!
+    elif not is_doc_claim(claim) and evidence.exit_code != 0:
+        result = VerificationResult(
+            status="REJECT",
+            claim_id=claim.claim_id,
+            reason=f"Claim rejected: Observed execution failed with exit code {evidence.exit_code}. Contradictory evidence.",
+            observed_exit_code=evidence.exit_code,
+            observed_files_changed=tuple(evidence.files_changed or []),
+            receipt_id=evidence.receipt_id,
+        )
+        if ledger:
+            ledger.append("rejection", result.to_dict())
+        return result
 
     # Finding #3: Staleness check (including repository state & same-file fingerprints)
     is_fresh, staleness_reason = check_verification_staleness(evidence, ws)

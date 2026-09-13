@@ -22,6 +22,7 @@ from sclass.survival.evidence import (
     _get_git_changed_files,
     compute_file_hashes,
     sanitize_verification_command,
+    resolve_executable_tokens,
 )
 
 
@@ -56,8 +57,9 @@ def execute_and_record(
             )
         else:
             cmd_tokens = sanitize_verification_command(command)
+            resolved_tokens = resolve_executable_tokens(cmd_tokens)
             proc = subprocess.run(
-                cmd_tokens,
+                resolved_tokens,
                 cwd=ws,
                 shell=False,
                 capture_output=True,

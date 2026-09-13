@@ -16,6 +16,7 @@ import sys
 import json
 import uuid
 import shlex
+import shutil
 import hashlib
 import subprocess
 from datetime import datetime, timezone
@@ -29,7 +30,7 @@ from sclass.survival.models import (
     LIFECYCLE_OBSERVED,
 )
 
-UNSAFE_SHELL_PATTERNS = [";", "&&", "||", "|", "`", "$(", "${"]
+UNSAFE_SHELL_PATTERNS = [";", "&&", "||", "|", "`", "$(", "${", "\n", "\r", ">", "<"]
 
 
 def sanitize_verification_command(command: str) -> List[str]:
@@ -44,6 +45,19 @@ def sanitize_verification_command(command: str) -> List[str]:
     if not tokens:
         raise ValueError("Empty verification command.")
     return tokens
+
+
+def resolve_executable_tokens(cmd_tokens: List[str]) -> List[str]:
+    """Resolves command tokens to ensure safe, cross-platform execution without shell=True."""
+    if not cmd_tokens:
+        return cmd_tokens
+    resolved = list(cmd_tokens)
+    first = resolved[0]
+    if first == "pytest" and not shutil.which("pytest"):
+        return [sys.executable, "-m", "pytest"] + resolved[1:]
+    if first in ("python", "python3") and not shutil.which(first):
+        return [sys.executable] + resolved[1:]
+    return resolved
 
 
 def compute_file_hash(abs_path: str) -> Optional[str]:
@@ -275,8 +289,9 @@ def observe_command(
             )
         else:
             cmd_tokens = sanitize_verification_command(command)
+            resolved_tokens = resolve_executable_tokens(cmd_tokens)
             proc = subprocess.run(
-                cmd_tokens,
+                resolved_tokens,
                 cwd=ws,
                 shell=False,
                 capture_output=True,

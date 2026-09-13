@@ -116,10 +116,18 @@ class EvidenceReceipt:
     receipt_hash: Optional[str] = None
 
     def __post_init__(self) -> None:
-        if self.files_changed:
+        if self.files_changed is None:
+            self.files_changed = []
+        else:
             self.files_changed = sorted([f.replace("\\", "/").strip() for f in self.files_changed if f])
-        if self.file_hashes:
+        if self.file_hashes is None:
+            self.file_hashes = {}
+        else:
             self.file_hashes = {k.replace("\\", "/").strip(): v for k, v in sorted(self.file_hashes.items())}
+        if self.evidence is None:
+            self.evidence = []
+        if self.metadata is None:
+            self.metadata = {}
         if not self.receipt_hash and isinstance(self.metadata, dict) and "receipt_hash" in self.metadata:
             self.receipt_hash = self.metadata["receipt_hash"]
 
@@ -135,13 +143,15 @@ class EvidenceReceipt:
             if k not in ("receipt_hash", "last_verified", "verification_timestamp")
         } if isinstance(self.metadata, dict) else {}
 
+        clean_ws = (self.workspace or "").replace("\\", "/").rstrip("/")
+
         payload = {
             "receipt_id": self.receipt_id,
             "task_id": self.task_id,
             "claim_id": self.claim_id,
             "agent": self.agent,
             "action": self.action,
-            "workspace": self.workspace,
+            "workspace": clean_ws,
             "base_commit": self.base_commit,
             "result_commit": self.result_commit,
             "command": self.command,
@@ -150,10 +160,11 @@ class EvidenceReceipt:
             "finished_at": self.finished_at,
             "stdout_hash": self.stdout_hash,
             "stderr_hash": self.stderr_hash,
-            "files_changed": sorted([f.replace("\\", "/").strip() for f in self.files_changed if f]),
+            "files_changed": sorted([f.replace("\\", "/").strip() for f in (self.files_changed or []) if f]),
             "file_hashes": {k.replace("\\", "/").strip(): v for k, v in sorted(self.file_hashes.items())} if self.file_hashes else {},
-            "evidence": self.evidence,
+            "evidence": self.evidence or [],
             "metadata": clean_meta,
+            "is_observed": bool(self.is_observed),
         }
         serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
@@ -187,7 +198,9 @@ class EvidenceReceipt:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> EvidenceReceipt:
         r_hash = data.get("receipt_hash") or (data.get("metadata", {}).get("receipt_hash") if isinstance(data.get("metadata"), dict) else None)
-        return cls(
+        obs = bool(data.get("is_observed", False))
+        cls_to_use = ObservedReceipt if obs else cls
+        return cls_to_use(
             receipt_id=data.get("receipt_id", ""),
             task_id=data.get("task_id", ""),
             claim_id=data.get("claim_id", ""),
@@ -202,11 +215,11 @@ class EvidenceReceipt:
             finished_at=data.get("finished_at", ""),
             stdout_hash=data.get("stdout_hash", ""),
             stderr_hash=data.get("stderr_hash", ""),
-            files_changed=list(data.get("files_changed", [])),
-            file_hashes=dict(data.get("file_hashes", {})),
-            evidence=list(data.get("evidence", [])),
-            metadata=dict(data.get("metadata", {})),
-            is_observed=bool(data.get("is_observed", True)),
+            files_changed=list(data.get("files_changed", []) or []),
+            file_hashes=dict(data.get("file_hashes", {}) or {}),
+            evidence=list(data.get("evidence", []) or []),
+            metadata=dict(data.get("metadata", {}) or {}),
+            is_observed=obs,
             lifecycle_state=data.get("lifecycle_state", LIFECYCLE_OBSERVED),
             verified=bool(data.get("verified", False)),
             receipt_hash=r_hash,
