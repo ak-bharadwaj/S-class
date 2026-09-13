@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 import re
 import json
+import hashlib
 from typing import Optional, Dict, Any
 
 from hook_core import HookRule, HookEvent, HookVerdict, HookDecision, HookEventType
@@ -28,11 +29,15 @@ class SecretScannerRule(HookRule):
     rule_id = "SCLASS-SEC-001"
     category = "SECURITY"
 
-    SECRET_PATTERNS = [
+    HIGH_CONFIDENCE_PATTERNS = [
         (re.compile(r"""(?:api[_-]?key|secret|token|password|auth[_-]?token)\s*[:=]\s*['"][A-Za-z0-9_\-\.]{16,}['"]""", re.IGNORECASE), "High-entropy secret assignment detected"),
         (re.compile(r"""-----BEGIN (?:RSA|OPENSSH|EC|PGP|PRIVATE) KEY-----""", re.IGNORECASE), "Private cryptographic key block detected"),
         (re.compile(r"""ghp_[A-Za-z0-9]{36}""", re.IGNORECASE), "GitHub Personal Access Token detected"),
         (re.compile(r"""sk-[A-Za-z0-9]{32,}""", re.IGNORECASE), "OpenAI/Anthropic API Key detected"),
+    ]
+
+    POSSIBLE_SECRET_PATTERNS = [
+        (re.compile(r"""(?:token|secret|credential)\s*[:=]\s*['"][A-Za-z0-9_\-\.]{8,15}['"]""", re.IGNORECASE), "Potential secret assignment detected"),
     ]
 
     def evaluate(self, event: HookEvent) -> Optional[HookVerdict]:
@@ -66,17 +71,50 @@ class SecretScannerRule(HookRule):
         if not text_to_scan:
             return None
 
-        for pattern, desc in self.SECRET_PATTERNS:
+        # Check high-confidence secrets (DENY)
+        for pattern, desc in self.HIGH_CONFIDENCE_PATTERNS:
             match = pattern.search(text_to_scan)
             if match:
-                snippet = match.group(0)[:40]
+                raw_secret = match.group(0)
+                fingerprint = hashlib.sha256(raw_secret.encode("utf-8")).hexdigest()[:12]
+                line_no = text_to_scan[:match.start()].count("\n") + 1
+                loc = f"{event.file_path or 'inline'}:{line_no}"
                 return HookVerdict(
                     decision=HookDecision.DENY,
-                    reason=f"Hardcoded secret detected: {desc} (match: '{snippet}...')",
+                    reason=(
+                        f"Hardcoded secret detected: Credential detected\n"
+                        f"Type: {desc}\n"
+                        f"Location: {loc}\n"
+                        f"Value: [REDACTED]\n"
+                        f"Fingerprint: {fingerprint}"
+                    ),
                     fix_hint="Extract secrets to environment variables or gitignored .env file",
                     rule_id=self.rule_id,
                     enforcement_level="blocking",
-                    diagnostics=(desc, f"file: {event.file_path or 'inline'}"),
+                    diagnostics=(desc, f"file: {event.file_path or 'inline'}", f"fingerprint: {fingerprint}"),
+                )
+
+        # Check possible secrets (WARN)
+        for pattern, desc in self.POSSIBLE_SECRET_PATTERNS:
+            match = pattern.search(text_to_scan)
+            if match:
+                raw_secret = match.group(0)
+                fingerprint = hashlib.sha256(raw_secret.encode("utf-8")).hexdigest()[:12]
+                line_no = text_to_scan[:match.start()].count("\n") + 1
+                loc = f"{event.file_path or 'inline'}:{line_no}"
+                return HookVerdict(
+                    decision=HookDecision.WARN,
+                    reason=(
+                        f"Potential secret detected: Credential detected\n"
+                        f"Type: {desc}\n"
+                        f"Location: {loc}\n"
+                        f"Value: [REDACTED]\n"
+                        f"Fingerprint: {fingerprint}"
+                    ),
+                    fix_hint="Verify whether this value contains credentials and extract to environment variable if so",
+                    rule_id=f"{self.rule_id}-WARN",
+                    enforcement_level="advisory",
+                    diagnostics=(desc, f"file: {event.file_path or 'inline'}", f"fingerprint: {fingerprint}"),
                 )
 
         return None
@@ -224,10 +262,10 @@ class BlastRadiusRule(HookRule):
 
         # Lazy import CodebaseGraphDB
         try:
-            from codebase_graph_db import CodebaseGraphDB
-            graph = CodebaseGraphDB(workspace_dir=event.workspace_dir)
+            import sqlite3
             target_file = event.file_path or event.tool_args.get("path") or ""
-            norm_target = os.path.relpath(target_file, event.workspace_dir).replace("\\", "/")
+            target_abs = os.path.join(event.workspace_dir, target_file) if not os.path.isabs(target_file) else target_file
+            norm_target = os.path.relpath(target_abs, event.workspace_dir).replace("\\", "/")
             
             # Count downstream callers for symbols defined in this file
             query = """
@@ -235,16 +273,18 @@ class BlastRadiusRule(HookRule):
                 FROM codebase_edges 
                 WHERE edge_type = 'CALLS' AND dest_node_id LIKE ?
             """
-            rows = graph.cursor.execute(query, (f"{norm_target}%",)).fetchone()
+            with sqlite3.connect(db_path) as conn:
+                rows = conn.cursor().execute(query, (f"{norm_target}%",)).fetchone()
             callers = rows[0] if rows else 0
             if callers > self.CALLER_THRESHOLD:
+                impact = "HIGH" if callers > 20 else "MEDIUM"
                 return HookVerdict(
                     decision=HookDecision.WARN,
-                    reason=f"High blast radius modification: {norm_target} has {callers} downstream callers",
+                    reason=f"Estimated impact:\n{impact}\n\nEstimated dependent references:\n{callers}\n\nRecommendation:\nRun targeted impact tests.",
                     fix_hint="Run impact_analysis tool or verify callers via targeted test suite before committing",
                     rule_id=self.rule_id,
                     enforcement_level="advisory",
-                    diagnostics=(f"Callers: {callers}", f"Target: {norm_target}"),
+                    diagnostics=(f"EstimatedReferences: {callers}", f"Target: {norm_target}"),
                 )
         except Exception:
             pass
@@ -266,22 +306,44 @@ class EvidenceIntegrityRule(HookRule):
         "event_store_snapshot.json",
         "confidence_matrix.json",
         "grill_report.json",
+        "audit_ledger.jsonl",
+    )
+
+    PROTECTED_DIRS = (
+        ".agents/receipts",
+        ".agents/reports",
+        ".agents/ledger",
+        ".agents/verification",
     )
 
     def evaluate(self, event: HookEvent) -> Optional[HookVerdict]:
-        target = (event.file_path or event.tool_args.get("path") or "").replace("\\", "/")
+        target = (event.file_path or event.tool_args.get("path") or event.tool_args.get("file_path") or "").replace("\\", "/")
         norm_name = os.path.basename(target)
 
-        # Check if target is a protected evidence artifact
-        if norm_name in self.PROTECTED_ARTIFACTS and ".agents" in target:
+        # Check if target is inside .agents SCLASS_ONLY directories or matches protected artifacts
+        is_protected_dir = any(p in target for p in self.PROTECTED_DIRS)
+        is_protected_file = norm_name in self.PROTECTED_ARTIFACTS and ".agents" in target
+
+        if is_protected_dir or is_protected_file:
             tool = (event.tool_name or "").lower()
-            if tool in ("delete", "remove", "rm", "unlink") or event.tool_args.get("delete"):
+            is_write_or_delete = (
+                tool in ("delete", "remove", "rm", "unlink", "write_to_file", "replace_file_content", "edit")
+                or event.tool_args.get("delete")
+                or any(k in event.tool_args for k in ("content", "file_text", "new_str"))
+                or event.event_type in (HookEventType.PRE_TOOL_USE, HookEventType.PRE_FILE_EDIT, HookEventType.POST_FILE_EDIT)
+            )
+            # Claims directory is AGENT_WRITABLE (proposals)
+            if ".agents/claims" in target:
+                return None
+
+            if is_write_or_delete:
                 return HookVerdict(
                     decision=HookDecision.DENY,
                     reason=f"Tampering with evidence artifact '{norm_name}' is prohibited",
                     fix_hint="Evidence artifacts may only be updated by the S-Class kernel verification engine",
                     rule_id=self.rule_id,
                     enforcement_level="blocking",
+                    diagnostics=(f"ProtectedTarget: {target}", f"Rule: {self.rule_id}"),
                 )
 
         return None

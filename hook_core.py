@@ -195,7 +195,7 @@ class HookCore:
 
                 if verdict.decision == HookDecision.DENY:
                     if mode == "warn":
-                        # In warn mode, demote DENY to WARN
+                        # In legacy warn mode, demote DENY to WARN
                         demoted = HookVerdict(
                             decision=HookDecision.WARN,
                             reason=f"[WARN-MODE DEMOTION] {verdict.reason}",
@@ -206,8 +206,20 @@ class HookCore:
                         )
                         if not first_warn:
                             first_warn = demoted
+                    elif mode == "audit":
+                        # In audit mode: evaluate and record, but do not interfere
+                        audit_verdict = HookVerdict(
+                            decision=HookDecision.WARN,
+                            reason=f"[AUDIT] {verdict.reason}",
+                            fix_hint=verdict.fix_hint,
+                            rule_id=verdict.rule_id,
+                            enforcement_level="advisory",
+                            diagnostics=verdict.diagnostics,
+                        )
+                        if not first_warn:
+                            first_warn = audit_verdict
                     else:
-                        # Blocking mode: run stage to record fail-closed outcome and return DENY
+                        # Enforce / blocking mode: policy decision has full authority
                         self.pipeline.run_stage(LifecycleStage.PRE_EXECUTE, context)
                         return verdict
 
@@ -216,12 +228,12 @@ class HookCore:
                         first_warn = verdict
 
             except Exception as e:
-                # Fail-closed safety for rule exceptions when in block mode
-                if mode == "block":
+                # Fail-closed safety for rule exceptions when in enforce or block mode
+                if mode in ("block", "enforce"):
                     return HookVerdict(
                         decision=HookDecision.DENY,
                         reason=f"Hook rule evaluation exception: {str(e)}",
-                        fix_hint="Audit rule implementation or downgrade to warn mode",
+                        fix_hint="Audit rule implementation or switch to audit mode",
                         rule_id="SCLASS-SYS-ERR",
                         enforcement_level="blocking",
                     )

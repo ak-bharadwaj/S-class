@@ -57,8 +57,19 @@ def _read_stdin_safe() -> str:
         return ""
 
 
-def _record_last_verified(workspace_dir: str, platform: str) -> None:
-    """Records ISO-8601 timestamp in .agents/sclass_hooks.json under last_verified[platform]."""
+def _record_hook_lifecycle(
+    workspace_dir: str,
+    platform: str,
+    verdict: Optional[HookVerdict] = None,
+    is_execution: bool = False,
+) -> None:
+    """
+    Records separate lifecycle timestamps in .agents/sclass_hooks.json:
+    - last_hook_seen: runner received event
+    - last_decision: policy decision recorded
+    - last_execution: action execution observed
+    (last_verified is only updated when evidence verification succeeds).
+    """
     try:
         cfg_path = os.path.join(workspace_dir, ".agents", "sclass_hooks.json")
         if not os.path.exists(cfg_path):
@@ -69,22 +80,46 @@ def _record_last_verified(workspace_dir: str, platform: str) -> None:
 
         now_iso = datetime.now(timezone.utc).isoformat()
 
-        if "last_verified" not in cfg or not isinstance(cfg["last_verified"], dict):
-            cfg["last_verified"] = {}
+        # Update last_hook_seen
+        if "last_hook_seen" not in cfg or not isinstance(cfg["last_hook_seen"], dict):
+            cfg["last_hook_seen"] = {}
+        cfg["last_hook_seen"][platform] = now_iso
 
-        cfg["last_verified"][platform] = now_iso
+        # Update last_decision
+        if verdict:
+            if "last_decision" not in cfg or not isinstance(cfg["last_decision"], dict):
+                cfg["last_decision"] = {}
+            cfg["last_decision"][platform] = {
+                "outcome": verdict.decision.value,
+                "rule_id": verdict.rule_id,
+                "timestamp": now_iso,
+            }
 
-        # Also update platforms[platform] if present for test / telemetry consumers
+        # Update last_execution if this is an execution/post event
+        if is_execution:
+            if "last_execution" not in cfg or not isinstance(cfg["last_execution"], dict):
+                cfg["last_execution"] = {}
+            cfg["last_execution"][platform] = now_iso
+
+        # Backward compatibility for existing telemetry consumers / legacy tests
         if "platforms" in cfg and isinstance(cfg["platforms"], dict):
             if platform in cfg["platforms"] and isinstance(cfg["platforms"][platform], dict):
                 cfg["platforms"][platform]["verified"] = True
                 cfg["platforms"][platform]["last_verified"] = now_iso
+                cfg["platforms"][platform]["last_hook_seen"] = now_iso
+                if verdict:
+                    cfg["platforms"][platform]["last_decision"] = verdict.to_dict()
 
         with open(cfg_path, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2)
     except Exception:
         # Non-fatal: runner must never crash on telemetry write
         pass
+
+
+def _record_last_verified(workspace_dir: str, platform: str) -> None:
+    """Records ISO-8601 timestamp in .agents/sclass_hooks.json under last_verified[platform]."""
+    _record_hook_lifecycle(workspace_dir, platform)
 
 
 def _serialize_cursor_response(event_type: str, verdict: HookVerdict) -> str:
@@ -141,6 +176,8 @@ def main() -> int:
     parser.add_argument("--workspace", default=None, help="Target workspace root")
     parser.add_argument("--repo-root", default=None, dest="repo_root", help="Alias for workspace root")
     parser.add_argument("--strict", action="store_true", default=False, help="Force block mode")
+    parser.add_argument("--enforce", action="store_true", default=False, help="Force strict enforcement mode")
+    parser.add_argument("--audit", action="store_true", default=False, help="Force audit mode (non-blocking)")
     parser.add_argument("--event", default=None, help="Inline JSON event payload")
     parser.add_argument("--file", default=None, help="Target file path if applicable")
     parser.add_argument("--tool", default=None, help="Tool name being invoked")
@@ -200,7 +237,12 @@ def main() -> int:
     )
 
     # Initialize Core with default rules
-    enforcement_override = "block" if args.strict else None
+    enforcement_override = None
+    if args.audit:
+        enforcement_override = "audit"
+    elif args.strict or args.enforce:
+        enforcement_override = "enforce"
+
     core = HookCore(workspace_dir=workspace_dir, enforcement_mode=enforcement_override)
     for rule in get_default_rules():
         core.register_rule(rule)
@@ -208,8 +250,13 @@ def main() -> int:
     # Evaluate event
     verdict = core.evaluate_event(hook_event)
 
-    # Record verified timestamp in sclass_hooks.json
-    _record_last_verified(workspace_dir, args.platform)
+    # Record lifecycle state (hook_seen, decision, execution)
+    _record_hook_lifecycle(
+        workspace_dir,
+        args.platform,
+        verdict=verdict,
+        is_execution="post" in args.event_type.lower(),
+    )
 
     # Format platform-specific outputs and exit codes
     platform = args.platform.lower()
