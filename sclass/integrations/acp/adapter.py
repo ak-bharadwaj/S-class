@@ -25,6 +25,16 @@ from typing import Dict, Any, Optional, Tuple, List
 
 from sclass.domain.action import ActionRequest, AuthorizationDecision, DecisionOutcome
 from sclass.control.authorization import authorize
+from sclass.integrations.acp.protocol import (
+    ACPProtocolTransport,
+    ACPInitializeResult,
+    ACPSessionNewResult,
+    ACPPermissionResult,
+    ACPToolCallResult,
+    ACPSessionForkResult,
+    ACPShutdownResult,
+    DEFAULT_PROTOCOL_VERSION,
+)
 
 
 @dataclass(frozen=True)
@@ -228,21 +238,20 @@ class ACPAdapter:
                 capabilities=caps,
             )
             self.sessions[session_id] = session
-            return {
-                "jsonrpc": "2.0",
-                "id": msg_id,
-                "result": {
-                    "protocolVersion": "2026-07-28",
-                    "sessionId": session_id,
-                    "capabilities": {
+            return ACPProtocolTransport.create_response(
+                msg_id,
+                ACPInitializeResult(
+                    protocolVersion=DEFAULT_PROTOCOL_VERSION,
+                    sessionId=session_id,
+                    capabilities={
                         "tools": True,
                         "prompts": True,
                         "authorization": True,
                         "cancellation": True,
                         "fork": True,
                     },
-                },
-            }
+                ),
+            )
 
         # 2. session/new
         elif method in ("session/new", "session.new"):
@@ -254,31 +263,28 @@ class ACPAdapter:
                 capabilities=AgentCapability(),
             )
             self.sessions[sid] = session
-            return {
-                "jsonrpc": "2.0",
-                "id": msg_id,
-                "result": {"sessionId": sid, "status": "active"},
-            }
+            return ACPProtocolTransport.create_response(
+                msg_id,
+                ACPSessionNewResult(sessionId=sid, status="active"),
+            )
 
         # 3. prompt
         elif method in ("prompt", "message"):
             sid = params.get("session_id", "default")
-            return {
-                "jsonrpc": "2.0",
-                "id": msg_id,
-                "result": {"status": "prompt_received", "session_id": sid},
-            }
+            return ACPProtocolTransport.create_response(
+                msg_id,
+                {"status": "prompt_received", "session_id": sid},
+            )
 
         # 4. session/update
         elif method in ("session/update", "session.update"):
             sid = params.get("session_id", "default")
             if sid in self.sessions:
                 self.sessions[sid].state.update(params.get("state", {}))
-            return {
-                "jsonrpc": "2.0",
-                "id": msg_id,
-                "result": {"status": "updated", "session_id": sid},
-            }
+            return ACPProtocolTransport.create_response(
+                msg_id,
+                {"status": "updated", "session_id": sid},
+            )
 
         # 5. permission (The Permission Bridge)
         elif method in ("permission", "permission/request"):
@@ -300,31 +306,28 @@ class ACPAdapter:
             decision = authorize(act_req, mode=self.mode, workspace_dir=self.workspace_dir)
 
             if decision.is_denied:
-                return {
-                    "jsonrpc": "2.0",
-                    "id": msg_id,
-                    "result": {
+                return ACPProtocolTransport.create_response(
+                    msg_id,
+                    {
                         "outcome": "DENY",
                         "policy_id": decision.policy_id,
                         "reason": decision.reason,
                         "risk_level": decision.risk_level,
                     },
-                }
+                )
             elif decision.requires_approval or decision.outcome == DecisionOutcome.REQUIRE_APPROVAL:
-                return {
-                    "jsonrpc": "2.0",
-                    "id": msg_id,
-                    "result": {
+                return ACPProtocolTransport.create_response(
+                    msg_id,
+                    {
                         "outcome": "APPROVAL",
                         "policy_id": decision.policy_id,
                         "reason": decision.reason,
                     },
-                }
-            return {
-                "jsonrpc": "2.0",
-                "id": msg_id,
-                "result": {"outcome": "ALLOW", "policy_id": decision.policy_id},
-            }
+                )
+            return ACPProtocolTransport.create_response(
+                msg_id,
+                {"outcome": "ALLOW", "policy_id": decision.policy_id},
+            )
 
         # 6. tool/action
         elif method in ("tool/action", "tool/call", "tool_call", "action/execute"):
@@ -346,46 +349,40 @@ class ACPAdapter:
             )
             decision = authorize(act_req, mode=self.mode, workspace_dir=self.workspace_dir)
             if decision.is_denied:
-                return {
-                    "jsonrpc": "2.0",
-                    "id": msg_id,
-                    "error": {
-                        "code": -32003,
-                        "message": f"Authorization DENIED by S-Class policy [{decision.policy_id}]: {decision.reason}",
-                        "data": decision.to_dict(),
-                    },
-                }
+                return ACPProtocolTransport.create_error(
+                    msg_id,
+                    code=-32003,
+                    message=f"Authorization DENIED by S-Class policy [{decision.policy_id}]: {decision.reason}",
+                    data=decision.to_dict(),
+                )
 
-            return {
-                "jsonrpc": "2.0",
-                "id": msg_id,
-                "result": {"status": "authorized_passthrough", "policy_id": decision.policy_id},
-            }
+            return ACPProtocolTransport.create_response(
+                msg_id,
+                {"status": "authorized_passthrough", "policy_id": decision.policy_id},
+            )
 
         # 7. cancellation
         elif method in ("cancel", "cancellation"):
             sid = params.get("session_id", "default")
-            return {
-                "jsonrpc": "2.0",
-                "id": msg_id,
-                "result": {"status": "cancelled", "session_id": sid},
-            }
+            return ACPProtocolTransport.create_response(
+                msg_id,
+                {"status": "cancelled", "session_id": sid},
+            )
 
         # 8. session/resume
         elif method in ("session/resume", "session.resume"):
             sid = params.get("session_id")
             if sid and sid in self.sessions:
                 self.sessions[sid].active = True
-                return {
-                    "jsonrpc": "2.0",
-                    "id": msg_id,
-                    "result": {"sessionId": sid, "status": "resumed"},
-                }
-            return {
-                "jsonrpc": "2.0",
-                "id": msg_id,
-                "error": {"code": -32004, "message": f"Session '{sid}' not found for resume."},
-            }
+                return ACPProtocolTransport.create_response(
+                    msg_id,
+                    {"sessionId": sid, "status": "resumed"},
+                )
+            return ACPProtocolTransport.create_error(
+                msg_id,
+                code=-32004,
+                message=f"Session '{sid}' not found for resume.",
+            )
 
         # 9. session/fork
         elif method in ("session/fork", "session.fork"):
@@ -401,26 +398,24 @@ class ACPAdapter:
                 state=dict(parent_sess.state) if parent_sess else {},
             )
             self.sessions[new_sid] = new_sess
-            return {
-                "jsonrpc": "2.0",
-                "id": msg_id,
-                "result": {"sessionId": new_sid, "forkedFrom": parent_sid, "status": "active"},
-            }
+            return ACPProtocolTransport.create_response(
+                msg_id,
+                ACPSessionForkResult(sessionId=new_sid, forkedFrom=str(parent_sid)),
+            )
 
         # 10. shutdown
         elif method in ("shutdown", "session/close", "session.close"):
             sid = params.get("session_id", "default")
             if sid in self.sessions:
                 self.sessions[sid].active = False
-            return {
-                "jsonrpc": "2.0",
-                "id": msg_id,
-                "result": {"status": "shutdown_complete", "session_id": sid},
-            }
+            return ACPProtocolTransport.create_response(
+                msg_id,
+                {"status": "shutdown_complete", "session_id": sid},
+            )
 
         # Fallback for unknown methods
-        return {
-            "jsonrpc": "2.0",
-            "id": msg_id,
-            "error": {"code": -32601, "message": f"Method '{method}' not found"},
-        }
+        return ACPProtocolTransport.create_error(
+            msg_id,
+            code=-32601,
+            message=f"Method '{method}' not found",
+        )

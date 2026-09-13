@@ -15,6 +15,7 @@ from sclass.integrations.mcp.normalization import MCPToolCall, compute_hash
 from sclass.integrations.mcp.auth import MCPAuthorizationContext, MCPAuthenticator
 from sclass.integrations.mcp.tools import MCPToolRegistry, MCPToolDefinition
 from sclass.integrations.mcp.resources import MCPResourceRegistry
+from sclass.integrations.mcp.transport import MCPProtocolTransport
 
 
 class MCPGateway:
@@ -59,34 +60,28 @@ class MCPGateway:
 
         # 1. Check if tool is invalidated due to schema mutation
         if self.tool_registry.is_invalidated(self.server_id, tool_name):
-            return {
-                "jsonrpc": "2.0",
-                "id": cid,
-                "error": {
-                    "code": -32005,
-                    "message": f"MCP tool '{tool_name}' trust cache was invalidated due to schema change.",
-                },
-            }
+            return MCPProtocolTransport.build_error(
+                cid,
+                code=-32005,
+                message=f"MCP tool '{tool_name}' trust cache was invalidated due to schema change.",
+            )
 
         # 2. Validate MCP authorization if context provided
         if auth_context:
             is_valid_auth, auth_err = self.authenticator.validate(auth_context)
             if not is_valid_auth:
-                return {
-                    "jsonrpc": "2.0",
-                    "id": cid,
-                    "error": {
-                        "code": -32002,
-                        "message": f"MCP Authorization failure: {auth_err}",
-                    },
-                }
+                return MCPProtocolTransport.build_error(
+                    cid,
+                    code=-32002,
+                    message=f"MCP Authorization failure: {auth_err}",
+                )
 
         # 3. Lookup tool schema and compute schema hash
         tool_def = self.tool_registry.get_tool(self.server_id, tool_name)
         schema_hash = tool_def.schema_hash if tool_def else "unknown_schema"
         args_hash = compute_hash(arguments)
 
-        # 4. Construct authoritative MCPToolCall identity
+        # 4. Construct authoritative MCPToolCall identity (MCPNormalizer)
         mcp_call = MCPToolCall(
             server_id=self.server_id,
             server_version=self.server_version,
@@ -100,50 +95,35 @@ class MCPGateway:
             call_id=cid,
         )
 
-        # 5. Evaluate S-Class policy
+        # 5. Evaluate S-Class policy (S-Class Authorization)
         action_req = mcp_call.to_action_request(self.workspace_dir)
         decision = authorize(action_req, mode=self.mode, workspace_dir=self.workspace_dir)
 
         if decision.is_denied:
-            return {
-                "jsonrpc": "2.0",
-                "id": cid,
-                "error": {
-                    "code": -32003,
-                    "message": f"Authorization DENIED by S-Class policy [{decision.policy_id}]: {decision.reason}",
-                    "data": {
-                        "policy_id": decision.policy_id,
-                        "reason": decision.reason,
-                        "risk_level": decision.risk_level,
-                        "mcp_identity": mcp_call.to_dict(),
-                    },
-                },
-            }
+            return MCPProtocolTransport.build_authorization_denied(
+                cid,
+                decision=decision,
+                mcp_identity=mcp_call.to_dict(),
+            )
 
-        # 6. Execute through executor if provided
+        # 6. Execute through executor if provided (MCP Execution / Result)
         exec_output = None
         if executor:
             try:
                 exec_output = executor(tool_name, arguments)
             except Exception as ex:
-                return {
-                    "jsonrpc": "2.0",
-                    "id": cid,
-                    "error": {
-                        "code": -32603,
-                        "message": f"Tool execution failed: {ex}",
-                    },
-                }
+                return MCPProtocolTransport.build_error(
+                    cid,
+                    code=-32603,
+                    message=f"Tool execution failed: {ex}",
+                )
 
-        return {
-            "jsonrpc": "2.0",
-            "id": cid,
-            "result": {
-                "status": "success",
-                "content": exec_output or [{"type": "text", "text": "Execution authorized by S-Class"}],
-                "mcp_identity": mcp_call.to_dict(),
-            },
-        }
+        return MCPProtocolTransport.build_tool_result(
+            cid,
+            content=exec_output or [{"type": "text", "text": "Execution authorized by S-Class"}],
+            status="success",
+            mcp_identity=mcp_call.to_dict(),
+        )
 
     def process_message(self, raw_rpc: Dict[str, Any], executor: Optional[Callable] = None) -> Dict[str, Any]:
         """Dispatches arbitrary incoming MCP JSON-RPC message."""
@@ -181,8 +161,8 @@ class MCPGateway:
                 "result": {"resources": resources},
             }
 
-        return {
-            "jsonrpc": "2.0",
-            "id": rpc_id,
-            "error": {"code": -32601, "message": f"Method '{method}' not implemented in MCP Gateway."},
-        }
+        return MCPProtocolTransport.build_error(
+            rpc_id,
+            code=-32601,
+            message=f"Method '{method}' not implemented in MCP Gateway.",
+        )

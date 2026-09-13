@@ -152,12 +152,19 @@ class TrustRegistry:
         if binary_hash and binary_hash.lower() in self.policy.untrusted_hashes:
             return VerifierTrustMode.UNTRUSTED
 
+        ws = os.path.normpath(workspace_dir).lower() if workspace_dir else ""
+
         for udir in self.policy.untrusted_dirs:
             if norm_path.startswith(udir) or (norm_path + os.sep).startswith(udir + os.sep):
+                # If the untrusted dir is the broad OS temp dir, but workspace was placed in temp
+                # (e.g. test runner or CI sandbox) and the executable is inside workspace:
+                if ws and (norm_path.startswith(ws) or (norm_path + os.sep).startswith(ws + os.sep)):
+                    if udir == ws or (norm_path.startswith(udir) and len(udir) > len(ws)):
+                        return VerifierTrustMode.UNTRUSTED
+                    continue
                 return VerifierTrustMode.UNTRUSTED
 
         # 2. Workspace trust
-        ws = os.path.normpath(workspace_dir).lower() if workspace_dir else ""
         if ws and norm_path.startswith(ws):
             # Binary located directly within workspace or workspace venv
             return VerifierTrustMode.WORKSPACE_TRUSTED

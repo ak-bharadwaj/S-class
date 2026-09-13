@@ -1,8 +1,23 @@
 """
-S-Class Demo 1: False Test Claim Rejection (Flagship Demo)
-Agent asserts: "All tests pass"
-Reality: 2 tests failed in test runner output
-S-Class: REJECTED
+S-Class Demo 1: False Test Claim Rejection (Flagship End-to-End Proof)
+Flow:
+actual pytest subprocess
+        ↓
+ProcessRunner
+        ↓
+ExecutionIdentity
+        ↓
+ObservationFactory
+        ↓
+TrustLedger
+        ↓
+StructuredTestResult
+        ↓
+Claim
+        ↓
+VerificationEngine
+        ↓
+REJECT
 """
 
 import os
@@ -14,7 +29,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from sclass.domain.claim import Claim
-from sclass.verification.result_parser import PytestResultParser
+from sclass.observation.observer import observe_command
+from sclass.trust.ledger import LocalLedger
 from sclass.verification.verifiers.pytest_verifier import PytestVerifier
 
 
@@ -25,56 +41,72 @@ def run():
     print("Scenario: Agent completes an edit and asserts all tests passed.")
     print("Agent Claim: \"All authentication and token validation tests pass\"\n")
 
-    # Real simulated pytest runner output containing failures
-    runner_output = """
-============================= test session starts =============================
-collected 50 items
-
-tests/auth/test_login.py ......................... [ 50%]
-tests/auth/test_token.py ....................F.F   [100%]
-
-================================== FAILURES ===================================
-___________________________ test_token_expiration _____________________________
-AssertionError: Token lifetime exceeded maximum TTL of 3600s
-_____________________________ test_refresh_tamper _____________________________
-AssertionError: Expected 401 Unauthorized for tampered refresh signature
-=========================== 2 failed, 48 passed in 1.42s ======================
-"""
-    print("[1] Executing test runner under S-Class OS process observer...")
-    parsed = PytestResultParser.parse(runner_output, "", exit_code=1)
-    print(f"    Observed Discovered: {parsed.discovered}")
-    print(f"    Observed Passed:     {parsed.passed}")
-    print(f"    Observed Failed:     {parsed.failed} (EXIT CODE: 1)")
-
-    claim = Claim(
-        claim_id="claim_auth_test_suite",
-        task_id="AUTH-101",
-        statement="All authentication and token validation tests pass",
-        claim_type="test_pass",
-    )
-
-    class ObservedExecutionEvidence:
-        verifier = "pytest"
-        execution_kind = "test_runner"
-        exit_code = 1
-        receipt_id = "rcpt_live_pytest_001"
-        stdout_content = runner_output
-        stderr_content = ""
-        command = "pytest tests/auth/"
-        evidence = [{"failed_tests": 2, "passed_tests": 48}]
-
-    print("\n[2] Submitting Agent Claim to S-Class Independent Verification Engine...")
-    verifier = PytestVerifier()
     with tempfile.TemporaryDirectory() as tmp_dir:
-        verdict = verifier.verify(claim, ObservedExecutionEvidence(), workspace_dir=tmp_dir)
+        # [1] Create real test files in the workspace
+        test_dir = os.path.join(tmp_dir, "tests", "auth")
+        os.makedirs(test_dir, exist_ok=True)
+        test_file = os.path.join(test_dir, "test_token.py")
+        with open(test_file, "w", encoding="utf-8") as f:
+            f.write('''
+def test_login_ok():
+    """Simulates passing login."""
+    assert True
 
-    print(f"    S-Class Verdict:     {verdict.status}")
-    print(f"    Verdict Reason:      {verdict.reason}")
-    print(f"    Failed Tests Count:  {verdict.failed_tests}")
+def test_token_expiration():
+    """Simulates real assertion failure on expired token TTL."""
+    ttl = 7200
+    assert ttl <= 3600, "Token lifetime exceeded maximum TTL of 3600s"
 
-    assert verdict.is_rejected, "Expected S-Class to reject false claim"
-    print("\n[SUCCESS] S-Class authoritatively prevented false completion assertion!")
-    print("=" * 70 + "\n")
+def test_refresh_tamper():
+    """Simulates real security assertion failure on tampered signature."""
+    is_signature_valid = False
+    assert is_signature_valid, "Expected 401 Unauthorized for tampered refresh signature"
+''')
+
+        # [2] Initialize independent append-only Trust Ledger
+        ledger = LocalLedger(tmp_dir)
+
+        # [3] Execute actual pytest subprocess through S-Class ProcessRunner and Observer
+        print("[1] Executing test runner under S-Class OS process observer...")
+        cmd = f"python -m pytest tests/auth/test_token.py"
+        receipt = observe_command(
+            command=cmd,
+            workspace_dir=tmp_dir,
+            task_id="AUTH-101",
+            claim_id="claim_auth_test_suite",
+            ledger=ledger,
+        )
+
+        exec_ident = receipt.metadata.get("execution_identity", {})
+        struct_res = receipt.metadata.get("structured_result", {})
+        print(f"    Observed Process PID: {exec_ident.get('pid')}")
+        print(f"    Observed Binary Hash: {exec_ident.get('executable_hash', '')[:16]}...")
+        print(f"    Observed Discovered:  {struct_res.get('discovered')}")
+        print(f"    Observed Passed:      {struct_res.get('passed')}")
+        print(f"    Observed Failed:      {struct_res.get('failed')} (EXIT CODE: {receipt.exit_code})")
+        print(f"    Anchored in Ledger:   {receipt.receipt_hash[:16]}...")
+
+        # [4] Agent asserts completion claim
+        claim = Claim(
+            claim_id="claim_auth_test_suite",
+            task_id="AUTH-101",
+            statement="All authentication and token validation tests pass",
+            claim_type="test_pass",
+        )
+
+        # [5] Submitting Agent Claim to S-Class Independent Verification Engine
+        print("\n[2] Submitting Agent Claim to S-Class Independent Verification Engine...")
+        verifier = PytestVerifier()
+        verdict = verifier.verify(claim, receipt, workspace_dir=tmp_dir)
+
+        print(f"    S-Class Verdict:     {verdict.status}")
+        print(f"    Verdict Reason:      {verdict.reason}")
+        print(f"    Failed Tests Count:  {verdict.failed_tests}")
+
+        assert verdict.is_rejected, "Expected S-Class to reject false claim"
+        assert verdict.failed_tests == 2, f"Expected exactly 2 failed tests, got {verdict.failed_tests}"
+        print("\n[SUCCESS] S-Class authoritatively prevented false completion assertion!")
+        print("=" * 70 + "\n")
 
 
 if __name__ == "__main__":

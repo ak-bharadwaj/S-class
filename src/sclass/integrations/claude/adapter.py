@@ -25,7 +25,7 @@ from sclass.domain.claim import Claim
 from sclass.domain.verification import VerificationResult
 from sclass.control.authorization import authorize
 from sclass.verification.engine import verify_claim
-from sclass.context.handoff import HandoffAssembler, HandoffPackage
+from sclass.context.handoff import HandoffPackage, HandoffAssembler
 from sclass.integrations.base import AdapterCapabilities, AdapterStatus
 from sclass.integrations.acp.adapter import ACPAdapter
 
@@ -145,3 +145,7 @@ class ClaudeCodeAdapter:
         if "result" in res:
             self.active_session_id = session_id
         return res
+
+
+# Backward-compatible alias
+ClaudeAdapter = ClaudeCodeAdapter

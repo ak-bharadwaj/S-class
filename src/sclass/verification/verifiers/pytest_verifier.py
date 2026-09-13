@@ -80,8 +80,13 @@ class PytestVerifier(Verifier):
         )
 
     def parse_result(self, observation: Any) -> NormalizedTestResult:
-        stdout = getattr(observation, "stdout_content", "") or ""
-        stderr = getattr(observation, "stderr_content", "") or ""
+        if hasattr(observation, "metadata") and isinstance(observation.metadata, dict):
+            sr = observation.metadata.get("structured_result")
+            if sr and isinstance(sr, dict):
+                return NormalizedTestResult.from_dict(sr)
+
+        stdout = getattr(observation, "stdout_content", "") or getattr(observation, "stdout", "") or ""
+        stderr = getattr(observation, "stderr_content", "") or getattr(observation, "stderr", "") or ""
         exit_code = getattr(observation, "exit_code", 0)
         command = getattr(observation, "command", "")
         # Extract selected targets from command

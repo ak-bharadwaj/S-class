@@ -21,6 +21,7 @@ from sclass.domain.verification import VerificationResult
 from sclass.control.authorization import authorize
 from sclass.verification.result_parser import PytestResultParser
 from sclass.verification.verifiers.pytest_verifier import PytestVerifier
+from sclass.observation.observer import observe_command
 from sclass.trust.ledger import LocalLedger
 from sclass.domain.project import Project, ProjectBoundary
 from sclass.state.tasks import StateRepository
@@ -36,12 +37,34 @@ class ProductDemos:
         """
         Demo 1: False test claim.
         Agent claims: "All tests pass"
-        Reality: 2 failed.
+        Reality: 2 failed under actual subprocess execution.
         S-Class verdict: REJECTED
         """
-        # Simulated pytest runner output with 2 failures
-        stdout = "=== 10 passed, 2 failed in 0.5s ==="
-        parsed = PytestResultParser.parse(stdout, "", exit_code=1)
+        # Create real test file with 1 pass, 2 failures
+        test_dir = os.path.join(workspace_dir, "tests")
+        os.makedirs(test_dir, exist_ok=True)
+        test_file = os.path.join(test_dir, "test_auth.py")
+        with open(test_file, "w", encoding="utf-8") as f:
+            f.write('''
+def test_login_ok():
+    assert True
+
+def test_token_expiration():
+    assert 7200 <= 3600, "Token lifetime exceeded maximum TTL of 3600s"
+
+def test_refresh_tamper():
+    assert False, "Expected 401 Unauthorized for tampered refresh signature"
+''')
+
+        ledger = LocalLedger(workspace_dir)
+        cmd = "python -m pytest tests/test_auth.py"
+        receipt = observe_command(
+            command=cmd,
+            workspace_dir=workspace_dir,
+            task_id="AUTH-101",
+            claim_id="claim_demo_1",
+            ledger=ledger,
+        )
 
         claim = Claim(
             claim_id="claim_demo_1",
@@ -50,24 +73,15 @@ class ProductDemos:
             claim_type="test_pass",
         )
 
-        class MockObservedEvidence:
-            verifier = "pytest"
-            execution_kind = "test_runner"
-            exit_code = 1
-            receipt_id = "rcpt_demo_1"
-            stdout_content = stdout
-            stderr_content = ""
-            command = "pytest tests/"
-            evidence = [{"failed_tests": 2, "passed_tests": 10}]
-
         verifier = PytestVerifier()
-        result = verifier.verify(claim, MockObservedEvidence(), workspace_dir=workspace_dir)
+        result = verifier.verify(claim, receipt, workspace_dir=workspace_dir)
+        struct_res = receipt.metadata.get("structured_result", {})
 
         return {
             "demo": "Demo 1 - False Test Claim",
             "agent_claim": claim.statement,
-            "actual_failures": parsed.failed,
-            "actual_passed": parsed.passed,
+            "actual_failures": result.failed_tests,
+            "actual_passed": result.passed_tests,
             "sclass_verdict": result.status,
             "reason": result.reason,
             "success": result.status == "REJECT",
