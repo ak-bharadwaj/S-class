@@ -98,49 +98,146 @@ class SubagentRegistry:
         )
     }
 
+    UI_SKILL_PATTERNS = {
+        "frontend", "react", "design", "aesthetic", "taste", "apple", "visual", "dom",
+        "responsive", "animation", "motion", "a11y", "theme", "dark-mode", "toast",
+        "dialog", "skeleton", "shimmer", "layout", "css", "tailwind", "ui-library",
+        "component", "palette", "typeset", "colorize", "delight", "mobile", "android",
+        "ios", "webgl", "3d", "scroll", "creative-interaction", "sonner", "ux", "page-route"
+    }
+
+    UNREQUESTED_ENTERPRISE_NON_UI = {
+        "oauth-sso-saml-auth", "tenant-isolation-multi-tenancy", "elasticsearch-vector-search",
+        "db-sharding-read-replicas", "prisma-drizzle-orm", "stripe-payment-checkout",
+        "seo-metadata-open-graph", "i18n-localization-engine", "background-pdf-excel-exporter"
+    }
+
     @classmethod
-    def prepare_full_8_subagent_dispatch(cls, goal_text: str, fsm_phase: str, workspace_dir: Optional[str] = None) -> Dict[str, Any]:
+    def _is_skill_excluded_for_non_ui(cls, skill_id: str, goal_text: str = "") -> bool:
+        """Determines if a skill is irrelevant for non-UI / algorithmic / library / CLI tasks."""
+        s_lower = skill_id.lower()
+        goal_lower = goal_text.lower()
+
+        # If explicitly requested in prompt text, do not exclude
+        if s_lower in goal_lower:
+            return False
+
+        skill_obj = SkillTaxonomy.SKILLS.get(skill_id)
+        if skill_obj and skill_obj.conditional_keywords and any(kw in goal_lower for kw in skill_obj.conditional_keywords):
+            return False
+
+        # 1. Tier filtering
+        if skill_obj:
+            if getattr(skill_obj, "tier", "") in ("emil", "taste", "presentation", "interaction"):
+                return True
+            if getattr(skill_obj, "tier", "") == "impeccable" and s_lower not in ("impeccable-harden", "impeccable-audit"):
+                return True
+
+        # 2. Token and substring patterns for UI skills
+        tokens = set(s_lower.split("-"))
+        if bool(tokens & cls.UI_SKILL_PATTERNS):
+            return True
+        if any(p in s_lower for p in ["dark-mode", "toast", "ui-library", "apple-design", "animation", "page-route"]):
+            return True
+
+        # 3. Heavy unrequested enterprise/ORM stacks for non-UI tasks
+        if s_lower in cls.UNREQUESTED_ENTERPRISE_NON_UI:
+            return True
+
+        return False
+
+    @classmethod
+    def prepare_full_8_subagent_dispatch(
+        cls,
+        goal_text: str,
+        fsm_phase: str,
+        workspace_dir: Optional[str] = None,
+        task_domain: Optional[str] = None,
+        requires_frontend_ui: Optional[bool] = None
+    ) -> Dict[str, Any]:
         cwd = workspace_dir if workspace_dir else os.getcwd()
-        
-        # 1. Run upfront Skill Discovery
+
+        # 1. Infer task domain & UI requirements if not provided
+        if task_domain is None or requires_frontend_ui is None:
+            try:
+                from task_classifier import TaskClassifier
+                tc = TaskClassifier.classify(goal_text, workspace_dir=cwd)
+                task_domain = task_domain or tc.domain.value
+                requires_frontend_ui = requires_frontend_ui if requires_frontend_ui is not None else tc.requires_frontend_ui
+            except Exception:
+                task_domain = task_domain or "fullstack"
+                requires_frontend_ui = requires_frontend_ui if requires_frontend_ui is not None else True
+
+        is_non_ui = task_domain in ("algorithm", "library", "cli") or requires_frontend_ui is False
+
+        # 2. Run upfront Skill Discovery
         discovery_res = SkillDiscoveryEngine.find_and_bind_required_skills(goal_text, cwd)
 
-        # 2. Resolve Phase Topology Router Targets
+        # 3. Resolve Phase Topology Router Targets
         from topology import TopologyRouter, SwarmTopology
         topo_router = TopologyRouter(SwarmTopology.STAR)
         phase_topology = topo_router.resolve_phase_topology(fsm_phase, {})
         all_agent_ids = list(cls.SUBAGENTS.keys())
-        
+
+        UI_AGENTS = {"dss_ui_ux", "dss_frontend_dev", "dss_qa_frontend", "dss_user_alias_v2"}
+
         dispatched_subagents = []
         for sa_id, sa in cls.SUBAGENTS.items():
             targets = topo_router.get_communication_targets(sa_id, all_agent_ids)
-            # Resolve dynamic skill stack for subagent
-            subagent_skills = SClassSkillOrchestrator.resolve_active_skills(fsm_phase, goal_text, cwd)
-            skill_ids = [s.id for s in subagent_skills]
-            discovered_skills = []
-            if isinstance(discovery_res, dict):
-                discovered_skills = discovery_res.get("discovered_skills", discovery_res.get("bound_skill_ids", []))
-            combined_skills = list(dict.fromkeys(sa.assigned_skills + skill_ids + discovered_skills))
-            
+
+            # Check if UI specialist subagent should be placed on standby for pure non-UI tasks
+            if is_non_ui and sa_id in UI_AGENTS:
+                status = "STANDBY_NON_UI"
+                combined_skills = []
+            else:
+                status = "DISPATCHED_CONCURRENTLY"
+                # Source 1: Resolve dynamic skill stack from SClassSkillOrchestrator
+                subagent_skills = SClassSkillOrchestrator.resolve_active_skills(fsm_phase, goal_text, cwd)
+                skill_ids = [s.id for s in subagent_skills]
+
+                # Source 2: Discovered skills from SkillDiscoveryEngine
+                discovered_skills = []
+                if isinstance(discovery_res, dict):
+                    discovered_skills = discovery_res.get("discovered_skills", discovery_res.get("bound_skill_ids", []))
+
+                # Source 3: Subagent static base skills
+                base_skills = list(sa.assigned_skills)
+
+                # Concatenate all 3 skill sources with deduplication preserving order
+                raw_skills = list(dict.fromkeys(base_skills + skill_ids + discovered_skills))
+
+                # If task is non-UI, rigorously filter all 3 concatenated skill sources
+                if is_non_ui:
+                    combined_skills = [
+                        sk for sk in raw_skills
+                        if not cls._is_skill_excluded_for_non_ui(sk, goal_text=goal_text)
+                    ]
+                else:
+                    combined_skills = raw_skills
+
             dispatched_subagents.append({
                 "subagent_id": sa.id,
                 "name": sa.name,
                 "role_title": sa.role_title,
                 "domain": sa.domain,
-                "status": "DISPATCHED_CONCURRENTLY",
+                "status": status,
                 "assigned_skills": combined_skills,
-                "find_skill_enabled": sa.has_find_skill_capability
+                "find_skill_enabled": sa.has_find_skill_capability if status != "STANDBY_NON_UI" else False
             })
 
         # Save Full 8 Dispatch Receipt
         state_dir = os.path.join(cwd, ".agents")
         os.makedirs(state_dir, exist_ok=True)
         dispatch_file = os.path.join(state_dir, "full_8_subagent_dispatch.json")
-        
+
+        active_count = len([s for s in dispatched_subagents if s["status"] == "DISPATCHED_CONCURRENTLY"])
         receipt = {
             "fsm_phase": fsm_phase,
             "goal": goal_text,
+            "task_domain": task_domain,
+            "total_subagents_registered": len(dispatched_subagents),
             "total_subagents_dispatched": len(dispatched_subagents),
+            "active_subagents_count": active_count,
             "concurrent_execution": True,
             "skill_discovery_active": True,
             "subagents": dispatched_subagents
@@ -152,5 +249,5 @@ class SubagentRegistry:
         except Exception as e:
             logger.error(f"[SubagentRegistry] Failed to save dispatch receipt: {e}")
 
-        logger.info("[SubagentRegistry] Successfully prepared and dispatched all subagents concurrently.")
+        logger.info(f"[SubagentRegistry] Successfully prepared and dispatched subagents (active={active_count}, domain={task_domain}).")
         return receipt
