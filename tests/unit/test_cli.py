@@ -60,6 +60,32 @@ def test_cli_init_status_doctor(workspace):
     doc_out = buf_doc.getvalue()
     assert "[PASSED]" in doc_out
 
+    # 4. sclass status --json
+    parser.add_argument("--json", action="store_true") # ensure json arg works or pass to parser
+    args_status_json = parser.parse_args(["status", "-w", workspace])
+    setattr(args_status_json, "json", True)
+    buf_json = io.StringIO()
+    with contextlib.redirect_stdout(buf_json):
+        assert cmd_status(args_status_json) == 0
+    import json
+    parsed_status = json.loads(buf_json.getvalue())
+    assert parsed_status["ledger_valid"] is True
+
+    # 5. sclass daemon --once
+    from sclass.cli.main import cmd_daemon
+    args_daemon = parser.parse_args(["daemon", "--once", "-w", workspace])
+    buf_daemon = io.StringIO()
+    with contextlib.redirect_stdout(buf_daemon):
+        assert cmd_daemon(args_daemon) == 0
+    assert "Health tick complete" in buf_daemon.getvalue()
+    # Check IPC file was written
+    ipc_file = os.path.join(workspace, ".sclass", "daemon", "ipc.json")
+    assert os.path.exists(ipc_file)
+    with open(ipc_file, "r", encoding="utf-8") as f:
+        ipc_data = json.load(f)
+    assert ipc_data["status"] == "healthy"
+
+
 
 def test_cli_task_and_handoff(workspace):
     parser = build_parser()

@@ -80,18 +80,56 @@ def cmd_status(args: argparse.Namespace) -> int:
     tasks = repo.list_tasks(project_id=proj_name)
     ledger = LocalLedger(ws)
     is_valid, err = ledger.verify_integrity()
+    entries = ledger.read_all_entries()
 
-    print(f"=== S-Class Control Plane Status ({__version__}) ===")
-    print(f"Workspace: {ws}")
-    print(f"Project:   {project.name if project else 'None'}")
-    print(f"Ledger:    {'OK (Chain Valid)' if is_valid else f'CORRUPTED ({err})'}")
-    print(f"Entries:   {len(ledger.read_all_entries())}")
-    print("\nTasks:")
+    if getattr(args, "json", False):
+        print(json.dumps({
+            "workspace": ws,
+            "project": project.name if project else None,
+            "ledger_valid": is_valid,
+            "ledger_error": err,
+            "entries_count": len(entries),
+            "tasks": [t.to_dict() for t in tasks],
+        }, indent=2))
+        return 0
+
+    ledger_status = "OK (Chain Valid)" if is_valid else f"CORRUPTED ({err})"
+    print("┌──────────────────────────────────────────────────────────────┐")
+    print(f"│ S-Class Control Plane Status ({__version__})".ljust(63) + "│")
+    print("├──────────────────────────────────────────────────────────────┤")
+    print(f"│ Workspace: {ws}"[:62].ljust(63) + "│")
+    print(f"│ Project:   {project.name if project else 'None'}"[:62].ljust(63) + "│")
+    print(f"│ Ledger:    {ledger_status}"[:62].ljust(63) + "│")
+    print(f"│ Entries:   {len(entries)}".ljust(63) + "│")
+    print("├──────────────────────────────────────────────────────────────┤")
+    print("│ Tasks:".ljust(63) + "│")
     if not tasks:
-        print("  (No tasks registered)")
+        print("│   (No tasks registered)".ljust(63) + "│")
     for t in tasks:
-        print(f"  [{t.state.value.upper():^11}] {t.task_id}: {t.title}")
+        line = f"│   [{t.state.value.upper():^11}] {t.task_id}: {t.title}"
+        print(line[:62].ljust(63) + "│")
+    print("└──────────────────────────────────────────────────────────────┘")
     return 0
+
+
+def cmd_daemon(args: argparse.Namespace) -> int:
+    """Runs the S-Class workspace daemon monitoring loop."""
+    from sclass.cli.daemon import SClassDaemon
+    ws = os.path.abspath(args.workspace)
+    daemon = SClassDaemon(ws, poll_interval_sec=args.interval)
+    if args.once:
+        daemon.run_once()
+        health = daemon.check_health()
+        print(f"[S-Class Daemon] Health tick complete: {health['status']} (tasks: {health['active_tasks_count']})")
+        return 0 if health["ledger_valid"] else 1
+    print(f"[S-Class Daemon] Starting daemon loop on {ws} (interval: {args.interval}s)...")
+    try:
+        daemon.start(max_ticks=args.ticks)
+    except KeyboardInterrupt:
+        daemon.stop()
+        print("\n[S-Class Daemon] Stopped.")
+    return 0
+
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
@@ -346,6 +384,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_imp.add_argument("-w", "--workspace", default=".", help="Target workspace path")
     p_imp.add_argument("--json", action="store_true", help="Output JSON")
 
+    # daemon
+    p_dae = subparsers.add_parser("daemon", help="Run workspace health and monitoring daemon")
+    p_dae.add_argument("--once", action="store_true", help="Run a single health check tick and write IPC")
+    p_dae.add_argument("--interval", type=float, default=5.0, help="Poll interval in seconds")
+    p_dae.add_argument("--ticks", type=int, default=None, help="Maximum ticks before exiting")
+    p_dae.add_argument("-w", "--workspace", default=".", help="Target workspace path")
+
     return parser
 
 
@@ -368,7 +413,9 @@ def main() -> None:
         "trust": cmd_trust,
         "map": cmd_map,
         "impact": cmd_impact,
+        "daemon": cmd_daemon,
     }
+
 
     if args.command == "task":
         if getattr(args, "task_command", None) == "create":

@@ -10,6 +10,20 @@ function getWorkspaceDir() {
 }
 
 function loadState(workspaceDir) {
+    const ipcFile = path.join(workspaceDir, '.sclass', 'daemon', 'ipc.json');
+    if (fs.existsSync(ipcFile)) {
+        try {
+            const ipc = JSON.parse(fs.readFileSync(ipcFile, 'utf8'));
+            return {
+                ...ipc,
+                isDaemonIPC: true,
+                currentPhase: ipc.status === 'healthy' ? 'HEALTHY' : 'DEGRADED',
+                goal: `Control Plane: ${ipc.active_tasks_count || 0} active tasks`,
+            };
+        } catch (e) {
+            console.error('Error parsing daemon ipc.json:', e);
+        }
+    }
     const stateFile = path.join(workspaceDir, '.agents', 'orchestration_state.json');
     if (fs.existsSync(stateFile)) {
         try {
@@ -20,6 +34,7 @@ function loadState(workspaceDir) {
     }
     return null;
 }
+
 
 class SClassTreeDataProvider {
     constructor() {
@@ -68,7 +83,30 @@ class SClassTreeDataProvider {
             gatesParent.iconPath = new vscode.ThemeIcon('shield');
             gatesParent.contextValue = 'gates';
 
+            if (state.isDaemonIPC) {
+                const healthItem = new vscode.TreeItem(`Ledger: ${state.ledger_valid ? 'OK (Valid)' : 'DEGRADED'}`, vscode.TreeItemCollapsibleState.None);
+                healthItem.iconPath = new vscode.ThemeIcon(state.ledger_valid ? 'pass' : 'error');
+
+                const tasksParent = new vscode.TreeItem(`Registered Tasks (${state.active_tasks_count || 0})`, vscode.TreeItemCollapsibleState.Collapsed);
+                tasksParent.iconPath = new vscode.ThemeIcon('checklist');
+                tasksParent.contextValue = 'daemon_tasks';
+
+                return [goalItem, healthItem, tasksParent, gatesParent, swarmParent];
+            }
+
             return [goalItem, phaseItem, epistemicItem, gatesParent, swarmParent];
+        }
+
+        if (element.contextValue === 'daemon_tasks') {
+            if (state && Array.isArray(state.tasks) && state.tasks.length > 0) {
+                return state.tasks.map(t => {
+                    const item = new vscode.TreeItem(`[${(t.state || 'READY').toUpperCase()}] ${t.title || t.task_id}`, vscode.TreeItemCollapsibleState.None);
+                    item.description = t.task_id;
+                    item.iconPath = new vscode.ThemeIcon(t.state === 'verified' ? 'check' : 'circle-outline');
+                    return item;
+                });
+            }
+            return [new vscode.TreeItem('(No tasks registered)', vscode.TreeItemCollapsibleState.None)];
         }
 
         if (element.contextValue === 'swarm') {
@@ -95,6 +133,7 @@ class SClassTreeDataProvider {
 
         return [];
     }
+
 }
 
 class SClassDashboardViewProvider {

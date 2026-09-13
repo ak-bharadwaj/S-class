@@ -88,5 +88,12 @@ def classify_resource(path: str, workspace_dir: str) -> Tuple[ResourceKind, Auth
     if rel.startswith("tests/") or rel.startswith("test/") or "/test_" in rel or rel.endswith("_test.py"):
         return ResourceKind.TEST_FILE, AuthorityBoundary.AGENT_WRITABLE
 
+    # Secret and credential files
+    base_name = os.path.basename(rel)
+    if base_name in (".env", ".env.local", ".env.production", "credentials.json", "id_rsa", "id_ed25519") or base_name.endswith((".pem", ".key")):
+        return ResourceKind.SECRET, AuthorityBoundary.SCLASS_TRUST_ROOT
+
     # Normal source file
     return ResourceKind.SOURCE_FILE, AuthorityBoundary.AGENT_WRITABLE
+
+

@@ -71,9 +71,18 @@ class DefaultPolicyEngine:
         # 1. Protected resource analysis on target path
         if request.target:
             r_kind, boundary = classify_resource(request.target, ws)
+            if r_kind == ResourceKind.SECRET:
+                return AuthorizationDecision(
+                    outcome=DecisionOutcome.DENY if mode == "enforce" else DecisionOutcome.WARN,
+                    policy_id="SCLASS-SEC-SECRET",
+                    risk_level="CRITICAL",
+                    reason=f"Target path '{request.target}' is a secret/credential resource.",
+                    remediation="Access to secrets (.env, keys, credentials) is strictly prohibited.",
+                )
             if boundary in (AuthorityBoundary.SCLASS_TRUST_ROOT, AuthorityBoundary.SCLASS_VERIFICATION_ONLY):
                 # Agents may not mutate trust roots or evidence
                 if request.action in ("write_file", "delete_file", "edit_file", "unlink", "truncate", "modify"):
+
                     return AuthorizationDecision(
                         outcome=DecisionOutcome.DENY if mode == "enforce" else DecisionOutcome.WARN,
                         policy_id="SCLASS-AUTH-001",
@@ -123,7 +132,25 @@ class DefaultPolicyEngine:
                     remediation="Agent processes cannot access or alter .sclass trust state.",
                 )
 
+            # Check dangerous destructive commands (e.g. rm -rf /, format, wipe)
+            cmd_clean = " ".join(cmd.split()).lower()
+            dangerous_patterns = (
+                "rm -rf /", "rm -rf /*", "rm -rf ~", "rm -rf $home", "rm -r -f /",
+                "rmdir /s /q c:\\", "rmdir /s /q c:/", "del /f /s /q c:\\",
+                ":(){ :|:& };:", "mkfs", "dd if=", "> /dev/sda",
+            )
+            for dp in dangerous_patterns:
+                if dp in cmd_clean or cmd_clean.startswith(dp):
+                    return AuthorizationDecision(
+                        outcome=DecisionOutcome.DENY if mode == "enforce" else DecisionOutcome.WARN,
+                        policy_id="SCLASS-SEC-DANGEROUS",
+                        risk_level="CRITICAL",
+                        reason=f"Dangerous destructive command pattern detected: '{cmd}'",
+                        remediation="Destructive filesystem commands are strictly forbidden by policy.",
+                    )
+
             # Check dangerous shell chaining if not explicitly permitted
+
             exec_mode = request.parameters.get("mode") or request.context.get("mode", ExecutionMode.HOST_ARGV.value)
             if exec_mode != ExecutionMode.HOST_SHELL.value:
                 if any(op in cmd for op in (";", "&&", "||", "|", "`", "$(")):

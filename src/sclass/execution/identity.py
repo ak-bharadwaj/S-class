@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional, Tuple
 
 from sclass.execution.modes import ExecutionMode
+from sclass.execution.chain import ExecutionChain, analyze_execution_chain
+from enum import Enum
 
 
 class ExecutionIdentityState(str, Enum):
@@ -26,31 +28,6 @@ class ExecutionIdentityState(str, Enum):
     COMPLETED = "COMPLETED"
     IDENTITY_UNCERTAIN = "IDENTITY_UNCERTAIN"
 
-
-@dataclass(frozen=True)
-class ExecutionChain:
-    """Represents multi-tier execution chains (e.g., npm -> node -> jest, or python -> pytest)."""
-    launcher: Optional[str] = None
-    interpreter: Optional[str] = None
-    child: Optional[str] = None
-    verifier: Optional[str] = None
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "launcher": self.launcher,
-            "interpreter": self.interpreter,
-            "child": self.child,
-            "verifier": self.verifier,
-        }
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> ExecutionChain:
-        return cls(
-            launcher=data.get("launcher"),
-            interpreter=data.get("interpreter"),
-            child=data.get("child"),
-            verifier=data.get("verifier"),
-        )
 
 
 def _query_windows_process_image(pid: int) -> Tuple[Optional[str], Optional[str]]:
@@ -135,55 +112,49 @@ def _query_linux_process_image(pid: int) -> Tuple[Optional[str], Optional[str]]:
     return exe_path, iso_time
 
 
+def _query_macos_process_image(pid: int) -> Tuple[Optional[str], Optional[str]]:
+    """
+    macOS platform helper using libproc proc_pidpath and creation time inspection.
+    Returns (actual_executable_path, creation_time_iso) or (None, None).
+    """
+    if platform.system() != "Darwin" or not pid:
+        return None, None
+
+    exe_path = None
+    iso_time = None
+    try:
+        import ctypes
+        import ctypes.util
+
+        libproc_path = ctypes.util.find_library("proc") or "/usr/lib/libproc.dylib"
+        libproc = ctypes.CDLL(libproc_path)
+        PROC_PIDPATHINFO_MAXSIZE = 4096
+        buf = ctypes.create_string_buffer(PROC_PIDPATHINFO_MAXSIZE)
+        ret = libproc.proc_pidpath(pid, buf, PROC_PIDPATHINFO_MAXSIZE)
+        if ret > 0:
+            exe_path = buf.value.decode("utf-8", errors="replace")
+    except Exception:
+        pass
+
+    if not exe_path:
+        try:
+            import subprocess
+            out = subprocess.check_output(["ps", "-p", str(pid), "-o", "comm="], text=True, timeout=2).strip()
+            if out:
+                exe_path = out
+        except Exception:
+            pass
+
+    return exe_path, iso_time
+
+
 def detect_execution_chain(
     argv: tuple[str, ...] | List[str],
     resolved_path: str = "",
 ) -> ExecutionChain:
     """Derives multi-tier execution chain (launcher, interpreter, child, verifier)."""
-    tokens = list(argv)
-    if not tokens:
-        return ExecutionChain()
+    return analyze_execution_chain(argv, resolved_path)
 
-    exe_base = os.path.basename(resolved_path or tokens[0]).lower()
-    if exe_base.endswith(".exe"):
-        exe_base = exe_base[:-4]
-
-    # Python chains
-    if exe_base in ("python", "python3", "py"):
-        if len(tokens) > 2 and tokens[1] == "-m":
-            module = tokens[2].lower()
-            return ExecutionChain(
-                launcher=tokens[0],
-                interpreter=exe_base,
-                child=module,
-                verifier=module if module in ("pytest", "unittest") else None,
-            )
-        elif len(tokens) > 1 and tokens[1].startswith("-m"):
-            module = tokens[1][2:].lower()
-            return ExecutionChain(
-                launcher=tokens[0],
-                interpreter=exe_base,
-                child=module,
-                verifier=module if module in ("pytest", "unittest") else None,
-            )
-        return ExecutionChain(launcher=tokens[0], interpreter=exe_base, child="script")
-
-    # Node / NPM / Package runner chains
-    if exe_base in ("npm", "pnpm", "yarn", "bun"):
-        sub = tokens[1].lower() if len(tokens) > 1 else ""
-        return ExecutionChain(
-            launcher=tokens[0],
-            interpreter=exe_base,
-            child=sub,
-            verifier=exe_base if sub in ("test", "run") else None,
-        )
-
-    if exe_base in ("node", "deno"):
-        child = tokens[1] if len(tokens) > 1 else "script"
-        return ExecutionChain(launcher=tokens[0], interpreter=exe_base, child=child)
-
-    # Direct binaries
-    return ExecutionChain(launcher=tokens[0], interpreter=None, child=exe_base, verifier=exe_base)
 
 
 @dataclass(frozen=True)
@@ -263,6 +234,13 @@ class ExecutionIdentity:
                     resolved = proc_exe
                 if proc_start:
                     actual_start_time = proc_start
+            elif platform.system() == "Darwin":
+                proc_exe, proc_start = _query_macos_process_image(pid)
+                if proc_exe:
+                    resolved = proc_exe
+                if proc_start:
+                    actual_start_time = proc_start
+
 
         # 2. Path resolution fallback if child PID inspection did not yield executable
         if not resolved and exe_name:
