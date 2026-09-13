@@ -191,6 +191,17 @@ def execute_init_command(workspace_dir: str, no_rules: bool = False) -> Dict[str
         except Exception:
             pass
 
+    # Deploy hook runner modules to target workspace if not present
+    sclass_dir = os.path.dirname(os.path.abspath(__file__))
+    runner_files = ["hook_runner.py", "hook_core.py", "hook_rules.py"]
+    for rf in runner_files:
+        dest_rf = os.path.join(workspace_dir, rf)
+        if not os.path.exists(dest_rf):
+            src_rf = os.path.join(sclass_dir, rf)
+            if os.path.exists(src_rf):
+                import shutil
+                shutil.copy2(src_rf, dest_rf)
+
     installed_adapters = {}
     for plat in detected.keys():
         mode = existing_enforcement.get(plat, "warn")
@@ -207,6 +218,14 @@ def execute_init_command(workspace_dir: str, no_rules: bool = False) -> Dict[str
             installed_adapters[plat] = CopilotAdapter(workspace_dir=workspace_dir).install_hooks(strict=strict_mode)
         elif plat == "windsurf":
             installed_adapters[plat] = WindsurfAdapter(workspace_dir=workspace_dir).install_hooks(strict=strict_mode)
+
+    # Register per-IDE MCP configs for detected platforms (or core IDEs if none detected)
+    mcp_configs = {}
+    try:
+        from mcp_installer import install_mcp_configs
+        mcp_configs = install_mcp_configs(workspace_dir=workspace_dir, detected_platforms=list(detected.keys()) if detected else None)
+    except Exception:
+        pass
 
     cfg = {
         "version": 1,
@@ -228,6 +247,7 @@ def execute_init_command(workspace_dir: str, no_rules: bool = False) -> Dict[str
         "status": "SUCCESS",
         "platforms_detected": list(detected.keys()),
         "installed_adapters": installed_adapters,
+        "mcp_configs": mcp_configs,
         "rules_projected": list(rule_projections.keys()) if not no_rules else "SKIPPED (--no-rules)",
         "enforcement_mode": cfg["enforcement_mode"],
         "initial_status": "UNVERIFIED (awaiting first real event)",

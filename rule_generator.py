@@ -192,6 +192,28 @@ alwaysApply: true
 """
         with open(claude_path, "w", encoding="utf-8") as f:
             f.write(content)
+
+        # Rule Parity: Also generate .claude/rules/sclass-governance.md
+        claude_rules_dir = os.path.join(self.workspace_dir, ".claude", "rules")
+        os.makedirs(claude_rules_dir, exist_ok=True)
+        claude_rule_path = os.path.join(claude_rules_dir, "sclass-governance.md")
+        claude_rule_content = f"""# S-Class Epistemic Governance (Claude Code Target)
+
+## Active Session Context
+- **FSM Phase**: `{ctx['fsm_phase']}`
+- **Active Goal**: {ctx['goal'] or 'Under Development'}
+- **Pending Tasks**: {len(ctx['active_tasks'])} active
+- **Knowledge Graph**: {ctx['stats']['total_nodes']} nodes, {ctx['stats']['total_edges']} edges
+
+## Non-Negotiable Engineering Directives
+1. **Zero Hallucinated APIs**: Always verify existing symbols in `.agents/codebase_graph.db` or via MCP `graph_query` before inventing method names or endpoints.
+2. **Blast Radius Discipline**: Running changes must consider downstream callers. Do not alter public signatures without an accepted ADR.
+3. **Strict Verification**: Never claim a task is completed without running targeted unit tests (`pytest` or `npm test`).
+4. **Completion Handshake**: Terminate completed task chunks with `<promise>TASK-ID:DONE</promise>`.
+"""
+        with open(claude_rule_path, "w", encoding="utf-8") as f:
+            f.write(claude_rule_content)
+
         return claude_path
 
     def generate_agents_md(self, ctx: Optional[Dict[str, Any]] = None) -> str:
