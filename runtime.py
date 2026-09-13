@@ -1185,7 +1185,7 @@ Generated autonomously by S-Class V13 Execution Microkernel.
 import time
 import threading
 from collections import deque
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 
 
 class SlidingWindowRateLimiter:
