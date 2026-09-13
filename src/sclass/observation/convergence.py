@@ -44,9 +44,13 @@ class ObservationConvergence:
         Executes an ActionRequest through the backend and seals observed evidence in LocalLedger.
         Strictly enforces that the action is authorized before dispatching to execution backend.
         """
+        # 0. Authoritative authorization enforcement (mandatory choke point)
+        if request is None:
+            from sclass.core.errors import SecurityViolationError
+            raise SecurityViolationError("NO AUTHORIZATION -> NO EXECUTION: ActionRequest is required before execution.")
+
         ws = os.path.abspath(request.workspace or os.getcwd())
 
-        # 0. Authoritative authorization enforcement
         decision = authorization
         if decision is None:
             if policy_engine is not None:
@@ -55,12 +59,23 @@ class ObservationConvergence:
                 from sclass.control.policy import DefaultPolicyEngine
                 decision = DefaultPolicyEngine().evaluate(request, ws)
 
+        if decision is None:
+            from sclass.core.errors import SecurityViolationError
+            raise SecurityViolationError("UNKNOWN POLICY STATE -> NO EXECUTION: Policy engine returned no decision.")
+
         if not getattr(decision, "is_allowed", False):
             from sclass.core.errors import SecurityViolationError
             pol_id = getattr(decision, "policy_id", "UNKNOWN")
             reason = getattr(decision, "reason", "Action is not permitted by security policy")
             raise SecurityViolationError(
-                f"ActionRequest unauthorized under policy [{pol_id}]: {reason}"
+                f"NO AUTHORIZATION -> NO EXECUTION: ActionRequest unauthorized under policy [{pol_id}]: {reason}"
+            )
+
+        outcome_val = getattr(decision.outcome, "value", str(decision.outcome)).lower()
+        if outcome_val not in ("allow", "warn"):
+            from sclass.core.errors import SecurityViolationError
+            raise SecurityViolationError(
+                f"NO AUTHORIZATION -> NO EXECUTION: Action outcome '{outcome_val}' is not authorized for execution."
             )
 
         # 1. Resolve target command

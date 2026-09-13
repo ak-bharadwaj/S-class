@@ -33,6 +33,12 @@ jobs:
         pip install -r requirements.txt
         pip install pytest-cov psutil pyright ruff
 
+    - name: Run Handoff B.1 Security Certification Suite
+      env:
+        PYTHONPATH: src:.
+      run: |
+        python -m pytest tests/certification/test_cert_handoff_b1_security.py -v
+
     - name: Run Full Test Suite
       env:
         PYTHONPATH: src:.

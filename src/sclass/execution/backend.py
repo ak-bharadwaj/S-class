@@ -311,8 +311,14 @@ class SandboxBackend(ExecutionBackend):
         # 1. Authoritative sandbox configuration compilation
         sandbox_config = self.compile_config(request=request, capability=capability, workspace_dir=cwd)
 
-        # 2. If chosen sandbox is not available on host OS (e.g., bwrap on Windows)
+        # 2. If chosen sandbox is not available on host OS (e.g., bwrap on Windows, runsc missing)
         if not self.is_available():
+            if self.backend_type in ("gvisor", "runsc"):
+                from sclass.core.errors import SecurityViolationError
+                raise SecurityViolationError(
+                    "NO SANDBOX -> NO SANDBOXED EXECUTION: gVisor (runsc) is not available on this host. "
+                    "gVisor isolation cannot be emulated or degraded to host execution."
+                )
             if self.fallback_to_host:
                 host_runner = ProcessRunner(sandbox=HostSandbox(), launcher=HostLauncher())
                 return host_runner.run(
@@ -327,7 +333,8 @@ class SandboxBackend(ExecutionBackend):
             else:
                 from sclass.core.errors import SecurityViolationError
                 raise SecurityViolationError(
-                    f"Requested sandbox backend '{self.backend_type}' is not available on this host. Fail-closed policy denies host fallback."
+                    f"NO SANDBOX -> NO SANDBOXED EXECUTION: Requested sandbox backend '{self.backend_type}' is not available on this host. "
+                    "Fail-closed policy strictly denies uncontained host execution."
                 )
 
         # 3. Apply compiled environment
@@ -347,7 +354,7 @@ class SandboxBackend(ExecutionBackend):
 
 
 def get_execution_backend(name: str = "host", **kwargs) -> ExecutionBackend:
-    """Factory retrieving requested execution backend."""
+    """Factory retrieving requested execution backend. Fails closed on unknown backends."""
     name_clean = name.lower()
     if name_clean in ("host", "direct", "native"):
         return HostProcessBackend()
@@ -357,4 +364,9 @@ def get_execution_backend(name: str = "host", **kwargs) -> ExecutionBackend:
         return SandboxBackend(backend_type="container", **kwargs)
     elif name_clean in ("gvisor", "runsc"):
         return SandboxBackend(backend_type="gvisor", **kwargs)
-    return HostProcessBackend()
+
+    from sclass.core.errors import SecurityViolationError
+    raise SecurityViolationError(
+        f"UNKNOWN BACKEND -> NO EXECUTION: Backend '{name}' is not recognized. "
+        "Fail-closed policy prevents execution under unknown backends."
+    )

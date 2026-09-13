@@ -105,9 +105,10 @@ class OPAPolicyAdapter:
         self,
         client: Optional[OPAClient] = None,
         fallback_engine: Optional[Any] = None,
-        allow_fallback: bool = True,
+        allow_fallback: bool = False,
+        endpoint_url: Optional[str] = None,
     ):
-        self.client = client or OPAClient()
+        self.client = client or OPAClient(endpoint_url=endpoint_url)
         self.fallback = fallback_engine or DefaultPolicyEngine()
         self.allow_fallback = allow_fallback
 
@@ -123,7 +124,25 @@ class OPAPolicyAdapter:
 
         try:
             resp_data = self.client.evaluate_raw(payload)
-            result = resp_data.get("result", {})
+            if not isinstance(resp_data, dict):
+                return AuthorizationDecision(
+                    outcome=DecisionOutcome.DENY,
+                    policy_id="OPA-MALFORMED",
+                    risk_level="CRITICAL",
+                    reason=f"UNKNOWN POLICY STATE: OPA response is not a JSON object ({type(resp_data).__name__}). Fail-closed enforced.",
+                    metadata={"opa_payload": payload},
+                )
+
+            if "result" not in resp_data:
+                return AuthorizationDecision(
+                    outcome=DecisionOutcome.DENY,
+                    policy_id="OPA-MALFORMED",
+                    risk_level="CRITICAL",
+                    reason="UNKNOWN POLICY STATE: OPA response missing 'result' field. Fail-closed enforced.",
+                    metadata={"opa_payload": payload, "raw_response": resp_data},
+                )
+
+            result = resp_data["result"]
 
             # Support both boolean allow or dictionary result
             if isinstance(result, bool):
@@ -131,13 +150,25 @@ class OPAPolicyAdapter:
                 reason = "Allowed by OPA policy" if allow else "Denied by OPA policy"
                 policy_id = "OPA-AUTHZ"
             elif isinstance(result, dict):
-                allow = bool(result.get("allow", True))
+                if "allow" not in result:
+                    return AuthorizationDecision(
+                        outcome=DecisionOutcome.DENY,
+                        policy_id="OPA-MALFORMED",
+                        risk_level="CRITICAL",
+                        reason="UNKNOWN POLICY STATE: OPA decision dictionary missing 'allow' boolean key. Fail-closed enforced.",
+                        metadata={"opa_payload": payload, "raw_response": resp_data},
+                    )
+                allow = bool(result.get("allow"))
                 reason = result.get("reason", "Allowed by OPA policy" if allow else "Denied by OPA policy")
                 policy_id = result.get("policy_id", "OPA-AUTHZ")
             else:
-                allow = True
-                reason = "Allowed by default OPA result"
-                policy_id = "OPA-AUTHZ"
+                return AuthorizationDecision(
+                    outcome=DecisionOutcome.DENY,
+                    policy_id="OPA-MALFORMED",
+                    risk_level="CRITICAL",
+                    reason=f"UNKNOWN POLICY STATE: OPA returned unexpected result type '{type(result).__name__}'. Fail-closed enforced.",
+                    metadata={"opa_payload": payload, "raw_response": resp_data},
+                )
 
             if not allow:
                 return AuthorizationDecision(
@@ -159,5 +190,10 @@ class OPAPolicyAdapter:
         except Exception as e:
             if self.allow_fallback:
                 return self.fallback.evaluate(request, workspace_dir=ws, mode=mode)
-            from sclass.core.errors import SecurityViolationError
-            raise SecurityViolationError(f"OPA evaluation failed and fallback is disabled: {e}")
+            return AuthorizationDecision(
+                outcome=DecisionOutcome.DENY,
+                policy_id="OPA-UNAVAILABLE",
+                risk_level="CRITICAL",
+                reason=f"UNKNOWN POLICY STATE: OPA service unavailable or evaluation error ({e}). Fail-closed policy denies execution.",
+                metadata={"opa_payload": payload, "error": str(e)},
+            )

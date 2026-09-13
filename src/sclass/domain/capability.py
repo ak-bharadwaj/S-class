@@ -100,65 +100,70 @@ class Capability:
     def allows_resource(self, requested_resource: str, workspace_dir: str = "") -> bool:
         """
         Evaluates whether the resource target matches allowed resource patterns
-        without wildcard bypasses.
+        without wildcard bypasses or path-widening escapes.
         """
         if not requested_resource:
             return True
 
-        norm_req = requested_resource.replace("\\", "/").strip()
+        raw_clean = requested_resource.replace("\\", "/").strip()
         norm_res = self.resource.replace("\\", "/").strip()
 
-        # If resource pattern is universal
+        # Workspace containment check if scope is workspace
+        if self.scope == "workspace" and workspace_dir:
+            ws_norm = os.path.abspath(workspace_dir).replace("\\", "/").rstrip("/")
+            if os.path.isabs(raw_clean):
+                abs_target = os.path.abspath(raw_clean).replace("\\", "/")
+            else:
+                abs_target = os.path.abspath(os.path.join(workspace_dir, raw_clean)).replace("\\", "/")
+
+            if not (abs_target == ws_norm or abs_target.startswith(ws_norm + "/")):
+                # Escapes workspace root
+                return False
+
+            # Normalize relative to workspace root
+            if abs_target == ws_norm:
+                norm_req = "."
+            else:
+                norm_req = abs_target[len(ws_norm) + 1:]
+        else:
+            if os.path.isabs(raw_clean):
+                norm_req = os.path.abspath(raw_clean).replace("\\", "/")
+            else:
+                norm_req = os.path.normpath(raw_clean).replace("\\", "/").strip("/")
+
+        # If resource pattern is universal, and workspace containment passed
         if norm_res == "*":
-            # If scoped to workspace, ensure it doesn't escape workspace root
-            if self.scope == "workspace" and workspace_dir:
-                ws_norm = os.path.abspath(workspace_dir).replace("\\", "/").rstrip("/")
-                if os.path.isabs(requested_resource):
-                    req_abs = os.path.abspath(requested_resource).replace("\\", "/")
-                    if not (req_abs == ws_norm or req_abs.startswith(ws_norm + "/")):
-                        return False
-                else:
-                    joined = os.path.abspath(os.path.join(workspace_dir, requested_resource)).replace("\\", "/")
-                    if not (joined == ws_norm or joined.startswith(ws_norm + "/")):
-                        return False
             return True
 
-        # Check relative normalization against workspace
-        rel_target = norm_req
-        if workspace_dir:
-            ws_norm = os.path.abspath(workspace_dir).replace("\\", "/").rstrip("/")
-            if os.path.isabs(requested_resource):
-                req_abs = os.path.abspath(requested_resource).replace("\\", "/")
-                if req_abs == ws_norm:
-                    rel_target = "."
-                elif req_abs.startswith(ws_norm + "/"):
-                    rel_target = req_abs[len(ws_norm) + 1:]
-                elif self.scope == "workspace":
-                    # Target is outside the workspace
-                    return False
-            else:
-                joined = os.path.abspath(os.path.join(workspace_dir, requested_resource)).replace("\\", "/")
-                if self.scope == "workspace" and not (joined == ws_norm or joined.startswith(ws_norm + "/")):
-                    return False
-                if joined.startswith(ws_norm + "/"):
-                    rel_target = joined[len(ws_norm) + 1:]
+        norm_res_clean = norm_res.strip("/")
+        norm_req_clean = norm_req.strip("/")
 
-        # Test both raw and workspace-relative against pattern
-        for candidate in (norm_req, rel_target):
-            if fnmatch.fnmatch(candidate, norm_res):
+        # Recursive wildcard
+        if norm_res_clean.endswith("/**"):
+            prefix = norm_res_clean[:-3].strip("/")
+            if not prefix or norm_req_clean == prefix or norm_req_clean.startswith(prefix + "/"):
                 return True
-            if fnmatch.fnmatch(candidate.strip("/"), norm_res.strip("/")):
+
+        # Single-level directory wildcard (must not match nested slashes beyond prefix)
+        elif norm_res_clean.endswith("/*"):
+            prefix = norm_res_clean[:-2].strip("/")
+            if norm_req_clean.startswith(prefix + "/"):
+                remainder = norm_req_clean[len(prefix) + 1:]
+                if "/" not in remainder:
+                    return True
+            elif prefix == "" and "/" not in norm_req_clean:
                 return True
-            if norm_res.endswith("/**"):
-                prefix = norm_res[:-3].strip("/")
-                cand_clean = candidate.strip("/")
-                if cand_clean == prefix or cand_clean.startswith(prefix + "/"):
+
+        # Segment-aware matching
+        elif "/" in norm_res_clean or "/" in norm_req_clean:
+            res_parts = norm_res_clean.split("/")
+            req_parts = norm_req_clean.split("/")
+            if len(res_parts) == len(req_parts):
+                if all(fnmatch.fnmatch(req_p, res_p) for req_p, res_p in zip(req_parts, res_parts)):
                     return True
-            elif norm_res.endswith("/*"):
-                prefix = norm_res[:-2].strip("/")
-                cand_clean = candidate.strip("/")
-                if cand_clean == prefix or cand_clean.startswith(prefix + "/"):
-                    return True
+        else:
+            if fnmatch.fnmatch(norm_req_clean, norm_res_clean):
+                return True
 
         return False
 
@@ -270,7 +275,9 @@ class CapabilityEvaluator:
         params = getattr(request, "parameters", {}) or {}
         if capability.arguments:
             for k, expected_v in capability.arguments.items():
-                if k in params and params[k] != expected_v:
+                if k not in params:
+                    failed.append(f"argument_constraint: required argument '{k}' is missing from request parameters")
+                elif params[k] != expected_v:
                     failed.append(f"argument_constraint: parameter '{k}' value '{params[k]}' does not match expected '{expected_v}'")
 
         # 6. Filesystem access level

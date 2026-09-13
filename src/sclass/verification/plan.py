@@ -50,7 +50,10 @@ class VerificationPlan:
         # 1. Determine present evidence kinds and verifier sources
         present_kinds = set()
         present_sources = set()
+        has_unobserved = False
         for ev in evidence_items:
+            if not getattr(ev, "is_observed", True):
+                has_unobserved = True
             kind = getattr(ev, "evidence_kind", None)
             if kind:
                 present_kinds.add(str(kind).lower())
@@ -68,21 +71,35 @@ class VerificationPlan:
                 workspace_dir=ws,
             )
 
-            # If evidence satisfies claim locally, but plan-level required evidence kinds or verifiers are missing:
+            # Invariant: MISSING REQUIRED EVIDENCE -> NO ACCEPTED CLAIM
             if verdict.is_accepted:
-                if missing_kinds:
+                if not evidence_items:
                     verdict = VerificationResult(
                         status="INCONCLUSIVE",
                         claim_id=claim.claim_id,
-                        reason=f"Plan requires evidence kinds {self.required_evidence_kinds}, but missing: {missing_kinds}",
+                        reason="MISSING REQUIRED EVIDENCE -> NO ACCEPTED CLAIM: No evidence items provided to plan.",
+                        metadata={**verdict.metadata, "empty_evidence": True},
+                    )
+                elif missing_kinds:
+                    verdict = VerificationResult(
+                        status="INCONCLUSIVE",
+                        claim_id=claim.claim_id,
+                        reason=f"MISSING REQUIRED EVIDENCE -> NO ACCEPTED CLAIM: Plan requires evidence kinds {self.required_evidence_kinds}, but missing: {missing_kinds}",
                         metadata={**verdict.metadata, "missing_evidence_kinds": missing_kinds},
                     )
                 elif missing_verifiers:
                     verdict = VerificationResult(
                         status="INCONCLUSIVE",
                         claim_id=claim.claim_id,
-                        reason=f"Plan requires verifier IDs {self.verifier_ids}, but missing: {missing_verifiers}",
+                        reason=f"MISSING REQUIRED EVIDENCE -> NO ACCEPTED CLAIM: Plan requires verifier IDs {self.verifier_ids}, but missing: {missing_verifiers}",
                         metadata={**verdict.metadata, "missing_verifiers": missing_verifiers},
+                    )
+                elif has_unobserved:
+                    verdict = VerificationResult(
+                        status="REJECT",
+                        claim_id=claim.claim_id,
+                        reason="UNAUTHENTIC EVIDENCE: Provided evidence contains unobserved or agent-authored receipts.",
+                        metadata={**verdict.metadata, "unobserved_evidence": True},
                     )
 
             results[claim.claim_id] = verdict
