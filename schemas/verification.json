@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "VerificationResult",
+  "type": "object",
+  "required": ["claim_id", "status", "reason"],
+  "properties": {
+    "claim_id": { "type": "string" },
+    "receipt_id": { "type": ["string", "null"] },
+    "status": { "type": "string", "enum": ["ACCEPT", "REJECT", "INCONCLUSIVE", "PENDING_MANUAL_REVIEW"] },
+    "reason": { "type": "string" },
+    "observed_exit_code": { "type": ["integer", "null"] },
+    "observed_files_changed": { "type": "array", "items": { "type": "string" } },
+    "passed_tests": { "type": ["integer", "null"] },
+    "failed_tests": { "type": ["integer", "null"] },
+    "skipped_tests": { "type": ["integer", "null"] },
+    "metadata": { "type": "object" }
+  }
+}

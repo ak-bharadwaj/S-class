@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActionRequest",
+  "type": "object",
+  "required": ["agent", "platform", "action", "tool", "target", "parameters", "workspace"],
+  "properties": {
+    "agent": { "type": "string" },
+    "platform": { "type": "string" },
+    "action": { "type": "string" },
+    "tool": { "type": "string" },
+    "target": { "type": "string" },
+    "parameters": { "type": "object" },
+    "workspace": { "type": "string" },
+    "task_id": { "type": ["string", "null"] },
+    "requested_at": { "type": "string", "format": "date-time" }
+  }
+}

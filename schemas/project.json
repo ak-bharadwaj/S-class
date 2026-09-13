@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ProjectState",
+  "type": "object",
+  "required": ["project_id", "name", "root_path"],
+  "properties": {
+    "project_id": { "type": "string" },
+    "name": { "type": "string" },
+    "root_path": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "active_agent": { "type": ["string", "null"] },
+    "current_goal": { "type": ["string", "null"] },
+    "metadata": { "type": "object" }
+  }
+}

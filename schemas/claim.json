@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Claim",
+  "type": "object",
+  "required": ["claim_id", "task_id", "statement", "claim_type"],
+  "properties": {
+    "claim_id": { "type": "string" },
+    "task_id": { "type": "string" },
+    "statement": { "type": "string" },
+    "claim_type": { "type": "string" },
+    "verifier": { "type": ["string", "null"] },
+    "target_files": { "type": "array", "items": { "type": "string" } },
+    "created_at": { "type": "string", "format": "date-time" },
+    "metadata": { "type": "object" }
+  }
+}

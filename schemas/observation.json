@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EvidenceReceipt",
+  "type": "object",
+  "required": [
+    "receipt_id", "task_id", "claim_id", "agent", "action", "workspace",
+    "command", "exit_code", "started_at", "finished_at", "stdout_hash",
+    "stderr_hash", "receipt_hash", "lifecycle_state", "is_observed"
+  ],
+  "properties": {
+    "receipt_id": { "type": "string" },
+    "task_id": { "type": "string" },
+    "claim_id": { "type": "string" },
+    "agent": { "type": "string" },
+    "action": { "type": "string" },
+    "workspace": { "type": "string" },
+    "command": { "type": "string" },
+    "exit_code": { "type": "integer" },
+    "started_at": { "type": "string", "format": "date-time" },
+    "finished_at": { "type": "string", "format": "date-time" },
+    "stdout_hash": { "type": "string" },
+    "stderr_hash": { "type": "string" },
+    "receipt_hash": { "type": "string" },
+    "lifecycle_state": { "type": "string", "enum": ["proposed", "claimed", "observed"] },
+    "is_observed": { "type": "boolean" },
+    "execution_kind": { "type": "string" },
+    "verifier": { "type": "string" },
+    "workspace_fingerprint": { "type": "string" },
+    "files_changed": { "type": "array", "items": { "type": "string" } },
+    "metadata": { "type": "object" }
+  }
+}

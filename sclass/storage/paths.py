@@ -21,6 +21,8 @@ class WorkspacePaths:
         self.ledger_dir = os.path.join(self.trust_dir, "ledger")
         self.locks_dir = os.path.join(self.sclass_dir, "locks")
         self.agent_dir = os.path.join(self.sclass_dir, "agent")
+        self.cache_dir = os.path.join(self.sclass_dir, "cache")
+        self.adapters_dir = os.path.join(self.sclass_dir, "adapters")
 
         # Compatibility paths (.agents/)
         self.legacy_agents_dir = os.path.join(self.root, ".agents")
