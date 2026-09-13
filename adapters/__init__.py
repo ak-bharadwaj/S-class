@@ -31,6 +31,27 @@ PLATFORM_CONFIDENCE = {
 }
 
 
+def resolve_runner_path(workspace_dir: str, runner_path: Optional[str] = None) -> str:
+    """
+    Resolves the authoritative path to hook_runner.py.
+    Prefers explicit runner_path, then workspace-local hook_runner.py,
+    falling back to the installed S-Class package's hook_runner.py.
+    """
+    if runner_path and os.path.exists(runner_path):
+        return runner_path
+
+    ws_runner = os.path.join(workspace_dir, "hook_runner.py")
+    if os.path.exists(ws_runner):
+        return ws_runner
+
+    pkg_runner = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "hook_runner.py")
+    if os.path.exists(pkg_runner):
+        return os.path.abspath(pkg_runner)
+
+    return ws_runner
+
+
+
 @dataclass
 class PlatformInfo:
     name: str
