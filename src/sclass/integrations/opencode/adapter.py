@@ -56,13 +56,18 @@ class OpenCodeAdapter:
 
     def on_action(self, action_name: str, target: str, parameters: Dict[str, Any], task_id: Optional[str] = None) -> AuthorizationDecision:
         req = ActionRequest(
-            agent="opencode",
-            platform="opencode",
+            actor="opencode",
+            session=task_id or "",
+            capability=action_name,
             action=action_name,
-            tool=action_name,
             target=target,
             parameters=parameters,
             workspace=self.workspace_dir,
+            context={"parameters": parameters},
+            provenance={"platform": "opencode", "agent": "opencode"},
+            agent="opencode",
+            platform="opencode",
+            tool=action_name,
             task_id=task_id,
         )
         return authorize(req, mode=self.mode, workspace_dir=self.workspace_dir)

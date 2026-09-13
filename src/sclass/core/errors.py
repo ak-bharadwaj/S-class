@@ -63,3 +63,9 @@ class StorageError(SClassError):
 class HandoffIntegrityError(SClassError):
     """Raised when handoff package or context assembly fails due to database or state integrity error."""
     pass
+
+
+class EpistemicIntegrityError(SClassError):
+    """Raised when epistemic invariants are breached (e.g. attempting to certify truth without observation)."""
+    pass
+

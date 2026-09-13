@@ -1,12 +1,24 @@
 """
-S-Class Domain: ActionRequest and AuthorizationDecision.
+S-Class Domain: ActionRequest, Capability, and AuthorizationDecision.
 """
 
 from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
+
+from sclass.domain.capability import (
+    Capability,
+    CAP_TERMINAL_EXECUTE,
+    CAP_FILESYSTEM_READ,
+    CAP_FILESYSTEM_WRITE,
+    CAP_GIT_READ,
+    CAP_GIT_WRITE,
+    CAP_NETWORK_REQUEST,
+    CAP_SECRET_READ,
+    CAP_PROCESS_SPAWN,
+)
 
 
 class DecisionOutcome(str, Enum):
@@ -16,47 +28,133 @@ class DecisionOutcome(str, Enum):
     DENY = "deny"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class ActionRequest:
-    """Canonical typed request for an agent action before execution."""
-    agent: str
-    platform: str
+    """
+    Canonical typed request for an agent or tool action before execution.
+    Unified across ACP terminal/fs, MCP tools/call, Claude, Codex, Cursor, OpenCode, and CLI.
+    """
+    actor: str
+    session: str
+    capability: str
     action: str
-    tool: str
     target: str
-    parameters: Dict[str, Any] = field(default_factory=dict)
-    workspace: str = ""
-    task_id: Optional[str] = None
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    context: Dict[str, Any] = field(default_factory=dict)
+    parameters: Dict[str, Any]
+    workspace: str
+    context: Dict[str, Any]
+    provenance: Dict[str, Any]
+
+    def __init__(
+        self,
+        actor: Optional[str] = None,
+        session: Optional[str] = None,
+        capability: Optional[str] = None,
+        action: Optional[str] = None,
+        target: Optional[str] = None,
+        parameters: Optional[Dict[str, Any]] = None,
+        workspace: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+        provenance: Optional[Dict[str, Any]] = None,
+        *,
+        agent: Optional[str] = None,
+        platform: Optional[str] = None,
+        tool: Optional[str] = None,
+        task_id: Optional[str] = None,
+        timestamp: Optional[str] = None,
+    ):
+        final_actor = actor if actor is not None else (agent if agent is not None else "unknown_actor")
+        final_session = session if session is not None else (task_id if task_id is not None else "")
+        final_capability = capability if capability is not None else (tool if tool is not None else (action or ""))
+        final_action = action if action is not None else (tool if tool is not None else "unknown_action")
+        final_target = target if target is not None else ""
+        final_parameters = dict(parameters) if parameters is not None else {}
+        final_workspace = workspace if workspace is not None else ""
+        final_context = dict(context) if context is not None else {}
+
+        prov = dict(provenance) if provenance is not None else {}
+        if platform is not None and "platform" not in prov:
+            prov["platform"] = platform
+        elif "platform" not in prov:
+            prov["platform"] = "generic"
+
+        if timestamp is not None and "timestamp" not in prov:
+            prov["timestamp"] = timestamp
+        elif "timestamp" not in prov:
+            prov["timestamp"] = datetime.now(timezone.utc).isoformat()
+
+        object.__setattr__(self, "actor", final_actor)
+        object.__setattr__(self, "session", final_session)
+        object.__setattr__(self, "capability", final_capability)
+        object.__setattr__(self, "action", final_action)
+        object.__setattr__(self, "target", final_target)
+        object.__setattr__(self, "parameters", final_parameters)
+        object.__setattr__(self, "workspace", final_workspace)
+        object.__setattr__(self, "context", final_context)
+        object.__setattr__(self, "provenance", prov)
+
+    # Backwards-compatible aliases
+    @property
+    def agent(self) -> str:
+        return self.actor
+
+    @property
+    def platform(self) -> str:
+        return self.provenance.get("platform", "generic")
+
+    @property
+    def tool(self) -> str:
+        return self.capability or self.action
+
+    @property
+    def task_id(self) -> Optional[str]:
+        return self.session or None
+
+    @property
+    def timestamp(self) -> str:
+        return self.provenance.get("timestamp", "")
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "agent": self.agent,
-            "platform": self.platform,
+            "actor": self.actor,
+            "session": self.session,
+            "capability": self.capability,
             "action": self.action,
-            "tool": self.tool,
             "target": self.target,
             "parameters": dict(self.parameters),
             "workspace": self.workspace,
+            "context": dict(self.context),
+            "provenance": dict(self.provenance),
+            # Backwards compatibility fields
+            "agent": self.actor,
+            "platform": self.platform,
+            "tool": self.tool,
             "task_id": self.task_id,
             "timestamp": self.timestamp,
-            "context": dict(self.context),
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> ActionRequest:
+        prov = dict(data.get("provenance", {}))
+        if "platform" in data and "platform" not in prov:
+            prov["platform"] = data["platform"]
+        if "timestamp" in data and "timestamp" not in prov:
+            prov["timestamp"] = data["timestamp"]
+
         return cls(
-            agent=data.get("agent", "unknown_agent"),
-            platform=data.get("platform", "generic"),
+            actor=data.get("actor") or data.get("agent", "unknown_actor"),
+            session=data.get("session") or data.get("task_id", ""),
+            capability=data.get("capability") or data.get("tool", ""),
             action=data.get("action", "unknown_action"),
-            tool=data.get("tool", "unknown_tool"),
             target=data.get("target", ""),
             parameters=dict(data.get("parameters", {})),
             workspace=data.get("workspace", ""),
-            task_id=data.get("task_id"),
-            timestamp=data.get("timestamp", datetime.now(timezone.utc).isoformat()),
             context=dict(data.get("context", {})),
+            provenance=prov,
+            agent=data.get("agent"),
+            platform=data.get("platform"),
+            tool=data.get("tool"),
+            task_id=data.get("task_id"),
+            timestamp=data.get("timestamp"),
         )
 
 

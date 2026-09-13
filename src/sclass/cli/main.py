@@ -313,6 +313,37 @@ def cmd_impact(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_run(args: argparse.Namespace) -> int:
+    """Executes a command under S-Class execution backend, OS observation, and ledger sealing."""
+    ws = os.path.abspath(args.workspace)
+    from sclass.domain.action import ActionRequest
+    from sclass.observation.convergence import ObservationConvergence
+    from sclass.execution.backend import get_execution_backend
+
+    cmd_str = " ".join(args.cmd) if isinstance(args.cmd, list) else args.cmd
+    req = ActionRequest(
+        actor=getattr(args, "actor", None) or "cli_user",
+        session=getattr(args, "session", "") or "",
+        capability="terminal.execute",
+        action="run_command",
+        target=cmd_str,
+        workspace=ws,
+        context={"cli": True},
+        provenance={"platform": "cli", "actor": getattr(args, "actor", None) or "cli_user"},
+    )
+    backend = get_execution_backend(getattr(args, "backend", "host"))
+    exec_res, receipt = ObservationConvergence.execute_and_observe(
+        request=req,
+        command=cmd_str,
+        backend=backend,
+    )
+    if exec_res.stdout:
+        print(exec_res.stdout, end="")
+    if exec_res.stderr:
+        print(exec_res.stderr, end="", file=sys.stderr)
+    return exec_res.exit_code
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="sclass", description="S-Class: The Open-Source Trust & Control Plane")
     parser.add_argument("--version", action="version", version=f"sclass {__version__}")
@@ -391,6 +422,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_dae.add_argument("--ticks", type=int, default=None, help="Maximum ticks before exiting")
     p_dae.add_argument("-w", "--workspace", default=".", help="Target workspace path")
 
+    # run
+    p_run = subparsers.add_parser("run", help="Execute command under S-Class observation convergence")
+    p_run.add_argument("cmd", nargs="+", help="Command to execute")
+    p_run.add_argument("-w", "--workspace", default=".", help="Target workspace path")
+    p_run.add_argument("--actor", default="cli_user", help="Actor identity")
+    p_run.add_argument("--session", default="", help="Session or task ID")
+    p_run.add_argument("--backend", default="host", help="Execution backend (host, bwrap, docker)")
+
     return parser
 
 
@@ -414,7 +453,9 @@ def main() -> None:
         "map": cmd_map,
         "impact": cmd_impact,
         "daemon": cmd_daemon,
+        "run": cmd_run,
     }
+
 
 
     if args.command == "task":

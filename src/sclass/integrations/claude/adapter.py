@@ -91,13 +91,18 @@ class ClaudeCodeAdapter:
             action = "tool_call"
 
         req = ActionRequest(
-            agent="claude",
-            platform="claude_code",
+            actor="claude",
+            session=task_id or "",
+            capability=tool_name,
             action=action,
-            tool=tool_name,
             target=str(target),
             parameters=tool_input,
             workspace=self.workspace_dir,
+            context={"tool_name": tool_name},
+            provenance={"platform": "claude_code", "agent": "claude"},
+            agent="claude",
+            platform="claude_code",
+            tool=tool_name,
             task_id=task_id,
         )
         return authorize(req, mode=self.mode, workspace_dir=self.workspace_dir)

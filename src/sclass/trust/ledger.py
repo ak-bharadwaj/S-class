@@ -60,6 +60,19 @@ class LocalLedger:
         """Returns the hash of the latest entry or genesis zeroes (alias for get_last_hash)."""
         return self.get_last_hash()
 
+    def get_entry_count(self) -> int:
+        """Returns total number of committed entries in the ledger."""
+        target_file = self.ledger_file if os.path.exists(self.ledger_file) else self.legacy_ledger_file
+        if not os.path.exists(target_file):
+            return 0
+        count = 0
+        with open(target_file, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.strip():
+                    count += 1
+        return count
+
+
     def append(self, event: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Appends a new event and anchors its hash in the ledger."""
         with WorkspaceLock(self.paths.root, lock_name="ledger"):

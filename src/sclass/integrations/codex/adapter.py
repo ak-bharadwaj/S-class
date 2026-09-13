@@ -16,6 +16,7 @@ import shutil
 from typing import Dict, Any, Optional, List
 
 from sclass.domain.action import ActionRequest, AuthorizationDecision
+from sclass.domain.capability import CAP_TERMINAL_EXECUTE, CAP_FILESYSTEM_WRITE, CAP_PROCESS_SPAWN
 from sclass.control.authorization import authorize
 from sclass.integrations.base import AdapterCapabilities, AdapterStatus
 from sclass.integrations.acp.adapter import ACPAdapter
@@ -52,13 +53,18 @@ class CodexAdapter:
     def on_command(self, command: str, task_id: Optional[str] = None) -> AuthorizationDecision:
         """Evaluates shell commands executed by Codex."""
         req = ActionRequest(
-            agent="codex",
-            platform="codex",
+            actor="codex",
+            session=task_id or "",
+            capability=CAP_TERMINAL_EXECUTE,
             action="run_command",
-            tool="bash",
             target=command,
             parameters={"command": command},
             workspace=self.workspace_dir,
+            context={"command": command},
+            provenance={"platform": "codex", "agent": "codex"},
+            agent="codex",
+            platform="codex",
+            tool="bash",
             task_id=task_id,
         )
         return authorize(req, mode=self.mode, workspace_dir=self.workspace_dir)
@@ -66,13 +72,18 @@ class CodexAdapter:
     def on_file_change(self, file_path: str, action: str = "write_file", task_id: Optional[str] = None) -> AuthorizationDecision:
         """Evaluates file creations or modifications by Codex."""
         req = ActionRequest(
-            agent="codex",
-            platform="codex",
+            actor="codex",
+            session=task_id or "",
+            capability=CAP_FILESYSTEM_WRITE,
             action=action,
-            tool="file_editor",
             target=file_path,
             parameters={"file_path": file_path},
             workspace=self.workspace_dir,
+            context={"file_path": file_path},
+            provenance={"platform": "codex", "agent": "codex"},
+            agent="codex",
+            platform="codex",
+            tool="file_editor",
             task_id=task_id,
         )
         return authorize(req, mode=self.mode, workspace_dir=self.workspace_dir)
@@ -98,13 +109,18 @@ class CodexAdapter:
     def on_subagent_dispatch(self, subagent_name: str, goal: str, task_id: Optional[str] = None) -> AuthorizationDecision:
         """Evaluates whether Codex is authorized to spawn a subagent."""
         req = ActionRequest(
-            agent="codex",
-            platform="codex",
+            actor="codex",
+            session=task_id or "",
+            capability=CAP_PROCESS_SPAWN,
             action="spawn_subagent",
-            tool="subagent_dispatcher",
             target=subagent_name,
             parameters={"subagent": subagent_name, "goal": goal},
             workspace=self.workspace_dir,
+            context={"goal": goal},
+            provenance={"platform": "codex", "agent": "codex"},
+            agent="codex",
+            platform="codex",
+            tool="subagent_dispatcher",
             task_id=task_id,
         )
         return authorize(req, mode=self.mode, workspace_dir=self.workspace_dir)

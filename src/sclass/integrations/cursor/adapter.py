@@ -15,6 +15,7 @@ import shutil
 from typing import Dict, Any, Optional
 
 from sclass.domain.action import ActionRequest, AuthorizationDecision
+from sclass.domain.capability import CAP_TERMINAL_EXECUTE, CAP_FILESYSTEM_READ, CAP_FILESYSTEM_WRITE
 from sclass.domain.claim import Claim
 from sclass.domain.verification import VerificationResult
 from sclass.control.authorization import authorize
@@ -50,27 +51,38 @@ class CursorAdapter:
     def before_shell_execution(self, command: str, task_id: Optional[str] = None) -> AuthorizationDecision:
         """Pre-execution hook for Cursor terminal / bash commands."""
         req = ActionRequest(
-            agent="cursor",
-            platform="cursor",
+            actor="cursor",
+            session=task_id or "",
+            capability=CAP_TERMINAL_EXECUTE,
             action="run_command",
-            tool="terminal",
             target=command,
             parameters={"command": command},
             workspace=self.workspace_dir,
+            context={"command": command},
+            provenance={"platform": "cursor", "agent": "cursor"},
+            agent="cursor",
+            platform="cursor",
+            tool="terminal",
             task_id=task_id,
         )
         return authorize(req, mode=self.mode, workspace_dir=self.workspace_dir)
 
     def on_file_operation(self, operation: str, file_path: str, contents: str = "", task_id: Optional[str] = None) -> AuthorizationDecision:
         """Evaluates file read, write, edit, or delete actions."""
+        cap = CAP_FILESYSTEM_READ if operation in ("read", "file_read") else CAP_FILESYSTEM_WRITE
         req = ActionRequest(
-            agent="cursor",
-            platform="cursor",
+            actor="cursor",
+            session=task_id or "",
+            capability=cap,
             action=operation,
-            tool="composer",
             target=file_path,
             parameters={"contents": contents, "file_path": file_path},
             workspace=self.workspace_dir,
+            context={"file_path": file_path, "operation": operation},
+            provenance={"platform": "cursor", "agent": "cursor"},
+            agent="cursor",
+            platform="cursor",
+            tool="composer",
             task_id=task_id,
         )
         return authorize(req, mode=self.mode, workspace_dir=self.workspace_dir)

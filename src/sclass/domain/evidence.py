@@ -7,9 +7,11 @@ from __future__ import annotations
 import os
 import json
 import hashlib
+import uuid
+from enum import Enum
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, Type
 
 LIFECYCLE_PROPOSED = "proposed"
 LIFECYCLE_CLAIMED = "claimed"
@@ -327,3 +329,475 @@ class ClaimedEvidence:
             "lifecycle_state": self.lifecycle_state,
             "is_observed": False,
         }
+
+
+# --- Generic Evidence Architecture (Handoff B) ---
+
+
+class EvidenceKind(str, Enum):
+    """Canonical classification for all S-Class evidence variants."""
+    TEST = "test"
+    BUILD = "build"
+    LINT = "lint"
+    SECURITY = "security"
+    SEMANTIC = "semantic"
+    FILESYSTEM = "filesystem"
+    PROCESS = "process"
+    GENERIC = "generic"
+
+
+@dataclass
+class Evidence:
+    """
+    Generic base model for independent evidence produced across the S-Class control plane.
+    Every evidence item has an authoritative provenance, timestamp, and optional link
+    to an observed cryptographic receipt.
+    """
+    evidence_id: str = field(default_factory=lambda: f"ev_{uuid.uuid4().hex[:12]}")
+    evidence_kind: str = EvidenceKind.GENERIC.value
+    source: str = "sclass"
+    collected_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    is_observed: bool = False
+    receipt_id: Optional[str] = None
+    receipt_hash: Optional[str] = None
+    workspace_fingerprint: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def is_valid(self, workspace_dir: Optional[str] = None) -> bool:
+        """Evaluates whether this evidence remains valid against current workspace state."""
+        if not self.workspace_fingerprint or not workspace_dir:
+            return True
+        from sclass.observation.fingerprint import compute_workspace_snapshot, compute_workspace_fingerprint
+        curr_snap = compute_workspace_snapshot(os.path.abspath(workspace_dir))
+        curr_fp = compute_workspace_fingerprint(curr_snap)
+        return curr_fp == self.workspace_fingerprint
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "evidence_id": self.evidence_id,
+            "evidence_kind": self.evidence_kind,
+            "source": self.source,
+            "collected_at": self.collected_at,
+            "is_observed": self.is_observed,
+            "receipt_id": self.receipt_id,
+            "receipt_hash": self.receipt_hash,
+            "workspace_fingerprint": self.workspace_fingerprint,
+            "metadata": dict(self.metadata),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> Evidence:
+        kind = data.get("evidence_kind", EvidenceKind.GENERIC.value)
+        subclasses = {
+            EvidenceKind.TEST.value: TestEvidence,
+            EvidenceKind.BUILD.value: BuildEvidence,
+            EvidenceKind.LINT.value: LintEvidence,
+            EvidenceKind.SECURITY.value: SecurityEvidence,
+            EvidenceKind.SEMANTIC.value: SemanticEvidence,
+            EvidenceKind.FILESYSTEM.value: FilesystemEvidence,
+            EvidenceKind.PROCESS.value: ProcessEvidence,
+        }
+        target_cls = subclasses.get(kind, cls)
+        if target_cls is not cls and hasattr(target_cls, "_from_dict_fields"):
+            return target_cls._from_dict_fields(data)
+
+        return cls(
+            evidence_id=data.get("evidence_id", f"ev_{uuid.uuid4().hex[:12]}"),
+            evidence_kind=kind,
+            source=data.get("source", "sclass"),
+            collected_at=data.get("collected_at", datetime.now(timezone.utc).isoformat()),
+            is_observed=data.get("is_observed", False),
+            receipt_id=data.get("receipt_id"),
+            receipt_hash=data.get("receipt_hash"),
+            workspace_fingerprint=data.get("workspace_fingerprint", ""),
+            metadata=dict(data.get("metadata", {})),
+        )
+
+
+@dataclass
+class TestEvidence(Evidence):
+    """Authoritative structured test results observed by test runner verifier."""
+    __test__ = False
+    evidence_kind: str = EvidenceKind.TEST.value
+    test_framework: str = "pytest"
+    passed_count: int = 0
+    failed_count: int = 0
+    skipped_count: int = 0
+    total_count: int = 0
+    duration_ms: float = 0.0
+    failures: List[Dict[str, Any]] = field(default_factory=list)
+    coverage: Optional[float] = None
+
+    @property
+    def is_passing(self) -> bool:
+        return self.failed_count == 0 and (self.passed_count > 0 or self.total_count == 0)
+
+    def to_dict(self) -> Dict[str, Any]:
+        d = super().to_dict()
+        d.update({
+            "test_framework": self.test_framework,
+            "passed_count": self.passed_count,
+            "failed_count": self.failed_count,
+            "skipped_count": self.skipped_count,
+            "total_count": self.total_count,
+            "duration_ms": round(self.duration_ms, 2),
+            "failures": list(self.failures),
+            "coverage": self.coverage,
+            "is_passing": self.is_passing,
+        })
+        return d
+
+    @classmethod
+    def _from_dict_fields(cls, data: Dict[str, Any]) -> TestEvidence:
+        return cls(
+            evidence_id=data.get("evidence_id", f"ev_{uuid.uuid4().hex[:12]}"),
+            evidence_kind=EvidenceKind.TEST.value,
+            source=data.get("source", "sclass"),
+            collected_at=data.get("collected_at", datetime.now(timezone.utc).isoformat()),
+            is_observed=data.get("is_observed", False),
+            receipt_id=data.get("receipt_id"),
+            receipt_hash=data.get("receipt_hash"),
+            workspace_fingerprint=data.get("workspace_fingerprint", ""),
+            metadata=dict(data.get("metadata", {})),
+            test_framework=data.get("test_framework", "pytest"),
+            passed_count=data.get("passed_count", 0),
+            failed_count=data.get("failed_count", 0),
+            skipped_count=data.get("skipped_count", 0),
+            total_count=data.get("total_count", 0),
+            duration_ms=data.get("duration_ms", 0.0),
+            failures=list(data.get("failures", [])),
+            coverage=data.get("coverage"),
+        )
+
+
+@dataclass
+class BuildEvidence(Evidence):
+    """Authoritative build results observed by build tool verifier."""
+    evidence_kind: str = EvidenceKind.BUILD.value
+    build_tool: str = ""
+    exit_code: int = 0
+    target: str = ""
+    artifacts: List[str] = field(default_factory=list)
+    warnings_count: int = 0
+    errors_count: int = 0
+
+    @property
+    def is_success(self) -> bool:
+        return self.exit_code == 0 and self.errors_count == 0
+
+    def to_dict(self) -> Dict[str, Any]:
+        d = super().to_dict()
+        d.update({
+            "build_tool": self.build_tool,
+            "exit_code": self.exit_code,
+            "target": self.target,
+            "artifacts": list(self.artifacts),
+            "warnings_count": self.warnings_count,
+            "errors_count": self.errors_count,
+            "is_success": self.is_success,
+        })
+        return d
+
+    @classmethod
+    def _from_dict_fields(cls, data: Dict[str, Any]) -> BuildEvidence:
+        return cls(
+            evidence_id=data.get("evidence_id", f"ev_{uuid.uuid4().hex[:12]}"),
+            evidence_kind=EvidenceKind.BUILD.value,
+            source=data.get("source", "sclass"),
+            collected_at=data.get("collected_at", datetime.now(timezone.utc).isoformat()),
+            is_observed=data.get("is_observed", False),
+            receipt_id=data.get("receipt_id"),
+            receipt_hash=data.get("receipt_hash"),
+            workspace_fingerprint=data.get("workspace_fingerprint", ""),
+            metadata=dict(data.get("metadata", {})),
+            build_tool=data.get("build_tool", ""),
+            exit_code=data.get("exit_code", 0),
+            target=data.get("target", ""),
+            artifacts=list(data.get("artifacts", [])),
+            warnings_count=data.get("warnings_count", 0),
+            errors_count=data.get("errors_count", 0),
+        )
+
+
+@dataclass
+class LintEvidence(Evidence):
+    """Authoritative static linting results observed by linter verifier."""
+    evidence_kind: str = EvidenceKind.LINT.value
+    linter: str = ""
+    violation_count: int = 0
+    violations: List[Dict[str, Any]] = field(default_factory=list)
+    files_checked: int = 0
+
+    @property
+    def is_clean(self) -> bool:
+        return self.violation_count == 0
+
+    def to_dict(self) -> Dict[str, Any]:
+        d = super().to_dict()
+        d.update({
+            "linter": self.linter,
+            "violation_count": self.violation_count,
+            "violations": list(self.violations),
+            "files_checked": self.files_checked,
+            "is_clean": self.is_clean,
+        })
+        return d
+
+    @classmethod
+    def _from_dict_fields(cls, data: Dict[str, Any]) -> LintEvidence:
+        return cls(
+            evidence_id=data.get("evidence_id", f"ev_{uuid.uuid4().hex[:12]}"),
+            evidence_kind=EvidenceKind.LINT.value,
+            source=data.get("source", "sclass"),
+            collected_at=data.get("collected_at", datetime.now(timezone.utc).isoformat()),
+            is_observed=data.get("is_observed", False),
+            receipt_id=data.get("receipt_id"),
+            receipt_hash=data.get("receipt_hash"),
+            workspace_fingerprint=data.get("workspace_fingerprint", ""),
+            metadata=dict(data.get("metadata", {})),
+            linter=data.get("linter", ""),
+            violation_count=data.get("violation_count", 0),
+            violations=list(data.get("violations", [])),
+            files_checked=data.get("files_checked", 0),
+        )
+
+
+@dataclass
+class SecurityEvidence(Evidence):
+    """Authoritative security scan results observed by security scanner verifier."""
+    evidence_kind: str = EvidenceKind.SECURITY.value
+    scanner: str = ""
+    findings_count: int = 0
+    findings: List[Dict[str, Any]] = field(default_factory=list)
+    risk_level: str = "low"
+    passed: bool = True
+
+    def to_dict(self) -> Dict[str, Any]:
+        d = super().to_dict()
+        d.update({
+            "scanner": self.scanner,
+            "findings_count": self.findings_count,
+            "findings": list(self.findings),
+            "risk_level": self.risk_level,
+            "passed": self.passed,
+        })
+        return d
+
+    @classmethod
+    def _from_dict_fields(cls, data: Dict[str, Any]) -> SecurityEvidence:
+        return cls(
+            evidence_id=data.get("evidence_id", f"ev_{uuid.uuid4().hex[:12]}"),
+            evidence_kind=EvidenceKind.SECURITY.value,
+            source=data.get("source", "sclass"),
+            collected_at=data.get("collected_at", datetime.now(timezone.utc).isoformat()),
+            is_observed=data.get("is_observed", False),
+            receipt_id=data.get("receipt_id"),
+            receipt_hash=data.get("receipt_hash"),
+            workspace_fingerprint=data.get("workspace_fingerprint", ""),
+            metadata=dict(data.get("metadata", {})),
+            scanner=data.get("scanner", ""),
+            findings_count=data.get("findings_count", 0),
+            findings=list(data.get("findings", [])),
+            risk_level=data.get("risk_level", "low"),
+            passed=data.get("passed", True),
+        )
+
+
+@dataclass
+class SemanticEvidence(Evidence):
+    """Semantic syntax/reference analysis evidence."""
+    evidence_kind: str = EvidenceKind.SEMANTIC.value
+    symbol: str = ""
+    file_path: str = ""
+    references_count: int = 0
+    impacted_symbols: List[str] = field(default_factory=list)
+    scip_document: Optional[str] = None
+    ast_node_type: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        d = super().to_dict()
+        d.update({
+            "symbol": self.symbol,
+            "file_path": self.file_path,
+            "references_count": self.references_count,
+            "impacted_symbols": list(self.impacted_symbols),
+            "scip_document": self.scip_document,
+            "ast_node_type": self.ast_node_type,
+        })
+        return d
+
+    @classmethod
+    def _from_dict_fields(cls, data: Dict[str, Any]) -> SemanticEvidence:
+        return cls(
+            evidence_id=data.get("evidence_id", f"ev_{uuid.uuid4().hex[:12]}"),
+            evidence_kind=EvidenceKind.SEMANTIC.value,
+            source=data.get("source", "sclass"),
+            collected_at=data.get("collected_at", datetime.now(timezone.utc).isoformat()),
+            is_observed=data.get("is_observed", False),
+            receipt_id=data.get("receipt_id"),
+            receipt_hash=data.get("receipt_hash"),
+            workspace_fingerprint=data.get("workspace_fingerprint", ""),
+            metadata=dict(data.get("metadata", {})),
+            symbol=data.get("symbol", ""),
+            file_path=data.get("file_path", ""),
+            references_count=data.get("references_count", 0),
+            impacted_symbols=list(data.get("impacted_symbols", [])),
+            scip_document=data.get("scip_document"),
+            ast_node_type=data.get("ast_node_type"),
+        )
+
+
+@dataclass
+class FilesystemEvidence(Evidence):
+    """Authoritative filesystem mutation evidence observed during execution."""
+    evidence_kind: str = EvidenceKind.FILESYSTEM.value
+    path: str = ""
+    operation: str = "read"  # read, write, create, delete
+    file_hash_before: Optional[str] = None
+    file_hash_after: Optional[str] = None
+    bytes_changed: int = 0
+    exists: bool = True
+
+    def to_dict(self) -> Dict[str, Any]:
+        d = super().to_dict()
+        d.update({
+            "path": self.path,
+            "operation": self.operation,
+            "file_hash_before": self.file_hash_before,
+            "file_hash_after": self.file_hash_after,
+            "bytes_changed": self.bytes_changed,
+            "exists": self.exists,
+        })
+        return d
+
+    @classmethod
+    def _from_dict_fields(cls, data: Dict[str, Any]) -> FilesystemEvidence:
+        return cls(
+            evidence_id=data.get("evidence_id", f"ev_{uuid.uuid4().hex[:12]}"),
+            evidence_kind=EvidenceKind.FILESYSTEM.value,
+            source=data.get("source", "sclass"),
+            collected_at=data.get("collected_at", datetime.now(timezone.utc).isoformat()),
+            is_observed=data.get("is_observed", False),
+            receipt_id=data.get("receipt_id"),
+            receipt_hash=data.get("receipt_hash"),
+            workspace_fingerprint=data.get("workspace_fingerprint", ""),
+            metadata=dict(data.get("metadata", {})),
+            path=data.get("path", ""),
+            operation=data.get("operation", "read"),
+            file_hash_before=data.get("file_hash_before"),
+            file_hash_after=data.get("file_hash_after"),
+            bytes_changed=data.get("bytes_changed", 0),
+            exists=data.get("exists", True),
+        )
+
+
+@dataclass
+class ProcessEvidence(Evidence):
+    """Authoritative subprocess execution evidence observed via OS primitives."""
+    evidence_kind: str = EvidenceKind.PROCESS.value
+    pid: int = 0
+    argv: List[str] = field(default_factory=list)
+    executable_path: str = ""
+    executable_hash: str = ""
+    exit_code: int = 0
+    stdout_hash: str = ""
+    stderr_hash: str = ""
+    duration_ms: float = 0.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        d = super().to_dict()
+        d.update({
+            "pid": self.pid,
+            "argv": list(self.argv),
+            "executable_path": self.executable_path,
+            "executable_hash": self.executable_hash,
+            "exit_code": self.exit_code,
+            "stdout_hash": self.stdout_hash,
+            "stderr_hash": self.stderr_hash,
+            "duration_ms": round(self.duration_ms, 2),
+        })
+        return d
+
+    @classmethod
+    def _from_dict_fields(cls, data: Dict[str, Any]) -> ProcessEvidence:
+        return cls(
+            evidence_id=data.get("evidence_id", f"ev_{uuid.uuid4().hex[:12]}"),
+            evidence_kind=EvidenceKind.PROCESS.value,
+            source=data.get("source", "sclass"),
+            collected_at=data.get("collected_at", datetime.now(timezone.utc).isoformat()),
+            is_observed=data.get("is_observed", False),
+            receipt_id=data.get("receipt_id"),
+            receipt_hash=data.get("receipt_hash"),
+            workspace_fingerprint=data.get("workspace_fingerprint", ""),
+            metadata=dict(data.get("metadata", {})),
+            pid=data.get("pid", 0),
+            argv=list(data.get("argv", [])),
+            executable_path=data.get("executable_path", ""),
+            executable_hash=data.get("executable_hash", ""),
+            exit_code=data.get("exit_code", 0),
+            stdout_hash=data.get("stdout_hash", ""),
+            stderr_hash=data.get("stderr_hash", ""),
+            duration_ms=data.get("duration_ms", 0.0),
+        )
+
+
+def build_evidence_from_receipt(receipt: EvidenceReceipt) -> List[Evidence]:
+    """Extracts typed Evidence items from an authentic EvidenceReceipt."""
+    results: List[Evidence] = []
+    meta = receipt.metadata if isinstance(receipt.metadata, dict) else {}
+    exec_id = meta.get("execution_identity", {})
+
+    # Process evidence
+    p_ev = ProcessEvidence(
+        source="receipt",
+        is_observed=receipt.is_observed,
+        receipt_id=receipt.receipt_id,
+        receipt_hash=receipt.receipt_hash,
+        workspace_fingerprint=receipt.workspace_fingerprint,
+        metadata={"receipt_id": receipt.receipt_id},
+        pid=exec_id.get("pid", 0) if isinstance(exec_id, dict) else 0,
+        argv=list(exec_id.get("actual_argv", receipt.command.split())) if isinstance(exec_id, dict) else receipt.command.split(),
+        executable_path=exec_id.get("executable_path", "") if isinstance(exec_id, dict) else "",
+        executable_hash=exec_id.get("executable_hash", "") if isinstance(exec_id, dict) else "",
+        exit_code=receipt.exit_code,
+        stdout_hash=receipt.stdout_hash,
+        stderr_hash=receipt.stderr_hash,
+        duration_ms=meta.get("duration_ms", 0.0),
+    )
+    results.append(p_ev)
+
+    # Filesystem evidence
+    for fpath in receipt.files_changed:
+        f_ev = FilesystemEvidence(
+            source="receipt",
+            is_observed=receipt.is_observed,
+            receipt_id=receipt.receipt_id,
+            receipt_hash=receipt.receipt_hash,
+            workspace_fingerprint=receipt.workspace_fingerprint,
+            path=fpath,
+            operation="write",
+            file_hash_after=receipt.file_hashes.get(fpath),
+        )
+        results.append(f_ev)
+
+    # Test evidence (if structured results are present)
+    struct_res = meta.get("structured_result")
+    if struct_res and isinstance(struct_res, dict):
+        t_ev = TestEvidence(
+            source="receipt",
+            is_observed=receipt.is_observed,
+            receipt_id=receipt.receipt_id,
+            receipt_hash=receipt.receipt_hash,
+            workspace_fingerprint=receipt.workspace_fingerprint,
+            test_framework=receipt.verifier or "test_runner",
+            passed_count=struct_res.get("passed", 0),
+            failed_count=struct_res.get("failed", 0),
+            skipped_count=struct_res.get("skipped", 0),
+            total_count=struct_res.get("total", 0),
+            duration_ms=meta.get("duration_ms", 0.0),
+            failures=list(struct_res.get("failures", [])),
+        )
+        results.append(t_ev)
+
+    return results
+
