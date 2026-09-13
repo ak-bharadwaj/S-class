@@ -17,13 +17,41 @@ from codebase_graph_db import CodebaseGraphDB
 
 logger = logging.getLogger("sclass_ast_graph_extractor")
 
+# Tree-sitter parser infrastructure for JavaScript & TypeScript
+HAS_TREESITTER = False
+_TS_JS_PARSERS: Dict[str, Any] = {}
+
+try:
+    from tree_sitter import Language, Parser
+    try:
+        import tree_sitter_javascript as tsjs
+        _TS_JS_PARSERS["javascript"] = Parser(Language(tsjs.language()))
+    except Exception:
+        pass
+    try:
+        import tree_sitter_typescript as tsts
+        _TS_JS_PARSERS["typescript"] = Parser(Language(tsts.language_typescript()))
+        _TS_JS_PARSERS["tsx"] = Parser(Language(tsts.language_tsx()))
+    except Exception:
+        pass
+    if _TS_JS_PARSERS:
+        HAS_TREESITTER = True
+except Exception:
+    try:
+        from tree_sitter_languages import get_parser
+        _TS_JS_PARSERS["javascript"] = get_parser("javascript")
+        _TS_JS_PARSERS["typescript"] = get_parser("typescript")
+        HAS_TREESITTER = True
+    except Exception:
+        pass
+
 
 class ASTGraphExtractor:
     """
     Polyglot Codebase AST Extractor.
     Operates zero-infrastructure: parses Python via stdlib `ast`,
-    TypeScript/JavaScript via structured lexical extraction,
-    and SQL/Prisma via schema parsers, with fallback to Tree-sitter when installed.
+    TypeScript/JavaScript via Tree-sitter AST parsing (with structured lexical fallback),
+    and SQL/Prisma via schema parsers.
     """
 
     SUPPORTED_EXTENSIONS = {
@@ -257,6 +285,125 @@ class ASTGraphExtractor:
             return self._ast_expr_to_name(expr.func)
         return ""
 
+    def _extract_js_ts_treesitter(
+        self,
+        content: str,
+        rel_path: str,
+        file_node_id: str,
+        nodes: List[Dict[str, Any]],
+        edges: List[Dict[str, Any]],
+        unresolved: Dict[str, Any],
+        lang_key: str = "typescript",
+    ) -> bool:
+        """High-fidelity AST extraction using Tree-sitter grammars."""
+        parser = _TS_JS_PARSERS.get(lang_key) or _TS_JS_PARSERS.get("typescript") or _TS_JS_PARSERS.get("javascript")
+        if not parser:
+            return False
+        try:
+            content_bytes = content.encode("utf-8", errors="ignore")
+            tree = parser.parse(content_bytes)
+            lines = content.splitlines()
+            root = tree.root_node
+
+            def _get_text(node) -> str:
+                if not node:
+                    return ""
+                return content_bytes[node.start_byte:node.end_byte].decode("utf-8", errors="ignore")
+
+            def walk_node(node):
+                if node.type in ("import_statement", "import_declaration"):
+                    src_node = node.child_by_field_name("source")
+                    mod_path = _get_text(src_node).strip("'\"`") if src_node else ""
+                    for child in node.children:
+                        if child.type in ("import_clause", "import_specifier", "named_imports"):
+                            for sc in child.children:
+                                if sc.type == "import_specifier":
+                                    n_node = sc.child_by_field_name("name")
+                                    alias_node = sc.child_by_field_name("alias")
+                                    name_val = _get_text(alias_node or n_node)
+                                    if name_val:
+                                        unresolved["imports"].append({"module": mod_path, "name": name_val})
+                                elif sc.type == "identifier":
+                                    unresolved["imports"].append({"module": mod_path, "name": _get_text(sc)})
+                        elif child.type == "identifier":
+                            unresolved["imports"].append({"module": mod_path, "name": _get_text(child)})
+
+                elif node.type in ("class_declaration", "class"):
+                    name_node = node.child_by_field_name("name")
+                    c_name = _get_text(name_node) if name_node else ""
+                    if c_name:
+                        class_id = f"class::{rel_path}:{c_name}"
+                        base_name = ""
+                        heritage = node.child_by_field_name("heritage")
+                        if not heritage:
+                            for ch in node.children:
+                                if ch.type in ("class_heritage", "extends_clause"):
+                                    heritage = ch
+                                    break
+                        if heritage:
+                            for ch in heritage.children:
+                                if ch.type == "identifier":
+                                    base_name = _get_text(ch)
+                                    break
+
+                        start_line = node.start_point[0] + 1
+                        end_line = node.end_point[0] + 1
+                        snippet = "\n".join(lines[start_line - 1 : end_line]) if lines else ""
+                        sig = f"class {c_name}" + (f" extends {base_name}" if base_name else "")
+
+                        nodes.append({
+                            "id": class_id,
+                            "name": c_name,
+                            "type": "CLASS",
+                            "file_path": rel_path,
+                            "start_line": start_line,
+                            "end_line": end_line,
+                            "docstring": "",
+                            "signature": sig,
+                            "content_hash": self.compute_sha256(snippet),
+                            "metadata": {"base": base_name, "parser": "tree-sitter"},
+                        })
+                        edges.append({"source_id": file_node_id, "target_id": class_id, "relation": "DEFINES", "metadata": {}})
+                        if base_name:
+                            unresolved["inherits"].append((class_id, base_name))
+
+                elif node.type in ("function_declaration", "method_definition"):
+                    name_node = node.child_by_field_name("name")
+                    f_name = _get_text(name_node) if name_node else ""
+                    if f_name:
+                        func_id = f"func::{rel_path}:{f_name}"
+                        start_line = node.start_point[0] + 1
+                        end_line = node.end_point[0] + 1
+                        sig_line = lines[start_line - 1].strip() if lines and start_line - 1 < len(lines) else f_name
+                        nodes.append({
+                            "id": func_id,
+                            "name": f_name,
+                            "type": "FUNCTION",
+                            "file_path": rel_path,
+                            "start_line": start_line,
+                            "end_line": end_line,
+                            "docstring": "",
+                            "signature": sig_line,
+                            "content_hash": self.compute_sha256("\n".join(lines[start_line - 1 : end_line])),
+                            "metadata": {"parser": "tree-sitter"},
+                        })
+                        edges.append({"source_id": file_node_id, "target_id": func_id, "relation": "DEFINES", "metadata": {}})
+
+                elif node.type == "call_expression":
+                    fn_node = node.child_by_field_name("function")
+                    callee = _get_text(fn_node)
+                    if callee:
+                        unresolved["calls"].append((file_node_id, callee))
+
+                for child in node.children:
+                    walk_node(child)
+
+            walk_node(root)
+            return True
+        except Exception as e:
+            logger.debug(f"[ASTGraphExtractor] Tree-sitter extraction fallback: {e}")
+            return False
+
     def _extract_js_ts(
         self,
         content: str,
@@ -266,6 +413,15 @@ class ASTGraphExtractor:
         edges: List[Dict[str, Any]],
         unresolved: Dict[str, Any],
     ) -> None:
+        # 1. Attempt Tree-sitter AST extraction
+        if HAS_TREESITTER:
+            ext = os.path.splitext(rel_path)[1].lower()
+            lang_key = "typescript" if ext in (".ts", ".tsx") else "javascript"
+            success = self._extract_js_ts_treesitter(content, rel_path, file_node_id, nodes, edges, unresolved, lang_key=lang_key)
+            if success and len(nodes) > 1:
+                return
+
+        # 2. Fallback: Structured lexical extraction
         lines = content.splitlines()
 
         # Extract Imports

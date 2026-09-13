@@ -59,3 +59,12 @@ async def test_official_mcp_sdk_server(tmp_path):
     assert res is not None
     assert res.is_error is False
     assert "initialized" in res.content[0].text
+
+    # Verify MCP Resources and Prompts registered
+    assert len(server._resource_manager._resources) >= 2
+    assert "sclass://orchestration/state" in server._resource_manager._resources
+    assert "sclass://orchestration/history" in server._resource_manager._resources
+
+    assert len(server._prompt_manager._prompts) >= 2
+    assert "sclass_goal_workflow" in server._prompt_manager._prompts
+    assert "sclass_audit_investigation" in server._prompt_manager._prompts

@@ -120,3 +120,13 @@ async def test_official_codebase_kg_mcp_sdk_server(seeded_mcp_server):
     assert res is not None
     assert res.is_error is False
     assert "GET /users" in res.content[0].text
+
+    # Verify Knowledge Graph MCP Resources and Prompts
+    assert len(server._resource_manager._resources) >= 3
+    assert "sclass://graph/stats" in server._resource_manager._resources
+    assert "sclass://graph/nodes" in server._resource_manager._resources
+    assert "sclass://graph/adrs" in server._resource_manager._resources
+
+    assert len(server._prompt_manager._prompts) >= 2
+    assert "sclass_architecture_review" in server._prompt_manager._prompts
+    assert "sclass_blast_radius_investigation" in server._prompt_manager._prompts

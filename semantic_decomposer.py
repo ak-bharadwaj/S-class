@@ -6,6 +6,7 @@ Semantic Primitives (Entities, Actors, Resources, Measurements, Policies, Events
 """
 
 import re
+import logging
 from typing import Dict, List, Set, Any, Optional, Tuple
 from domain_primitives import (
     DomainPrimitiveType,
@@ -16,12 +17,64 @@ from domain_primitives import (
     SemanticDomainGraph
 )
 
+logger = logging.getLogger("sclass_semantic_decomposer")
+
+# Optional local ONNX embedding upgrade path (exact graph_rag.py pattern)
+HAS_FASTEMBED = False
+try:
+    from fastembed import TextEmbedding
+    HAS_FASTEMBED = True
+except ImportError:
+    TextEmbedding = None
+
 
 class SemanticDecomposer:
     """
     Deconstructs natural language requirements and workspace evidence into
     universal semantic domain primitives without static keyword dictionaries.
+    Integrates local ONNX fastembed vector embeddings when installed with Jaccard fallback.
     """
+
+    _embedding_model = None
+
+    @classmethod
+    def get_embedding_model(cls):
+        if cls._embedding_model is None and HAS_FASTEMBED and TextEmbedding is not None:
+            try:
+                cls._embedding_model = TextEmbedding()
+            except Exception:
+                cls._embedding_model = None
+        return cls._embedding_model
+
+    @classmethod
+    def compute_dense_embedding(cls, text: str) -> Optional[List[float]]:
+        """Computes dense vector embedding using fastembed when present."""
+        model = cls.get_embedding_model()
+        if model is not None:
+            try:
+                vectors = list(model.embed([text]))
+                if vectors:
+                    return [float(x) for x in vectors[0]]
+            except Exception as e:
+                logger.debug(f"[SemanticDecomposer] fastembed computation error: {e}")
+        return None
+
+    @classmethod
+    def semantic_similarity(cls, text1: str, text2: str) -> float:
+        """Computes semantic cosine similarity using fastembed embeddings when available."""
+        vec1 = cls.compute_dense_embedding(text1)
+        vec2 = cls.compute_dense_embedding(text2)
+        if vec1 and vec2 and len(vec1) == len(vec2):
+            dot = sum(a * b for a, b in zip(vec1, vec2))
+            norm1 = sum(a * a for a in vec1) ** 0.5
+            norm2 = sum(b * b for b in vec2) ** 0.5
+            if norm1 > 0 and norm2 > 0:
+                return float(dot / (norm1 * norm2))
+        words1 = set(text1.lower().split())
+        words2 = set(text2.lower().split())
+        if not words1 or not words2:
+            return 0.0
+        return float(len(words1 & words2) / len(words1 | words2))
 
     # Functional Linguistic Markers
     MEASUREMENT_MARKERS = [

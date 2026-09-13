@@ -187,3 +187,37 @@ def test_graph_rag_semantic_search_and_subgraph(temp_graph_db):
     subgraph_node_names = {n["name"] for n in subgraph["subgraph_nodes"]}
     assert "charge_card" in subgraph_node_names
     assert "Invoice" in subgraph_node_names
+
+
+def test_ast_graph_extractor_typescript_treesitter():
+    sample_ts = """
+import { AuthService } from './services/auth';
+import axios from 'axios';
+
+class UserController extends BaseController {
+    async getUser(userId: string) {
+        return AuthService.find(userId);
+    }
+}
+
+export function formatUser(user: any): string {
+    return user.name;
+}
+"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db = CodebaseGraphDB(db_path=os.path.join(tmpdir, "test.db"))
+        extractor = ASTGraphExtractor(graph_db=db, workspace_dir=tmpdir)
+        nodes, edges, unresolved = extractor.extract_file("user_controller.ts", sample_ts)
+
+        node_types = {n["type"] for n in nodes}
+        assert "FILE" in node_types
+        assert "CLASS" in node_types
+        assert "FUNCTION" in node_types
+
+        class_names = {n["name"] for n in nodes if n["type"] == "CLASS"}
+        assert "UserController" in class_names
+
+        func_names = {n["name"] for n in nodes if n["type"] == "FUNCTION"}
+        assert "formatUser" in func_names or "getUser" in func_names
+        assert len(unresolved["imports"]) >= 1
+
