@@ -96,10 +96,21 @@ class HandoffContext:
 class HandoffAssembler:
     """Assembles authoritative HandoffContext and HandoffPackage from state and local ledger."""
 
-    def __init__(self, workspace_dir: str):
+    def __init__(
+        self,
+        workspace_dir: str,
+        repo: Optional[StateRepository] = None,
+        ledger: Optional[LocalLedger] = None,
+    ):
         self.workspace_dir = os.path.abspath(workspace_dir)
-        self.repo = StateRepository(workspace_dir)
-        self.ledger = LocalLedger(workspace_dir)
+        try:
+            self.repo = repo or StateRepository(workspace_dir)
+        except Exception as e:
+            raise HandoffIntegrityError(f"Failed to initialize state repository for handoff: {e}") from e
+        try:
+            self.ledger = ledger or LocalLedger(workspace_dir)
+        except Exception as e:
+            raise HandoffIntegrityError(f"Failed to initialize ledger for handoff: {e}") from e
 
     def assemble(self, project_id: str, next_action: Optional[str] = None) -> HandoffContext:
         """
@@ -240,9 +251,9 @@ class HandoffAssembler:
         )
 
         v_refs = tuple(
-            t.get("verified_receipt_id", t.get("task_id", ""))
+            str(t.get("verified_receipt_id") or t.get("task_id") or "")
             for t in ctx.verified_tasks
-            if t.get("verified_receipt_id") or t.get("task_id")
+            if (t.get("verified_receipt_id") or t.get("task_id"))
         )
         rej_claims = tuple(ctx.failed_attempts)
         files = tuple(ctx.relevant_files)

@@ -1,22 +1,22 @@
 """
-S-Class Integration: Official MCP Protocol Transport Layer.
+S-Class Integration: Official MCP Protocol Transport Layer (MCP 2026-07-28).
 Implements the clean architectural boundary:
-    MCPProtocolTransport
+    MCPProtocolTransport (Headers, Stateless Routing, Framing)
             ↓
-    MCPNormalizer
+    MCPNormalizer (Tool Identity, Provenance)
             ↓
-    S-Class Authorization
+    S-Class Authorization (Policy Enforcement)
             ↓
-    MCP Execution / Result
+    MCP Execution / Result / Evidence
 
 Leverages official mcp.types (where available) while providing robust
-fallback schemas for JSON-RPC 2.0 protocol envelopes, July 2026 stateless
-routing, and explicit tool execution results.
+schemas for JSON-RPC 2.0 protocol envelopes, July 2026 stateless self-describing
+routing, header-based policy validation, and explicit tool execution results.
 """
 
 from __future__ import annotations
 import uuid
-from typing import Dict, Any, Optional, List, Union
+from typing import Dict, Any, Optional, List, Union, Tuple
 from pydantic import BaseModel, Field, ConfigDict
 
 try:
@@ -29,6 +29,64 @@ except ImportError:
 from sclass.domain.action import AuthorizationDecision
 
 
+SUPPORTED_MCP_VERSIONS = ("2024-11-05", "2025-01-01", "2026-07-28", "v1")
+DEFAULT_MCP_VERSION = "2026-07-28"
+
+
+class MCPHeaderPolicy:
+    """
+    Validates and enforces header-based routing and policy checks under MCP 2026-07-28:
+    - MCP-Protocol-Version (must match supported protocol versions)
+    - Mcp-Method / MCP-Method (must match requested JSON-RPC method)
+    - Mcp-Name / MCP-Name (must match tool or resource name)
+    """
+
+    @classmethod
+    def get_header(cls, headers: Dict[str, str], header_name: str) -> Optional[str]:
+        """Case-insensitive header lookup."""
+        if not headers:
+            return None
+        target = header_name.lower()
+        for k, v in headers.items():
+            if k.lower() == target:
+                return str(v)
+        return None
+
+    @classmethod
+    def validate_headers(
+        cls,
+        headers: Dict[str, str],
+        expected_method: Optional[str] = None,
+        expected_name: Optional[str] = None,
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Validates MCP headers against expected method and supported protocol version.
+        Returns (is_valid, error_reason).
+        """
+        if not headers:
+            return True, None
+
+        # 1. Validate MCP-Protocol-Version if present
+        proto_ver = cls.get_header(headers, "MCP-Protocol-Version") or cls.get_header(headers, "Mcp-Protocol-Version")
+        if proto_ver:
+            if proto_ver not in SUPPORTED_MCP_VERSIONS:
+                return False, f"Unsupported MCP-Protocol-Version '{proto_ver}'. Supported: {list(SUPPORTED_MCP_VERSIONS)}"
+
+        # 2. Validate Mcp-Method if present
+        mcp_method = cls.get_header(headers, "Mcp-Method") or cls.get_header(headers, "MCP-Method")
+        if mcp_method and expected_method:
+            if mcp_method.lower() != expected_method.lower():
+                return False, f"Header Mcp-Method '{mcp_method}' does not match request method '{expected_method}'"
+
+        # 3. Validate Mcp-Name if present
+        mcp_name = cls.get_header(headers, "Mcp-Name") or cls.get_header(headers, "MCP-Name")
+        if mcp_name and expected_name:
+            if mcp_name != expected_name:
+                return False, f"Header Mcp-Name '{mcp_name}' does not match target name '{expected_name}'"
+
+        return True, None
+
+
 class MCPProtocolRequest(BaseModel):
     """Normalized inbound MCP JSON-RPC 2.0 request envelope."""
     model_config = ConfigDict(extra="allow")
@@ -36,6 +94,15 @@ class MCPProtocolRequest(BaseModel):
     id: Union[str, int]
     method: str
     params: Dict[str, Any] = Field(default_factory=dict)
+
+
+class StatelessSelfDescribingRequest(BaseModel):
+    """Stateless self-describing request under MCP 2026-07-28."""
+    model_config = ConfigDict(extra="allow")
+    rpc_request: MCPProtocolRequest
+    headers: Dict[str, str] = Field(default_factory=dict)
+    protocol_version: str = Field(default=DEFAULT_MCP_VERSION)
+    routing_key: Optional[str] = None
 
 
 class MCPProtocolTransport:
@@ -59,6 +126,36 @@ class MCPProtocolTransport:
         return MCPProtocolRequest.model_validate(raw_rpc)
 
     @classmethod
+    def parse_stateless_request(
+        cls,
+        raw_rpc: Dict[str, Any],
+        headers: Optional[Dict[str, str]] = None,
+    ) -> StatelessSelfDescribingRequest:
+        """Parses a self-describing stateless MCP request with protocol headers."""
+        req = cls.parse_request(raw_rpc)
+        hdrs = dict(headers or {})
+        # If headers were embedded in params (e.g. meta or headers key)
+        if "headers" in raw_rpc and isinstance(raw_rpc["headers"], dict):
+            hdrs.update(raw_rpc["headers"])
+        if "_meta" in req.params and isinstance(req.params["_meta"], dict):
+            meta_headers = req.params["_meta"].get("headers")
+            if isinstance(meta_headers, dict):
+                hdrs.update(meta_headers)
+
+        proto_ver = (
+            MCPHeaderPolicy.get_header(hdrs, "MCP-Protocol-Version")
+            or raw_rpc.get("protocol_version")
+            or DEFAULT_MCP_VERSION
+        )
+
+        return StatelessSelfDescribingRequest(
+            rpc_request=req,
+            headers=hdrs,
+            protocol_version=proto_ver,
+            routing_key=MCPHeaderPolicy.get_header(hdrs, "Mcp-Routing-Key"),
+        )
+
+    @classmethod
     def build_tool_result(
         cls,
         call_id: Union[str, int],
@@ -67,7 +164,6 @@ class MCPProtocolTransport:
         mcp_identity: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Constructs an official MCP CallToolResult response."""
-        # Convert content to standard MCP content items
         if isinstance(content, list):
             formatted_content = content
         elif isinstance(content, dict):
