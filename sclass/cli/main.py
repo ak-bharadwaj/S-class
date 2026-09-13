@@ -154,6 +154,31 @@ def cmd_handoff(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_map(args: argparse.Namespace) -> int:
+    """Builds and prints concise repository symbol map."""
+    ws = os.path.abspath(args.workspace)
+    from sclass.intelligence.repository import RepositoryMapBuilder
+    builder = RepositoryMapBuilder(ws)
+    print(builder.build_map(max_files=args.max_files, max_chars=args.max_chars))
+    return 0
+
+
+def cmd_impact(args: argparse.Namespace) -> int:
+    """Estimates downstream impact of modifying a symbol or file."""
+    ws = os.path.abspath(args.workspace)
+    from sclass.intelligence.impact import SymbolImpactEstimator
+    estimator = SymbolImpactEstimator(ws)
+    impact = estimator.estimate_impact(args.target)
+    if args.json:
+        print(json.dumps(impact.to_dict(), indent=2))
+    else:
+        print(f"[S-Class Impact] Target: {impact.target}")
+        print(f"Impacted files count: {impact.impact_count}")
+        for f in impact.impacted_files:
+            print(f"  - {f}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="sclass", description="S-Class: The Open-Source Trust & Control Plane")
     parser.add_argument("--version", action="version", version=f"sclass {__version__}")
@@ -192,6 +217,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_hand.add_argument("--json", action="store_true", help="Output JSON instead of Markdown")
     p_hand.add_argument("-w", "--workspace", default=".", help="Target workspace path")
 
+    # map
+    p_map = subparsers.add_parser("map", help="Build repository symbol map")
+    p_map.add_argument("-w", "--workspace", default=".", help="Target workspace path")
+    p_map.add_argument("--max-files", type=int, default=50, help="Max files to scan")
+    p_map.add_argument("--max-chars", type=int, default=8000, help="Max characters in output")
+
+    # impact
+    p_imp = subparsers.add_parser("impact", help="Estimate symbol dependency impact")
+    p_imp.add_argument("target", help="Target symbol or file to analyze")
+    p_imp.add_argument("-w", "--workspace", default=".", help="Target workspace path")
+    p_imp.add_argument("--json", action="store_true", help="Output JSON")
+
     return parser
 
 
@@ -209,6 +246,8 @@ def main() -> None:
         "doctor": cmd_doctor,
         "verify": cmd_verify,
         "handoff": cmd_handoff,
+        "map": cmd_map,
+        "impact": cmd_impact,
     }
 
     if args.command == "task":
