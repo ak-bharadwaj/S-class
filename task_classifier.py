@@ -44,6 +44,34 @@ class ScopeTier:
     MAJOR = "MAJOR"
 
 
+class ComplexityTier(str, Enum):
+    TRIVIAL = "trivial"        # single small change, no new architecture, no security surface
+    SMALL = "small"            # a few files, no new dependencies, low risk
+    FEATURE = "feature"        # new capability, moderate blast radius
+    LARGE = "large"            # multi-component, cross-cutting change
+    HIGH_RISK = "high_risk"    # security/auth/payment/data-integrity surface
+
+
+# Easily tunable complexity keywords
+HIGH_RISK_COMPLEXITY_KEYWORDS: Set[str] = {
+    "auth", "oauth", "sso", "saml", "payment", "password", "token", "encrypt",
+    "encryption", "pii", "security", "permission", "permissions", "role", "roles"
+}
+
+TRIVIAL_COMPLEXITY_KEYWORDS: Set[str] = {
+    "toggle", "color", "rename", "typo", "copy text", "copy", "label",
+    "spacing", "padding", "font"
+}
+
+LARGE_COMPLEXITY_ARCHITECTURE_KEYWORDS: Set[str] = {
+    "migrate", "refactor", "redesign", "rewrite", "overhaul"
+}
+
+LARGE_COMPLEXITY_CONNECTORS: Set[str] = {
+    "and", "across", "throughout"
+}
+
+
 class TaskClassification(dict):
     """
     Hybrid dict/object representation of a task classification,
@@ -65,6 +93,8 @@ class TaskClassification(dict):
         matched_rules: Optional[List[str]] = None,
         deterministic: bool = True,
         design_principle: str = "deterministic_over_adaptive",
+        complexity_tier: ComplexityTier = ComplexityTier.FEATURE,
+        complexity_decision: str = "",
         **kwargs
     ):
         kw_list = list(detected_keywords) if detected_keywords is not None else []
@@ -84,6 +114,8 @@ class TaskClassification(dict):
             "matched_rules": rule_list,
             "deterministic": deterministic,
             "design_principle": design_principle,
+            "complexity_tier": complexity_tier.value if isinstance(complexity_tier, ComplexityTier) else str(complexity_tier),
+            "complexity_decision": complexity_decision,
         }
         payload.update(kwargs)
         super().__init__(payload)
@@ -101,6 +133,8 @@ class TaskClassification(dict):
         self.matched_rules = rule_list
         self.deterministic = deterministic
         self.design_principle = design_principle
+        self.complexity_tier = complexity_tier
+        self.complexity_decision = complexity_decision
 
     def to_dict(self) -> Dict[str, Any]:
         return dict(self)
@@ -112,6 +146,11 @@ class TaskClassification(dict):
             dom = TaskDomain(domain_val)
         except Exception:
             dom = TaskDomain.FULLSTACK
+        tier_val = data.get("complexity_tier", ComplexityTier.FEATURE.value)
+        try:
+            c_tier = ComplexityTier(tier_val)
+        except Exception:
+            c_tier = ComplexityTier.FEATURE
         return cls(
             domain=dom,
             requires_frontend_ui=data.get("requires_frontend_ui", True),
@@ -125,7 +164,9 @@ class TaskClassification(dict):
             confidence=float(data.get("confidence", 0.5)),
             matched_rules=data.get("matched_rules", []),
             deterministic=bool(data.get("deterministic", True)),
-            design_principle=data.get("design_principle", "deterministic_over_adaptive")
+            design_principle=data.get("design_principle", "deterministic_over_adaptive"),
+            complexity_tier=c_tier,
+            complexity_decision=data.get("complexity_decision", "")
         )
 
 
@@ -198,7 +239,71 @@ class TaskClassifier:
         classification["deterministic"] = task_info["deterministic"]
         classification["design_principle"] = task_info["design_principle"]
 
+        complexity_tier = cls._classify_complexity(raw_request)
+        complexity_decision = cls._format_complexity_decision(complexity_tier)
+
+        classification.complexity_tier = complexity_tier
+        classification.complexity_decision = complexity_decision
+        classification["complexity_tier"] = complexity_tier.value
+        classification["complexity_decision"] = complexity_decision
+
         return classification
+
+    @classmethod
+    def _classify_complexity(cls, raw_request: str) -> ComplexityTier:
+        req_lower = raw_request.lower().strip()
+        words = re.findall(r"\b[\w-]+\b", req_lower)
+        word_count = len(words)
+
+        # Default empty/unspecified goals to FEATURE
+        if not words:
+            return ComplexityTier.FEATURE
+
+        # 1. Keyword lift to HIGH_RISK (checked first, overrides everything):
+        # auth, payment, password, token, encrypt, pii, security, permission, role
+        for kw in HIGH_RISK_COMPLEXITY_KEYWORDS:
+            if re.search(r'\b' + re.escape(kw) + r'\b', req_lower):
+                return ComplexityTier.HIGH_RISK
+
+        # 2. Keyword drop to TRIVIAL:
+        # toggle, color, rename, typo, copy text, label, spacing, padding, font
+        # if the goal is short (under ~15 words) and contains one of these and no HIGH_RISK keyword fired, tier is TRIVIAL.
+        has_trivial_kw = any(re.search(r'\b' + re.escape(kw) + r'\b', req_lower) for kw in TRIVIAL_COMPLEXITY_KEYWORDS)
+        if word_count <= 15 and has_trivial_kw:
+            return ComplexityTier.TRIVIAL
+
+        # 3. Everything else:
+        # LARGE if it explicitly mentions multiple subsystems
+        # e.g., "and", "across", "throughout" combined with architecture-sounding words like "migrate", "refactor the", "redesign"
+        has_connector = any(re.search(r'\b' + re.escape(c) + r'\b', req_lower) for c in LARGE_COMPLEXITY_CONNECTORS)
+        has_arch = any(re.search(r'\b' + re.escape(a) + r'\b', req_lower) for a in LARGE_COMPLEXITY_ARCHITECTURE_KEYWORDS)
+        if has_connector and has_arch:
+            return ComplexityTier.LARGE
+
+        # FEATURE if longer (> 15 words) or mentions multiple nouns/verbs/features
+        feature_indicators = [
+            "full-stack", "fullstack", "enterprise", "application", "platform", "portal",
+            "crud", "pipeline", "workflow", "dashboard", "integration", "engine", "service",
+            "e-commerce", "ecommerce", "system", "analytics", "management", "reporting"
+        ]
+        if word_count > 15 or any(w in req_lower for w in feature_indicators):
+            return ComplexityTier.FEATURE
+
+        # Default to SMALL if the goal is short and mentions a single concept
+        return ComplexityTier.SMALL
+
+    @classmethod
+    def _format_complexity_decision(cls, tier: ComplexityTier) -> str:
+        if tier == ComplexityTier.TRIVIAL:
+            return "TRIVIAL — skipped debate, security review, and full visual verification"
+        elif tier == ComplexityTier.SMALL:
+            return "SMALL — skipped debate and security review; lightweight visual verification"
+        elif tier == ComplexityTier.HIGH_RISK:
+            return "HIGH_RISK — strict full debate, security review, and full verification enforced"
+        elif tier == ComplexityTier.LARGE:
+            return "LARGE — multi-subsystem architecture debate and comprehensive verification enforced"
+        else:
+            return "FEATURE — standard full-lifecycle governance active"
 
     @classmethod
     def _classify_domain(cls, raw_request: str, workspace_dir: Optional[str] = None) -> TaskClassification:

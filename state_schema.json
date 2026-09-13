@@ -23,6 +23,12 @@
     "taskDomain": {
       "type": "string"
     },
+    "complexityTier": {
+      "type": "string"
+    },
+    "complexityDecision": {
+      "type": "string"
+    },
     "requiresFrontendUi": {
       "type": "boolean"
     },

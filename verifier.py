@@ -235,10 +235,35 @@ class EvidenceVerifier:
         return True
 
     @staticmethod
+    def _get_complexity_tier(cwd: str, state_dir: str) -> str:
+        state_file = os.path.join(state_dir, "orchestration_state.json")
+        if os.path.exists(state_file):
+            try:
+                with open(state_file, "r", encoding="utf-8") as sf:
+                    sdata = json.load(sf)
+                if sdata.get("complexityTier"):
+                    return str(sdata["complexityTier"]).lower()
+                goal = sdata.get("goal", "")
+                if goal:
+                    from task_classifier import TaskClassifier
+                    tc = TaskClassifier.classify(goal, workspace_dir=cwd)
+                    return tc.complexity_tier.value
+            except Exception:
+                pass
+        return "feature"
+
+    @staticmethod
     def _verify_qa_evidence_shared(cwd: str, state_dir: str, state_file: str, allow_soft: bool) -> Tuple[List[str], List[str], int]:
         errors = []
         real_screenshots = []
         required_min_screenshots = 1
+
+        complexity_tier = EvidenceVerifier._get_complexity_tier(cwd, state_dir)
+        is_low_complexity = complexity_tier in ("trivial", "small")
+        if complexity_tier == "trivial":
+            required_min_screenshots = 0
+        elif complexity_tier == "small":
+            required_min_screenshots = 1
 
         is_ui_req = EvidenceVerifier._is_frontend_ui_required(cwd, state_dir)
         if not is_ui_req:
@@ -568,7 +593,7 @@ class EvidenceVerifier:
                     pass
 
         # Programmatic Zero-Loophole Error Assertions (Independent if blocks)
-        if not dom_actions_performed and os.path.exists(os.path.join(cwd, "frontend")) and not allow_soft:
+        if not is_low_complexity and not dom_actions_performed and os.path.exists(os.path.join(cwd, "frontend")) and not allow_soft:
             errors.append("QA verification failed: USER PROXY INACTION DETECTED! Taking static screenshots without interactive DOM testing (clicking buttons, filling forms, submitting data) is FORBIDDEN. User Proxy (dss_user_alias_v2) MUST perform interactive DOM actions (clicks, form fills) using Chrome MCP and log receipts in '.agents/interaction_receipts.json'.")
         
         if failed_auth_or_error and not allow_soft:
@@ -592,16 +617,16 @@ class EvidenceVerifier:
         if duplicate_screenshots_detected and not allow_soft:
             errors.append("QA verification failed: CHEATING DETECTED! Identical/Duplicate screenshots found. Taking the same screenshot and saving it under multiple filenames to bypass viewport layout requirements is strictly forbidden.")
         
-        if missing_snapshots and not allow_soft:
+        if not is_low_complexity and missing_snapshots and not allow_soft:
             errors.append("QA verification failed: Missing DOM A11y Snapshots. Professional QA testing must capture DOM / Accessibility tree text snapshots in '.agents/snapshots/'.")
         
-        if missing_lh and not allow_soft:
+        if not is_low_complexity and missing_lh and not allow_soft:
             errors.append("QA verification failed: Missing Lighthouse Audit Receipt. Execute 'lighthouse_audit' tool and save receipt to '.agents/lighthouse_audit.json'.")
         
-        if low_lh_score and not allow_soft:
+        if not is_low_complexity and low_lh_score and not allow_soft:
             errors.append(f"QA verification failed: Lighthouse Accessibility score too low ({lh_score_val} < 50). UI layout must meet accessibility standards.")
             
-        if missing_user_flow_receipts and not allow_soft:
+        if not is_low_complexity and missing_user_flow_receipts and not allow_soft:
             errors.append("QA verification failed: USER PROXY FLOW VERIFICATION MISSING! User Proxy (dss_user_alias_v2) MUST examine the live website by submitting input data (forms) and verifying that the submitted output visually renders in screen views. Log flow receipts in '.agents/user_flow_receipts.json'.")
 
         if unrendered_input_flow_detected and not allow_soft:
@@ -610,7 +635,7 @@ class EvidenceVerifier:
         if invalid_receipt_schema and not allow_soft:
             errors.append("QA verification failed: Malformed interaction receipts file (interaction_receipts.json). Check that interaction receipts match the required schema format.")
         
-        if os.path.exists(os.path.join(cwd, "frontend")) and not allow_soft:
+        if os.path.exists(os.path.join(cwd, "frontend")) and not allow_soft and not is_low_complexity:
             if not has_desktop_ss:
                 errors.append("QA verification failed: Missing desktop viewport test screenshot. Capture desktop visual state containing 'desktop' or '1920' in screenshot filename.")
             if not has_mobile_ss:
@@ -630,17 +655,20 @@ class EvidenceVerifier:
         if empty_test_stubs and not allow_soft:
             errors.append("QA verification failed: Empty or unasserted test stubs detected! Test files must contain real assertions ('expect(' or 'assert').")
         
-        if dev_server_inactive and not allow_soft:
+        if not is_low_complexity and dev_server_inactive and not allow_soft:
             errors.append("QA verification failed: DEV SERVER INACTIVE! No active web application server listening on localhost ports (3000, 5173, 8000, 8080). Visual QA verification requires a live web application server running during the test.")
 
         if mock_detected and not allow_soft:
             errors.append("QA verification failed: CHEATING DETECTED! Mock or fake screenshot receipts (<10KB, invalid magic bytes, <320x320 dimensions, or zero color variance) were found. Real Chrome DevTools MCP visual screenshots (>10KB valid PNG/JPEG with non-zero color variance) are strictly required.")
         
-        if not has_visual and not allow_soft:
-            errors.append("QA verification failed: Mandatory Chrome MCP visual screenshot receipts missing from '.agents/screenshots/'. Run Chrome DevTools MCP to capture real screenshots before passing QA.")
-        
-        if len(real_screenshots) < required_min_screenshots and not allow_soft:
-            errors.append(f"QA verification failed: Insufficient visual screenshot coverage. Found only {len(real_screenshots)} valid screenshot(s) ({', '.join(real_screenshots)}), but project requires at least {required_min_screenshots} distinct visual screenshots covering all core user roles and flows.")
+        if not is_low_complexity:
+            if not has_visual and not allow_soft:
+                errors.append("QA verification failed: Mandatory Chrome MCP visual screenshot receipts missing from '.agents/screenshots/'. Run Chrome DevTools MCP to capture real screenshots before passing QA.")
+            if len(real_screenshots) < required_min_screenshots and not allow_soft:
+                errors.append(f"QA verification failed: Insufficient visual screenshot coverage. Found only {len(real_screenshots)} valid screenshot(s) ({', '.join(real_screenshots)}), but project requires at least {required_min_screenshots} distinct visual screenshots covering all core user roles and flows.")
+        elif complexity_tier == "small" and required_min_screenshots > 0:
+            if len(real_screenshots) < 1 and not allow_soft:
+                errors.append("QA verification failed: Small complexity change requires at least 1 lightweight screenshot receipt in '.agents/screenshots/'.")
 
         return errors, real_screenshots, required_min_screenshots
 
@@ -927,21 +955,24 @@ class EvidenceVerifier:
             errors.extend(shared_errors)
             
             is_ui_req = EvidenceVerifier._is_frontend_ui_required(cwd, state_dir)
-            if is_ui_req:
+            complexity_tier = EvidenceVerifier._get_complexity_tier(cwd, state_dir)
+            is_low_complexity = complexity_tier in ("trivial", "small")
+
+            if is_ui_req and not (is_low_complexity and complexity_tier == "trivial"):
                 screenshots_dir = os.path.join(state_dir, "screenshots")
                 has_visual = len(real_screenshots) > 0
                 artifacts.append(EvidenceArtifact(
                     current_phase,
                     "visual_output_check",
                     screenshots_dir,
-                    has_visual and len(real_screenshots) >= required_min_screenshots and len(shared_errors) == 0,
+                    (has_visual and len(real_screenshots) >= required_min_screenshots and len(shared_errors) == 0) or (is_low_complexity and len(shared_errors) == 0),
                     strength=EvidenceStrength.HIGH_PLAYWRIGHT_VISUAL
                 ))
             else:
                 qa_report_file = os.path.join(state_dir, "qa_report.json")
                 artifacts.append(EvidenceArtifact(
                     current_phase,
-                    "backend_qa_verification",
+                    "backend_qa_verification" if not is_ui_req else "lightweight_qa_verification",
                     qa_report_file,
                     len(shared_errors) == 0,
                     strength=EvidenceStrength.HIGH_TEST_PASSED

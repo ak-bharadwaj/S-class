@@ -226,13 +226,24 @@ class SClassSDK:
                 "receipts under authority 'FSM_TEST_RUNNER'."
             )
 
+        complexity_dec = ""
+        complexity_tier = ""
+        try:
+            st = runtime.get_state(self.workspace_dir)
+            complexity_dec = getattr(st, "complexityDecision", "")
+            complexity_tier = getattr(st, "complexityTier", "")
+        except Exception:
+            pass
+
         return {
             "synthetic": is_synthetic,
             "authority": authority,
             "execution_mode": execution_mode,
             "code_generated": has_code,
             "source_files": source_files,
-            "epistemic_warning": warning
+            "epistemic_warning": warning,
+            "complexity_decision": complexity_dec,
+            "complexity_tier": complexity_tier
         }
 
     def execute_goal(self, goal: str, profile: str = "full", max_steps: int = 25) -> Dict[str, Any]:
@@ -257,12 +268,25 @@ class SClassSDK:
         else:
             status = "IN_PROGRESS"
 
+        complexity_dec = getattr(curr, "complexityDecision", "")
+        complexity_tier = getattr(curr, "complexityTier", "")
+        if not complexity_dec:
+            try:
+                from task_classifier import TaskClassifier
+                tc = TaskClassifier.classify(curr.goal or goal, workspace_dir=self.workspace_dir)
+                complexity_dec = tc.complexity_decision
+                complexity_tier = tc.complexity_tier.value
+            except Exception:
+                pass
+
         res = {
             "mode": "goal",
             "workspace": self.workspace_dir,
             "status": status,
             "current_phase": curr.currentPhase,
             "goal": curr.goal,
+            "complexity_tier": complexity_tier,
+            "complexity_decision": complexity_dec,
             "synthetic": prov["synthetic"],
             "authority": prov["authority"],
             "execution_mode": prov["execution_mode"],
@@ -301,12 +325,25 @@ class SClassSDK:
         else:
             status = "IN_PROGRESS"
 
+        complexity_dec = getattr(curr, "complexityDecision", "")
+        complexity_tier = getattr(curr, "complexityTier", "")
+        if not complexity_dec:
+            try:
+                from task_classifier import TaskClassifier
+                tc = TaskClassifier.classify(curr.goal or goal_or_task, workspace_dir=self.workspace_dir)
+                complexity_dec = tc.complexity_decision
+                complexity_tier = tc.complexity_tier.value
+            except Exception:
+                pass
+
         res = {
             "mode": "boost",
             "workspace": self.workspace_dir,
             "status": status,
             "current_phase": curr.currentPhase,
             "goal": curr.goal,
+            "complexity_tier": complexity_tier,
+            "complexity_decision": complexity_dec,
             "skills_loaded": [s.name for s in skills],
             "nodes_indexed": index_res.get("nodes_indexed", 0),
             "synthetic": prov["synthetic"],

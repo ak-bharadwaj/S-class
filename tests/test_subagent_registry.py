@@ -43,7 +43,8 @@ class TestSubagentRegistry(unittest.TestCase):
         res = SubagentRegistry.prepare_full_8_subagent_dispatch(
             goal_text="Implement Red-Black Tree in Python",
             fsm_phase="CODING",
-            workspace_dir=self.test_dir
+            workspace_dir=self.test_dir,
+            complexity_tier="feature"
         )
         self.assertEqual(res["task_domain"], "algorithm")
 

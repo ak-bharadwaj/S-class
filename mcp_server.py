@@ -186,11 +186,20 @@ def handle_tool_call(tool_name: str, arguments: Dict[str, Any], workspace_dir: O
         profile = arguments.get("profile")
         runtime.initialize_state(workspace_dir, goal=goal, profile=profile)
         state = runtime.get_state(workspace_dir)
-        return {"status": "initialized", "state": asdict(state)}
+        return {
+            "status": "initialized",
+            "state": asdict(state),
+            "complexity_tier": getattr(state, "complexityTier", "feature"),
+            "complexity_decision": getattr(state, "complexityDecision", "")
+        }
 
     elif tool_name == "sclass_get_state":
         state = runtime.get_state(workspace_dir)
-        return {"state": asdict(state)}
+        return {
+            "state": asdict(state),
+            "complexity_tier": getattr(state, "complexityTier", "feature"),
+            "complexity_decision": getattr(state, "complexityDecision", "")
+        }
 
     elif tool_name == "sclass_dispatch":
         event_name = arguments.get("event_name", "")

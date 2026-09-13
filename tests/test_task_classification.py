@@ -211,3 +211,63 @@ def test_fsm_goal_sequence_algorithm_reaches_done():
         assert final_st.currentPhase == "DONE"
         assert final_st.taskDomain == "algorithm"
         assert final_st.requiresFrontendUi is False
+
+
+def test_complexity_tier_classification():
+    from task_classifier import ComplexityTier
+
+    # 1. Trivial tasks
+    trivial_toggle = TaskClassifier.classify("Add a dark mode toggle")
+    assert trivial_toggle.complexity_tier == ComplexityTier.TRIVIAL
+    assert "TRIVIAL" in trivial_toggle.complexity_decision
+
+    trivial_color = TaskClassifier.classify("Fix button color on login screen")
+    assert trivial_color.complexity_tier == ComplexityTier.TRIVIAL
+
+    trivial_typo = TaskClassifier.classify("Fix typo in error label")
+    assert trivial_typo.complexity_tier == ComplexityTier.TRIVIAL
+
+    # 2. High Risk tasks (checked first, overrides everything)
+    oauth_task = TaskClassifier.classify("Implement OAuth login with refresh token rotation")
+    assert oauth_task.complexity_tier == ComplexityTier.HIGH_RISK
+    assert "HIGH_RISK" in oauth_task.complexity_decision
+
+    stripe_task = TaskClassifier.classify("Process payment with stripe checkout")
+    assert stripe_task.complexity_tier == ComplexityTier.HIGH_RISK
+
+    rbac_task = TaskClassifier.classify("Enforce role permission access control")
+    assert rbac_task.complexity_tier == ComplexityTier.HIGH_RISK
+
+    # 3. Large architecture tasks
+    large_task = TaskClassifier.classify("Migrate database schema and refactor caching throughout services")
+    assert large_task.complexity_tier == ComplexityTier.LARGE
+
+    # 4. Small tasks
+    small_task = TaskClassifier.classify("Add helper to parse date strings")
+    assert small_task.complexity_tier == ComplexityTier.SMALL
+
+
+def test_subagent_registry_complexity_standby():
+    from sclass_subagent_registry import SubagentRegistry
+
+    # For TRIVIAL tasks: Architect (debate) & Security Officer on STANDBY_LOW_COMPLEXITY
+    dispatch_trivial = SubagentRegistry.prepare_full_8_subagent_dispatch("Add a dark mode toggle", "CODING")
+    status_map = {s["subagent_id"]: s["status"] for s in dispatch_trivial["subagents"]}
+    assert status_map["dss_governor"] == "STANDBY_LOW_COMPLEXITY"
+    assert status_map["dss_cso_v2"] == "STANDBY_LOW_COMPLEXITY"
+
+    # For HIGH_RISK tasks: Architect & Security Officer DISPATCHED_CONCURRENTLY
+    dispatch_high = SubagentRegistry.prepare_full_8_subagent_dispatch("Implement OAuth login with refresh token rotation", "CODING")
+    status_map_high = {s["subagent_id"]: s["status"] for s in dispatch_high["subagents"]}
+    assert status_map_high["dss_governor"] == "DISPATCHED_CONCURRENTLY"
+    assert status_map_high["dss_cso_v2"] == "DISPATCHED_CONCURRENTLY"
+
+
+def test_runtime_ceremony_downgrade_by_complexity():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        runtime.initialize_state(tmpdir, goal="Add a dark mode toggle", profile="full")
+        st = runtime.get_state(tmpdir)
+        # Should be downgraded from FULL to CORE due to TRIVIAL tier
+        assert st.workflowProfile == "core"
+        assert st.complexityTier == "trivial"
+        assert "TRIVIAL" in st.complexityDecision

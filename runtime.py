@@ -61,6 +61,8 @@ class State:
     planRationale: str = ""
     goal: str = ""
     taskDomain: str = "fullstack"
+    complexityTier: str = "feature"
+    complexityDecision: str = ""
     requiresFrontendUi: bool = True
     tasks: List[Task] = field(default_factory=list)
     decisionLog: List[Decision] = field(default_factory=list)
@@ -638,11 +640,14 @@ def initialize_state(workspace_dir: Optional[str] = None, goal: Optional[str] = 
                 except Exception:
                     pass
 
-        from task_classifier import TaskClassifier
+        from task_classifier import TaskClassifier, ComplexityTier
         tc = TaskClassifier.classify(goal or "", workspace_dir=workspace_dir)
 
-        # Auto-select CORE profile for non-UI tasks when planner defaulted to FULL
-        if tc.domain.value in ("algorithm", "library", "cli") and plan.profile == WorkflowProfile.FULL:
+        # Gate ceremony by complexity tier and domain
+        if tc.complexity_tier in (ComplexityTier.TRIVIAL, ComplexityTier.SMALL) and plan.profile == WorkflowProfile.FULL:
+            plan = MetaPlanner.classify_goal(goal or "", "core")
+            logger.info(f"Auto-selected CORE profile for {tc.complexity_tier.value} complexity task (7 states, no debate/deploy)")
+        elif tc.domain.value in ("algorithm", "library", "cli") and plan.profile == WorkflowProfile.FULL:
             plan = MetaPlanner.classify_goal(goal or "", "core")
             logger.info(f"Auto-selected CORE profile for {tc.domain.value} task (7 states, no debate/deploy)")
 
@@ -654,6 +659,8 @@ def initialize_state(workspace_dir: Optional[str] = None, goal: Optional[str] = 
             "planRationale": plan.rationale,
             "goal": goal or "",
             "taskDomain": tc.domain.value,
+            "complexityTier": tc.complexity_tier.value,
+            "complexityDecision": tc.complexity_decision,
             "requiresFrontendUi": tc.requires_frontend_ui,
             "currentSpecVersion": prev_spec_version,
             "currentDebateVersion": 0,
@@ -666,7 +673,7 @@ def initialize_state(workspace_dir: Optional[str] = None, goal: Optional[str] = 
             "tasks": [],
             "decisionLog": [
                 {
-                    "decision": f"Initialize S-Class FSM Engine ({plan.profile.value.upper()} Profile, {tc.domain.value.upper()} Domain)",
+                    "decision": f"Initialize S-Class FSM Engine ({plan.profile.value.upper()} Profile, {tc.domain.value.upper()} Domain, {tc.complexity_tier.value.upper()} Tier)",
                     "reason": plan.rationale,
                     "alternatives": [p.value for p in WorkflowProfile],
                     "confidence": 1.0,
@@ -755,6 +762,8 @@ def get_state(workspace_dir: Optional[str] = None) -> State:
         planRationale=state_dict.get("planRationale", ""),
         goal=state_dict.get("goal", ""),
         taskDomain=state_dict.get("taskDomain", "fullstack"),
+        complexityTier=state_dict.get("complexityTier", "feature"),
+        complexityDecision=state_dict.get("complexityDecision", ""),
         requiresFrontendUi=state_dict.get("requiresFrontendUi", True),
         currentSpecVersion=state_dict["currentSpecVersion"],
         currentDebateVersion=state_dict["currentDebateVersion"],

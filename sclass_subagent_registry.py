@@ -158,22 +158,27 @@ class SubagentRegistry:
         fsm_phase: str,
         workspace_dir: Optional[str] = None,
         task_domain: Optional[str] = None,
-        requires_frontend_ui: Optional[bool] = None
+        requires_frontend_ui: Optional[bool] = None,
+        complexity_tier: Optional[str] = None
     ) -> Dict[str, Any]:
         cwd = workspace_dir if workspace_dir else os.getcwd()
 
-        # 1. Infer task domain & UI requirements if not provided
-        if task_domain is None or requires_frontend_ui is None:
+        # 1. Infer task domain, UI requirements, & complexity tier if not provided
+        complexity_tier_val = complexity_tier
+        if task_domain is None or requires_frontend_ui is None or complexity_tier_val is None:
             try:
                 from task_classifier import TaskClassifier
                 tc = TaskClassifier.classify(goal_text, workspace_dir=cwd)
                 task_domain = task_domain or tc.domain.value
                 requires_frontend_ui = requires_frontend_ui if requires_frontend_ui is not None else tc.requires_frontend_ui
+                complexity_tier_val = complexity_tier_val or tc.complexity_tier.value
             except Exception:
                 task_domain = task_domain or "fullstack"
                 requires_frontend_ui = requires_frontend_ui if requires_frontend_ui is not None else True
+                complexity_tier_val = complexity_tier_val or "feature"
 
         is_non_ui = task_domain in ("algorithm", "library", "cli") or requires_frontend_ui is False
+        is_low_complexity = complexity_tier_val in ("trivial", "small")
 
         # 2. Run upfront Skill Discovery
         discovery_res = SkillDiscoveryEngine.find_and_bind_required_skills(goal_text, cwd)
@@ -185,13 +190,18 @@ class SubagentRegistry:
         all_agent_ids = list(cls.SUBAGENTS.keys())
 
         UI_AGENTS = {"dss_ui_ux", "dss_frontend_dev", "dss_qa_frontend", "dss_user_alias_v2"}
+        ARCHITECT_SECURITY_AGENTS = {"dss_governor", "dss_cso_v2"}
 
         dispatched_subagents = []
         for sa_id, sa in cls.SUBAGENTS.items():
             targets = topo_router.get_communication_targets(sa_id, all_agent_ids)
 
+            # Check if Architect (debate) or Security Officer should be placed on standby for low complexity
+            if is_low_complexity and sa_id in ARCHITECT_SECURITY_AGENTS:
+                status = "STANDBY_LOW_COMPLEXITY"
+                combined_skills = []
             # Check if UI specialist subagent should be placed on standby for pure non-UI tasks
-            if is_non_ui and sa_id in UI_AGENTS:
+            elif is_non_ui and sa_id in UI_AGENTS:
                 status = "STANDBY_NON_UI"
                 combined_skills = []
             else:
@@ -227,7 +237,7 @@ class SubagentRegistry:
                 "domain": sa.domain,
                 "status": status,
                 "assigned_skills": combined_skills,
-                "find_skill_enabled": sa.has_find_skill_capability if status != "STANDBY_NON_UI" else False
+                "find_skill_enabled": sa.has_find_skill_capability if status == "DISPATCHED_CONCURRENTLY" else False
             })
 
         # Save Full 8 Dispatch Receipt
@@ -240,6 +250,7 @@ class SubagentRegistry:
             "fsm_phase": fsm_phase,
             "goal": goal_text,
             "task_domain": task_domain,
+            "complexity_tier": complexity_tier_val,
             "total_subagents_registered": len(dispatched_subagents),
             "total_subagents_dispatched": len(dispatched_subagents),
             "active_subagents_count": active_count,
