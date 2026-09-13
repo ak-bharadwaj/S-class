@@ -25,6 +25,7 @@ from typing import Dict, Any, Optional, List, Tuple
 from sclass.observation.fingerprint import compute_workspace_snapshot, compute_workspace_fingerprint
 from sclass.trust.ledger import LocalLedger
 from sclass.state.tasks import StateRepository
+from sclass.core.errors import HandoffIntegrityError
 
 
 @dataclass(frozen=True)
@@ -117,8 +118,8 @@ class CheckpointManager:
         try:
             ledger = LocalLedger(workspace_dir=ws)
             ledger_head = ledger.get_head_hash() or ""
-        except Exception:
-            pass
+        except Exception as e:
+            raise HandoffIntegrityError(f"Ledger access failure while creating checkpoint in '{workspace_dir}': {e}") from e
 
         # 3. Verified tasks from state repository
         verified_task_ids = []
@@ -126,8 +127,8 @@ class CheckpointManager:
             repo = StateRepository(ws)
             tasks = repo.list_tasks()
             verified_task_ids = [t.task_id for t in tasks if getattr(t, "state", None) == "VERIFIED"]
-        except Exception:
-            pass
+        except Exception as e:
+            raise HandoffIntegrityError(f"Database access failure while creating checkpoint in '{workspace_dir}': {e}") from e
 
         blks = tuple(blockers or [])
         rel_files = tuple(relevant_files or [])

@@ -199,8 +199,8 @@ class HandoffAssembler:
                                 })
                         except Exception:
                             continue
-        except Exception:
-            pass
+        except Exception as e:
+            raise HandoffIntegrityError(f"Ledger access failure while reading decisions in '{self.workspace_dir}': {e}") from e
 
         return HandoffContext(
             project_id=project_id,

@@ -143,14 +143,26 @@ class TrustRegistry:
         if binary_hash:
             self.policy.trusted_hashes.add(binary_hash.lower())
 
+    def _is_within_dir(self, target_path: str, base_dir: str) -> bool:
+        """Authoritatively checks if target_path is within base_dir, preventing prefix collisions."""
+        if not target_path or not base_dir:
+            return False
+        try:
+            norm_t = os.path.normcase(os.path.abspath(target_path))
+            norm_b = os.path.normcase(os.path.abspath(base_dir))
+            return norm_t == norm_b or norm_t.startswith(norm_b.rstrip(os.sep) + os.sep)
+        except Exception:
+            return False
+
     def classify_binary_trust(
         self,
-        executable_path: str,
+        executable_path: str = "",
         workspace_dir: str = "",
         binary_hash: str = "",
+        execution: Optional[ExecutionIdentity] = None,
     ) -> VerifierTrustMode:
         """
-        Determines the authoritative trust mode of an executable binary.
+        Determines the authoritative trust mode of an executable binary or ExecutionIdentity.
         Hierarchy:
         - Explicit compromised/untrusted -> UNTRUSTED
         - Explicit trusted path/hash    -> TRUSTED
@@ -159,58 +171,68 @@ class TrustRegistry:
         - System allowlisted            -> SYSTEM_TRUSTED
         - Unrecognized binary           -> UNKNOWN (fail-closed, NEVER SYSTEM_TRUSTED)
         """
+        if execution is not None:
+            executable_path = execution.executable_path or (execution.actual_argv[0] if execution.actual_argv else "")
+            binary_hash = binary_hash or execution.executable_hash
+            workspace_dir = workspace_dir or execution.cwd
+
         if not executable_path:
             return VerifierTrustMode.UNKNOWN
 
-        norm_path = os.path.normpath(executable_path).lower()
+        norm_path = os.path.normpath(executable_path)
+        norm_case = os.path.normcase(norm_path)
+
+        # 0. Reject NTFS Alternate Data Streams (ADS) on Windows (e.g. file.txt:evil.exe)
+        if os.name == "nt":
+            drive, rest = os.path.splitdrive(norm_path)
+            if ":" in rest:
+                return VerifierTrustMode.UNKNOWN
 
         # 1. Explicit compromised / untrusted check
-        if norm_path in self.policy.untrusted_paths:
+        if norm_case in self.policy.untrusted_paths or norm_path in self.policy.untrusted_paths:
             return VerifierTrustMode.UNTRUSTED
 
         if binary_hash and binary_hash.lower() in self.policy.untrusted_hashes:
             return VerifierTrustMode.UNTRUSTED
 
         # 2. Explicit trusted check
-        if norm_path in self.policy.trusted_paths:
+        if norm_case in self.policy.trusted_paths or norm_path in self.policy.trusted_paths:
             return VerifierTrustMode.TRUSTED
 
         if binary_hash and binary_hash.lower() in self.policy.trusted_hashes:
             return VerifierTrustMode.TRUSTED
 
-        ws = os.path.normpath(workspace_dir).lower() if workspace_dir else ""
+        ws = os.path.abspath(workspace_dir) if workspace_dir else ""
 
         for udir in self.policy.untrusted_dirs:
-            if norm_path.startswith(udir) or (norm_path + os.sep).startswith(udir + os.sep):
-                # If the untrusted dir is the broad OS temp dir, but workspace was placed in temp
-                # (e.g. test runner or CI sandbox) and the executable is inside workspace:
-                if ws and (norm_path.startswith(ws) or (norm_path + os.sep).startswith(ws + os.sep)):
-                    if udir == ws or (norm_path.startswith(udir) and len(udir) > len(ws)):
-                        return VerifierTrustMode.UNTRUSTED
-                    continue
+            if self._is_within_dir(norm_path, udir):
+                # If untrusted dir is broad OS temp, but workspace is placed in temp
+                # (e.g. CI sandbox) and the executable is within workspace:
+                if ws and self._is_within_dir(norm_path, ws):
+                    if self._is_within_dir(ws, udir) and not self._is_within_dir(udir, ws):
+                        continue
                 return VerifierTrustMode.UNTRUSTED
 
-        # 3. Workspace trust
-        if ws and norm_path.startswith(ws):
-            # Binary located directly within workspace or workspace venv
+        # 3. Workspace trust (strictly within workspace_dir or policy.workspace_dirs)
+        if ws and self._is_within_dir(norm_path, ws):
             return VerifierTrustMode.WORKSPACE_TRUSTED
 
         for wdir in self.policy.workspace_dirs:
-            if norm_path.startswith(wdir):
+            if self._is_within_dir(norm_path, wdir):
                 return VerifierTrustMode.WORKSPACE_TRUSTED
 
         # 4. User trusted
         for udir in self.policy.user_trusted_dirs:
-            if norm_path.startswith(udir):
+            if self._is_within_dir(norm_path, udir):
                 return VerifierTrustMode.USER_TRUSTED
 
         # 5. System allowlisted
         for sdir in self.policy.system_trusted_dirs:
-            if norm_path.startswith(sdir):
+            if self._is_within_dir(norm_path, sdir):
                 return VerifierTrustMode.SYSTEM_TRUSTED
 
         # If it is sys.executable or in sys.prefix
-        if norm_path == os.path.normpath(sys.executable).lower():
+        if os.path.normcase(os.path.abspath(norm_path)) == os.path.normcase(os.path.abspath(sys.executable)):
             return VerifierTrustMode.SYSTEM_TRUSTED
 
         # 6. Fail-closed default fallback: unrecognized binary is UNKNOWN (NEVER SYSTEM_TRUSTED)

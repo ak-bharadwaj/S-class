@@ -118,11 +118,35 @@ def test_batch1_1_fail_closed_trust_fallback(tmp_path):
     mode_hash = registry.classify_binary_trust("/some/arbitrary/path", binary_hash=hash_test)
     assert mode_hash == VerifierTrustMode.TRUSTED
 
-    # Compromised hash takes precedence -> UNTRUSTED
-    bad_hash = "badbadbad1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
-    registry.mark_untrusted_hash(bad_hash)
-    mode_bad = registry.classify_binary_trust("/some/arbitrary/path", binary_hash=bad_hash)
-    assert mode_bad == VerifierTrustMode.UNTRUSTED
+    # Sibling directory prefix attack: /workspace_attacker must NEVER match /workspace
+    sibling_bin = "C:\\project_attacker\\pytest.exe" if os.name == "nt" else "/project_attacker/pytest"
+    assert registry.classify_binary_trust(sibling_bin, workspace_dir="C:\\project" if os.name == "nt" else "/project") == VerifierTrustMode.UNKNOWN
+
+    # Sibling in temp directory resolves to UNTRUSTED (outside workspace in temp)
+    sibling_temp = str(tmp_path / "workspace_attacker" / "pytest.exe")
+    assert registry.classify_binary_trust(sibling_temp, workspace_dir=ws_dir) == VerifierTrustMode.UNTRUSTED
+
+    # Windows NTFS Alternate Data Stream attack: file.txt:evil.exe must fail closed to UNKNOWN
+    ads_bin = os.path.join(ws_dir, "clean.txt:evil.exe")
+    assert registry.classify_binary_trust(ads_bin, workspace_dir=ws_dir) == VerifierTrustMode.UNKNOWN
+
+    # Direct ExecutionIdentity consumption
+    from sclass.execution.identity import ExecutionIdentity
+    ident = ExecutionIdentity(
+        requested_argv=("pytest",),
+        actual_argv=("pytest",),
+        executable_name="pytest",
+        executable_path=unknown_bin,
+        executable_hash=hash_test,
+        pid=1234,
+        parent_pid=1,
+        process_start_time="2026-09-13T00:00:00Z",
+        cwd=ws_dir,
+        environment_digest="digest",
+        execution_mode="HOST_ARGV",
+    )
+    # With trusted hash, execution object resolves to TRUSTED
+    assert registry.classify_binary_trust(execution=ident) == VerifierTrustMode.TRUSTED
 
 
 def test_batch1_2_and_3_execution_identity_and_chain(tmp_path):
@@ -141,12 +165,25 @@ def test_batch1_2_and_3_execution_identity_and_chain(tmp_path):
     assert identity.platform == platform.system()
     assert identity.platform_support_status in (PlatformSupportStatus.SUPPORTED.value, PlatformSupportStatus.DEGRADED.value)
 
-    # Chain analysis for modern tools
+    assert len(identity.parent_chain) >= 1
+
+    # Chain analysis for modern tools with options and flags
     chain_uv = analyze_execution_chain(["uv", "run", "pytest", "tests/"])
     assert chain_uv.launcher == "uv"
     assert chain_uv.actual_child == "pytest"
     assert chain_uv.verifier == "pytest"
     assert "uv" in chain_uv.describe_chain()
+
+    # uv run with flags like --isolated
+    chain_uv_isolated = analyze_execution_chain(["uv", "run", "--isolated", "pytest", "tests/"])
+    assert chain_uv_isolated.launcher == "uv"
+    assert chain_uv_isolated.verifier == "pytest"
+
+    # uv run with python -m pytest
+    chain_uv_py = analyze_execution_chain(["uv", "run", "python", "-m", "pytest", "tests/"])
+    assert chain_uv_py.launcher == "uv"
+    assert chain_uv_py.interpreter == "python"
+    assert chain_uv_py.verifier == "pytest"
 
     chain_poetry = analyze_execution_chain(["poetry", "run", "pytest", "tests/unit"])
     assert chain_poetry.launcher == "poetry"
@@ -159,6 +196,16 @@ def test_batch1_2_and_3_execution_identity_and_chain(tmp_path):
     chain_docker = analyze_execution_chain(["docker", "run", "-v", ".:/app", "test-image", "pytest"])
     assert chain_docker.launcher == "docker"
     assert chain_docker.verifier == "pytest"
+
+    # docker run with multiple flags and trailing arguments
+    chain_docker_rm = analyze_execution_chain(["docker", "run", "--rm", "-v", ".:/app", "image:latest", "pytest", "tests/"])
+    assert chain_docker_rm.launcher == "docker"
+    assert chain_docker_rm.verifier == "pytest"
+
+    # shell -c inline script unwrapping
+    chain_bash_c = analyze_execution_chain(["bash", "-c", "pytest tests/"])
+    assert chain_bash_c.launcher == "bash"
+    assert chain_bash_c.verifier == "pytest"
 
 
 def test_batch1_4_platform_identity():
@@ -283,9 +330,21 @@ def test_batch1_7_fail_closed_handoff_reads(tmp_path, monkeypatch):
 
     assert "Database access failure" in str(exc_info.value)
 
+    # CheckpointManager.create_checkpoint also fails closed with HandoffIntegrityError
+    from sclass.context.checkpoint import CheckpointManager
+    from sclass.state.tasks import StateRepository
 
-def test_batch1_8_verification_state_machine():
-    """Verify strict verification state machine: CLAIMED -> ... -> ACCEPTED -> INVALIDATED and reject CLAIMED->ACCEPTED."""
+    def broken_list_tasks(*args, **kwargs):
+        raise RuntimeError("SQLite database file corrupt")
+
+    monkeypatch.setattr(StateRepository, "list_tasks", broken_list_tasks)
+    with pytest.raises(HandoffIntegrityError) as chk_exc:
+        CheckpointManager.create_checkpoint(workspace_dir=ws)
+    assert "Database access failure" in str(chk_exc.value)
+
+
+def test_batch1_8_verification_state_machine(tmp_path):
+    """Verify strict verification state machine: CLAIMED -> ... -> ACCEPTED -> INVALIDATED and engine integration."""
     sm = VerificationStateMachine(claim_id="claim_test_101")
     assert sm.current_state == VerificationState.CLAIMED
 
@@ -314,3 +373,75 @@ def test_batch1_8_verification_state_machine():
     # Mutation invalidates accepted claim
     sm.transition_to(VerificationState.INVALIDATED, "Workspace mutated")
     assert sm.current_state == VerificationState.INVALIDATED
+
+    # Verify engine integration: verify_claim attaches and transitions state_machine
+    from sclass.domain.claim import Claim
+    from sclass.verification.engine import verify_claim, check_staleness
+    from sclass.domain.claim import ClaimType
+    from sclass.trust.ledger import LocalLedger
+    from sclass.observation.fingerprint import compute_workspace_snapshot, compute_workspace_fingerprint
+
+    ws_dir = str(tmp_path / "engine_sm_ws")
+    os.makedirs(ws_dir, exist_ok=True)
+    ledger = LocalLedger(workspace_dir=ws_dir)
+
+    claim = Claim(
+        claim_id="claim_engine_sm",
+        task_id="T_SM",
+        statement="Executed command",
+        claim_type=ClaimType.EXECUTION.value,
+        metadata={"agent": "test_agent"},
+    )
+
+    # Unobserved evidence is rejected and state machine moves to REJECTED
+    verdict_none = verify_claim(claim=claim, evidence=None, workspace_dir=ws_dir, ledger=ledger)
+    assert verdict_none.status == "REJECT"
+    assert verdict_none.state_machine is not None
+    assert verdict_none.state_machine.current_state == VerificationState.REJECTED
+
+    # Valid observed receipt advances state machine to ACCEPTED
+    snap = compute_workspace_snapshot(ws_dir)
+    fp = compute_workspace_fingerprint(snap)
+    receipt = EvidenceReceipt(
+        receipt_id="rcpt_sm_test",
+        task_id="T_SM",
+        claim_id="claim_engine_sm",
+        agent="test_agent",
+        action="run_command",
+        workspace=ws_dir,
+        workspace_fingerprint=fp,
+        execution_kind="generic_command",
+        verifier="generic",
+        exit_code=0,
+        is_observed=True,
+        metadata={
+            "workspace_fingerprint_before": fp,
+            "workspace_fingerprint": fp,
+        },
+    )
+    receipt.receipt_hash = receipt.compute_hash()
+
+    # Anchor receipt into ledger
+    ledger.append("OBSERVATION", {
+        "receipt_id": receipt.receipt_id,
+        "receipt_hash": receipt.receipt_hash,
+        "fingerprint_before": fp,
+        "fingerprint_after": fp,
+        "action": "run_command",
+        "verifier": "generic",
+        "status": "COMPLETED",
+    })
+
+    verdict_accepted = verify_claim(claim=claim, evidence=receipt, workspace_dir=ws_dir, ledger=ledger)
+    assert verdict_accepted.status == "ACCEPT"
+    assert verdict_accepted.state_machine is not None
+    assert verdict_accepted.state_machine.current_state == VerificationState.ACCEPTED
+
+    # Subsequent workspace mutation invalidates accepted verification state machine
+    with open(os.path.join(ws_dir, "mutation.txt"), "w") as f:
+        f.write("modified")
+
+    receipt.state_machine = verdict_accepted.state_machine
+    is_fresh, stale_reason = check_staleness(receipt, ws_dir)
+    assert not is_fresh
+    assert receipt.state_machine.current_state == VerificationState.INVALIDATED

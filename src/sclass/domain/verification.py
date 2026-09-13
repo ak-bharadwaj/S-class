@@ -112,6 +112,7 @@ class VerificationResult:
     receipt_id: Optional[str] = None
     verification_event: Optional[VerificationEvent] = None
     verification_state: str = ""
+    state_machine: Optional[Any] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -147,6 +148,7 @@ class VerificationResult:
             "invalidation_reason": self.invalidation_reason,
             "receipt_id": self.receipt_id,
             "verification_state": self.verification_state or self.status,
+            "state_machine": self.state_machine.to_dict() if (self.state_machine and hasattr(self.state_machine, "to_dict")) else None,
             "verification_event": self.verification_event.to_dict() if self.verification_event else None,
             "metadata": dict(self.metadata),
         }

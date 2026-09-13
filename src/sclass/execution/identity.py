@@ -163,6 +163,130 @@ def detect_execution_chain(
     return analyze_execution_chain(argv, resolved_path)
 
 
+def discover_parent_chain(target_pid: int, known_parent_pid: Optional[int] = None) -> tuple[int, ...]:
+    """
+    Authoritatively discovers multi-tier OS process ancestry (parent PIDs).
+    Walks up the parent process chain across Windows, Linux, and macOS.
+    """
+    chain: List[int] = []
+    if not target_pid:
+        return ()
+
+    if platform.system() == "Windows":
+        try:
+            import ctypes
+            from ctypes import wintypes
+            TH32CS_SNAPPROCESS = 0x00000002
+
+            class PROCESSENTRY32W(ctypes.Structure):
+                _fields_ = [
+                    ('dwSize', wintypes.DWORD),
+                    ('cntUsage', wintypes.DWORD),
+                    ('th32ProcessID', wintypes.DWORD),
+                    ('th32DefaultHeapID', ctypes.POINTER(wintypes.ULONG)),
+                    ('th32ModuleID', wintypes.DWORD),
+                    ('cntThreads', wintypes.DWORD),
+                    ('th32ParentProcessID', wintypes.DWORD),
+                    ('pcPriClassBase', wintypes.LONG),
+                    ('dwFlags', wintypes.DWORD),
+                    ('szExeFile', ctypes.c_wchar * 260)
+                ]
+
+            hSnapshot = ctypes.windll.kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+            if hSnapshot and hSnapshot != -1:
+                pe = PROCESSENTRY32W()
+                pe.dwSize = ctypes.sizeof(PROCESSENTRY32W)
+                pid_map = {}
+                if ctypes.windll.kernel32.Process32FirstW(hSnapshot, ctypes.byref(pe)):
+                    while True:
+                        pid_map[pe.th32ProcessID] = pe.th32ParentProcessID
+                        if not ctypes.windll.kernel32.Process32NextW(hSnapshot, ctypes.byref(pe)):
+                            break
+                ctypes.windll.kernel32.CloseHandle(hSnapshot)
+
+                curr = target_pid
+                start_p = pid_map.get(curr, known_parent_pid)
+                curr = start_p
+                while curr and curr in pid_map and curr not in chain and curr > 0 and len(chain) < 32:
+                    chain.append(curr)
+                    curr = pid_map.get(curr)
+        except Exception:
+            pass
+
+    elif platform.system() == "Linux":
+        curr = known_parent_pid or target_pid
+        while curr and curr > 1 and len(chain) < 32:
+            try:
+                with open(f"/proc/{curr}/status", "r", encoding="utf-8") as f:
+                    ppid = None
+                    for line in f:
+                        if line.startswith("PPid:"):
+                            ppid = int(line.split()[1])
+                            break
+                    if ppid and ppid not in chain and ppid > 0:
+                        chain.append(ppid)
+                        curr = ppid
+                    else:
+                        break
+            except Exception:
+                break
+
+    elif platform.system() == "Darwin":
+        curr = known_parent_pid or target_pid
+        while curr and curr > 1 and len(chain) < 32:
+            try:
+                import subprocess
+                out = subprocess.check_output(["ps", "-o", "ppid=", "-p", str(curr)], text=True, timeout=1).strip()
+                if out and out.isdigit():
+                    ppid = int(out)
+                    if ppid not in chain and ppid > 0:
+                        chain.append(ppid)
+                        curr = ppid
+                    else:
+                        break
+                else:
+                    break
+            except Exception:
+                break
+
+    if known_parent_pid and known_parent_pid not in chain:
+        chain.insert(0, known_parent_pid)
+    if target_pid not in chain:
+        chain.append(target_pid)
+
+    return tuple(chain)
+
+
+def detect_container_sandbox() -> Optional[str]:
+    """Authoritatively detects containerization or sandbox environment."""
+    if os.path.exists("/.dockerenv"):
+        return "docker"
+    elif os.path.exists("/run/.containerenv"):
+        return "podman"
+    elif "CONTAINER_ID" in os.environ:
+        return os.environ["CONTAINER_ID"]
+    elif "KUBERNETES_SERVICE_HOST" in os.environ:
+        return "kubernetes"
+    elif "WSL_DISTRO_NAME" in os.environ or os.path.exists("/proc/sys/fs/binfmt_misc/WSLInterop"):
+        return "wsl2"
+    elif os.path.exists("/proc/1/cgroup"):
+        try:
+            with open("/proc/1/cgroup", "r", encoding="utf-8", errors="ignore") as f:
+                cgroup = f.read()
+                if "docker" in cgroup:
+                    return "docker"
+                elif "containerd" in cgroup:
+                    return "containerd"
+                elif "kubepods" in cgroup:
+                    return "kubernetes"
+                elif "lxc" in cgroup:
+                    return "lxc"
+        except Exception:
+            pass
+    return None
+
+
+
 
 @dataclass(frozen=True)
 class ExecutionIdentity:
@@ -320,27 +444,14 @@ class ExecutionIdentity:
         else:
             plat_status = PlatformSupportStatus.UNSUPPORTED.value
 
-        # 7. UID, GID, parent chain, and container sandbox identity
+        # 7. UID, GID, authoritative parent chain, and container sandbox identity
         actual_parent_pid = parent_pid or (os.getppid() if hasattr(os, "getppid") else None)
         cur_uid = os.getuid() if hasattr(os, "getuid") else None
         cur_gid = os.getgid() if hasattr(os, "getgid") else None
 
-        chain_pids = []
-        if actual_parent_pid:
-            chain_pids.append(actual_parent_pid)
-        if hasattr(os, "getpid") and os.getpid() not in chain_pids:
-            chain_pids.append(os.getpid())
-        parent_chain_tuple = tuple(chain_pids)
-
-        container_id: Optional[str] = None
-        if os.path.exists("/.dockerenv"):
-            container_id = "docker"
-        elif os.path.exists("/run/.containerenv"):
-            container_id = "podman"
-        elif "CONTAINER_ID" in os.environ:
-            container_id = os.environ["CONTAINER_ID"]
-        elif "KUBERNETES_SERVICE_HOST" in os.environ:
-            container_id = "kubernetes"
+        target_proc_pid = pid or os.getpid()
+        parent_chain_tuple = discover_parent_chain(target_proc_pid, actual_parent_pid)
+        container_id = detect_container_sandbox()
 
         return cls(
             requested_argv=req_tokens,

@@ -17,6 +17,7 @@ from sclass.trust.ledger import LocalLedger
 from sclass.observation.fingerprint import compute_workspace_snapshot, compute_workspace_fingerprint
 from sclass.verification.registry import get_verifier_registry
 from sclass.verification.acceptance import ClaimAcceptanceMatrix
+from sclass.verification.state_machine import VerificationState, VerificationStateMachine
 
 
 def check_staleness(evidence: Any, workspace_dir: str) -> Tuple[bool, Optional[str]]:
@@ -26,6 +27,11 @@ def check_staleness(evidence: Any, workspace_dir: str) -> Tuple[bool, Optional[s
     if hasattr(evidence, "validate_dependencies") and callable(evidence.validate_dependencies):
         is_valid, dep_reason = evidence.validate_dependencies(ws)
         if not is_valid:
+            if hasattr(evidence, "state_machine") and getattr(evidence.state_machine, "current_state", None) == VerificationState.ACCEPTED:
+                try:
+                    evidence.state_machine.transition_to(VerificationState.INVALIDATED, reason="Workspace mutation detected")
+                except Exception:
+                    pass
             return False, dep_reason or "Workspace files or content modified after observation."
 
     current_snapshot = compute_workspace_snapshot(ws)
@@ -33,6 +39,11 @@ def check_staleness(evidence: Any, workspace_dir: str) -> Tuple[bool, Optional[s
 
     recorded_fp = getattr(evidence, "workspace_fingerprint", None)
     if recorded_fp and current_fp != recorded_fp:
+        if hasattr(evidence, "state_machine") and getattr(evidence.state_machine, "current_state", None) == VerificationState.ACCEPTED:
+            try:
+                evidence.state_machine.transition_to(VerificationState.INVALIDATED, reason="Workspace mutation detected")
+            except Exception:
+                pass
         return False, "Workspace files or content modified after observation."
 
     return True, None
@@ -63,11 +74,18 @@ def _record_rejection(
     ledger: Optional[LocalLedger],
     exit_code: Optional[int] = None,
     failed_tests: int = 0,
+    state_machine: Optional[VerificationStateMachine] = None,
 ) -> VerificationResult:
     r_id = getattr(evidence, "receipt_id", None)
     r_hash = getattr(evidence, "receipt_hash", "") or (evidence.compute_hash() if hasattr(evidence, "compute_hash") else "")
     ws_fp = getattr(evidence, "workspace_fingerprint", "") or ""
     prev_hash = ledger.get_last_hash() if (ledger and hasattr(ledger, "get_last_hash")) else "0" * 64
+
+    if state_machine:
+        try:
+            state_machine.transition_to(VerificationState.REJECTED, reason=reason)
+        except Exception:
+            pass
 
     event = None
     if evidence is not None:
@@ -91,6 +109,7 @@ def _record_rejection(
         failed_tests=failed_tests,
         receipt_id=r_id,
         verification_state="REJECTED",
+        state_machine=state_machine,
         verification_event=event,
     )
     if ledger:
@@ -111,6 +130,15 @@ def verify_claim(
     Authoritatively verifies an agent claim against observed evidence.
     Returns VerificationResult (ACCEPT | REJECT | INVALID | INCONCLUSIVE).
     """
+    sm = getattr(claim, "state_machine", None) or VerificationStateMachine(
+        initial_state=VerificationState.CLAIMED,
+        claim_id=claim.claim_id,
+    )
+    try:
+        sm.transition_to(VerificationState.EVIDENCE_REQUIRED, reason="Evaluating provided evidence")
+    except Exception:
+        pass
+
     ws = os.path.abspath(workspace_dir or (getattr(evidence, "workspace", None) if evidence else os.getcwd()))
     if ledger is None:
         try:
@@ -124,6 +152,7 @@ def verify_claim(
             reason="Claim rejected: Agent claimed completion but produced no independently observed evidence receipt.",
             evidence=None,
             ledger=ledger,
+            state_machine=sm,
         )
 
     if isinstance(evidence, (ProposedEvidence, ClaimedEvidence)) or getattr(evidence, "_explicitly_unobserved", False):
@@ -132,6 +161,7 @@ def verify_claim(
             reason="Claim rejected: Agent supplied proposed/claimed evidence, but verification requires an independently observed receipt.",
             evidence=evidence,
             ledger=ledger,
+            state_machine=sm,
         )
 
     recorded_hash = getattr(evidence, "receipt_hash", None)
@@ -141,6 +171,7 @@ def verify_claim(
             reason="Claim rejected: Missing evidence receipt hash. Authoritative receipt must have cryptographic receipt_hash.",
             evidence=evidence,
             ledger=ledger,
+            state_machine=sm,
         )
 
     if hasattr(evidence, "compute_hash") and recorded_hash != evidence.compute_hash():
@@ -149,6 +180,7 @@ def verify_claim(
             reason="Claim rejected: Evidence receipt hash mismatch. Tampering detected.",
             evidence=evidence,
             ledger=ledger,
+            state_machine=sm,
         )
 
     # Universal provenance check against LocalLedger
@@ -158,6 +190,7 @@ def verify_claim(
             reason="Claim rejected: Local ledger is required to verify observation provenance.",
             evidence=evidence,
             ledger=ledger,
+            state_machine=sm,
         )
 
     is_chain_valid, chain_error = ledger.verify_integrity()
@@ -167,6 +200,7 @@ def verify_claim(
             reason=f"Claim rejected: Local ledger integrity compromised ({chain_error}). Evidence provenance cannot be established.",
             evidence=evidence,
             ledger=ledger,
+            state_machine=sm,
         )
 
     matching_obs = None
@@ -181,6 +215,7 @@ def verify_claim(
             reason="Claim rejected: Agent supplied unobserved or untrusted evidence. Provenance not found in local ledger (missing OBSERVATION event).",
             evidence=evidence,
             ledger=ledger,
+            state_machine=sm,
         )
 
     obs_payload = matching_obs.get("payload", {})
@@ -190,6 +225,7 @@ def verify_claim(
             reason="Claim rejected: Receipt hash mismatch between evidence receipt and ledger OBSERVATION event. Tampering detected.",
             evidence=evidence,
             ledger=ledger,
+            state_machine=sm,
         )
 
     # Check fingerprint consistency between receipt and ledger
@@ -206,6 +242,7 @@ def verify_claim(
             reason="Claim rejected: Missing workspace fingerprints in evidence or ledger observation.",
             evidence=evidence,
             ledger=ledger,
+            state_machine=sm,
         )
 
     if receipt_fp_before != ledger_fp_before or receipt_fp_after != ledger_fp_after:
@@ -214,6 +251,7 @@ def verify_claim(
             reason="Claim rejected: Workspace fingerprint mismatch between evidence receipt and ledger OBSERVATION event.",
             evidence=evidence,
             ledger=ledger,
+            state_machine=sm,
         )
 
     # Check post-verification staleness
@@ -224,7 +262,15 @@ def verify_claim(
             reason=f"Claim rejected: Evidence is stale. {stale_reason}",
             evidence=evidence,
             ledger=ledger,
+            state_machine=sm,
         )
+
+    # Evidence is observed and valid: advance state machine
+    try:
+        sm.transition_to(VerificationState.OBSERVED, reason="Observed receipt validated")
+        sm.transition_to(VerificationState.VERIFICATION_RUNNING, reason="Executing verification plan")
+    except Exception:
+        pass
 
     # Invariant 3: Validate caller-requested verifier against actual detected verifier
     requested_v = getattr(claim, "requested_verifier", None) or getattr(claim, "verifier", None)
@@ -239,6 +285,7 @@ def verify_claim(
                 ),
                 evidence=evidence,
                 ledger=ledger,
+                state_machine=sm,
             )
 
     # Evaluate ClaimAcceptanceMatrix sufficiency
@@ -250,14 +297,21 @@ def verify_claim(
                 reason=f"Claim rejected per acceptance matrix: {matrix_reason}",
                 evidence=evidence,
                 ledger=ledger,
+                state_machine=sm,
             )
         elif def_verdict == "INCONCLUSIVE":
+            try:
+                sm.transition_to(VerificationState.INCONCLUSIVE, reason=matrix_reason)
+            except Exception:
+                pass
             return VerificationResult(
                 status="INCONCLUSIVE",
                 claim_id=claim.claim_id,
                 reason=matrix_reason,
                 observed_exit_code=getattr(evidence, "exit_code", None),
                 receipt_id=evidence.receipt_id,
+                verification_state="INCONCLUSIVE",
+                state_machine=sm,
             )
 
     # Select and invoke pluggable verifier
@@ -273,9 +327,16 @@ def verify_claim(
             ledger=ledger,
             exit_code=verdict.observed_exit_code,
             failed_tests=verdict.failed_tests,
+            state_machine=sm,
         )
 
     if verdict.is_inconclusive:
+        try:
+            sm.transition_to(VerificationState.INCONCLUSIVE, reason=verdict.reason)
+        except Exception:
+            pass
+        verdict.state_machine = sm
+        verdict.verification_state = "INCONCLUSIVE"
         return verdict
 
     # Emit VerificationEvent for accepted claims
@@ -293,6 +354,12 @@ def verify_claim(
         metadata={"exit_code": getattr(evidence, "exit_code", 0), "agent": getattr(evidence, "agent", "agent")},
     )
 
+    try:
+        sm.transition_to(VerificationState.ACCEPTED, reason=verdict.reason)
+    except Exception:
+        pass
+
+    verdict.state_machine = sm
     verdict.verification_state = "ACCEPTED"
     verdict.verification_event = event
     _update_hooks_verified(ws, getattr(evidence, "agent", ""))

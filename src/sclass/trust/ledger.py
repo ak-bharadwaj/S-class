@@ -56,6 +56,10 @@ class LocalLedger:
         last = self.get_last_entry()
         return last["hash"] if last else "0" * 64
 
+    def get_head_hash(self) -> str:
+        """Returns the hash of the latest entry or genesis zeroes (alias for get_last_hash)."""
+        return self.get_last_hash()
+
     def append(self, event: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Appends a new event and anchors its hash in the ledger."""
         with WorkspaceLock(self.paths.root, lock_name="ledger"):

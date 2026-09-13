@@ -120,6 +120,25 @@ def analyze_execution_chain(
 
     tokens_list = list(actual_tokens)
 
+    def _clean_exe(name: str) -> str:
+        base = os.path.basename(name).lower()
+        return base[:-4] if base.endswith(".exe") else base
+
+    def _unwrap_python_tokens(p_tokens: List[str]) -> Tuple[Optional[str], Optional[str]]:
+        """Given tokens starting with python (or sub-args), extracts (actual_child, verifier)."""
+        if len(p_tokens) > 2 and p_tokens[1] == "-m":
+            mod = _clean_exe(p_tokens[2])
+            v = "pytest" if "pytest" in mod else (mod if mod in ("unittest",) else None)
+            return mod, v
+        elif len(p_tokens) > 1 and p_tokens[1].startswith("-m"):
+            mod = _clean_exe(p_tokens[1][2:])
+            v = "pytest" if "pytest" in mod else (mod if mod in ("unittest",) else None)
+            return mod, v
+        elif len(p_tokens) > 1:
+            script = os.path.basename(p_tokens[1])
+            return script, None
+        return "python", None
+
     # 1. Shell / Wrapper detection (e.g. bash run_tests.sh, sh wrapper.sh, cmd /c)
     if exe_base in ("sh", "bash", "zsh", "cmd", "powershell", "pwsh"):
         launcher = exe_base
@@ -130,76 +149,147 @@ def analyze_execution_chain(
                 actual_child = sub
             elif sub in ("-c", "/c") and len(tokens_list) > 2:
                 wrapper = "inline_script"
-                actual_child = tokens_list[2]
+                script_body = tokens_list[2].strip()
+                actual_child = script_body
+                body_parts = script_body.split()
+                if body_parts:
+                    b_exe = _clean_exe(body_parts[0])
+                    if b_exe in ("pytest", "py.test"):
+                        actual_child = "pytest"
+                        verifier = "pytest"
+                    elif b_exe in ("python", "python3", "py"):
+                        interpreter = b_exe
+                        c_child, c_ver = _unwrap_python_tokens(body_parts)
+                        actual_child = c_child or actual_child
+                        verifier = c_ver
 
-    # 2. Modern Python / JS Package Runners & Tool Managers (uv, poetry, pipx, npx, bunx, mise, asdf, docker, podman)
+    # 2. Modern Python Package Runners & Tool Managers (uv, poetry, pipx)
     elif exe_base in ("uv", "poetry", "pipx"):
         launcher = exe_base
         interpreter = "python"
-        sub_args = tokens_list[2:] if len(tokens_list) > 1 and tokens_list[1] in ("run", "exec") else tokens_list[1:]
-        if sub_args:
-            sub_exe = os.path.basename(sub_args[0]).lower()
-            if sub_exe.endswith(".exe"):
-                sub_exe = sub_exe[:-4]
-            actual_child = sub_exe
-            if sub_exe in ("pytest", "py.test", "unittest"):
-                verifier = "pytest" if "pytest" in sub_exe else sub_exe
+        # Skip 'run' or 'exec' and any option flags (like --isolated, -v, --extra dev, etc.)
+        idx = 1
+        flags_with_val = {"-e", "-p", "-m", "--extra", "--with", "--python", "--env-file", "--directory", "-C"}
+        while idx < len(tokens_list):
+            tok = tokens_list[idx]
+            if tok in ("run", "exec", "--"):
+                idx += 1
+            elif tok in flags_with_val and idx + 1 < len(tokens_list):
+                idx += 2
+            elif tok.startswith("-"):
+                idx += 1
+            else:
+                break
 
+        sub_args = tokens_list[idx:]
+        if sub_args:
+            sub_exe = _clean_exe(sub_args[0])
+            if sub_exe in ("python", "python3", "py"):
+                c_child, c_ver = _unwrap_python_tokens(sub_args)
+                actual_child = c_child
+                verifier = c_ver
+            elif sub_exe in ("pytest", "py.test", "unittest"):
+                actual_child = "pytest" if "pytest" in sub_exe else sub_exe
+                verifier = actual_child
+            else:
+                actual_child = sub_exe
+
+    # 3. Modern JS Package Runners (npx, bunx)
     elif exe_base in ("npx", "bunx"):
         launcher = exe_base
         interpreter = "node" if exe_base == "npx" else "bun"
-        sub_args = tokens_list[1:]
+        idx = 1
+        flags_with_val = {"-p", "--package", "-c"}
+        while idx < len(tokens_list):
+            tok = tokens_list[idx]
+            if tok in flags_with_val and idx + 1 < len(tokens_list):
+                idx += 2
+            elif tok.startswith("-"):
+                idx += 1
+            else:
+                break
+        sub_args = tokens_list[idx:]
         if sub_args:
-            sub_exe = os.path.basename(sub_args[0]).lower()
-            if sub_exe.endswith(".exe"):
-                sub_exe = sub_exe[:-4]
+            sub_exe = _clean_exe(sub_args[0])
             actual_child = sub_exe
             if sub_exe in ("jest", "vitest", "mocha", "playwright"):
                 verifier = sub_exe
 
+    # 4. Environment managers (mise, asdf)
     elif exe_base in ("mise", "asdf"):
         launcher = exe_base
-        sub_args = [t for t in tokens_list[1:] if t not in ("exec", "run", "--")]
+        idx = 1
+        while idx < len(tokens_list):
+            tok = tokens_list[idx]
+            if tok in ("exec", "run", "--"):
+                idx += 1
+            elif tok.startswith("-"):
+                idx += 1
+            else:
+                break
+        sub_args = tokens_list[idx:]
         if sub_args:
-            sub_exe = os.path.basename(sub_args[0]).lower()
-            if sub_exe.endswith(".exe"):
-                sub_exe = sub_exe[:-4]
-            actual_child = sub_exe
-            if sub_exe in ("pytest", "jest", "vitest", "cargo", "go"):
+            sub_exe = _clean_exe(sub_args[0])
+            if sub_exe in ("python", "python3", "py"):
+                interpreter = sub_exe
+                c_child, c_ver = _unwrap_python_tokens(sub_args)
+                actual_child = c_child
+                verifier = c_ver
+            elif sub_exe in ("pytest", "jest", "vitest", "cargo", "go"):
+                actual_child = sub_exe
                 verifier = sub_exe
+            else:
+                actual_child = sub_exe
 
+    # 5. Containers (docker, podman)
     elif exe_base in ("docker", "podman"):
         launcher = exe_base
-        sub_args = [t for t in tokens_list[1:] if not t.startswith("-") and t not in ("run", "exec")]
-        if sub_args:
-            sub_exe = os.path.basename(sub_args[-1]).lower() if len(sub_args) > 1 else sub_args[0]
-            if sub_exe.endswith(".exe"):
-                sub_exe = sub_exe[:-4]
-            actual_child = sub_exe
-            if sub_exe in ("pytest", "jest", "vitest"):
-                verifier = sub_exe
+        idx = 1
+        flags_with_val = {
+            "-v", "--volume", "-p", "--publish", "-e", "--env", "--env-file",
+            "-w", "--workdir", "-u", "--user", "--name", "--network", "--mount", "--entrypoint"
+        }
+        while idx < len(tokens_list):
+            tok = tokens_list[idx]
+            if tok in ("run", "exec"):
+                idx += 1
+            elif tok in flags_with_val and idx + 1 < len(tokens_list):
+                idx += 2
+            elif tok.startswith("-"):
+                idx += 1
+            else:
+                break
 
-    # 3. Python Chains (python -m pytest tests/)
+        # idx is now the image token
+        if idx < len(tokens_list):
+            _image = tokens_list[idx]
+            cmd_args = tokens_list[idx + 1:]
+            if cmd_args:
+                cmd_exe = _clean_exe(cmd_args[0])
+                if cmd_exe in ("python", "python3", "py"):
+                    interpreter = "python"
+                    c_child, c_ver = _unwrap_python_tokens(cmd_args)
+                    actual_child = c_child
+                    verifier = c_ver
+                elif cmd_exe in ("pytest", "py.test", "jest", "vitest", "mocha"):
+                    actual_child = "pytest" if "pytest" in cmd_exe else cmd_exe
+                    verifier = actual_child
+                else:
+                    actual_child = cmd_exe
+            else:
+                actual_child = _image
+
+    # 6. Python Chains (python -m pytest tests/)
     elif exe_base in ("python", "python3", "py"):
         interpreter = exe_base
         launcher = launcher or tokens_list[0]
-        if len(tokens_list) > 2 and tokens_list[1] == "-m":
-            mod = tokens_list[2].lower()
-            actual_child = mod
-            if mod in ("pytest", "unittest"):
-                verifier = mod
-        elif len(tokens_list) > 1 and tokens_list[1].startswith("-m"):
-            mod = tokens_list[1][2:].lower()
-            actual_child = mod
-            if mod in ("pytest", "unittest"):
-                verifier = mod
-        elif len(tokens_list) > 1:
-            script = tokens_list[1]
-            actual_child = os.path.basename(script)
-            if "wrapper" in script.lower():
-                wrapper = script
+        c_child, c_ver = _unwrap_python_tokens(tokens_list)
+        actual_child = c_child
+        verifier = c_ver
+        if len(tokens_list) > 1 and "wrapper" in tokens_list[1].lower():
+            wrapper = tokens_list[1]
 
-    # 3. Node / NPM Package Runner Chains (npm run test, pnpm test, yarn test, bun test)
+    # 7. Node / NPM Package Runner Chains (npm run test, pnpm test, yarn test, bun test)
     elif exe_base in ("npm", "pnpm", "yarn", "bun"):
         launcher = tokens_list[0]
         interpreter = exe_base
@@ -211,8 +301,7 @@ def analyze_execution_chain(
         else:
             actual_child = "script"
 
-
-    # 4. Node directly (node runner.js)
+    # 8. Node directly (node runner.js)
     elif exe_base in ("node", "deno"):
         interpreter = exe_base
         launcher = launcher or tokens_list[0]
@@ -224,7 +313,7 @@ def analyze_execution_chain(
             elif "mocha" in target.lower():
                 verifier = "mocha"
 
-    # 5. Direct Test Runner Binaries
+    # 9. Direct Test Runner Binaries
     elif exe_base in ("pytest", "py.test"):
         launcher = launcher or tokens_list[0]
         actual_child = "pytest"
