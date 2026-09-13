@@ -58,3 +58,8 @@ class PolicyEvaluationError(SClassError):
 class StorageError(SClassError):
     """Raised when SQLite, event journal, or content-addressed storage fails."""
     pass
+
+
+class HandoffIntegrityError(SClassError):
+    """Raised when handoff package or context assembly fails due to database or state integrity error."""
+    pass

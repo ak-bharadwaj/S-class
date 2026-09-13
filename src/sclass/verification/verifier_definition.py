@@ -13,6 +13,7 @@ from typing import Tuple, Dict, Any, Optional, List, Callable
 
 class VerifierTrustMode(str, Enum):
     """Categorical trust mode for test runner binaries and verifier environments."""
+    TRUSTED = "TRUSTED"
     SYSTEM_TRUSTED = "SYSTEM_TRUSTED"
     USER_TRUSTED = "USER_TRUSTED"
     WORKSPACE_TRUSTED = "WORKSPACE_TRUSTED"

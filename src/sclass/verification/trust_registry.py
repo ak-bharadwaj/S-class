@@ -25,6 +25,8 @@ class TrustPolicy:
     untrusted_hashes: Set[str] = field(default_factory=set)
     untrusted_paths: Set[str] = field(default_factory=set)
     workspace_dirs: Set[str] = field(default_factory=set)
+    trusted_paths: Set[str] = field(default_factory=set)
+    trusted_hashes: Set[str] = field(default_factory=set)
 
     def __post_init__(self):
         # Always add standard Python system prefixes
@@ -131,6 +133,16 @@ class TrustRegistry:
         if binary_hash:
             self.policy.untrusted_hashes.add(binary_hash.lower())
 
+    def mark_trusted_path(self, path: str) -> None:
+        """Explicitly flags a path as trusted."""
+        if path:
+            self.policy.trusted_paths.add(os.path.normpath(path).lower())
+
+    def mark_trusted_hash(self, binary_hash: str) -> None:
+        """Explicitly flags a binary hash as trusted."""
+        if binary_hash:
+            self.policy.trusted_hashes.add(binary_hash.lower())
+
     def classify_binary_trust(
         self,
         executable_path: str,
@@ -139,18 +151,32 @@ class TrustRegistry:
     ) -> VerifierTrustMode:
         """
         Determines the authoritative trust mode of an executable binary.
+        Hierarchy:
+        - Explicit compromised/untrusted -> UNTRUSTED
+        - Explicit trusted path/hash    -> TRUSTED
+        - Workspace trusted             -> WORKSPACE_TRUSTED
+        - User trusted                  -> USER_TRUSTED
+        - System allowlisted            -> SYSTEM_TRUSTED
+        - Unrecognized binary           -> UNKNOWN (fail-closed, NEVER SYSTEM_TRUSTED)
         """
         if not executable_path:
             return VerifierTrustMode.UNKNOWN
 
         norm_path = os.path.normpath(executable_path).lower()
 
-        # 1. Explicit untrusted check
+        # 1. Explicit compromised / untrusted check
         if norm_path in self.policy.untrusted_paths:
             return VerifierTrustMode.UNTRUSTED
 
         if binary_hash and binary_hash.lower() in self.policy.untrusted_hashes:
             return VerifierTrustMode.UNTRUSTED
+
+        # 2. Explicit trusted check
+        if norm_path in self.policy.trusted_paths:
+            return VerifierTrustMode.TRUSTED
+
+        if binary_hash and binary_hash.lower() in self.policy.trusted_hashes:
+            return VerifierTrustMode.TRUSTED
 
         ws = os.path.normpath(workspace_dir).lower() if workspace_dir else ""
 
@@ -164,7 +190,7 @@ class TrustRegistry:
                     continue
                 return VerifierTrustMode.UNTRUSTED
 
-        # 2. Workspace trust
+        # 3. Workspace trust
         if ws and norm_path.startswith(ws):
             # Binary located directly within workspace or workspace venv
             return VerifierTrustMode.WORKSPACE_TRUSTED
@@ -173,12 +199,12 @@ class TrustRegistry:
             if norm_path.startswith(wdir):
                 return VerifierTrustMode.WORKSPACE_TRUSTED
 
-        # 3. User trusted
+        # 4. User trusted
         for udir in self.policy.user_trusted_dirs:
             if norm_path.startswith(udir):
                 return VerifierTrustMode.USER_TRUSTED
 
-        # 4. System trusted
+        # 5. System allowlisted
         for sdir in self.policy.system_trusted_dirs:
             if norm_path.startswith(sdir):
                 return VerifierTrustMode.SYSTEM_TRUSTED
@@ -187,8 +213,8 @@ class TrustRegistry:
         if norm_path == os.path.normpath(sys.executable).lower():
             return VerifierTrustMode.SYSTEM_TRUSTED
 
-        # Default fallback
-        return VerifierTrustMode.SYSTEM_TRUSTED if os.path.isabs(norm_path) else VerifierTrustMode.UNKNOWN
+        # 6. Fail-closed default fallback: unrecognized binary is UNKNOWN (NEVER SYSTEM_TRUSTED)
+        return VerifierTrustMode.UNKNOWN
 
     def evaluate_verifier(
         self,
@@ -233,6 +259,9 @@ class TrustRegistry:
 
         if trust_mode == VerifierTrustMode.UNTRUSTED:
             return matched_defn, trust_mode, f"IDENTIFIED_AS_{vid}+UNTRUSTED_BINARY"
+
+        if trust_mode == VerifierTrustMode.UNKNOWN:
+            return matched_defn, trust_mode, f"IDENTIFIED_AS_{vid}+UNKNOWN_BINARY"
 
         return matched_defn, trust_mode, f"AUTHORIZED_{vid}"
 

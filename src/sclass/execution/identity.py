@@ -29,6 +29,13 @@ class ExecutionIdentityState(str, Enum):
     IDENTITY_UNCERTAIN = "IDENTITY_UNCERTAIN"
 
 
+class PlatformSupportStatus(str, Enum):
+    """Authoritative platform support status for process inspection."""
+    SUPPORTED = "supported"
+    DEGRADED = "degraded"
+    UNSUPPORTED = "unsupported"
+
+
 
 def _query_windows_process_image(pid: int) -> Tuple[Optional[str], Optional[str]]:
     """
@@ -178,6 +185,19 @@ class ExecutionIdentity:
     wrapper_identity: Optional[str] = None
     identity_state: str = ExecutionIdentityState.IDENTIFIED.value
     execution_chain: Optional[Dict[str, Any]] = None
+    ppid: Optional[int] = None
+    uid: Optional[int] = None
+    gid: Optional[int] = None
+    parent_chain: tuple[int, ...] = field(default_factory=tuple)
+    platform: str = field(default_factory=platform.system)
+    container_sandbox_identity: Optional[str] = None
+    platform_support_status: str = PlatformSupportStatus.SUPPORTED.value
+
+    def __post_init__(self):
+        if self.ppid is None and self.parent_pid is not None:
+            object.__setattr__(self, "ppid", self.parent_pid)
+        elif self.parent_pid is None and self.ppid is not None:
+            object.__setattr__(self, "parent_pid", self.ppid)
 
     @property
     def executable(self) -> str:
@@ -194,6 +214,10 @@ class ExecutionIdentity:
     @property
     def start_time(self) -> str:
         return self.process_start_time
+
+    @property
+    def environment_fingerprint(self) -> str:
+        return self.environment_digest
 
     @classmethod
     def capture(
@@ -286,6 +310,38 @@ class ExecutionIdentity:
         # 5. Execution chain
         chain = detect_execution_chain(actual_tokens, resolved)
 
+        # 6. Platform identity and support status
+        plat = platform.system()
+        if plat in ("Windows", "Linux", "Darwin"):
+            if pid and resolved and actual_start_time:
+                plat_status = PlatformSupportStatus.SUPPORTED.value
+            else:
+                plat_status = PlatformSupportStatus.DEGRADED.value
+        else:
+            plat_status = PlatformSupportStatus.UNSUPPORTED.value
+
+        # 7. UID, GID, parent chain, and container sandbox identity
+        actual_parent_pid = parent_pid or (os.getppid() if hasattr(os, "getppid") else None)
+        cur_uid = os.getuid() if hasattr(os, "getuid") else None
+        cur_gid = os.getgid() if hasattr(os, "getgid") else None
+
+        chain_pids = []
+        if actual_parent_pid:
+            chain_pids.append(actual_parent_pid)
+        if hasattr(os, "getpid") and os.getpid() not in chain_pids:
+            chain_pids.append(os.getpid())
+        parent_chain_tuple = tuple(chain_pids)
+
+        container_id: Optional[str] = None
+        if os.path.exists("/.dockerenv"):
+            container_id = "docker"
+        elif os.path.exists("/run/.containerenv"):
+            container_id = "podman"
+        elif "CONTAINER_ID" in os.environ:
+            container_id = os.environ["CONTAINER_ID"]
+        elif "KUBERNETES_SERVICE_HOST" in os.environ:
+            container_id = "kubernetes"
+
         return cls(
             requested_argv=req_tokens,
             actual_argv=actual_tokens,
@@ -293,7 +349,14 @@ class ExecutionIdentity:
             executable_path=resolved,
             executable_hash=exe_hash,
             pid=pid or os.getpid(),
-            parent_pid=parent_pid or (os.getppid() if hasattr(os, "getppid") else None),
+            parent_pid=actual_parent_pid,
+            ppid=actual_parent_pid,
+            uid=cur_uid,
+            gid=cur_gid,
+            parent_chain=parent_chain_tuple,
+            platform=plat,
+            container_sandbox_identity=container_id,
+            platform_support_status=plat_status,
             process_start_time=start_time_val,
             cwd=os.path.abspath(cwd) if cwd else os.getcwd(),
             environment_digest=env_digest,
@@ -309,7 +372,8 @@ class ExecutionIdentity:
         payload = (
             f"{self.executable_path}|{self.executable_hash}|"
             f"{' '.join(self.actual_argv)}|{' '.join(self.requested_argv)}|"
-            f"{self.cwd}|{self.environment_digest}|{self.execution_mode}|{self.identity_state}"
+            f"{self.cwd}|{self.environment_digest}|{self.execution_mode}|{self.identity_state}|"
+            f"{self.platform}|{self.platform_support_status}"
         )
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
@@ -325,8 +389,16 @@ class ExecutionIdentity:
             "argv": list(self.actual_argv),
             "cwd": self.cwd,
             "environment_digest": self.environment_digest,
+            "environment_fingerprint": self.environment_digest,
             "parent_pid": self.parent_pid,
+            "ppid": self.ppid or self.parent_pid,
             "pid": self.pid,
+            "uid": self.uid,
+            "gid": self.gid,
+            "parent_chain": list(self.parent_chain),
+            "platform": self.platform,
+            "container_sandbox_identity": self.container_sandbox_identity,
+            "platform_support_status": self.platform_support_status,
             "start_time": self.process_start_time,
             "process_start_time": self.process_start_time,
             "execution_mode": self.execution_mode,
@@ -341,6 +413,7 @@ class ExecutionIdentity:
     def from_dict(cls, data: Dict[str, Any]) -> ExecutionIdentity:
         req_argv = tuple(data.get("requested_argv", data.get("argv", [])))
         act_argv = tuple(data.get("actual_argv", data.get("argv", [])))
+        parent_p = data.get("parent_pid", data.get("ppid"))
         return cls(
             requested_argv=req_argv,
             actual_argv=act_argv,
@@ -348,10 +421,17 @@ class ExecutionIdentity:
             executable_path=data.get("executable_path", data.get("resolved_path", "")),
             executable_hash=data.get("executable_hash", ""),
             pid=data.get("pid"),
-            parent_pid=data.get("parent_pid"),
+            parent_pid=parent_p,
+            ppid=data.get("ppid", parent_p),
+            uid=data.get("uid"),
+            gid=data.get("gid"),
+            parent_chain=tuple(data.get("parent_chain", [])),
+            platform=data.get("platform", platform.system()),
+            container_sandbox_identity=data.get("container_sandbox_identity"),
+            platform_support_status=data.get("platform_support_status", PlatformSupportStatus.SUPPORTED.value),
             process_start_time=data.get("process_start_time", data.get("start_time", datetime.now(timezone.utc).isoformat())),
             cwd=data.get("cwd", ""),
-            environment_digest=data.get("environment_digest", ""),
+            environment_digest=data.get("environment_digest", data.get("environment_fingerprint", "")),
             execution_mode=data.get("execution_mode", ExecutionMode.HOST_ARGV.value),
             launcher_identity=data.get("launcher_identity"),
             wrapper_identity=data.get("wrapper_identity"),

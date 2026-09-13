@@ -20,10 +20,18 @@ from sclass.core.errors import ObservationIntegrityError
 class ObservationLifecycleState(str, Enum):
     """Authoritative states of an observed execution lifecycle."""
     REQUESTED = "REQUESTED"
-    SPAWNED = "SPAWNED"
-    IDENTIFIED = "IDENTIFIED"
+    AUTHORIZED = "AUTHORIZED"
+    STARTED = "STARTED"
+    RUNNING = "RUNNING"
+    EXITED = "EXITED"
     OBSERVED = "OBSERVED"
     ANCHORED = "ANCHORED"
+    VERIFIED = "VERIFIED"
+    INVALIDATED = "INVALIDATED"
+
+    # Compatibility / execution states
+    SPAWNED = "SPAWNED"
+    IDENTIFIED = "IDENTIFIED"
     PUBLISHED = "PUBLISHED"
 
     # Terminal failure states
@@ -56,24 +64,55 @@ class ObservationLifecycleTracker:
 
     VALID_TRANSITIONS = {
         ObservationLifecycleState.REQUESTED: {
+            ObservationLifecycleState.AUTHORIZED,
             ObservationLifecycleState.SPAWNED,
             ObservationLifecycleState.OBSERVATION_FAILED,
         },
-        ObservationLifecycleState.SPAWNED: {
-            ObservationLifecycleState.IDENTIFIED,
-            ObservationLifecycleState.IDENTITY_UNCERTAIN,
+        ObservationLifecycleState.AUTHORIZED: {
+            ObservationLifecycleState.STARTED,
+            ObservationLifecycleState.SPAWNED,
             ObservationLifecycleState.OBSERVATION_FAILED,
         },
-        ObservationLifecycleState.IDENTIFIED: {
+        ObservationLifecycleState.STARTED: {
+            ObservationLifecycleState.RUNNING,
+            ObservationLifecycleState.OBSERVATION_FAILED,
+        },
+        ObservationLifecycleState.RUNNING: {
+            ObservationLifecycleState.EXITED,
+            ObservationLifecycleState.OBSERVED,
+            ObservationLifecycleState.OBSERVATION_FAILED,
+        },
+        ObservationLifecycleState.EXITED: {
             ObservationLifecycleState.OBSERVED,
             ObservationLifecycleState.OBSERVATION_FAILED,
         },
         ObservationLifecycleState.OBSERVED: {
             ObservationLifecycleState.ANCHORED,
             ObservationLifecycleState.ANCHOR_FAILED,
+            ObservationLifecycleState.OBSERVATION_FAILED,
         },
         ObservationLifecycleState.ANCHORED: {
+            ObservationLifecycleState.VERIFIED,
             ObservationLifecycleState.PUBLISHED,
+            ObservationLifecycleState.INVALIDATED,
+        },
+        ObservationLifecycleState.VERIFIED: {
+            ObservationLifecycleState.INVALIDATED,
+        },
+        # Compatibility transitions
+        ObservationLifecycleState.SPAWNED: {
+            ObservationLifecycleState.IDENTIFIED,
+            ObservationLifecycleState.IDENTITY_UNCERTAIN,
+            ObservationLifecycleState.RUNNING,
+            ObservationLifecycleState.OBSERVED,
+            ObservationLifecycleState.OBSERVATION_FAILED,
+        },
+        ObservationLifecycleState.IDENTIFIED: {
+            ObservationLifecycleState.OBSERVED,
+            ObservationLifecycleState.OBSERVATION_FAILED,
+        },
+        ObservationLifecycleState.PUBLISHED: {
+            ObservationLifecycleState.INVALIDATED,
         },
     }
 

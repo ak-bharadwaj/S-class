@@ -4,6 +4,7 @@ Preserves cryptographic invariants and enforces post-issuance immutability for O
 """
 
 from __future__ import annotations
+import os
 import json
 import hashlib
 from dataclasses import dataclass, field
@@ -17,6 +18,51 @@ LIFECYCLE_INTEGRITY_VERIFIED = "integrity_verified"
 LIFECYCLE_CLAIM_VERIFIED = "claim_verified"
 
 _OBSERVATION_TOKEN = object()
+
+
+@dataclass(frozen=True)
+class EvidenceDependencies:
+    """
+    Immutable evidence dependency graph specification.
+    Captures exact preconditions required for this evidence to remain valid:
+    - execution_identity
+    - argv
+    - workspace_fingerprint
+    - relevant_files
+    - environment_constraints
+    - verifier
+    - verifier_output
+    """
+    execution_identity: Optional[Dict[str, Any]] = None
+    argv: tuple[str, ...] = field(default_factory=tuple)
+    workspace_fingerprint: str = ""
+    relevant_files: tuple[str, ...] = field(default_factory=tuple)
+    environment_constraints: Dict[str, str] = field(default_factory=dict)
+    verifier: str = ""
+    verifier_output_hash: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "execution_identity": self.execution_identity,
+            "argv": list(self.argv),
+            "workspace_fingerprint": self.workspace_fingerprint,
+            "relevant_files": list(self.relevant_files),
+            "environment_constraints": dict(self.environment_constraints),
+            "verifier": self.verifier,
+            "verifier_output_hash": self.verifier_output_hash,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> EvidenceDependencies:
+        return cls(
+            execution_identity=data.get("execution_identity"),
+            argv=tuple(data.get("argv", [])),
+            workspace_fingerprint=data.get("workspace_fingerprint", ""),
+            relevant_files=tuple(data.get("relevant_files", [])),
+            environment_constraints=dict(data.get("environment_constraints", {})),
+            verifier=data.get("verifier", ""),
+            verifier_output_hash=data.get("verifier_output_hash", ""),
+        )
 
 
 @dataclass
@@ -50,7 +96,44 @@ class EvidenceReceipt:
     execution_kind: str = "generic_command"
     verifier: str = ""
     workspace_fingerprint: str = ""
+    dependencies: Optional[EvidenceDependencies] = None
     _observation_token: Optional[object] = field(default=None, repr=False, compare=False)
+
+    def get_dependencies(self) -> EvidenceDependencies:
+        """Returns authoritative EvidenceDependencies for this receipt."""
+        if self.dependencies is not None:
+            return self.dependencies
+        meta = self.metadata if isinstance(self.metadata, dict) else {}
+        exec_id = meta.get("execution_identity")
+        act_argv = tuple(exec_id.get("actual_argv", [])) if (exec_id and isinstance(exec_id, dict)) else tuple(self.command.split())
+        env_constraints = {}
+        if exec_id and isinstance(exec_id, dict) and "environment_digest" in exec_id:
+            env_constraints["environment_digest"] = exec_id["environment_digest"]
+        out_hash = self.stdout_hash or self.stderr_hash
+        return EvidenceDependencies(
+            execution_identity=exec_id,
+            argv=act_argv,
+            workspace_fingerprint=self.workspace_fingerprint,
+            relevant_files=tuple(sorted(list(self.files_changed))),
+            environment_constraints=env_constraints,
+            verifier=self.verifier,
+            verifier_output_hash=out_hash,
+        )
+
+    def validate_dependencies(self, workspace_dir: str) -> Tuple[bool, Optional[str]]:
+        """
+        Evaluates immutable dependency graph against current workspace state.
+        If workspace mutation is detected, dependent evidence is invalid.
+        """
+        from sclass.observation.fingerprint import compute_workspace_snapshot, compute_workspace_fingerprint
+        ws = os.path.abspath(workspace_dir)
+        deps = self.get_dependencies()
+        if deps.workspace_fingerprint:
+            curr_snap = compute_workspace_snapshot(ws)
+            curr_fp = compute_workspace_fingerprint(curr_snap)
+            if curr_fp != deps.workspace_fingerprint:
+                return False, f"Workspace mutation detected: files or content modified after observation (fingerprint changed from {deps.workspace_fingerprint[:12]} to {curr_fp[:12]}). Dependent evidence invalidated."
+        return True, None
 
     def compute_hash(self) -> str:
         """
@@ -141,10 +224,13 @@ class EvidenceReceipt:
             "execution_kind": self.execution_kind,
             "verifier": self.verifier,
             "workspace_fingerprint": self.workspace_fingerprint,
+            "dependencies": self.get_dependencies().to_dict(),
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> EvidenceReceipt:
+        deps_data = data.get("dependencies")
+        deps = EvidenceDependencies.from_dict(deps_data) if (deps_data and isinstance(deps_data, dict)) else None
         receipt = cls(
             receipt_id=data["receipt_id"],
             task_id=data.get("task_id", "task_default"),
@@ -171,6 +257,7 @@ class EvidenceReceipt:
             execution_kind=data.get("execution_kind", "generic_command"),
             verifier=data.get("verifier", ""),
             workspace_fingerprint=data.get("workspace_fingerprint", ""),
+            dependencies=deps,
             _observation_token=None,
         )
         return receipt

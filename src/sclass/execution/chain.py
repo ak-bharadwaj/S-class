@@ -44,6 +44,21 @@ class ExecutionChain:
         elif self.actual_child is None and self.child is not None:
             object.__setattr__(self, "actual_child", self.child)
 
+    def describe_chain(self) -> str:
+        """Returns human and auditor explanation of which executable actually produced this receipt."""
+        parts = []
+        if self.launcher:
+            parts.append(f"launcher:{self.launcher}")
+        if self.wrapper:
+            parts.append(f"wrapper:{self.wrapper}")
+        if self.interpreter:
+            parts.append(f"interpreter:{self.interpreter}")
+        if self.actual_child:
+            parts.append(f"child:{self.actual_child}")
+        if self.verifier:
+            parts.append(f"verifier:{self.verifier}")
+        return " -> ".join(parts) if parts else "unclassified_process"
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "requested": list(self.requested),
@@ -117,7 +132,54 @@ def analyze_execution_chain(
                 wrapper = "inline_script"
                 actual_child = tokens_list[2]
 
-    # 2. Python Chains (python -m pytest tests/)
+    # 2. Modern Python / JS Package Runners & Tool Managers (uv, poetry, pipx, npx, bunx, mise, asdf, docker, podman)
+    elif exe_base in ("uv", "poetry", "pipx"):
+        launcher = exe_base
+        interpreter = "python"
+        sub_args = tokens_list[2:] if len(tokens_list) > 1 and tokens_list[1] in ("run", "exec") else tokens_list[1:]
+        if sub_args:
+            sub_exe = os.path.basename(sub_args[0]).lower()
+            if sub_exe.endswith(".exe"):
+                sub_exe = sub_exe[:-4]
+            actual_child = sub_exe
+            if sub_exe in ("pytest", "py.test", "unittest"):
+                verifier = "pytest" if "pytest" in sub_exe else sub_exe
+
+    elif exe_base in ("npx", "bunx"):
+        launcher = exe_base
+        interpreter = "node" if exe_base == "npx" else "bun"
+        sub_args = tokens_list[1:]
+        if sub_args:
+            sub_exe = os.path.basename(sub_args[0]).lower()
+            if sub_exe.endswith(".exe"):
+                sub_exe = sub_exe[:-4]
+            actual_child = sub_exe
+            if sub_exe in ("jest", "vitest", "mocha", "playwright"):
+                verifier = sub_exe
+
+    elif exe_base in ("mise", "asdf"):
+        launcher = exe_base
+        sub_args = [t for t in tokens_list[1:] if t not in ("exec", "run", "--")]
+        if sub_args:
+            sub_exe = os.path.basename(sub_args[0]).lower()
+            if sub_exe.endswith(".exe"):
+                sub_exe = sub_exe[:-4]
+            actual_child = sub_exe
+            if sub_exe in ("pytest", "jest", "vitest", "cargo", "go"):
+                verifier = sub_exe
+
+    elif exe_base in ("docker", "podman"):
+        launcher = exe_base
+        sub_args = [t for t in tokens_list[1:] if not t.startswith("-") and t not in ("run", "exec")]
+        if sub_args:
+            sub_exe = os.path.basename(sub_args[-1]).lower() if len(sub_args) > 1 else sub_args[0]
+            if sub_exe.endswith(".exe"):
+                sub_exe = sub_exe[:-4]
+            actual_child = sub_exe
+            if sub_exe in ("pytest", "jest", "vitest"):
+                verifier = sub_exe
+
+    # 3. Python Chains (python -m pytest tests/)
     elif exe_base in ("python", "python3", "py"):
         interpreter = exe_base
         launcher = launcher or tokens_list[0]

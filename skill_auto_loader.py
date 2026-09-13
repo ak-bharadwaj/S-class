@@ -307,8 +307,8 @@ alwaysApply: false
     def _format_skills_summary(skills: List[SkillDefinition]) -> str:
         blocks = []
         for s in skills:
-            blocks.append(f"### Playbook: {s.name}\n> {s.description}\n\n{s.content}\n")
-        return "\n---\n".join(blocks)
+            blocks.append(f"- **{s.name}**: {s.description}")
+        return "\n".join(blocks)
 
     @staticmethod
     def _update_markdown_section(file_path: str, header: str, content: str) -> None:

@@ -17,6 +17,7 @@ from typing import Dict, Any, List, Optional, Tuple
 from sclass.domain.task import Task, TaskState
 from sclass.state.tasks import StateRepository
 from sclass.trust.ledger import LocalLedger
+from sclass.core.errors import HandoffIntegrityError
 
 
 @dataclass
@@ -105,7 +106,11 @@ class HandoffAssembler:
         Authoritatively derives verified state, failed claims, blocked tasks,
         recent decisions, and ledger head from SQLite store and LocalLedger.
         """
-        tasks = self.repo.list_tasks(project_id=project_id)
+        try:
+            tasks = self.repo.list_tasks(project_id=project_id)
+        except Exception as e:
+            raise HandoffIntegrityError(f"Database access failure while listing tasks for project '{project_id}': {e}") from e
+
         verified = [t.to_dict() for t in tasks if t.state == TaskState.VERIFIED]
         blocked = [t.to_dict() for t in tasks if t.state == TaskState.BLOCKED]
         in_progress = next(
@@ -140,8 +145,8 @@ class HandoffAssembler:
                         "failed_tests": r["failed_tests"],
                         "verification_time": r["verification_time"],
                     })
-        except Exception:
-            pass
+        except Exception as e:
+            raise HandoffIntegrityError(f"Database access failure while retrieving verification history: {e}") from e
 
         # Also incorporate any blocked tasks into known failure modes if not duplicate
         for bt in blocked:

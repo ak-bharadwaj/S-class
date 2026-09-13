@@ -22,6 +22,12 @@ from sclass.verification.acceptance import ClaimAcceptanceMatrix
 def check_staleness(evidence: Any, workspace_dir: str) -> Tuple[bool, Optional[str]]:
     """Detects whether repository state was modified after the evidence was observed."""
     ws = os.path.abspath(workspace_dir)
+
+    if hasattr(evidence, "validate_dependencies") and callable(evidence.validate_dependencies):
+        is_valid, dep_reason = evidence.validate_dependencies(ws)
+        if not is_valid:
+            return False, dep_reason or "Workspace files or content modified after observation."
+
     current_snapshot = compute_workspace_snapshot(ws)
     current_fp = compute_workspace_fingerprint(current_snapshot)
 
@@ -84,6 +90,7 @@ def _record_rejection(
         observed_exit_code=exit_code,
         failed_tests=failed_tests,
         receipt_id=r_id,
+        verification_state="REJECTED",
         verification_event=event,
     )
     if ledger:
@@ -286,6 +293,7 @@ def verify_claim(
         metadata={"exit_code": getattr(evidence, "exit_code", 0), "agent": getattr(evidence, "agent", "agent")},
     )
 
+    verdict.verification_state = "ACCEPTED"
     verdict.verification_event = event
     _update_hooks_verified(ws, getattr(evidence, "agent", ""))
 

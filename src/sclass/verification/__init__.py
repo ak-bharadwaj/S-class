@@ -8,6 +8,7 @@ from sclass.verification.verifiers.pytest_verifier import PytestVerifier
 from sclass.verification.verifiers.generic_verifier import GenericVerifier
 from sclass.verification.registry import VerifierRegistry, get_verifier_registry
 from sclass.verification.engine import verify_claim, check_staleness
+from sclass.verification.state_machine import VerificationState, VerificationStateMachine
 
 __all__ = [
     "Verifier",
@@ -17,4 +18,6 @@ __all__ = [
     "get_verifier_registry",
     "verify_claim",
     "check_staleness",
+    "VerificationState",
+    "VerificationStateMachine",
 ]
