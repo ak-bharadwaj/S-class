@@ -61,10 +61,15 @@ class ACPTerminalGateway:
             ledger=self.ledger,
         )
 
+        stdout_content = receipt.metadata.get("stdout", "")
+        stderr_content = receipt.metadata.get("stderr", "")
+
         return ACPTerminalExecResult(
             command=params.command,
             exit_code=receipt.exit_code,
-            stdout=receipt.stdout_hash,
-            stderr=receipt.stderr_hash,
+            stdout=stdout_content,
+            stderr=stderr_content,
             execution_receipt_id=receipt.receipt_id,
+            stdout_hash=receipt.stdout_hash,
+            stderr_hash=receipt.stderr_hash,
         )

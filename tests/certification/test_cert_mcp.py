@@ -148,3 +148,39 @@ def test_cert_mcp_gateway_integration(workspace):
     status_resp = gateway.process_message(status_call)
     assert "result" in status_resp
     assert status_resp["result"]["task_id"] == task_id
+
+    # 4. tasks/result via gateway
+    result_call = {
+        "jsonrpc": "2.0",
+        "id": "task-result-1",
+        "method": "tasks/result",
+        "params": {"task_id": task_id},
+    }
+    res_resp = gateway.process_message(result_call)
+    assert "result" in res_resp
+    assert res_resp["result"]["task_id"] == task_id
+    assert res_resp["result"]["status"] in ("completed", "running")
+
+    # 5. tasks/start with dangerous command blocked by S-Class policy
+    danger_call = {
+        "jsonrpc": "2.0",
+        "id": "task-danger-1",
+        "method": "tasks/start",
+        "params": {"name": "run_command", "arguments": {"command": "rm -rf /"}},
+    }
+    danger_resp = gateway.process_message(danger_call)
+    assert "error" in danger_resp
+    assert danger_resp["error"]["code"] == -32003
+    assert "DENIED" in danger_resp["error"]["message"]
+    assert "SCLASS-SEC-DANGEROUS" in danger_resp["error"]["data"]["policy_id"]
+
+    # 6. tasks/cancel via gateway
+    cancel_call = {
+        "jsonrpc": "2.0",
+        "id": "task-cancel-1",
+        "method": "tasks/cancel",
+        "params": {"task_id": task_id, "reason": "test finished"},
+    }
+    cancel_resp = gateway.process_message(cancel_call)
+    assert "result" in cancel_resp
+    assert cancel_resp["result"]["task_id"] == task_id

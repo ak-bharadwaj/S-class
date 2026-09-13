@@ -241,3 +241,6 @@ class ACPTerminalExecResult(BaseModel):
     stdout: str
     stderr: str
     execution_receipt_id: Optional[str] = None
+    stdout_hash: Optional[str] = None
+    stderr_hash: Optional[str] = None
+

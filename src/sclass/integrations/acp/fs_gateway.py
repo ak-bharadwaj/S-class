@@ -27,8 +27,8 @@ class ACPFsGateway:
     def __init__(self, workspace_dir: str):
         self.workspace_dir = os.path.abspath(workspace_dir)
 
-    def _resolve_contained_path(self, relative_or_abs_path: str) -> str:
-        """Resolves target path and ensures it remains strictly inside workspace."""
+    def _resolve_contained_path(self, relative_or_abs_path: str, is_write: bool = False) -> str:
+        """Resolves target path and ensures it remains strictly inside workspace and adheres to boundary policy."""
         if os.path.isabs(relative_or_abs_path):
             target = os.path.abspath(relative_or_abs_path)
         else:
@@ -44,18 +44,35 @@ class ACPFsGateway:
 
         # Classify resource
         kind, boundary = classify_resource(target, self.workspace_dir)
+
+        # Secret resources cannot be read or written by agents
         if kind == ResourceKind.SECRET:
             raise PermissionError(f"Target path '{relative_or_abs_path}' is a protected or secret resource.")
-        if boundary == AuthorityBoundary.SCLASS_TRUST_ROOT and not relative_or_abs_path.startswith("src/"):
-            # If outside normal agent writable areas
-            if kind in (ResourceKind.SCLASS_LEDGER, ResourceKind.SCLASS_EVIDENCE):
-                raise PermissionError(f"Target path '{relative_or_abs_path}' is an immutable S-Class resource.")
+
+        # For write operations: agent can ONLY write to AGENT_WRITABLE resources
+        if is_write:
+            if boundary != AuthorityBoundary.AGENT_WRITABLE or kind in (
+                ResourceKind.GIT,
+                ResourceKind.SECRET,
+                ResourceKind.SCLASS_STATE,
+                ResourceKind.SCLASS_EVIDENCE,
+                ResourceKind.SCLASS_LEDGER,
+                ResourceKind.SCLASS_CONFIG,
+            ):
+                raise PermissionError(
+                    f"Target path '{relative_or_abs_path}' is not agent writable (boundary={boundary}, kind={kind})."
+                )
+        else:
+            # For read operations: SCLASS_TRUST_ROOT ledger is protected from direct agent manipulation
+            if boundary == AuthorityBoundary.SCLASS_TRUST_ROOT and not relative_or_abs_path.startswith("src/"):
+                if kind in (ResourceKind.SCLASS_LEDGER, ResourceKind.SECRET):
+                    raise PermissionError(f"Target path '{relative_or_abs_path}' is an immutable S-Class resource.")
 
         return target
 
     def read_file(self, params: ACPFsReadParams) -> ACPFsReadResult:
         """Reads file content within workspace boundaries."""
-        target_path = self._resolve_contained_path(params.path)
+        target_path = self._resolve_contained_path(params.path, is_write=False)
 
         if not os.path.exists(target_path):
             raise FileNotFoundError(f"File not found: {params.path}")
@@ -78,7 +95,7 @@ class ACPFsGateway:
 
     def write_file(self, params: ACPFsWriteParams) -> ACPFsWriteResult:
         """Writes file content within workspace boundaries."""
-        target_path = self._resolve_contained_path(params.path)
+        target_path = self._resolve_contained_path(params.path, is_write=True)
 
         if os.path.exists(target_path) and not params.overwrite:
             raise FileExistsError(f"File already exists and overwrite=False: {params.path}")
@@ -101,7 +118,9 @@ class ACPFsGateway:
 
     def list_dir(self, relative_path: str = "") -> list[str]:
         """Lists directory entries safely contained in workspace."""
-        target_path = self._resolve_contained_path(relative_path or ".")
+        target_path = self._resolve_contained_path(relative_path or ".", is_write=False)
+        if not os.path.exists(target_path):
+            raise FileNotFoundError(f"Directory not found: {relative_path}")
         if not os.path.isdir(target_path):
             raise NotADirectoryError(f"Path is not a directory: {relative_path}")
         return sorted(os.listdir(target_path))

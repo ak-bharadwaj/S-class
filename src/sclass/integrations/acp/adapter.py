@@ -16,6 +16,7 @@ Enforces Invariant 5: Adapters never directly produce ObservedReceipt or Verific
 """
 
 from __future__ import annotations
+import os
 import uuid
 import json
 from enum import Enum
@@ -34,6 +35,13 @@ from sclass.integrations.acp.protocol import (
     ACPSessionForkResult,
     ACPShutdownResult,
     DEFAULT_PROTOCOL_VERSION,
+)
+from sclass.integrations.acp.fs_gateway import ACPFsGateway
+from sclass.integrations.acp.terminal_gateway import ACPTerminalGateway
+from sclass.integrations.acp.schema import (
+    ACPFsReadParams,
+    ACPFsWriteParams,
+    ACPTerminalExecParams,
 )
 
 
@@ -153,10 +161,12 @@ class ACPAdapter:
     """
 
     def __init__(self, workspace_dir: str, agent_id: str = "acp_agent", mode: str = "enforce"):
-        self.workspace_dir = workspace_dir
+        self.workspace_dir = os.path.abspath(workspace_dir)
         self.agent_id = agent_id
         self.mode = mode
         self.sessions: Dict[str, AgentSession] = {}
+        self.fs_gateway = ACPFsGateway(self.workspace_dir)
+        self.terminal_gateway = ACPTerminalGateway(self.workspace_dir, mode=self.mode)
 
     def normalize_message(self, raw_message: Dict[str, Any]) -> Tuple[Optional[AgentEvent], Optional[ActionRequest]]:
         """Backwards-compatible helper extracting event and action request."""
@@ -412,6 +422,75 @@ class ACPAdapter:
                 msg_id,
                 {"status": "shutdown_complete", "session_id": sid},
             )
+
+        # 11. fs/read
+        elif method in ("fs/read", "fs.read"):
+            path = params.get("path", "")
+            offset = params.get("offset", 0)
+            limit = params.get("limit")
+            read_params = ACPFsReadParams(
+                session_id=params.get("session_id", "default"),
+                path=path,
+                offset=offset,
+                limit=limit,
+            )
+            try:
+                result = self.fs_gateway.read_file(read_params)
+                return ACPProtocolTransport.create_response(msg_id, result.model_dump())
+            except PermissionError as pe:
+                return ACPProtocolTransport.create_error(msg_id, code=-32003, message=f"Permission denied: {pe}")
+            except FileNotFoundError as fe:
+                return ACPProtocolTransport.create_error(msg_id, code=-32004, message=f"File not found: {fe}")
+            except Exception as e:
+                return ACPProtocolTransport.create_error(msg_id, code=-32603, message=f"Filesystem read error: {e}")
+
+        # 12. fs/write
+        elif method in ("fs/write", "fs.write"):
+            path = params.get("path", "")
+            content = params.get("content", "")
+            overwrite = params.get("overwrite", True)
+            write_params = ACPFsWriteParams(
+                session_id=params.get("session_id", "default"),
+                path=path,
+                content=content,
+                overwrite=overwrite,
+            )
+            try:
+                result = self.fs_gateway.write_file(write_params)
+                return ACPProtocolTransport.create_response(msg_id, result.model_dump())
+            except PermissionError as pe:
+                return ACPProtocolTransport.create_error(msg_id, code=-32003, message=f"Permission denied: {pe}")
+            except FileExistsError as fe:
+                return ACPProtocolTransport.create_error(msg_id, code=-32005, message=f"File already exists: {fe}")
+            except Exception as e:
+                return ACPProtocolTransport.create_error(msg_id, code=-32603, message=f"Filesystem write error: {e}")
+
+        # 13. fs/list
+        elif method in ("fs/list", "fs.list"):
+            path = params.get("path", "")
+            try:
+                entries = self.fs_gateway.list_dir(path)
+                return ACPProtocolTransport.create_response(msg_id, {"path": path, "entries": entries})
+            except PermissionError as pe:
+                return ACPProtocolTransport.create_error(msg_id, code=-32003, message=f"Permission denied: {pe}")
+            except (FileNotFoundError, NotADirectoryError) as fe:
+                return ACPProtocolTransport.create_error(msg_id, code=-32004, message=str(fe))
+            except Exception as e:
+                return ACPProtocolTransport.create_error(msg_id, code=-32603, message=f"Filesystem list error: {e}")
+
+        # 14. terminal/exec
+        elif method in ("terminal/exec", "terminal.exec"):
+            cmd = params.get("command", "")
+            cwd = params.get("cwd")
+            sid = params.get("session_id", "default")
+            exec_params = ACPTerminalExecParams(session_id=sid, command=cmd, cwd=cwd)
+            try:
+                result = self.terminal_gateway.execute_terminal_command(exec_params, agent_id=self.agent_id)
+                return ACPProtocolTransport.create_response(msg_id, result.model_dump())
+            except PermissionError as pe:
+                return ACPProtocolTransport.create_error(msg_id, code=-32003, message=f"Permission denied: {pe}")
+            except Exception as e:
+                return ACPProtocolTransport.create_error(msg_id, code=-32603, message=f"Terminal execution error: {e}")
 
         # Fallback for unknown methods
         return ACPProtocolTransport.create_error(

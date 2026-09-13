@@ -148,20 +148,41 @@ def test_cert_acp_filesystem_gateway(workspace):
     with pytest.raises(PermissionError, match="protected or secret resource"):
         fs_gw.read_file(ACPFsReadParams(session_id="sess-1", path=".env"))
 
+    # 5. Writing to protected resources (.git, .sclass/state, .sclass/evidence) is rejected
+    with pytest.raises(PermissionError, match="not agent writable"):
+        fs_gw.write_file(ACPFsWriteParams(session_id="sess-1", path=".git/hooks/pre-commit", content="#!/bin/sh\nevil"))
+
+    with pytest.raises(PermissionError, match="not agent writable"):
+        fs_gw.write_file(ACPFsWriteParams(session_id="sess-1", path=".sclass/state/tasks.db", content="corrupted"))
+
+    with pytest.raises(PermissionError, match="not agent writable"):
+        fs_gw.write_file(ACPFsWriteParams(session_id="sess-1", path=".sclass/evidence/fake.json", content="spoofed"))
+
+    with pytest.raises(PermissionError, match="protected or secret resource"):
+        fs_gw.write_file(ACPFsWriteParams(session_id="sess-1", path=".env", content="SECRET=123"))
+
+    # 6. List dir safe containment
+    entries = fs_gw.list_dir()
+    assert "src" in entries
+    with pytest.raises(FileNotFoundError):
+        fs_gw.list_dir("nonexistent_directory")
+
 
 def test_cert_acp_terminal_gateway(workspace):
-    """Certifies ACP terminal execution gateway with observation and receipt creation."""
+    """Certifies ACP terminal execution gateway with observation, stdout capture, and receipt creation."""
     term_gw = ACPTerminalGateway(workspace)
 
-    # Safe terminal execution
+    # Safe terminal execution with authentic output verification
     params = ACPTerminalExecParams(
         session_id="sess-1",
-        command="python -c \"print('acp terminal ok')\"",
+        command="python -c \"print('acp terminal authentic output')\"",
         cwd=workspace,
     )
     result = term_gw.execute_terminal_command(params)
     assert result.exit_code == 0
     assert result.execution_receipt_id is not None
+    assert "acp terminal authentic output" in result.stdout
+    assert len(result.stdout_hash) == 64
 
     # Blocked terminal execution
     blocked_params = ACPTerminalExecParams(
@@ -170,3 +191,62 @@ def test_cert_acp_terminal_gateway(workspace):
     )
     with pytest.raises(PermissionError, match="denied by S-Class policy"):
         term_gw.execute_terminal_command(blocked_params)
+
+
+def test_cert_acp_adapter_gateway_routing(workspace):
+    """Certifies that ACPAdapter dispatches fs/* and terminal/* through authoritative gateways."""
+    adapter = ACPAdapter(workspace_dir=workspace, agent_id="cert_agent", mode="enforce")
+
+    # 1. fs/write via adapter
+    w_msg = {
+        "jsonrpc": "2.0",
+        "id": "write-1",
+        "method": "fs/write",
+        "params": {"path": "src/module.py", "content": "x = 42\n"},
+    }
+    w_resp = adapter.process_acp_message(w_msg)
+    assert w_resp["jsonrpc"] == "2.0"
+    assert "result" in w_resp
+    assert w_resp["result"]["status"] == "written"
+
+    # 2. fs/read via adapter
+    r_msg = {
+        "jsonrpc": "2.0",
+        "id": "read-1",
+        "method": "fs/read",
+        "params": {"path": "src/module.py"},
+    }
+    r_resp = adapter.process_acp_message(r_msg)
+    assert r_resp["result"]["content"] == "x = 42\n"
+
+    # 3. fs/list via adapter
+    l_msg = {
+        "jsonrpc": "2.0",
+        "id": "list-1",
+        "method": "fs/list",
+        "params": {"path": ""},
+    }
+    l_resp = adapter.process_acp_message(l_msg)
+    assert "src" in l_resp["result"]["entries"]
+
+    # 4. terminal/exec via adapter
+    t_msg = {
+        "jsonrpc": "2.0",
+        "id": "term-1",
+        "method": "terminal/exec",
+        "params": {"command": "python -c \"print('routed through adapter')\""},
+    }
+    t_resp = adapter.process_acp_message(t_msg)
+    assert t_resp["result"]["exit_code"] == 0
+    assert "routed through adapter" in t_resp["result"]["stdout"]
+
+    # 5. Security violation via adapter fails closed with error code -32003
+    bad_w = {
+        "jsonrpc": "2.0",
+        "id": "bad-w-1",
+        "method": "fs/write",
+        "params": {"path": ".git/config", "content": "malicious"},
+    }
+    bad_resp = adapter.process_acp_message(bad_w)
+    assert "error" in bad_resp
+    assert bad_resp["error"]["code"] == -32003

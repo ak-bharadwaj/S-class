@@ -126,6 +126,8 @@ class ObservationFactory:
             "duration_ms": execution_result.duration_ms,
             "lifecycle_state": tracker.current_state.value,
             "lifecycle_history": tracker.to_dict()["history"],
+            "stdout": execution_result.stdout,
+            "stderr": execution_result.stderr,
         }
 
         # 6. Bind authoritative hash across all execution and observation parameters

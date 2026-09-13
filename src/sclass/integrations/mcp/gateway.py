@@ -208,11 +208,36 @@ class MCPGateway:
         elif method in ("tasks/start", "task/start"):
             t_name = params.get("name") or params.get("tool") or ""
             t_args = params.get("arguments") or params.get("parameters") or {}
+            target_str = str(t_args.get("command") or t_args.get("target") or t_args.get("path") or t_name)
+            agent_id = params.get("agent_id", "mcp_agent")
+
+            # Evaluate S-Class policy for task execution
+            action_req = ActionRequest(
+                agent=agent_id,
+                platform="mcp",
+                action=t_name,
+                tool=t_name,
+                target=target_str,
+                parameters=t_args,
+                workspace=self.workspace_dir,
+                task_id=params.get("task_id"),
+                context={"mcp_method": "tasks/start", "headers": msg_headers},
+            )
+            decision = authorize(action_req, mode=self.mode, workspace_dir=self.workspace_dir)
+            if decision.is_denied:
+                return MCPProtocolTransport.build_authorization_denied(
+                    rpc_id,
+                    decision=decision,
+                    mcp_identity={"tool_name": t_name, "arguments": t_args},
+                )
+
             task_op = self.task_manager.start_task(
                 tool_name=t_name,
                 arguments=t_args,
+                agent_id=agent_id,
                 task_id=params.get("task_id"),
                 executor=executor,
+                mode=self.mode,
             )
             return {
                 "jsonrpc": "2.0",
@@ -231,6 +256,26 @@ class MCPGateway:
                 "jsonrpc": "2.0",
                 "id": rpc_id,
                 "result": task_op.to_dict(),
+            }
+
+        elif method in ("tasks/result", "task/result"):
+            tid = params.get("task_id") or ""
+            task_op = self.task_manager.get_task(tid)
+            if not task_op:
+                return MCPProtocolTransport.build_error(
+                    rpc_id, code=-32004, message=f"Task '{tid}' not found"
+                )
+            return {
+                "jsonrpc": "2.0",
+                "id": rpc_id,
+                "result": {
+                    "task_id": tid,
+                    "status": task_op.status.value,
+                    "result": task_op.result,
+                    "error": task_op.error,
+                    "execution_receipt_id": task_op.execution_receipt_id,
+                    "completed_at": task_op.completed_at,
+                },
             }
 
         elif method in ("tasks/cancel", "task/cancel"):

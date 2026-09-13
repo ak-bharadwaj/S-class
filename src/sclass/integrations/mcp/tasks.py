@@ -75,9 +75,40 @@ class MCPTaskManager:
         agent_id: str = "mcp_agent",
         task_id: Optional[str] = None,
         executor: Optional[Callable[[str, Dict[str, Any]], Any]] = None,
+        mode: str = "enforce",
     ) -> MCPTaskOperation:
         """Starts a long-running task operation under S-Class authorization."""
         tid = task_id or f"task_{uuid.uuid4().hex[:12]}"
+        target_str = str(arguments.get("command") or arguments.get("target") or arguments.get("path") or tool_name)
+
+        # Policy authorization check
+        action_req = ActionRequest(
+            agent=agent_id,
+            platform="mcp",
+            action=tool_name,
+            tool=tool_name,
+            target=target_str,
+            parameters=arguments,
+            workspace=self.workspace_dir,
+            task_id=tid,
+            context={"mcp_method": "tasks/start"},
+        )
+        decision = authorize(action_req, mode=mode, workspace_dir=self.workspace_dir)
+        if decision.is_denied:
+            task = MCPTaskOperation(
+                task_id=tid,
+                tool_name=tool_name,
+                arguments=arguments,
+                agent_id=agent_id,
+                workspace_dir=self.workspace_dir,
+                status=MCPTaskStatus.FAILED,
+                progress=0.0,
+                status_message=f"Denied by S-Class policy [{decision.policy_id}]: {decision.reason}",
+                error=decision.reason,
+            )
+            self._tasks[tid] = task
+            return task
+
         task = MCPTaskOperation(
             task_id=tid,
             tool_name=tool_name,
