@@ -138,6 +138,7 @@ class TaskClassifier:
         "algorithm", "algorithms", "rate limiter", "rate-limiter", "sliding window",
         "sliding-window", "token bucket", "leaky bucket", "fixed window", "cache",
         "lru cache", "lfu cache", "fifo", "binary search", "binary tree", "trie",
+        "red-black tree", "red black tree", "avl tree", "b-tree", "tree", "bst",
         "graph traversal", "dijkstra", "astar", "a*", "sort", "sorting", "quicksort",
         "mergesort", "hash map", "hash table", "hashmap", "data structure",
         "data structures", "in-memory", "in memory", "thread pool", "concurrency",
@@ -278,7 +279,8 @@ class TaskClassifier:
         has_heavy_algo = any(k in algo_matches for k in [
             "algorithm", "algorithms", "rate limiter", "rate-limiter", "sliding window",
             "sliding-window", "token bucket", "leaky bucket", "cache", "lru cache",
-            "binary search", "binary tree", "trie", "graph traversal", "dijkstra",
+            "binary search", "binary tree", "trie", "red-black tree", "red black tree",
+            "avl tree", "b-tree", "tree", "bst", "graph traversal", "dijkstra",
             "astar", "sorting", "hash map", "hash table", "thread pool", "concurrency",
             "mutex", "semaphore", "bloom filter", "backtracking", "dynamic programming"
         ])
