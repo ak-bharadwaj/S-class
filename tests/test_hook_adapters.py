@@ -173,3 +173,40 @@ def test_detect_platforms_and_deterministic_48h_warn_threshold(clean_workspace):
     assert detections["claude_code"].verification_status == "PASS"
     assert detections["claude_code"].verified is True
     assert detections["cursor"].verification_status == "WARN"
+
+
+def test_execute_init_command_deploys_runner_and_mcp_and_claude_rules(clean_workspace):
+    from sclass_cli import execute_init_command
+
+    # Mark workspace as having Cursor and Claude Code
+    os.makedirs(os.path.join(clean_workspace, ".cursor"), exist_ok=True)
+    os.makedirs(os.path.join(clean_workspace, ".claude"), exist_ok=True)
+
+    res = execute_init_command(workspace_dir=clean_workspace)
+    assert res["status"] == "SUCCESS"
+
+    # 1. Verify runner files are deployed to clean_workspace
+    assert os.path.exists(os.path.join(clean_workspace, "hook_runner.py"))
+    assert os.path.exists(os.path.join(clean_workspace, "hook_core.py"))
+    assert os.path.exists(os.path.join(clean_workspace, "hook_rules.py"))
+
+    # 2. Verify MCP registration files
+    cursor_mcp = os.path.join(clean_workspace, ".cursor", "mcp.json")
+    assert os.path.exists(cursor_mcp)
+    with open(cursor_mcp, "r", encoding="utf-8") as f:
+        mcp_data = json.load(f)
+    assert "sclass" in mcp_data["mcpServers"]
+    assert "mcp_server.py" in mcp_data["mcpServers"]["sclass"]["args"][0]
+
+    claude_mcp = os.path.join(clean_workspace, ".claude", "mcp.json")
+    assert os.path.exists(claude_mcp)
+
+    # 3. Verify Claude Code rule parity (.claude/rules/sclass-governance.md)
+    claude_rule = os.path.join(clean_workspace, ".claude", "rules", "sclass-governance.md")
+    assert os.path.exists(claude_rule)
+    with open(claude_rule, "r", encoding="utf-8") as f:
+        rule_text = f.read()
+    assert "S-Class Epistemic Governance" in rule_text
+    assert "Zero Hallucinated APIs" in rule_text
+    assert "Blast Radius Discipline" in rule_text
+
