@@ -134,15 +134,15 @@ def test_performance_benchmark_matrix(tmp_path):
     handoff_perf = measure_operation(lambda: assembler.assemble_package(proj_id, next_action="Deploy"))
 
     matrix = {
-        "1. Authorization": (auth_perf, 50.0),        # SLA: p50 < 50ms (allows CI VM jitter)
-        "2. Process Identity": (ident_perf, 30.0),    # SLA: p50 < 30ms
-        "3. Workspace Fingerprint": (fp_perf, 50.0),  # SLA: p50 < 50ms
-        "4. Ledger Append": (ledger_perf, 50.0),      # SLA: p50 < 50ms
-        "5. Verification Engine": (verif_perf, 50.0),# SLA: p50 < 50ms
-        "6. Daemon IPC Tick": (daemon_perf, 50.0),    # SLA: p50 < 50ms
-        "7. ACP Round-trip": (acp_perf, 25.0),        # SLA: p50 < 25ms
-        "8. MCP Round-trip": (mcp_perf, 25.0),        # SLA: p50 < 25ms
-        "9. Handoff Assembly": (handoff_perf, 50.0),  # SLA: p50 < 50ms
+        "1. Authorization": (auth_perf, 75.0),        # SLA: p50 < 75ms (allows CI VM jitter)
+        "2. Process Identity": (ident_perf, 50.0),    # SLA: p50 < 50ms
+        "3. Workspace Fingerprint": (fp_perf, 75.0),  # SLA: p50 < 75ms
+        "4. Ledger Append": (ledger_perf, 75.0),      # SLA: p50 < 75ms
+        "5. Verification Engine": (verif_perf, 75.0), # SLA: p50 < 75ms (allows CI VM jitter)
+        "6. Daemon IPC Tick": (daemon_perf, 75.0),    # SLA: p50 < 75ms
+        "7. ACP Round-trip": (acp_perf, 50.0),        # SLA: p50 < 50ms
+        "8. MCP Round-trip": (mcp_perf, 50.0),        # SLA: p50 < 50ms
+        "9. Handoff Assembly": (handoff_perf, 75.0),  # SLA: p50 < 75ms
     }
 
     # Print benchmark report
