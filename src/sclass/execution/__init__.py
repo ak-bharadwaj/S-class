@@ -1,5 +1,6 @@
 """
-S-Class Execution: Process execution, identity capture, sandbox management, and execution backends.
+S-Class Execution: Process execution, identity capture, sandbox management, execution backends,
+and execution providers.
 """
 
 from sclass.execution.process import ProcessRunner, ProcessExecutionResult
@@ -8,6 +9,7 @@ from sclass.execution.sandbox import (
     HostSandbox,
     BubblewrapSandbox,
     ContainerSandbox,
+    GVisorSandbox,
     get_sandbox_backend,
 )
 from sclass.execution.backend import (
@@ -18,6 +20,26 @@ from sclass.execution.backend import (
     SandboxConfigCompiler,
     get_execution_backend,
 )
+from sclass.execution.base import (
+    ExecutionProvider,
+    ProviderCapabilities,
+    ProviderHealth,
+    ProviderExecutionResult,
+)
+from sclass.execution.native import NativeProcessProvider
+from sclass.execution.isolated import (
+    BubblewrapProvider,
+    OCIProvider,
+    GVisorProvider,
+    DaggerProvider,
+    IsolatedSandboxProvider,
+)
+from sclass.execution.registry import (
+    ExecutionProviderRegistry,
+    get_provider_registry,
+    reset_provider_registry,
+    get_execution_provider,
+)
 
 __all__ = [
     "ProcessRunner",
@@ -27,10 +49,25 @@ __all__ = [
     "HostSandbox",
     "BubblewrapSandbox",
     "ContainerSandbox",
+    "GVisorSandbox",
     "get_sandbox_backend",
     "ExecutionBackend",
     "HostProcessBackend",
     "SandboxConfig",
     "SandboxConfigCompiler",
     "get_execution_backend",
+    "ExecutionProvider",
+    "ProviderCapabilities",
+    "ProviderHealth",
+    "ProviderExecutionResult",
+    "NativeProcessProvider",
+    "BubblewrapProvider",
+    "OCIProvider",
+    "GVisorProvider",
+    "DaggerProvider",
+    "IsolatedSandboxProvider",
+    "ExecutionProviderRegistry",
+    "get_provider_registry",
+    "reset_provider_registry",
+    "get_execution_provider",
 ]

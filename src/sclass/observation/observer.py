@@ -111,6 +111,7 @@ def observe_command(
     execution_kind: Optional[str] = None,
     verifier: Optional[str] = None,
     requested_verifier: Optional[str] = None,
+    request: Optional[Any] = None,
 ) -> ObservedReceipt:
     """
     Independently executes and observes a command, recording child execution identity,
@@ -119,6 +120,15 @@ def observe_command(
     Atomically commits an immutable OBSERVATION event in the LocalLedger.
     """
     ws = os.path.abspath(workspace_dir)
+
+    # Authoritative Authorization Gate (L3 & L8)
+    if request is not None:
+        from sclass.control.authorization import authorize
+        dec = authorize(request, mode="enforce", workspace_dir=ws)
+        if not dec.is_allowed:
+            raise SecurityViolationError(
+                f"Execution rejected by S-Class security policy [{dec.policy_id}]: {dec.reason}"
+            )
 
     if allow_shell is not None:
         mode = ExecutionMode.HOST_SHELL if allow_shell else ExecutionMode.HOST_ARGV

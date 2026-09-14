@@ -232,6 +232,17 @@ class HostProcessBackend(ExecutionBackend):
         **kwargs,
     ) -> ProcessExecutionResult:
         t_id = task_id or (getattr(request, "session", None) if request else None)
+
+        # Authoritative Authorization Gate (L3 & L8)
+        if request is not None:
+            from sclass.control.authorization import authorize
+            from sclass.core.errors import SecurityViolationError
+            dec = authorize(request, mode="enforce", workspace_dir=cwd)
+            if not dec.is_allowed:
+                raise SecurityViolationError(
+                    f"Execution rejected by S-Class security policy [{dec.policy_id}]: {dec.reason}"
+                )
+
         return self.runner.run(
             command=command,
             cwd=cwd,
@@ -312,6 +323,16 @@ class SandboxBackend(ExecutionBackend):
         **kwargs,
     ) -> ProcessExecutionResult:
         t_id = task_id or (getattr(request, "session", None) if request else None)
+
+        # Authoritative Authorization Gate (L3 & L8)
+        if request is not None:
+            from sclass.control.authorization import authorize
+            from sclass.core.errors import SecurityViolationError
+            dec = authorize(request, mode="enforce", workspace_dir=cwd)
+            if not dec.is_allowed:
+                raise SecurityViolationError(
+                    f"Execution rejected by S-Class security policy [{dec.policy_id}]: {dec.reason}"
+                )
 
         # 1. Authoritative sandbox configuration compilation
         sandbox_config = self.compile_config(request=request, capability=capability, workspace_dir=cwd)
