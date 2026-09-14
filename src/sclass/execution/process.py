@@ -107,9 +107,15 @@ class ProcessRunner:
         start_mono = time.monotonic()
         timed_out = False
 
-        run_env = os.environ.copy()
-        if env:
-            run_env.update(env)
+        if config is not None and getattr(config, "env_whitelist", None) is not None:
+            # Whitelist-only environment: strictly refuse to inherit ambient host os.environ secrets
+            run_env = dict(config.env_whitelist)
+            if env:
+                run_env.update(env)
+        else:
+            run_env = os.environ.copy()
+            if env:
+                run_env.update(env)
 
         # Detect wrapper identity if present
         wrapper_id = None

@@ -37,7 +37,10 @@ class ObservationConvergence:
         timeout: float = 60.0,
         claim_id: Optional[str] = None,
         authorization: Optional[Any] = None,
+        capability: Optional[Any] = None,
         policy_engine: Optional[Any] = None,
+        auth_service: Optional[Any] = None,
+        capability_registry: Optional[Any] = None,
         **kwargs,
     ) -> Tuple[ProcessExecutionResult, ObservedReceipt]:
         """
@@ -54,18 +57,31 @@ class ObservationConvergence:
         from sclass.policy.authorization_service import AuthorizationService, verify_decision_integrity
         from sclass.core.errors import SecurityViolationError
 
-        auth_service = AuthorizationService()
+        service = auth_service or AuthorizationService(capability_registry=capability_registry)
+
+        # Resolve authoritative capability
+        resolved_cap = capability or service.capability_registry.resolve(request, workspace_dir=ws)
+        if resolved_cap is None:
+            raise SecurityViolationError(
+                "NO AUTHORITATIVE CAPABILITY -> NO EXECUTION: No capability granted to actor for this action."
+            )
+
         if authorization is not None:
-            # Authoritatively verify that the supplied decision is genuine, S-Class issued, bound to this exact request, and untampered
-            valid, verify_reason = verify_decision_integrity(authorization, request)
+            # Authoritatively verify that the supplied decision is genuine, S-Class issued, bound to this exact request, capability, and policy version
+            valid, verify_reason = verify_decision_integrity(
+                authorization,
+                request,
+                capability=resolved_cap,
+                expected_policy_version=service.policy_version,
+            )
             if not valid:
                 raise SecurityViolationError(
                     f"NO AUTHORIZATION -> NO EXECUTION: Supplied authorization is unauthentic, forged, tampered, "
-                    f"or not bound to this exact ActionRequest: {verify_reason}"
+                    f"or not bound to this exact ActionRequest, capability, or policy version: {verify_reason}"
                 )
             decision = authorization
         else:
-            decision = auth_service.authorize(request, workspace_dir=ws, policy_engine=policy_engine)
+            decision = service.authorize(request, capability=resolved_cap, workspace_dir=ws, policy_engine=policy_engine)
 
         if decision is None:
             raise SecurityViolationError("UNKNOWN POLICY STATE -> NO EXECUTION: Policy engine returned no decision.")
@@ -106,6 +122,7 @@ class ObservationConvergence:
             command=cmd,
             cwd=ws,
             request=request,
+            capability=resolved_cap,
             timeout=timeout,
             **kwargs,
         )

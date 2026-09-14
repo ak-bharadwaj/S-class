@@ -204,27 +204,18 @@ class GVisorSandbox:
 
 
 
-def get_sandbox_backend(name: str = "host", allow_fallback: bool = False) -> SandboxBackend:
-    """Factory retrieving requested sandbox backend without silent host fallback."""
+def get_sandbox_backend(name: str = "bubblewrap") -> SandboxBackend:
+    """Factory retrieving requested sandbox backend. Strictly fails closed without host degradation."""
     name_clean = name.lower()
     if name_clean in ("bwrap", "bubblewrap"):
-        bw = BubblewrapSandbox()
-        if bw.is_available() or not allow_fallback:
-            return bw
+        return BubblewrapSandbox()
     elif name_clean in ("gvisor", "runsc"):
-        gv = GVisorSandbox()
-        if gv.is_available() or not allow_fallback:
-            return gv
+        return GVisorSandbox()
     elif name_clean in ("docker", "container", "podman"):
-        cont = ContainerSandbox()
-        if cont.is_available() or not allow_fallback:
-            return cont
+        return ContainerSandbox()
     elif name_clean in ("host", "direct", "native"):
         return HostSandbox()
 
-    if allow_fallback:
-        return HostSandbox()
-
     from sclass.core.errors import SecurityViolationError
-    raise SecurityViolationError(f"Requested sandbox backend '{name}' is not supported or available.")
+    raise SecurityViolationError(f"UNKNOWN BACKEND -> NO EXECUTION: Requested sandbox backend '{name}' is not supported.")
 

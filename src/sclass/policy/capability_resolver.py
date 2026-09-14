@@ -1,0 +1,158 @@
+"""
+S-Class Policy: Capability Registry and Resolver.
+Authoritatively resolves granted capabilities for ActionRequests.
+Enforces invariant: NO AUTHORITATIVE CAPABILITY -> NO EXECUTION.
+"""
+
+from __future__ import annotations
+import os
+from typing import List, Optional, Dict, Any
+
+from sclass.domain.action import ActionRequest
+from sclass.domain.capability import (
+    Capability,
+    CAP_TERMINAL_EXECUTE,
+    CAP_FILESYSTEM_READ,
+    CAP_FILESYSTEM_WRITE,
+    CAP_GIT_READ,
+    CAP_GIT_WRITE,
+    CAP_PROCESS_SPAWN,
+    CAP_NETWORK_REQUEST,
+    CAP_SECRET_READ,
+)
+
+
+class CapabilityRegistry:
+    """
+    Authoritative registry of capabilities governing workspaces and actors.
+    Provides strict lookup and resolution of granted capabilities.
+    """
+
+    def __init__(self, load_defaults: bool = True):
+        self._capabilities: List[Capability] = []
+        if load_defaults:
+            self._load_baseline_defaults()
+
+    def _load_baseline_defaults(self) -> None:
+        """Loads baseline default capabilities permitted for standard workspace operations."""
+        self._capabilities.extend([
+            Capability(
+                actor="*",
+                operation=CAP_TERMINAL_EXECUTE,
+                resource="**",
+                scope="workspace",
+                risk="medium",
+                duration=300.0,
+                filesystem="read_write",
+                network=False,
+            ),
+            Capability(
+                actor="*",
+                operation=CAP_FILESYSTEM_READ,
+                resource="**",
+                scope="workspace",
+                risk="low",
+                duration=60.0,
+                filesystem="read",
+                network=False,
+            ),
+            Capability(
+                actor="*",
+                operation=CAP_GIT_READ,
+                resource="**",
+                scope="workspace",
+                risk="low",
+                duration=60.0,
+                filesystem="read",
+                network=False,
+            ),
+            Capability(
+                actor="*",
+                operation=CAP_PROCESS_SPAWN,
+                resource="**",
+                scope="workspace",
+                risk="medium",
+                duration=120.0,
+                filesystem="read_write",
+                network=False,
+            ),
+        ])
+
+    def register(self, capability: Capability) -> None:
+        """Registers an authoritative capability."""
+        if not isinstance(capability, Capability):
+            raise TypeError("capability must be an instance of Capability")
+        self._capabilities.insert(0, capability)  # Prepend so custom capabilities take priority
+
+    def clear(self) -> None:
+        """Clears all capabilities from the registry."""
+        self._capabilities.clear()
+
+    def get_capabilities(self) -> List[Capability]:
+        """Returns a copy of all registered capabilities."""
+        return list(self._capabilities)
+
+    def resolve(
+        self,
+        request: ActionRequest,
+        workspace_dir: str = "",
+    ) -> Optional[Capability]:
+        """
+        Resolves the most specific authoritative capability matching the ActionRequest.
+        Matches actor, operation, and resource constraints.
+        Returns None if no capability grants this request.
+        """
+        if request is None:
+            return None
+
+        req_actor = getattr(request, "actor", None) or getattr(request, "agent", "unknown_actor")
+        req_op = getattr(request, "capability", None) or getattr(request, "action", "")
+        req_target = getattr(request, "target", "") or ""
+        ws = os.path.abspath(workspace_dir or getattr(request, "workspace", "") or os.getcwd())
+
+        exact_actor_matches: List[Capability] = []
+        wildcard_actor_matches: List[Capability] = []
+
+        for cap in self._capabilities:
+            # 1. Check Operation match
+            if cap.operation != "*" and cap.operation != req_op:
+                continue
+
+            # 2. Check Resource match
+            if req_target and not cap.allows_resource(req_target, ws):
+                continue
+
+            # 3. Check Actor match
+            if cap.actor == req_actor:
+                exact_actor_matches.append(cap)
+            elif cap.actor in ("*", "any"):
+                wildcard_actor_matches.append(cap)
+
+        if exact_actor_matches:
+            return exact_actor_matches[0]
+        if wildcard_actor_matches:
+            return wildcard_actor_matches[0]
+
+        return None
+
+
+# Global default capability registry singleton
+_GLOBAL_REGISTRY = CapabilityRegistry(load_defaults=True)
+
+
+class CapabilityResolver:
+    """Convenience helper resolving capabilities from global or custom registry."""
+
+    @classmethod
+    def get_global_registry(cls) -> CapabilityRegistry:
+        return _GLOBAL_REGISTRY
+
+    @classmethod
+    def resolve(
+        cls,
+        request: ActionRequest,
+        workspace_dir: str = "",
+        registry: Optional[CapabilityRegistry] = None,
+    ) -> Optional[Capability]:
+        reg = registry or _GLOBAL_REGISTRY
+        return reg.resolve(request, workspace_dir=workspace_dir)

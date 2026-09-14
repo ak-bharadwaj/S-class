@@ -632,13 +632,15 @@ def test_tampered_authorization_decision_blocked(test_ws):
         target="secrets/api.key",
         workspace=test_ws,
     )
-    # Mint legitimate decision
+    # Mint legitimate decision with authoritative capability
+    cap = service.capability_registry.resolve(req, workspace_dir=test_ws)
     sealed = service.seal_decision(
         request=req,
         outcome=DecisionOutcome.DENY,
         policy_id="SEC-DENY",
         risk_level="critical",
         reason="Target is secret",
+        capability=cap,
     )
 
     # Attacker tampers with decision outcome
@@ -894,3 +896,261 @@ def test_exact_verifier_identity_no_substring_spoof(test_ws):
     # Since required verifier 'pytest' was not satisfied by 'test', verdict must be INCONCLUSIVE
     assert results["c_test"].status == "INCONCLUSIVE"
     assert "missing: ['pytest']" in results["c_test"].reason
+
+
+# ==============================================================================
+# 9. B.1.3 ADVERSARIAL SECRET, CAPABILITY RESOLUTION & ENVIRONMENT CLOSURE TESTS
+# ==============================================================================
+
+def test_no_valid_auth_secret_fails_closed_in_strict_mode(monkeypatch):
+    """
+    Invariant: NO VALID AUTH SECRET -> NO EXECUTION.
+    In strict security mode (SCLASS_STRICT_SECURITY=1), missing SCLASS_AUTH_SECRET
+    must fail closed and raise SecurityViolationError, never use built-in secret.
+    """
+    from sclass.policy.authorization_service import get_authorization_secret
+    from sclass.core.errors import SecurityViolationError
+
+    monkeypatch.setenv("SCLASS_STRICT_SECURITY", "1")
+    monkeypatch.delenv("SCLASS_AUTH_SECRET", raising=False)
+
+    with pytest.raises(SecurityViolationError) as exc_info:
+        get_authorization_secret()
+
+    assert "no valid auth secret -> no execution" in str(exc_info.value).lower()
+
+
+def test_no_hardcoded_fallback_secret_in_codebase():
+    """
+    Certifies that no hardcoded fallback secret string exists anywhere in policy codebase.
+    """
+    policy_dir = os.path.dirname(os.path.abspath(__file__))
+    src_dir = os.path.normpath(os.path.join(policy_dir, "..", "..", "src", "sclass"))
+
+    forbidden_patterns = [
+        "sclass-internal-authoritative-auth-token-secret-v1",
+        "default_secret_key",
+        "hardcoded_auth_secret",
+    ]
+
+    for root, _, files in os.walk(src_dir):
+        for fname in files:
+            if fname.endswith(".py"):
+                fpath = os.path.join(root, fname)
+                with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
+                    file_content = f.read()
+                for pat in forbidden_patterns:
+                    assert pat not in file_content, f"Forbidden hardcoded secret pattern '{pat}' found in {fpath}"
+
+
+def test_no_authoritative_capability_no_execution(test_ws):
+    """
+    Invariant: NO AUTHORITATIVE CAPABILITY -> NO EXECUTION.
+    If no capability is registered or matches the ActionRequest,
+    authorization strictly returns DENY and execution raises SecurityViolationError.
+    """
+    from sclass.policy.capability_resolver import CapabilityRegistry
+    from sclass.policy.authorization_service import AuthorizationService
+    from sclass.observation.convergence import ObservationConvergence
+    from sclass.core.errors import SecurityViolationError
+
+    # Empty registry with no matching capability
+    empty_registry = CapabilityRegistry(load_defaults=False)
+    service = AuthorizationService(capability_registry=empty_registry)
+
+    req = ActionRequest(
+        actor="unregistered_agent",
+        capability=CAP_TERMINAL_EXECUTE,
+        action="run_command",
+        target="echo 'unauthorized'",
+        workspace=test_ws,
+    )
+
+    # 1. Authorize fails closed with NO-CAPABILITY
+    dec = service.authorize(req, workspace_dir=test_ws)
+    assert dec.is_allowed is False
+    assert dec.outcome == DecisionOutcome.DENY
+    assert dec.policy_id == "NO-CAPABILITY"
+    assert "NO AUTHORITATIVE CAPABILITY -> NO EXECUTION" in dec.reason
+
+    # 2. Execution choke point raises SecurityViolationError
+    with pytest.raises(SecurityViolationError) as exc_info:
+        ObservationConvergence.execute_and_observe(
+            request=req,
+            command="echo 'unauthorized'",
+            backend=HostProcessBackend(),
+            capability=None,
+            capability_registry=empty_registry,
+        )
+    assert "no authoritative capability -> no execution" in str(exc_info.value).lower()
+
+
+def test_decision_capability_hash_tamper_rejected(test_ws):
+    """
+    Adversarial Attack: Decision minted for Capability A (low risk read)
+    is presented to execute under Capability B (high risk execute).
+    Invariant: Cryptographic capability hash binding must reject transplanted decisions.
+    """
+    from sclass.policy.authorization_service import AuthorizationService, verify_decision_integrity
+
+    service = AuthorizationService()
+
+    cap_a = Capability(
+        actor="agent-claude",
+        operation=CAP_FILESYSTEM_READ,
+        resource="src/**",
+        scope="workspace",
+        workspace=test_ws,
+    )
+    cap_b = Capability(
+        actor="agent-claude",
+        operation=CAP_TERMINAL_EXECUTE,
+        resource="src/**",
+        scope="workspace",
+        workspace=test_ws,
+    )
+
+    req = ActionRequest(
+        actor="agent-claude",
+        capability=CAP_FILESYSTEM_READ,
+        action="read_file",
+        target="src/main.py",
+        workspace=test_ws,
+    )
+
+    # Mint legitimate decision for Cap A
+    decision = service.authorize(req, capability=cap_a, workspace_dir=test_ws)
+    assert decision.is_allowed is True
+
+    # Attacker tries to verify decision under Cap B
+    valid, reason = verify_decision_integrity(decision, req, capability=cap_b)
+    assert valid is False
+    assert "capability hash mismatch" in reason.lower()
+
+
+def test_decision_outdated_policy_version_rejected(test_ws):
+    """
+    Invariant: DECISION BOUND TO CURRENT POLICY VERSION.
+    Decisions issued under outdated policy version must fail freshness verification.
+    """
+    from sclass.policy.authorization_service import AuthorizationService, verify_decision_integrity
+
+    service_v1 = AuthorizationService(policy_version="1.0.0")
+    req = ActionRequest(
+        actor="dev",
+        capability=CAP_TERMINAL_EXECUTE,
+        action="run_command",
+        target="pytest",
+        workspace=test_ws,
+    )
+
+    decision_v1 = service_v1.authorize(req, workspace_dir=test_ws)
+    assert decision_v1.is_allowed is True
+
+    # Policy updates to 1.0.1
+    valid, reason = verify_decision_integrity(decision_v1, req, expected_policy_version="1.0.1")
+    assert valid is False
+    assert "policy version mismatch" in reason.lower()
+
+
+def test_approval_token_base64_iso_timestamp_and_expiration(test_ws):
+    """
+    Certifies that approval token encoding:
+    1. Parses cleanly with ISO timestamps containing colons (:).
+    2. Enforces cryptographic HMAC signature.
+    3. Fails closed when expired.
+    4. Rejects forged or tampered tokens.
+    """
+    import time
+    from sclass.policy.authorization_service import AuthorizationService
+
+    service = AuthorizationService()
+    req = ActionRequest(
+        actor="dev",
+        capability=CAP_TERMINAL_EXECUTE,
+        action="run_command",
+        target="deploy.sh",
+        workspace=test_ws,
+    )
+
+    # Mint approval token with 1 second TTL
+    token = service.mint_approval_token(req, approver="security_officer", ttl_seconds=1.0)
+    assert "." in token
+    assert service.verify_approval_token(token, req) is True
+
+    # Tampered token fails
+    tampered_token = token[:-4] + "dead"
+    assert service.verify_approval_token(tampered_token, req) is False
+
+    # Token for different request fails
+    req_other = ActionRequest(
+        actor="dev",
+        capability=CAP_TERMINAL_EXECUTE,
+        action="run_command",
+        target="malicious.sh",
+        workspace=test_ws,
+    )
+    assert service.verify_approval_token(token, req_other) is False
+
+    # Expired token fails
+    time.sleep(1.1)
+    assert service.verify_approval_token(token, req) is False
+
+
+def test_sandbox_environment_isolation_strips_parent_secrets(monkeypatch, test_ws):
+    """
+    Invariant: SANDBOX ENVIRONMENT ISOLATION.
+    Parent process environment variables (such as API keys or secret credentials)
+    must NEVER leak into sandboxed child execution.
+    """
+    from sclass.execution.backend import SandboxConfigCompiler
+    from sclass.execution.process import ProcessRunner
+    from sclass.execution.sandbox import HostSandbox
+
+    monkeypatch.setenv("SCLASS_TEST_PARENT_SECRET", "super_secret_classified_key_12345")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "AKIAIOSFODNN7SECRET")
+
+    req = ActionRequest(
+        actor="agent",
+        capability=CAP_TERMINAL_EXECUTE,
+        action="run_command",
+        target="echo hello",
+        workspace=test_ws,
+    )
+
+    # Compile sandbox configuration
+    cfg = SandboxConfigCompiler.compile(request=req, workspace_dir=test_ws)
+
+    # 1. Config environment whitelist must NOT contain parent secrets
+    assert "SCLASS_TEST_PARENT_SECRET" not in cfg.env_whitelist
+    assert "AWS_SECRET_ACCESS_KEY" not in cfg.env_whitelist
+
+    # 2. ProcessRunner executed with config must use whitelist-only env
+    runner = ProcessRunner(sandbox=HostSandbox())
+    res = runner.run(["python", "-c", "import os; print('SECRET_FOUND=' + str('SCLASS_TEST_PARENT_SECRET' in os.environ))"], cwd=test_ws, config=cfg)
+    assert res.exit_code == 0
+    assert "SECRET_FOUND=False" in res.stdout
+
+
+def test_get_sandbox_backend_fails_closed_without_fallback():
+    """
+    Invariant: get_sandbox_backend() must NOT expose an allow_fallback option that degrades to HostSandbox.
+    Unknown or unsupported backends must raise SecurityViolationError.
+    """
+    import inspect
+    from sclass.execution.sandbox import get_sandbox_backend, BubblewrapSandbox, HostSandbox
+    from sclass.core.errors import SecurityViolationError
+
+    sig = inspect.signature(get_sandbox_backend)
+    assert "allow_fallback" not in sig.parameters
+
+    # Explicit host returns HostSandbox
+    assert isinstance(get_sandbox_backend("host"), HostSandbox)
+
+    # Bubblewrap returns BubblewrapSandbox
+    assert isinstance(get_sandbox_backend("bubblewrap"), BubblewrapSandbox)
+
+    # Unknown backend strictly raises SecurityViolationError
+    with pytest.raises(SecurityViolationError) as exc_info:
+        get_sandbox_backend("unknown_cloud_hypervisor")
+    assert "unknown backend -> no execution" in str(exc_info.value).lower()

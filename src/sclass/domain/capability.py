@@ -139,8 +139,8 @@ class Capability:
         norm_req_clean = norm_req.strip("/")
 
         # Recursive wildcard
-        if norm_res_clean.endswith("/**"):
-            prefix = norm_res_clean[:-3].strip("/")
+        if norm_res_clean == "**" or norm_res_clean.endswith("/**"):
+            prefix = norm_res_clean[:-3].strip("/") if norm_res_clean.endswith("/**") else ""
             if not prefix or norm_req_clean == prefix or norm_req_clean.startswith(prefix + "/"):
                 return True
 

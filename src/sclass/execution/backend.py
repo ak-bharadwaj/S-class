@@ -91,6 +91,11 @@ class SandboxConfigCompiler:
             "LANG": os.environ.get("LANG", "en_US.UTF-8"),
             "TERM": "xterm-256color",
         }
+        if os.name == "nt":
+            for win_key in ("SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT", "TEMP", "TMP"):
+                if win_key in os.environ:
+                    safe_env[win_key] = os.environ[win_key]
+
         allowed_creds = getattr(capability, "credentials", []) if capability else []
         for cred in allowed_creds:
             if cred in os.environ:

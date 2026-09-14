@@ -196,7 +196,8 @@ class AuthorizationDecision:
             return False
         import hmac
         import hashlib
-        key = secret_key or os.environ.get("SCLASS_AUTH_SECRET", "sclass-internal-authoritative-auth-token-secret-v1").encode("utf-8")
+        from sclass.policy.authorization_service import get_authorization_secret
+        key = secret_key or get_authorization_secret()
         out_str = self.outcome.value if isinstance(self.outcome, DecisionOutcome) else str(self.outcome)
         payload = f"{self.issuer}:{self.request_hash}:{self.capability_hash}:{self.policy_id}:{self.policy_version}:{out_str}:{self.risk_level}:{self.evaluated_at}"
         expected = hmac.new(key, payload.encode("utf-8"), hashlib.sha256).hexdigest()

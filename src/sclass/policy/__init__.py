@@ -12,7 +12,9 @@ from sclass.policy.authorization_service import (
     compute_canonical_capability_hash,
     verify_decision_integrity,
     generate_integrity_token,
+    get_authorization_secret,
 )
+from sclass.policy.capability_resolver import CapabilityRegistry, CapabilityResolver
 
 # Aliases for naming consistency
 InternalPolicyEngine = DefaultPolicyEngine
@@ -29,10 +31,13 @@ __all__ = [
     "OPAClient",
     "OPAPolicyAdapter",
     "AuthorizationService",
+    "CapabilityRegistry",
+    "CapabilityResolver",
     "compute_canonical_request_hash",
     "compute_canonical_capability_hash",
     "verify_decision_integrity",
     "generate_integrity_token",
+    "get_authorization_secret",
     "PolicyContext",
     "SecurityDecision",
     "AuthorizationDecision",
