@@ -8,6 +8,10 @@ Demo 4: Post-verification mutation -> VERIFICATION INVALIDATED
 Demo 5: Cross-agent continuity -> verified state preserved from Claude to Codex
 """
 
+import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "demos")))
+
 from sclass.product.demos import ProductDemos
 
 
@@ -45,3 +49,19 @@ def test_demo_5_cross_agent_continuity(tmp_path):
     assert res["transferred_verified_count"] >= 1
     assert "Fix test_refresh" in res["transferred_next_action"]
     assert len(res["transferred_blockers"]) > 0
+
+
+def test_demo_6_codex_autonomous():
+    import demo_codex_autonomous
+    demo_codex_autonomous.run()
+
+
+def test_demo_7_claude_reasoning():
+    import demo_claude_reasoning
+    demo_claude_reasoning.run()
+
+
+def test_demo_8_antigravity_swarm():
+    import demo_antigravity_swarm
+    demo_antigravity_swarm.run()
+

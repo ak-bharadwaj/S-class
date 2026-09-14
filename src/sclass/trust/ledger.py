@@ -54,7 +54,9 @@ class LocalLedger:
     def get_last_hash(self) -> str:
         """Returns the hash of the latest entry or genesis zeroes."""
         last = self.get_last_entry()
-        return last["hash"] if last else "0" * 64
+        if not last:
+            return "0" * 64
+        return last.get("hash") or last.get("signature") or ("0" * 64)
 
     def get_head_hash(self) -> str:
         """Returns the hash of the latest entry or genesis zeroes (alias for get_last_hash)."""
@@ -77,8 +79,8 @@ class LocalLedger:
         """Appends a new event and anchors its hash in the ledger."""
         with WorkspaceLock(self.paths.root, lock_name="ledger"):
             last = self.get_last_entry()
-            seq = (last["sequence"] + 1) if last else 1
-            prev_hash = last["hash"] if last else "0" * 64
+            seq = (last.get("sequence", 0) + 1) if last else 1
+            prev_hash = (last.get("hash") or last.get("signature") or ("0" * 64)) if last else "0" * 64
             now_iso = datetime.now(timezone.utc).isoformat()
             p_hash = self._compute_payload_hash(payload)
             entry_hash = self._compute_entry_hash(seq, event, prev_hash, p_hash, now_iso)

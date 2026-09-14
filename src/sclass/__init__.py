@@ -85,6 +85,15 @@ __all__ = [
     "PlatformOptimizationEngine",
     "ControlPolicy",
     "PlatformComparisonBenchmark",
+    "AgentIdentity",
+    "AgentStatus",
+    "ResourceLease",
+    "LeaseType",
+    "ConflictEvent",
+    "ConflictType",
+    "FleetState",
+    "FleetMergeResult",
+    "FleetIntegrityEngine",
 ]
 
 from sclass.platform.profile import PlatformProfile
@@ -92,3 +101,14 @@ from sclass.platform.policy import CompensationPolicy
 from sclass.platform.budget import PerformanceBudget
 from sclass.platform.engine import PlatformOptimizationEngine, ControlPolicy
 from sclass.platform.benchmark import PlatformComparisonBenchmark
+from sclass.agent_fleet import (
+    AgentIdentity,
+    AgentStatus,
+    ResourceLease,
+    LeaseType,
+    ConflictEvent,
+    ConflictType,
+    FleetState,
+    FleetMergeResult,
+    FleetIntegrityEngine,
+)
