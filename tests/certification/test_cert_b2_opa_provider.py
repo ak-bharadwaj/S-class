@@ -114,6 +114,9 @@ def test_real_opa_allow_end_to_end(auth_service_with_opa):
     assert decision.policy_id == "OPA-AUTHZ-SCLASS"
     assert decision.issuer == "S_CLASS"
     assert decision.policy_version == "1.0.0"
+    assert decision.risk_level.lower() == "low"
+    assert "allowed" in decision.reason.lower()
+    assert "denied" not in decision.reason.lower()
 
     # Cryptographic decision verification
     assert service.verify_decision(decision, req) is True
@@ -199,50 +202,34 @@ def test_opa_unavailable_fails_closed(tmp_path):
 # 4. INVALID RESPONSE (FAIL-CLOSED)
 # ==============================================================================
 
-@pytest.mark.parametrize("bad_response, expected_policy_id", [
-    (None, "OPA-MALFORMED"),
-    ("Not a json string", "OPA-MALFORMED"),
-    ({"error": "missing result"}, "OPA-MALFORMED"),
-    ({"result": 42}, "OPA-MALFORMED"),
-    ({"result": {"missing_allow_key": True}}, "OPA-MALFORMED"),
-    ({"result": {"decision": {"missing_allow": True}}}, "OPA-MALFORMED"),
+@pytest.mark.parametrize("bad_payload, expected_policy_id", [
+    (b"", "OPA-MALFORMED"),
+    (b"Not a json string", "OPA-MALFORMED"),
+    (b'{"error": "missing result"}', "OPA-MALFORMED"),
+    (b'{"result": 42}', "OPA-MALFORMED"),
+    (b'{"result": {"missing_allow_key": true}}', "OPA-MALFORMED"),
+    (b'{"result": {"decision": {"missing_allow": true}}}', "OPA-MALFORMED"),
+    (b'[1, 2, 3]', "OPA-MALFORMED"),
 ])
-def test_opa_invalid_response_fails_closed(bad_response, expected_policy_id, tmp_path):
-    """Certifies that malformed or non-standard OPA responses fail closed."""
-    class MockInvalidClientProvider(OPAProvider):
-        def evaluate(self, request, workspace_dir="", capability=None, expected_policy_version=None, mode="enforce", timeout=None):
-            if bad_response is None or isinstance(bad_response, str):
-                return AuthorizationDecision(
-                    outcome=DecisionOutcome.DENY,
-                    policy_id="OPA-MALFORMED",
-                    risk_level="CRITICAL",
-                    reason="UNKNOWN POLICY STATE: OPA response is not valid JSON. Fail-closed enforced.",
-                )
-            if "result" not in bad_response:
-                return AuthorizationDecision(
-                    outcome=DecisionOutcome.DENY,
-                    policy_id="OPA-MALFORMED",
-                    risk_level="CRITICAL",
-                    reason="UNKNOWN POLICY STATE: OPA response missing result field. Fail-closed enforced.",
-                )
-            res = bad_response["result"]
-            if not isinstance(res, (bool, dict)):
-                return AuthorizationDecision(
-                    outcome=DecisionOutcome.DENY,
-                    policy_id="OPA-MALFORMED",
-                    risk_level="CRITICAL",
-                    reason="UNKNOWN POLICY STATE: OPA returned unexpected result type. Fail-closed enforced.",
-                )
-            if isinstance(res, dict) and "allow" not in res and ("decision" not in res or "allow" not in res.get("decision", {})):
-                return AuthorizationDecision(
-                    outcome=DecisionOutcome.DENY,
-                    policy_id="OPA-MALFORMED",
-                    risk_level="CRITICAL",
-                    reason="UNKNOWN POLICY STATE: OPA decision dictionary missing allow boolean key. Fail-closed enforced.",
-                )
-            return AuthorizationDecision(outcome=DecisionOutcome.ALLOW, policy_id="OPA-AUTHZ")
+def test_opa_invalid_response_fails_closed(bad_payload, expected_policy_id, tmp_path, monkeypatch):
+    """Certifies that malformed or non-standard OPA responses fail closed in real OPAProvider.evaluate."""
+    class FakeHTTPResponse:
+        def __init__(self, data):
+            self._data = data
+            self.status = 200
+        def read(self):
+            return self._data
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
 
-    provider = MockInvalidClientProvider()
+    monkeypatch.setattr(
+        "urllib.request.urlopen",
+        lambda req, timeout=None: FakeHTTPResponse(bad_payload),
+    )
+
+    provider = OPAProvider(endpoint_url="http://127.0.0.1:8181")
     reg = CapabilityRegistry(load_defaults=True)
     service = AuthorizationService(capability_registry=reg, policy_provider=provider)
 
@@ -255,11 +242,21 @@ def test_opa_invalid_response_fails_closed(bad_response, expected_policy_id, tmp
         workspace=str(tmp_path),
     )
 
+    # 1. Test direct OPAProvider.evaluate execution
+    provider_decision = provider.evaluate(req)
+    assert provider_decision.is_allowed is False
+    assert provider_decision.outcome == DecisionOutcome.DENY
+    assert provider_decision.policy_id == expected_policy_id
+    assert provider_decision.risk_level == "CRITICAL"
+    assert "UNKNOWN POLICY STATE" in provider_decision.reason
+
+    # 2. Test through AuthorizationService fail-closed sealing
     decision = service.authorize(req)
     assert decision.is_allowed is False
     assert decision.outcome == DecisionOutcome.DENY
     assert decision.policy_id == expected_policy_id
-    assert decision.risk_level == "CRITICAL"
+    assert decision.risk_level.lower() == "critical"
+
 
 
 # ==============================================================================
@@ -388,6 +385,35 @@ def test_opa_tampered_response_rejected(auth_service_with_opa):
     assert valid_tok is False
     assert "Integrity token verification failed" in tok_reason
 
+    # Tamper 4: Intercepted/tampered OPA HTTP response returning mismatched request hash
+    class FakeTamperedHTTPResponse:
+        def __init__(self):
+            self.status = 200
+        def read(self):
+            return json.dumps({
+                "result": {
+                    "allow": True,
+                    "policy_id": "OPA-AUTHZ-SCLASS",
+                    "policy_version": "1.0.0",
+                    "request_hash": "deadbeef" * 8,  # Forged/tampered request hash
+                }
+            }).encode("utf-8")
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+
+    import unittest.mock
+    with unittest.mock.patch("urllib.request.urlopen", return_value=FakeTamperedHTTPResponse()):
+        tampered_opa_provider = OPAProvider(endpoint_url="http://127.0.0.1:8181")
+        tampered_svc = AuthorizationService(capability_registry=reg, policy_provider=tampered_opa_provider)
+        dec_tamper_opa = tampered_svc.authorize(req)
+        assert dec_tamper_opa.is_allowed is False
+        assert dec_tamper_opa.outcome == DecisionOutcome.DENY
+        assert dec_tamper_opa.policy_id == "OPA-TAMPERED-RESPONSE"
+        assert dec_tamper_opa.risk_level.lower() == "critical"
+        assert "TAMPERED OPA RESPONSE" in dec_tamper_opa.reason
+
 
 # ==============================================================================
 # 7. TIMEOUT (FAIL-CLOSED)
@@ -491,3 +517,51 @@ def test_real_opa_binary_lifecycle():
 
     # After with block exit, server process is terminated
     assert server.is_running is False
+
+
+# ==============================================================================
+# 10. POLICY EVALUATION RESULT PROTOCOL CONTRACT
+# ==============================================================================
+
+def test_policy_evaluation_result_contract(tmp_path):
+    """Certifies that PolicyEvaluationResult from PolicyProvider is seamlessly accepted by AuthorizationService."""
+    class CustomProvider:
+        @property
+        def provider_name(self) -> str:
+            return "custom"
+
+        @property
+        def provider_version(self) -> str:
+            return "1.0.0"
+
+        def evaluate(self, request, workspace_dir="", capability=None, expected_policy_version=None, mode="enforce", timeout=None):
+            return PolicyEvaluationResult(
+                allow=True,
+                policy_id="CUSTOM-AUTHZ",
+                policy_version="1.0.0",
+                risk_level="LOW",
+                reason="Permitted by custom policy evaluation result",
+            )
+
+        def is_healthy(self) -> bool:
+            return True
+
+    reg = CapabilityRegistry(load_defaults=True)
+    service = AuthorizationService(capability_registry=reg, policy_provider=CustomProvider())
+    req = ActionRequest(
+        actor="agent-claude",
+        session="s_proto",
+        capability=CAP_FILESYSTEM_READ,
+        action="read_file",
+        target="file.txt",
+        workspace=str(tmp_path),
+    )
+
+    decision = service.authorize(req)
+    assert decision.is_allowed is True
+    assert decision.outcome == DecisionOutcome.ALLOW
+    assert decision.policy_id == "CUSTOM-AUTHZ"
+    assert decision.reason == "Permitted by custom policy evaluation result"
+    assert decision.issuer == "S_CLASS"
+    assert service.verify_decision(decision, req) is True
+

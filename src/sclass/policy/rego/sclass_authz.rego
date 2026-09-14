@@ -6,8 +6,6 @@ import rego.v1
 # Enforces workspace containment, credential safety, and command execution boundaries.
 
 default allow := false
-default reason := "Operation denied by OPA policy"
-default risk_level := "HIGH"
 default policy_id := "OPA-AUTHZ-SCLASS"
 default policy_version := "1.0.0"
 
@@ -18,6 +16,7 @@ decision := {
     "policy_version": policy_version,
     "risk_level": risk_level,
     "reason": reason,
+    "request_hash": get_request_hash(input),
 }
 
 # Policy version resolution
@@ -26,6 +25,13 @@ policy_version := v if {
 } else := "1.0.0"
 
 policy_id := "OPA-AUTHZ-SCLASS"
+
+# Helper: Extract canonical request hash from input context
+get_request_hash(inp) := h if {
+    h := inp.request.request_hash
+} else := h if {
+    h := inp.context.request_hash
+} else := ""
 
 # 1. Allow read-only file actions strictly within workspace
 allow if {
@@ -51,6 +57,34 @@ allow if {
     not contains_protected_targeting(cmd)
     not contains_dangerous_chaining(cmd)
 }
+
+# Risk level resolution
+risk_level := "LOW" if {
+    allow
+} else := "CRITICAL" if {
+    is_secret_path(input.request.target)
+} else := "CRITICAL" if {
+    is_protected_trust_path(input.request.target)
+} else := "CRITICAL" if {
+    is_dangerous_command(get_command(input.request))
+} else := "HIGH"
+
+# Reason resolution
+reason := "Operation allowed by OPA policy" if {
+    allow
+} else := "Secret path access denied by OPA policy" if {
+    is_secret_path(input.request.target)
+} else := "Protected trust path write denied by OPA policy" if {
+    is_protected_trust_path(input.request.target)
+} else := "Workspace escape attempt denied by OPA policy" if {
+    not input.workspace.target_is_within
+} else := "Dangerous command execution denied by OPA policy" if {
+    is_dangerous_command(get_command(input.request))
+} else := "Command chaining operator denied by OPA policy" if {
+    contains_dangerous_chaining(get_command(input.request))
+} else := "Protected trust state mutation denied by OPA policy" if {
+    contains_protected_targeting(get_command(input.request))
+} else := "Operation denied by OPA policy"
 
 # Helper: Extract command string from request
 get_command(req) := cmd if {

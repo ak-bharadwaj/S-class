@@ -488,6 +488,12 @@ class AuthorizationService:
         raw_outcome = getattr(raw_decision, "outcome", None)
         if isinstance(raw_outcome, DecisionOutcome):
             outcome = raw_outcome
+        elif hasattr(raw_decision, "allow"):
+            # PolicyEvaluationResult protocol support
+            outcome = DecisionOutcome.ALLOW if getattr(raw_decision, "allow") else DecisionOutcome.DENY
+        elif hasattr(raw_decision, "allowed"):
+            # Alternative policy result object support
+            outcome = DecisionOutcome.ALLOW if getattr(raw_decision, "allowed") else DecisionOutcome.DENY
         else:
             out_str = getattr(raw_outcome, "value", str(raw_outcome)).lower()
             if out_str == "allow":

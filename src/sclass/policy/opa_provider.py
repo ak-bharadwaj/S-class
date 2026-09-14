@@ -20,6 +20,7 @@ Required Invariants Enforced:
 from __future__ import annotations
 import os
 import json
+import hmac
 import socket
 import logging
 import urllib.request
@@ -320,21 +321,43 @@ class OPAProvider(PolicyProvider):
                     },
                 )
 
-            # 4. Return Evaluation Outcome
+            # 4. Request Hash Binding & Tamper Detection (S-Class ownership of request identity)
+            from sclass.policy.authorization_service import compute_canonical_request_hash
+            expected_req_hash = compute_canonical_request_hash(request)
+            result_req_hash = None
+            if isinstance(result, dict):
+                if "decision" in result and isinstance(result["decision"], dict):
+                    result_req_hash = result["decision"].get("request_hash")
+                elif "request_hash" in result:
+                    result_req_hash = result.get("request_hash")
+
+            if result_req_hash and not hmac.compare_digest(str(result_req_hash), str(expected_req_hash)):
+                return AuthorizationDecision(
+                    outcome=DecisionOutcome.DENY,
+                    policy_id="OPA-TAMPERED-RESPONSE",
+                    risk_level="CRITICAL",
+                    reason=f"TAMPERED OPA RESPONSE: OPA decision bound to request hash '{result_req_hash}', but current request hash is '{expected_req_hash}'. Fail-closed policy denies execution.",
+                    metadata={"expected_request_hash": expected_req_hash, "received_request_hash": result_req_hash},
+                )
+
+            # 5. Return Evaluation Outcome with normalized reason/risk
             if not allow:
+                effective_reason = reason if reason != "Operation allowed by OPA policy" else "Operation denied by OPA policy"
                 return AuthorizationDecision(
                     outcome=DecisionOutcome.DENY if mode == "enforce" else DecisionOutcome.WARN,
                     policy_id=policy_id,
                     risk_level=risk_level if risk_level != "LOW" else "HIGH",
-                    reason=reason,
+                    reason=effective_reason,
                     metadata={"opa_payload": payload, "policy_version": active_version},
                 )
 
+            effective_reason = reason if reason != "Operation denied by OPA policy" else "Operation allowed by OPA policy"
+            effective_risk = "LOW" if risk_level in ("LOW", "HIGH") else risk_level
             return AuthorizationDecision(
                 outcome=DecisionOutcome.ALLOW,
                 policy_id=policy_id,
-                risk_level=risk_level,
-                reason=reason,
+                risk_level=effective_risk,
+                reason=effective_reason,
                 metadata={"opa_payload": payload, "policy_version": active_version},
             )
 

@@ -19,6 +19,7 @@ import subprocess
 import urllib.request
 import urllib.error
 import logging
+import tempfile
 from typing import Optional, List, Dict, Any
 
 logger = logging.getLogger("sclass.policy.opa_runner")
@@ -50,8 +51,13 @@ def ensure_opa_binary(version: str = OPA_VERSION_DEFAULT, target_dir: Optional[s
     """
     # 1. SCLASS_OPA_BIN
     env_bin = os.environ.get("SCLASS_OPA_BIN")
-    if env_bin and os.path.isfile(env_bin) and os.access(env_bin, os.X_OK):
-        return os.path.abspath(env_bin)
+    if env_bin:
+        if os.path.isfile(env_bin) and os.access(env_bin, os.X_OK):
+            return os.path.abspath(env_bin)
+        if sys.platform == "win32" and not env_bin.lower().endswith(".exe"):
+            env_bin_exe = env_bin + ".exe"
+            if os.path.isfile(env_bin_exe) and os.access(env_bin_exe, os.X_OK):
+                return os.path.abspath(env_bin_exe)
 
     # 2. PATH
     bin_name = "opa.exe" if sys.platform == "win32" else "opa"
@@ -128,6 +134,8 @@ class OPAServerProcess:
         self.timeout = timeout
         self.process: Optional[subprocess.Popen] = None
         self._url = f"http://127.0.0.1:{self.port}"
+        self._stderr_file: Optional[Any] = None
+        self._stderr_path: Optional[str] = None
 
     @property
     def url(self) -> str:
@@ -158,10 +166,17 @@ class OPAServerProcess:
                 cmd.append(os.path.abspath(p))
         cmd.extend(self.extra_args)
 
+        try:
+            self._stderr_file = tempfile.NamedTemporaryFile(mode="w+", encoding="utf-8", delete=False, suffix="_opa_err.log")
+            self._stderr_path = self._stderr_file.name
+        except Exception:
+            self._stderr_file = None
+            self._stderr_path = None
+
         self.process = subprocess.Popen(
             cmd,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stderr=self._stderr_file or subprocess.DEVNULL,
         )
 
         # Wait for health check
@@ -171,7 +186,16 @@ class OPAServerProcess:
 
         while time.time() < deadline:
             if self.process.poll() is not None:
-                raise RuntimeError(f"OPA process exited prematurely with code {self.process.returncode}")
+                err_detail = ""
+                if self._stderr_file:
+                    try:
+                        self._stderr_file.seek(0)
+                        err_detail = self._stderr_file.read().strip()
+                    except Exception:
+                        pass
+                detail_str = f": {err_detail}" if err_detail else ""
+                self.stop()
+                raise RuntimeError(f"OPA process exited prematurely with code {self.process.returncode}{detail_str}")
             try:
                 req = urllib.request.Request(health_url, headers={"User-Agent": "S-Class-OPA"})
                 with urllib.request.urlopen(req, timeout=0.5) as resp:
@@ -199,6 +223,20 @@ class OPAServerProcess:
                 pass
             finally:
                 self.process = None
+
+        if self._stderr_file is not None:
+            try:
+                self._stderr_file.close()
+            except Exception:
+                pass
+            self._stderr_file = None
+
+        if self._stderr_path is not None and os.path.exists(self._stderr_path):
+            try:
+                os.remove(self._stderr_path)
+            except Exception:
+                pass
+            self._stderr_path = None
 
     def __enter__(self) -> OPAServerProcess:
         return self.start()

@@ -39,6 +39,7 @@ class ObservationConvergence:
         authorization: Optional[Any] = None,
         capability: Optional[Any] = None,
         policy_engine: Optional[Any] = None,
+        policy_provider: Optional[Any] = None,
         auth_service: Optional[Any] = None,
         capability_registry: Optional[Any] = None,
         **kwargs,
@@ -91,7 +92,13 @@ class ObservationConvergence:
                 )
             decision = authorization
         else:
-            decision = service.authorize(request, capability=resolved_cap, workspace_dir=ws, policy_engine=policy_engine)
+            decision = service.authorize(
+                request,
+                capability=resolved_cap,
+                workspace_dir=ws,
+                policy_engine=policy_engine,
+                policy_provider=policy_provider,
+            )
 
         if decision is None:
             raise SecurityViolationError("UNKNOWN POLICY STATE -> NO EXECUTION: Policy engine returned no decision.")

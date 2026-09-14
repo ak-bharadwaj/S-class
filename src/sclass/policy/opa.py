@@ -41,6 +41,24 @@ class OPAInputCompiler:
             except Exception:
                 is_within_ws = False
 
+        req_hash = ""
+        cap_hash = ""
+        try:
+            from sclass.policy.authorization_service import (
+                compute_canonical_request_hash,
+                compute_canonical_capability_hash,
+            )
+            req_hash = compute_canonical_request_hash(request)
+            cap_hash = compute_canonical_capability_hash(capability)
+        except Exception:
+            pass
+
+        ctx = dict(extra_context or {})
+        if req_hash:
+            ctx.setdefault("request_hash", req_hash)
+        if cap_hash:
+            ctx.setdefault("capability_hash", cap_hash)
+
         return {
             "input": {
                 "request": {
@@ -53,13 +71,14 @@ class OPAInputCompiler:
                     "workspace": ws,
                     "context": dict(request.context),
                     "provenance": dict(request.provenance),
+                    "request_hash": req_hash,
                 },
                 "capability": capability.to_dict() if capability else None,
                 "workspace": {
                     "root": ws,
                     "target_is_within": is_within_ws,
                 },
-                "context": dict(extra_context or {}),
+                "context": ctx,
                 "environment": {
                     "os": os.name,
                     "timestamp": datetime.now(timezone.utc).isoformat(),
