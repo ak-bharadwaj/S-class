@@ -274,6 +274,62 @@ class HandoffAssembler:
             ledger_head=ctx.ledger_head,
         )
 
+    @classmethod
+    def assemble_from_verified_state(
+        cls,
+        state: Any,
+        workspace_dir: Optional[str] = None,
+        target_platform: str = "generic",
+        next_action: Optional[str] = None,
+        blockers: Optional[List[str]] = None,
+    ) -> HandoffPackage:
+        """Assembles authoritative HandoffPackage directly from a VerifiedProjectState."""
+        from sclass.context.checkpoint import CheckpointManager
+        ws = os.path.abspath(workspace_dir or getattr(state, "workspace", "") or os.getcwd())
+
+        act_id = getattr(state, "active_task", None)
+        act_task = {"task_id": act_id, "title": f"Active task {act_id}"} if act_id else {}
+
+        resolved_blockers = blockers or [
+            f"Blocked: {b}" for b in getattr(state, "blocked_tasks", [])
+        ]
+
+        chk = CheckpointManager.create_checkpoint(
+            workspace_dir=ws,
+            active_task_id=act_id,
+            blockers=resolved_blockers,
+            relevant_files=getattr(state, "active_plan", []),
+            next_action=next_action or getattr(state, "next_action", ""),
+        )
+
+        v_refs = tuple(
+            str(c.get("claim_id") or c.get("task_id") or "")
+            for c in getattr(state, "verified_claims", [])
+            if (c.get("claim_id") or c.get("task_id"))
+        )
+        if not v_refs and getattr(state, "verified_tasks", None):
+            v_refs = tuple(str(t) for t in state.verified_tasks)
+
+        rej_claims = tuple(getattr(state, "invalidated_claims", []))
+        if not rej_claims and getattr(state, "rejected_claims", None):
+            rej_claims = tuple({"claim_id": str(c), "reason": "rejected"} for c in state.rejected_claims)
+
+        pkg_payload = f"{chk.checkpoint_hash}|{act_id}|{','.join(v_refs)}|{next_action}|{target_platform}"
+        pkg_hash = hashlib.sha256(pkg_payload.encode("utf-8")).hexdigest()
+
+        return HandoffPackage(
+            checkpoint=chk,
+            task_context=act_task,
+            verified_evidence_refs=v_refs,
+            rejected_claims=rej_claims,
+            relevant_files=tuple(getattr(state, "active_plan", [])),
+            next_action=next_action or getattr(state, "next_action", None),
+            package_hash=pkg_hash,
+            blocked_tasks=tuple({"task_id": b} for b in getattr(state, "blocked_tasks", [])),
+            recent_decisions=tuple(getattr(state, "recent_decisions", [])),
+            ledger_head=getattr(state, "current_revision", ""),
+        )
+
 
 @dataclass(frozen=True)
 class HandoffPackage:

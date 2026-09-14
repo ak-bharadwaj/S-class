@@ -7,9 +7,10 @@ from __future__ import annotations
 import os
 import uuid
 import hashlib
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List, Tuple, Union
 
 
 @dataclass(frozen=True)
@@ -94,8 +95,34 @@ class ProjectCheckpoint:
 
 @dataclass
 class VerifiedProjectState:
-    """Authoritative project state tracking verified facts rather than unverified agent claims."""
-    goal: str
+    """
+    Authoritative project state tracking verified facts rather than unverified agent claims (B.11 Universal Truth Layer).
+
+    Structure (B.11):
+    VerifiedProjectState
+    ├── repository
+    ├── workspace
+    ├── current_revision
+    ├── verified_claims
+    ├── evidence
+    ├── invalidated_claims
+    ├── pending_verification
+    ├── agent_context_summary
+    └── handoff
+    """
+    # Universal Truth Layer Core (B.11)
+    repository: str = ""
+    workspace: str = ""
+    current_revision: str = ""
+    verified_claims: List[Dict[str, Any]] = field(default_factory=list)
+    evidence: List[Dict[str, Any]] = field(default_factory=list)
+    invalidated_claims: List[Dict[str, Any]] = field(default_factory=list)
+    pending_verification: List[Dict[str, Any]] = field(default_factory=list)
+    agent_context_summary: str = ""
+    handoff: Optional[Dict[str, Any]] = None
+
+    # Backward compatibility fields
+    goal: str = ""
     active_plan: List[str] = field(default_factory=list)
     active_task: Optional[str] = None
     verified_tasks: List[str] = field(default_factory=list)
@@ -116,8 +143,96 @@ class VerifiedProjectState:
         if claim_id not in self.rejected_claims:
             self.rejected_claims.append(claim_id)
 
+    def record_verified_claim(
+        self,
+        claim: Union[Any, Dict[str, Any]],
+        receipt: Optional[Union[Any, Dict[str, Any]]] = None,
+    ) -> None:
+        """Records a verified claim along with authoritative evidence receipt (B.11)."""
+        c_dict = claim.to_dict() if hasattr(claim, "to_dict") else (dict(claim) if isinstance(claim, dict) else {"statement": str(claim)})
+        cid = c_dict.get("claim_id") or c_dict.get("id")
+
+        # Remove from pending if present
+        if cid:
+            self.pending_verification = [p for p in self.pending_verification if (p.get("claim_id") or p.get("id")) != cid]
+
+        # Record evidence
+        if receipt is not None:
+            r_dict = receipt.to_dict() if hasattr(receipt, "to_dict") else (dict(receipt) if isinstance(receipt, dict) else {"receipt_id": str(receipt)})
+            c_dict["evidence_receipt_id"] = r_dict.get("receipt_id")
+            c_dict["receipt_hash"] = r_dict.get("receipt_hash")
+            if r_dict not in self.evidence:
+                self.evidence.append(r_dict)
+
+        self.verified_claims.append(c_dict)
+
+        # Track in verified_tasks if task_id associated
+        task_id = c_dict.get("task_id")
+        if task_id and task_id not in self.verified_tasks:
+            self.verified_tasks.append(task_id)
+
+    def record_invalidated_claim(
+        self,
+        claim_or_id: Union[str, Any, Dict[str, Any]],
+        reason: str = "Claim rejected or invalidated by workspace divergence",
+    ) -> None:
+        """Records a claim as invalidated/rejected."""
+        cid = claim_or_id if isinstance(claim_or_id, str) else (
+            getattr(claim_or_id, "claim_id", None) or (claim_or_id.get("claim_id") if isinstance(claim_or_id, dict) else str(claim_or_id))
+        )
+        if cid:
+            self.record_rejected_claim(cid)
+            # Remove from verified_claims
+            self.verified_claims = [c for c in self.verified_claims if (c.get("claim_id") or c.get("id")) != cid]
+            self.pending_verification = [p for p in self.pending_verification if (p.get("claim_id") or p.get("id")) != cid]
+
+        inv_record = {
+            "claim_id": cid,
+            "reason": reason,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        if isinstance(claim_or_id, dict):
+            inv_record["claim_details"] = claim_or_id
+        self.invalidated_claims.append(inv_record)
+
+    def record_pending_verification(self, claim: Union[Any, Dict[str, Any]]) -> None:
+        """Adds a proposed claim to pending verification."""
+        c_dict = claim.to_dict() if hasattr(claim, "to_dict") else (dict(claim) if isinstance(claim, dict) else {"statement": str(claim)})
+        self.pending_verification.append(c_dict)
+
+    def invalidate_on_workspace_mutation(self, new_fingerprint: str) -> List[str]:
+        """
+        Invalidates verified claims if workspace mutates after observation without corresponding proof.
+        Returns list of invalidated claim IDs.
+        """
+        if not self.current_revision or self.current_revision == new_fingerprint:
+            self.current_revision = new_fingerprint
+            return []
+
+        # Workspace mutated: invalidate claims tied to earlier revision
+        invalidated_ids: List[str] = []
+        for c in list(self.verified_claims):
+            cid = c.get("claim_id") or c.get("id") or "unknown_claim"
+            invalidated_ids.append(cid)
+            self.record_invalidated_claim(
+                c,
+                reason=f"Workspace mutated from revision '{self.current_revision}' to '{new_fingerprint}' without verified observation",
+            )
+
+        self.current_revision = new_fingerprint
+        return invalidated_ids
+
     def to_dict(self) -> Dict[str, Any]:
         return {
+            "repository": self.repository,
+            "workspace": self.workspace,
+            "current_revision": self.current_revision,
+            "verified_claims": list(self.verified_claims),
+            "evidence": list(self.evidence),
+            "invalidated_claims": list(self.invalidated_claims),
+            "pending_verification": list(self.pending_verification),
+            "agent_context_summary": self.agent_context_summary,
+            "handoff": dict(self.handoff) if self.handoff else None,
             "goal": self.goal,
             "active_plan": list(self.active_plan),
             "active_task": self.active_task,
@@ -130,9 +245,21 @@ class VerifiedProjectState:
             "next_action": self.next_action,
         }
 
+    def to_json(self, indent: int = 2) -> str:
+        return json.dumps(self.to_dict(), indent=indent, sort_keys=True)
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> VerifiedProjectState:
         return cls(
+            repository=data.get("repository", ""),
+            workspace=data.get("workspace", ""),
+            current_revision=data.get("current_revision", ""),
+            verified_claims=list(data.get("verified_claims", [])),
+            evidence=list(data.get("evidence", [])),
+            invalidated_claims=list(data.get("invalidated_claims", [])),
+            pending_verification=list(data.get("pending_verification", [])),
+            agent_context_summary=data.get("agent_context_summary", ""),
+            handoff=data.get("handoff"),
             goal=data.get("goal", ""),
             active_plan=list(data.get("active_plan", [])),
             active_task=data.get("active_task"),
@@ -144,6 +271,10 @@ class VerifiedProjectState:
             verification_checkpoint=data.get("verification_checkpoint"),
             next_action=data.get("next_action", ""),
         )
+
+    @classmethod
+    def from_json(cls, s: str) -> VerifiedProjectState:
+        return cls.from_dict(json.loads(s))
 
 
 @dataclass
