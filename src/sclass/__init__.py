@@ -79,4 +79,16 @@ __all__ = [
     "PathAuthorityLevel",
     "verify_claim",
     "LocalLedger",
+    "PlatformProfile",
+    "CompensationPolicy",
+    "PerformanceBudget",
+    "PlatformOptimizationEngine",
+    "ControlPolicy",
+    "PlatformComparisonBenchmark",
 ]
+
+from sclass.platform.profile import PlatformProfile
+from sclass.platform.policy import CompensationPolicy
+from sclass.platform.budget import PerformanceBudget
+from sclass.platform.engine import PlatformOptimizationEngine, ControlPolicy
+from sclass.platform.benchmark import PlatformComparisonBenchmark
