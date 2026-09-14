@@ -90,6 +90,8 @@ def cmd_status(args: argparse.Namespace) -> int:
     proj_name = os.path.basename(ws)
     project = repo.get_project(proj_name)
     tasks = repo.list_tasks(project_id=proj_name)
+    if not tasks:
+        tasks = repo.list_tasks()
     ledger = LocalLedger(ws)
     is_valid, err = ledger.verify_integrity()
     entries = ledger.read_all_entries()
@@ -241,7 +243,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
     # 5. Core Dependencies
     dep_results = []
-    for dep_pkg in ["pydantic", "rich", "portalocker", "cryptography", "yaml", "tree_sitter"]:
+    for dep_pkg in ["pydantic", "rich", "portalocker", "cryptography", "yaml", "tree_sitter", "tree_sitter_python"]:
         try:
             __import__(dep_pkg)
             dep_results.append((dep_pkg, True))
@@ -553,6 +555,8 @@ def cmd_trust(args: argparse.Namespace) -> int:
     # Active tasks and verification counts
     proj_name = os.path.basename(ws)
     tasks = repo.list_tasks(project_id=proj_name)
+    if not tasks:
+        tasks = repo.list_tasks()
     verified_count = sum(1 for t in tasks if t.state == TaskState.VERIFIED)
     failed_count = sum(1 for t in tasks if t.state == TaskState.FAILED)
 

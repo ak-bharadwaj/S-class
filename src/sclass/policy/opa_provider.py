@@ -431,9 +431,13 @@ class OPAProvider(PolicyProvider):
             if p_name.endswith(".rego"):
                 clean_id = p_name.replace("/", "_").replace("\\", "_").replace(".", "_")
                 try:
-                    self.upload_policy(policy_id=clean_id, rego_code=p_src)
-                except Exception:
-                    pass
+                    self.load_policy(policy_id=clean_id, rego_code=p_src)
+                except Exception as ex:
+                    logger.warning(f"Failed to load bundle policy {p_name} into OPA: {ex}")
+
+    def upload_policy(self, policy_id: str, rego_code: str) -> bool:
+        """Alias for load_policy for backward compatibility."""
+        return self.load_policy(policy_id, rego_code)
 
     def explain_decision(
         self,

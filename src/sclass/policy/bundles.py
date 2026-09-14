@@ -175,18 +175,19 @@ class PolicyBundleManager:
         mode = "r:gz" if tar_path.endswith((".tar.gz", ".tgz")) else "r:"
         with tarfile.open(abs_tar, mode) as tar:
             for member in tar.getmembers():
-                if member.name.endswith("manifest.json"):
+                clean_name = member.name.lstrip("./").lstrip(".\\").replace("\\", "/")
+                if clean_name.endswith("manifest.json"):
                     f = tar.extractfile(member)
                     if f:
                         manifest_data = json.loads(f.read().decode("utf-8"))
-                elif member.name.endswith("data.json"):
+                elif clean_name.endswith("data.json"):
                     f = tar.extractfile(member)
                     if f:
                         bundle_data = json.loads(f.read().decode("utf-8"))
-                elif member.name.endswith((".rego", ".cedar")):
+                elif clean_name.endswith((".rego", ".cedar")):
                     f = tar.extractfile(member)
                     if f:
-                        policies[member.name] = f.read().decode("utf-8")
+                        policies[clean_name] = f.read().decode("utf-8")
 
         manifest = BundleManifest.from_dict(manifest_data) if manifest_data else BundleManifest(
             name=os.path.basename(tar_path).split(".")[0],

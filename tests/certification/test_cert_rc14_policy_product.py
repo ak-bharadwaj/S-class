@@ -243,3 +243,67 @@ def test_cedar_provider_non_blocking_experimental_semantics():
     # Non-blocking semantics: does NOT throw fatal exception, returns normalized decision
     assert decision is not None
     assert decision.metadata.get("experimental") is True
+
+
+def test_cedar_provider_standard_equality_and_set_syntax():
+    # Verify standard Cedar syntax matches properly
+    policies = """
+    permit (principal == Agent::"agent_alice", action in [Action::"fs.read", Action::"fs.write"], resource);
+    """
+    provider = CedarProvider(policies=policies, strict_fail_closed=True)
+
+    # Matching request
+    req_match = ActionRequest(actor="agent_alice", capability="fs", action="read", target="data.txt")
+    dec_match = provider.evaluate(req_match)
+    assert dec_match.is_allowed is True
+    assert dec_match.policy_id == "CEDAR-PERMIT"
+
+    # Non-matching actor
+    req_nomatch = ActionRequest(actor="agent_bob", capability="fs", action="read", target="data.txt")
+    dec_nomatch = provider.evaluate(req_nomatch)
+    assert dec_nomatch.is_allowed is False
+    assert dec_nomatch.outcome == DecisionOutcome.DENY
+
+
+def test_cedar_provider_boolean_literals_and_unless_condition():
+    policies = """
+    permit (principal, action, resource);
+    forbid (principal, action, resource) unless { context.platform == "claude" && context.is_admin == true };
+    """
+    provider = CedarProvider(policies=policies, strict_fail_closed=True)
+
+    # Allowed: platform is claude and is_admin is true
+    req_ok = ActionRequest(provenance={"platform": "claude"}, context={"is_admin": True})
+    dec_ok = provider.evaluate(req_ok)
+    assert dec_ok.is_allowed is True
+
+    # Forbidden: is_admin is false (unless triggers forbid)
+    req_bad = ActionRequest(provenance={"platform": "claude"}, context={"is_admin": False})
+    dec_bad = provider.evaluate(req_bad)
+    assert dec_bad.is_allowed is False
+    assert dec_bad.outcome == DecisionOutcome.DENY
+
+
+def test_cedar_provider_false_condition_does_not_match():
+    # when { false } must NOT trigger
+    provider = CedarProvider(policies='forbid (principal, action, resource) when { false };', strict_fail_closed=False)
+    req = ActionRequest(actor="agent_alice")
+    dec = provider.evaluate(req)
+    # The forbid rule does not match, so it does not forbid
+    assert dec.policy_id != "CEDAR-FORBID"
+
+
+def test_opa_provider_load_bundle_uploads_rego_policies(bundle_dir):
+    mgr = PolicyBundleManager()
+    bundle = mgr.load_from_directory(bundle_dir)
+
+    uploaded_policies = []
+    opa = OPAProvider(endpoint_url="http://localhost:8181", allow_fallback=True)
+
+    # Monkeypatch load_policy to verify it is called for rego files
+    opa.load_policy = lambda policy_id, rego_code: uploaded_policies.append((policy_id, rego_code)) or True
+
+    opa.load_bundle(bundle)
+    assert len(uploaded_policies) >= 1
+    assert any("authz_rego" in p[0] for p in uploaded_policies)
+

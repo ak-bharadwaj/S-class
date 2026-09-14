@@ -9,13 +9,33 @@ from __future__ import annotations
 import re
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, Any, Optional, List, Union
+from typing import Dict, Any, Optional, List, Union, Tuple
 
 from sclass.domain.action import ActionRequest, AuthorizationDecision, DecisionOutcome
 from sclass.domain.capability import Capability
 from sclass.policy.provider import PolicyProvider
 
 logger = logging.getLogger("sclass.policy.cedar_provider")
+
+
+def clean_entity(e: str) -> str:
+    """Removes surrounding quotes and whitespace from an entity/identifier."""
+    return re.sub(r'[\"\']', '', e.strip())
+
+
+class CedarContextNamespace:
+    """Context wrapper enabling attribute-style and dict-style access for condition eval."""
+    def __init__(self, d: Optional[Dict[str, Any]] = None):
+        self._d = d or {}
+
+    def __getattr__(self, name: str) -> Any:
+        return self._d.get(name)
+
+    def __getitem__(self, name: str) -> Any:
+        return self._d.get(name)
+
+    def get(self, name: str, default: Any = None) -> Any:
+        return self._d.get(name, default)
 
 
 @dataclass
@@ -36,37 +56,96 @@ class CedarRule:
     action_pattern: str
     resource_pattern: str
     condition: Optional[str] = None
+    clause_type: str = "when"  # "when" | "unless"
     rule_id: str = "rule_default"
 
+    def _matches_entity(self, raw_pattern: str, entity_value: str) -> bool:
+        """Matches a principal/action/resource pattern against the target entity string."""
+        raw = raw_pattern.strip()
+        if raw.lower() in ("principal", "action", "resource", "?", "*", ""):
+            return True
+
+        cleaned_entity = clean_entity(entity_value)
+        entity_id = cleaned_entity.split("::")[-1]
+
+        def _match_single(target: str) -> bool:
+            c_target = clean_entity(target)
+            if not c_target:
+                return True
+            target_id = c_target.split("::")[-1]
+            return (
+                c_target == cleaned_entity
+                or c_target in cleaned_entity
+                or cleaned_entity in c_target
+                or target_id == entity_id
+                or entity_id.endswith(target_id)
+                or target_id.endswith(entity_id)
+            )
+
+        # Equality match: e.g. "principal == Agent::\"alice\"" or "== Agent::\"alice\""
+        if "==" in raw:
+            target = raw.split("==", 1)[1]
+            return _match_single(target)
+
+        # Set membership: e.g. "action in [Action::\"read\", Action::\"write\"]"
+        if " in " in raw:
+            target = raw.split(" in ", 1)[1].strip()
+            if target.startswith("[") and target.endswith("]"):
+                items = [i for i in target.strip("[]").split(",") if i.strip()]
+                return any(_match_single(item) for item in items)
+            return _match_single(target)
+
+        # Direct pattern match
+        return _match_single(raw)
+
     def matches(self, principal: str, action: str, resource: str, context: Dict[str, Any]) -> bool:
-        """Evaluates whether rule patterns match the evaluation context."""
-        # Principal match
-        if self.principal_pattern.lower() not in ("principal", "?", "*", "") and self.principal_pattern not in principal:
+        """Evaluates whether rule patterns and condition match the evaluation context."""
+        # 1. Principal match
+        if not self._matches_entity(self.principal_pattern, principal):
             return False
 
-        # Action match
-        if self.action_pattern.lower() not in ("action", "?", "*", "") and self.action_pattern not in action:
+        # 2. Action match
+        if not self._matches_entity(self.action_pattern, action):
             return False
 
-        # Resource match
-        if self.resource_pattern.lower() not in ("resource", "?", "*", "") and self.resource_pattern not in resource:
+        # 3. Resource match
+        if not self._matches_entity(self.resource_pattern, resource):
             return False
 
-        # Condition check (basic expression evaluator for when {...})
+        # 4. Condition check (for when {...} or unless {...})
         if self.condition:
             cond = self.condition.strip()
-            # Handle context attribute checks e.g. context.platform == "claude"
-            if "context." in cond:
-                for k, v in context.items():
-                    placeholder = f"context.{k}"
-                    if placeholder in cond:
-                        val_repr = f'"{v}"' if isinstance(v, str) else str(v)
-                        cond = cond.replace(placeholder, val_repr)
-                try:
-                    # Evaluate simple python expression safely
-                    return bool(eval(cond, {"__builtins__": None}, {}))
-                except Exception:
+            # Normalize boolean literals, null, operators
+            c = re.sub(r'\btrue\b', 'True', cond)
+            c = re.sub(r'\bfalse\b', 'False', c)
+            c = re.sub(r'\bnull\b', 'None', c)
+            c = c.replace('&&', ' and ').replace('||', ' or ')
+            # Replace ! (not part of !=) with not
+            c = re.sub(r'!(?!=)', ' not ', c)
+            # Replace Entity::"id" or Entity::id with "Entity::id"
+            c = re.sub(r'([A-Za-z0-9_]+)::[\"\']?(.*?)[\"\']?(?=[^A-Za-z0-9_\-]|$)', r'"\1::\2"', c)
+
+            globs = {
+                "__builtins__": None,
+                "True": True,
+                "False": False,
+                "None": None,
+            }
+            locs = {
+                "context": CedarContextNamespace(context),
+                "principal": principal,
+                "action": action,
+                "resource": resource,
+            }
+            try:
+                cond_val = bool(eval(c, globs, locs))
+                # when: condition must be true; unless: condition must be false
+                matched = cond_val if self.clause_type == "when" else (not cond_val)
+                if not matched:
                     return False
+            except Exception as ex:
+                logger.debug(f"Condition evaluation failed for rule '{self.rule_id}': {ex}")
+                return False
 
         return True
 
@@ -89,6 +168,12 @@ class CedarProvider(PolicyProvider):
         self.non_blocking = non_blocking
         self.strict_fail_closed = strict_fail_closed
         self._rules: List[CedarRule] = []
+        self._cedarpy = None
+        try:
+            import cedarpy
+            self._cedarpy = cedarpy
+        except ImportError:
+            self._cedarpy = None
 
         if policies:
             if isinstance(policies, list):
@@ -116,19 +201,60 @@ class CedarProvider(PolicyProvider):
         """Always healthy since it embeds a reliable in-memory evaluator with graceful degradation."""
         return True
 
+    @staticmethod
+    def _split_cedar_args(args_str: str) -> List[str]:
+        """Splits Cedar arguments respecting nested brackets and string literals."""
+        parts: List[str] = []
+        current: List[str] = []
+        depth_bracket = 0
+        in_quote = False
+        quote_char = None
+        for ch in args_str:
+            if in_quote:
+                current.append(ch)
+                if ch == quote_char:
+                    in_quote = False
+            elif ch in ('"', "'"):
+                in_quote = True
+                quote_char = ch
+                current.append(ch)
+            elif ch == '[':
+                depth_bracket += 1
+                current.append(ch)
+            elif ch == ']':
+                depth_bracket -= 1
+                current.append(ch)
+            elif ch == ',' and depth_bracket == 0:
+                parts.append(''.join(current).strip())
+                current = []
+            else:
+                current.append(ch)
+        if current:
+            parts.append(''.join(current).strip())
+        return parts
+
     def add_policy(self, policy_text: str) -> None:
         """Parses and registers Cedar policy statements."""
         statements = [s.strip() for s in policy_text.split(";") if s.strip()]
         for stmt in statements:
-            # Match: permit / forbid (principal, action, resource) [when { ... }]
-            m = re.match(r"(permit|forbid)\s*\(\s*([^,]+),\s*([^,]+),\s*([^)]+)\)\s*(?:when\s*\{\s*(.*?)\s*\})?", stmt, re.DOTALL)
+            # Match: permit / forbid ( ... ) [when|unless { ... }]
+            m = re.match(
+                r"(permit|forbid)\s*\((.*?)\)\s*(?:(when|unless)\s*\{\s*(.*?)\s*\})?",
+                stmt,
+                re.DOTALL,
+            )
             if m:
-                effect, princ, act, res, cond = m.groups()
+                effect, args_body, clause, cond = m.groups()
+                args = self._split_cedar_args(args_body)
+                princ = args[0] if len(args) > 0 else "principal"
+                act = args[1] if len(args) > 1 else "action"
+                res = args[2] if len(args) > 2 else "resource"
                 rule = CedarRule(
                     effect=effect.strip().lower(),
-                    principal_pattern=princ.strip().replace('"', ''),
-                    action_pattern=act.strip().replace('"', ''),
-                    resource_pattern=res.strip().replace('"', ''),
+                    principal_pattern=princ.strip(),
+                    action_pattern=act.strip(),
+                    resource_pattern=res.strip(),
+                    clause_type=(clause or "when").strip().lower(),
                     condition=cond.strip() if cond else None,
                     rule_id=f"cedar_{len(self._rules)+1}",
                 )

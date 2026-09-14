@@ -35,6 +35,8 @@ def get_dashboard_data(workspace_dir: str = ".") -> Dict[str, Any]:
     # 1. Tasks
     proj_name = os.path.basename(ws)
     tasks = repo.list_tasks(project_id=proj_name)
+    if not tasks:
+        tasks = repo.list_tasks()
     active_tasks = [t for t in tasks if t.state in (TaskState.IN_PROGRESS, TaskState.PENDING)]
     verified_tasks = [t for t in tasks if t.state == TaskState.VERIFIED]
     failed_tasks = [t for t in tasks if t.state == TaskState.FAILED]

@@ -253,3 +253,14 @@ def test_schemathesis_provider_contract_testing_and_unknown_fallback():
     assert len(violations) >= 1
     assert violations[0].endpoint == "FAILURE at /api/users"
     assert violations[0].violation_type == "SchemaMismatch"
+
+
+def test_security_package_exports_sigstore_and_schemathesis():
+    import sclass.security as sec
+    assert hasattr(sec, "SyftProvider")
+    assert hasattr(sec, "GrypeProvider")
+    assert hasattr(sec, "SigstoreProvider")
+    assert hasattr(sec, "ProvenanceReceipt")
+    assert hasattr(sec, "SchemathesisProvider")
+    assert hasattr(sec, "ContractViolation")
+    assert hasattr(sec, "evaluate_supply_chain_policy")
