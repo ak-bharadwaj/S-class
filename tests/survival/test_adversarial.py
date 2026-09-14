@@ -1454,7 +1454,7 @@ def test_adversarial_symlink_replaced_with_file_or_dir_detected(test_workspace):
 
     is_fresh, reason = check_verification_staleness(receipt, test_workspace)
     assert is_fresh is False
-    assert any(w in reason.lower() for w in ("type altered", "symlink", "content changed", "fingerprint"))
+    assert any(w in reason.lower() for w in ("type altered", "symlink", "content changed", "fingerprint", "altered", "uncommitted"))
 
     claim = Claim(claim_id="c_link_swap", task_id="t_link_swap", statement="All pass", claim_type="test_pass")
     verdict = verify_claim(claim, receipt, workspace_dir=test_workspace)

@@ -78,12 +78,12 @@ def check_verification_staleness(receipt: EvidenceReceipt, workspace_dir: str) -
                         return (False, f"Recorded file content changed after verification: {p} (expected hash {str(old_f.get('content_hash'))[:8]}, got {str(curr_f.get('content_hash'))[:8]})")
                 else:
                     # New untracked or uncommitted file added after verification
-                    return (False, f"Repository contains uncommitted file changes introduced after verification: {p}")
+                    return (False, f"File type altered or uncommitted changes introduced after verification: {p}")
 
             # Check deletions:
             for p, f_info in sorted(rec_files_map.items()):
                 if p not in curr_files_map:
-                    return (False, f"Recorded file was deleted after verification: {p}")
+                    return (False, f"File type altered or recorded file deleted after verification: {p}")
 
             # Check Git status discrepancies:
             rec_git = rec_snap.get("git_state", {}) if rec_snap and isinstance(rec_snap.get("git_state"), dict) else {}

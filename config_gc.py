@@ -46,7 +46,7 @@ def run_gc(workspace_dir: str, state_max_age_days: int = 7, memory_max_age_days:
         try:
             mtime = os.path.getmtime(state_file)
             mtime_dt = datetime.fromtimestamp(mtime, tz=timezone.utc)
-            if (now - mtime_dt).days > state_max_age_days:
+            if (now - mtime_dt) >= timedelta(days=state_max_age_days):
                 size = os.path.getsize(state_file)
                 os.remove(state_file)
                 report.expired_states_removed += 1
@@ -63,7 +63,7 @@ def run_gc(workspace_dir: str, state_max_age_days: int = 7, memory_max_age_days:
                 if os.path.isfile(fpath):
                     mtime = os.path.getmtime(fpath)
                     mtime_dt = datetime.fromtimestamp(mtime, tz=timezone.utc)
-                    if (now - mtime_dt).days > state_max_age_days:
+                    if (now - mtime_dt) >= timedelta(days=state_max_age_days):
                         size = os.path.getsize(fpath)
                         os.remove(fpath)
                         report.orphaned_screenshots_removed += 1

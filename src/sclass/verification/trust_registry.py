@@ -197,11 +197,10 @@ class TrustRegistry:
         norm_path = os.path.normpath(executable_path)
         norm_case = os.path.normcase(norm_path)
 
-        # 0. Reject NTFS Alternate Data Streams (ADS) on Windows (e.g. file.txt:evil.exe)
-        if os.name == "nt":
-            drive, rest = os.path.splitdrive(norm_path)
-            if ":" in rest:
-                return VerifierTrustMode.UNKNOWN
+        # 0. Reject NTFS Alternate Data Streams (ADS) and path colon injection (e.g. file.txt:evil.exe)
+        drive, rest = os.path.splitdrive(norm_path)
+        if ":" in rest:
+            return VerifierTrustMode.UNKNOWN
 
         # 1. Explicit compromised / untrusted check
         if norm_case in self.policy.untrusted_paths or norm_path in self.policy.untrusted_paths:
