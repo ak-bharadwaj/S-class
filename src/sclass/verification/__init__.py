@@ -11,6 +11,21 @@ from sclass.verification.engine import verify_claim, check_staleness
 from sclass.verification.state_machine import VerificationState, VerificationStateMachine
 from sclass.verification.acceptance import ClaimAcceptanceMatrix, RequiredEvidenceKind
 from sclass.verification.plan import VerificationPlan
+from sclass.verification.provider import (
+    VerificationProvider,
+    BaseVerificationProvider,
+    PytestProvider,
+    SemgrepProvider,
+    SyftProvider,
+    SchemathesisProvider,
+    VerificationProviderRegistry,
+    get_provider_registry,
+)
+from sclass.verification.adaptive import (
+    VerificationLevel,
+    AdaptiveVerificationPolicy,
+    AdaptiveVerificationEngine,
+)
 
 __all__ = [
     "Verifier",
@@ -25,4 +40,17 @@ __all__ = [
     "ClaimAcceptanceMatrix",
     "RequiredEvidenceKind",
     "VerificationPlan",
+    # Verification Providers (B.7)
+    "VerificationProvider",
+    "BaseVerificationProvider",
+    "PytestProvider",
+    "SemgrepProvider",
+    "SyftProvider",
+    "SchemathesisProvider",
+    "VerificationProviderRegistry",
+    "get_provider_registry",
+    # Adaptive Verification (B.8)
+    "VerificationLevel",
+    "AdaptiveVerificationPolicy",
+    "AdaptiveVerificationEngine",
 ]

@@ -324,6 +324,10 @@ class PerformanceBudget:
         """Returns True if all overhead dimensions are within limits."""
         return len(self.exceeded_dimensions()) == 0
 
+    def is_exhausted(self) -> bool:
+        """Returns True if any overhead dimension has exceeded its budget limit."""
+        return not self.is_within_budget()
+
     def exceeded_dimensions(self) -> List[str]:
         """Returns list of dimensions where consumption exceeded limits."""
         exceeded: List[str] = []

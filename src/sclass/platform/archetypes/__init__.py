@@ -70,6 +70,18 @@ def get_archetype(platform_id: str) -> Tuple[PlatformProfile, CompensationPolicy
     return generic_profile, generic_policy
 
 
+def get_archetype_profile(platform_id: str) -> PlatformProfile:
+    """Retrieve just the PlatformProfile for a given platform."""
+    profile, _ = get_archetype(platform_id)
+    return profile
+
+
+def get_archetype_policy(platform_id: str) -> CompensationPolicy:
+    """Retrieve just the CompensationPolicy for a given platform."""
+    _, policy = get_archetype(platform_id)
+    return policy
+
+
 __all__ = [
     "get_codex_profile",
     "get_codex_compensation_policy",
@@ -78,6 +90,8 @@ __all__ = [
     "get_antigravity_profile",
     "get_antigravity_compensation_policy",
     "get_archetype",
+    "get_archetype_profile",
+    "get_archetype_policy",
     "register_archetype",
     "list_archetypes",
 ]

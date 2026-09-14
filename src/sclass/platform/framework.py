@@ -107,9 +107,46 @@ class PlatformProfilingFramework:
 
         return sorted(list(set(capabilities)))
 
+    def get_profile(self, platform_id: str) -> PlatformProfile:
+        """Retrieves PlatformProfile for a given platform identifier."""
+        from sclass.platform.archetypes import get_archetype_profile
+        return get_archetype_profile(platform_id)
+
+    def detect(
+        self,
+        actor_token: Optional[str] = None,
+        client_info: Optional[Dict[str, Any]] = None,
+        env: Optional[Dict[str, str]] = None,
+    ) -> DetectionOutcome:
+        """Convenience alias for resolve_platform."""
+        return self.resolve_platform(
+            requested_actor=actor_token,
+            client_info=client_info,
+            env=env,
+        )
+
+    def synthesize_policy(
+        self,
+        task: str = "general",
+        risk: str = "medium",
+        actor_token: Optional[str] = None,
+        state: Optional[Dict[str, Any]] = None,
+        client_info: Optional[Dict[str, Any]] = None,
+        env: Optional[Dict[str, str]] = None,
+    ) -> ControlPolicy:
+        """Convenience alias for synthesize_control_policy."""
+        return self.synthesize_control_policy(
+            task=task,
+            risk=risk,
+            state=state,
+            client_info=client_info,
+            requested_actor=actor_token,
+            env=env,
+        )
+
     def synthesize_control_policy(
         self,
-        task: str,
+        task: str = "general",
         risk: str = "medium",
         state: Optional[Dict[str, Any]] = None,
         client_info: Optional[Dict[str, Any]] = None,

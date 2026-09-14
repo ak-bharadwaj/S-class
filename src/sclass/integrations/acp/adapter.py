@@ -43,6 +43,8 @@ from sclass.integrations.acp.schema import (
     ACPFsWriteParams,
     ACPTerminalExecParams,
 )
+from sclass.platform.framework import PlatformProfilingFramework
+from sclass.platform.engine import ControlPolicy
 
 
 @dataclass(frozen=True)
@@ -160,13 +162,24 @@ class ACPAdapter:
     ActionRequests, PermissionRequests, and session lifecycle state machines.
     """
 
-    def __init__(self, workspace_dir: str, agent_id: str = "acp_agent", mode: str = "enforce"):
+    def __init__(
+        self,
+        workspace_dir: str,
+        agent_id: str = "acp_agent",
+        mode: str = "enforce",
+        platform_framework: Optional[PlatformProfilingFramework] = None,
+    ):
         self.workspace_dir = os.path.abspath(workspace_dir)
         self.agent_id = agent_id
         self.mode = mode
         self.sessions: Dict[str, AgentSession] = {}
         self.fs_gateway = ACPFsGateway(self.workspace_dir)
         self.terminal_gateway = ACPTerminalGateway(self.workspace_dir, mode=self.mode)
+        self.platform_framework = platform_framework or PlatformProfilingFramework(workspace_dir=self.workspace_dir)
+
+    def get_control_policy(self, task: Optional[Any] = None) -> ControlPolicy:
+        """Synthesizes active control policy for this ACP session."""
+        return self.platform_framework.synthesize_policy(actor_token=self.agent_id, task=task)
 
     def normalize_message(self, raw_message: Dict[str, Any]) -> Tuple[Optional[AgentEvent], Optional[ActionRequest]]:
         """Backwards-compatible helper extracting event and action request."""
@@ -223,6 +236,17 @@ class ACPAdapter:
             return AgentEvent("tool.request", sid, params), req
 
         return None, None
+
+    def handle_message(self, message: Union[str, Dict[str, Any]]) -> str:
+        """
+        Convenience method accepting JSON string or dictionary and returning serialized JSON response.
+        """
+        if isinstance(message, str):
+            raw_msg = json.loads(message)
+        else:
+            raw_msg = message
+        resp = self.process_acp_message(raw_msg)
+        return json.dumps(resp)
 
     def process_acp_message(self, raw_message: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -491,6 +515,26 @@ class ACPAdapter:
                 return ACPProtocolTransport.create_error(msg_id, code=-32003, message=f"Permission denied: {pe}")
             except Exception as e:
                 return ACPProtocolTransport.create_error(msg_id, code=-32603, message=f"Terminal execution error: {e}")
+
+        # 15. sclass/profile & sclass/control_policy (B.6 Platform Optimization)
+        elif method in ("sclass/profile", "sclass.profile", "sclass/control_policy"):
+            det = self.platform_framework.detect(actor_token=self.agent_id)
+            prof = self.platform_framework.get_profile(det.platform_id)
+            ctrl = self.platform_framework.synthesize_policy(actor_token=self.agent_id)
+            return ACPProtocolTransport.create_response(
+                msg_id,
+                {
+                    "platform_id": prof.platform_id,
+                    "confidence": det.confidence,
+                    "execution_style": prof.execution_style,
+                    "native_strengths": prof.native_strengths,
+                    "preserved_capabilities": list(ctrl.preserved_capabilities),
+                    "active_compensations": list(ctrl.active_compensations),
+                    "observation_mode": ctrl.observation_mode,
+                    "verification_gate": ctrl.verification_gate,
+                    "interruption_policy": ctrl.interruption_policy,
+                },
+            )
 
         # Fallback for unknown methods
         return ACPProtocolTransport.create_error(

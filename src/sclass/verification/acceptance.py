@@ -197,6 +197,11 @@ class ClaimAcceptanceMatrix:
         has_matching_evidence = False
 
         for ev in evidence_items:
+            # If evidence is bound to a specific claim and does not match this claim, skip it
+            ev_claim_id = getattr(ev, "claim_id", None)
+            if ev_claim_id and ev_claim_id != claim.claim_id:
+                continue
+
             # Check staleness if evidence supports it
             if workspace_dir:
                 if hasattr(ev, "validate_dependencies") and callable(ev.validate_dependencies):
@@ -221,9 +226,10 @@ class ClaimAcceptanceMatrix:
 
             # Evaluate based on evidence type / kind
             ev_kind = getattr(ev, "evidence_kind", None)
+            ev_kind_str = str(ev_kind).lower() if ev_kind else ""
 
             # 1. Test Evidence
-            if ev_kind == "test" or hasattr(ev, "failed_count"):
+            if ev_kind_str in ("test", "test_pass", "tests") or hasattr(ev, "failed_count"):
                 f_count = getattr(ev, "failed_count", 0)
                 p_count = getattr(ev, "passed_count", 0)
                 failed_tests += f_count
@@ -240,7 +246,7 @@ class ClaimAcceptanceMatrix:
                     has_matching_evidence = True
 
             # 2. Build Evidence
-            elif ev_kind == "build" or hasattr(ev, "is_success"):
+            elif ev_kind_str in ("build", "compilation") or hasattr(ev, "is_success"):
                 is_succ = getattr(ev, "is_success", True)
                 err_count = getattr(ev, "errors_count", 0)
                 exit_c = getattr(ev, "exit_code", 0)
@@ -255,7 +261,7 @@ class ClaimAcceptanceMatrix:
                     has_matching_evidence = True
 
             # 3. Security Evidence
-            elif ev_kind == "security" or hasattr(ev, "findings_count"):
+            elif ev_kind_str in ("security", "security_scan", "sast", "sbom", "contract") or hasattr(ev, "findings_count"):
                 findings = getattr(ev, "findings_count", 0)
                 passed = getattr(ev, "passed", True)
                 if not passed or findings > 0:
@@ -264,7 +270,7 @@ class ClaimAcceptanceMatrix:
                         claim_id=claim.claim_id,
                         reason=f"Security verifier reported {findings} security finding(s).",
                     )
-                if claim.claim_type == ClaimType.SECURITY.value:
+                if claim.claim_type in (ClaimType.SECURITY.value, ClaimType.DEPLOYMENT.value, ClaimType.CORRECTNESS.value):
                     has_matching_evidence = True
 
             # 4. Standard EvidenceReceipt / ObservedReceipt
@@ -278,14 +284,14 @@ class ClaimAcceptanceMatrix:
                     )
                 # Check single evidence sufficiency
                 suff, suff_verdict, suff_reason = cls.evaluate_evidence_sufficiency(claim, ev)
-                if not suff and suff_verdict == "REJECT":
+                if suff:
+                    has_matching_evidence = True
+                elif len(evidence_items) == 1 and suff_verdict == "REJECT":
                     return VerificationResult(
                         status="REJECT",
                         claim_id=claim.claim_id,
                         reason=suff_reason,
                     )
-                elif suff:
-                    has_matching_evidence = True
 
         if not has_observed:
             return VerificationResult(
