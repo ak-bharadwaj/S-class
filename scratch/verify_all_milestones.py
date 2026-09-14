@@ -47,6 +47,9 @@ MILESTONES: List[Tuple[str, str, str]] = [
     ("M16_FLEET_INTEGRITY", "B.15 Multi-Agent Fleet Integrity", "tests/certification/test_cert_b15_agent_fleet_integrity.py"),
     ("M17_CODEX_BENCHMARK", "RC.1 External Codex Subprocess & Benchmark", "tests/certification/test_cert_rc1_codex_benchmark.py"),
     ("M18_EXECUTION_PROVIDERS", "RC.2 Execution Provider Closure & Sandboxing", "tests/certification/test_cert_rc2_execution_providers.py"),
+    ("M19_OBSERVATION_PLANE", "RC.3 Independent Observation Plane", "tests/certification/test_cert_rc3_observation.py"),
+    ("M20_VERIFICATION_ENGINE", "RC.4 Executable Verification Engine Hierarchy", "tests/certification/test_cert_rc4_verification_engine.py"),
+    ("M21_PROJECT_TRUTH", "RC.5 Universal Project Truth & Invalidation", "tests/certification/test_cert_rc5_project_truth.py"),
 ]
 
 
@@ -74,14 +77,14 @@ def run_milestone(idx: int, code: str, title: str, path: str) -> Dict[str, Any]:
 
 def main():
     print("\n" + "=" * 78)
-    print("  S-CLASS: 18/18 MASTER MILESTONE AUDITOR & REALITY CERTIFICATION")
+    print("  S-CLASS: 21/21 MASTER MILESTONE AUDITOR & REALITY CERTIFICATION")
     print("=" * 78)
 
     results: List[Dict[str, Any]] = []
     total_start = time.perf_counter()
 
     for i, (code, title, path) in enumerate(MILESTONES, start=1):
-        status_label = f"[{i:02d}/18] Auditing {title}..."
+        status_label = f"[{i:02d}/21] Auditing {title}..."
         print(f"\n{status_label:<60}", end="", flush=True)
         res = run_milestone(i, code, title, path)
         results.append(res)

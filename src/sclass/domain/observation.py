@@ -11,6 +11,13 @@ from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
 from sclass.domain.execution import ExecutionIdentity
+from sclass.observation.record import (
+    ObservationRecord,
+    ProcessTelemetry,
+    GitRevisionState,
+    WorkspaceDelta,
+    FileMutation,
+)
 
 
 @dataclass
@@ -32,6 +39,7 @@ class Observation:
     raw_stdout: Optional[str] = field(default=None, repr=False)
     raw_stderr: Optional[str] = field(default=None, repr=False)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    observation_record: Optional[ObservationRecord] = None
 
     def compute_hash(self) -> str:
         """Computes cryptographic digest of the observation facts."""
@@ -60,10 +68,13 @@ class Observation:
             "files_changed": list(self.files_changed),
             "observation_hash": self.compute_hash(),
             "metadata": self.metadata,
+            "observation_record": self.observation_record.to_dict() if self.observation_record else None,
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> Observation:
+        obs_rec_data = data.get("observation_record")
+        obs_rec = ObservationRecord.from_dict(obs_rec_data) if (obs_rec_data and isinstance(obs_rec_data, dict)) else None
         return cls(
             observation_id=data["observation_id"],
             task_id=data.get("task_id", "task_default"),
@@ -79,4 +90,16 @@ class Observation:
             duration_ms=data.get("duration_ms", 0.0),
             files_changed=list(data.get("files_changed", [])),
             metadata=data.get("metadata", {}),
+            observation_record=obs_rec,
         )
+
+
+__all__ = [
+    "Observation",
+    "ObservationRecord",
+    "ProcessTelemetry",
+    "GitRevisionState",
+    "WorkspaceDelta",
+    "FileMutation",
+]
+

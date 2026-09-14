@@ -7,6 +7,16 @@ from sclass.observation.receipt import save_receipt, load_receipt, create_observ
 from sclass.observation.observer import observe_command, detect_execution_kind, KNOWN_TEST_VERIFIERS
 from sclass.observation.factory import ObservationFactory
 from sclass.observation.convergence import ObservationConvergence, converge_execution
+from sclass.observation.record import (
+    ObservationRecord,
+    ProcessTelemetry,
+    GitRevisionState,
+    WorkspaceDelta,
+    FileMutation,
+    redact_observation_secrets,
+)
+from sclass.observation.git_observer import GitObserver
+from sclass.observation.delta import DeltaCalculator
 
 __all__ = [
     "compute_workspace_snapshot",
@@ -21,4 +31,13 @@ __all__ = [
     "ObservationFactory",
     "ObservationConvergence",
     "converge_execution",
+    "ObservationRecord",
+    "ProcessTelemetry",
+    "GitRevisionState",
+    "WorkspaceDelta",
+    "FileMutation",
+    "GitObserver",
+    "DeltaCalculator",
+    "redact_observation_secrets",
 ]
+

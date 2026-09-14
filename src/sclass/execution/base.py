@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from sclass.domain.evidence import ObservedReceipt
     from sclass.domain.observation import Observation
     from sclass.trust.ledger import LocalLedger
+    from sclass.observation.record import ObservationRecord
 
 from sclass.execution.modes import (
     ExecutionMode,
@@ -129,6 +130,7 @@ class ProviderExecutionResult:
     raw_result: Optional[ProcessExecutionResult] = None
     authorization_decision: Optional[AuthorizationDecision] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+    observation_record: Optional[ObservationRecord] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -144,6 +146,7 @@ class ProviderExecutionResult:
             "evidence_receipt": self.evidence_receipt.to_dict(),
             "authorization_decision": self.authorization_decision.to_dict() if self.authorization_decision else None,
             "metadata": dict(self.metadata),
+            "observation_record": self.observation_record.to_dict() if self.observation_record else None,
         }
 
 
@@ -377,7 +380,10 @@ class ExecutionProvider(ABC):
                 "provider_type": self.provider_type,
                 "policy_id": decision.policy_id if decision else "N/A",
             },
+            observation_record=getattr(receipt, "observation_record", None),
         )
+
+        obs_rec = getattr(receipt, "observation_record", None)
 
         return ProviderExecutionResult(
             provider_name=self.name,
@@ -393,4 +399,6 @@ class ExecutionProvider(ABC):
             raw_result=raw_result,
             authorization_decision=decision,
             metadata={"provider_type": self.provider_type},
+            observation_record=obs_rec,
         )
+

@@ -26,6 +26,10 @@ class VerificationPlan:
     """
     plan_id: str = field(default_factory=lambda: f"vplan_{uuid.uuid4().hex[:12]}")
     goal: str = ""
+    task_id: str = ""
+    verifiers: List[str] = field(default_factory=list)
+    commands: List[Any] = field(default_factory=list)
+    claim_ids: List[str] = field(default_factory=list)
     target_claims: List[Claim] = field(default_factory=list)
     required_evidence_kinds: List[str] = field(default_factory=list)
     verifier_ids: List[str] = field(default_factory=list)

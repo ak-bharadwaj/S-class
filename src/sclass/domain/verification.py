@@ -102,8 +102,8 @@ class VerificationEvent:
 class VerificationResult:
     """The authoritative verdict of an agent claim evaluated against observed evidence."""
     status: str  # ACCEPT | REJECT | INVALID | INCONCLUSIVE
-    claim_id: str
-    reason: str
+    claim_id: str = ""
+    reason: str = ""
     observed_exit_code: Optional[int] = None
     observed_files_changed: Tuple[str, ...] = field(default_factory=tuple)
     passed_tests: int = 0
@@ -114,6 +114,10 @@ class VerificationResult:
     verification_state: str = ""
     state_machine: Optional[Any] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def is_verified(self) -> bool:
+        return self.status in ("ACCEPT", "PASS")
 
     @property
     def is_accepted(self) -> bool:
