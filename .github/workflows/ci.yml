@@ -34,11 +34,21 @@ jobs:
         pip install -r requirements.txt
         pip install pytest-cov psutil pyright ruff
 
+    - name: Ensure Real OPA Binary
+      run: |
+        python -c "import sys; sys.path.insert(0, 'src'); from sclass.policy.opa_runner import ensure_opa_binary; print('OPA ready at:', ensure_opa_binary())"
+
     - name: Run Handoff B.1 Security Certification Suite
       env:
         PYTHONPATH: src:.
       run: |
         python -m pytest tests/certification/test_cert_handoff_b1_security.py -v
+
+    - name: Run B.2 Real OPA Certification Suite
+      env:
+        PYTHONPATH: src:.
+      run: |
+        python -m pytest tests/certification/test_cert_b2_opa_provider.py -v
 
     - name: Run Full Test Suite
       env:
@@ -60,4 +70,4 @@ jobs:
         gh api repos/${{ github.repository }}/statuses/${{ github.sha }} \
           -f state=success \
           -f context="ci/sclass-certification" \
-          -f description="B.1.3 Security Certification & Full Suite 100% Passed" || true
+          -f description="B.1.5 Security & B.2 Real OPA Certification 100% Passed" || true

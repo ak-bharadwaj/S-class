@@ -247,10 +247,12 @@ class AuthorizationService:
         secret_key: Optional[bytes] = None,
         policy_version: str = "1.0.0",
         capability_registry: Optional[CapabilityRegistry] = None,
+        policy_provider: Optional[Any] = None,
     ):
         self._secret_key = secret_key or get_authorization_secret()
         self.policy_version = policy_version
         self.capability_registry = capability_registry or CapabilityResolver.get_global_registry()
+        self.policy_provider = policy_provider
 
     def mint_approval_token(
         self,
@@ -382,6 +384,7 @@ class AuthorizationService:
         capability: Optional[Capability] = None,
         workspace_dir: str = "",
         policy_engine: Optional[Any] = None,
+        policy_provider: Optional[Any] = None,
     ) -> AuthorizationDecision:
         """
         Authoritatively evaluates an ActionRequest across Capability, Policy, and Invariants.
@@ -439,8 +442,16 @@ class AuthorizationService:
                 metadata={"failed_constraints": cap_decision.failed_constraints},
             )
 
-        # 3. Evaluate Policy Engine
-        if policy_engine is not None:
+        # 3. Evaluate Policy Engine / Policy Provider
+        active_provider = policy_provider or self.policy_provider
+        if active_provider is not None:
+            raw_decision = active_provider.evaluate(
+                request=request,
+                workspace_dir=ws,
+                capability=target_cap,
+                expected_policy_version=self.policy_version,
+            )
+        elif policy_engine is not None:
             raw_decision = policy_engine.evaluate(request, ws)
         else:
             from sclass.control.policy import DefaultPolicyEngine
@@ -454,6 +465,24 @@ class AuthorizationService:
                 risk_level="critical",
                 reason="UNKNOWN POLICY STATE -> NO EXECUTION: Policy engine returned no decision.",
                 capability=target_cap,
+            )
+
+        # Enforce Policy Version Binding if provider returned a policy version
+        dec_pol_ver = None
+        if hasattr(raw_decision, "policy_version"):
+            dec_pol_ver = getattr(raw_decision, "policy_version")
+        elif hasattr(raw_decision, "metadata") and isinstance(raw_decision.metadata, dict):
+            dec_pol_ver = raw_decision.metadata.get("policy_version")
+
+        if dec_pol_ver is not None and str(dec_pol_ver) != str(self.policy_version):
+            return self.seal_decision(
+                request=request,
+                outcome=DecisionOutcome.DENY,
+                policy_id="OPA-VERSION-MISMATCH",
+                risk_level="critical",
+                reason=f"POLICY VERSION MISMATCH: Policy evaluated under version '{dec_pol_ver}', but active S-Class policy version is '{self.policy_version}'. Fail-closed policy denies execution.",
+                capability=target_cap,
+                metadata={"expected_policy_version": self.policy_version, "received_policy_version": dec_pol_ver},
             )
 
         raw_outcome = getattr(raw_decision, "outcome", None)

@@ -6,6 +6,9 @@ from sclass.domain.action import ActionRequest, AuthorizationDecision, DecisionO
 from sclass.control.capabilities import Capability
 from sclass.control.resources import ResourceKind, classify_resource
 from sclass.policy.opa import OPAInputCompiler, OPAClient, OPAPolicyAdapter
+from sclass.policy.provider import PolicyProvider, PolicyEvaluationResult
+from sclass.policy.opa_provider import OPAProvider
+from sclass.policy.opa_runner import OPAServerProcess, ensure_opa_binary
 from sclass.policy.authorization_service import (
     AuthorizationService,
     compute_canonical_request_hash,
@@ -30,6 +33,11 @@ __all__ = [
     "OPAInputCompiler",
     "OPAClient",
     "OPAPolicyAdapter",
+    "PolicyProvider",
+    "PolicyEvaluationResult",
+    "OPAProvider",
+    "OPAServerProcess",
+    "ensure_opa_binary",
     "AuthorizationService",
     "CapabilityRegistry",
     "CapabilityResolver",

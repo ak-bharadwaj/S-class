@@ -197,3 +197,9 @@ class OPAPolicyAdapter:
                 reason=f"UNKNOWN POLICY STATE: OPA service unavailable or evaluation error ({e}). Fail-closed policy denies execution.",
                 metadata={"opa_payload": payload, "error": str(e)},
             )
+
+
+# Re-exports for Phase B.2 Real OPA integration
+from sclass.policy.provider import PolicyProvider, PolicyEvaluationResult
+from sclass.policy.opa_provider import OPAProvider
+from sclass.policy.opa_runner import OPAServerProcess, ensure_opa_binary
