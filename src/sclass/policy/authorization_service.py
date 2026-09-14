@@ -110,11 +110,13 @@ def generate_integrity_token(
     outcome: str,
     risk_level: str,
     evaluated_at: str,
+    capability_id: str = "",
+    capability_version: str = "1.0.0",
     secret_key: Optional[bytes] = None,
 ) -> str:
     """Computes HMAC-SHA256 integrity token sealing decision parameters."""
     key = secret_key or get_authorization_secret()
-    payload = f"{issuer}:{request_hash}:{capability_hash}:{policy_id}:{policy_version}:{outcome}:{risk_level}:{evaluated_at}"
+    payload = f"{issuer}:{request_hash}:{capability_hash}:{capability_id}:{capability_version}:{policy_id}:{policy_version}:{outcome}:{risk_level}:{evaluated_at}"
     return hmac.new(key, payload.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
@@ -123,6 +125,8 @@ def verify_decision_integrity(
     request: Union[ActionRequest, Any],
     capability: Optional[Capability] = None,
     expected_capability_hash: Optional[str] = None,
+    expected_capability_id: Optional[str] = None,
+    expected_capability_version: Optional[str] = None,
     expected_policy_version: Optional[str] = None,
     secret_key: Optional[bytes] = None,
     max_age_seconds: float = 3600.0,
@@ -131,7 +135,7 @@ def verify_decision_integrity(
     Authoritatively verifies that an AuthorizationDecision:
     1. Was issued by S-Class (issuer == 'S_CLASS')
     2. Is bound to the exact canonical ActionRequest (request_hash matches)
-    3. Is bound to the exact authoritative Capability (capability_hash matches)
+    3. Is bound to the exact authoritative Capability (capability_hash, capability_id, capability_version match)
     4. Is bound to the active policy version (policy_version matches)
     5. Has not been forged or tampered with (valid HMAC integrity_token)
     6. Is not stale (within max_age_seconds)
@@ -150,12 +154,24 @@ def verify_decision_integrity(
     if not decision_req_hash or not hmac.compare_digest(decision_req_hash, req_hash):
         return False, f"Request hash mismatch: decision bound to '{decision_req_hash}', but request hash is '{req_hash}'"
 
-    # 2. Capability Hash Binding
+    # 2. Capability Hash, ID, and Version Binding
     target_cap_hash = expected_capability_hash or (compute_canonical_capability_hash(capability) if capability else None)
     if target_cap_hash is not None:
         decision_cap_hash = getattr(decision, "capability_hash", "") or ""
         if not decision_cap_hash or not hmac.compare_digest(decision_cap_hash, target_cap_hash):
             return False, f"Capability hash mismatch: decision bound to '{decision_cap_hash}', but expected capability hash is '{target_cap_hash}'"
+
+    target_cap_id = expected_capability_id or (getattr(capability, "id", None) if capability else None)
+    if target_cap_id is not None:
+        decision_cap_id = getattr(decision, "capability_id", "") or ""
+        if decision_cap_id != target_cap_id:
+            return False, f"Capability ID mismatch: decision bound to ID '{decision_cap_id}', but expected capability ID is '{target_cap_id}'"
+
+    target_cap_ver = expected_capability_version or (getattr(capability, "version", None) if capability else None)
+    if target_cap_ver is not None:
+        decision_cap_ver = getattr(decision, "capability_version", "1.0.0") or "1.0.0"
+        if decision_cap_ver != target_cap_ver:
+            return False, f"Capability version mismatch: decision bound to version '{decision_cap_ver}', but active capability version is '{target_cap_ver}'"
 
     # 3. Policy Version Freshness
     pol_ver = getattr(decision, "policy_version", "1.0.0")
@@ -170,6 +186,8 @@ def verify_decision_integrity(
     outcome_str = getattr(decision.outcome, "value", str(decision.outcome)).lower()
     risk_str = getattr(decision, "risk_level", "")
     cap_hash = getattr(decision, "capability_hash", "") or ""
+    cap_id = getattr(decision, "capability_id", "") or ""
+    cap_ver = getattr(decision, "capability_version", "1.0.0") or "1.0.0"
     pol_id = getattr(decision, "policy_id", "")
     eval_at = getattr(decision, "evaluated_at", "")
 
@@ -178,6 +196,8 @@ def verify_decision_integrity(
         issuer=issuer,
         request_hash=decision_req_hash,
         capability_hash=cap_hash,
+        capability_id=cap_id,
+        capability_version=cap_ver,
         policy_id=pol_id,
         policy_version=pol_ver,
         outcome=outcome_str,
@@ -306,12 +326,16 @@ class AuthorizationService:
         now_iso = datetime.now(timezone.utc).isoformat()
         req_hash = compute_canonical_request_hash(request)
         cap_hash = compute_canonical_capability_hash(capability)
+        cap_id = getattr(capability, "id", "") if capability else ""
+        cap_ver = getattr(capability, "version", "1.0.0") if capability else "1.0.0"
         outcome_str = outcome.value if isinstance(outcome, DecisionOutcome) else str(outcome)
 
         token = generate_integrity_token(
             issuer="S_CLASS",
             request_hash=req_hash,
             capability_hash=cap_hash,
+            capability_id=cap_id,
+            capability_version=cap_ver,
             policy_id=policy_id,
             policy_version=self.policy_version,
             outcome=outcome_str,
@@ -332,6 +356,8 @@ class AuthorizationService:
             issuer="S_CLASS",
             request_hash=req_hash,
             capability_hash=cap_hash,
+            capability_id=cap_id,
+            capability_version=cap_ver,
             policy_version=self.policy_version,
             integrity_token=token,
         )
@@ -345,7 +371,9 @@ class AuthorizationService:
     ) -> AuthorizationDecision:
         """
         Authoritatively evaluates an ActionRequest across Capability, Policy, and Invariants.
-        Enforces: NO AUTHORITATIVE CAPABILITY -> NO EXECUTION.
+        Enforces:
+        1. NO AUTHORITATIVE CAPABILITY -> NO EXECUTION
+        2. NO CALLER-SUPPLIED CAPABILITY MAY BECOME AUTHORITY
         Returns a sealed, non-forgeable AuthorizationDecision.
         """
         if request is None:
@@ -353,18 +381,35 @@ class AuthorizationService:
 
         ws = os.path.abspath(workspace_dir or request.workspace or os.getcwd())
 
-        # 1. Resolve Authoritative Capability
-        target_cap = capability or self.capability_registry.resolve(request, workspace_dir=ws)
-        if target_cap is None:
+        # 1. Resolve Authoritative Capability exclusively from registry
+        reg_cap = self.capability_registry.resolve(request, workspace_dir=ws)
+
+        # Invariant: NO CALLER-SUPPLIED CAPABILITY MAY BECOME AUTHORITY
+        if capability is not None:
+            if reg_cap is None or (capability is not reg_cap and capability != reg_cap):
+                return self.seal_decision(
+                    request=request,
+                    outcome=DecisionOutcome.DENY,
+                    policy_id="FORGED-CAPABILITY",
+                    risk_level="critical",
+                    reason="NO CALLER-SUPPLIED CAPABILITY MAY BECOME AUTHORITY: Caller-supplied capability rejected. "
+                           "Capabilities must resolve exclusively from the authoritative registry.",
+                    remediation="Do not pass external capabilities to authorize(); register capabilities in CapabilityRegistry.",
+                    capability=None,
+                )
+
+        if reg_cap is None:
             return self.seal_decision(
                 request=request,
                 outcome=DecisionOutcome.DENY,
                 policy_id="NO-CAPABILITY",
                 risk_level="critical",
-                reason="NO AUTHORITATIVE CAPABILITY -> NO EXECUTION: No capability granted to actor for this action.",
+                reason="NO AUTHORITATIVE CAPABILITY -> NO EXECUTION: No capability granted to actor for this action in authoritative registry.",
                 remediation="Register an authoritative capability covering this actor, operation, and resource.",
                 capability=None,
             )
+
+        target_cap = reg_cap
 
         # 2. Evaluate all 11 dimensions of the Capability
         cap_decision = target_cap.evaluate_request(request, ws)

@@ -59,11 +59,20 @@ class ObservationConvergence:
 
         service = auth_service or AuthorizationService(capability_registry=capability_registry)
 
-        # Resolve authoritative capability
-        resolved_cap = capability or service.capability_registry.resolve(request, workspace_dir=ws)
+        # Resolve authoritative capability exclusively from the authoritative registry
+        resolved_cap = service.capability_registry.resolve(request, workspace_dir=ws)
+
+        # Invariant: NO CALLER-SUPPLIED CAPABILITY MAY BECOME AUTHORITY
+        if capability is not None:
+            if resolved_cap is None or (capability is not resolved_cap and capability != resolved_cap):
+                raise SecurityViolationError(
+                    "NO CALLER-SUPPLIED CAPABILITY MAY BECOME AUTHORITY: Caller-supplied capability rejected on execution API. "
+                    "Capabilities must resolve exclusively from the authoritative registry."
+                )
+
         if resolved_cap is None:
             raise SecurityViolationError(
-                "NO AUTHORITATIVE CAPABILITY -> NO EXECUTION: No capability granted to actor for this action."
+                "NO AUTHORITATIVE CAPABILITY -> NO EXECUTION: No capability granted to actor for this action in authoritative registry."
             )
 
         if authorization is not None:

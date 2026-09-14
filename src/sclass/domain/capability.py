@@ -81,6 +81,12 @@ class Capability:
     credentials: List[str] = field(default_factory=list)
     approval: Union[bool, str] = False
     metadata: Dict[str, Any] = field(default_factory=dict)
+    id: str = ""
+    version: str = "1.0.0"
+
+    def __post_init__(self) -> None:
+        if not self.id:
+            object.__setattr__(self, "id", f"cap:{self.actor}:{self.operation}:{self.resource}")
 
     def allows_operation(self, requested_op: str) -> bool:
         """Evaluates whether this capability permits the requested operation."""
@@ -194,6 +200,8 @@ class Capability:
             "credentials": list(self.credentials),
             "approval": self.approval,
             "metadata": dict(self.metadata),
+            "id": self.id,
+            "version": self.version,
         }
 
     @classmethod
@@ -212,6 +220,8 @@ class Capability:
             credentials=list(data.get("credentials", [])),
             approval=data.get("approval", False),
             metadata=dict(data.get("metadata", {})),
+            id=data.get("id", ""),
+            version=data.get("version", "1.0.0"),
         )
 
 

@@ -30,13 +30,21 @@ class CapabilityRegistry:
 
     def __init__(self, load_defaults: bool = True):
         self._capabilities: List[Capability] = []
+        self._generation: int = 0
         if load_defaults:
             self._load_baseline_defaults()
+
+    @property
+    def generation(self) -> int:
+        """Returns the current mutation generation counter of the registry."""
+        return self._generation
 
     def _load_baseline_defaults(self) -> None:
         """Loads baseline default capabilities permitted for standard workspace operations."""
         self._capabilities.extend([
             Capability(
+                id="cap:terminal.execute:baseline",
+                version="1.0.0",
                 actor="*",
                 operation=CAP_TERMINAL_EXECUTE,
                 resource="**",
@@ -47,6 +55,8 @@ class CapabilityRegistry:
                 network=False,
             ),
             Capability(
+                id="cap:filesystem.read:baseline",
+                version="1.0.0",
                 actor="*",
                 operation=CAP_FILESYSTEM_READ,
                 resource="**",
@@ -57,6 +67,8 @@ class CapabilityRegistry:
                 network=False,
             ),
             Capability(
+                id="cap:git.read:baseline",
+                version="1.0.0",
                 actor="*",
                 operation=CAP_GIT_READ,
                 resource="**",
@@ -67,6 +79,8 @@ class CapabilityRegistry:
                 network=False,
             ),
             Capability(
+                id="cap:process.spawn:baseline",
+                version="1.0.0",
                 actor="*",
                 operation=CAP_PROCESS_SPAWN,
                 resource="**",
@@ -83,10 +97,39 @@ class CapabilityRegistry:
         if not isinstance(capability, Capability):
             raise TypeError("capability must be an instance of Capability")
         self._capabilities.insert(0, capability)  # Prepend so custom capabilities take priority
+        self._generation += 1
+
+    def unregister(self, capability_id: str) -> bool:
+        """Unregisters a capability by ID. Returns True if removed."""
+        initial_len = len(self._capabilities)
+        self._capabilities = [c for c in self._capabilities if c.id != capability_id]
+        if len(self._capabilities) < initial_len:
+            self._generation += 1
+            return True
+        return False
+
+    def replace(self, old_capability_id: str, new_capability: Capability) -> bool:
+        """Replaces a capability matching old_capability_id with new_capability."""
+        if not isinstance(new_capability, Capability):
+            raise TypeError("new_capability must be an instance of Capability")
+        for i, cap in enumerate(self._capabilities):
+            if cap.id == old_capability_id:
+                self._capabilities[i] = new_capability
+                self._generation += 1
+                return True
+        return False
+
+    def get(self, capability_id: str) -> Optional[Capability]:
+        """Gets a capability by ID."""
+        for cap in self._capabilities:
+            if cap.id == capability_id:
+                return cap
+        return None
 
     def clear(self) -> None:
         """Clears all capabilities from the registry."""
         self._capabilities.clear()
+        self._generation += 1
 
     def get_capabilities(self) -> List[Capability]:
         """Returns a copy of all registered capabilities."""

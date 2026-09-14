@@ -1018,6 +1018,9 @@ def test_decision_capability_hash_tamper_rejected(test_ws):
         workspace=test_ws,
     )
 
+    # Register legitimate Cap A in authoritative registry
+    service.capability_registry.register(cap_a)
+
     # Mint legitimate decision for Cap A
     decision = service.authorize(req, capability=cap_a, workspace_dir=test_ws)
     assert decision.is_allowed is True
@@ -1154,3 +1157,294 @@ def test_get_sandbox_backend_fails_closed_without_fallback():
     with pytest.raises(SecurityViolationError) as exc_info:
         get_sandbox_backend("unknown_cloud_hypervisor")
     assert "unknown backend -> no execution" in str(exc_info.value).lower()
+
+
+# ==============================================================================
+# B.1.4 — Authoritative Capability Boundary Certification Tests
+# Invariant: NO CALLER-SUPPLIED CAPABILITY MAY BECOME AUTHORITY
+# ==============================================================================
+
+def test_forged_permissive_capability_cannot_authorize_execution(test_ws):
+    """
+    Invariant: NO CALLER-SUPPLIED CAPABILITY MAY BECOME AUTHORITY.
+    Attacker crafts an arbitrary permissive Capability and passes it to execution APIs.
+    System must ignore/reject caller-supplied capability and strictly deny execution.
+    """
+    from sclass.policy.capability_resolver import CapabilityRegistry
+    from sclass.policy.authorization_service import AuthorizationService
+    from sclass.domain.action import DecisionOutcome
+
+    # Clean registry with zero capabilities
+    empty_registry = CapabilityRegistry(load_defaults=False)
+    auth_service = AuthorizationService(capability_registry=empty_registry)
+
+    req = ActionRequest(
+        actor="untrusted-agent",
+        capability=CAP_FILESYSTEM_WRITE,
+        action="write_file",
+        target="src/backdoor.py",
+        workspace=test_ws,
+    )
+
+    forged_cap = Capability(
+        id="forged-root-superadmin",
+        actor="*",
+        operation="*",
+        resource="**",
+        scope="workspace",
+        risk="critical",
+        duration=999999.0,
+        network=True,
+        filesystem="read_write",
+        credentials=["*"],
+        version="99.9.9",
+    )
+
+    # 1. Attacker attempts to pass forged capability to execute_and_observe
+    with pytest.raises(SecurityViolationError) as exc_info:
+        ObservationConvergence.execute_and_observe(
+            request=req,
+            capability=forged_cap,
+            auth_service=auth_service,
+        )
+    err_msg = str(exc_info.value)
+    assert (
+        "NO AUTHORITATIVE CAPABILITY -> NO EXECUTION" in err_msg
+        or "NO CALLER-SUPPLIED CAPABILITY MAY BECOME AUTHORITY" in err_msg
+    )
+
+    # 2. Attacker attempts to pass forged capability directly to authorize()
+    decision = auth_service.authorize(req, capability=forged_cap, workspace_dir=test_ws)
+    assert decision.is_allowed is False
+    assert decision.outcome == DecisionOutcome.DENY
+    assert decision.policy_id in ("FORGED-CAPABILITY", "NO-CAPABILITY")
+
+
+def test_caller_supplied_overprivileged_capability_denied(test_ws):
+    """
+    Invariant: Caller cannot elevate permissions by supplying an over-privileged capability.
+    Registry authorizes only read operations. Caller supplies write capability.
+    Must fail closed.
+    """
+    from sclass.policy.capability_resolver import CapabilityRegistry
+    from sclass.policy.authorization_service import AuthorizationService
+    from sclass.domain.action import DecisionOutcome
+
+    registry = CapabilityRegistry(load_defaults=False)
+    read_cap = Capability(
+        id="cap:read-only",
+        version="1.0.0",
+        actor="dev-agent",
+        operation=CAP_FILESYSTEM_READ,
+        resource="src/**",
+        scope="workspace",
+        risk="low",
+        filesystem="read",
+    )
+    registry.register(read_cap)
+    auth_service = AuthorizationService(capability_registry=registry)
+
+    req = ActionRequest(
+        actor="dev-agent",
+        capability=CAP_FILESYSTEM_WRITE,
+        action="write_file",
+        target="src/protected.py",
+        workspace=test_ws,
+    )
+
+    overprivileged_cap = Capability(
+        id="cap:write-privileged",
+        version="1.0.0",
+        actor="dev-agent",
+        operation=CAP_FILESYSTEM_WRITE,
+        resource="**",
+        scope="workspace",
+        risk="critical",
+        filesystem="read_write",
+    )
+
+    # Attempting to authorize with external over-privileged capability fails
+    decision = auth_service.authorize(req, capability=overprivileged_cap, workspace_dir=test_ws)
+    assert decision.is_allowed is False
+    assert decision.outcome == DecisionOutcome.DENY
+
+    # Attempting to execute with external over-privileged capability fails closed
+    with pytest.raises(SecurityViolationError):
+        ObservationConvergence.execute_and_observe(
+            request=req,
+            capability=overprivileged_cap,
+            auth_service=auth_service,
+        )
+
+
+def test_capability_swapped_after_authorization_rejected(test_ws):
+    """
+    Invariant: Capability identity and version bound to decision cannot be swapped post-authorization.
+    Decision authorized for read operation cannot be presented for execution of another request.
+    """
+    from sclass.policy.capability_resolver import CapabilityRegistry
+    from sclass.policy.authorization_service import AuthorizationService
+
+    registry = CapabilityRegistry(load_defaults=False)
+    cap_read = Capability(
+        id="cap:read",
+        version="1.0.0",
+        actor="agent-claude",
+        operation=CAP_FILESYSTEM_READ,
+        resource="src/**",
+        scope="workspace",
+        risk="low",
+        filesystem="read",
+    )
+    cap_exec = Capability(
+        id="cap:exec",
+        version="1.0.0",
+        actor="agent-claude",
+        operation=CAP_TERMINAL_EXECUTE,
+        resource="**",
+        scope="workspace",
+        risk="medium",
+        filesystem="read_write",
+    )
+    registry.register(cap_read)
+    registry.register(cap_exec)
+    auth_service = AuthorizationService(capability_registry=registry)
+
+    req_read = ActionRequest(
+        actor="agent-claude",
+        capability=CAP_FILESYSTEM_READ,
+        action="read_file",
+        target="src/main.py",
+        workspace=test_ws,
+    )
+    decision = auth_service.authorize(req_read, workspace_dir=test_ws)
+    assert decision.is_allowed is True
+    assert decision.capability_id == "cap:read"
+
+    # Attacker attempts to use the decision to execute a terminal command
+    req_exec = ActionRequest(
+        actor="agent-claude",
+        capability=CAP_TERMINAL_EXECUTE,
+        action="run_command",
+        target="python -c 'print(1)'",
+        workspace=test_ws,
+    )
+    with pytest.raises(SecurityViolationError) as exc_info:
+        ObservationConvergence.execute_and_observe(
+            request=req_exec,
+            authorization=decision,
+            auth_service=auth_service,
+        )
+    assert "request hash mismatch" in str(exc_info.value).lower() or "capability hash mismatch" in str(exc_info.value).lower()
+
+
+def test_registry_capability_mutation_invalidates_prior_authorization(test_ws):
+    """
+    Invariant: REGISTRY CAPABILITY MUTATION INVALIDATES PRIOR AUTHORIZATION.
+    A decision authorized under capability v1.0.0 is invalidated if the registry
+    capability is mutated (version bump, restriction, or replacement).
+    """
+    from sclass.policy.capability_resolver import CapabilityRegistry
+    from sclass.policy.authorization_service import AuthorizationService
+
+    registry = CapabilityRegistry(load_defaults=False)
+    cap_v1 = Capability(
+        id="cap:runner",
+        version="1.0.0",
+        actor="agent-worker",
+        operation=CAP_TERMINAL_EXECUTE,
+        resource="**",
+        scope="workspace",
+        risk="medium",
+        filesystem="read_write",
+    )
+    registry.register(cap_v1)
+    auth_service = AuthorizationService(capability_registry=registry)
+
+    req = ActionRequest(
+        actor="agent-worker",
+        capability=CAP_TERMINAL_EXECUTE,
+        action="run_command",
+        target="python -c \"print('mutated')\"",
+        workspace=test_ws,
+    )
+
+    # 1. Authorize under v1.0.0
+    decision_v1 = auth_service.authorize(req, workspace_dir=test_ws)
+    assert decision_v1.is_allowed is True
+    assert decision_v1.capability_version == "1.0.0"
+
+    # 2. Mutate registry capability (e.g. security team bumps capability version to 1.0.1 and tightens scope)
+    cap_v2 = Capability(
+        id="cap:runner",
+        version="1.0.1",
+        actor="agent-worker",
+        operation=CAP_TERMINAL_EXECUTE,
+        resource="**",
+        scope="workspace",
+        risk="high",
+        filesystem="read_write",
+    )
+    replaced = registry.replace("cap:runner", cap_v2)
+    assert replaced is True
+    assert registry.generation > 1
+
+    # 3. Presenting the old decision_v1 for execution MUST FAIL CLOSED
+    with pytest.raises(SecurityViolationError) as exc_info:
+        ObservationConvergence.execute_and_observe(
+            request=req,
+            authorization=decision_v1,
+            auth_service=auth_service,
+        )
+    err_msg = str(exc_info.value).lower()
+    assert "capability hash mismatch" in err_msg or "capability version mismatch" in err_msg
+
+
+def test_stale_capability_identity_rejected(test_ws):
+    """
+    Invariant: STALE CAPABILITY IDENTITY REJECTED.
+    A decision authorized under a capability that has since been revoked/unregistered
+    from the authoritative registry cannot be used for execution.
+    """
+    from sclass.policy.capability_resolver import CapabilityRegistry
+    from sclass.policy.authorization_service import AuthorizationService
+
+    registry = CapabilityRegistry(load_defaults=False)
+    ephemeral_cap = Capability(
+        id="cap:ephemeral:revoke-me",
+        version="1.0.0",
+        actor="agent-worker",
+        operation=CAP_TERMINAL_EXECUTE,
+        resource="**",
+        scope="workspace",
+        risk="medium",
+        filesystem="read_write",
+    )
+    registry.register(ephemeral_cap)
+    auth_service = AuthorizationService(capability_registry=registry)
+
+    req = ActionRequest(
+        actor="agent-worker",
+        capability=CAP_TERMINAL_EXECUTE,
+        action="run_command",
+        target="python -c \"print('revoked')\"",
+        workspace=test_ws,
+    )
+
+    # Authorize decision while capability exists
+    decision = auth_service.authorize(req, workspace_dir=test_ws)
+    assert decision.is_allowed is True
+
+    # Revoke capability from authoritative registry
+    unregistered = registry.unregister("cap:ephemeral:revoke-me")
+    assert unregistered is True
+
+    # Attempt execution with prior decision now fails closed
+    with pytest.raises(SecurityViolationError) as exc_info:
+        ObservationConvergence.execute_and_observe(
+            request=req,
+            authorization=decision,
+            auth_service=auth_service,
+        )
+    assert "no authoritative capability -> no execution" in str(exc_info.value).lower()
+
