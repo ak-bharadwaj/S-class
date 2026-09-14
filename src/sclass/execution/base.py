@@ -32,6 +32,34 @@ from sclass.execution.process import ProcessExecutionResult
 from sclass.core.errors import SecurityViolationError, ObservationIntegrityError
 
 
+def split_command(cmd_str: str) -> List[str]:
+    """
+    Platform-aware command tokenizer.
+    On Windows (nt), preserves directory path backslashes while respecting quotes.
+    On POSIX, uses standard POSIX shell escaping.
+    Strictly fails closed with SecurityViolationError on unparseable quotes or syntax.
+    """
+    if not cmd_str or not cmd_str.strip():
+        return []
+    if os.name == "nt":
+        try:
+            raw_tokens = shlex.split(cmd_str, posix=False)
+            tokens: List[str] = []
+            for t in raw_tokens:
+                if ((t.startswith('"') and t.endswith('"')) or (t.startswith("'") and t.endswith("'"))) and len(t) >= 2:
+                    tokens.append(t[1:-1])
+                else:
+                    tokens.append(t)
+            return tokens
+        except ValueError as ve:
+            raise SecurityViolationError(f"Command contains unparseable syntax: {ve}") from ve
+    else:
+        try:
+            return shlex.split(cmd_str)
+        except ValueError as ve:
+            raise SecurityViolationError(f"Command contains unparseable syntax: {ve}") from ve
+
+
 @dataclass(frozen=True)
 class ProviderCapabilities:
     """Introspected capability profile of an execution provider."""
@@ -217,19 +245,13 @@ class ExecutionProvider(ABC):
                 cmd_str = subprocess.list2cmdline(cmd_tokens) if os.name == "nt" else shlex.join(cmd_tokens)
             else:
                 cmd_str = str(cmd_raw)
-                try:
-                    cmd_tokens = shlex.split(cmd_str)
-                except ValueError as ve:
-                    raise SecurityViolationError(f"Command contains unparseable syntax: {ve}") from ve
+                cmd_tokens = split_command(cmd_str)
             resolved_cwd = cwd or action_req.workspace or os.getcwd()
             t_id = task_id or action_req.session or "task_default"
         else:
             if isinstance(command, str):
                 cmd_str = command
-                try:
-                    cmd_tokens = shlex.split(cmd_str)
-                except ValueError as ve:
-                    raise SecurityViolationError(f"Command contains unparseable syntax: {ve}") from ve
+                cmd_tokens = split_command(cmd_str)
             else:
                 cmd_tokens = list(command)
                 import subprocess
@@ -250,10 +272,11 @@ class ExecutionProvider(ABC):
             if decision is None:
                 # Construct canonical ActionRequest if not already present
                 if action_req is None:
+                    cap_name = capability.name if capability else "terminal.execute"
                     action_req = ActionRequest(
                         actor="agent",
                         session=t_id,
-                        capability="terminal.execute",
+                        capability=cap_name,
                         action="run_command",
                         target=cmd_str,
                         parameters={"command": cmd_str, "cwd": ws},
@@ -315,7 +338,7 @@ class ExecutionProvider(ABC):
         # 6. Cryptographic Observation & Receipt Emission
         agent_name = action_req.actor if action_req else "agent"
         action_name = action_req.action if action_req else "run_command"
-        claim_id = getattr(action_req, "claim_id", f"claim_{t_id}")
+        claim_id = (action_req.context.get("claim_id") if (action_req and action_req.context) else None) or getattr(action_req, "claim_id", None) or f"claim_{t_id}"
 
         receipt = ObservationFactory.create_observation(
             execution_result=raw_result,

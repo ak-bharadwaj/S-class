@@ -130,6 +130,16 @@ def test_rc2_native_process_provider_determinism_and_observation(tmp_path):
     assert receipt.exit_code == 0
     assert ledger.verify_chain() is True
 
+    # 6. Verify Windows backslash path execution without stripping path separators
+    script_file = ws / "sub dir" / "test_target.py"
+    script_file.parent.mkdir(parents=True, exist_ok=True)
+    script_file.write_text("print('path_execution_success')\n", encoding="utf-8")
+
+    backslash_cmd = f'{sys.executable} "{script_file}"'
+    res_path = provider.execute(command=backslash_cmd, cwd=str(ws), ledger=ledger)
+    assert res_path.success is True
+    assert "path_execution_success" in res_path.stdout
+
 
 def test_rc2_fail_closed_authorization_gate(tmp_path):
     """
@@ -214,7 +224,54 @@ def test_rc2_isolated_providers_fail_closed_semantics(tmp_path):
             )
         assert "NO SANDBOX -> NO SANDBOXED EXECUTION" in str(excinfo.value)
 
-    # 3. Unified IsolatedSandboxProvider
+    # 3. OCI Container provider (Docker/Podman)
+    oci_p = OCIProvider()
+    assert oci_p.provider_type == "container"
+    o_caps = oci_p.inspect_capabilities()
+    assert o_caps.network_isolation is True
+    assert o_caps.filesystem_isolation is True
+
+    if not oci_p.is_available():
+        h = oci_p.health_check()
+        assert h.status == "unavailable"
+        assert h.is_healthy is False
+        assert "daemon_running" in h.details or "reason" in h.details
+
+        with pytest.raises(SecurityViolationError) as excinfo:
+            oci_p.execute(
+                command="echo oci_test",
+                cwd=str(ws),
+            )
+        assert "NO SANDBOX -> NO SANDBOXED EXECUTION" in str(excinfo.value)
+
+    # 4. Dagger provider
+    dagger_p = DaggerProvider()
+    assert dagger_p.provider_type == "reproducible_pipeline"
+    d_caps = dagger_p.inspect_capabilities()
+    assert d_caps.network_isolation is True
+
+    if not dagger_p.is_available():
+        h = dagger_p.health_check()
+        assert h.status == "unavailable"
+        assert h.is_healthy is False
+
+        with pytest.raises(SecurityViolationError) as excinfo:
+            dagger_p.execute(
+                command="echo dagger_test",
+                cwd=str(ws),
+            )
+        assert "NO SANDBOX -> NO SANDBOXED EXECUTION" in str(excinfo.value)
+
+    # 5. Unified IsolatedSandboxProvider (auto and backend-specific)
+    sandbox_auto = IsolatedSandboxProvider()
+    if not sandbox_auto.is_available():
+        with pytest.raises(SecurityViolationError) as excinfo:
+            sandbox_auto.execute(
+                command="echo sandbox_auto_test",
+                cwd=str(ws),
+            )
+        assert "NO SANDBOX -> NO SANDBOXED EXECUTION" in str(excinfo.value)
+
     sandbox_p = IsolatedSandboxProvider(preferred_backend="gvisor")
     if not sandbox_p.is_available():
         with pytest.raises(SecurityViolationError):
@@ -348,3 +405,35 @@ def test_rc2_execution_bypass_elimination_audit(tmp_path):
             workspace_dir=str(ws),
             request=denied_req,
         )
+
+
+def test_rc2_ledger_append_atomic_backward_compatibility_with_legacy_signatures(tmp_path):
+    """
+    Certifies that LocalLedger.append_atomic() and verify_integrity() gracefully handle
+    legacy ledger records containing 'signature' instead of 'hash', preventing KeyError: 'hash'.
+    """
+    import json
+    ws = tmp_path / "legacy_ledger_ws"
+    ws.mkdir()
+    ledger = LocalLedger(workspace_dir=str(ws))
+
+    # Simulate legacy genesis entry with signature
+    legacy_entry = {
+        "sequence": 1,
+        "event": "legacy_genesis",
+        "previous_hash": "0" * 64,
+        "payload_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "timestamp": "2026-09-14T00:00:00.000000+00:00",
+        "signature": "37199002c414fab5ee6035e0da997ce46d58d08d4b50b76df6ee6c8a68606ffd",
+        "payload": {"legacy_field": "test"},
+    }
+    with open(ledger.ledger_file, "w", encoding="utf-8") as f:
+        f.write(json.dumps(legacy_entry) + "\n")
+
+    # Appending atomic observation onto legacy entry MUST succeed without KeyError: 'hash'
+    new_entry = ledger.append_atomic("OBSERVATION", {"observed_step": 1})
+    assert new_entry["sequence"] == 2
+    assert new_entry["previous_hash"] == "37199002c414fab5ee6035e0da997ce46d58d08d4b50b76df6ee6c8a68606ffd"
+    assert "hash" in new_entry
+    assert len(new_entry["hash"]) == 64
+

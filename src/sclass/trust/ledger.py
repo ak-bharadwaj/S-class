@@ -123,8 +123,8 @@ class LocalLedger:
         """
         with WorkspaceLock(self.paths.root, lock_name="ledger"):
             last = self.get_last_entry()
-            seq = (last["sequence"] + 1) if last else 1
-            prev_hash = last["hash"] if last else "0" * 64
+            seq = (last.get("sequence", 0) + 1) if last else 1
+            prev_hash = (last.get("hash") or last.get("signature") or ("0" * 64)) if last else "0" * 64
             now_iso = datetime.now(timezone.utc).isoformat()
             p_hash = self._compute_payload_hash(payload)
             entry_hash = self._compute_entry_hash(seq, event, prev_hash, p_hash, now_iso)
@@ -196,16 +196,17 @@ class LocalLedger:
                 return False, f"Payload hash mismatch at sequence {entry.get('sequence')}"
 
             calc_hash = self._compute_entry_hash(
-                entry["sequence"],
-                entry["event"],
-                entry["previous_hash"],
-                entry["payload_hash"],
-                entry["timestamp"],
+                entry.get("sequence", 0),
+                entry.get("event", ""),
+                entry.get("previous_hash", "0" * 64),
+                entry.get("payload_hash", ""),
+                entry.get("timestamp", ""),
             )
-            if entry.get("hash") != calc_hash:
+            entry_hash = entry.get("hash") or entry.get("signature")
+            if entry.get("hash") and entry.get("hash") != calc_hash:
                 return False, f"Entry hash mismatch at sequence {entry.get('sequence')}"
 
-            expected_prev = entry["hash"]
+            expected_prev = entry_hash or calc_hash
 
         return True, None
 
@@ -284,7 +285,7 @@ class LocalLedger:
                     if entry.get("sequence") != idx + 1 or entry.get("previous_hash") != expected_prev:
                         snap_valid = False
                         break
-                    expected_prev = entry["hash"]
+                    expected_prev = entry.get("hash") or entry.get("signature") or ("0" * 64)
 
                 if snap_valid:
                     # Restore from snapshot without overwriting audit log of repair

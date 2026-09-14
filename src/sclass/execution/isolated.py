@@ -78,7 +78,8 @@ class BubblewrapProvider(ExecutionProvider):
             )
         t0 = time.perf_counter()
         try:
-            res = self._runner.run(
+            host_runner = ProcessRunner()
+            res = host_runner.run(
                 command=["bwrap", "--version"],
                 cwd=os.getcwd(),
                 timeout=5.0,
@@ -90,7 +91,7 @@ class BubblewrapProvider(ExecutionProvider):
                 status="healthy" if res.exit_code == 0 else "degraded",
                 is_healthy=(res.exit_code == 0),
                 latency_ms=latency,
-                details={"exit_code": res.exit_code, "version_output": res.stdout.strip()},
+                details={"exit_code": res.exit_code, "version_output": res.stdout.strip() or res.stderr.strip()},
             )
         except Exception as e:
             latency = (time.perf_counter() - t0) * 1000.0
@@ -151,8 +152,30 @@ class OCIProvider(ExecutionProvider):
     def provider_type(self) -> str:
         return "container"
 
+    def _is_daemon_available(self) -> bool:
+        """
+        Checks whether the container engine daemon/socket is responsive.
+        Client-server container engines cannot execute without an active daemon.
+        """
+        runtime = "docker" if shutil.which("docker") else ("podman" if shutil.which("podman") else None)
+        if not runtime:
+            return False
+
+        if runtime == "podman" and os.name != "nt":
+            return True
+
+        if os.environ.get("DOCKER_HOST"):
+            return True
+
+        if os.name == "nt":
+            return os.path.exists(r"\\.\pipe\docker_engine") or os.path.exists(r"\\.\pipe\dockerDesktopLinuxEngine")
+        else:
+            return os.path.exists("/var/run/docker.sock") or os.path.exists(os.path.expanduser("~/.docker/run/docker.sock"))
+
     def is_available(self) -> bool:
-        return self._sandbox.is_available()
+        if not self._sandbox.is_available():
+            return False
+        return self._is_daemon_available()
 
     def inspect_capabilities(self) -> ProviderCapabilities:
         runtime = "docker" if shutil.which("docker") else ("podman" if shutil.which("podman") else None)
@@ -167,11 +190,12 @@ class OCIProvider(ExecutionProvider):
             supported_modes=["host_argv"],
             runtime_path=runtime_path,
             version=runtime,
-            metadata={"image": self.image, "runtime": runtime or "none"},
+            metadata={"image": self.image, "runtime": runtime or "none", "daemon_available": self._is_daemon_available()},
         )
 
     def health_check(self) -> ProviderHealth:
-        if not self.is_available():
+        runtime = "docker" if shutil.which("docker") else ("podman" if shutil.which("podman") else None)
+        if not runtime:
             return ProviderHealth(
                 provider_name=self.name,
                 status="unavailable",
@@ -180,21 +204,44 @@ class OCIProvider(ExecutionProvider):
                 details={"reason": "Neither Docker nor Podman container runtime is available on host PATH."},
             )
         t0 = time.perf_counter()
-        runtime = "docker" if shutil.which("docker") else "podman"
         try:
-            res = self._runner.run(
+            host_runner = ProcessRunner()
+            res = host_runner.run(
                 command=[runtime, "--version"],
                 cwd=os.getcwd(),
                 timeout=5.0,
                 mode=ExecutionMode.HOST_ARGV,
             )
             latency = (time.perf_counter() - t0) * 1000.0
+            if res.exit_code != 0:
+                return ProviderHealth(
+                    provider_name=self.name,
+                    status="degraded",
+                    is_healthy=False,
+                    latency_ms=latency,
+                    details={"runtime": runtime, "version": res.stderr.strip() or res.stdout.strip()},
+                )
+
+            if not self._is_daemon_available():
+                return ProviderHealth(
+                    provider_name=self.name,
+                    status="unavailable",
+                    is_healthy=False,
+                    latency_ms=latency,
+                    details={
+                        "runtime": runtime,
+                        "version": res.stdout.strip(),
+                        "daemon_running": False,
+                        "reason": "Container CLI is installed, but container daemon socket/pipe is not active.",
+                    },
+                )
+
             return ProviderHealth(
                 provider_name=self.name,
-                status="healthy" if res.exit_code == 0 else "degraded",
-                is_healthy=(res.exit_code == 0),
+                status="healthy",
+                is_healthy=True,
                 latency_ms=latency,
-                details={"runtime": runtime, "version": res.stdout.strip()},
+                details={"runtime": runtime, "version": res.stdout.strip(), "daemon_running": True},
             )
         except Exception as e:
             latency = (time.perf_counter() - t0) * 1000.0
@@ -284,7 +331,8 @@ class GVisorProvider(ExecutionProvider):
             )
         t0 = time.perf_counter()
         try:
-            res = self._runner.run(
+            host_runner = ProcessRunner()
+            res = host_runner.run(
                 command=["runsc", "--version"],
                 cwd=os.getcwd(),
                 timeout=5.0,
@@ -296,7 +344,7 @@ class GVisorProvider(ExecutionProvider):
                 status="healthy" if res.exit_code == 0 else "degraded",
                 is_healthy=(res.exit_code == 0),
                 latency_ms=latency,
-                details={"version": res.stdout.strip()},
+                details={"version": res.stdout.strip() or res.stderr.strip()},
             )
         except Exception as e:
             latency = (time.perf_counter() - t0) * 1000.0
