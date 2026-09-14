@@ -69,3 +69,9 @@ class EpistemicIntegrityError(SClassError):
     """Raised when epistemic invariants are breached (e.g. attempting to certify truth without observation)."""
     pass
 
+
+class FleetIntegrityError(SClassError):
+    """Raised when fleet swarm coordination, leasing, or multi-agent state integrity is compromised."""
+    pass
+
+

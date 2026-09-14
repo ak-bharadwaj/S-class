@@ -30,6 +30,18 @@ from sclass.agent_fleet.models import (
     ConflictType,
     FleetState,
     FleetMergeResult,
+    TaskNode,
+    TaskEdge,
+    SymbolOwnership,
+    ConflictRecord,
+    QuarantineRecord,
+)
+from sclass.agent_fleet.agent_registry import AgentSessionManager
+from sclass.agent_fleet.conflict import (
+    ConflictDetector,
+    ConflictResolver,
+    QuarantineEngine,
+    ResolutionStrategy,
 )
 from sclass.domain.project import VerifiedProjectState
 from sclass.storage.paths import WorkspacePaths
@@ -73,6 +85,11 @@ class FleetIntegrityEngine:
         self.state = FleetState()
         self._init_db()
         self._load_state()
+
+        self.task_graph = TaskGraph()
+        self.agent_registry = AgentSessionManager()
+        self.conflict_engine = ConflictEngine(fleet_engine=self)
+        self.evidence_aggregator = EvidenceAggregator(self.workspace_root, fleet_engine=self)
 
     def _get_conn(self) -> sqlite3.Connection:
         """Returns a configured SQLite connection with WAL mode and busy timeout."""
@@ -814,3 +831,199 @@ class FleetIntegrityEngine:
 
             self._save_state()
             return result
+
+
+class TaskGraph:
+    """Directed Acyclic Graph (DAG) coordinating multi-agent subtask execution."""
+
+    def __init__(self):
+        self.nodes: Dict[str, TaskNode] = {}
+        self.edges: List[TaskEdge] = []
+
+    def add_task(
+        self,
+        task_id: str,
+        title: str,
+        dependencies: Optional[List[str]] = None,
+        assigned_agent_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> TaskNode:
+        deps = list(dependencies or [])
+        node = TaskNode(
+            task_id=task_id,
+            title=title,
+            dependencies=deps,
+            assigned_agent_id=assigned_agent_id,
+            state="READY" if not deps else "PENDING",
+            metadata=dict(metadata or {}),
+        )
+        self.nodes[task_id] = node
+        for d in deps:
+            self.edges.append(TaskEdge(from_task_id=d, to_task_id=task_id, relation="depends_on"))
+        return node
+
+    def add_dependency(self, task_id: str, depends_on_task_id: str) -> None:
+        if task_id not in self.nodes:
+            raise FleetStorageError(f"Task '{task_id}' not found in task graph.")
+        if depends_on_task_id not in self.nodes[task_id].dependencies:
+            self.nodes[task_id].dependencies.append(depends_on_task_id)
+            self.edges.append(TaskEdge(from_task_id=depends_on_task_id, to_task_id=task_id, relation="depends_on"))
+            if self.nodes[task_id].state == "READY":
+                self.nodes[task_id].state = "PENDING"
+
+    def has_cycles(self) -> bool:
+        """Detects whether the task dependency graph contains any cycles via DFS."""
+        visited: Dict[str, int] = {}  # 0: visiting, 1: visited
+
+        def dfs(u: str) -> bool:
+            visited[u] = 0
+            node = self.nodes.get(u)
+            if node:
+                for dep in node.dependencies:
+                    if dep in self.nodes:
+                        if visited.get(dep) == 0:
+                            return True
+                        if dep not in visited and dfs(dep):
+                            return True
+            visited[u] = 1
+            return False
+
+        for node_id in self.nodes:
+            if node_id not in visited:
+                if dfs(node_id):
+                    return True
+        return False
+
+    def get_execution_order(self) -> List[str]:
+        """Calculates topological sort order of tasks. Raises FleetStorageError if cycles exist."""
+        if self.has_cycles():
+            raise FleetStorageError("Cycle detected in fleet task graph; cannot determine execution order.")
+
+        in_degree: Dict[str, int] = {k: 0 for k in self.nodes}
+        adj: Dict[str, List[str]] = {k: [] for k in self.nodes}
+
+        for edge in self.edges:
+            if edge.from_task_id in self.nodes and edge.to_task_id in self.nodes:
+                adj[edge.from_task_id].append(edge.to_task_id)
+                in_degree[edge.to_task_id] += 1
+
+        queue = [k for k, deg in in_degree.items() if deg == 0]
+        order = []
+
+        while queue:
+            curr = queue.pop(0)
+            order.append(curr)
+            for neighbor in adj.get(curr, []):
+                in_degree[neighbor] -= 1
+                if in_degree[neighbor] == 0:
+                    queue.append(neighbor)
+
+        if len(order) != len(self.nodes):
+            raise FleetStorageError("Task graph has unresolvable dependencies or cycles.")
+        return order
+
+    def get_ready_tasks(self) -> List[TaskNode]:
+        """Returns all tasks whose dependencies are fully completed and are ready to execute."""
+        ready = []
+        for node in self.nodes.values():
+            if node.state in ("COMPLETED", "FAILED", "RUNNING"):
+                continue
+            all_deps_completed = True
+            for dep_id in node.dependencies:
+                dep_node = self.nodes.get(dep_id)
+                if not dep_node or dep_node.state != "COMPLETED":
+                    all_deps_completed = False
+                    break
+            if all_deps_completed:
+                node.state = "READY"
+                ready.append(node)
+        return ready
+
+    def mark_completed(self, task_id: str) -> None:
+        if task_id in self.nodes:
+            self.nodes[task_id].state = "COMPLETED"
+
+    def mark_failed(self, task_id: str) -> None:
+        if task_id in self.nodes:
+            self.nodes[task_id].state = "FAILED"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "nodes": {k: v.to_dict() for k, v in self.nodes.items()},
+            "edges": [e.to_dict() for e in self.edges],
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> TaskGraph:
+        tg = cls()
+        for k, v in data.get("nodes", {}).items():
+            tg.nodes[k] = TaskNode.from_dict(v)
+        for e in data.get("edges", []):
+            tg.edges.append(TaskEdge.from_dict(e))
+        return tg
+
+
+class ConflictEngine:
+    """Manages conflict detection, policy resolution, and agent quarantine."""
+
+    def __init__(self, fleet_engine: Optional[Any] = None):
+        self.fleet_engine = fleet_engine
+        self.detector = ConflictDetector()
+        self.quarantine_engine = QuarantineEngine()
+        self.resolver = ConflictResolver(quarantine_engine=self.quarantine_engine)
+
+    def check_and_resolve(
+        self,
+        conflict: ConflictRecord,
+        strategy: ResolutionStrategy = ResolutionStrategy.REJECT,
+    ) -> ConflictRecord:
+        return self.resolver.resolve(conflict, strategy=strategy, fleet_engine=self.fleet_engine)
+
+    def quarantine(self, agent_id: str, reason: str, evidence: Optional[Dict[str, Any]] = None) -> QuarantineRecord:
+        return self.quarantine_engine.quarantine_agent(
+            agent_id=agent_id,
+            reason=reason,
+            evidence=evidence,
+            fleet_engine=self.fleet_engine,
+        )
+
+    def is_quarantined(self, agent_id: str) -> bool:
+        return self.quarantine_engine.is_quarantined(agent_id)
+
+
+class EvidenceAggregator:
+    """Aggregates and reconciles multi-agent claims, receipts, and truth updates."""
+
+    def __init__(self, workspace_root: str, fleet_engine: Optional[Any] = None):
+        self.workspace_root = os.path.abspath(workspace_root)
+        self.fleet_engine = fleet_engine
+
+    def aggregate_evidence(
+        self,
+        agent_receipts: List[Dict[str, Any]],
+        verified_state: Optional[VerifiedProjectState] = None,
+        project_truth: Optional[Any] = None,
+    ) -> FleetMergeResult:
+        if self.fleet_engine and hasattr(self.fleet_engine, "merge_fleet_evidence"):
+            state = verified_state or VerifiedProjectState(workspace=self.workspace_root)
+            rev = getattr(state, "current_revision", "") or "REV_001"
+            return self.fleet_engine.merge_fleet_evidence(
+                verified_state=state,
+                fleet_receipts=agent_receipts,
+                current_revision=rev,
+            )
+
+        # Standalone aggregation fallback
+        result = FleetMergeResult()
+        for r in agent_receipts:
+            cid = r.get("claim_id", "")
+            agent = r.get("agent_id", "")
+            code = r.get("exit_code", 0)
+            if code != 0:
+                result.invalidated_claims.append({"claim_id": cid, "agent": agent, "reason": f"exit_code_{code}"})
+            else:
+                result.merged_claims.append({"claim_id": cid, "agent": agent, "receipt": r})
+                if project_truth and hasattr(project_truth, "verify"):
+                    project_truth.verify(cid, receipt=r)
+        return result
+

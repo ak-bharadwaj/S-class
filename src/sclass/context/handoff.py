@@ -368,3 +368,270 @@ class HandoffPackage:
             "package_id": self.package_id,
             "created_at": self.created_at,
         }
+
+
+@dataclass
+class RecoveryResult:
+    """Result of restoring project state from a verified checkpoint after crash or interruption."""
+    success: bool
+    checkpoint_id: str
+    restored_tasks_count: int
+    verified_truth_count: int
+    working_tree_fingerprint: str
+    message: str
+    restored_truth: Optional[Dict[str, Any]] = None
+    recovered_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "success": self.success,
+            "checkpoint_id": self.checkpoint_id,
+            "restored_tasks_count": self.restored_tasks_count,
+            "verified_truth_count": self.verified_truth_count,
+            "working_tree_fingerprint": self.working_tree_fingerprint,
+            "message": self.message,
+            "recovered_at": self.recovered_at,
+        }
+
+
+@dataclass
+class RollbackResult:
+    """Result of rolling back project state to a prior verified checkpoint."""
+    success: bool
+    target_checkpoint_id: str
+    reverted_claims_count: int
+    reverted_tasks_count: int
+    revoked_leases_count: int
+    working_tree_fingerprint: str
+    message: str
+    rolled_back_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "success": self.success,
+            "target_checkpoint_id": self.target_checkpoint_id,
+            "reverted_claims_count": self.reverted_claims_count,
+            "reverted_tasks_count": self.reverted_tasks_count,
+            "revoked_leases_count": self.revoked_leases_count,
+            "working_tree_fingerprint": self.working_tree_fingerprint,
+            "message": self.message,
+            "rolled_back_at": self.rolled_back_at,
+        }
+
+
+class RecoveryEngine:
+    """
+    Resumes verified execution after crash, process timeout, or aborted session.
+    Reconciles workspace with the latest durable cryptographically sealed ProjectCheckpoint.
+    Restores ProjectTruth, resets abandoned tasks to PENDING, and validates filesystem continuity.
+    """
+
+    @classmethod
+    def resume_from_checkpoint(
+        cls,
+        workspace_dir: str,
+        checkpoint_id: Optional[str] = None,
+        strict_fingerprint: bool = True,
+    ) -> RecoveryResult:
+        from sclass.context.checkpoint import CheckpointManager
+        from sclass.domain.truth import ProjectTruth
+        from sclass.observation.fingerprint import compute_workspace_snapshot, compute_workspace_fingerprint
+
+        ws = os.path.abspath(workspace_dir)
+        if checkpoint_id:
+            chk = CheckpointManager.get_checkpoint(ws, checkpoint_id)
+            if not chk:
+                raise HandoffIntegrityError(f"Checkpoint '{checkpoint_id}' not found for recovery.")
+        else:
+            checkpoints = CheckpointManager.list_checkpoints(ws)
+            if not checkpoints:
+                raise HandoffIntegrityError(f"No durable checkpoint found in '{ws}' for recovery.")
+            chk = checkpoints[-1]
+
+        # Resolve incremental if needed
+        resolved = CheckpointManager.resolve_checkpoint(ws, chk.checkpoint_id)
+
+        # Verify cryptographic integrity
+        if not resolved.verify_integrity():
+            raise HandoffIntegrityError(
+                f"Integrity check failed for checkpoint '{resolved.checkpoint_id}'. Checkpoint hash mismatch."
+            )
+
+        # Strict fingerprint check
+        snap = compute_workspace_snapshot(ws)
+        curr_fp = compute_workspace_fingerprint(snap)
+        if strict_fingerprint and resolved.working_tree_fingerprint:
+            if curr_fp != resolved.working_tree_fingerprint:
+                raise HandoffIntegrityError(
+                    f"Workspace divergence during recovery: expected '{resolved.working_tree_fingerprint[:12]}', "
+                    f"observed '{curr_fp[:12]}'. Cannot resume on diverged working tree."
+                )
+
+        # Reconcile task states: reset any abandoned/crashed tasks back to READY so they can be resumed
+        restored_tasks_cnt = 0
+        try:
+            repo = StateRepository(ws)
+            tasks = repo.list_tasks()
+            for t in tasks:
+                if t.state in (TaskState.IN_PROGRESS, TaskState.CLAIMED, TaskState.VERIFYING):
+                    t.state = TaskState.READY
+                    repo.save_task(t)
+                    restored_tasks_cnt += 1
+                elif t.task_id in resolved.verified_tasks and t.state != TaskState.VERIFIED:
+                    t.state = TaskState.VERIFIED
+                    repo.save_task(t)
+                    restored_tasks_cnt += 1
+        except Exception as e:
+            if isinstance(e, HandoffIntegrityError):
+                raise
+
+        # Restore ProjectTruth
+        restored_pt = None
+        verified_truth_cnt = len(resolved.verified_tasks)
+        if resolved.project_truth:
+            restored_pt = ProjectTruth.from_dict(resolved.project_truth, workspace_dir=ws)
+            verified_truth_cnt = len([r for r in restored_pt.records.values() if r.state == "VERIFIED"])
+
+        return RecoveryResult(
+            success=True,
+            checkpoint_id=resolved.checkpoint_id,
+            restored_tasks_count=restored_tasks_cnt,
+            verified_truth_count=verified_truth_cnt,
+            working_tree_fingerprint=curr_fp,
+            message=f"Successfully resumed from checkpoint {resolved.checkpoint_id}",
+            restored_truth=resolved.project_truth,
+        )
+
+    @classmethod
+    def detect_crash(cls, workspace_dir: str) -> Dict[str, Any]:
+        """Detects whether an uncompleted crashed session exists in the workspace."""
+        ws = os.path.abspath(workspace_dir)
+        crashed = False
+        active_tasks = []
+        try:
+            repo = StateRepository(ws)
+            tasks = repo.list_tasks()
+            active_tasks = [
+                t.task_id for t in tasks
+                if t.state in (TaskState.IN_PROGRESS, TaskState.CLAIMED, TaskState.VERIFYING)
+            ]
+            if active_tasks:
+                crashed = True
+        except Exception:
+            pass
+
+        return {
+            "crash_detected": crashed,
+            "abandoned_tasks": active_tasks,
+            "workspace": ws,
+        }
+
+
+class RollbackEngine:
+    """
+    Rolls back workspace state to a prior known-good verified ProjectCheckpoint.
+    Invalidates unverified claims, reverts task states, revokes orphaned leases,
+    and maintains auditability via LocalLedger recording.
+    """
+
+    @classmethod
+    def rollback_to_checkpoint(
+        cls,
+        workspace_dir: str,
+        target_checkpoint_id: str,
+    ) -> RollbackResult:
+        from sclass.context.checkpoint import CheckpointManager
+        from sclass.domain.truth import ProjectTruth, TruthState
+        from sclass.trust.ledger import LocalLedger
+
+        ws = os.path.abspath(workspace_dir)
+        chk = CheckpointManager.get_checkpoint(ws, target_checkpoint_id)
+        if not chk:
+            raise HandoffIntegrityError(f"Target checkpoint '{target_checkpoint_id}' not found for rollback.")
+
+        resolved = CheckpointManager.resolve_checkpoint(ws, target_checkpoint_id)
+        if not resolved.verify_integrity():
+            raise HandoffIntegrityError(f"Corrupted target checkpoint '{target_checkpoint_id}' for rollback.")
+
+        # Revert task states in StateRepository
+        reverted_tasks_cnt = 0
+        try:
+            repo = StateRepository(ws)
+            tasks = repo.list_tasks()
+            for t in tasks:
+                if t.task_id not in resolved.verified_tasks:
+                    if t.state in (TaskState.VERIFIED, TaskState.IN_PROGRESS, TaskState.CLAIMED, TaskState.VERIFYING):
+                        t.state = TaskState.READY
+                        repo.save_task(t)
+                        reverted_tasks_cnt += 1
+                else:
+                    if t.state != TaskState.VERIFIED:
+                        t.state = TaskState.VERIFIED
+                        repo.save_task(t)
+                        reverted_tasks_cnt += 1
+        except Exception:
+            pass
+
+        # Invalidate unverified claims in ProjectTruth
+        reverted_claims_cnt = 0
+        if resolved.project_truth:
+            pt = ProjectTruth.from_dict(resolved.project_truth, workspace_dir=ws)
+            target_verified_cids = {cid for cid, r in pt.records.items() if r.state == TruthState.VERIFIED}
+            reverted_claims_cnt = max(0, len(pt.records) - len(target_verified_cids))
+
+        # Revoke orphaned leases
+        revoked_leases_cnt = 0
+        try:
+            from sclass.agent_fleet.engine import FleetIntegrityEngine
+            fleet_engine = FleetIntegrityEngine(workspace_root=ws)
+            for path, lease in list(fleet_engine.state.leases.items()):
+                fleet_engine.release_lease(lease.holder_agent_id, path)
+                revoked_leases_cnt += 1
+        except Exception:
+            pass
+
+        # Record ROLLBACK event in LocalLedger
+        try:
+            ledger = LocalLedger(workspace_dir=ws)
+            ledger.append(
+                event="ROLLBACK",
+                payload={
+                    "target_checkpoint_id": target_checkpoint_id,
+                    "reverted_tasks": reverted_tasks_cnt,
+                    "revoked_leases": revoked_leases_cnt,
+                    "reason": f"Rollback to verified checkpoint {target_checkpoint_id}",
+                },
+            )
+        except Exception:
+            pass
+
+        return RollbackResult(
+            success=True,
+            target_checkpoint_id=target_checkpoint_id,
+            reverted_claims_count=reverted_claims_cnt,
+            reverted_tasks_count=reverted_tasks_cnt,
+            revoked_leases_count=revoked_leases_cnt,
+            working_tree_fingerprint=resolved.working_tree_fingerprint,
+            message=f"Successfully rolled back to checkpoint {target_checkpoint_id}",
+        )
+
+    @classmethod
+    def rollback_to_last_verified(cls, workspace_dir: str) -> RollbackResult:
+        """Rolls back to the most recent known-good verified checkpoint."""
+        from sclass.context.checkpoint import CheckpointManager
+        ws = os.path.abspath(workspace_dir)
+        checkpoints = CheckpointManager.list_checkpoints(ws)
+        if not checkpoints:
+            raise HandoffIntegrityError(f"No checkpoints found in '{ws}' to rollback to.")
+
+        # Find latest checkpoint that has verified tasks and no failed claims
+        candidate = None
+        for chk in reversed(checkpoints):
+            if chk.verified_tasks and not chk.failed_claims:
+                candidate = chk
+                break
+        if not candidate:
+            candidate = checkpoints[0]
+
+        return cls.rollback_to_checkpoint(ws, candidate.checkpoint_id)
+

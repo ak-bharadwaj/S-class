@@ -201,3 +201,90 @@ class CrossPlatformContinuityEngine:
             ])
 
         return "\n".join(lines)
+
+    @classmethod
+    def validate_law_l9_compliance(cls, pkg: HandoffPackage) -> bool:
+        """
+        Validates Invariant Law L9: Handoff carries verified truth and observed receipts,
+        never chat transcripts, conversation histories, or prompt bloat.
+        """
+        forbidden_keys = {"chat_transcript", "conversation_history", "messages", "dialogue", "chat_log", "raw_prompt"}
+        pkg_dict = pkg.to_dict()
+
+        def scan_keys(obj: Any, path: str = ""):
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    if k in forbidden_keys:
+                        raise HandoffIntegrityError(
+                            f"Law L9 Violation: Handoff package contains conversational transcript data at '{path}.{k}'."
+                        )
+                    scan_keys(v, f"{path}.{k}")
+            elif isinstance(obj, (list, tuple)):
+                for i, item in enumerate(obj):
+                    scan_keys(item, f"{path}[{i}]")
+
+        scan_keys(pkg_dict, "package")
+        return True
+
+    @classmethod
+    def execute_agent_handoff(
+        cls,
+        workspace_dir: str,
+        source_agent_id: str,
+        target_agent_id: str,
+        source_platform: str = "generic",
+        target_platform: str = "generic",
+        next_action: Optional[str] = None,
+        project_state: Optional[VerifiedProjectState] = None,
+    ) -> ContinuityTransferResult:
+        """
+        Executes a complete verified cross-agent handoff under Law L9.
+        Creates a durable checkpoint, packages verified state, validates L9 compliance,
+        and hands off cleanly to target agent without conversational bloat.
+        """
+        ws = os.path.abspath(workspace_dir)
+        snap = compute_workspace_snapshot(ws)
+        curr_fp = compute_workspace_fingerprint(snap)
+
+        if project_state is None:
+            project_state = VerifiedProjectState(
+                workspace=ws,
+                current_revision=curr_fp,
+                active_task=None,
+                next_action=next_action,
+            )
+
+        # Assemble and transfer
+        result = cls.transfer(
+            source_platform=source_platform,
+            target_platform=target_platform,
+            state=project_state,
+            workspace_dir=ws,
+            next_action=next_action,
+            strict_fingerprint_check=False,
+        )
+
+        # Verify Law L9 compliance
+        cls.validate_law_l9_compliance(result.handoff_package)
+
+        # Record handoff transition in ledger
+        try:
+            from sclass.trust.ledger import LocalLedger
+            ledger = LocalLedger(workspace_dir=ws)
+            ledger.append(
+                event="HANDOFF",
+                payload={
+                    "source_agent_id": source_agent_id,
+                    "target_agent_id": target_agent_id,
+                    "source_platform": source_platform,
+                    "target_platform": target_platform,
+                    "package_id": result.handoff_package.package_id,
+                    "verified_work_count": result.verified_work_count,
+                    "working_tree_fingerprint": curr_fp,
+                },
+            )
+        except Exception:
+            pass
+
+        return result
+

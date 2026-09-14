@@ -214,3 +214,153 @@ class FleetMergeResult:
             "quarantined_agents": list(self.quarantined_agents),
             "is_clean": self.is_clean,
         }
+
+
+@dataclass
+class TaskNode:
+    """Represents an executable unit of work in the fleet task DAG."""
+    task_id: str
+    title: str
+    dependencies: List[str] = field(default_factory=list)
+    assigned_agent_id: Optional[str] = None
+    state: str = "PENDING"  # PENDING, READY, RUNNING, COMPLETED, FAILED, BLOCKED
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "task_id": self.task_id,
+            "title": self.title,
+            "dependencies": list(self.dependencies),
+            "assigned_agent_id": self.assigned_agent_id,
+            "state": self.state,
+            "metadata": dict(self.metadata),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> TaskNode:
+        return cls(
+            task_id=data["task_id"],
+            title=data.get("title", ""),
+            dependencies=list(data.get("dependencies", [])),
+            assigned_agent_id=data.get("assigned_agent_id"),
+            state=data.get("state", "PENDING"),
+            metadata=dict(data.get("metadata", {})),
+        )
+
+
+@dataclass
+class TaskEdge:
+    """Represents a dependency relationship between tasks in the task graph."""
+    from_task_id: str
+    to_task_id: str
+    relation: str = "depends_on"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "from_task_id": self.from_task_id,
+            "to_task_id": self.to_task_id,
+            "relation": self.relation,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> TaskEdge:
+        return cls(
+            from_task_id=data["from_task_id"],
+            to_task_id=data["to_task_id"],
+            relation=data.get("relation", "depends_on"),
+        )
+
+
+@dataclass
+class SymbolOwnership:
+    """Granular lease on a specific code symbol (file_path::symbol_name)."""
+    symbol_key: str
+    holder_agent_id: str
+    acquired_at: float = field(default_factory=time.time)
+    expires_at: float = field(default_factory=lambda: time.time() + 300.0)
+
+    def is_expired(self, current_time: Optional[float] = None) -> bool:
+        now = current_time if current_time is not None else time.time()
+        return now > self.expires_at
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "symbol_key": self.symbol_key,
+            "holder_agent_id": self.holder_agent_id,
+            "acquired_at": self.acquired_at,
+            "expires_at": self.expires_at,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> SymbolOwnership:
+        return cls(
+            symbol_key=data["symbol_key"],
+            holder_agent_id=data["holder_agent_id"],
+            acquired_at=float(data.get("acquired_at", time.time())),
+            expires_at=float(data.get("expires_at", time.time() + 300.0)),
+        )
+
+
+@dataclass
+class ConflictRecord:
+    """Structured record of an integrity conflict detected across agents."""
+    conflict_id: str
+    conflict_type: str
+    agents_involved: List[str]
+    resource_target: str
+    details: Dict[str, Any] = field(default_factory=dict)
+    resolution: Optional[str] = None
+    resolved: bool = False
+    timestamp: float = field(default_factory=time.time)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "conflict_id": self.conflict_id,
+            "conflict_type": self.conflict_type,
+            "agents_involved": list(self.agents_involved),
+            "resource_target": self.resource_target,
+            "details": dict(self.details),
+            "resolution": self.resolution,
+            "resolved": self.resolved,
+            "timestamp": self.timestamp,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> ConflictRecord:
+        return cls(
+            conflict_id=data["conflict_id"],
+            conflict_type=data.get("conflict_type", "UNKNOWN"),
+            agents_involved=list(data.get("agents_involved", [])),
+            resource_target=data.get("resource_target", ""),
+            details=dict(data.get("details", {})),
+            resolution=data.get("resolution"),
+            resolved=bool(data.get("resolved", False)),
+            timestamp=float(data.get("timestamp", time.time())),
+        )
+
+
+@dataclass
+class QuarantineRecord:
+    """Record of an agent quarantined due to policy violation or state conflict."""
+    agent_id: str
+    reason: str
+    quarantined_at: float = field(default_factory=time.time)
+    evidence: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "agent_id": self.agent_id,
+            "reason": self.reason,
+            "quarantined_at": self.quarantined_at,
+            "evidence": dict(self.evidence),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> QuarantineRecord:
+        return cls(
+            agent_id=data["agent_id"],
+            reason=data.get("reason", "Unknown quarantine reason"),
+            quarantined_at=float(data.get("quarantined_at", time.time())),
+            evidence=dict(data.get("evidence", {})),
+        )
+

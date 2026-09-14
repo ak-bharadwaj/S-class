@@ -52,6 +52,8 @@ MILESTONES: List[Tuple[str, str, str]] = [
     ("M21_PROJECT_TRUTH", "RC.5 Universal Project Truth & Invalidation", "tests/certification/test_cert_rc5_project_truth.py"),
     ("M22_CODE_INTELLIGENCE", "RC.6 Tree-sitter Code Intelligence & SCIP", "tests/certification/test_cert_rc6_code_intelligence.py"),
     ("M23_PROTOCOL_GATEWAY", "RC.7 ACP Proxy & MCP Protocol Gateway", "tests/certification/test_cert_rc7_protocol_gateway.py"),
+    ("M24_HANDOFF_CONTINUITY", "RC.8 Handoff & Continuity Engine", "tests/certification/test_cert_rc8_handoff_continuity.py"),
+    ("M25_FLEET_PRODUCTION", "RC.9 Fleet Task Graph & Production Engine", "tests/certification/test_cert_rc9_fleet_production.py"),
 ]
 
 
