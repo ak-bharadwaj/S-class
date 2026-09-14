@@ -33,7 +33,25 @@ class PlatformProfilingFramework:
         self.workspace_dir = os.path.abspath(workspace_dir) if workspace_dir else os.getcwd()
         self.budget = budget or PerformanceBudget()
         self.override_platform_id = override_platform_id
+        self.metrics_file = os.path.join(self.workspace_dir, ".sclass", "platform", "learned_metrics.json")
         self._learned_metrics: Dict[str, List[Dict[str, Any]]] = {}
+        self._load_learned_metrics()
+
+    def _load_learned_metrics(self) -> None:
+        if os.path.exists(self.metrics_file):
+            try:
+                with open(self.metrics_file, "r", encoding="utf-8") as f:
+                    self._learned_metrics = json.load(f)
+            except Exception:
+                self._learned_metrics = {}
+
+    def _save_learned_metrics(self) -> None:
+        try:
+            os.makedirs(os.path.dirname(self.metrics_file), exist_ok=True)
+            with open(self.metrics_file, "w", encoding="utf-8") as f:
+                json.dump(self._learned_metrics, f, indent=2)
+        except Exception:
+            pass
 
     def resolve_platform(
         self,
@@ -117,7 +135,7 @@ class PlatformProfilingFramework:
         actor_token: Optional[str] = None,
         client_info: Optional[Dict[str, Any]] = None,
         env: Optional[Dict[str, str]] = None,
-    ) -> DetectionOutcome:
+    ) -> DetectedPlatform:
         """Convenience alias for resolve_platform."""
         return self.resolve_platform(
             requested_actor=actor_token,
@@ -191,13 +209,14 @@ class PlatformProfilingFramework:
             "tokens_used": tokens_used,
             "regressions_detected": regressions_detected,
         })
+        self._save_learned_metrics()
 
     def get_learned_summary(self, platform_id: str) -> Dict[str, Any]:
         """Summarizes empirical outcomes recorded for a platform archetype."""
         key = platform_id.lower()
         runs = self._learned_metrics.get(key, [])
         if not runs:
-            return {"runs_count": 0, "success_rate": 0.0, "avg_duration_ms": 0.0}
+            return {"runs_count": 0, "success_rate": 0.0, "avg_duration_ms": 0.0, "total_regressions": 0}
 
         successes = sum(1 for r in runs if r["success"])
         total_dur = sum(r["duration_ms"] for r in runs)
@@ -208,3 +227,59 @@ class PlatformProfilingFramework:
             "avg_duration_ms": round(total_dur / len(runs), 2),
             "total_regressions": sum(r["regressions_detected"] for r in runs),
         }
+
+    def refine_archetype(self, platform_id: str) -> PlatformProfile:
+        """
+        Refines PlatformProfile dynamically based on empirical historical runs.
+        - If success_rate >= 0.85 and 0 regressions: annotates high empirical reliability, optimizes strengths.
+        - If regressions > 0 or success_rate < 0.70: annotates elevated risk, requires deep verification.
+        """
+        base_profile = self.get_profile(platform_id)
+        summary = self.get_learned_summary(platform_id)
+
+        if summary.get("runs_count", 0) < 1:
+            return base_profile
+
+        meta = dict(base_profile.metadata)
+        meta["empirical_runs"] = summary["runs_count"]
+        meta["empirical_success_rate"] = summary["success_rate"]
+        meta["empirical_regressions"] = summary["total_regressions"]
+
+        strengths = list(base_profile.native_strengths)
+
+        if summary["total_regressions"] > 0 or summary["success_rate"] < 0.70:
+            meta["verification_requirement"] = "deep"
+            meta["empirical_status"] = "elevated_risk"
+            if "deep_verification_required" not in strengths:
+                strengths.append("deep_verification_required")
+        elif summary["success_rate"] >= 0.85 and summary["total_regressions"] == 0:
+            meta["verification_requirement"] = "streamlined"
+            meta["empirical_status"] = "high_reliability"
+            if "high_empirical_reliability" not in strengths:
+                strengths.append("high_empirical_reliability")
+
+        return base_profile.clone_with(
+            native_strengths=strengths,
+            metadata=meta,
+        )
+
+    def evaluate_net_utility(self, platform_id: str) -> float:
+        """
+        Calculates empirical Net Utility Ratio for a platform across historical runs:
+        Useful reliability gained vs operational overhead consumed.
+        """
+        summary = self.get_learned_summary(platform_id)
+        if summary.get("runs_count", 0) == 0:
+            return 1.0
+
+        runs = self._learned_metrics.get(platform_id.lower(), [])
+        success_count = sum(1 for r in runs if r.get("success", False))
+        regressions = sum(r.get("regressions_detected", 0) for r in runs)
+        total_duration = sum(r.get("duration_ms", 0.0) for r in runs)
+        total_tokens = sum(r.get("tokens_used", 0) for r in runs)
+
+        # Reliability score: success gives 20 pts each, regressions penalized 10 pts
+        rel_score = max(1.0, (success_count * 20.0) - (regressions * 10.0))
+        # Overhead score: duration (0.01 per ms) + tokens (0.005 per token)
+        ovh_score = max(1.0, (total_duration * 0.01) + (total_tokens * 0.005))
+        return round(rel_score / ovh_score, 4)
