@@ -65,7 +65,7 @@ def run():
         print("\n[4] Detecting & Preventing Duplicate Work via CKG Symbol Tracking:")
         c1, _ = fleet.claim_symbol_work("subagent_backend", "hash_password", "src/backend/crypto.py")
         print(f"    {a1.agent_id} claimed symbol 'hash_password': Granted={c1}")
-        c2, conflict_dup = fleet.claim_symbol_work("subagent_frontend", "hash_password", "src/frontend/util.ts")
+        c2, conflict_dup = fleet.claim_symbol_work("subagent_frontend", "hash_password", "src/backend/crypto.py")
         print(f"    {a2.agent_id} attempts to claim 'hash_password': Granted={c2}")
         print(f"    Conflict: {conflict_dup.conflict_type.value} ({conflict_dup.details['message']})")
         assert c2 is False

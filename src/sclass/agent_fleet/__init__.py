@@ -12,7 +12,7 @@ from sclass.agent_fleet.models import (
     FleetState,
     FleetMergeResult,
 )
-from sclass.agent_fleet.engine import FleetIntegrityEngine
+from sclass.agent_fleet.engine import FleetIntegrityEngine, FleetStorageError
 
 __all__ = [
     "AgentIdentity",
@@ -24,4 +24,5 @@ __all__ = [
     "FleetState",
     "FleetMergeResult",
     "FleetIntegrityEngine",
+    "FleetStorageError",
 ]
