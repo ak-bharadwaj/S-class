@@ -2,14 +2,14 @@
 S-Class Multi-Agent Fleet Integrity Engine (Phase 15 / B.15 Hardened - Reality Closure).
 
 Implements the authoritative governance and integrity layer for parallel multi-agent swarms:
-- ACID Transactional Storage: SQLite backing with WAL mode and row/table locking.
-- Concurrent file mutation race condition prevention with granular leases.
+- ACID Transactional Storage: SQLite backing with WAL mode and atomic lease transactions.
+- Concurrent file mutation race condition prevention with serializable SQLite leases.
 - Duplicate work detection via qualified CKG symbol claim tracking (file_path::symbol_name).
 - Cross-agent semantic assumption & contract reconciliation.
 - Strict workspace path containment checking preventing directory traversal attacks.
 - Stale branch detection and cascading evidence invalidation upon workspace mutation.
 - Subagent isolation / quarantine under EscalationPolicy.QUARANTINE_SUBAGENT.
-- Epistemic global verification & multi-agent evidence merging into VerifiedProjectState.
+- Epistemic independent verification & multi-agent evidence merging into VerifiedProjectState.
 - Law L8 enforcement: No silent failure, explicit FleetStorageError.
 """
 
@@ -46,7 +46,8 @@ class FleetIntegrityEngine:
     Authoritative governance engine for multi-agent swarm integrity.
     Ensures parallel agents cannot overwrite shared state, duplicate work,
     drift in semantic assumptions, or contaminate verified truth.
-    Backed by an ACID transactional SQLite store (.sclass/fleet/fleet.db) with WAL mode.
+    Backed by an ACID transactional SQLite store (.sclass/fleet/fleet.db) with WAL mode
+    and atomic serializable lease acquisition.
     """
 
     def __init__(
@@ -417,7 +418,7 @@ class FleetIntegrityEngine:
         """
         Acquire a resource lease on a workspace path.
         Prevents concurrent mutations and race conditions between parallel agents.
-        Enforces strict workspace path containment.
+        Enforces strict workspace path containment and serializable SQLite transactions.
         """
         tracer = get_local_tracer(self.workspace_root)
         with tracer.span("sclass.fleet.lease_acquire", attributes={"agent.id": agent_id, "resource.path": path}):
@@ -450,97 +451,119 @@ class FleetIntegrityEngine:
                 return False, conflict
 
             now = time.time()
+            expires = now + timeout_seconds
 
-            # Clean expired leases
-            expired = [p for p, l in self.state.leases.items() if l.is_expired(now)]
-            for exp in expired:
-                del self.state.leases[exp]
+            # 3. ATOMIC SQLite TRANSACTION for serializable lease acquisition
+            try:
+                with self._get_conn() as conn:
+                    conn.execute("BEGIN IMMEDIATE;")
+                    
+                    # Clean expired leases
+                    conn.execute("DELETE FROM leases WHERE expires_at <= ?;", (now,))
 
-            # Check existing lease on exact path
-            existing = self.state.leases.get(norm_path)
-            if existing:
-                if existing.holder_agent_id == agent_id:
-                    # Renew lease
-                    existing.expires_at = now + timeout_seconds
-                    existing.lease_type = lease_type
-                    self._save_state()
+                    # Check exact path lease
+                    cur = conn.execute("SELECT * FROM leases WHERE path = ?;", (norm_path,))
+                    existing = cur.fetchone()
+                    if existing:
+                        existing_holder = existing["holder_agent_id"]
+                        existing_type = existing["lease_type"]
+                        if existing_holder == agent_id:
+                            # Renew
+                            conn.execute(
+                                "UPDATE leases SET expires_at = ?, lease_type = ? WHERE path = ?;",
+                                (expires, lease_type.value, norm_path)
+                            )
+                            conn.commit()
+                            self._load_state()
+                            return True, None
+                        
+                        if lease_type == LeaseType.EXCLUSIVE_WRITE or existing_type == LeaseType.EXCLUSIVE_WRITE.value:
+                            conflict = ConflictEvent(
+                                conflict_id=str(uuid.uuid4())[:8],
+                                conflict_type=ConflictType.CONCURRENT_MUTATION,
+                                agents_involved=[existing_holder, agent_id],
+                                resource_target=norm_path,
+                                details={
+                                    "existing_holder": existing_holder,
+                                    "attempted_by": agent_id,
+                                    "existing_mode": existing_type,
+                                    "attempted_mode": lease_type.value,
+                                    "expires_at": existing["expires_at"],
+                                },
+                            )
+                            self._record_conflict_in_conn(conn, conflict)
+                            conn.commit()
+                            self._load_state()
+                            return False, conflict
+
+                    # Check directory hierarchy conflicts
+                    cur = conn.execute("SELECT * FROM leases WHERE holder_agent_id != ?;", (agent_id,))
+                    for row in cur.fetchall():
+                        l_path = row["path"]
+                        l_type = row["lease_type"]
+                        l_holder = row["holder_agent_id"]
+                        if lease_type == LeaseType.EXCLUSIVE_WRITE or l_type == LeaseType.EXCLUSIVE_WRITE.value:
+                            if norm_path.startswith(l_path + "/") or l_path.startswith(norm_path + "/"):
+                                conflict = ConflictEvent(
+                                    conflict_id=str(uuid.uuid4())[:8],
+                                    conflict_type=ConflictType.CONCURRENT_MUTATION,
+                                    agents_involved=[l_holder, agent_id],
+                                    resource_target=norm_path,
+                                    details={
+                                        "overlapping_path": l_path,
+                                        "holder": l_holder,
+                                        "reason": "Directory hierarchy containment conflict",
+                                    },
+                                )
+                                self._record_conflict_in_conn(conn, conflict)
+                                conn.commit()
+                                self._load_state()
+                                return False, conflict
+
+                    # Grant lease atomically
+                    lease_id = str(uuid.uuid4())[:8]
+                    conn.execute("""
+                        INSERT INTO leases (path, lease_id, holder_agent_id, lease_type, acquired_at, expires_at)
+                        VALUES (?, ?, ?, ?, ?, ?);
+                    """, (norm_path, lease_id, agent_id, lease_type.value, now, expires))
+                    conn.commit()
+                    self._load_state()
                     return True, None
-                
-                # Check for conflict: either party requesting EXCLUSIVE_WRITE triggers collision
-                if lease_type == LeaseType.EXCLUSIVE_WRITE or existing.lease_type == LeaseType.EXCLUSIVE_WRITE:
-                    conflict = ConflictEvent(
-                        conflict_id=str(uuid.uuid4())[:8],
-                        conflict_type=ConflictType.CONCURRENT_MUTATION,
-                        agents_involved=[existing.holder_agent_id, agent_id],
-                        resource_target=norm_path,
-                        details={
-                            "existing_holder": existing.holder_agent_id,
-                            "attempted_by": agent_id,
-                            "existing_mode": existing.lease_type.value,
-                            "attempted_mode": lease_type.value,
-                            "expires_at": existing.expires_at,
-                        },
-                    )
-                    self.state.conflicts.append(conflict)
-                    self._save_state()
-                    return False, conflict
+            except sqlite3.Error as e:
+                raise FleetStorageError(f"Atomic lease acquisition failed: {e}") from e
 
-            # Check directory hierarchy conflicts (e.g. exclusive lease on parent or child)
-            for l_path, l in self.state.leases.items():
-                if l.holder_agent_id != agent_id and (
-                    lease_type == LeaseType.EXCLUSIVE_WRITE or l.lease_type == LeaseType.EXCLUSIVE_WRITE
-                ):
-                    if norm_path.startswith(l_path + "/") or l_path.startswith(norm_path + "/"):
-                        conflict = ConflictEvent(
-                            conflict_id=str(uuid.uuid4())[:8],
-                            conflict_type=ConflictType.CONCURRENT_MUTATION,
-                            agents_involved=[l.holder_agent_id, agent_id],
-                            resource_target=norm_path,
-                            details={
-                                "overlapping_path": l_path,
-                                "holder": l.holder_agent_id,
-                                "reason": "Directory hierarchy containment conflict",
-                            },
-                        )
-                        self.state.conflicts.append(conflict)
-                        self._save_state()
-                        return False, conflict
-
-            # Grant lease
-            new_lease = ResourceLease(
-                lease_id=str(uuid.uuid4())[:8],
-                path=norm_path,
-                holder_agent_id=agent_id,
-                lease_type=lease_type,
-                acquired_at=now,
-                expires_at=now + timeout_seconds,
-            )
-            self.state.leases[norm_path] = new_lease
-
-            # Track in agent identity
-            agent = self.state.agents.get(agent_id)
-            if agent and norm_path not in agent.assigned_paths:
-                agent.assigned_paths.append(norm_path)
-
-            self._save_state()
-            return True, None
+    def _record_conflict_in_conn(self, conn: sqlite3.Connection, conflict: ConflictEvent) -> None:
+        """Records a conflict event inside an active database connection."""
+        conn.execute("""
+            INSERT INTO conflicts (conflict_id, conflict_type, agents_involved, resource_target, details, timestamp, resolved)
+            VALUES (?, ?, ?, ?, ?, ?, ?);
+        """, (
+            conflict.conflict_id,
+            conflict.conflict_type.value,
+            json.dumps(conflict.agents_involved),
+            conflict.resource_target,
+            json.dumps(conflict.details),
+            conflict.timestamp,
+            1 if conflict.resolved else 0,
+        ))
 
     def release_lease(self, agent_id: str, path: str) -> bool:
-        """Release an acquired lease."""
+        """Release an acquired lease atomically."""
         try:
             norm_path = self._normalize_path(path)
         except ValueError:
             return False
 
-        lease = self.state.leases.get(norm_path)
-        if lease and lease.holder_agent_id == agent_id:
-            del self.state.leases[norm_path]
-            agent = self.state.agents.get(agent_id)
-            if agent and norm_path in agent.assigned_paths:
-                agent.assigned_paths.remove(norm_path)
-            self._save_state()
-            return True
-        return False
+        try:
+            with self._get_conn() as conn:
+                with conn:
+                    cur = conn.execute("DELETE FROM leases WHERE path = ? AND holder_agent_id = ?;", (norm_path, agent_id))
+                    released = cur.rowcount > 0
+            if released:
+                self._load_state()
+            return released
+        except sqlite3.Error as e:
+            raise FleetStorageError(f"Failed to release lease: {e}") from e
 
     def claim_symbol_work(
         self,
