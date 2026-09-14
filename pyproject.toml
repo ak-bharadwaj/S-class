@@ -60,6 +60,9 @@ mcp = [
 cedar = [
     "cedarpy>=3.0.0",
 ]
+mem0 = [
+    "mem0ai>=0.1.0",
+]
 supply-chain = [
     "sigstore>=3.0.0",
     "schemathesis>=3.25.0",
@@ -72,6 +75,7 @@ all = [
     "mcp>=1.0.0",
     "fastapi>=0.100.0",
     "cedarpy>=3.0.0",
+    "mem0ai>=0.1.0",
     "sigstore>=3.0.0",
     "schemathesis>=3.25.0",
     "pytest>=8.0.0",
@@ -81,6 +85,13 @@ all = [
 
 [project.scripts]
 sclass = "sclass.cli.main:main"
+
+[project.entry-points."sclass.adapters"]
+codex = "sclass.integrations.codex.adapter:CodexAdapter"
+claude = "sclass.integrations.claude.adapter:ClaudeCodeAdapter"
+cursor = "sclass.integrations.cursor.adapter:CursorAdapter"
+opencode = "sclass.integrations.opencode.adapter:OpenCodeAdapter"
+generic = "sclass.integrations.generic.adapter:GenericProcessAdapter"
 
 [tool.setuptools.packages.find]
 where = ["src"]

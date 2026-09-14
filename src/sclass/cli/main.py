@@ -54,24 +54,14 @@ from sclass.cli.dashboard import render_dashboard, get_dashboard_data
 def cmd_init(args: argparse.Namespace) -> int:
     """Initializes S-Class workspace control plane."""
     ws = os.path.abspath(args.workspace)
+    force = getattr(args, "force", False)
+    mode = getattr(args, "mode", "enforce") or "enforce"
+
+    from sclass.product.installer import ProductInstaller
+    installer = ProductInstaller(ws)
+    result = installer.install(force=force, mode=mode)
+
     paths = WorkspacePaths(ws)
-    paths.ensure_directories()
-    repo = StateRepository(ws)
-
-    # Initialize project record if absent
-    proj_name = os.path.basename(ws)
-    project = repo.get_project(proj_name)
-    if not project:
-        project = Project(
-            project_id=proj_name,
-            name=proj_name,
-            boundary=ProjectBoundary(ws),
-        )
-        repo.save_project(project)
-
-    ledger = LocalLedger(ws)
-    ledger.append("initialization", {"workspace": ws, "version": __version__})
-
     print(f"[S-Class] Initialized workspace control plane at: {ws}")
     print(f"[S-Class] Authoritative state: {paths.state_dir}")
     print(f"[S-Class] Cryptographic ledger: {paths.ledger_dir}")
@@ -793,6 +783,8 @@ def build_parser() -> argparse.ArgumentParser:
     # init
     p_init = subparsers.add_parser("init", help="Initialize S-Class workspace")
     p_init.add_argument("-w", "--workspace", default=".", help="Target workspace path")
+    p_init.add_argument("--force", action="store_true", help="Force reinitialization")
+    p_init.add_argument("--mode", default="enforce", choices=["enforce", "monitor", "silent"], help="Initial governance mode")
 
     # status
     p_status = subparsers.add_parser("status", help="Display workspace status")
