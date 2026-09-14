@@ -18,25 +18,28 @@ from typing import Dict, Any, Optional, List
 from sclass.domain.action import ActionRequest, AuthorizationDecision
 from sclass.domain.capability import CAP_TERMINAL_EXECUTE, CAP_FILESYSTEM_WRITE, CAP_PROCESS_SPAWN
 from sclass.control.authorization import authorize
-from sclass.integrations.base import AdapterCapabilities, AdapterStatus
+from sclass.integrations.base import AdapterCapabilities, AdapterStatus, BasePlatformAdapter
 from sclass.integrations.acp.adapter import ACPAdapter
 from sclass.integrations.mcp.gateway import MCPGateway
 from sclass.context.handoff import HandoffAssembler, HandoffPackage
 
 
-class CodexAdapter:
+class CodexAdapter(BasePlatformAdapter):
     """Adapts OpenAI Codex CLI and ACP events to S-Class control plane."""
 
     def __init__(self, workspace_dir: str, mode: str = "enforce"):
-        self.workspace_dir = os.path.abspath(workspace_dir)
-        self.mode = mode
-        self.capabilities = AdapterCapabilities(
-            pre_action_enforcement=True,
-            post_action_observation=True,
-            approval=True,
-            verification=True,
-            session_events=True,
-            native_protocol="acp",
+        super().__init__(
+            workspace_dir=workspace_dir,
+            platform_id="codex",
+            mode=mode,
+            capabilities=AdapterCapabilities(
+                pre_action_enforcement=True,
+                post_action_observation=True,
+                approval=True,
+                verification=True,
+                session_events=True,
+                native_protocol="acp",
+            ),
         )
         self.acp = ACPAdapter(workspace_dir=self.workspace_dir, agent_id="codex", mode=mode)
         self.mcp_gateway = MCPGateway(workspace_dir=self.workspace_dir, server_id="codex_mcp", mode=mode)

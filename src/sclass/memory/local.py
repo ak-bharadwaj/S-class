@@ -27,6 +27,8 @@ class LocalMemoryProvider(MemoryProvider):
 
     def _init_db(self) -> None:
         with sqlite3.connect(self.db_path, timeout=30.0) as conn:
+            conn.execute("PRAGMA journal_mode = WAL;")
+            conn.execute("PRAGMA busy_timeout = 30000;")
             conn.execute("""
             CREATE TABLE IF NOT EXISTS memories (
                 key TEXT PRIMARY KEY,
@@ -85,6 +87,7 @@ class LocalMemoryProvider(MemoryProvider):
             raise ValueError("VERIFIED_FACT memory requires a cryptographic evidence pointer.")
 
         with sqlite3.connect(self.db_path, timeout=30.0) as conn:
+            conn.execute("PRAGMA busy_timeout = 30000;")
             conn.execute("""
             INSERT INTO memories (
                 key, content, category, memory_type, evidence_pointer,
@@ -111,7 +114,7 @@ class LocalMemoryProvider(MemoryProvider):
                 item.created_at,
                 item.expires_at,
                 item.ttl_seconds,
-                float(item.relevance_score),
+                float(item.relevance_score if item.relevance_score is not None else 1.0),
             ))
             conn.commit()
 
@@ -123,16 +126,14 @@ class LocalMemoryProvider(MemoryProvider):
         """Retrieves a specific memory item by key, filtering out expired items."""
         now_iso = datetime.now(timezone.utc).isoformat()
         with sqlite3.connect(self.db_path, timeout=30.0) as conn:
+            conn.execute("PRAGMA busy_timeout = 30000;")
             conn.row_factory = sqlite3.Row
             row = conn.execute("SELECT * FROM memories WHERE key = ?;", (key,)).fetchone()
             if not row:
                 return None
 
             expires_at = row["expires_at"] if "expires_at" in row.keys() else None
-            if expires_at and expires_at < now_iso:
-                return None
-
-            return MemoryItem(
+            item = MemoryItem(
                 key=row["key"],
                 content=row["content"],
                 category=row["category"],
@@ -145,6 +146,9 @@ class LocalMemoryProvider(MemoryProvider):
                 relevance_score=float(row["relevance_score"]) if "relevance_score" in row.keys() and row["relevance_score"] is not None else 1.0,
                 is_authoritative=False,
             )
+            if item.is_expired(now_iso):
+                return None
+            return item
 
     def query(
         self,
@@ -203,21 +207,21 @@ class LocalMemoryProvider(MemoryProvider):
                     score += term_hits * 0.3
 
                 if score >= min_relevance and score > 0.0:
-                    scored_items.append(
-                        MemoryItem(
-                            key=r["key"],
-                            content=r["content"],
-                            category=r["category"],
-                            memory_type=r["memory_type"] if "memory_type" in r.keys() else MemoryType.CONTEXT.value,
-                            evidence_pointer=r["evidence_pointer"] if "evidence_pointer" in r.keys() else None,
-                            metadata=json.loads(r["metadata_json"]),
-                            created_at=r["created_at"],
-                            expires_at=r["expires_at"] if "expires_at" in r.keys() else None,
-                            ttl_seconds=r["ttl_seconds"] if "ttl_seconds" in r.keys() else None,
-                            relevance_score=round(score, 3),
-                            is_authoritative=False,
-                        )
+                    cand = MemoryItem(
+                        key=r["key"],
+                        content=r["content"],
+                        category=r["category"],
+                        memory_type=r["memory_type"] if "memory_type" in r.keys() else MemoryType.CONTEXT.value,
+                        evidence_pointer=r["evidence_pointer"] if "evidence_pointer" in r.keys() else None,
+                        metadata=json.loads(r["metadata_json"]),
+                        created_at=r["created_at"],
+                        expires_at=r["expires_at"] if "expires_at" in r.keys() else None,
+                        ttl_seconds=r["ttl_seconds"] if "ttl_seconds" in r.keys() else None,
+                        relevance_score=round(score, 3),
+                        is_authoritative=False,
                     )
+                    if not cand.is_expired(now_iso):
+                        scored_items.append(cand)
 
             # Sort by relevance score descending, then created_at descending
             scored_items.sort(key=lambda item: (item.relevance_score, item.created_at), reverse=True)

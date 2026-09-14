@@ -358,11 +358,17 @@ class InterventionPolicy:
 
         # 5. Default baseline rules
         if risk_score >= 0.4 or blast_radius > 0:
+            tier = VerificationLevel.MINIMAL.value if is_budget_exhausted else VerificationLevel.STANDARD.value
+            reason_msg = (
+                f"Verification tier degraded to minimal due to budget exhaustion (risk={risk_score:.2f})."
+                if is_budget_exhausted
+                else f"Standard verification triggered for mutating action (risk={risk_score:.2f})."
+            )
             return InterventionResult(
                 decision=InterventionDecision.VERIFY.value,
                 action=action,
-                reason=f"Standard verification triggered for mutating action (risk={risk_score:.2f}).",
-                recommended_tier=VerificationLevel.STANDARD.value,
+                reason=reason_msg,
+                recommended_tier=tier,
             )
 
         return InterventionResult(

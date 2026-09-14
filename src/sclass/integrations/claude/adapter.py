@@ -26,23 +26,26 @@ from sclass.domain.verification import VerificationResult
 from sclass.control.authorization import authorize
 from sclass.verification.engine import verify_claim
 from sclass.context.handoff import HandoffPackage, HandoffAssembler
-from sclass.integrations.base import AdapterCapabilities, AdapterStatus
+from sclass.integrations.base import AdapterCapabilities, AdapterStatus, BasePlatformAdapter
 from sclass.integrations.acp.adapter import ACPAdapter
 
 
-class ClaudeCodeAdapter:
+class ClaudeCodeAdapter(BasePlatformAdapter):
     """Adapts Claude Code hooks, ACP sessions, and tool invocations to S-Class governance."""
 
     def __init__(self, workspace_dir: str, mode: str = "enforce"):
-        self.workspace_dir = os.path.abspath(workspace_dir)
-        self.mode = mode
-        self.capabilities = AdapterCapabilities(
-            pre_action_enforcement=True,
-            post_action_observation=True,
-            approval=True,
-            verification=True,
-            session_events=True,
-            native_protocol="acp",
+        super().__init__(
+            workspace_dir=workspace_dir,
+            platform_id="claude_code",
+            mode=mode,
+            capabilities=AdapterCapabilities(
+                pre_action_enforcement=True,
+                post_action_observation=True,
+                approval=True,
+                verification=True,
+                session_events=True,
+                native_protocol="acp",
+            ),
         )
         self.acp = ACPAdapter(workspace_dir=self.workspace_dir, agent_id="claude", mode=mode)
         self.active_session_id: Optional[str] = None

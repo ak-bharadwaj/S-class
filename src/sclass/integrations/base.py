@@ -19,7 +19,11 @@ from sclass.domain.capability import (
     CAP_TERMINAL_EXECUTE,
     CAP_FILESYSTEM_READ,
     CAP_FILESYSTEM_WRITE,
+    CAP_GIT_READ,
+    CAP_GIT_WRITE,
     CAP_NETWORK_REQUEST,
+    CAP_SECRET_READ,
+    CAP_PROCESS_SPAWN,
 )
 from sclass.domain.claim import Claim
 from sclass.domain.verification import VerificationResult
@@ -167,15 +171,35 @@ class BasePlatformAdapter(PlatformAdapter):
         params = dict(parameters or {})
         ctx = dict(context or {})
 
-        # Determine capability mapping
-        if any(k in act_lower for k in ("command", "bash", "terminal", "exec", "sh", "shell", "run")):
+        # Determine capability mapping with security-first precedence
+        tgt_lower = str(target).strip().lower()
+
+        # 1. Secrets and credentials (must precede general read/terminal)
+        if any(k in act_lower for k in ("secret", "token", "credential", "api_key", "password", "env_var")) or \
+           any(k in tgt_lower for k in ("secret", "token", "credential", "api_key", "password")):
+            cap = CAP_SECRET_READ
+        # 2. Process spawning and background daemons
+        elif any(k in act_lower for k in ("spawn", "fork", "daemon", "service")):
+            cap = CAP_PROCESS_SPAWN
+        # 3. Terminal execution / shell
+        elif any(k in act_lower for k in ("command", "bash", "terminal", "exec", "sh", "shell", "run")):
             cap = CAP_TERMINAL_EXECUTE
+        # 4. Git specific operations
+        elif "git" in act_lower or "git" in tgt_lower.split():
+            if any(k in act_lower or k in tgt_lower for k in ("commit", "push", "merge", "rebase", "reset", "tag", "checkout -b")):
+                cap = CAP_GIT_WRITE
+            else:
+                cap = CAP_GIT_READ
+        # 5. Network access
+        elif any(k in act_lower for k in ("net", "http", "curl", "fetch", "download", "request")):
+            cap = CAP_NETWORK_REQUEST
+        # 6. Filesystem write / mutation
+        elif any(k in act_lower for k in ("write", "edit", "modify", "save", "delete", "patch")) or \
+             any(w in act_lower.split("_") for w in ("rm", "remove", "del")):
+            cap = CAP_FILESYSTEM_WRITE
+        # 7. Filesystem read
         elif any(k in act_lower for k in ("read", "cat", "view", "get_file", "search", "list")):
             cap = CAP_FILESYSTEM_READ
-        elif any(k in act_lower for k in ("write", "edit", "modify", "save", "delete", "rm", "patch")):
-            cap = CAP_FILESYSTEM_WRITE
-        elif any(k in act_lower for k in ("net", "http", "curl", "fetch", "download")):
-            cap = CAP_NETWORK_REQUEST
         else:
             cap = CAP_TERMINAL_EXECUTE
 

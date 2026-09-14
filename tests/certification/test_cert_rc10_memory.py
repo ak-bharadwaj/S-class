@@ -262,3 +262,82 @@ def test_rc10_mem0_roundtrip_with_mock_client(rc10_ws):
     assert health["status"] == "ok"
     assert health["backend"] == "mem0_client"
     assert health["healthy"] is True
+
+
+def test_rc10_sqlite_wal_concurrency(rc10_ws):
+    """Certifies concurrent multi-threaded writes to LocalMemoryProvider under WAL mode."""
+    import concurrent.futures
+
+    provider = LocalMemoryProvider(rc10_ws)
+
+    def write_worker(idx: int):
+        p = LocalMemoryProvider(rc10_ws)
+        item = MemoryItem(
+            key=f"concurrent_key_{idx}",
+            content=f"Concurrent memory payload {idx}",
+            category="test",
+        )
+        p.store(item)
+        return p.recall(f"concurrent_key_{idx}") is not None
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(write_worker, i) for i in range(25)]
+        results = [f.result() for f in futures]
+
+    assert all(results)
+    assert provider.health()["item_count"] >= 25
+
+
+def test_rc10_iso_z_suffix_and_timezone_expiration(rc10_ws):
+    """Certifies that ISO timestamps with Z-suffix and microsecond boundaries expire reliably."""
+    provider = LocalMemoryProvider(rc10_ws)
+
+    past_utc_z = "2020-01-01T00:00:00Z"
+    item = MemoryItem(
+        key="z_expired",
+        content="Item with past Z timestamp",
+        expires_at=past_utc_z,
+    )
+    provider.store(item)
+
+    # Must be expired and not recallable
+    assert provider.recall("z_expired") is None
+    # Must not appear in query
+    assert len(provider.query("Item with past Z")) == 0
+
+
+def test_rc10_mem0_unverified_fact_demotion_without_crash(rc10_ws):
+    """Certifies that unverified fact claims from Mem0 are safely demoted to CONTEXT without crashing."""
+    mock_client = MagicMock()
+    mock_client.search.return_value = [
+        {
+            "id": "unverified_fact_1",
+            "memory": "Unverified claim from external store",
+            "metadata": {"memory_type": "verified_fact", "evidence_pointer": None},
+        },
+        {
+            "id": "valid_fact_2",
+            "memory": "Valid claim from external store",
+            "metadata": {"memory_type": "verified_fact", "evidence_pointer": "receipt_abc_123"},
+        }
+    ]
+
+    provider = Mem0Provider(rc10_ws, client=mock_client)
+    res = provider.query("claim")
+
+    assert len(res) == 2
+    # First item demoted to context because evidence_pointer was missing
+    assert res[0].memory_type == MemoryType.CONTEXT.value
+    # Second item kept verified_fact because it has evidence_pointer
+    assert res[1].memory_type == MemoryType.VERIFIED_FACT.value
+
+
+def test_rc10_memory_item_none_relevance_from_dict():
+    """Certifies MemoryItem.from_dict handles None relevance_score gracefully."""
+    d = {
+        "key": "test_k",
+        "content": "test_c",
+        "relevance_score": None,
+    }
+    item = MemoryItem.from_dict(d)
+    assert item.relevance_score == 1.0

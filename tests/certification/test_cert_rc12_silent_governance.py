@@ -226,3 +226,75 @@ def test_rc12_silent_governance_end_to_end_with_adapter(rc12_ws):
     assert controller.audit_trail[0].action == "read_code"
     assert controller.audit_trail[1].action == "write_code"
     assert controller.audit_trail[1].surfaced is True
+
+
+def test_rc12_secret_and_git_capability_normalization(rc12_ws):
+    """Certifies that security-sensitive secrets, git ops, and processes are accurately mapped."""
+    from sclass.domain.capability import (
+        CAP_SECRET_READ,
+        CAP_PROCESS_SPAWN,
+        CAP_GIT_READ,
+        CAP_GIT_WRITE,
+    )
+    adapter = BasePlatformAdapter(workspace_dir=rc12_ws)
+
+    # 1. Secret read must not be misclassified as generic filesystem read
+    req_secret = adapter.normalize_action(action="read_secret", target="OPENAI_API_KEY")
+    assert req_secret.capability == CAP_SECRET_READ
+
+    req_token = adapter.normalize_action(action="get_token", target="aws_session_token")
+    assert req_token.capability == CAP_SECRET_READ
+
+    # 2. Process spawning
+    req_spawn = adapter.normalize_action(action="spawn_daemon", target="./worker.py")
+    assert req_spawn.capability == CAP_PROCESS_SPAWN
+
+    # 3. Git read vs git write
+    req_git_read = adapter.normalize_action(action="git_diff", target="HEAD~1")
+    assert req_git_read.capability == CAP_GIT_READ
+
+    req_git_write = adapter.normalize_action(action="git_commit", target="-m 'fix'")
+    assert req_git_write.capability == CAP_GIT_WRITE
+
+
+def test_rc12_concrete_adapters_protocol_conformance(rc12_ws):
+    """Certifies that Cursor, Codex, and Claude concrete adapters strictly satisfy PlatformAdapter protocol."""
+    from sclass.integrations.cursor.adapter import CursorAdapter
+    from sclass.integrations.codex.adapter import CodexAdapter
+    from sclass.integrations.claude.adapter import ClaudeCodeAdapter
+
+    cursor = CursorAdapter(rc12_ws)
+    assert isinstance(cursor, PlatformAdapter)
+    assert cursor.platform_id == "cursor"
+
+    codex = CodexAdapter(rc12_ws)
+    assert isinstance(codex, PlatformAdapter)
+    assert codex.platform_id == "codex"
+
+    claude = ClaudeCodeAdapter(rc12_ws)
+    assert isinstance(claude, PlatformAdapter)
+    assert claude.platform_id == "claude_code"
+
+
+def test_rc12_govern_action_requires_approval_message(rc12_ws):
+    """Certifies that actions requiring approval surface '[S-Class Approval Required]' instead of 'BLOCKED'."""
+    from unittest.mock import patch
+    from sclass.domain.action import AuthorizationDecision, DecisionOutcome
+
+    controller = SilentGovernanceController(workspace_dir=rc12_ws, mode=SilentGovernanceMode.SURFACE_ANOMALIES)
+    req = ActionRequest(actor="agent", session="s", capability="terminal.execute", action="deploy", target="prod", workspace=rc12_ws)
+
+    approval_decision = AuthorizationDecision(
+        outcome=DecisionOutcome.REQUIRE_APPROVAL,
+        policy_id="policy_deploy_gate",
+        risk_level="high",
+        reason="Production deployment requires human confirmation",
+    )
+
+    with patch("sclass.product.silent_governance.authorize", return_value=approval_decision):
+        dec, surfaced, msg = controller.govern_action(req, risk_score=0.7)
+        assert surfaced is True
+        assert msg is not None
+        assert "[S-Class Approval Required]" in msg
+        assert "Action requires human approval" in msg
+        assert "BLOCKED" not in msg

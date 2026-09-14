@@ -223,3 +223,52 @@ def test_rc11_intervention_policy_decisions():
     )
     assert esc_res.decision == InterventionDecision.ESCALATE.value
     assert esc_res.escalate is True
+
+
+def test_rc11_verification_budget_serialization():
+    """Certifies VerificationBudgetLimits and VerificationBudgetController serialization."""
+    limits = VerificationBudgetLimits(
+        max_tokens=25000,
+        max_latency_ms=15000.0,
+        max_compute_cpu_sec=12.5,
+        max_cost_usd=0.75,
+        degradation_threshold_pct=18.0,
+    )
+    limits_dict = limits.to_dict()
+    restored_limits = VerificationBudgetLimits.from_dict(limits_dict)
+    assert restored_limits.max_tokens == 25000
+    assert restored_limits.max_latency_ms == 15000.0
+    assert restored_limits.max_compute_cpu_sec == 12.5
+    assert restored_limits.max_cost_usd == 0.75
+    assert restored_limits.degradation_threshold_pct == 18.0
+
+    ctrl = VerificationBudgetController(limits=limits)
+    ctrl.record_verification(duration_ms=1200.0, tokens=4000, compute_cpu_sec=2.0, cost_usd=0.1)
+    ctrl_dict = ctrl.to_dict()
+    restored_ctrl = VerificationBudgetController.from_dict(ctrl_dict)
+    assert restored_ctrl.tokens_consumed == 4000
+    assert restored_ctrl.latency_ms_consumed == 1200.0
+    assert restored_ctrl.compute_cpu_sec_consumed == 2.0
+    assert restored_ctrl.cost_usd_consumed == 0.1
+    assert restored_ctrl.limits.max_tokens == 25000
+
+
+def test_rc11_evaluate_intervention_dynamic_budget_degradation():
+    """Certifies evaluate_intervention downshifts verification tier when budget controller triggers degradation."""
+    limits = VerificationBudgetLimits(max_tokens=1000, degradation_threshold_pct=20.0)
+    ctrl = VerificationBudgetController(limits=limits)
+    # Consume 900 tokens (10% remaining <= 20% threshold)
+    ctrl.record_verification(tokens=900)
+    assert ctrl.should_degrade() is True
+
+    # Under medium risk, high blast radius would normally require thorough, but budget degrades to standard
+    res = PlatformOptimizationEngine.evaluate_intervention(
+        platform_id="generic",
+        action="large_refactor",
+        risk=0.45,
+        code_intel_signals={"blast_radius": 6},
+        budget_controller=ctrl,
+    )
+    assert res.decision == InterventionDecision.VERIFY.value
+    assert res.recommended_tier == "standard"
+    assert "Verification tier degraded" in res.reason

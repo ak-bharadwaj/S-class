@@ -20,22 +20,25 @@ from sclass.domain.claim import Claim
 from sclass.domain.verification import VerificationResult
 from sclass.control.authorization import authorize
 from sclass.verification.engine import verify_claim
-from sclass.integrations.base import AdapterCapabilities, AdapterStatus
+from sclass.integrations.base import AdapterCapabilities, AdapterStatus, BasePlatformAdapter
 
 
-class CursorAdapter:
+class CursorAdapter(BasePlatformAdapter):
     """Adapts Cursor IDE hooks and composer tool calls to S-Class governance."""
 
     def __init__(self, workspace_dir: str, mode: str = "enforce"):
-        self.workspace_dir = os.path.abspath(workspace_dir)
-        self.mode = mode
-        self.capabilities = AdapterCapabilities(
-            pre_action_enforcement=True,
-            post_action_observation=False,
-            approval=True,
-            verification=True,
-            session_events=True,
-            native_protocol="native_hook",
+        super().__init__(
+            workspace_dir=workspace_dir,
+            platform_id="cursor",
+            mode=mode,
+            capabilities=AdapterCapabilities(
+                pre_action_enforcement=True,
+                post_action_observation=False,
+                approval=True,
+                verification=True,
+                session_events=True,
+                native_protocol="native_hook",
+            ),
         )
 
     def inspect_status(self) -> AdapterStatus:

@@ -69,7 +69,17 @@ class MemoryItem:
             except Exception:
                 base_dt = datetime.now(timezone.utc)
             exp = base_dt + timedelta(seconds=max(0, int(self.ttl_seconds)))
-            object.__setattr__(self, "expires_at", exp.isoformat())
+            object.__setattr__(self, "expires_at", exp.astimezone(timezone.utc).isoformat())
+        elif self.expires_at is not None:
+            try:
+                exp_dt = datetime.fromisoformat(self.expires_at)
+                if exp_dt.tzinfo is None:
+                    exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+                else:
+                    exp_dt = exp_dt.astimezone(timezone.utc)
+                object.__setattr__(self, "expires_at", exp_dt.isoformat())
+            except Exception:
+                pass
 
     def is_expired(self, now_iso: Optional[str] = None) -> bool:
         """Check if this memory item has expired according to its TTL/expires_at."""
@@ -97,12 +107,13 @@ class MemoryItem:
             "created_at": self.created_at,
             "ttl_seconds": self.ttl_seconds,
             "expires_at": self.expires_at,
-            "relevance_score": float(self.relevance_score),
+            "relevance_score": float(self.relevance_score if self.relevance_score is not None else 1.0),
             "is_authoritative": False,
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> MemoryItem:
+        rel_score = data.get("relevance_score")
         return cls(
             key=data["key"],
             content=data["content"],
@@ -113,7 +124,7 @@ class MemoryItem:
             created_at=data.get("created_at", datetime.now(timezone.utc).isoformat()),
             ttl_seconds=data.get("ttl_seconds"),
             expires_at=data.get("expires_at"),
-            relevance_score=float(data.get("relevance_score", 1.0)),
+            relevance_score=float(rel_score) if rel_score is not None else 1.0,
             is_authoritative=False,
         )
 

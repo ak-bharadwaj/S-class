@@ -397,6 +397,25 @@ class VerificationBudgetLimits:
     max_cost_usd: float = 2.0
     degradation_threshold_pct: float = 15.0
 
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "max_tokens": self.max_tokens,
+            "max_latency_ms": self.max_latency_ms,
+            "max_compute_cpu_sec": self.max_compute_cpu_sec,
+            "max_cost_usd": self.max_cost_usd,
+            "degradation_threshold_pct": self.degradation_threshold_pct,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> VerificationBudgetLimits:
+        return cls(
+            max_tokens=int(data.get("max_tokens", 50000)),
+            max_latency_ms=float(data.get("max_latency_ms", 30000.0)),
+            max_compute_cpu_sec=float(data.get("max_compute_cpu_sec", 30.0)),
+            max_cost_usd=float(data.get("max_cost_usd", 2.0)),
+            degradation_threshold_pct=float(data.get("degradation_threshold_pct", 15.0)),
+        )
+
 
 class VerificationBudgetController:
     """
@@ -513,4 +532,27 @@ class VerificationBudgetController:
         self.cost_usd_consumed = 0.0
         self.verifications_run = 0
         self.degradations_triggered = 0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "limits": self.limits.to_dict(),
+            "tokens_consumed": self.tokens_consumed,
+            "latency_ms_consumed": self.latency_ms_consumed,
+            "compute_cpu_sec_consumed": self.compute_cpu_sec_consumed,
+            "cost_usd_consumed": self.cost_usd_consumed,
+            "verifications_run": self.verifications_run,
+            "degradations_triggered": self.degradations_triggered,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> VerificationBudgetController:
+        limits = VerificationBudgetLimits.from_dict(data.get("limits", {}))
+        ctrl = cls(limits=limits)
+        ctrl.tokens_consumed = int(data.get("tokens_consumed", 0))
+        ctrl.latency_ms_consumed = float(data.get("latency_ms_consumed", 0.0))
+        ctrl.compute_cpu_sec_consumed = float(data.get("compute_cpu_sec_consumed", 0.0))
+        ctrl.cost_usd_consumed = float(data.get("cost_usd_consumed", 0.0))
+        ctrl.verifications_run = int(data.get("verifications_run", 0))
+        ctrl.degradations_triggered = int(data.get("degradations_triggered", 0))
+        return ctrl
 

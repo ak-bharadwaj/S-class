@@ -483,7 +483,7 @@ class PlatformOptimizationEngine:
             is_exhausted = budget_controller.is_budget_exhausted()
 
         policy = InterventionPolicy(platform_id)
-        return policy.evaluate(
+        result = policy.evaluate(
             action=action,
             risk_score=risk_score,
             blast_radius=blast_radius,
@@ -491,4 +491,19 @@ class PlatformOptimizationEngine:
             consecutive_failures=consecutive_failures,
             policy_violation=policy_violation,
         )
+
+        if budget_controller and result.decision == InterventionDecision.VERIFY.value:
+            risk_str = "critical" if risk_score >= 0.8 else ("high" if risk_score >= 0.5 else ("medium" if risk_score >= 0.2 else "low"))
+            recommended = budget_controller.recommended_verification_tier(result.recommended_tier, risk_str)
+            if recommended != result.recommended_tier:
+                result = InterventionResult(
+                    decision=result.decision,
+                    action=result.action,
+                    reason=f"{result.reason} [Verification tier degraded to {recommended} by budget controller]",
+                    recommended_tier=recommended,
+                    escalate=result.escalate,
+                    suppress_notification=result.suppress_notification,
+                    metadata=dict(result.metadata),
+                )
+        return result
 

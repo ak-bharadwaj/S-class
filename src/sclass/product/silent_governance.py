@@ -121,6 +121,7 @@ class SilentGovernanceController:
         self,
         action_request: ActionRequest,
         risk_score: float = 0.0,
+        auth_mode: Optional[str] = None,
     ) -> Tuple[AuthorizationDecision, bool, Optional[str]]:
         """
         Silently governs an incoming ActionRequest.
@@ -130,7 +131,8 @@ class SilentGovernanceController:
         self.total_actions += 1
 
         # Transparently authorize
-        decision = authorize(action_request, mode="enforce", workspace_dir=self.workspace_dir)
+        mode = auth_mode or "enforce"
+        decision = authorize(action_request, mode=mode, workspace_dir=self.workspace_dir)
 
         if not decision.allow:
             self.blocked_actions += 1
@@ -141,7 +143,12 @@ class SilentGovernanceController:
         notification_msg: Optional[str] = None
         if surfaced:
             self.surfaced_actions += 1
-            if not decision.allow:
+            if decision.requires_approval:
+                notification_msg = (
+                    f"[S-Class Approval Required] Action requires human approval: '{action_request.action} {action_request.target}'. "
+                    f"Reason: {decision.reason or 'Policy approval boundary'}"
+                )
+            elif not decision.allow:
                 notification_msg = (
                     f"[S-Class Alert] Action BLOCKED: '{action_request.action} {action_request.target}'. "
                     f"Reason: {decision.reason or 'Policy boundary violation'}"

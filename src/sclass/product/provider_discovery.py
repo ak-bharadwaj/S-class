@@ -209,33 +209,21 @@ class ProviderDiscovery:
         if pid == "cursor":
             try:
                 from sclass.integrations.cursor.adapter import CursorAdapter
-                # If CursorAdapter exists, wrap or return
-                return BasePlatformAdapter(
-                    workspace_dir=workspace_dir,
-                    platform_id="cursor",
-                    mode=active_mode,
-                    capabilities=AdapterCapabilities(native_protocol="native_hook"),
-                )
+                return CursorAdapter(workspace_dir=workspace_dir, mode=active_mode)
             except Exception:
                 pass
         elif pid == "codex":
             try:
                 from sclass.integrations.codex.adapter import CodexAdapter
-                return BasePlatformAdapter(
-                    workspace_dir=workspace_dir,
-                    platform_id="codex",
-                    mode=active_mode,
-                    capabilities=AdapterCapabilities(native_protocol="acp"),
-                )
+                return CodexAdapter(workspace_dir=workspace_dir, mode=active_mode)
             except Exception:
                 pass
-        elif pid == "claude_code":
-            return BasePlatformAdapter(
-                workspace_dir=workspace_dir,
-                platform_id="claude_code",
-                mode=active_mode,
-                capabilities=AdapterCapabilities(native_protocol="cli"),
-            )
+        elif pid in ("claude", "claude_code"):
+            try:
+                from sclass.integrations.claude.adapter import ClaudeCodeAdapter
+                return ClaudeCodeAdapter(workspace_dir=workspace_dir, mode=active_mode)
+            except Exception:
+                pass
         elif pid == "antigravity":
             return BasePlatformAdapter(
                 workspace_dir=workspace_dir,

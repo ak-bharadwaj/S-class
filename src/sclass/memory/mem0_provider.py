@@ -64,7 +64,7 @@ class Mem0Provider(MemoryProvider):
                 meta = dict(item.metadata)
                 meta["key"] = item.key
                 meta["category"] = item.category
-                meta["memory_type"] = item.memory_type
+                meta["memory_type"] = item.memory_type.value if isinstance(item.memory_type, MemoryType) else str(item.memory_type)
                 if item.evidence_pointer:
                     meta["evidence_pointer"] = item.evidence_pointer
                 self.client.add(messages, user_id=meta.get("user_id", "sclass"), metadata=meta)
@@ -100,17 +100,25 @@ class Mem0Provider(MemoryProvider):
                             cat = meta.get("category", "general")
                             m_type = meta.get("memory_type", MemoryType.CONTEXT.value)
                             ev_ptr = meta.get("evidence_pointer")
-                            items.append(
-                                MemoryItem(
-                                    key=key,
-                                    content=content,
-                                    category=cat,
-                                    memory_type=m_type,
-                                    evidence_pointer=ev_ptr,
-                                    metadata=meta,
-                                    is_authoritative=False,  # L10 enforced
+
+                            # L10: Unverified external memories cannot declare verified facts
+                            if str(m_type) == MemoryType.VERIFIED_FACT.value and not ev_ptr:
+                                m_type = MemoryType.CONTEXT.value
+
+                            try:
+                                items.append(
+                                    MemoryItem(
+                                        key=key,
+                                        content=content,
+                                        category=cat,
+                                        memory_type=m_type,
+                                        evidence_pointer=ev_ptr,
+                                        metadata=meta,
+                                        is_authoritative=False,  # L10 enforced
+                                    )
                                 )
-                            )
+                            except Exception as parse_exc:
+                                logger.debug(f"Skipping unparseable Mem0 item: {parse_exc}")
                 if items:
                     if memory_type:
                         m_type_val = memory_type.value if isinstance(memory_type, MemoryType) else str(memory_type)
