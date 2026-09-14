@@ -76,17 +76,18 @@ class ObservationConvergence:
             )
 
         if authorization is not None:
-            # Authoritatively verify that the supplied decision is genuine, S-Class issued, bound to this exact request, capability, and policy version
+            # Authoritatively verify that the supplied decision is genuine, S-Class issued, bound to this exact request, capability, registry generation, and policy version
             valid, verify_reason = verify_decision_integrity(
                 authorization,
                 request,
                 capability=resolved_cap,
+                expected_registry_generation=service.capability_registry.generation,
                 expected_policy_version=service.policy_version,
             )
             if not valid:
                 raise SecurityViolationError(
                     f"NO AUTHORIZATION -> NO EXECUTION: Supplied authorization is unauthentic, forged, tampered, "
-                    f"or not bound to this exact ActionRequest, capability, or policy version: {verify_reason}"
+                    f"or not bound to this exact ActionRequest, capability, registry generation, or policy version: {verify_reason}"
                 )
             decision = authorization
         else:

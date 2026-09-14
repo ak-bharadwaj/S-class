@@ -173,6 +173,7 @@ class AuthorizationDecision:
     capability_hash: str = ""
     capability_id: str = ""
     capability_version: str = "1.0.0"
+    capability_registry_generation: int = 0
     policy_version: str = "1.0.0"
     integrity_token: str = ""
 
@@ -201,7 +202,7 @@ class AuthorizationDecision:
         from sclass.policy.authorization_service import get_authorization_secret
         key = secret_key or get_authorization_secret()
         out_str = self.outcome.value if isinstance(self.outcome, DecisionOutcome) else str(self.outcome)
-        payload = f"{self.issuer}:{self.request_hash}:{self.capability_hash}:{self.capability_id}:{self.capability_version}:{self.policy_id}:{self.policy_version}:{out_str}:{self.risk_level}:{self.evaluated_at}"
+        payload = f"{self.issuer}:{self.request_hash}:{self.capability_hash}:{self.capability_id}:{self.capability_version}:{self.capability_registry_generation}:{self.policy_id}:{self.policy_version}:{out_str}:{self.risk_level}:{self.evaluated_at}"
         expected = hmac.new(key, payload.encode("utf-8"), hashlib.sha256).hexdigest()
         return hmac.compare_digest(self.integrity_token, expected)
 
@@ -219,6 +220,7 @@ class AuthorizationDecision:
             "capability_hash": self.capability_hash,
             "capability_id": self.capability_id,
             "capability_version": self.capability_version,
+            "capability_registry_generation": self.capability_registry_generation,
             "policy_version": self.policy_version,
             "integrity_token": self.integrity_token,
         }
@@ -244,6 +246,7 @@ class AuthorizationDecision:
             capability_hash=data.get("capability_hash", ""),
             capability_id=data.get("capability_id", ""),
             capability_version=data.get("capability_version", "1.0.0"),
+            capability_registry_generation=int(data.get("capability_registry_generation", 0)),
             policy_version=data.get("policy_version", "1.0.0"),
             integrity_token=data.get("integrity_token", ""),
         )

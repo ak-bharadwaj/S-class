@@ -91,6 +91,12 @@ class CapabilityRegistry:
                 network=False,
             ),
         ])
+        self._generation += 1
+
+    def reload_defaults(self) -> None:
+        """Clears registry and reloads baseline defaults, incrementing generation."""
+        self.clear()
+        self._load_baseline_defaults()
 
     def register(self, capability: Capability) -> None:
         """Registers an authoritative capability."""

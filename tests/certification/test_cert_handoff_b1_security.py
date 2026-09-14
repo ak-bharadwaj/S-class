@@ -1448,3 +1448,80 @@ def test_stale_capability_identity_rejected(test_ws):
         )
     assert "no authoritative capability -> no execution" in str(exc_info.value).lower()
 
+
+def test_registry_generation_mismatch_denies_execution(test_ws):
+    """
+    Invariant: B.1.5 — Authorization Context Generation Binding.
+    decision.generation != registry.generation -> NO EXECUTION.
+    Mutating registry (register, unregister, clear, reload) increments generation.
+    Any prior authorization decision minted under an older registry generation is rejected.
+    """
+    from sclass.policy.capability_resolver import CapabilityRegistry
+    from sclass.policy.authorization_service import AuthorizationService
+
+    registry = CapabilityRegistry(load_defaults=False)
+    assert registry.generation == 0
+
+    cap = Capability(
+        id="cap:generation-test",
+        version="1.0.0",
+        actor="agent-claude",
+        operation=CAP_TERMINAL_EXECUTE,
+        resource="**",
+        scope="workspace",
+        risk="medium",
+        filesystem="read_write",
+    )
+    registry.register(cap)
+    gen_at_auth = registry.generation
+    assert gen_at_auth == 1
+
+    auth_service = AuthorizationService(capability_registry=registry)
+
+    req = ActionRequest(
+        actor="agent-claude",
+        capability=CAP_TERMINAL_EXECUTE,
+        action="run_command",
+        target="python -c \"print('generation_bound')\"",
+        workspace=test_ws,
+    )
+
+    # 1. Authorize under generation 1
+    decision = auth_service.authorize(req, workspace_dir=test_ws)
+    assert decision.is_allowed is True
+    assert decision.capability_registry_generation == 1
+
+    # 2. Mutate registry by registering an unrelated capability
+    unrelated_cap = Capability(
+        id="cap:unrelated",
+        actor="agent-bob",
+        operation=CAP_FILESYSTEM_READ,
+        resource="src/**",
+    )
+    registry.register(unrelated_cap)
+    assert registry.generation == 2
+    assert registry.generation != decision.capability_registry_generation
+
+    # 3. Presenting the old decision with generation 1 MUST FAIL CLOSED
+    with pytest.raises(SecurityViolationError) as exc_info:
+        ObservationConvergence.execute_and_observe(
+            request=req,
+            authorization=decision,
+            auth_service=auth_service,
+        )
+    err_msg = str(exc_info.value)
+    assert "registry generation mismatch" in err_msg.lower()
+    assert "decision bound to registry generation 1" in err_msg
+    assert "active registry generation is 2" in err_msg
+
+    # 4. Verify clear() also increments generation
+    gen_before_clear = registry.generation
+    registry.clear()
+    assert registry.generation == gen_before_clear + 1
+
+    # 5. Verify reload_defaults() also increments generation
+    gen_before_reload = registry.generation
+    registry.reload_defaults()
+    assert registry.generation > gen_before_reload
+
+

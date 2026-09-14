@@ -112,11 +112,12 @@ def generate_integrity_token(
     evaluated_at: str,
     capability_id: str = "",
     capability_version: str = "1.0.0",
+    registry_generation: int = 0,
     secret_key: Optional[bytes] = None,
 ) -> str:
     """Computes HMAC-SHA256 integrity token sealing decision parameters."""
     key = secret_key or get_authorization_secret()
-    payload = f"{issuer}:{request_hash}:{capability_hash}:{capability_id}:{capability_version}:{policy_id}:{policy_version}:{outcome}:{risk_level}:{evaluated_at}"
+    payload = f"{issuer}:{request_hash}:{capability_hash}:{capability_id}:{capability_version}:{registry_generation}:{policy_id}:{policy_version}:{outcome}:{risk_level}:{evaluated_at}"
     return hmac.new(key, payload.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
@@ -127,6 +128,7 @@ def verify_decision_integrity(
     expected_capability_hash: Optional[str] = None,
     expected_capability_id: Optional[str] = None,
     expected_capability_version: Optional[str] = None,
+    expected_registry_generation: Optional[int] = None,
     expected_policy_version: Optional[str] = None,
     secret_key: Optional[bytes] = None,
     max_age_seconds: float = 3600.0,
@@ -136,10 +138,11 @@ def verify_decision_integrity(
     1. Was issued by S-Class (issuer == 'S_CLASS')
     2. Is bound to the exact canonical ActionRequest (request_hash matches)
     3. Is bound to the exact authoritative Capability (capability_hash, capability_id, capability_version match)
-    4. Is bound to the active policy version (policy_version matches)
-    5. Has not been forged or tampered with (valid HMAC integrity_token)
-    6. Is not stale (within max_age_seconds)
-    7. Is allowed (outcome in 'allow', 'warn')
+    4. Is bound to the active registry generation (capability_registry_generation matches)
+    5. Is bound to the active policy version (policy_version matches)
+    6. Has not been forged or tampered with (valid HMAC integrity_token)
+    7. Is not stale (within max_age_seconds)
+    8. Is allowed (outcome in 'allow', 'warn')
     """
     if decision is None:
         return False, "Authorization decision is None"
@@ -173,7 +176,13 @@ def verify_decision_integrity(
         if decision_cap_ver != target_cap_ver:
             return False, f"Capability version mismatch: decision bound to version '{decision_cap_ver}', but active capability version is '{target_cap_ver}'"
 
-    # 3. Policy Version Freshness
+    # 3. Registry Generation Freshness
+    decision_gen = getattr(decision, "capability_registry_generation", 0)
+    if expected_registry_generation is not None:
+        if decision_gen != expected_registry_generation:
+            return False, f"Registry generation mismatch: decision bound to registry generation {decision_gen}, but active registry generation is {expected_registry_generation}"
+
+    # 4. Policy Version Freshness
     pol_ver = getattr(decision, "policy_version", "1.0.0")
     if expected_policy_version is not None:
         if pol_ver != expected_policy_version:
@@ -198,6 +207,7 @@ def verify_decision_integrity(
         capability_hash=cap_hash,
         capability_id=cap_id,
         capability_version=cap_ver,
+        registry_generation=decision_gen,
         policy_id=pol_id,
         policy_version=pol_ver,
         outcome=outcome_str,
@@ -209,7 +219,7 @@ def verify_decision_integrity(
     if not hmac.compare_digest(token, expected_token):
         return False, "Integrity token verification failed: decision has been forged or tampered with"
 
-    # 4. Check Staleness
+    # 5. Check Staleness
     if eval_at:
         try:
             dt = datetime.fromisoformat(eval_at)
@@ -320,6 +330,7 @@ class AuthorizationService:
         reason: str,
         remediation: Optional[str] = None,
         capability: Optional[Capability] = None,
+        registry_generation: Optional[int] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> AuthorizationDecision:
         """Constructs and cryptographically seals a canonical AuthorizationDecision."""
@@ -328,6 +339,7 @@ class AuthorizationService:
         cap_hash = compute_canonical_capability_hash(capability)
         cap_id = getattr(capability, "id", "") if capability else ""
         cap_ver = getattr(capability, "version", "1.0.0") if capability else "1.0.0"
+        reg_gen = registry_generation if registry_generation is not None else getattr(self.capability_registry, "generation", 0)
         outcome_str = outcome.value if isinstance(outcome, DecisionOutcome) else str(outcome)
 
         token = generate_integrity_token(
@@ -336,6 +348,7 @@ class AuthorizationService:
             capability_hash=cap_hash,
             capability_id=cap_id,
             capability_version=cap_ver,
+            registry_generation=reg_gen,
             policy_id=policy_id,
             policy_version=self.policy_version,
             outcome=outcome_str,
@@ -358,6 +371,7 @@ class AuthorizationService:
             capability_hash=cap_hash,
             capability_id=cap_id,
             capability_version=cap_ver,
+            capability_registry_generation=reg_gen,
             policy_version=self.policy_version,
             integrity_token=token,
         )
@@ -478,15 +492,18 @@ class AuthorizationService:
         decision: Any,
         request: ActionRequest,
         capability: Optional[Capability] = None,
+        expected_registry_generation: Optional[int] = None,
         expected_policy_version: Optional[str] = None,
         max_age_seconds: float = 3600.0,
     ) -> bool:
-        """Verifies an AuthorizationDecision against this service's secret key, capability, and policy version."""
+        """Verifies an AuthorizationDecision against this service's secret key, capability, registry generation, and policy version."""
         ver = expected_policy_version or self.policy_version
+        exp_gen = expected_registry_generation if expected_registry_generation is not None else getattr(self.capability_registry, "generation", None)
         valid, _ = verify_decision_integrity(
             decision=decision,
             request=request,
             capability=capability,
+            expected_registry_generation=exp_gen,
             expected_policy_version=ver,
             secret_key=self._secret_key,
             max_age_seconds=max_age_seconds,
