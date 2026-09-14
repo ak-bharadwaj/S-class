@@ -18,6 +18,7 @@ from sclass.integrations.mcp.tools import MCPToolRegistry, MCPToolDefinition
 from sclass.integrations.mcp.resources import MCPResourceRegistry
 from sclass.integrations.mcp.transport import MCPProtocolTransport, MCPHeaderPolicy
 from sclass.integrations.mcp.tasks import MCPTaskManager, MCPTaskStatus
+from sclass.integrations.protocol_gateway import ProtocolEventGateway, get_protocol_gateway
 
 
 class MCPGateway:
@@ -36,6 +37,7 @@ class MCPGateway:
         resource_registry: Optional[MCPResourceRegistry] = None,
         authenticator: Optional[MCPAuthenticator] = None,
         task_manager: Optional[MCPTaskManager] = None,
+        gateway: Optional[ProtocolEventGateway] = None,
     ):
         self.workspace_dir = workspace_dir
         self.server_id = server_id
@@ -45,6 +47,7 @@ class MCPGateway:
         self.resource_registry = resource_registry or MCPResourceRegistry(workspace_dir)
         self.authenticator = authenticator or MCPAuthenticator()
         self.task_manager = task_manager or MCPTaskManager(workspace_dir)
+        self.gateway = gateway or get_protocol_gateway()
 
     def handle_call_tool(
         self,
@@ -62,6 +65,14 @@ class MCPGateway:
         Returns conformant JSON-RPC result or error.
         """
         cid = call_id or str(uuid.uuid4())
+
+        # Emit incoming tool call event
+        self.gateway.emit_mcp(
+            event_type="mcp.tools_call",
+            session_id=str(task_id or cid),
+            agent_id=agent_id,
+            payload={"tool": tool_name, "arguments": arguments, "call_id": cid},
+        )
 
         # 0. Header-based policy check (MCP 2026-07-28)
         if headers:
@@ -117,11 +128,24 @@ class MCPGateway:
         decision = authorize(action_req, mode=self.mode, workspace_dir=self.workspace_dir)
 
         if decision.is_denied:
+            self.gateway.emit_mcp(
+                event_type="mcp.action_denied",
+                session_id=str(task_id or cid),
+                agent_id=agent_id,
+                payload={"decision": decision.to_dict(), "tool": tool_name, "arguments": arguments},
+            )
             return MCPProtocolTransport.build_authorization_denied(
                 cid,
                 decision=decision,
                 mcp_identity=mcp_call.to_dict(),
             )
+
+        self.gateway.emit_mcp(
+            event_type="mcp.action_authorized",
+            session_id=str(task_id or cid),
+            agent_id=agent_id,
+            payload={"decision": decision.to_dict(), "tool": tool_name, "arguments": arguments},
+        )
 
         # 6. Execute through executor or native execution (MCP Execution / Result)
         exec_output = None
@@ -190,6 +214,12 @@ class MCPGateway:
             )
 
         elif method in ("tools/list", "tools_list"):
+            self.gateway.emit_mcp(
+                event_type="mcp.tools_list",
+                session_id=str(rpc_id or "default"),
+                agent_id="mcp_agent",
+                payload=params,
+            )
             tools = [t.to_dict() for t in self.tool_registry.list_tools(self.server_id)]
             return {
                 "jsonrpc": "2.0",
@@ -198,6 +228,12 @@ class MCPGateway:
             }
 
         elif method in ("resources/list", "resources_list"):
+            self.gateway.emit_mcp(
+                event_type="mcp.resources_list",
+                session_id=str(rpc_id or "default"),
+                agent_id="mcp_agent",
+                payload=params,
+            )
             resources = [r.to_dict() for r in self.resource_registry.list_resources()]
             return {
                 "jsonrpc": "2.0",
@@ -210,6 +246,14 @@ class MCPGateway:
             t_args = params.get("arguments") or params.get("parameters") or {}
             target_str = str(t_args.get("command") or t_args.get("target") or t_args.get("path") or t_name)
             agent_id = params.get("agent_id", "mcp_agent")
+            task_session = str(params.get("task_id") or rpc_id or "default")
+
+            self.gateway.emit_mcp(
+                event_type="mcp.tasks_start",
+                session_id=task_session,
+                agent_id=agent_id,
+                payload=params,
+            )
 
             # Evaluate S-Class policy for task execution
             action_req = ActionRequest(
@@ -225,11 +269,24 @@ class MCPGateway:
             )
             decision = authorize(action_req, mode=self.mode, workspace_dir=self.workspace_dir)
             if decision.is_denied:
+                self.gateway.emit_mcp(
+                    event_type="mcp.action_denied",
+                    session_id=task_session,
+                    agent_id=agent_id,
+                    payload={"decision": decision.to_dict(), "tool": t_name},
+                )
                 return MCPProtocolTransport.build_authorization_denied(
                     rpc_id,
                     decision=decision,
                     mcp_identity={"tool_name": t_name, "arguments": t_args},
                 )
+
+            self.gateway.emit_mcp(
+                event_type="mcp.action_authorized",
+                session_id=task_session,
+                agent_id=agent_id,
+                payload={"decision": decision.to_dict(), "tool": t_name},
+            )
 
             task_op = self.task_manager.start_task(
                 tool_name=t_name,
@@ -247,6 +304,12 @@ class MCPGateway:
 
         elif method in ("tasks/status", "task/status"):
             tid = params.get("task_id") or ""
+            self.gateway.emit_mcp(
+                event_type="mcp.tasks_status",
+                session_id=tid or str(rpc_id),
+                agent_id="mcp_agent",
+                payload=params,
+            )
             task_op = self.task_manager.get_task(tid)
             if not task_op:
                 return MCPProtocolTransport.build_error(
@@ -260,6 +323,12 @@ class MCPGateway:
 
         elif method in ("tasks/result", "task/result"):
             tid = params.get("task_id") or ""
+            self.gateway.emit_mcp(
+                event_type="mcp.tasks_result",
+                session_id=tid or str(rpc_id),
+                agent_id="mcp_agent",
+                payload=params,
+            )
             task_op = self.task_manager.get_task(tid)
             if not task_op:
                 return MCPProtocolTransport.build_error(
@@ -280,6 +349,12 @@ class MCPGateway:
 
         elif method in ("tasks/cancel", "task/cancel"):
             tid = params.get("task_id") or ""
+            self.gateway.emit_mcp(
+                event_type="mcp.tasks_cancel",
+                session_id=tid or str(rpc_id),
+                agent_id="mcp_agent",
+                payload=params,
+            )
             cancelled = self.task_manager.cancel_task(tid, reason=params.get("reason"))
             return {
                 "jsonrpc": "2.0",
@@ -292,3 +367,40 @@ class MCPGateway:
             code=-32601,
             message=f"Method '{method}' not implemented in MCP Gateway.",
         )
+
+    def check_governance(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        agent_id: str = "mcp_agent",
+        task_id: Optional[str] = None,
+    ) -> AuthorizationDecision:
+        """
+        Authoritative MCP governance check evaluating S-Class policy and emitting
+        structured ProtocolEvents to the ProtocolEventGateway.
+        """
+        tool_def = self.tool_registry.get_tool(self.server_id, tool_name)
+        schema_hash = tool_def.schema_hash if tool_def else "unknown_schema"
+        mcp_call = MCPToolCall(
+            server_id=self.server_id,
+            server_version=self.server_version,
+            tool_name=tool_name,
+            tool_schema_hash=schema_hash,
+            arguments_hash=compute_hash(arguments),
+            authorization_context={},
+            task_id=task_id,
+            agent_id=agent_id,
+            parameters=arguments,
+            call_id=str(uuid.uuid4()),
+        )
+        action_req = mcp_call.to_action_request(self.workspace_dir)
+        decision = authorize(action_req, mode=self.mode, workspace_dir=self.workspace_dir)
+        event_type = "mcp.action_denied" if decision.is_denied else "mcp.action_authorized"
+        self.gateway.emit_mcp(
+            event_type=event_type,
+            session_id=str(task_id or "default"),
+            agent_id=agent_id,
+            payload={"decision": decision.to_dict(), "tool": tool_name, "arguments": arguments},
+        )
+        return decision
+

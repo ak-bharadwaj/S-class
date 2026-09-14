@@ -43,6 +43,7 @@ from sclass.integrations.acp.schema import (
     ACPFsWriteParams,
     ACPTerminalExecParams,
 )
+from sclass.integrations.protocol_gateway import ProtocolEventGateway, get_protocol_gateway
 from sclass.platform.framework import PlatformProfilingFramework
 from sclass.platform.engine import ControlPolicy
 
@@ -168,6 +169,7 @@ class ACPAdapter:
         agent_id: str = "acp_agent",
         mode: str = "enforce",
         platform_framework: Optional[PlatformProfilingFramework] = None,
+        gateway: Optional[ProtocolEventGateway] = None,
     ):
         self.workspace_dir = os.path.abspath(workspace_dir)
         self.agent_id = agent_id
@@ -176,6 +178,7 @@ class ACPAdapter:
         self.fs_gateway = ACPFsGateway(self.workspace_dir)
         self.terminal_gateway = ACPTerminalGateway(self.workspace_dir, mode=self.mode)
         self.platform_framework = platform_framework or PlatformProfilingFramework(workspace_dir=self.workspace_dir)
+        self.gateway = gateway or get_protocol_gateway()
 
     def get_control_policy(self, task: Optional[Any] = None) -> ControlPolicy:
         """Synthesizes active control policy for this ACP session."""
@@ -257,6 +260,15 @@ class ACPAdapter:
         msg_id = raw_message.get("id")
         method = raw_message.get("method", "")
         params = raw_message.get("params", {})
+
+        session_id_hint = str(params.get("session_id") or msg_id or "default")
+        norm_method = method.replace("/", "_").replace(".", "_")
+        self.gateway.emit_acp(
+            event_type=f"acp.{norm_method}",
+            session_id=session_id_hint,
+            agent_id=self.agent_id,
+            payload=params,
+        )
 
         # 1. initialize
         if method in ("initialize", "init"):
@@ -340,6 +352,12 @@ class ACPAdapter:
             decision = authorize(act_req, mode=self.mode, workspace_dir=self.workspace_dir)
 
             if decision.is_denied:
+                self.gateway.emit_acp(
+                    event_type="acp.action_denied",
+                    session_id=sid,
+                    agent_id=self.agent_id,
+                    payload={"decision": decision.to_dict(), "tool": tool_name},
+                )
                 return ACPProtocolTransport.create_response(
                     msg_id,
                     {
@@ -350,6 +368,12 @@ class ACPAdapter:
                     },
                 )
             elif decision.requires_approval or decision.outcome == DecisionOutcome.REQUIRE_APPROVAL:
+                self.gateway.emit_acp(
+                    event_type="acp.action_require_approval",
+                    session_id=sid,
+                    agent_id=self.agent_id,
+                    payload={"decision": decision.to_dict(), "tool": tool_name},
+                )
                 return ACPProtocolTransport.create_response(
                     msg_id,
                     {
@@ -358,6 +382,12 @@ class ACPAdapter:
                         "reason": decision.reason,
                     },
                 )
+            self.gateway.emit_acp(
+                event_type="acp.action_authorized",
+                session_id=sid,
+                agent_id=self.agent_id,
+                payload={"decision": decision.to_dict(), "tool": tool_name},
+            )
             return ACPProtocolTransport.create_response(
                 msg_id,
                 {"outcome": "ALLOW", "policy_id": decision.policy_id},
@@ -383,6 +413,12 @@ class ACPAdapter:
             )
             decision = authorize(act_req, mode=self.mode, workspace_dir=self.workspace_dir)
             if decision.is_denied:
+                self.gateway.emit_acp(
+                    event_type="acp.action_denied",
+                    session_id=sid,
+                    agent_id=self.agent_id,
+                    payload={"decision": decision.to_dict(), "tool": tool_name},
+                )
                 return ACPProtocolTransport.create_error(
                     msg_id,
                     code=-32003,
@@ -390,6 +426,12 @@ class ACPAdapter:
                     data=decision.to_dict(),
                 )
 
+            self.gateway.emit_acp(
+                event_type="acp.action_authorized",
+                session_id=sid,
+                agent_id=self.agent_id,
+                payload={"decision": decision.to_dict(), "tool": tool_name},
+            )
             return ACPProtocolTransport.create_response(
                 msg_id,
                 {"status": "authorized_passthrough", "policy_id": decision.policy_id},
