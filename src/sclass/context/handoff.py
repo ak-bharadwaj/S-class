@@ -482,8 +482,7 @@ class RecoveryEngine:
                     repo.save_task(t)
                     restored_tasks_cnt += 1
         except Exception as e:
-            if isinstance(e, HandoffIntegrityError):
-                raise
+            raise HandoffIntegrityError(f"Task state reconciliation failed during recovery in '{ws}': {e}") from e
 
         # Restore ProjectTruth
         restored_pt = None
@@ -517,8 +516,8 @@ class RecoveryEngine:
             ]
             if active_tasks:
                 crashed = True
-        except Exception:
-            pass
+        except Exception as e:
+            raise HandoffIntegrityError(f"Failed to inspect task state for crash detection in '{ws}': {e}") from e
 
         return {
             "crash_detected": crashed,
@@ -569,8 +568,8 @@ class RollbackEngine:
                         t.state = TaskState.VERIFIED
                         repo.save_task(t)
                         reverted_tasks_cnt += 1
-        except Exception:
-            pass
+        except Exception as e:
+            raise HandoffIntegrityError(f"Task state rollback failed in '{ws}': {e}") from e
 
         # Invalidate unverified claims in ProjectTruth
         reverted_claims_cnt = 0
@@ -579,7 +578,7 @@ class RollbackEngine:
             target_verified_cids = {cid for cid, r in pt.records.items() if r.state == TruthState.VERIFIED}
             reverted_claims_cnt = max(0, len(pt.records) - len(target_verified_cids))
 
-        # Revoke orphaned leases
+        # Revoke orphaned leases and symbol claims
         revoked_leases_cnt = 0
         try:
             from sclass.agent_fleet.engine import FleetIntegrityEngine
@@ -587,8 +586,11 @@ class RollbackEngine:
             for path, lease in list(fleet_engine.state.leases.items()):
                 fleet_engine.release_lease(lease.holder_agent_id, path)
                 revoked_leases_cnt += 1
-        except Exception:
-            pass
+            for sym_key, holder in list(fleet_engine.state.claimed_symbols.items()):
+                fleet_engine.release_symbol_work(holder, sym_key)
+        except Exception as e:
+            if not isinstance(e, (ImportError, ModuleNotFoundError)):
+                raise HandoffIntegrityError(f"Failed to revoke fleet leases/claims during rollback in '{ws}': {e}") from e
 
         # Record ROLLBACK event in LocalLedger
         try:
@@ -602,8 +604,8 @@ class RollbackEngine:
                     "reason": f"Rollback to verified checkpoint {target_checkpoint_id}",
                 },
             )
-        except Exception:
-            pass
+        except Exception as e:
+            raise HandoffIntegrityError(f"Failed to record rollback event in ledger: {e}") from e
 
         return RollbackResult(
             success=True,

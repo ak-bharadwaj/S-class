@@ -48,14 +48,20 @@ class ConflictDetector:
         norm_path = path.strip().replace("\\", "/").lower()
         for p, lease in existing_leases.items():
             l_norm = p.strip().replace("\\", "/").lower()
-            if l_norm == norm_path:
+            is_hierarchy = norm_path.startswith(l_norm + "/") or l_norm.startswith(norm_path + "/")
+            if l_norm == norm_path or is_hierarchy:
                 if lease.holder_agent_id == agent_id:
                     continue  # Re-entrant acquisition
                 if lease.is_expired():
                     continue
 
                 # Conflict if either requires EXCLUSIVE_WRITE
-                if requested_type == LeaseType.EXCLUSIVE_WRITE or lease.lease_type == LeaseType.EXCLUSIVE_WRITE:
+                is_excl = (
+                    requested_type == LeaseType.EXCLUSIVE_WRITE or
+                    lease.lease_type == LeaseType.EXCLUSIVE_WRITE or
+                    getattr(lease.lease_type, "value", str(lease.lease_type)) == LeaseType.EXCLUSIVE_WRITE.value
+                )
+                if is_excl:
                     return ConflictRecord(
                         conflict_id=f"conf_file_{uuid.uuid4().hex[:8]}",
                         conflict_type=ConflictType.CONCURRENT_MUTATION.value,
@@ -66,6 +72,7 @@ class ConflictDetector:
                             "existing_type": lease.lease_type.value if hasattr(lease.lease_type, "value") else str(lease.lease_type),
                             "requested_type": requested_type.value if hasattr(requested_type, "value") else str(requested_type),
                             "expires_at": lease.expires_at,
+                            "overlapping_path": p,
                         },
                         timestamp=time.time(),
                     )
@@ -145,13 +152,19 @@ class QuarantineEngine:
         )
         self.records[agent_id] = rec
 
-        # Revoke all leases in fleet engine
+        # Revoke all leases and symbol claims in fleet engine
         if fleet_engine:
             if hasattr(fleet_engine, "state") and hasattr(fleet_engine.state, "leases"):
                 for path, lease in list(fleet_engine.state.leases.items()):
                     if lease.holder_agent_id == agent_id:
                         if hasattr(fleet_engine, "release_lease"):
                             fleet_engine.release_lease(agent_id, path)
+
+            if hasattr(fleet_engine, "state") and hasattr(fleet_engine.state, "claimed_symbols"):
+                for sym_key, holder in list(fleet_engine.state.claimed_symbols.items()):
+                    if holder == agent_id:
+                        if hasattr(fleet_engine, "release_symbol_work"):
+                            fleet_engine.release_symbol_work(agent_id, sym_key)
 
             # Update agent status in engine state if available
             if hasattr(fleet_engine, "state") and hasattr(fleet_engine.state, "agents"):

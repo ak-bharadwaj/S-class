@@ -23,6 +23,7 @@ import os
 import json
 import sqlite3
 import hashlib
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List, Tuple, Union
@@ -141,9 +142,22 @@ class DurableCheckpointStore:
         conn.execute("PRAGMA synchronous = NORMAL;")
         return conn
 
+    @contextmanager
+    def _connection(self):
+        """Context manager yielding SQLite connection with deterministic cleanup."""
+        conn = self._get_conn()
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
     def _init_db(self) -> None:
         try:
-            with self._get_conn() as conn:
+            with self._connection() as conn:
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS checkpoints (
                         checkpoint_id TEXT PRIMARY KEY,
@@ -173,7 +187,7 @@ class DurableCheckpointStore:
 
     def save(self, chk: ProjectCheckpoint) -> None:
         try:
-            with self._get_conn() as conn:
+            with self._connection() as conn:
                 conn.execute("""
                     INSERT OR REPLACE INTO checkpoints (
                         checkpoint_id, repo_head, working_tree_fingerprint, ledger_head,
@@ -209,7 +223,7 @@ class DurableCheckpointStore:
 
     def get(self, checkpoint_id: str) -> Optional[ProjectCheckpoint]:
         try:
-            with self._get_conn() as conn:
+            with self._connection() as conn:
                 row = conn.execute(
                     "SELECT * FROM checkpoints WHERE checkpoint_id = ?", (checkpoint_id,)
                 ).fetchone()
@@ -221,7 +235,7 @@ class DurableCheckpointStore:
 
     def list_all(self) -> List[ProjectCheckpoint]:
         try:
-            with self._get_conn() as conn:
+            with self._connection() as conn:
                 rows = conn.execute("SELECT * FROM checkpoints ORDER BY created_at ASC, ROWID ASC").fetchall()
                 return [self._row_to_checkpoint(r) for r in rows]
         except sqlite3.Error as e:
@@ -475,21 +489,38 @@ class CheckpointManager:
         return chk
 
     @classmethod
-    def resolve_checkpoint(cls, workspace_dir: str, checkpoint_id: str) -> ProjectCheckpoint:
+    def resolve_checkpoint(
+        cls,
+        workspace_dir: str,
+        checkpoint_id: str,
+        visited: Optional[Set[str]] = None,
+    ) -> ProjectCheckpoint:
         """
         Resolves an incremental checkpoint by recursively walking parent checkpoints
-        and reconstructing the complete state.
+        and reconstructing the complete state. Validates integrity and detects cycles.
         """
         ws = os.path.abspath(workspace_dir)
         chk = cls.get_checkpoint(ws, checkpoint_id)
         if not chk:
             raise HandoffIntegrityError(f"Checkpoint '{checkpoint_id}' not found.")
 
+        # Cryptographic integrity check on the checkpoint itself
+        if not chk.verify_integrity():
+            raise HandoffIntegrityError(
+                f"Integrity check failed for checkpoint '{chk.checkpoint_id}'. Checkpoint hash mismatch."
+            )
+
         if not chk.is_incremental or not chk.parent_checkpoint_id:
             return chk
 
+        if visited is None:
+            visited = set()
+        if checkpoint_id in visited:
+            raise HandoffIntegrityError(f"Circular parent dependency detected in checkpoint chain: '{checkpoint_id}'.")
+        visited.add(checkpoint_id)
+
         # Reconstruct from parent
-        parent = cls.resolve_checkpoint(ws, chk.parent_checkpoint_id)
+        parent = cls.resolve_checkpoint(ws, chk.parent_checkpoint_id, visited=visited)
 
         # Merge verified tasks
         merged_v_tasks = list(parent.verified_tasks)
@@ -515,25 +546,40 @@ class CheckpointManager:
         # Truth
         resolved_truth = chk.project_truth or parent.project_truth
 
+        # Compute canonical hash for resolved state snapshot
+        v_tasks = tuple(merged_v_tasks)
+        blks = tuple(merged_blockers)
+        rel_files = tuple(merged_files)
+        repo_head = chk.repo_head or parent.repo_head
+        ledger_head = chk.ledger_head or parent.ledger_head
+        next_action = chk.next_action or parent.next_action
+
+        res_payload = (
+            f"{chk.checkpoint_id}|{repo_head}|{chk.working_tree_fingerprint}|"
+            f"{ledger_head}|{chk.active_task_id}|{','.join(v_tasks)}|"
+            f"{','.join(blks)}|{','.join(rel_files)}|{next_action}"
+        )
+        res_hash = hashlib.sha256(res_payload.encode("utf-8")).hexdigest()
+
         return ProjectCheckpoint(
             checkpoint_id=chk.checkpoint_id,
-            repo_head=chk.repo_head or parent.repo_head,
+            repo_head=repo_head,
             working_tree_fingerprint=chk.working_tree_fingerprint,
-            ledger_head=chk.ledger_head or parent.ledger_head,
+            ledger_head=ledger_head,
             active_task_id=chk.active_task_id,
-            verified_tasks=tuple(merged_v_tasks),
+            verified_tasks=v_tasks,
             failed_claims=chk.failed_claims or parent.failed_claims,
-            blockers=tuple(merged_blockers),
-            relevant_files=tuple(merged_files),
-            next_action=chk.next_action or parent.next_action,
+            blockers=blks,
+            relevant_files=rel_files,
+            next_action=next_action,
             constraints=chk.constraints or parent.constraints,
-            checkpoint_hash=chk.checkpoint_hash,
+            checkpoint_hash=res_hash,
             created_at=chk.created_at,
             project_truth=resolved_truth,
             active_leases=chk.active_leases or parent.active_leases,
             pending_claims=chk.pending_claims or parent.pending_claims,
             evidence_graph=chk.evidence_graph or parent.evidence_graph,
             parent_checkpoint_id=chk.parent_checkpoint_id,
-            is_incremental=chk.is_incremental,
+            is_incremental=False,
             delta=chk.delta,
         )

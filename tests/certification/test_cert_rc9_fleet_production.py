@@ -241,3 +241,97 @@ def test_rc9_fleet_integrity_engine_concurrent_coordination(rc9_workspace):
     assert ok_new is True
     assert conf_new is None
     assert engine.state.leases["module_a.py"].holder_agent_id == "agent_2"
+
+
+def test_rc9_symbol_ownership_lifecycle_and_release(rc9_workspace):
+    """Certifies symbol work claim, collision rejection, and release allowing reacquisition."""
+    engine = FleetIntegrityEngine(workspace_root=rc9_workspace)
+
+    # Agent 1 claims symbol
+    ok1, conf1 = engine.claim_symbol_work("agent_1", "execute_pipeline", file_path="src/engine.py")
+    assert ok1 is True
+    assert conf1 is None
+
+    # Agent 2 claims same symbol -> duplicate work rejected
+    ok2, conf2 = engine.claim_symbol_work("agent_2", "execute_pipeline", file_path="src/engine.py")
+    assert ok2 is False
+    assert conf2 is not None
+    assert conf2.conflict_type == ConflictType.DUPLICATE_WORK
+
+    # Agent 1 releases symbol
+    rel = engine.release_symbol_work("agent_1", "execute_pipeline", file_path="src/engine.py")
+    assert rel is True
+
+    # Agent 2 can now successfully claim symbol
+    ok3, conf3 = engine.claim_symbol_work("agent_2", "execute_pipeline", file_path="src/engine.py")
+    assert ok3 is True
+    assert conf3 is None
+
+
+def test_rc9_quarantine_and_stale_cleanup_revokes_symbol_claims(rc9_workspace):
+    """Certifies that quarantining an agent or stale lease cleanup revokes symbol claims."""
+    engine = FleetIntegrityEngine(workspace_root=rc9_workspace)
+    manager = AgentSessionManager(heartbeat_timeout=0.1)
+
+    # Agent 1 claims symbol then gets quarantined
+    engine.claim_symbol_work("rogue_agent", "critical_symbol", file_path="src/core.py")
+    engine.quarantine_agent("rogue_agent", "Security violation")
+
+    # Claim should be revoked, allowing healthy agent to claim it
+    ok_after_q, conf_after_q = engine.claim_symbol_work("clean_agent", "critical_symbol", file_path="src/core.py")
+    assert ok_after_q is True
+    assert conf_after_q is None
+
+    # Stale agent claims symbol
+    manager.register("stale_agent")
+    engine.claim_symbol_work("stale_agent", "stale_symbol", file_path="src/core.py")
+    time.sleep(0.15)
+    manager.cleanup_stale_leases(fleet_engine=engine)
+
+    # Claim should be revoked, allowing another agent to claim it
+    ok_after_stale, _ = engine.claim_symbol_work("clean_agent", "stale_symbol", file_path="src/core.py")
+    assert ok_after_stale is True
+
+
+def test_rc9_task_graph_missing_dependency_fails_closed():
+    """Certifies that task graph fails closed if tasks depend on undeclared/missing dependencies."""
+    tg = TaskGraph()
+    tg.add_task(task_id="t_deploy", title="Deploy", dependencies=["missing_compile_task"])
+
+    with pytest.raises(FleetStorageError, match="missing task"):
+        tg.get_execution_order()
+
+
+def test_rc9_directory_hierarchy_containment_conflict():
+    """Certifies that ConflictDetector catches directory vs file containment collisions."""
+    existing_leases = {
+        "src/controllers": ResourceLease(
+            lease_id="l_dir",
+            path="src/controllers",
+            holder_agent_id="agent_lead",
+            lease_type=LeaseType.EXCLUSIVE_WRITE,
+        )
+    }
+
+    conf = ConflictDetector.detect_file_conflict(
+        agent_id="agent_sub",
+        path="src/controllers/auth.py",
+        requested_type=LeaseType.EXCLUSIVE_WRITE,
+        existing_leases=existing_leases,
+    )
+    assert conf is not None
+    assert conf.conflict_type == ConflictType.CONCURRENT_MUTATION.value
+    assert "agent_lead" in conf.agents_involved
+
+
+def test_rc9_conflict_engine_delegator_api(rc9_workspace):
+    """Certifies that ConflictEngine delegator methods function on engine state."""
+    engine = FleetIntegrityEngine(workspace_root=rc9_workspace)
+    engine.acquire_lease("agent_1", "src/shared.py", LeaseType.EXCLUSIVE_WRITE)
+    engine.claim_symbol_work("agent_1", "shared_func", file_path="src/shared.py")
+
+    file_conf = engine.conflict_engine.detect_file_conflict("agent_2", "src/shared.py")
+    assert file_conf is not None
+
+    sym_conf = engine.conflict_engine.detect_symbol_conflict("agent_2", "src/shared.py::shared_func")
+    assert sym_conf is not None

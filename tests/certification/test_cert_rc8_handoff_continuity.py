@@ -143,11 +143,61 @@ def test_rc8_incremental_checkpoint_and_reconstruction(rc8_workspace):
     assert "t2" in inc_chk.delta.get("new_verified_tasks", [])
 
     # 4. Resolve incremental checkpoint to full reconstruction
+    assert inc_chk.verify_integrity() is True
     resolved = CheckpointManager.resolve_checkpoint(rc8_workspace, "chk_inc_01")
+    assert resolved.verify_integrity() is True
     assert "t1" in resolved.verified_tasks
     assert "t2" in resolved.verified_tasks
     assert "app.py" in resolved.relevant_files
     assert "utils.py" in resolved.relevant_files
+
+    # 5. RecoveryEngine resumes cleanly from incremental checkpoint
+    rec_result = RecoveryEngine.resume_from_checkpoint(rc8_workspace, "chk_inc_01")
+    assert rec_result.success is True
+    assert rec_result.checkpoint_id == "chk_inc_01"
+
+
+def test_rc8_incremental_checkpoint_cycle_detection(rc8_workspace):
+    """Certifies that cyclic parent pointers in incremental checkpoints fail closed."""
+    # Create chk_a pointing to chk_b, and chk_b pointing to chk_a
+    store = DurableCheckpointStore(rc8_workspace)
+    chk_a = ProjectCheckpoint(
+        checkpoint_id="chk_loop_a",
+        repo_head="HEAD",
+        working_tree_fingerprint="fp",
+        ledger_head="lh",
+        active_task_id=None,
+        verified_tasks=(),
+        failed_claims=(),
+        blockers=(),
+        relevant_files=(),
+        next_action=None,
+        constraints=(),
+        checkpoint_hash="hash_a",
+        parent_checkpoint_id="chk_loop_b",
+        is_incremental=True,
+    )
+    chk_b = ProjectCheckpoint(
+        checkpoint_id="chk_loop_b",
+        repo_head="HEAD",
+        working_tree_fingerprint="fp",
+        ledger_head="lh",
+        active_task_id=None,
+        verified_tasks=(),
+        failed_claims=(),
+        blockers=(),
+        relevant_files=(),
+        next_action=None,
+        constraints=(),
+        checkpoint_hash="hash_b",
+        parent_checkpoint_id="chk_loop_a",
+        is_incremental=True,
+    )
+    store.save(chk_a)
+    store.save(chk_b)
+
+    with pytest.raises(HandoffIntegrityError):
+        CheckpointManager.resolve_checkpoint(rc8_workspace, "chk_loop_a")
 
 
 def test_rc8_recovery_engine_resume_from_checkpoint(rc8_workspace):

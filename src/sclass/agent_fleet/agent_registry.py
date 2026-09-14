@@ -107,6 +107,12 @@ class AgentSessionManager:
                         if hasattr(fleet_engine, "release_lease"):
                             fleet_engine.release_lease(agent.agent_id, path)
                             cleaned_leases.append(path)
+            # Revoke claimed symbols in fleet engine
+            if hasattr(fleet_engine, "state") and hasattr(fleet_engine.state, "claimed_symbols"):
+                for sym_key, holder in list(fleet_engine.state.claimed_symbols.items()):
+                    if holder == agent.agent_id:
+                        if hasattr(fleet_engine, "release_symbol_work"):
+                            fleet_engine.release_symbol_work(agent.agent_id, sym_key)
         return cleaned_leases
 
     def get_agent(self, agent_id: str) -> Optional[AgentIdentity]:

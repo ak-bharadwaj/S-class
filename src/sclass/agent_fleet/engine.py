@@ -19,6 +19,7 @@ import time
 import json
 import uuid
 import sqlite3
+from contextlib import contextmanager
 from typing import Dict, Any, List, Optional, Tuple, Set
 
 from sclass.agent_fleet.models import (
@@ -103,10 +104,23 @@ class FleetIntegrityEngine:
         except sqlite3.Error as e:
             raise FleetStorageError(f"Failed to open fleet database at '{self.db_path}': {e}") from e
 
+    @contextmanager
+    def _connection(self):
+        """Context manager yielding SQLite connection with deterministic cleanup."""
+        conn = self._get_conn()
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
     def _init_db(self) -> None:
         """Initializes database schema with ACID table definitions."""
         try:
-            with self._get_conn() as conn:
+            with self._connection() as conn:
                 conn.executescript("""
                     CREATE TABLE IF NOT EXISTS agents (
                         agent_id TEXT PRIMARY KEY,
@@ -157,7 +171,7 @@ class FleetIntegrityEngine:
     def _load_state(self) -> None:
         """Load fleet state from transactional SQLite store or migrate legacy JSON."""
         try:
-            with self._get_conn() as conn:
+            with self._connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("SELECT COUNT(*) as cnt FROM agents")
                 count = cursor.fetchone()["cnt"]
@@ -249,9 +263,8 @@ class FleetIntegrityEngine:
         Eliminates fail-silent anti-pattern (Law L8).
         """
         try:
-            with self._get_conn() as conn:
-                with conn:
-                    # Sync agents
+            with self._connection() as conn:
+                # Sync agents
                     for a in self.state.agents.values():
                         conn.execute("""
                             INSERT INTO agents (agent_id, role, platform_id, status, base_revision, quarantine_reason, assigned_paths, claimed_symbols, metadata, registered_at)
@@ -413,13 +426,21 @@ class FleetIntegrityEngine:
             for p in expired_paths:
                 del self.state.leases[p]
 
+            # Release all symbol claims held by this agent so they do not deadlock other workers
+            held_symbols = [
+                sym_key for sym_key, holder in self.state.claimed_symbols.items()
+                if holder == agent_id
+            ]
+            for sym_key in held_symbols:
+                del self.state.claimed_symbols[sym_key]
+
             # Record quarantine conflict event
             event = ConflictEvent(
                 conflict_id=str(uuid.uuid4())[:8],
                 conflict_type=ConflictType.QUARANTINE_VIOLATION,
                 agents_involved=[agent_id],
                 resource_target=f"agent:{agent_id}",
-                details={"reason": reason, "revoked_leases": expired_paths},
+                details={"reason": reason, "revoked_leases": expired_paths, "revoked_symbols": held_symbols},
             )
             self.state.conflicts.append(event)
             self._save_state()
@@ -472,9 +493,7 @@ class FleetIntegrityEngine:
 
             # 3. ATOMIC SQLite TRANSACTION for serializable lease acquisition
             try:
-                with self._get_conn() as conn:
-                    conn.execute("BEGIN IMMEDIATE;")
-                    
+                with self._connection() as conn:
                     # Clean expired leases
                     conn.execute("DELETE FROM leases WHERE expires_at <= ?;", (now,))
 
@@ -572,10 +591,9 @@ class FleetIntegrityEngine:
             return False
 
         try:
-            with self._get_conn() as conn:
-                with conn:
-                    cur = conn.execute("DELETE FROM leases WHERE path = ? AND holder_agent_id = ?;", (norm_path, agent_id))
-                    released = cur.rowcount > 0
+            with self._connection() as conn:
+                cur = conn.execute("DELETE FROM leases WHERE path = ? AND holder_agent_id = ?;", (norm_path, agent_id))
+                released = cur.rowcount > 0
             if released:
                 self._load_state()
             return released
@@ -642,6 +660,44 @@ class FleetIntegrityEngine:
 
         self._save_state()
         return True, None
+
+    def release_symbol_work(
+        self,
+        agent_id: str,
+        symbol_name: str,
+        file_path: str = "",
+    ) -> bool:
+        """
+        Release ownership of a CKG symbol so other agents can work on it.
+        """
+        if file_path:
+            try:
+                norm_file = self._normalize_path(file_path)
+            except ValueError:
+                norm_file = file_path.replace("\\", "/").strip()
+            symbol_key = f"{norm_file}::{symbol_name}"
+        else:
+            symbol_key = symbol_name
+
+        existing_holder = self.state.claimed_symbols.get(symbol_key)
+        if not existing_holder or existing_holder != agent_id:
+            return False
+
+        del self.state.claimed_symbols[symbol_key]
+        agent = self.state.agents.get(agent_id)
+        if agent and symbol_key in agent.claimed_symbols:
+            agent.claimed_symbols.remove(symbol_key)
+
+        try:
+            with self._connection() as conn:
+                conn.execute(
+                    "DELETE FROM symbol_claims WHERE symbol_key = ? AND holder_agent_id = ?;",
+                    (symbol_key, agent_id),
+                )
+            self._save_state()
+            return True
+        except Exception as e:
+            raise FleetStorageError(f"Failed to release symbol claim '{symbol_key}': {e}") from e
 
     def record_agent_assumption(
         self,
@@ -895,7 +951,13 @@ class TaskGraph:
         return False
 
     def get_execution_order(self) -> List[str]:
-        """Calculates topological sort order of tasks. Raises FleetStorageError if cycles exist."""
+        """Calculates topological sort order of tasks. Raises FleetStorageError if cycles or missing dependencies exist."""
+        # Fail-closed validation for missing dependencies
+        for node in self.nodes.values():
+            for dep in node.dependencies:
+                if dep not in self.nodes:
+                    raise FleetStorageError(f"Task '{node.task_id}' depends on missing task '{dep}'.")
+
         if self.has_cycles():
             raise FleetStorageError("Cycle detected in fleet task graph; cannot determine execution order.")
 
@@ -989,6 +1051,32 @@ class ConflictEngine:
 
     def is_quarantined(self, agent_id: str) -> bool:
         return self.quarantine_engine.is_quarantined(agent_id)
+
+    def detect_file_conflict(
+        self,
+        agent_id: str,
+        path: str,
+        requested_type: LeaseType = LeaseType.EXCLUSIVE_WRITE,
+    ) -> Optional[ConflictRecord]:
+        leases = getattr(self.fleet_engine.state, "leases", {}) if self.fleet_engine else {}
+        return self.detector.detect_file_conflict(agent_id, path, requested_type, leases)
+
+    def detect_symbol_conflict(
+        self,
+        agent_id: str,
+        symbol_key: str,
+    ) -> Optional[ConflictRecord]:
+        claims = getattr(self.fleet_engine.state, "claimed_symbols", {}) if self.fleet_engine else {}
+        return self.detector.detect_symbol_conflict(agent_id, symbol_key, claims)
+
+    def detect_assumption_conflict(
+        self,
+        agent_id: str,
+        key: str,
+        spec: Dict[str, Any],
+    ) -> Optional[ConflictRecord]:
+        assumptions = getattr(self.fleet_engine.state, "assumptions", {}) if self.fleet_engine else {}
+        return self.detector.detect_assumption_conflict(agent_id, key, spec, assumptions)
 
 
 class EvidenceAggregator:
