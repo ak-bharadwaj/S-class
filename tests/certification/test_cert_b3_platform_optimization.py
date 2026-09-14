@@ -666,3 +666,231 @@ def test_b3_benchmark_detects_net_negative_regression():
     assert result.product_sla_passed is False
     assert len(result.ci_violations) > 0
     assert len(result.product_sla_violations) > 0
+
+
+# ==============================================================================
+# 7. Edge Cases, Attack Vectors & Invariant Hardening
+# ==============================================================================
+
+def test_b3_2_should_stay_out_of_way_and_should_intervene():
+    """
+    Certifies the core S-Class question:
+    Where should S-Class intervene, and where should it deliberately stay out of the way?
+    """
+    policy = get_codex_compensation_policy()
+    assert policy.should_stay_out_of_way("long-horizon autonomy") is True
+    assert policy.should_stay_out_of_way("terminal execution") is True
+    assert policy.should_stay_out_of_way("duplicate planning") is True
+    assert policy.should_intervene("regression detection") is True
+    assert policy.should_intervene("accuracy") is True
+    assert policy.should_intervene("verification") is True
+
+    # Empty string should never trigger
+    assert policy.should_stay_out_of_way("") is False
+    assert policy.should_intervene("") is False
+
+    engine = PlatformOptimizationEngine()
+    control = engine.reconcile(get_codex_profile())
+    assert control.should_stay_out_of_way("duplicate_planning") is True
+    assert control.should_intervene("regression_detection") is True
+    assert control.should_stay_out_of_way("") is False
+    assert control.should_intervene("") is False
+
+
+def test_b3_edge_cases_empty_and_whitespace_inputs():
+    """
+    Certifies that empty, whitespace, or invalid inputs never crash or falsely trigger matches.
+    """
+    policy = get_claude_code_compensation_policy()
+    for empty_input in ["", "   ", "\t\n"]:
+        assert policy.should_preserve(empty_input) is False
+        assert policy.should_compensate(empty_input) is False
+        assert policy.should_avoid(empty_input) is False
+        assert policy.should_stay_out_of_way(empty_input) is False
+        assert policy.should_intervene(empty_input) is False
+        assert policy.permits_interruption(empty_input) is False
+
+    assert policy.permits_interruption(None) is False
+
+    profile = get_claude_code_profile()
+    assert profile.has_capability("") is False
+    assert profile.has_capability("  ") is False
+    assert profile.has_strength("") is False
+    assert profile.has_strength("  ") is False
+
+    # PlatformProfile rejects empty platform_id or version
+    with pytest.raises(ValueError):
+        PlatformProfile(platform_id="")
+    with pytest.raises(ValueError):
+        PlatformProfile(platform_id="test", version="")
+
+
+def test_b3_substring_qualifier_precision():
+    """
+    Certifies that qualified suppression rules do NOT falsely suppress generic operations:
+    - 'constant_micro_checkpoints' does NOT suppress generic 'checkpoint' or 'milestone_checkpoint'.
+    - 'huge_context_injection' does NOT suppress generic 'context' or 'context_injection'.
+    - But 'micro_checkpoints' and 'huge_context' ARE recognized as suppressed.
+    """
+    engine = PlatformOptimizationEngine()
+    control = engine.reconcile(get_codex_profile())
+
+    # Generic checkpoint is NOT suppressed (Codex uses milestone checkpoints!)
+    assert control.is_intervention_suppressed("checkpoint") is False
+    assert control.is_intervention_suppressed("milestone_checkpoint") is False
+
+    # Specific micro-checkpoint IS suppressed
+    assert control.is_intervention_suppressed("constant_micro_checkpoints") is True
+    assert control.is_intervention_suppressed("micro_checkpoints") is True
+    assert control.is_intervention_suppressed("micro_checkpoint") is True
+
+    # Generic context is NOT suppressed (Codex has a 2048 token context budget!)
+    assert control.is_intervention_suppressed("context") is False
+    assert control.is_intervention_suppressed("context_injection") is False
+
+    # Huge context IS suppressed
+    assert control.is_intervention_suppressed("huge_context_injection") is True
+    assert control.is_intervention_suppressed("huge_context") is True
+
+
+def test_b3_critical_risk_exhausted_budget_failsafe():
+    """
+    ATTACK VECTOR CERTIFICATION:
+    When risk is CRITICAL and both latency and token headroom are 0%,
+    S-Class must NOT compromise security or observation:
+    - observation_mode must NOT be degraded to PASSIVE
+    - escalation_policy must remain FAIL_CLOSED
+    - mandatory security verifications must remain allowed
+    """
+    engine = PlatformOptimizationEngine()
+    exhausted_budget = PerformanceBudget(
+        limits=BudgetLimits(max_latency_ms=10.0, max_tokens=1000, max_interruptions=0)
+    )
+    # 0% headroom on latency, tokens, interruptions
+    exhausted_budget.record_overhead(latency_ms=50.0, tokens=2000, interruptions=1)
+
+    control = engine.reconcile(
+        profile=get_codex_profile(),
+        risk="critical",
+        budget=exhausted_budget,
+    )
+
+    # Observation mode must NOT be passive under critical risk
+    assert control.observation_mode != ObservationLevel.PASSIVE.value
+    # Escalation must remain fail-closed
+    assert control.escalation_policy == EscalationPolicy.FAIL_CLOSED.value
+    # Mandatory security controls are preserved
+    assert control.is_intervention_allowed("security_boundary_enforcement") is True
+    assert control.is_intervention_allowed("evidence_verification") is True
+    assert control.is_intervention_allowed("regression_detection") is True
+
+
+def test_b3_benchmark_enforces_all_ci_and_sla_dimensions():
+    """
+    Certifies that all declared CI and Product SLA dimensions are strictly evaluated:
+    - min_correctness_rate
+    - max_token_overhead_pct
+    - max_p99_latency_ms
+    - max_context_overhead_pct
+    """
+    bench = PlatformComparisonBenchmark()
+    native = PlatformMetrics(
+        task_success_rate=0.90,
+        correctness_score=0.90,
+        regressions_count=2,
+        token_count=10000,
+        context_bytes=50000,
+    )
+
+    # Subcase A: Fails CI on low correctness (10%)
+    sclass_low_correctness = PlatformMetrics(
+        task_success_rate=0.95,
+        correctness_score=0.10,  # Below CI min (85%)
+        regressions_count=0,
+        token_count=10500,
+        context_bytes=51000,
+    )
+    res_a = bench.evaluate_comparison("codex", native, sclass_low_correctness)
+    assert res_a.ci_passed is False
+    assert any("correctness" in v for v in res_a.ci_violations)
+
+    # Subcase B: Fails CI on excessive token overhead (500%)
+    sclass_huge_tokens = PlatformMetrics(
+        task_success_rate=0.95,
+        correctness_score=0.95,
+        regressions_count=0,
+        token_count=60000,  # 500% overhead > 30% CI max
+        context_bytes=51000,
+    )
+    res_b = bench.evaluate_comparison("codex", native, sclass_huge_tokens)
+    assert res_b.ci_passed is False
+    assert any("token overhead" in v for v in res_b.ci_violations)
+
+    # Subcase C: Fails Product SLA on p99 tail latency spike (500ms > 75ms)
+    sclass_p99_spike = PlatformMetrics(
+        task_success_rate=0.99,
+        correctness_score=0.98,
+        regressions_count=0,
+        token_count=10500,
+        context_bytes=51000,
+        latency_samples_ms=[15.0] * 98 + [500.0] * 2,  # p50=15ms, p95=15ms, p99=500ms
+    )
+    res_c = bench.evaluate_comparison("codex", native, sclass_p99_spike)
+    assert res_c.product_sla_passed is False
+    assert any("p99 latency" in v for v in res_c.product_sla_violations)
+
+    # Subcase D: Fails Product SLA on context overhead (50% > 20%)
+    sclass_ctx_overhead = PlatformMetrics(
+        task_success_rate=0.99,
+        correctness_score=0.98,
+        regressions_count=0,
+        token_count=10500,
+        context_bytes=75000,  # 50% overhead > 20% Product SLA max
+        latency_samples_ms=[15.0] * 10,
+    )
+    res_d = bench.evaluate_comparison("codex", native, sclass_ctx_overhead)
+    assert res_d.product_sla_passed is False
+    assert any("context overhead" in v for v in res_d.product_sla_violations)
+
+
+def test_b3_benchmark_task_success_regression_rejects_thesis():
+    """
+    Certifies that S-Class cannot claim thesis proven if task success rate regresses,
+    even if correctness was higher on the tasks that finished.
+    """
+    bench = PlatformComparisonBenchmark()
+    native = PlatformMetrics(
+        task_success_rate=0.95,
+        correctness_score=0.90,
+        regressions_count=2,
+    )
+    # S-Class improved correctness on completed tasks, but half of all tasks failed!
+    sclass_dropped_success = PlatformMetrics(
+        task_success_rate=0.50,  # Regressed from 95% to 50%!
+        correctness_score=0.99,
+        regressions_count=0,
+    )
+    result = bench.evaluate_comparison("codex", native, sclass_dropped_success)
+    assert result.thesis_proven is False
+
+
+def test_b3_budget_zero_limit_headroom_and_validation():
+    """
+    Certifies BudgetLimits and OverheadConsumption non-negative clamping
+    and accurate headroom reporting when limits are zero.
+    """
+    limits = BudgetLimits(max_latency_ms=0.0, max_tokens=-50)
+    assert limits.max_latency_ms == 0.0
+    assert limits.max_tokens == 0
+
+    consumption = OverheadConsumption(latency_ms=-10.0, tokens=-100)
+    assert consumption.latency_ms == 0.0
+    assert consumption.tokens == 0
+
+    budget = PerformanceBudget(limits=limits, consumption=consumption)
+    # Zero consumption with zero limit -> 100% headroom
+    assert budget.budget_headroom_pct()["latency"] == 100.0
+
+    # Any consumption with zero limit -> 0% headroom
+    budget.record_overhead(latency_ms=1.0)
+    assert budget.budget_headroom_pct()["latency"] == 0.0

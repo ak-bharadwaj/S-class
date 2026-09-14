@@ -49,18 +49,69 @@ class ControlPolicy:
 
     def is_intervention_allowed(self, intervention: str) -> bool:
         """Check if an intervention is permitted and not explicitly suppressed."""
-        target = intervention.strip().lower()
-        if any(s.lower() in target or target in s.lower() for s in self.suppressed_interventions):
+        if not intervention or not str(intervention).strip():
             return False
-        if any(a.lower() in target or target in a.lower() for a in self.allowed_interventions):
-            return True
-        # If not explicitly allowed, default to False to avoid invasive drift
+        if self.is_intervention_suppressed(intervention):
+            return False
+        target = str(intervention).strip().lower().replace("-", "_").replace(" ", "_")
+        for a in self.allowed_interventions:
+            norm_a = str(a).strip().lower().replace("-", "_").replace(" ", "_")
+            if target == norm_a or norm_a in target:
+                return True
+            if target in norm_a and len(target) >= 4:
+                return True
         return False
 
     def is_intervention_suppressed(self, intervention: str) -> bool:
         """Check if an intervention is actively suppressed to avoid platform interference."""
-        target = intervention.strip().lower()
-        return any(s.lower() in target or target in s.lower() for s in self.suppressed_interventions)
+        if not intervention or not str(intervention).strip():
+            return False
+        target = str(intervention).strip().lower().replace("-", "_").replace(" ", "_")
+        for s in self.suppressed_interventions:
+            norm_s = str(s).strip().lower().replace("-", "_").replace(" ", "_")
+            if target == norm_s or norm_s in target:
+                return True
+            # Only match if target contains specific qualifiers of the suppression rule
+            # e.g. "micro_checkpoints" in "constant_micro_checkpoints" matches,
+            # but generic "checkpoint" does NOT match qualified "constant_micro_checkpoints"
+            if target in norm_s:
+                target_words = set(target.split("_"))
+                supp_words = set(norm_s.split("_"))
+                qualifiers = {"micro", "constant", "huge", "redundant", "duplicate", "interactive", "verbose", "exhaustive"}
+                if (supp_words & qualifiers):
+                    if (target_words & qualifiers):
+                        return True
+                elif len(target) >= 5:
+                    return True
+        return False
+
+    def should_stay_out_of_way(self, action_or_area: str) -> bool:
+        """Evaluate if S-Class should deliberately stay out of the way of this action/area."""
+        if not action_or_area or not str(action_or_area).strip():
+            return False
+        if self.is_intervention_suppressed(action_or_area):
+            return True
+        target = str(action_or_area).strip().lower().replace("-", "_").replace(" ", "_")
+        return any(
+            target in str(p).lower().replace("-", "_").replace(" ", "_")
+            or str(p).lower().replace("-", "_").replace(" ", "_") in target
+            for p in self.preserved_capabilities
+        )
+
+    def should_intervene(self, action_or_area: str) -> bool:
+        """Evaluate if S-Class should actively intervene in this action/area."""
+        if not action_or_area or not str(action_or_area).strip():
+            return False
+        if self.is_intervention_suppressed(action_or_area):
+            return False
+        if self.is_intervention_allowed(action_or_area):
+            return True
+        target = str(action_or_area).strip().lower().replace("-", "_").replace(" ", "_")
+        return any(
+            target in str(c).lower().replace("-", "_").replace(" ", "_")
+            or str(c).lower().replace("-", "_").replace(" ", "_") in target
+            for c in self.active_compensations
+        )
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize ControlPolicy to dictionary."""
@@ -247,14 +298,22 @@ class PlatformOptimizationEngine:
 
         # Check Latency Headroom
         if headrooms["latency"] < 25.0:
-            rationale.append(f"Latency budget constrained ({headrooms['latency']}% headroom): downshifting observation mode.")
-            obs_mode = ObservationLevel.PASSIVE.value
-            suppressed.add("synchronous_ledger_wait")
+            if risk_level in ("critical", "high"):
+                rationale.append(f"Latency constrained ({headrooms['latency']}% headroom) but risk is {risk_level}: maintaining strict verification priority over latency.")
+            else:
+                rationale.append(f"Latency budget constrained ({headrooms['latency']}% headroom): downshifting observation mode.")
+                obs_mode = ObservationLevel.PASSIVE.value
+                suppressed.add("synchronous_ledger_wait")
 
         # Check Interruption Headroom
         if headrooms["interruptions"] <= 0.0:
-            rationale.append("Interruption budget depleted: strictly forbidding interactive prompts.")
-            int_policy = InterruptionPolicy.FATAL_ONLY.value
+            if risk_level in ("critical", "high"):
+                rationale.append(f"Interruption quota depleted during {risk_level} risk: enforcing fail-closed escalation without interactive prompts.")
+                int_policy = InterruptionPolicy.FATAL_ONLY.value
+                esc_policy = EscalationPolicy.FAIL_CLOSED.value
+            else:
+                rationale.append("Interruption budget depleted: strictly forbidding interactive prompts.")
+                int_policy = InterruptionPolicy.FATAL_ONLY.value
             suppressed.add("interactive_micro_prompts")
             suppressed.add("milestone_prompts")
 
@@ -293,8 +352,12 @@ class PlatformOptimizationEngine:
             suppressed.add("agent_blocking")
             rationale.append("Antigravity archetype applied: maximizing parallel intelligence with parallel integrity.")
 
-        # Ensure suppressed interventions take precedence
-        final_allowed = [a for a in sorted(allowed) if a not in suppressed]
+        # Ensure suppressed interventions take precedence EXCEPT mandatory security controls under elevated risk
+        if risk_level in ("critical", "high"):
+            mandatory_security = {"security_boundary_enforcement", "evidence_verification", "regression_detection"}
+            final_allowed = [a for a in sorted(allowed) if a not in suppressed or a in mandatory_security]
+        else:
+            final_allowed = [a for a in sorted(allowed) if a not in suppressed]
         final_suppressed = sorted(suppressed)
 
         return ControlPolicy(

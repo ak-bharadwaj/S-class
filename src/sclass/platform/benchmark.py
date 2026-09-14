@@ -34,7 +34,12 @@ from typing import Dict, Any, List, Optional, Tuple, Callable
 
 def calculate_distribution(samples_ms: List[float]) -> Dict[str, float]:
     """Calculates p50, p95, p99, mean, and stddev from a list of millisecond samples."""
-    if not samples_ms:
+    valid_samples = [
+        max(0.0, float(x))
+        for x in samples_ms
+        if x is not None and not math.isnan(x) and not math.isinf(x)
+    ]
+    if not valid_samples:
         return {
             "p50": 0.0,
             "p95": 0.0,
@@ -45,7 +50,7 @@ def calculate_distribution(samples_ms: List[float]) -> Dict[str, float]:
             "max": 0.0,
             "count": 0,
         }
-    sorted_s = sorted(samples_ms)
+    sorted_s = sorted(valid_samples)
     n = len(sorted_s)
     p50_idx = min(int(n * 0.50), n - 1)
     p95_idx = min(int(n * 0.95), n - 1)
@@ -81,6 +86,7 @@ class CIThresholds:
     min_net_utility_ratio: float = 1.0 # At least break-even in CI
     max_interruptions: int = 5
     max_token_overhead_pct: float = 30.0
+    max_context_overhead_pct: float = 50.0
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -93,6 +99,7 @@ class CIThresholds:
             "min_net_utility_ratio": self.min_net_utility_ratio,
             "max_interruptions": self.max_interruptions,
             "max_token_overhead_pct": self.max_token_overhead_pct,
+            "max_context_overhead_pct": self.max_context_overhead_pct,
         }
 
     @classmethod
@@ -107,6 +114,7 @@ class CIThresholds:
             min_net_utility_ratio=float(d.get("min_net_utility_ratio", 1.0)),
             max_interruptions=int(d.get("max_interruptions", 5)),
             max_token_overhead_pct=float(d.get("max_token_overhead_pct", 30.0)),
+            max_context_overhead_pct=float(d.get("max_context_overhead_pct", 50.0)),
         )
 
 
@@ -126,6 +134,7 @@ class ProductSLA:
     min_net_utility_ratio: float = 2.0 # S-Class must provide 2x value over overhead
     max_interruptions: int = 1
     max_token_overhead_pct: float = 10.0 # Strict token efficiency (<10% overhead)
+    max_context_overhead_pct: float = 20.0 # Strict context efficiency (<20% overhead)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -138,6 +147,7 @@ class ProductSLA:
             "min_net_utility_ratio": self.min_net_utility_ratio,
             "max_interruptions": self.max_interruptions,
             "max_token_overhead_pct": self.max_token_overhead_pct,
+            "max_context_overhead_pct": self.max_context_overhead_pct,
         }
 
     @classmethod
@@ -152,6 +162,7 @@ class ProductSLA:
             min_net_utility_ratio=float(d.get("min_net_utility_ratio", 2.0)),
             max_interruptions=int(d.get("max_interruptions", 1)),
             max_token_overhead_pct=float(d.get("max_token_overhead_pct", 10.0)),
+            max_context_overhead_pct=float(d.get("max_context_overhead_pct", 20.0)),
         )
 
 
@@ -255,6 +266,11 @@ class PlatformComparisonResult:
         tok_pct = (tok_diff / max(1, self.native_metrics.token_count)) * 100.0
         lines.append(f"| 5. Token Overhead | {self.native_metrics.token_count} tok | {self.sclass_metrics.token_count} tok | +{tok_diff} ({tok_pct:.1f}%) | {'EFFICIENT' if tok_pct < 15.0 else 'WARN'} |")
         
+        # 5b. Context Overhead
+        ctx_diff = self.sclass_metrics.context_bytes - self.native_metrics.context_bytes
+        ctx_pct = (ctx_diff / self.native_metrics.context_bytes) * 100.0 if self.native_metrics.context_bytes > 0 else 0.0
+        lines.append(f"| 5b. Context Overhead | {self.native_metrics.context_bytes} B | {self.sclass_metrics.context_bytes} B | +{ctx_diff} ({ctx_pct:.1f}%) | {'EFFICIENT' if ctx_pct < 20.0 else 'WARN'} |")
+        
         # 6. Interruptions
         int_diff = self.sclass_metrics.interruptions_count - self.native_metrics.interruptions_count
         lines.append(f"| 6. Interruptions | {self.native_metrics.interruptions_count} | {self.sclass_metrics.interruptions_count} | {int_diff:+d} | {'MINIMAL' if self.sclass_metrics.interruptions_count <= 1 else 'ELEVATED'} |")
@@ -346,17 +362,24 @@ class PlatformComparisonBenchmark:
             success_gain * 100.0 +
             verified_outputs * 5.0
         )
-        # Ensure non-zero floor for positive comparison
-        if reliability_score <= 0.0 and sclass_metrics.correctness_score >= 0.95:
-            reliability_score = 50.0
+        # Non-zero baseline ONLY if S-Class maintained or improved reliability across all core dimensions
+        if (
+            reliability_score <= 0.0
+            and sclass_metrics.correctness_score >= native_metrics.correctness_score
+            and sclass_metrics.regressions_count <= native_metrics.regressions_count
+            and sclass_metrics.task_success_rate >= native_metrics.task_success_rate
+        ):
+            reliability_score = 25.0
 
         # Compute S-Class overhead
         p50_latency = sclass_metrics.distribution.get("p50", 10.0)
         token_diff = max(0, sclass_metrics.token_count - native_metrics.token_count)
+        context_diff = max(0, sclass_metrics.context_bytes - native_metrics.context_bytes)
         interruptions = sclass_metrics.interruptions_count
         overhead_score = (
             p50_latency * 0.1 +
             token_diff * 0.01 +
+            context_diff * 0.0005 +
             interruptions * 20.0
         )
         if overhead_score <= 1e-6:
@@ -370,14 +393,27 @@ class PlatformComparisonBenchmark:
             ci_violations.append(f"p50 latency {p50_latency}ms > {self.ci_thresholds.max_p50_latency_ms}ms")
         if sclass_metrics.distribution.get("p95", 0.0) > self.ci_thresholds.max_p95_latency_ms:
             ci_violations.append(f"p95 latency {sclass_metrics.distribution.get('p95', 0.0)}ms > {self.ci_thresholds.max_p95_latency_ms}ms")
+        if sclass_metrics.distribution.get("p99", 0.0) > self.ci_thresholds.max_p99_latency_ms:
+            ci_violations.append(f"p99 latency {sclass_metrics.distribution.get('p99', 0.0)}ms > {self.ci_thresholds.max_p99_latency_ms}ms")
         if sclass_metrics.task_success_rate < self.ci_thresholds.min_task_success_rate:
             ci_violations.append(f"task success {sclass_metrics.task_success_rate} < {self.ci_thresholds.min_task_success_rate}")
+        if sclass_metrics.correctness_score < self.ci_thresholds.min_correctness_rate:
+            ci_violations.append(f"correctness {sclass_metrics.correctness_score} < {self.ci_thresholds.min_correctness_rate}")
         if sclass_metrics.regressions_count > self.ci_thresholds.max_regressions:
             ci_violations.append(f"regressions {sclass_metrics.regressions_count} > {self.ci_thresholds.max_regressions}")
         if net_ratio < self.ci_thresholds.min_net_utility_ratio:
             ci_violations.append(f"net utility ratio {net_ratio} < {self.ci_thresholds.min_net_utility_ratio}")
         if sclass_metrics.interruptions_count > self.ci_thresholds.max_interruptions:
             ci_violations.append(f"interruptions {sclass_metrics.interruptions_count} > {self.ci_thresholds.max_interruptions}")
+
+        token_overhead_pct = (token_diff / max(1, native_metrics.token_count)) * 100.0
+        if token_overhead_pct > self.ci_thresholds.max_token_overhead_pct:
+            ci_violations.append(f"token overhead {token_overhead_pct:.1f}% > {self.ci_thresholds.max_token_overhead_pct}%")
+
+        if native_metrics.context_bytes > 0:
+            context_overhead_pct = (context_diff / native_metrics.context_bytes) * 100.0
+            if context_overhead_pct > self.ci_thresholds.max_context_overhead_pct:
+                ci_violations.append(f"context overhead {context_overhead_pct:.1f}% > {self.ci_thresholds.max_context_overhead_pct}%")
 
         ci_passed = len(ci_violations) == 0
 
@@ -387,6 +423,8 @@ class PlatformComparisonBenchmark:
             sla_violations.append(f"p50 latency {p50_latency}ms > {self.product_sla.max_p50_latency_ms}ms")
         if sclass_metrics.distribution.get("p95", 0.0) > self.product_sla.max_p95_latency_ms:
             sla_violations.append(f"p95 latency {sclass_metrics.distribution.get('p95', 0.0)}ms > {self.product_sla.max_p95_latency_ms}ms")
+        if sclass_metrics.distribution.get("p99", 0.0) > self.product_sla.max_p99_latency_ms:
+            sla_violations.append(f"p99 latency {sclass_metrics.distribution.get('p99', 0.0)}ms > {self.product_sla.max_p99_latency_ms}ms")
         if sclass_metrics.task_success_rate < self.product_sla.min_task_success_rate:
             sla_violations.append(f"task success {sclass_metrics.task_success_rate} < {self.product_sla.min_task_success_rate}")
         if sclass_metrics.correctness_score < self.product_sla.min_correctness_rate:
@@ -398,14 +436,20 @@ class PlatformComparisonBenchmark:
         if sclass_metrics.interruptions_count > self.product_sla.max_interruptions:
             sla_violations.append(f"interruptions {sclass_metrics.interruptions_count} > {self.product_sla.max_interruptions}")
 
-        token_overhead_pct = (token_diff / max(1, native_metrics.token_count)) * 100.0
         if token_overhead_pct > self.product_sla.max_token_overhead_pct:
             sla_violations.append(f"token overhead {token_overhead_pct:.1f}% > {self.product_sla.max_token_overhead_pct}%")
 
+        if native_metrics.context_bytes > 0:
+            context_overhead_pct = (context_diff / native_metrics.context_bytes) * 100.0
+            if context_overhead_pct > self.product_sla.max_context_overhead_pct:
+                sla_violations.append(f"context overhead {context_overhead_pct:.1f}% > {self.product_sla.max_context_overhead_pct}%")
+
         sla_passed = len(sla_violations) == 0
 
-        # Core thesis is validated if S-Class improved reliability over native with net utility >= 1.0
+        # Core thesis is validated if S-Class improved or preserved reliability over native with net utility >= 1.0
+        # AND did not regress on task success
         thesis_proven = (
+            sclass_metrics.task_success_rate >= native_metrics.task_success_rate and
             sclass_metrics.correctness_score >= native_metrics.correctness_score and
             sclass_metrics.regressions_count <= native_metrics.regressions_count and
             net_ratio >= 1.0

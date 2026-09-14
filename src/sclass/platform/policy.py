@@ -76,31 +76,68 @@ class CompensationPolicy:
     escalation_policy: str = EscalationPolicy.FAIL_CLOSED.value
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        if self.context_budget < 0:
+            object.__setattr__(self, "context_budget", max(0, int(self.context_budget)))
+
     def should_preserve(self, capability_or_behavior: str) -> bool:
         """Check whether S-Class must preserve (not usurp/duplicate) a native behavior."""
-        target = capability_or_behavior.strip().lower()
-        return any(
-            target in p.lower() or p.lower() in target
-            for p in self.preserve
-        )
+        if not capability_or_behavior or not str(capability_or_behavior).strip():
+            return False
+        target = str(capability_or_behavior).strip().lower().replace("-", "_").replace(" ", "_")
+        for p in self.preserve:
+            norm_p = str(p).strip().lower().replace("-", "_").replace(" ", "_")
+            if target == norm_p or norm_p in target:
+                return True
+            if target in norm_p and len(target) >= 4:
+                return True
+        return False
 
     def should_compensate(self, risk_or_gap: str) -> bool:
         """Check whether S-Class must actively compensate for a weakness or risk."""
-        target = risk_or_gap.strip().lower()
-        return any(
-            target in c.lower() or c.lower() in target
-            for c in self.compensate
-        )
+        if not risk_or_gap or not str(risk_or_gap).strip():
+            return False
+        target = str(risk_or_gap).strip().lower().replace("-", "_").replace(" ", "_")
+        for c in self.compensate:
+            norm_c = str(c).strip().lower().replace("-", "_").replace(" ", "_")
+            if target == norm_c or norm_c in target:
+                return True
+            if target in norm_c and len(target) >= 4:
+                return True
+        return False
 
     def should_avoid(self, anti_pattern: str) -> bool:
         """Check whether S-Class must avoid a specific interference mode."""
-        target = anti_pattern.strip().lower()
-        return any(
-            target in a.lower() or a.lower() in target
-            for a in self.avoid_interference
-        )
+        if not anti_pattern or not str(anti_pattern).strip():
+            return False
+        target = str(anti_pattern).strip().lower().replace("-", "_").replace(" ", "_")
+        for a in self.avoid_interference:
+            norm_a = str(a).strip().lower().replace("-", "_").replace(" ", "_")
+            if target == norm_a or norm_a in target:
+                return True
+            if target in norm_a and len(target) >= 4:
+                return True
+        return False
 
-    def permits_interruption(self, reason: str = "general") -> bool:
+    def should_stay_out_of_way(self, action_or_area: str) -> bool:
+        """
+        Evaluate if S-Class should deliberately stay out of the way for an action or domain.
+        Returns True if the behavior should be preserved or the interference avoided.
+        """
+        if not action_or_area or not str(action_or_area).strip():
+            return False
+        return self.should_preserve(action_or_area) or self.should_avoid(action_or_area)
+
+    def should_intervene(self, action_or_area: str) -> bool:
+        """
+        Evaluate if S-Class should intervene in an action or domain.
+        Returns True if the gap or risk is explicitly earmarked for compensation.
+        """
+        if not action_or_area or not str(action_or_area).strip():
+            return False
+        return self.should_compensate(action_or_area)
+
+    def permits_interruption(self, reason: Optional[str] = "general") -> bool:
         """
         Evaluate if an interruption is permitted under current policy.
         """
@@ -109,14 +146,16 @@ class CompensationPolicy:
             return False
         if policy == InterruptionPolicy.ALWAYS.value:
             return True
-        reason_lower = reason.lower()
+        if not reason or not str(reason).strip():
+            return False
+        reason_lower = str(reason).lower()
         if policy == InterruptionPolicy.FATAL_ONLY.value:
-            return "fatal" in reason_lower or "crash" in reason_lower or "corruption" in reason_lower
+            return any(k in reason_lower for k in ("fatal", "crash", "corruption", "unrecoverable"))
         if policy == InterruptionPolicy.POLICY_VIOLATION_ONLY.value:
-            return "violation" in reason_lower or "unauthorized" in reason_lower or "breach" in reason_lower or "fatal" in reason_lower
+            return any(k in reason_lower for k in ("violation", "unauthorized", "breach", "fatal", "crash"))
         if policy == InterruptionPolicy.MILESTONE_PROMPT.value:
-            return "milestone" in reason_lower or "phase" in reason_lower or "handoff" in reason_lower
-        return True
+            return any(k in reason_lower for k in ("milestone", "phase", "handoff"))
+        return False
 
     def clone_with(self, **overrides) -> CompensationPolicy:
         """Create a modified copy of this policy."""

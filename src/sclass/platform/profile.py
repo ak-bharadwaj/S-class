@@ -97,13 +97,23 @@ class PlatformProfile:
     native_strengths: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        if not self.platform_id or not str(self.platform_id).strip():
+            raise ValueError("platform_id must be a non-empty string")
+        if not self.version or not str(self.version).strip():
+            raise ValueError("version must be a non-empty string")
+
     def has_capability(self, capability: str) -> bool:
         """Check if platform declares a specific capability."""
+        if not capability or not str(capability).strip():
+            return False
         cap_clean = capability.strip().lower()
         return any(c.strip().lower() == cap_clean for c in self.capabilities)
 
     def has_strength(self, strength: str) -> bool:
         """Check if platform has a specific declared native strength."""
+        if not strength or not str(strength).strip():
+            return False
         str_clean = strength.strip().lower()
         return any(s.strip().lower() == str_clean for s in self.native_strengths)
 

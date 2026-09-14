@@ -38,6 +38,15 @@ class OverheadConsumption:
     interruptions: int = 0
     compute_cpu_sec: float = 0.0
 
+    def __post_init__(self) -> None:
+        self.latency_ms = max(0.0, float(self.latency_ms))
+        self.tokens = max(0, int(self.tokens))
+        self.context_bytes = max(0, int(self.context_bytes))
+        self.tool_calls = max(0, int(self.tool_calls))
+        self.checkpoints = max(0, int(self.checkpoints))
+        self.interruptions = max(0, int(self.interruptions))
+        self.compute_cpu_sec = max(0.0, float(self.compute_cpu_sec))
+
     def add(
         self,
         latency_ms: float = 0.0,
@@ -91,6 +100,14 @@ class ReliabilityGain:
     state_conflicts_resolved: int = 0
     accuracy_gain: float = 0.0  # 0.0 to 1.0 (e.g., 0.15 = 15% improvement in accuracy)
 
+    def __post_init__(self) -> None:
+        self.regressions_prevented = max(0, int(self.regressions_prevented))
+        self.verification_passes = max(0, int(self.verification_passes))
+        self.security_violations_blocked = max(0, int(self.security_violations_blocked))
+        self.scope_drifts_corrected = max(0, int(self.scope_drifts_corrected))
+        self.state_conflicts_resolved = max(0, int(self.state_conflicts_resolved))
+        self.accuracy_gain = min(1.0, max(0.0, float(self.accuracy_gain)))
+
     def add(
         self,
         regressions_prevented: int = 0,
@@ -141,6 +158,24 @@ class BudgetLimits:
     max_interruptions: int = 2
     max_compute_cpu_sec: float = 5.0
     min_utility_ratio: float = 1.0
+
+    def __post_init__(self) -> None:
+        if self.max_latency_ms < 0.0:
+            object.__setattr__(self, "max_latency_ms", 0.0)
+        if self.max_tokens < 0:
+            object.__setattr__(self, "max_tokens", 0)
+        if self.max_context_bytes < 0:
+            object.__setattr__(self, "max_context_bytes", 0)
+        if self.max_tool_calls < 0:
+            object.__setattr__(self, "max_tool_calls", 0)
+        if self.max_checkpoints < 0:
+            object.__setattr__(self, "max_checkpoints", 0)
+        if self.max_interruptions < 0:
+            object.__setattr__(self, "max_interruptions", 0)
+        if self.max_compute_cpu_sec < 0.0:
+            object.__setattr__(self, "max_compute_cpu_sec", 0.0)
+        if self.min_utility_ratio < 0.0:
+            object.__setattr__(self, "min_utility_ratio", 0.0)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -311,13 +346,19 @@ class PerformanceBudget:
     def budget_headroom_pct(self) -> Dict[str, float]:
         """Calculates remaining percentage headroom for each dimension."""
         headroom: Dict[str, float] = {}
-        headroom["latency"] = max(0.0, 100.0 * (1.0 - (self.consumption.latency_ms / max(1.0, self.limits.max_latency_ms))))
-        headroom["tokens"] = max(0.0, 100.0 * (1.0 - (self.consumption.tokens / max(1, self.limits.max_tokens))))
-        headroom["context"] = max(0.0, 100.0 * (1.0 - (self.consumption.context_bytes / max(1, self.limits.max_context_bytes))))
-        headroom["tool_calls"] = max(0.0, 100.0 * (1.0 - (self.consumption.tool_calls / max(1, self.limits.max_tool_calls))))
-        headroom["checkpoints"] = max(0.0, 100.0 * (1.0 - (self.consumption.checkpoints / max(1, self.limits.max_checkpoints))))
-        headroom["interruptions"] = max(0.0, 100.0 * (1.0 - (self.consumption.interruptions / max(1, self.limits.max_interruptions))))
-        headroom["compute"] = max(0.0, 100.0 * (1.0 - (self.consumption.compute_cpu_sec / max(0.001, self.limits.max_compute_cpu_sec))))
+        for dim, cons, limit in [
+            ("latency", self.consumption.latency_ms, self.limits.max_latency_ms),
+            ("tokens", self.consumption.tokens, self.limits.max_tokens),
+            ("context", self.consumption.context_bytes, self.limits.max_context_bytes),
+            ("tool_calls", self.consumption.tool_calls, self.limits.max_tool_calls),
+            ("checkpoints", self.consumption.checkpoints, self.limits.max_checkpoints),
+            ("interruptions", self.consumption.interruptions, self.limits.max_interruptions),
+            ("compute", self.consumption.compute_cpu_sec, self.limits.max_compute_cpu_sec),
+        ]:
+            if limit <= 0:
+                headroom[dim] = 0.0 if cons > 0 else 100.0
+            else:
+                headroom[dim] = max(0.0, 100.0 * (1.0 - (cons / limit)))
         return {k: round(v, 1) for k, v in headroom.items()}
 
     def to_dict(self) -> Dict[str, Any]:
