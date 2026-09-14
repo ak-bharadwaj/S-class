@@ -187,7 +187,8 @@ class ACPAdapter:
     def normalize_message(self, raw_message: Dict[str, Any]) -> Tuple[Optional[AgentEvent], Optional[ActionRequest]]:
         """Backwards-compatible helper extracting event and action request."""
         method = raw_message.get("method", "")
-        params = raw_message.get("params", {})
+        raw_params = raw_message.get("params")
+        params: Dict[str, Any] = raw_params if isinstance(raw_params, dict) else {}
         msg_id = raw_message.get("id")
 
         if method in ("initialize", "init"):

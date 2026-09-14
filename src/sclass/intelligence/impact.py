@@ -72,6 +72,9 @@ class SymbolImpactEstimator:
         else:
             name_stem = ident
 
+        if not name_stem or not name_stem.strip():
+            return SymbolImpact(target=target_identifier)
+
         pattern = re.compile(r"\b" + re.escape(name_stem) + r"\b")
         impacted: List[str] = []
 
@@ -133,17 +136,38 @@ class ChangeImpactAnalyzer:
         self.ensure_index()
         graph = self.scip_engine.get_symbol_graph()
 
-        mut_files_norm = [f.replace("\\", "/") for f in mutated_files]
+        mut_files_norm: List[str] = []
+        for f in mutated_files:
+            norm_f = f.replace("\\", "/")
+            if os.path.isabs(f):
+                try:
+                    rel = os.path.relpath(f, self.workspace_root).replace("\\", "/")
+                    mut_files_norm.append(rel)
+                except Exception:
+                    mut_files_norm.append(norm_f)
+            else:
+                mut_files_norm.append(norm_f.lstrip("./"))
+
         mut_syms = list(mutated_symbols or [])
 
-        # Collect identifiers for blast radius calculation
+        # Collect identifiers for blast radius calculation (both relative and absolute)
         query_set: Set[str] = set(mut_files_norm)
+        for f in mutated_files:
+            query_set.add(f.replace("\\", "/"))
         query_set.update(mut_syms)
 
         blast = graph.compute_blast_radius(query_set)
 
         all_affected_files = set(blast["affected_files"])
         all_affected_files.update(mut_files_norm)
+        # Also ensure relative paths for all affected files
+        for af in list(all_affected_files):
+            if os.path.isabs(af):
+                try:
+                    rel = os.path.relpath(af, self.workspace_root).replace("\\", "/")
+                    all_affected_files.add(rel)
+                except Exception:
+                    pass
 
         all_affected_symbols = set(blast["affected_symbols"])
         all_affected_symbols.update(mut_syms)

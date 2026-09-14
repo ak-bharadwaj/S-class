@@ -308,8 +308,15 @@ class TreeSitterCodeParser:
                 return ""
             return code_bytes[node.start_byte:node.end_byte].decode("utf-8", errors="replace")
 
-        def visit(node, current_scope: Optional[str] = None):
+        def visit(node, current_scope: Optional[str] = None, outer_start_point: Optional[Any] = None):
             ntype = node.type
+
+            # Decorated Definitions
+            if ntype == "decorated_definition":
+                for c in node.children:
+                    if c.type in ("function_definition", "class_definition"):
+                        visit(c, current_scope=current_scope, outer_start_point=node.start_point)
+                return
 
             # Imports
             if ntype == "import_statement":
@@ -370,9 +377,9 @@ class TreeSitterCodeParser:
             elif ntype == "class_definition":
                 name_node = node.child_by_field_name("name")
                 class_name = get_text(name_node) if name_node else "AnonymousClass"
-                start_l = node.start_point.row + 1
+                start_l = (outer_start_point.row + 1) if outer_start_point else (node.start_point.row + 1)
                 end_l = node.end_point.row + 1
-                start_c = node.start_point.column
+                start_c = outer_start_point.column if outer_start_point else node.start_point.column
                 end_c = node.end_point.column
 
                 symbols.append(
@@ -422,9 +429,9 @@ class TreeSitterCodeParser:
                 ret_type = get_text(ret_node) if ret_node else None
 
                 kind = "method" if current_scope else "function"
-                start_l = node.start_point.row + 1
+                start_l = (outer_start_point.row + 1) if outer_start_point else (node.start_point.row + 1)
                 end_l = node.end_point.row + 1
-                start_c = node.start_point.column
+                start_c = outer_start_point.column if outer_start_point else node.start_point.column
                 end_c = node.end_point.column
 
                 sig_prefix = "async def" if is_async else "def"
@@ -522,6 +529,12 @@ class TreeSitterCodeParser:
                                             names.append(n_str)
                                             if a:
                                                 alias_map[n_str] = get_text(a)
+                            elif sub.type == "namespace_import":
+                                for ch in sub.children:
+                                    if ch.type == "identifier":
+                                        n_str = get_text(ch)
+                                        names.append(n_str)
+                                        alias_map["*"] = n_str
                             elif sub.type == "identifier":
                                 names.append(get_text(sub))
                 imports.append(
@@ -535,7 +548,7 @@ class TreeSitterCodeParser:
                     )
                 )
 
-            # TypeScript Interface & Type Alias
+            # TypeScript Interface & Type Alias & Enum
             elif is_ts and ntype == "interface_declaration":
                 name_node = node.child_by_field_name("name")
                 if_name = get_text(name_node) if name_node else "AnonymousInterface"
@@ -566,6 +579,23 @@ class TreeSitterCodeParser:
                         start_col=node.start_point.column,
                         end_col=node.end_point.column,
                         signature=f"type {type_name}",
+                        parent_scope=current_scope,
+                    )
+                )
+
+            elif is_ts and ntype == "enum_declaration":
+                name_node = node.child_by_field_name("name")
+                enum_name = get_text(name_node) if name_node else "AnonymousEnum"
+                symbols.append(
+                    ParsedSymbol(
+                        name=enum_name,
+                        kind="enum",
+                        file_path=file_path,
+                        start_line=node.start_point.row + 1,
+                        end_line=node.end_point.row + 1,
+                        start_col=node.start_point.column,
+                        end_col=node.end_point.column,
+                        signature=f"enum {enum_name}",
                         parent_scope=current_scope,
                     )
                 )
@@ -660,6 +690,30 @@ class TreeSitterCodeParser:
                             start_col=node.start_point.column,
                             end_col=node.end_point.column,
                             signature=f"const {fn_name} = {'async ' if is_async else ''}() => ...",
+                            parent_scope=current_scope,
+                            is_async=is_async,
+                        )
+                    )
+                    visit(val_node, current_scope=fn_name)
+                    return
+
+            # Class property arrow functions: foo = () => ...
+            elif ntype in ("public_field_definition", "field_definition", "property_definition"):
+                val_node = node.child_by_field_name("value")
+                if val_node and val_node.type in ("arrow_function", "function_expression"):
+                    name_node = node.child_by_field_name("name") or node.child_by_field_name("property")
+                    fn_name = get_text(name_node) if name_node else "anonymous_field"
+                    is_async = any(c.type == "async" for c in val_node.children)
+                    symbols.append(
+                        ParsedSymbol(
+                            name=fn_name,
+                            kind="method",
+                            file_path=file_path,
+                            start_line=node.start_point.row + 1,
+                            end_line=node.end_point.row + 1,
+                            start_col=node.start_point.column,
+                            end_col=node.end_point.column,
+                            signature=f"{'async ' if is_async else ''}{fn_name} = () => ...",
                             parent_scope=current_scope,
                             is_async=is_async,
                         )

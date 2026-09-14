@@ -41,9 +41,13 @@ class ACPProxy:
         If is_intercepted is True, caller MUST return response_dict to sender and abort forwarding.
         If is_intercepted is False, caller forwards the message.
         """
+        if not isinstance(msg, dict):
+            return False, None
+
         method = msg.get("method", "")
         msg_id = msg.get("id")
-        params = msg.get("params", {})
+        raw_params = msg.get("params")
+        params: Dict[str, Any] = raw_params if isinstance(raw_params, dict) else {}
         session_id = params.get("session_id", "default_session")
 
         # 1. Emit lifecycle / prompt / cancel events
@@ -148,7 +152,11 @@ class ACPProxy:
         except Exception:
             return False, None
 
-        intercepted, resp_dict = self.intercept_message(msg)
-        if intercepted and resp_dict:
-            return True, json.dumps(resp_dict)
-        return False, None
+        try:
+            intercepted, resp_dict = self.intercept_message(msg)
+            if intercepted and resp_dict:
+                return True, json.dumps(resp_dict)
+            return False, None
+        except Exception as exc:
+            logger.warning(f"Error intercepting message: {exc}")
+            return False, None

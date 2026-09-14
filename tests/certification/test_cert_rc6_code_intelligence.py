@@ -429,3 +429,65 @@ def test_rc6_authorization_risk_and_test_selection(workspace):
     # Test selection identifies test_security_config.py
     tests = engine.select_tests_for_changes(["security_config.py"])
     assert any("test_security_config.py" in t for t in tests)
+
+
+def test_rc6_absolute_path_and_import_blast_radius(workspace):
+    """Certifies blast radius calculation with absolute paths and import-only dependencies."""
+    f_a = os.path.join(workspace, "service_a.py")
+    with open(f_a, "w", encoding="utf-8") as f:
+        f.write("def compute_val(): return 42\n")
+
+    f_b = os.path.join(workspace, "service_b.py")
+    with open(f_b, "w", encoding="utf-8") as f:
+        f.write("from service_a import compute_val\n")
+
+    analyzer = ChangeImpactAnalyzer(workspace)
+    # Query with absolute path
+    res = analyzer.analyze_changes([f_a])
+    assert any("service_a.py" in f for f in res.affected_files)
+    assert any("service_b.py" in f for f in res.affected_files)
+
+
+def test_rc6_ts_namespace_import_and_enums(workspace):
+    """Certifies TS namespace import, enum, and arrow field method extraction."""
+    parser = TreeSitterCodeParser()
+    ts_code = """
+import * as Utils from './utils';
+export enum TaskPriority { LOW, HIGH }
+export class Worker {
+    execute = async () => { return true; };
+}
+"""
+    f_ts = os.path.join(workspace, "worker.ts")
+    with open(f_ts, "w", encoding="utf-8") as f:
+        f.write(ts_code)
+
+    parsed = parser.parse_file(f_ts)
+    assert any(i.module == "./utils" and "Utils" in i.imported_names for i in parsed.imports)
+    assert any(s.name == "TaskPriority" and s.kind == "enum" for s in parsed.symbols)
+    assert any(s.name == "execute" and s.kind == "method" and s.is_async for s in parsed.symbols)
+
+
+def test_rc6_python_decorator_span_tracking(workspace):
+    """Certifies that Python decorated class and function definitions track decorator span."""
+    parser = TreeSitterCodeParser()
+    py_code = """# line 1
+@decorator_one
+@decorator_two
+class SecureManager:
+    @property
+    def key(self):
+        return "secret"
+"""
+    f_py = os.path.join(workspace, "secure.py")
+    with open(f_py, "w", encoding="utf-8") as f:
+        f.write(py_code)
+
+    parsed = parser.parse_file(f_py)
+    sym_map = {s.name: s for s in parsed.symbols}
+    assert "SecureManager" in sym_map
+    # Starts on line 2 (the first decorator)
+    assert sym_map["SecureManager"].start_line == 2
+    assert "key" in sym_map
+    # Starts on line 5 (the @property decorator)
+    assert sym_map["key"].start_line == 5

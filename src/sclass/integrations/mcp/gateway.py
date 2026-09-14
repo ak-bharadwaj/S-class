@@ -65,13 +65,14 @@ class MCPGateway:
         Returns conformant JSON-RPC result or error.
         """
         cid = call_id or str(uuid.uuid4())
+        args = arguments if isinstance(arguments, dict) else {}
 
         # Emit incoming tool call event
         self.gateway.emit_mcp(
             event_type="mcp.tools_call",
             session_id=str(task_id or cid),
             agent_id=agent_id,
-            payload={"tool": tool_name, "arguments": arguments, "call_id": cid},
+            payload={"tool": tool_name, "arguments": args, "call_id": cid},
         )
 
         # 0. Header-based policy check (MCP 2026-07-28)
@@ -107,7 +108,7 @@ class MCPGateway:
         # 3. Lookup tool schema and compute schema hash
         tool_def = self.tool_registry.get_tool(self.server_id, tool_name)
         schema_hash = tool_def.schema_hash if tool_def else "unknown_schema"
-        args_hash = compute_hash(arguments)
+        args_hash = compute_hash(args)
 
         # 4. Construct authoritative MCPToolCall identity (MCPNormalizer)
         mcp_call = MCPToolCall(
@@ -119,7 +120,7 @@ class MCPGateway:
             authorization_context=auth_context.to_dict() if auth_context else {},
             task_id=task_id,
             agent_id=agent_id,
-            parameters=arguments,
+            parameters=args,
             call_id=cid,
         )
 
@@ -132,7 +133,7 @@ class MCPGateway:
                 event_type="mcp.action_denied",
                 session_id=str(task_id or cid),
                 agent_id=agent_id,
-                payload={"decision": decision.to_dict(), "tool": tool_name, "arguments": arguments},
+                payload={"decision": decision.to_dict(), "tool": tool_name, "arguments": args},
             )
             return MCPProtocolTransport.build_authorization_denied(
                 cid,
@@ -144,7 +145,7 @@ class MCPGateway:
             event_type="mcp.action_authorized",
             session_id=str(task_id or cid),
             agent_id=agent_id,
-            payload={"decision": decision.to_dict(), "tool": tool_name, "arguments": arguments},
+            payload={"decision": decision.to_dict(), "tool": tool_name, "arguments": args},
         )
 
         # 6. Execute through executor or native execution (MCP Execution / Result)

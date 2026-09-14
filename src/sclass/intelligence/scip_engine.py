@@ -194,11 +194,39 @@ class SCIPEngine:
                     parsed.file_path = rel_path
                     parsed_files.append(parsed)
 
-        # 1. Register all definitions as SymbolNodes
+        # Build map of module stems to file rel_paths for import resolution
+        stem_to_files: Dict[str, List[str]] = {}
         for pf in parsed_files:
             rel = pf.file_path
+            stem = os.path.splitext(os.path.basename(rel))[0]
+            if stem not in stem_to_files:
+                stem_to_files[stem] = []
+            stem_to_files[stem].append(rel)
+            rel_no_ext = os.path.splitext(rel)[0]
+            if rel_no_ext not in stem_to_files:
+                stem_to_files[rel_no_ext] = []
+            stem_to_files[rel_no_ext].append(rel)
+
+        # 1. Register all files and definitions as SymbolNodes
+        for pf in parsed_files:
+            rel = pf.file_path
+            file_sym_id = f"sclass://{rel}"
+            file_node = SymbolNode(
+                id=file_sym_id,
+                name=os.path.basename(rel),
+                kind="file",
+                file_path=rel,
+                start_line=1,
+                end_line=1,
+            )
+            self._symbol_graph.add_node(file_node)
+
             for sym in pf.symbols:
-                sym_id = f"sclass://{rel}#{sym.name}"
+                if sym.parent_scope:
+                    sym_id = f"sclass://{rel}#{sym.parent_scope}.{sym.name}"
+                else:
+                    sym_id = f"sclass://{rel}#{sym.name}"
+
                 occ = SCIPOccurrence(
                     symbol=sym_id,
                     file_path=rel,
@@ -208,6 +236,8 @@ class SCIPEngine:
                 )
                 self._definitions[sym.name] = occ
                 self._definitions[sym_id] = occ
+                if sym.parent_scope:
+                    self._definitions[f"{sym.parent_scope}.{sym.name}"] = occ
 
                 node = SymbolNode(
                     id=sym_id,
@@ -217,7 +247,7 @@ class SCIPEngine:
                     start_line=sym.start_line,
                     end_line=sym.end_line,
                     signature=sym.signature,
-                    parent_id=f"sclass://{rel}#{sym.parent_scope}" if sym.parent_scope else None,
+                    parent_id=f"sclass://{rel}#{sym.parent_scope}" if sym.parent_scope else file_sym_id,
                 )
                 self._symbol_graph.add_node(node)
 
@@ -227,20 +257,32 @@ class SCIPEngine:
                     self._symbol_graph.add_edge(
                         SymbolEdge(source=parent_id, target=sym_id, kind="contains")
                     )
+                else:
+                    self._symbol_graph.add_edge(
+                        SymbolEdge(source=file_sym_id, target=sym_id, kind="contains")
+                    )
 
         # 2. Register imports as dependency edges
         for pf in parsed_files:
             rel = pf.file_path
+            file_sym_id = f"sclass://{rel}"
             for imp in pf.imports:
                 for name in imp.imported_names:
-                    # Find if imported symbol is defined in workspace
                     target_occ = self._definitions.get(name)
                     if target_occ:
-                        # Add edge: this file imports target symbol
-                        file_sym_id = f"sclass://{rel}"
                         self._symbol_graph.add_edge(
                             SymbolEdge(source=file_sym_id, target=target_occ.symbol, kind="imports")
                         )
+                # Link module-level imports (e.g. `import a` or `from a import ...` or `import * as A from './a'`)
+                if imp.module:
+                    clean_mod = imp.module.lstrip("./").replace("\\", "/")
+                    mod_stem = os.path.splitext(os.path.basename(clean_mod))[0]
+                    target_files = stem_to_files.get(clean_mod) or stem_to_files.get(mod_stem) or []
+                    for tf in target_files:
+                        if tf != rel:
+                            self._symbol_graph.add_edge(
+                                SymbolEdge(source=file_sym_id, target=f"sclass://{tf}", kind="imports")
+                            )
 
         # 3. Register call sites as 'calls' edges
         for pf in parsed_files:
@@ -249,7 +291,7 @@ class SCIPEngine:
                 caller_sym_name = call.caller_scope
                 callee_name = call.callee.split(".")[-1] if "." in call.callee else call.callee
 
-                target_occ = self._definitions.get(callee_name)
+                target_occ = self._definitions.get(call.callee) or self._definitions.get(callee_name)
                 target_id = target_occ.symbol if target_occ else f"external://{callee_name}"
 
                 source_id = f"sclass://{rel}#{caller_sym_name}" if caller_sym_name else f"sclass://{rel}"

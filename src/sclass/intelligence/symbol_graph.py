@@ -107,11 +107,14 @@ class SymbolGraph:
         """Adds a directed relationship between two symbols."""
         if edge.source not in self._forward_edges:
             self._forward_edges[edge.source] = []
-        self._forward_edges[edge.source].append(edge)
+        # Prevent identical duplicate edges
+        if not any(e.target == edge.target and e.kind == edge.kind for e in self._forward_edges[edge.source]):
+            self._forward_edges[edge.source].append(edge)
 
         if edge.target not in self._backward_edges:
             self._backward_edges[edge.target] = []
-        self._backward_edges[edge.target].append(edge)
+        if not any(e.source == edge.source and e.kind == edge.kind for e in self._backward_edges[edge.target]):
+            self._backward_edges[edge.target].append(edge)
 
     def get_node(self, symbol_id: str) -> Optional[SymbolNode]:
         return self._nodes.get(symbol_id)
@@ -122,7 +125,11 @@ class SymbolGraph:
 
     def find_nodes_by_file(self, file_path: str) -> List[SymbolNode]:
         norm_file = file_path.replace("\\", "/")
-        ids = self._file_to_symbols.get(norm_file, set())
+        ids = set(self._file_to_symbols.get(norm_file, set()))
+        if not ids:
+            for fk, f_ids in self._file_to_symbols.items():
+                if norm_file.endswith("/" + fk) or fk.endswith("/" + norm_file) or norm_file == fk:
+                    ids.update(f_ids)
         return [self._nodes[i] for i in ids if i in self._nodes]
 
     def all_nodes(self) -> List[SymbolNode]:
@@ -192,15 +199,30 @@ class SymbolGraph:
 
         for ident in mutated_identifiers:
             norm_ident = ident.replace("\\", "/")
-            # Check if identifier is an exact symbol ID
+
+            # 1. Check if identifier is an exact symbol or node ID
             if norm_ident in self._nodes:
                 root_symbol_ids.add(norm_ident)
-            # Check if identifier is a file path
-            elif norm_ident in self._file_to_symbols:
-                root_symbol_ids.update(self._file_to_symbols[norm_ident])
-            # Check by symbol name
-            elif ident in self._name_to_symbols:
+
+            # 2. Check if identifier matches a file path or URI
+            file_candidates = [norm_ident]
+            if norm_ident.startswith("sclass://"):
+                uri_path = norm_ident[len("sclass://"):].split("#")[0]
+                file_candidates.append(uri_path)
+
+            for fc in file_candidates:
+                if fc in self._file_to_symbols:
+                    root_symbol_ids.update(self._file_to_symbols[fc])
+                for indexed_file, sym_ids in self._file_to_symbols.items():
+                    if fc.endswith("/" + indexed_file) or fc == indexed_file or indexed_file.endswith("/" + fc):
+                        root_symbol_ids.update(sym_ids)
+
+            # 3. Check by symbol name (both full ident and bare name)
+            if ident in self._name_to_symbols:
                 root_symbol_ids.update(self._name_to_symbols[ident])
+            clean_name = ident.split("#")[-1].split("/")[-1]
+            if clean_name in self._name_to_symbols:
+                root_symbol_ids.update(self._name_to_symbols[clean_name])
 
         affected_symbols: Set[str] = set(root_symbol_ids)
         for sym_id in root_symbol_ids:
@@ -211,7 +233,12 @@ class SymbolGraph:
         for sym_id in affected_symbols:
             node = self._nodes.get(sym_id)
             if node:
-                affected_files.add(node.file_path.replace("\\", "/"))
+                if node.file_path:
+                    affected_files.add(node.file_path.replace("\\", "/"))
+            elif sym_id.startswith("sclass://"):
+                raw_path = sym_id[len("sclass://"):].split("#")[0]
+                if raw_path:
+                    affected_files.add(raw_path.replace("\\", "/"))
 
         return {
             "root_symbols": sorted(list(root_symbol_ids)),

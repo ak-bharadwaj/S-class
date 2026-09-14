@@ -317,3 +317,30 @@ def test_rc7_observation_plane_fanout_and_audit_trail(workspace, gateway):
     assert "acp.initialize" in event_sequence
     assert "acp.tool_call" in event_sequence
     assert "acp.shutdown" in event_sequence
+
+
+def test_rc7_acp_null_params_resilience(workspace, gateway):
+    """Certifies ACPProxy and message processor resilience against null/non-dict params."""
+    proxy = ACPProxy(workspace_dir=workspace, gateway=gateway)
+
+    # 1. Null params in initialize
+    intercepted, resp = proxy.intercept_message({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": None})
+    assert intercepted is False
+    assert resp is None
+
+    # 2. Raw JSON-RPC line with null params
+    raw = '{"jsonrpc": "2.0", "id": 2, "method": "initialize", "params": null}'
+    intercepted_raw, resp_raw = proxy.process_incoming_message(raw)
+    assert intercepted_raw is False
+
+    # 3. List params (valid JSON-RPC, non-dict)
+    raw_list = '{"jsonrpc": "2.0", "id": 3, "method": "initialize", "params": ["arg"]}'
+    intercepted_list, resp_list = proxy.process_incoming_message(raw_list)
+    assert intercepted_list is False
+
+
+def test_rc7_mcp_none_arguments_resilience(workspace, gateway):
+    """Certifies MCPGateway resilience when tool call arguments are None or missing."""
+    mcp = MCPGateway(workspace_dir=workspace, gateway=gateway)
+    res = mcp.handle_call_tool(tool_name="view_file", arguments=None)
+    assert "result" in res or "error" in res
