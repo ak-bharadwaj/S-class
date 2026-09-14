@@ -5,6 +5,7 @@ Provides empirical, working-hypothesis archetypes for:
 - OpenAI Codex: "Let Codex run. Make the result more trustworthy."
 - Anthropic Claude Code: "Let Claude spend intelligence on reasoning; S-Class handles control bookkeeping."
 - Google Antigravity: "Let Antigravity maximize parallel intelligence; S-Class maximizes parallel integrity."
+- Anysphere Cursor: "Preserve fluid IDE speed; verify multi-file diffs silently."
 """
 
 from __future__ import annotations
@@ -21,11 +22,16 @@ from sclass.platform.archetypes.antigravity import (
     get_antigravity_profile,
     get_antigravity_compensation_policy,
 )
+from sclass.platform.archetypes.cursor import (
+    get_cursor_profile,
+    get_cursor_compensation_policy,
+)
 
 _ARCHETYPE_REGISTRY: Dict[str, Tuple[Callable[[], PlatformProfile], Callable[[], CompensationPolicy]]] = {
     "codex": (get_codex_profile, get_codex_compensation_policy),
     "claude_code": (get_claude_code_profile, get_claude_code_compensation_policy),
     "antigravity": (get_antigravity_profile, get_antigravity_compensation_policy),
+    "cursor": (get_cursor_profile, get_cursor_compensation_policy),
 }
 
 
@@ -89,6 +95,8 @@ __all__ = [
     "get_claude_code_compensation_policy",
     "get_antigravity_profile",
     "get_antigravity_compensation_policy",
+    "get_cursor_profile",
+    "get_cursor_compensation_policy",
     "get_archetype",
     "get_archetype_profile",
     "get_archetype_policy",

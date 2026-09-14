@@ -386,3 +386,131 @@ class PerformanceBudget:
         consumption = OverheadConsumption.from_dict(d.get("consumption", {}))
         reliability_gain = ReliabilityGain.from_dict(d.get("reliability_gain", {}))
         return cls(limits=limits, consumption=consumption, reliability_gain=reliability_gain)
+
+
+@dataclass(frozen=True)
+class VerificationBudgetLimits:
+    """Resource limits for independent verification operations."""
+    max_tokens: int = 50000
+    max_latency_ms: float = 30000.0
+    max_compute_cpu_sec: float = 30.0
+    max_cost_usd: float = 2.0
+    degradation_threshold_pct: float = 15.0
+
+
+class VerificationBudgetController:
+    """
+    RC.11: Verification Budget Controller.
+    Tracks real token, latency, compute, and cost expenditure during verification.
+    When headroom drops below degradation threshold, triggers graceful degradation
+    (reduces verification tier instead of throwing unhandled exceptions or failing tasks).
+    """
+
+    def __init__(self, limits: Optional[VerificationBudgetLimits] = None):
+        self.limits = limits or VerificationBudgetLimits()
+        self.tokens_consumed: int = 0
+        self.latency_ms_consumed: float = 0.0
+        self.compute_cpu_sec_consumed: float = 0.0
+        self.cost_usd_consumed: float = 0.0
+        self.verifications_run: int = 0
+        self.degradations_triggered: int = 0
+
+    def record_verification(
+        self,
+        duration_ms: float = 0.0,
+        tokens: int = 0,
+        compute_cpu_sec: float = 0.0,
+        cost_usd: float = 0.0,
+    ) -> None:
+        """Record resources consumed by a verification run."""
+        self.tokens_consumed += max(0, int(tokens))
+        self.latency_ms_consumed += max(0.0, float(duration_ms))
+        self.compute_cpu_sec_consumed += max(0.0, float(compute_cpu_sec))
+        self.cost_usd_consumed += max(0.0, float(cost_usd))
+        self.verifications_run += 1
+
+    def check_headroom(self) -> Dict[str, float]:
+        """Calculates percentage headroom remaining across resource dimensions."""
+        dims = {
+            "tokens": (self.tokens_consumed, self.limits.max_tokens),
+            "latency": (self.latency_ms_consumed, self.limits.max_latency_ms),
+            "compute": (self.compute_cpu_sec_consumed, self.limits.max_compute_cpu_sec),
+            "cost": (self.cost_usd_consumed, self.limits.max_cost_usd),
+        }
+        res: Dict[str, float] = {}
+        for k, (cons, lim) in dims.items():
+            if lim <= 0:
+                res[k] = 0.0 if cons > 0 else 100.0
+            else:
+                pct = max(0.0, 100.0 * (1.0 - (cons / lim)))
+                res[k] = round(pct, 1)
+        return res
+
+    def is_budget_exhausted(self) -> bool:
+        """True if any dimension has 0% headroom remaining."""
+        headroom = self.check_headroom()
+        return any(v <= 0.0 for v in headroom.values())
+
+    def should_degrade(self) -> bool:
+        """True if any dimension is below the degradation headroom threshold."""
+        headroom = self.check_headroom()
+        return any(v <= self.limits.degradation_threshold_pct for v in headroom.values())
+
+    def recommended_verification_tier(
+        self,
+        requested_tier: str = "standard",
+        risk_level: str = "medium",
+    ) -> str:
+        """
+        Calculates recommended verification tier based on budget state and risk.
+        Graceful degradation rules:
+        - Critical risk: cannot drop below 'standard' (L3/L8 security invariant).
+        - High risk: drops from 'thorough'/'epistemic' to 'standard'.
+        - Medium risk: drops from 'thorough' -> 'standard' -> 'minimal'.
+        - Low risk: drops to 'minimal'.
+        """
+        if not self.should_degrade():
+            return requested_tier
+
+        self.degradations_triggered += 1
+        req = requested_tier.lower()
+        risk = risk_level.lower()
+
+        if risk in ("critical", "high"):
+            if req in ("epistemic", "thorough"):
+                return "standard"
+            return req
+
+        if risk == "medium":
+            if req in ("epistemic", "thorough"):
+                return "standard"
+            if req == "standard":
+                return "minimal"
+            return "minimal"
+
+        # low risk
+        return "minimal"
+
+    def get_metrics(self) -> Dict[str, Any]:
+        """Returns verification budget operational metrics."""
+        return {
+            "tokens_consumed": self.tokens_consumed,
+            "latency_ms_consumed": round(self.latency_ms_consumed, 2),
+            "compute_cpu_sec_consumed": round(self.compute_cpu_sec_consumed, 3),
+            "cost_usd_consumed": round(self.cost_usd_consumed, 4),
+            "verifications_run": self.verifications_run,
+            "degradations_triggered": self.degradations_triggered,
+            "is_exhausted": self.is_budget_exhausted(),
+            "should_degrade": self.should_degrade(),
+            "headroom_pct": self.check_headroom(),
+        }
+
+    def reset(self) -> None:
+        """Resets consumption counters for a new execution horizon."""
+        self.tokens_consumed = 0
+        self.latency_ms_consumed = 0.0
+        self.compute_cpu_sec_consumed = 0.0
+        self.cost_usd_consumed = 0.0
+        self.verifications_run = 0
+        self.degradations_triggered = 0
+

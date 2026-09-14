@@ -23,8 +23,17 @@ from sclass.platform.policy import (
     CheckpointLevel,
     InterruptionPolicy,
     EscalationPolicy,
+    InterventionDecision,
+    InterventionResult,
+    InterventionPolicy,
 )
-from sclass.platform.budget import PerformanceBudget, BudgetLimits, OverheadConsumption, ReliabilityGain
+from sclass.platform.budget import (
+    PerformanceBudget,
+    BudgetLimits,
+    OverheadConsumption,
+    ReliabilityGain,
+    VerificationBudgetController,
+)
 from sclass.platform.archetypes import get_archetype
 
 
@@ -194,6 +203,8 @@ class PlatformOptimizationEngine:
         state: Optional[Dict[str, Any]] = None,
         budget: Optional[PerformanceBudget] = None,
         compensation_policy: Optional[CompensationPolicy] = None,
+        code_intel_signals: Optional[Dict[str, Any]] = None,
+        budget_controller: Optional[VerificationBudgetController] = None,
     ) -> ControlPolicy:
         """
         Reconcile platform profile, task demands, risk posture, current state,
@@ -290,6 +301,24 @@ class PlatformOptimizationEngine:
             suppressed.add("mutation_testing")
             suppressed.add("synchronous_barrier")
 
+        # 4b. Analyze Code Intelligence Signals (AST Blast Radius, Transitive Impact)
+        if code_intel_signals:
+            blast_radius = int(code_intel_signals.get("blast_radius", 0))
+            critical_path = bool(code_intel_signals.get("critical_path", False))
+            if blast_radius >= 5 or critical_path:
+                rationale.append(
+                    f"Code intelligence signal (blast_radius={blast_radius}, critical_path={critical_path}): "
+                    f"elevating verification gate to thorough and activating blast radius containment."
+                )
+                verif_gate = VerificationLevel.THOROUGH.value
+                allowed.add("blast_radius_containment")
+                allowed.add("transitive_impact_analysis")
+                active_comps.add("blast_radius_containment")
+            elif blast_radius > 0:
+                rationale.append(f"Code intelligence signal (blast_radius={blast_radius}): activating transitive impact analysis.")
+                allowed.add("transitive_impact_analysis")
+                active_comps.add("blast_radius_containment")
+
         # 5. Analyze State
         if state:
             subagents = int(state.get("subagents_count", state.get("subagent_count", 0)))
@@ -347,6 +376,16 @@ class PlatformOptimizationEngine:
             suppressed.add("exhaustive_lint_checks")
             suppressed.add("mutation_testing")
 
+        # 6b. Verification Budget Controller Dynamic Degradation
+        if budget_controller is not None:
+            if budget_controller.should_degrade():
+                orig_gate = verif_gate
+                verif_gate = budget_controller.recommended_verification_tier(verif_gate, risk_level)
+                rationale.append(
+                    f"Verification budget degradation triggered ({budget_controller.check_headroom()}): "
+                    f"gracefully downshifting verification tier from {orig_gate} to {verif_gate}."
+                )
+
         # 7. Archetype-Specific Enhancements
         pid = profile.platform_id.lower()
         if pid == "codex":
@@ -375,6 +414,14 @@ class PlatformOptimizationEngine:
             suppressed.add("agent_blocking")
             rationale.append("Antigravity archetype applied: maximizing parallel intelligence with parallel integrity.")
 
+        elif pid == "cursor":
+            allowed.add("multi_file_diff_verification")
+            allowed.add("import_validation")
+            allowed.add("syntax_integrity")
+            suppressed.add("blocking_keystroke_checks")
+            suppressed.add("interactive_micro_prompts")
+            rationale.append("Cursor archetype applied: preserving fluid in-line editing while verifying multi-file diffs silently.")
+
         # Ensure suppressed interventions take precedence EXCEPT mandatory security controls under elevated risk
         if risk_level in ("critical", "high"):
             mandatory_security = {"security_boundary_enforcement", "evidence_verification", "regression_detection"}
@@ -398,3 +445,50 @@ class PlatformOptimizationEngine:
             budget=active_budget,
             rationale=rationale,
         )
+
+    @classmethod
+    def evaluate_intervention(
+        cls,
+        platform_id: str,
+        action: str,
+        risk: Optional[Union[Dict[str, Any], str, float]] = None,
+        code_intel_signals: Optional[Dict[str, Any]] = None,
+        budget_controller: Optional[VerificationBudgetController] = None,
+        consecutive_failures: int = 0,
+        policy_violation: bool = False,
+    ) -> InterventionResult:
+        """
+        Evaluate intervention decision for a specific platform action using InterventionPolicy.
+        """
+        risk_score = 0.0
+        if isinstance(risk, (int, float)):
+            risk_score = float(risk)
+        elif isinstance(risk, str):
+            mapping = {"low": 0.1, "medium": 0.4, "high": 0.7, "critical": 0.95}
+            risk_score = mapping.get(risk.lower(), 0.3)
+        elif isinstance(risk, dict):
+            raw = risk.get("score", risk.get("level", 0.0))
+            if isinstance(raw, (int, float)):
+                risk_score = float(raw)
+            elif isinstance(raw, str):
+                mapping = {"low": 0.1, "medium": 0.4, "high": 0.7, "critical": 0.95}
+                risk_score = mapping.get(raw.lower(), 0.3)
+
+        blast_radius = 0
+        if code_intel_signals:
+            blast_radius = int(code_intel_signals.get("blast_radius", 0))
+
+        is_exhausted = False
+        if budget_controller:
+            is_exhausted = budget_controller.is_budget_exhausted()
+
+        policy = InterventionPolicy(platform_id)
+        return policy.evaluate(
+            action=action,
+            risk_score=risk_score,
+            blast_radius=blast_radius,
+            is_budget_exhausted=is_exhausted,
+            consecutive_failures=consecutive_failures,
+            policy_violation=policy_violation,
+        )
+

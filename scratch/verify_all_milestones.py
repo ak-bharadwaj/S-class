@@ -17,8 +17,18 @@ Executes and audits all 18 architectural, product, and reality milestones in seq
 14. Milestone 14: Milestone B.11 Universal Truth Layer & State (tests/certification/test_cert_b11_verified_project_state.py)
 15. Milestone 15: Milestone B.12 Cross-Platform Continuity (tests/certification/test_cert_b12_cross_platform_continuity.py)
 16. Milestone 16: Milestone B.15 Multi-Agent Fleet Integrity (tests/certification/test_cert_b15_agent_fleet_integrity.py)
-17. Milestone 17: Milestone RC.1 External Codex & Benchmark (tests/certification/test_cert_rc1_codex_benchmark.py)
-18. Milestone 18: Milestone RC.2 Execution Provider Closure & Sandboxing (tests/certification/test_cert_rc2_execution_providers.py)
+ 17. Milestone 17: Milestone RC.1 External Codex & Benchmark (tests/certification/test_cert_rc1_codex_benchmark.py)
+ 18. Milestone 18: Milestone RC.2 Execution Provider Closure & Sandboxing (tests/certification/test_cert_rc2_execution_providers.py)
+ 19. Milestone 19: Milestone RC.3 Independent Observation Plane (tests/certification/test_cert_rc3_observation.py)
+ 20. Milestone 20: Milestone RC.4 Executable Verification Engine (tests/certification/test_cert_rc4_verification_engine.py)
+ 21. Milestone 21: Milestone RC.5 Universal Project Truth & Invalidation (tests/certification/test_cert_rc5_project_truth.py)
+ 22. Milestone 22: Milestone RC.6 Tree-sitter Code Intelligence & SCIP (tests/certification/test_cert_rc6_code_intelligence.py)
+ 23. Milestone 23: Milestone RC.7 ACP Proxy & MCP Protocol Gateway (tests/certification/test_cert_rc7_protocol_gateway.py)
+ 24. Milestone 24: Milestone RC.8 Handoff & Continuity Engine (tests/certification/test_cert_rc8_handoff_continuity.py)
+ 25. Milestone 25: Milestone RC.9 Fleet Task Graph & Production Engine (tests/certification/test_cert_rc9_fleet_production.py)
+ 26. Milestone 26: Milestone RC.10 Memory Provider Abstraction & Mem0 (tests/certification/test_cert_rc10_memory.py)
+ 27. Milestone 27: Milestone RC.11 Platform Profile Engine & Compensation Budget (tests/certification/test_cert_rc11_platform_engine.py)
+ 28. Milestone 28: Milestone RC.12 Silent Governance Mode & Universal Adapters (tests/certification/test_cert_rc12_silent_governance.py)
 """
 
 import sys
@@ -54,6 +64,9 @@ MILESTONES: List[Tuple[str, str, str]] = [
     ("M23_PROTOCOL_GATEWAY", "RC.7 ACP Proxy & MCP Protocol Gateway", "tests/certification/test_cert_rc7_protocol_gateway.py"),
     ("M24_HANDOFF_CONTINUITY", "RC.8 Handoff & Continuity Engine", "tests/certification/test_cert_rc8_handoff_continuity.py"),
     ("M25_FLEET_PRODUCTION", "RC.9 Fleet Task Graph & Production Engine", "tests/certification/test_cert_rc9_fleet_production.py"),
+    ("M26_MEMORY_PROVIDER", "RC.10 Memory Provider Abstraction & Mem0", "tests/certification/test_cert_rc10_memory.py"),
+    ("M27_PLATFORM_ENGINE", "RC.11 Platform Profile Engine & Compensation Budget", "tests/certification/test_cert_rc11_platform_engine.py"),
+    ("M28_SILENT_GOVERNANCE", "RC.12 Silent Governance Mode & Universal Adapters", "tests/certification/test_cert_rc12_silent_governance.py"),
 ]
 
 

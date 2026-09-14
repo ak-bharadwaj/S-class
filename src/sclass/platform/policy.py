@@ -1,9 +1,11 @@
 """
-S-Class Compensation Policy (B.3.2)
+S-Class Compensation Policy (B.3.2) & Intervention Policy (RC.11)
 
 Defines what S-Class should PRESERVE, COMPENSATE for, and AVOID INTERFERING with.
 The core architectural primitive:
 Where should S-Class intervene, and where should it deliberately stay out of the way?
+Formalizes InterventionDecision: when to intervene, when to stay silent, when to verify,
+when to terminate, and when to escalate across platforms (Codex, Claude, Antigravity, Cursor).
 """
 
 from __future__ import annotations
@@ -55,6 +57,38 @@ class EscalationPolicy(str, Enum):
     QUARANTINE_SUBAGENT = "quarantine_subagent"# Isolate offending subagent, allow others to continue
     COMPENSATING_ACTION = "compensating_action"# Run automated rollback or fix
     WARN_AND_AUDIT = "warn_and_audit"# Emit warning to ledger and continue
+
+
+class InterventionDecision(str, Enum):
+    """Core intervention decisions made by S-Class."""
+    INTERVENE = "intervene"          # Take active compensating action or enforce boundary
+    STAY_SILENT = "stay_silent"      # Transparent observation, no user or agent interruption
+    VERIFY = "verify"                # Trigger independent verification check before proceeding
+    TERMINATE = "terminate"          # Terminate dangerous action or task execution immediately
+    ESCALATE = "escalate"            # Elevate to human operator or quarantine subagent
+
+
+@dataclass(frozen=True)
+class InterventionResult:
+    """The synthesized decision outcome of an intervention evaluation."""
+    decision: str  # InterventionDecision value
+    action: str
+    reason: str
+    recommended_tier: str = VerificationLevel.STANDARD.value
+    escalate: bool = False
+    suppress_notification: bool = False
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "decision": self.decision,
+            "action": self.action,
+            "reason": self.reason,
+            "recommended_tier": self.recommended_tier,
+            "escalate": self.escalate,
+            "suppress_notification": self.suppress_notification,
+            "metadata": dict(self.metadata),
+        }
 
 
 @dataclass(frozen=True)
@@ -138,9 +172,7 @@ class CompensationPolicy:
         return self.should_compensate(action_or_area)
 
     def permits_interruption(self, reason: Optional[str] = "general") -> bool:
-        """
-        Evaluate if an interruption is permitted under current policy.
-        """
+        """Evaluate if an interruption is permitted under current policy."""
         policy = self.interruption_policy.lower()
         if policy == InterruptionPolicy.NEVER.value:
             return False
@@ -179,12 +211,10 @@ class CompensationPolicy:
         }
 
     def to_json(self, indent: int = 2) -> str:
-        """Serialize compensation policy to JSON formatted string."""
         return json.dumps(self.to_dict(), indent=indent, sort_keys=True)
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> CompensationPolicy:
-        """Construct CompensationPolicy from dictionary."""
         return cls(
             preserve=list(d.get("preserve", [])),
             compensate=list(d.get("compensate", [])),
@@ -200,5 +230,144 @@ class CompensationPolicy:
 
     @classmethod
     def from_json(cls, s: str) -> CompensationPolicy:
-        """Construct CompensationPolicy from JSON string."""
         return cls.from_dict(json.loads(s))
+
+
+class InterventionPolicy:
+    """
+    Formal S-Class Intervention Policy Engine.
+    Determines: when to intervene, when to stay silent, when to verify,
+    when to terminate, and when to escalate.
+    Tailored per platform archetype (Codex, Claude Code, Antigravity, Cursor).
+    """
+
+    def __init__(self, platform_id: str = "generic"):
+        self.platform_id = platform_id.strip().lower()
+
+    def evaluate(
+        self,
+        action: str,
+        risk_score: float = 0.0,
+        blast_radius: int = 0,
+        is_budget_exhausted: bool = False,
+        consecutive_failures: int = 0,
+        policy_violation: bool = False,
+    ) -> InterventionResult:
+        """
+        Synthesize concrete intervention decision.
+        """
+        norm_action = str(action).strip().lower()
+
+        # 1. Critical Policy Violation / Invariant Failure -> Fail Closed or Terminate
+        if policy_violation or (risk_score >= 0.9 and consecutive_failures >= 2):
+            return InterventionResult(
+                decision=InterventionDecision.TERMINATE.value,
+                action=action,
+                reason="Critical security invariant violation or repeated high-risk failure: terminating execution.",
+                recommended_tier=VerificationLevel.EPISTEMIC.value,
+                escalate=True,
+            )
+
+        # 2. Budget Exhausted under elevated risk -> Escalate to human
+        if is_budget_exhausted and risk_score >= 0.5:
+            return InterventionResult(
+                decision=InterventionDecision.ESCALATE.value,
+                action=action,
+                reason="Verification budget exhausted under elevated risk: escalating to human operator (L8 fail-closed).",
+                recommended_tier=VerificationLevel.STANDARD.value,
+                escalate=True,
+            )
+
+        # 3. High Blast Radius from Code Intelligence -> Verification Barrier
+        if blast_radius >= 5 or risk_score >= 0.7:
+            tier = VerificationLevel.THOROUGH.value if not is_budget_exhausted else VerificationLevel.STANDARD.value
+            return InterventionResult(
+                decision=InterventionDecision.VERIFY.value,
+                action=action,
+                reason=f"Substantial code blast radius ({blast_radius} symbols) or elevated risk ({risk_score:.2f}): gating on independent verification.",
+                recommended_tier=tier,
+                escalate=False,
+            )
+
+        # 4. Platform-Specific Interventions & Preservations
+        if self.platform_id == "codex":
+            # Codex: Let Codex run autonomously; intervene only on regressions/claims
+            if any(k in norm_action for k in ["claim", "finish", "test_report", "benchmark"]):
+                return InterventionResult(
+                    decision=InterventionDecision.VERIFY.value,
+                    action=action,
+                    reason="Codex claim / milestone completion: independently verifying project truth.",
+                    recommended_tier=VerificationLevel.STANDARD.value,
+                )
+            if risk_score < 0.4 and blast_radius < 3:
+                return InterventionResult(
+                    decision=InterventionDecision.STAY_SILENT.value,
+                    action=action,
+                    reason="Codex autonomous operation within safe boundaries: staying silent.",
+                    suppress_notification=True,
+                )
+
+        elif self.platform_id == "claude_code":
+            # Claude: Assist reasoning by intervening for execution bookkeeping
+            if any(k in norm_action for k in ["checkpoint", "state", "ledger", "bookkeeping"]):
+                return InterventionResult(
+                    decision=InterventionDecision.INTERVENE.value,
+                    action=action,
+                    reason="Claude Code reasoning session: managing execution state bookkeeping.",
+                )
+            if risk_score < 0.4:
+                return InterventionResult(
+                    decision=InterventionDecision.STAY_SILENT.value,
+                    action=action,
+                    reason="Claude Code reasoning within budget: staying silent.",
+                    suppress_notification=True,
+                )
+
+        elif self.platform_id == "antigravity":
+            # Antigravity: Intervene on cross-agent conflicts and symbol lease contention
+            if any(k in norm_action for k in ["lease", "conflict", "invalidation", "multi_agent"]):
+                return InterventionResult(
+                    decision=InterventionDecision.INTERVENE.value,
+                    action=action,
+                    reason="Antigravity multi-agent lease / conflict detected: actively coordinating parallel integrity.",
+                )
+            if risk_score < 0.3:
+                return InterventionResult(
+                    decision=InterventionDecision.STAY_SILENT.value,
+                    action=action,
+                    reason="Independent parallel agent turn: staying silent.",
+                    suppress_notification=True,
+                )
+
+        elif self.platform_id == "cursor":
+            # Cursor: Preserve fast fluid in-line editing; intervene on multi-file mutations
+            if any(k in norm_action for k in ["inline_edit", "completion", "typing", "quick_diff"]):
+                return InterventionResult(
+                    decision=InterventionDecision.STAY_SILENT.value,
+                    action=action,
+                    reason="Cursor in-line editor typing flow: preserving fluid responsiveness without blocking.",
+                    suppress_notification=True,
+                )
+            if blast_radius >= 2 or any(k in norm_action for k in ["composer_apply", "multi_file_write"]):
+                return InterventionResult(
+                    decision=InterventionDecision.VERIFY.value,
+                    action=action,
+                    reason="Cursor composer multi-file application: verifying diff integrity and syntax.",
+                    recommended_tier=VerificationLevel.STANDARD.value,
+                )
+
+        # 5. Default baseline rules
+        if risk_score >= 0.4 or blast_radius > 0:
+            return InterventionResult(
+                decision=InterventionDecision.VERIFY.value,
+                action=action,
+                reason=f"Standard verification triggered for mutating action (risk={risk_score:.2f}).",
+                recommended_tier=VerificationLevel.STANDARD.value,
+            )
+
+        return InterventionResult(
+            decision=InterventionDecision.STAY_SILENT.value,
+            action=action,
+            reason="Low-risk routine operation within performance budget: staying silent.",
+            suppress_notification=True,
+        )

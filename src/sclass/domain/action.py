@@ -178,6 +178,10 @@ class AuthorizationDecision:
     integrity_token: str = ""
 
     @property
+    def allow(self) -> bool:
+        return self.is_allowed
+
+    @property
     def is_allowed(self) -> bool:
         return self.outcome in (DecisionOutcome.ALLOW, DecisionOutcome.WARN)
 
