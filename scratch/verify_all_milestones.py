@@ -67,6 +67,9 @@ MILESTONES: List[Tuple[str, str, str]] = [
     ("M26_MEMORY_PROVIDER", "RC.10 Memory Provider Abstraction & Mem0", "tests/certification/test_cert_rc10_memory.py"),
     ("M27_PLATFORM_ENGINE", "RC.11 Platform Profile Engine & Compensation Budget", "tests/certification/test_cert_rc11_platform_engine.py"),
     ("M28_SILENT_GOVERNANCE", "RC.12 Silent Governance Mode & Universal Adapters", "tests/certification/test_cert_rc12_silent_governance.py"),
+    ("M29_CLI_UX", "RC.13 CLI Completion & Explain/Audit UX", "tests/certification/test_cert_rc13_cli_ux.py"),
+    ("M30_POLICY_PRODUCT", "RC.14 OPA/Cedar Policy Product & Bundles", "tests/certification/test_cert_rc14_policy_product.py"),
+    ("M31_SUPPLY_CHAIN", "RC.15 Supply-Chain Evidence & Provenance", "tests/certification/test_cert_rc15_supply_chain.py"),
 ]
 
 

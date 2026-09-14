@@ -52,6 +52,7 @@ class OPAProvider(PolicyProvider):
         server_process: Optional[OPAServerProcess] = None,
         allow_fallback: bool = False,
         fallback_engine: Optional[Any] = None,
+        bundle: Optional[Any] = None,
     ):
         self._server_process = server_process
         base = endpoint_url or (server_process.url if server_process else None) or os.environ.get("SCLASS_OPA_URL", "http://localhost:8181")
@@ -63,6 +64,9 @@ class OPAProvider(PolicyProvider):
         self.allow_fallback = allow_fallback
         self.fallback_engine = fallback_engine
         self._cached_provider_version: Optional[str] = None
+        self.bundle = None
+        if bundle:
+            self.load_bundle(bundle)
 
     @property
     def provider_name(self) -> str:
@@ -400,3 +404,107 @@ class OPAProvider(PolicyProvider):
                 reason=f"UNKNOWN POLICY STATE: OPA service evaluation error ({ex}). Fail-closed policy denies execution.",
                 metadata={"error": str(ex)},
             )
+
+    def load_bundle(self, bundle: Any) -> None:
+        """Loads and activates a policy bundle, updating policy version and daemon rules."""
+        from sclass.policy.bundles import PolicyBundleManager, PolicyBundle
+        mgr = PolicyBundleManager()
+        if isinstance(bundle, str):
+            if os.path.isdir(bundle):
+                loaded = mgr.load_from_directory(bundle)
+            elif os.path.isfile(bundle) and bundle.endswith((".tar.gz", ".tgz", ".tar")):
+                loaded = mgr.load_from_archive(bundle)
+            elif os.path.isfile(bundle) and bundle.endswith(".json"):
+                with open(bundle, "r", encoding="utf-8") as f:
+                    loaded = mgr.load_from_dict(json.load(f))
+            else:
+                loaded = mgr.load_from_directory(bundle)
+        elif isinstance(bundle, PolicyBundle):
+            loaded = bundle
+        else:
+            raise TypeError(f"Invalid bundle type: {type(bundle)}")
+
+        self.bundle = loaded
+        self.policy_version = loaded.version
+        # Upload rego policies from bundle to endpoint if available
+        for p_name, p_src in loaded.policies.items():
+            if p_name.endswith(".rego"):
+                clean_id = p_name.replace("/", "_").replace("\\", "_").replace(".", "_")
+                try:
+                    self.upload_policy(policy_id=clean_id, rego_code=p_src)
+                except Exception:
+                    pass
+
+    def explain_decision(
+        self,
+        request: ActionRequest,
+        decision: Optional[AuthorizationDecision] = None,
+    ) -> Dict[str, Any]:
+        """
+        Explainability engine answering: 'Why was this request permitted or denied?'
+        Inspects request attributes, boundaries, dangerous commands, and policy violations.
+        """
+        dec = decision or self.evaluate(request)
+        violating_rules = []
+        denial_reasons = []
+        remediation = None
+
+        is_allowed = getattr(dec, "is_allowed", dec.outcome == DecisionOutcome.ALLOW)
+        if not is_allowed:
+            # 1. Capability check
+            if not request.capability:
+                violating_rules.append("sclass.authz.require_capability")
+                denial_reasons.append("Request missing mandatory capability declaration.")
+                remediation = "Specify explicit capability (e.g. 'terminal.execute', 'filesystem.write')."
+
+            # 2. Workspace boundary check
+            if request.target and request.workspace:
+                norm_ws = os.path.abspath(request.workspace)
+                norm_target = os.path.abspath(request.target) if os.path.isabs(request.target) else os.path.abspath(os.path.join(norm_ws, request.target))
+                try:
+                    if os.path.commonpath([norm_ws, norm_target]) != norm_ws:
+                        violating_rules.append("sclass.authz.workspace_boundary_containment")
+                        denial_reasons.append(f"Target path '{request.target}' escapes workspace boundary '{request.workspace}'.")
+                        remediation = "Confine file and directory operations within project workspace."
+                except (ValueError, OSError):
+                    pass
+
+            # 3. Dangerous command execution check
+            if request.capability == "terminal.execute":
+                cmd_str = str(request.target or (request.parameters.get("command", "") if hasattr(request, "parameters") else ""))
+                dangerous_tokens = ["rm -rf /", ":(){ :|:& };:", "mkfs", "dd if=/dev/zero", "chmod -R 777 /"]
+                for tok in dangerous_tokens:
+                    if tok in cmd_str:
+                        violating_rules.append("sclass.authz.deny_destructive_commands")
+                        denial_reasons.append(f"Command contains destructive shell pattern '{tok}'.")
+                        remediation = "Remove destructive parameters or execute in isolated disposable container."
+
+            # 4. Untrusted actor check
+            if request.actor and any(bad in request.actor.lower() for bad in ("rogue", "malicious", "unauthorized")):
+                violating_rules.append("sclass.authz.actor_quarantine")
+                denial_reasons.append(f"Actor identity '{request.actor}' is blacklisted or unverified.")
+                remediation = "Re-authenticate using verified platform adapter credentials."
+
+            # 5. Generic fallback reason
+            if not denial_reasons:
+                violating_rules.append(dec.policy_id)
+                denial_reasons.append(dec.reason)
+                remediation = "Review active policy rules in sclass/authz bundle."
+
+        return {
+            "allowed": is_allowed,
+            "outcome": dec.outcome.value if hasattr(dec.outcome, "value") else str(dec.outcome),
+            "policy_id": dec.policy_id,
+            "policy_version": self.policy_version,
+            "risk_level": dec.risk_level,
+            "primary_reason": dec.reason,
+            "violating_rules": violating_rules,
+            "denial_reasons": denial_reasons,
+            "remediation": remediation,
+            "evaluated_request": {
+                "actor": request.actor,
+                "capability": request.capability,
+                "action": request.action,
+                "target": request.target,
+            },
+        }

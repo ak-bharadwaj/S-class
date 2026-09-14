@@ -57,6 +57,27 @@ mcp = [
     "mcp>=1.0.0",
     "fastapi>=0.100.0",
 ]
+cedar = [
+    "cedarpy>=3.0.0",
+]
+supply-chain = [
+    "sigstore>=3.0.0",
+    "schemathesis>=3.25.0",
+]
+all = [
+    "tree-sitter>=0.21.0",
+    "tree-sitter-python>=0.21.0",
+    "tree-sitter-javascript>=0.21.0",
+    "tree-sitter-typescript>=0.21.0",
+    "mcp>=1.0.0",
+    "fastapi>=0.100.0",
+    "cedarpy>=3.0.0",
+    "sigstore>=3.0.0",
+    "schemathesis>=3.25.0",
+    "pytest>=8.0.0",
+    "hypothesis>=6.90.0",
+    "pytest-cov>=4.1.0",
+]
 
 [project.scripts]
 sclass = "sclass.cli.main:main"
