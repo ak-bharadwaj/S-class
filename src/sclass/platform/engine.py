@@ -98,6 +98,28 @@ class ControlPolicy:
             for p in self.preserved_capabilities
         )
 
+    def should_preserve(self, capability: str) -> bool:
+        """Check if capability is in preserved capabilities."""
+        if not capability or not str(capability).strip():
+            return False
+        target = str(capability).strip().lower().replace("-", "_").replace(" ", "_")
+        return any(
+            target in str(p).lower().replace("-", "_").replace(" ", "_")
+            or str(p).lower().replace("-", "_").replace(" ", "_") in target
+            for p in self.preserved_capabilities
+        )
+
+    def should_compensate(self, compensation: str) -> bool:
+        """Check if compensation is in active compensations."""
+        if not compensation or not str(compensation).strip():
+            return False
+        target = str(compensation).strip().lower().replace("-", "_").replace(" ", "_")
+        return any(
+            target in str(c).lower().replace("-", "_").replace(" ", "_")
+            or str(c).lower().replace("-", "_").replace(" ", "_") in target
+            for c in self.active_compensations
+        )
+
     def should_intervene(self, action_or_area: str) -> bool:
         """Evaluate if S-Class should actively intervene in this action/area."""
         if not action_or_area or not str(action_or_area).strip():
@@ -163,8 +185,9 @@ class PlatformOptimizationEngine:
     def __init__(self):
         pass
 
+    @classmethod
     def reconcile(
-        self,
+        cls,
         profile: PlatformProfile,
         task: Optional[Any] = None,
         risk: Optional[Union[Dict[str, Any], str, float]] = None,

@@ -53,6 +53,12 @@ from sclass.platform.benchmark import (
     ProductSLA,
     calculate_distribution,
 )
+from sclass.platform.detector import (
+    PlatformDetector,
+    DetectedPlatform,
+    detect_platform,
+)
+from sclass.platform.framework import PlatformProfilingFramework
 
 __all__ = [
     # Profile
@@ -88,6 +94,11 @@ __all__ = [
     # Engine
     "PlatformOptimizationEngine",
     "ControlPolicy",
+    # Detection & Profiling
+    "PlatformDetector",
+    "DetectedPlatform",
+    "detect_platform",
+    "PlatformProfilingFramework",
     # Benchmark
     "PlatformComparisonBenchmark",
     "PlatformComparisonResult",

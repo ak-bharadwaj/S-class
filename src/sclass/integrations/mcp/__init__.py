@@ -24,6 +24,11 @@ from sclass.integrations.mcp.tasks import (
 )
 from sclass.integrations.mcp.client import MCPClient
 from sclass.integrations.mcp.server import MCPServer
+from sclass.integrations.mcp.official import (
+    SClassMCPServer,
+    create_sclass_mcp_server,
+    open_in_memory_session,
+)
 
 __all__ = [
     "MCPToolPolicy",
@@ -47,4 +52,7 @@ __all__ = [
     "MCPTaskStatus",
     "MCPClient",
     "MCPServer",
+    "SClassMCPServer",
+    "create_sclass_mcp_server",
+    "open_in_memory_session",
 ]

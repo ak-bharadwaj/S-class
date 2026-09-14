@@ -116,6 +116,12 @@ class Capability:
 
         # Workspace containment check if scope is workspace
         if self.scope == "workspace" and workspace_dir:
+            # For terminal and process execution capabilities with universal wildcard resource,
+            # the command is executed in the workspace directory (cwd); the executable binary
+            # itself (e.g. python, git, /usr/bin/env, or sys.executable) resides in system or environment paths.
+            if self.operation in (CAP_TERMINAL_EXECUTE, CAP_PROCESS_SPAWN) and norm_res in ("*", "**"):
+                return True
+
             ws_norm = os.path.abspath(workspace_dir).replace("\\", "/").rstrip("/")
             if os.path.isabs(raw_clean):
                 abs_target = os.path.abspath(raw_clean).replace("\\", "/")
@@ -268,8 +274,9 @@ class CapabilityEvaluator:
         if not capability.allows_resource(req_target, ws):
             failed.append(f"resource_mismatch: target '{req_target}' violates resource constraint '{capability.resource}' or workspace boundary")
 
-        # Check path traversal if workspace scope
-        if capability.scope == "workspace" and ws and req_target:
+        # Check path traversal if workspace scope (for filesystem / path resources)
+        is_exec_op = req_op in (CAP_TERMINAL_EXECUTE, CAP_PROCESS_SPAWN)
+        if capability.scope == "workspace" and ws and req_target and not (is_exec_op and capability.resource in ("*", "**")):
             try:
                 ws_abs = os.path.abspath(ws).replace("\\", "/").rstrip("/")
                 if os.path.isabs(req_target):

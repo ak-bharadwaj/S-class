@@ -170,6 +170,10 @@ class LocalLedger:
                     entries.append(json.loads(line.strip()))
         return entries
 
+    def read_all(self) -> List[Dict[str, Any]]:
+        """Alias for read_all_entries for backward compatibility."""
+        return self.read_all_entries()
+
     def verify_integrity(self) -> Tuple[bool, Optional[str]]:
         """Verifies the entire cryptographic hash chain of the ledger."""
         entries = self.read_all_entries()

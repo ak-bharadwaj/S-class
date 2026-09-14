@@ -68,8 +68,8 @@ class DefaultPolicyEngine:
     def evaluate(self, request: ActionRequest, workspace_dir: str, mode: str = "enforce") -> AuthorizationDecision:
         ws = os.path.abspath(workspace_dir or request.workspace or os.getcwd())
 
-        # 1. Protected resource analysis on target path
-        if request.target:
+        # 1. Protected resource analysis on target path (for filesystem actions)
+        if request.target and request.action not in ("shell.execute", "execute", "run_command"):
             r_kind, boundary = classify_resource(request.target, ws)
             if r_kind == ResourceKind.SECRET:
                 return AuthorizationDecision(
