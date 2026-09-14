@@ -33,6 +33,8 @@ from sclass.verification.engine import verify_claim
 
 class AdapterStatus(str, Enum):
     """Honest verification tiers for agent platform integrations."""
+    NOT_DETECTED = "NOT_DETECTED"# No platform signals found
+    CONFIGURED = "CONFIGURED"    # Config markers, workspace directories, or env vars detected
     SUPPORTED = "SUPPORTED"      # Adapter implementation exists
     INSTALLED = "INSTALLED"      # Client/agent binary detected on system
     CONNECTED = "CONNECTED"      # Protocol transport handshake succeeded

@@ -9,7 +9,10 @@ cryptographically recorded, and verified against real evidence.
 from __future__ import annotations
 from typing import Optional, Dict, Any
 
-__version__ = "0.1.0"
+from sclass.metadata import VERSION, get_release_metadata
+
+__version__ = VERSION
+
 
 from sclass.domain.project import Project, ProjectBoundary
 from sclass.domain.task import Task, TaskState, TaskPriority

@@ -168,70 +168,114 @@ class SigstoreProvider:
 
         if not health.available:
             return ProvenanceReceipt(
-                receipt_id=f"sig_unknown_{digest[:12]}",
-                status="UNKNOWN",
+                receipt_id=f"sig_unavailable_{digest[:12]}",
+                status="REAL_SIGSTORE_UNAVAILABLE",
                 is_verified=False,
                 digest=digest,
                 identity=identity or "unspecified",
                 tool_version="unavailable",
-                error="Sigstore unavailable. Provenance is UNKNOWN/UNVERIFIED (Law L5).",
-                provenance={"provider": "sigstore", "status": "UNAVAILABLE"},
+                error="Sigstore unavailable. Provenance is UNVERIFIED (Law L5).",
+                provenance={"provider": "sigstore", "status": "REAL_SIGSTORE_UNAVAILABLE"},
             )
 
-        # Python SDK signing
+        # Python SDK signing via official sigstore
         if self._has_python_sigstore:
             try:
-                # In offline/mock test environments, invoke real library interface
-                return ProvenanceReceipt(
-                    receipt_id=f"sig_python_{digest[:12]}",
-                    status="SUCCESS",
-                    is_verified=True,
-                    digest=digest,
-                    signature=f"sig_{hashlib.sha256((digest + (identity or '')).encode()).hexdigest()[:32]}",
-                    certificate="simulated_fulcio_cert",
-                    identity=identity or "sclass@identity.local",
-                    bundle_json=json.dumps({"digest": digest, "signer": identity or "sclass"}),
-                    tool_version=health.version,
-                    provenance={"provider": "sigstore-python", "mode": "native"},
-                )
+                import sigstore
+                from sigstore.oidc import Issuer
+                from sigstore.sign import SigningContext
+
+                # Real keyless signing requires OIDC identity token
+                issuer = Issuer.production()
+                oidc_token = issuer.identity_token()
+                ctx = SigningContext.production()
+                with ctx.signer(oidc_token) as signer:
+                    bundle = signer.sign_artifact(raw_bytes)
+                    bundle_json = bundle.to_json()
+                    return ProvenanceReceipt(
+                        receipt_id=f"sig_real_{digest[:12]}",
+                        status="REAL_SIGSTORE_SUCCESS",
+                        is_verified=True,
+                        digest=digest,
+                        signature=bundle_json,
+                        bundle_json=bundle_json,
+                        identity=identity or "sigstore-signer",
+                        tool_version=health.version,
+                        provenance={"provider": "sigstore-python", "mode": "native"},
+                    )
             except Exception as ex:
                 return ProvenanceReceipt(
                     receipt_id=f"sig_err_{digest[:12]}",
-                    status="ERROR",
+                    status="REAL_SIGSTORE_ERROR",
                     is_verified=False,
                     digest=digest,
-                    error=str(ex),
+                    error=f"Real Sigstore signing error: {ex}",
+                    provenance={"provider": "sigstore-python", "status": "REAL_SIGSTORE_ERROR"},
                 )
 
-        # CLI fallback
-        if self.cli_path:
+        # CLI execution via cosign
+        if self.cli_path and shutil.which(self.cli_path):
+            import tempfile
+            temp_in = None
+            temp_sig = None
             try:
-                # cosign keyless or mock signature
-                return ProvenanceReceipt(
-                    receipt_id=f"sig_cli_{digest[:12]}",
-                    status="SUCCESS",
-                    is_verified=True,
-                    digest=digest,
-                    signature=f"cosign_{hashlib.sha256(digest.encode()).hexdigest()[:32]}",
-                    identity=identity or "cli_identity",
-                    tool_version=health.version,
-                    provenance={"provider": "cosign", "mode": "cli"},
-                )
+                with tempfile.NamedTemporaryFile(delete=False) as f_in:
+                    f_in.write(raw_bytes)
+                    temp_in = f_in.name
+                temp_sig = temp_in + ".sig"
+
+                cmd = [self.cli_path, "sign-blob", "--yes", "--output-signature", temp_sig, temp_in]
+                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+                if proc.returncode == 0 and os.path.isfile(temp_sig):
+                    with open(temp_sig, "r", encoding="utf-8") as f_s:
+                        real_sig = f_s.read().strip()
+                    return ProvenanceReceipt(
+                        receipt_id=f"sig_real_{digest[:12]}",
+                        status="REAL_SIGSTORE_SUCCESS",
+                        is_verified=True,
+                        digest=digest,
+                        signature=real_sig,
+                        identity=identity or "cosign_signer",
+                        tool_version=health.version,
+                        provenance={"provider": "cosign", "mode": "cli"},
+                    )
+                else:
+                    return ProvenanceReceipt(
+                        receipt_id=f"sig_err_{digest[:12]}",
+                        status="REAL_SIGSTORE_ERROR",
+                        is_verified=False,
+                        digest=digest,
+                        error=proc.stderr.strip() or f"cosign failed with exit code {proc.returncode}",
+                        provenance={"provider": "cosign", "status": "REAL_SIGSTORE_ERROR"},
+                    )
             except Exception as ex:
                 return ProvenanceReceipt(
                     receipt_id=f"sig_err_{digest[:12]}",
-                    status="ERROR",
+                    status="REAL_SIGSTORE_ERROR",
                     is_verified=False,
                     digest=digest,
                     error=str(ex),
+                    provenance={"provider": "cosign", "status": "REAL_SIGSTORE_ERROR"},
                 )
+            finally:
+                if temp_in and os.path.exists(temp_in):
+                    try:
+                        os.unlink(temp_in)
+                    except OSError:
+                        pass
+                if temp_sig and os.path.exists(temp_sig):
+                    try:
+                        os.unlink(temp_sig)
+                    except OSError:
+                        pass
 
         return ProvenanceReceipt(
-            receipt_id=f"sig_unknown_{digest[:12]}",
-            status="UNKNOWN",
+            receipt_id=f"sig_unavailable_{digest[:12]}",
+            status="REAL_SIGSTORE_UNAVAILABLE",
             is_verified=False,
             digest=digest,
-            error="No signing provider resolved.",
+            error="No supported signing provider resolved.",
+            provenance={"provider": "sigstore", "status": "REAL_SIGSTORE_UNAVAILABLE"},
         )
 
     def verify_provenance(
@@ -241,13 +285,14 @@ class SigstoreProvider:
         timeout: float = 30.0,
     ) -> ProvenanceVerificationResult:
         """
-        Verifies cryptographic signature against receipt content and digest.
+        Cryptographically verifies provenance signature against receipt content,
+        digest, and cryptographic trust anchors. Never merely compares digest.
         """
-        if receipt.status == "UNKNOWN" or not receipt.is_verified:
+        if receipt.status != "REAL_SIGSTORE_SUCCESS" or not receipt.is_verified:
             return ProvenanceVerificationResult(
                 is_valid=False,
-                status="UNKNOWN",
-                error="Cannot verify receipt marked UNKNOWN/UNVERIFIED.",
+                status=receipt.status if receipt.status in ("REAL_SIGSTORE_UNAVAILABLE", "REAL_SIGSTORE_ERROR") else "UNKNOWN",
+                error=f"Cannot verify receipt marked {receipt.status}/UNVERIFIED.",
             )
 
         if isinstance(payload, dict):
@@ -261,13 +306,84 @@ class SigstoreProvider:
         if current_digest != receipt.digest:
             return ProvenanceVerificationResult(
                 is_valid=False,
-                status="ERROR",
+                status="REAL_SIGSTORE_ERROR",
                 error=f"Digest mismatch: payload hash {current_digest} != receipt digest {receipt.digest}. Tampering detected.",
             )
 
+        # Real cryptographic verification via Python Sigstore SDK
+        if receipt.bundle_json and self._has_python_sigstore:
+            try:
+                import sigstore
+                from sigstore.models import Bundle
+                from sigstore.verify import Verifier, Policy
+                from sigstore.verify.policy import Identity
+
+                verifier = Verifier.production()
+                bundle = Bundle.from_json(receipt.bundle_json)
+                policy = Policy(Identity(receipt.identity)) if receipt.identity else Policy.unconstrained()
+                result = verifier.verify_artifact(raw_bytes, bundle, policy)
+                if result:
+                    return ProvenanceVerificationResult(
+                        is_valid=True,
+                        status="REAL_SIGSTORE_SUCCESS",
+                        identity=receipt.identity,
+                        details={"tool_version": receipt.tool_version, "engine": "sigstore-python"},
+                    )
+            except Exception as ex:
+                return ProvenanceVerificationResult(
+                    is_valid=False,
+                    status="REAL_SIGSTORE_ERROR",
+                    error=f"Sigstore cryptographic verification failed: {ex}",
+                )
+
+        # Real cryptographic verification via cosign CLI
+        if receipt.signature and self.cli_path and shutil.which(self.cli_path):
+            import tempfile
+            temp_in = None
+            temp_sig = None
+            try:
+                with tempfile.NamedTemporaryFile(delete=False) as f_in:
+                    f_in.write(raw_bytes)
+                    temp_in = f_in.name
+                with tempfile.NamedTemporaryFile(delete=False, mode="w", encoding="utf-8") as f_s:
+                    f_s.write(receipt.signature)
+                    temp_sig = f_s.name
+
+                cmd = [self.cli_path, "verify-blob", "--signature", temp_sig, temp_in]
+                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+                if proc.returncode == 0:
+                    return ProvenanceVerificationResult(
+                        is_valid=True,
+                        status="REAL_SIGSTORE_SUCCESS",
+                        identity=receipt.identity,
+                        details={"signature": receipt.signature, "tool_version": receipt.tool_version, "engine": "cosign"},
+                    )
+                else:
+                    return ProvenanceVerificationResult(
+                        is_valid=False,
+                        status="REAL_SIGSTORE_ERROR",
+                        error=proc.stderr.strip() or f"cosign verify-blob failed with exit code {proc.returncode}",
+                    )
+            except Exception as ex:
+                return ProvenanceVerificationResult(
+                    is_valid=False,
+                    status="REAL_SIGSTORE_ERROR",
+                    error=f"CLI verification exception: {ex}",
+                )
+            finally:
+                if temp_in and os.path.exists(temp_in):
+                    try:
+                        os.unlink(temp_in)
+                    except OSError:
+                        pass
+                if temp_sig and os.path.exists(temp_sig):
+                    try:
+                        os.unlink(temp_sig)
+                    except OSError:
+                        pass
+
         return ProvenanceVerificationResult(
-            is_valid=True,
-            status="SUCCESS",
-            identity=receipt.identity,
-            details={"signature": receipt.signature, "tool_version": receipt.tool_version},
+            is_valid=False,
+            status="REAL_SIGSTORE_ERROR",
+            error="No valid cryptographic verification engine could corroborate the signature.",
         )

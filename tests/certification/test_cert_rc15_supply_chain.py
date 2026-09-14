@@ -221,17 +221,17 @@ def test_sigstore_provider_signing_and_verification_and_unknown_fallback():
     assert receipt.digest is not None
 
     if not sigstore.is_available:
-        assert receipt.status == "UNKNOWN"
+        assert receipt.status == "REAL_SIGSTORE_UNAVAILABLE"
         assert receipt.is_verified is False
-        assert "sigstore unavailable" in receipt.error.lower()
+        assert "no supported signing provider" in receipt.error.lower() or "sigstore unavailable" in receipt.error.lower()
 
-        # Cannot verify UNKNOWN receipt
+        # Cannot verify UNKNOWN / UNAVAILABLE receipt
         ver_res = sigstore.verify_provenance(payload, receipt)
         assert ver_res.is_valid is False
-        assert ver_res.status == "UNKNOWN"
+        assert ver_res.status in ("REAL_SIGSTORE_UNAVAILABLE", "UNKNOWN")
     else:
         # If available in environment, verification passes
-        assert receipt.status == "SUCCESS"
+        assert receipt.status == "REAL_SIGSTORE_SUCCESS"
         ver_res = sigstore.verify_provenance(payload, receipt)
         assert ver_res.is_valid is True
 
@@ -264,3 +264,32 @@ def test_security_package_exports_sigstore_and_schemathesis():
     assert hasattr(sec, "SchemathesisProvider")
     assert hasattr(sec, "ContractViolation")
     assert hasattr(sec, "evaluate_supply_chain_policy")
+    assert hasattr(sec, "promote_to_verified")
+
+
+def test_schemathesis_and_supply_chain_observed_vs_verified_promotion():
+    from sclass.security.supply_chain import SBOMResult, VulnerabilityScanResult, promote_to_verified
+    from sclass.security.api_assurance import APIAssuranceResult
+
+    # 1. External tools initially yield OBSERVED evidence, is_verified=False
+    sbom = SBOMResult(status="SUCCESS", is_verified=False, evidence_state="OBSERVED")
+    assert sbom.evidence_state == "OBSERVED"
+    assert sbom.is_verified is False
+
+    # 2. Corroboration promotes SBOM to VERIFIED
+    promoted_sbom = promote_to_verified(sbom)
+    assert promoted_sbom.evidence_state == "VERIFIED"
+    assert promoted_sbom.is_verified is True
+
+    # 3. Vulnerability scan promotion
+    vuln = VulnerabilityScanResult(status="SUCCESS", is_verified=False, evidence_state="OBSERVED")
+    promoted_vuln = promote_to_verified(vuln)
+    assert promoted_vuln.evidence_state == "VERIFIED"
+    assert promoted_vuln.is_verified is True
+
+    # 4. API assurance (Schemathesis) promotion
+    api_res = APIAssuranceResult(status="SUCCESS", is_verified=False, evidence_state="OBSERVED")
+    promoted_api = promote_to_verified(api_res)
+    assert promoted_api.evidence_state == "VERIFIED"
+    assert promoted_api.is_verified is True
+

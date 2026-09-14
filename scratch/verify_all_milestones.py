@@ -1,6 +1,7 @@
 """
 S-Class Master Milestone Auditor (scratch/verify_all_milestones.py).
-Executes and audits all 18 architectural, product, and reality milestones in sequence:
+Executes and audits all 32 architectural, product, and reality milestones in sequence:
+
  1. Milestone 01: Phase 1 Trust Kernel (tests/certification/test_cert_trust.py)
  2. Milestone 02: Execution Security & Modes (tests/certification/test_cert_execution.py)
  3. Milestone 03: Session Handoff & Continuity (tests/certification/test_cert_handoff.py)
@@ -29,6 +30,10 @@ Executes and audits all 18 architectural, product, and reality milestones in seq
  26. Milestone 26: Milestone RC.10 Memory Provider Abstraction & Mem0 (tests/certification/test_cert_rc10_memory.py)
  27. Milestone 27: Milestone RC.11 Platform Profile Engine & Compensation Budget (tests/certification/test_cert_rc11_platform_engine.py)
  28. Milestone 28: Milestone RC.12 Silent Governance Mode & Universal Adapters (tests/certification/test_cert_rc12_silent_governance.py)
+ 29. Milestone 29: Milestone RC.13 CLI Completion & Explain/Audit UX (tests/certification/test_cert_rc13_cli_ux.py)
+ 30. Milestone 30: Milestone RC.14 OPA/Cedar Policy Product & Bundles (tests/certification/test_cert_rc14_policy_product.py)
+ 31. Milestone 31: Milestone RC.15 Supply-Chain Evidence & Provenance (tests/certification/test_cert_rc15_supply_chain.py)
+ 32. Milestone 32: Milestone RC.16 Packaging, Unified Config & Installer (tests/certification/test_cert_rc16_packaging.py)
 """
 
 import sys
@@ -38,39 +43,16 @@ import subprocess
 from typing import List, Dict, Any, Tuple
 
 
+_src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+if _src_dir not in sys.path:
+    sys.path.insert(0, _src_dir)
+
+from sclass.metadata import MILESTONE_DEFINITIONS
+
 MILESTONES: List[Tuple[str, str, str]] = [
-    ("M01_TRUST_KERNEL", "Phase 1 Trust Kernel", "tests/certification/test_cert_trust.py"),
-    ("M02_EXECUTION_SECURITY", "Execution Security & Modes", "tests/certification/test_cert_execution.py"),
-    ("M03_SESSION_HANDOFF", "Session Handoff & Continuity", "tests/certification/test_cert_handoff.py"),
-    ("M04_MCP_TRANSPORT", "MCP Protocol & Transport", "tests/certification/test_cert_mcp.py"),
-    ("M05_OPA_PROVIDER", "B.2 OPA Policy Provider", "tests/certification/test_cert_b2_opa_provider.py"),
-    ("M06_PLATFORM_OPTIMIZATION", "B.3 Platform Optimization Core", "tests/certification/test_cert_b3_platform_optimization.py"),
-    ("M07_PLATFORM_PROFILING", "B.4 Platform Profiling Framework", "tests/certification/test_cert_b4_platform_profiling.py"),
-    ("M08_MCP_OFFICIAL", "B.5 Official MCP Integration", "tests/certification/test_cert_b5_mcp_official.py"),
-    ("M09_ACP_PROTOCOL", "B.6 ACP Platform Integration", "tests/certification/test_cert_acp.py"),
-    ("M10_VERIFICATION_PROVIDERS", "B.7 Verification Providers", "tests/certification/test_cert_b7_verification_providers.py"),
-    ("M11_ADAPTIVE_VERIFICATION", "B.8 Adaptive Verification Policies", "tests/certification/test_cert_b8_adaptive_verification.py"),
-    ("M12_INDEPENDENT_OBSERVATION", "B.9 Independent Observation & OTel", "tests/certification/test_cert_b9_independent_observation.py"),
-    ("M13_EMPIRICAL_LEARNING", "B.10 Empirical Outcome Learning", "tests/certification/test_cert_b10_empirical_learning.py"),
-    ("M14_UNIVERSAL_TRUTH", "B.11 Universal Truth Layer & Project State", "tests/certification/test_cert_b11_verified_project_state.py"),
-    ("M15_CROSS_PLATFORM_CONTINUITY", "B.12 Cross-Platform Continuity", "tests/certification/test_cert_b12_cross_platform_continuity.py"),
-    ("M16_FLEET_INTEGRITY", "B.15 Multi-Agent Fleet Integrity", "tests/certification/test_cert_b15_agent_fleet_integrity.py"),
-    ("M17_CODEX_BENCHMARK", "RC.1 External Codex Subprocess & Benchmark", "tests/certification/test_cert_rc1_codex_benchmark.py"),
-    ("M18_EXECUTION_PROVIDERS", "RC.2 Execution Provider Closure & Sandboxing", "tests/certification/test_cert_rc2_execution_providers.py"),
-    ("M19_OBSERVATION_PLANE", "RC.3 Independent Observation Plane", "tests/certification/test_cert_rc3_observation.py"),
-    ("M20_VERIFICATION_ENGINE", "RC.4 Executable Verification Engine Hierarchy", "tests/certification/test_cert_rc4_verification_engine.py"),
-    ("M21_PROJECT_TRUTH", "RC.5 Universal Project Truth & Invalidation", "tests/certification/test_cert_rc5_project_truth.py"),
-    ("M22_CODE_INTELLIGENCE", "RC.6 Tree-sitter Code Intelligence & SCIP", "tests/certification/test_cert_rc6_code_intelligence.py"),
-    ("M23_PROTOCOL_GATEWAY", "RC.7 ACP Proxy & MCP Protocol Gateway", "tests/certification/test_cert_rc7_protocol_gateway.py"),
-    ("M24_HANDOFF_CONTINUITY", "RC.8 Handoff & Continuity Engine", "tests/certification/test_cert_rc8_handoff_continuity.py"),
-    ("M25_FLEET_PRODUCTION", "RC.9 Fleet Task Graph & Production Engine", "tests/certification/test_cert_rc9_fleet_production.py"),
-    ("M26_MEMORY_PROVIDER", "RC.10 Memory Provider Abstraction & Mem0", "tests/certification/test_cert_rc10_memory.py"),
-    ("M27_PLATFORM_ENGINE", "RC.11 Platform Profile Engine & Compensation Budget", "tests/certification/test_cert_rc11_platform_engine.py"),
-    ("M28_SILENT_GOVERNANCE", "RC.12 Silent Governance Mode & Universal Adapters", "tests/certification/test_cert_rc12_silent_governance.py"),
-    ("M29_CLI_UX", "RC.13 CLI Completion & Explain/Audit UX", "tests/certification/test_cert_rc13_cli_ux.py"),
-    ("M30_POLICY_PRODUCT", "RC.14 OPA/Cedar Policy Product & Bundles", "tests/certification/test_cert_rc14_policy_product.py"),
-    ("M31_SUPPLY_CHAIN", "RC.15 Supply-Chain Evidence & Provenance", "tests/certification/test_cert_rc15_supply_chain.py"),
+    (m["code"], m["title"], m["path"]) for m in MILESTONE_DEFINITIONS
 ]
+
 
 
 def run_milestone(idx: int, code: str, title: str, path: str) -> Dict[str, Any]:

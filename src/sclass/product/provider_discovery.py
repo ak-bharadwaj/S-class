@@ -117,31 +117,7 @@ class ProviderDiscovery:
         env_vars = spec.get("env_vars", [])
         ws_marker = spec.get("workspace_dir")
 
-        # 1. Check Workspace Marker (highest contextual relevance for workspace)
-        if workspace_dir and ws_marker:
-            marker_path = os.path.join(workspace_dir, ws_marker)
-            if os.path.exists(marker_path):
-                return DiscoveredProvider(
-                    platform_id=platform_id,
-                    name=name,
-                    status=AdapterStatus.INSTALLED,
-                    config_path=marker_path,
-                    detected_by="workspace_marker",
-                    metadata={"protocol": spec.get("protocol", "generic")},
-                )
-
-        # 2. Check Environment Variables (explicit runtime configuration override)
-        active_env = [ev for ev in env_vars if os.getenv(ev)]
-        if active_env:
-            return DiscoveredProvider(
-                platform_id=platform_id,
-                name=name,
-                status=AdapterStatus.INSTALLED,
-                detected_by=f"env:{active_env[0]}",
-                metadata={"active_env": active_env, "protocol": spec.get("protocol", "generic")},
-            )
-
-        # 3. Check Binary (installed on system path)
+        # 1. Check Binary first (installed on system path)
         bin_path = shutil.which(bin_target) if bin_target else None
         if bin_path:
             return DiscoveredProvider(
@@ -154,23 +130,47 @@ class ProviderDiscovery:
                 metadata={"protocol": spec.get("protocol", "generic")},
             )
 
-        # 4. Check Home / Config Path (~/.codex, ~/.claude, etc.)
+        # 2. Check Workspace Marker (config/context marker only -> CONFIGURED, not INSTALLED)
+        if workspace_dir and ws_marker:
+            marker_path = os.path.join(workspace_dir, ws_marker)
+            if os.path.exists(marker_path):
+                return DiscoveredProvider(
+                    platform_id=platform_id,
+                    name=name,
+                    status=AdapterStatus.CONFIGURED,
+                    config_path=marker_path,
+                    detected_by="workspace_marker",
+                    metadata={"protocol": spec.get("protocol", "generic")},
+                )
+
+        # 3. Check Environment Variables (API key / env only -> CONFIGURED, not INSTALLED)
+        active_env = [ev for ev in env_vars if os.getenv(ev)]
+        if active_env:
+            return DiscoveredProvider(
+                platform_id=platform_id,
+                name=name,
+                status=AdapterStatus.CONFIGURED,
+                detected_by=f"env:{active_env[0]}",
+                metadata={"active_env": active_env, "protocol": spec.get("protocol", "generic")},
+            )
+
+        # 4. Check Home / Config Path (~/.codex, ~/.claude, etc.) -> CONFIGURED
         if home_target and os.path.exists(home_target):
             return DiscoveredProvider(
                 platform_id=platform_id,
                 name=name,
-                status=AdapterStatus.INSTALLED,
+                status=AdapterStatus.CONFIGURED,
                 config_path=home_target,
                 detected_by="config_dir",
                 metadata={"protocol": spec.get("protocol", "generic")},
             )
 
-        # If not installed, report as supported
+        # Not detected
         return DiscoveredProvider(
             platform_id=platform_id,
             name=name,
-            status=AdapterStatus.SUPPORTED,
-            detected_by="registry",
+            status=AdapterStatus.NOT_DETECTED,
+            detected_by="not_detected",
             metadata={"protocol": spec.get("protocol", "generic")},
         )
 
@@ -201,29 +201,30 @@ class ProviderDiscovery:
     ) -> BasePlatformAdapter:
         """
         Creates a normalized S-Class adapter for the requested platform.
+        Fails closed with ADAPTER_ERROR / UNAVAILABLE if adapter initialization fails.
+        Never silently substitutes a generic adapter for a requested known platform.
         """
         pid = platform_id.strip().lower()
         active_mode = mode or self.default_mode
 
-        # Try to use specific adapters if available
         if pid == "cursor":
             try:
                 from sclass.integrations.cursor.adapter import CursorAdapter
                 return CursorAdapter(workspace_dir=workspace_dir, mode=active_mode)
-            except Exception:
-                pass
+            except Exception as ex:
+                raise RuntimeError(f"ADAPTER_ERROR: Failed to initialize Cursor adapter: {ex}")
         elif pid == "codex":
             try:
                 from sclass.integrations.codex.adapter import CodexAdapter
                 return CodexAdapter(workspace_dir=workspace_dir, mode=active_mode)
-            except Exception:
-                pass
+            except Exception as ex:
+                raise RuntimeError(f"ADAPTER_ERROR: Failed to initialize Codex adapter: {ex}")
         elif pid in ("claude", "claude_code"):
             try:
                 from sclass.integrations.claude.adapter import ClaudeCodeAdapter
                 return ClaudeCodeAdapter(workspace_dir=workspace_dir, mode=active_mode)
-            except Exception:
-                pass
+            except Exception as ex:
+                raise RuntimeError(f"ADAPTER_ERROR: Failed to initialize Claude Code adapter: {ex}")
         elif pid == "antigravity":
             return BasePlatformAdapter(
                 workspace_dir=workspace_dir,
@@ -231,10 +232,12 @@ class ProviderDiscovery:
                 mode=active_mode,
                 capabilities=AdapterCapabilities(native_protocol="native_hook"),
             )
+        elif pid in ("generic", "base", "default"):
+            return BasePlatformAdapter(
+                workspace_dir=workspace_dir,
+                platform_id=pid,
+                mode=active_mode,
+                capabilities=AdapterCapabilities(native_protocol="generic"),
+            )
 
-        return BasePlatformAdapter(
-            workspace_dir=workspace_dir,
-            platform_id=pid,
-            mode=active_mode,
-            capabilities=AdapterCapabilities(native_protocol="generic"),
-        )
+        raise ValueError(f"UNAVAILABLE: Unknown or unsupported platform '{pid}'. Generic adapter not substituted.")

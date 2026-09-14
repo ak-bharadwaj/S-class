@@ -12,6 +12,7 @@ from sclass.security.supply_chain import (
     VulnerabilityScanResult,
     SupplyChainPolicyDecision,
     evaluate_supply_chain_policy,
+    promote_to_verified,
 )
 from sclass.security.provenance import (
     SigstoreProvider,
@@ -20,6 +21,8 @@ from sclass.security.provenance import (
 )
 from sclass.security.api_assurance import (
     SchemathesisProvider,
+    SchemathesisCLIProvider,
+    SchemathesisPythonProvider,
     ContractViolation,
     APIAssuranceResult,
 )
@@ -34,10 +37,13 @@ __all__ = [
     "VulnerabilityScanResult",
     "SupplyChainPolicyDecision",
     "evaluate_supply_chain_policy",
+    "promote_to_verified",
     "SigstoreProvider",
     "ProvenanceReceipt",
     "ProvenanceVerificationResult",
     "SchemathesisProvider",
+    "SchemathesisCLIProvider",
+    "SchemathesisPythonProvider",
     "ContractViolation",
     "APIAssuranceResult",
 ]

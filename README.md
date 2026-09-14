@@ -5,7 +5,7 @@
 ### The Optimization, Governance, Verification, and Portable-Truth Layer Underneath Autonomous Coding Platforms
 
 [![Version](https://img.shields.io/badge/version-0.2.0--survival-blue.svg)](https://github.com/ak-bharadwaj/S-class/tree/survival-v0)
-[![Milestones](https://img.shields.io/badge/milestones-18%2F18%20passed-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class/tree/survival-v0)
+[![Milestones](https://img.shields.io/badge/milestones-32%2F32%20passed-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class/tree/survival-v0)
 [![Demos](https://img.shields.io/badge/flagship%20demos-8%2F8%20verified-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class/tree/survival-v0)
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 
@@ -255,15 +255,15 @@ Configure hooks in your native editor/platform directory:
 
 ## 8. Verification & Certified Milestones
 
-### Master Milestone Auditor (18/18 Certified)
+### Master Milestone Auditor (32/32 Certified)
 ```bash
-# Run the master milestone auditor across all 18 product & reality milestones
+# Run the master milestone auditor across all 32 product & reality milestones
 python scratch/verify_all_milestones.py
 ```
 
-### Complete Test Suite (712+ Passed Tests)
+### Complete Test Suite (Authoritative pytest Test Suite)
 ```bash
-# Run complete test suite across 55 test modules
+# Run complete test suite across all test modules
 python -m pytest
 ```
 

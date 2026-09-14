@@ -114,8 +114,11 @@ class DetectedPlatformInfo:
     """Detailed platform discovery outcome."""
     platform_id: str
     name: str
-    installed: bool
-    detected_by: str
+    installed: bool = False
+    supported: bool = True
+    configured: bool = False
+    discovery_state: str = "NOT_DETECTED"  # NOT_DETECTED | CONFIGURED | INSTALLED | CONNECTED | VERIFIED
+    detected_by: str = "not_detected"
     binary_path: Optional[str] = None
     config_marker: Optional[str] = None
     protocol: str = "generic"
@@ -126,6 +129,9 @@ class DetectedPlatformInfo:
             "platform_id": self.platform_id,
             "name": self.name,
             "installed": self.installed,
+            "supported": self.supported,
+            "configured": self.configured,
+            "discovery_state": self.discovery_state,
             "detected_by": self.detected_by,
             "binary_path": self.binary_path,
             "config_marker": self.config_marker,
@@ -141,10 +147,10 @@ class InstallationResult:
     workspace_dir: str
     sclass_dir: str
     config_path: str
-    created_directories: List[str]
-    created_databases: List[str]
-    detected_platforms: List[Dict[str, Any]]
-    deployed_adapters: List[str]
+    created_directories: List[str] = field(default_factory=list)
+    created_databases: List[str] = field(default_factory=list)
+    detected_platforms: List[Dict[str, Any]] = field(default_factory=list)
+    deployed_adapters: List[str] = field(default_factory=list)
     is_reinstall: bool = False
     details: Dict[str, Any] = field(default_factory=dict)
 
@@ -178,6 +184,7 @@ class ProductInstaller:
         """
         Auto-detects coding agent environments:
         Codex, Claude, Antigravity, Cursor, Windsurf, Copilot.
+        Honest tiering: binaries = INSTALLED; env vars / markers = CONFIGURED.
         """
         results: List[DetectedPlatformInfo] = []
         for spec in SUPPORTED_PLATFORMS:
@@ -186,43 +193,7 @@ class ProductInstaller:
             proto = spec["protocol"]
             ep = spec["entrypoint"]
 
-            # 1. Check workspace markers
-            ws_marker_found = None
-            for marker in spec["markers"]:
-                target = os.path.join(self.workspace_dir, marker)
-                if os.path.exists(target):
-                    ws_marker_found = marker
-                    break
-            if ws_marker_found:
-                results.append(DetectedPlatformInfo(
-                    platform_id=pid,
-                    name=name,
-                    installed=True,
-                    detected_by=f"workspace_marker:{ws_marker_found}",
-                    config_marker=ws_marker_found,
-                    protocol=proto,
-                    entrypoint=ep,
-                ))
-                continue
-
-            # 2. Check environment variables
-            env_found = None
-            for ev in spec["envs"]:
-                if os.getenv(ev):
-                    env_found = ev
-                    break
-            if env_found:
-                results.append(DetectedPlatformInfo(
-                    platform_id=pid,
-                    name=name,
-                    installed=True,
-                    detected_by=f"env:{env_found}",
-                    protocol=proto,
-                    entrypoint=ep,
-                ))
-                continue
-
-            # 3. Check system binaries on PATH
+            # 1. Check system binaries on PATH -> INSTALLED
             bin_found = None
             for b in spec["binaries"]:
                 p = shutil.which(b)
@@ -233,7 +204,10 @@ class ProductInstaller:
                 results.append(DetectedPlatformInfo(
                     platform_id=pid,
                     name=name,
+                    supported=True,
                     installed=True,
+                    configured=True,
+                    discovery_state="INSTALLED",
                     detected_by="binary",
                     binary_path=bin_found,
                     protocol=proto,
@@ -241,13 +215,58 @@ class ProductInstaller:
                 ))
                 continue
 
-            # 4. Check home directories (~/.codex, ~/.claude, etc.)
+            # 2. Check workspace markers -> CONFIGURED (NOT INSTALLED)
+            ws_marker_found = None
+            for marker in spec["markers"]:
+                target = os.path.join(self.workspace_dir, marker)
+                if os.path.exists(target):
+                    ws_marker_found = marker
+                    break
+            if ws_marker_found:
+                results.append(DetectedPlatformInfo(
+                    platform_id=pid,
+                    name=name,
+                    supported=True,
+                    installed=False,
+                    configured=True,
+                    discovery_state="CONFIGURED",
+                    detected_by=f"workspace_marker:{ws_marker_found}",
+                    config_marker=ws_marker_found,
+                    protocol=proto,
+                    entrypoint=ep,
+                ))
+                continue
+
+            # 3. Check environment variables -> CONFIGURED (NOT INSTALLED)
+            env_found = None
+            for ev in spec["envs"]:
+                if os.getenv(ev):
+                    env_found = ev
+                    break
+            if env_found:
+                results.append(DetectedPlatformInfo(
+                    platform_id=pid,
+                    name=name,
+                    supported=True,
+                    installed=False,
+                    configured=True,
+                    discovery_state="CONFIGURED",
+                    detected_by=f"env:{env_found}",
+                    protocol=proto,
+                    entrypoint=ep,
+                ))
+                continue
+
+            # 4. Check home directories (~/.codex, ~/.claude, etc.) -> CONFIGURED
             home_target = os.path.expanduser(spec["home_dir"])
             if os.path.exists(home_target):
                 results.append(DetectedPlatformInfo(
                     platform_id=pid,
                     name=name,
-                    installed=True,
+                    supported=True,
+                    installed=False,
+                    configured=True,
+                    discovery_state="CONFIGURED",
                     detected_by="home_config_dir",
                     config_marker=home_target,
                     protocol=proto,
@@ -255,11 +274,14 @@ class ProductInstaller:
                 ))
                 continue
 
-            # Not installed
+            # 5. Not installed or configured
             results.append(DetectedPlatformInfo(
                 platform_id=pid,
                 name=name,
+                supported=True,
                 installed=False,
+                configured=False,
+                discovery_state="NOT_DETECTED",
                 detected_by="not_detected",
                 protocol=proto,
                 entrypoint=ep,
@@ -341,11 +363,16 @@ class ProductInstaller:
 
         # Deploy for each platform
         for plat in detected_platforms:
+            is_generic = plat.platform_id in ("generic", "base", "default")
+            is_enabled = plat.installed or is_generic
             cfg = {
                 "platform_id": plat.platform_id,
                 "name": plat.name,
-                "enabled": True,
+                "supported": plat.supported,
                 "installed": plat.installed,
+                "configured": plat.configured,
+                "discovery_state": plat.discovery_state,
+                "enabled": is_enabled,
                 "detected_by": plat.detected_by,
                 "entrypoint": plat.entrypoint,
                 "protocol": plat.protocol,

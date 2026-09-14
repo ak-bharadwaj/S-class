@@ -214,6 +214,12 @@ def test_rc3_observation_record_process_telemetry(rc3_workspace):
     assert obs.exit_code == 0
     assert obs.stdout_bytes == 13
 
+    # Invariant: compute_hash binds created_at and all immutable fields
+    from dataclasses import replace
+    obs_time_shifted = replace(obs, created_at="2099-01-01T00:00:00Z")
+    assert obs_time_shifted.compute_hash() != record_hash, "compute_hash must bind created_at"
+
+
 
 def test_rc3_opentelemetry_semantic_spans(rc3_workspace):
     """

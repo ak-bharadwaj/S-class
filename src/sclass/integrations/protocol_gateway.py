@@ -16,7 +16,34 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List, Set, Callable
 
+from enum import Enum
+
 logger = logging.getLogger("sclass.integrations.protocol_gateway")
+
+
+class EventCriticality(str, Enum):
+    """Criticality levels for protocol events."""
+    BEST_EFFORT = "BEST_EFFORT"
+    DURABLE = "DURABLE"
+    GOVERNANCE_CRITICAL = "GOVERNANCE_CRITICAL"
+
+
+GOVERNANCE_CRITICAL_EVENT_TYPES = {
+    "action_requested",
+    "action_authorized",
+    "action_denied",
+    "execution_started",
+    "execution_finished",
+    "verification_completed",
+    "truth_updated",
+}
+
+DURABLE_EVENT_TYPES = {
+    *GOVERNANCE_CRITICAL_EVENT_TYPES,
+    "session_started",
+    "session_ended",
+    "tool_call",
+}
 
 
 @dataclass(frozen=True)
@@ -28,7 +55,14 @@ class ProtocolEvent:
     agent_id: str
     session_id: str
     payload: Dict[str, Any]
+    criticality: EventCriticality = EventCriticality.BEST_EFFORT
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+    def __post_init__(self) -> None:
+        if self.event_type in GOVERNANCE_CRITICAL_EVENT_TYPES:
+            object.__setattr__(self, "criticality", EventCriticality.GOVERNANCE_CRITICAL)
+        elif self.event_type in DURABLE_EVENT_TYPES and self.criticality == EventCriticality.BEST_EFFORT:
+            object.__setattr__(self, "criticality", EventCriticality.DURABLE)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -38,18 +72,50 @@ class ProtocolEvent:
             "agent_id": self.agent_id,
             "session_id": self.session_id,
             "payload": dict(self.payload),
+            "criticality": self.criticality.value if hasattr(self.criticality, "value") else str(self.criticality),
             "timestamp": self.timestamp,
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> ProtocolEvent:
+    def from_dict(cls, data: Dict[str, Any], allow_defaults: bool = False) -> ProtocolEvent:
+        event_type = data.get("event_type")
+        raw_crit = data.get("criticality")
+        crit = EventCriticality(raw_crit) if raw_crit in EventCriticality.__members__.values() else None
+
+        is_gov_critical = (event_type in GOVERNANCE_CRITICAL_EVENT_TYPES) or (crit == EventCriticality.GOVERNANCE_CRITICAL)
+        if is_gov_critical and not allow_defaults:
+            # Reject missing or placeholder identity fields for governance-critical events
+            source = data.get("source")
+            agent_id = data.get("agent_id")
+            session_id = data.get("session_id")
+            if not source or source == "unknown":
+                raise ValueError(f"Governance-critical event '{event_type}' missing mandatory 'source'")
+            if not agent_id or agent_id == "default_agent":
+                raise ValueError(f"Governance-critical event '{event_type}' missing mandatory 'agent_id'")
+            if not session_id or session_id == "default_session":
+                raise ValueError(f"Governance-critical event '{event_type}' missing mandatory 'session_id'")
+            if not event_type or event_type == "unknown":
+                raise ValueError("Governance-critical event missing mandatory 'event_type'")
+
+            return cls(
+                event_id=data.get("event_id", str(uuid.uuid4())),
+                source=source,
+                event_type=event_type,
+                agent_id=agent_id,
+                session_id=session_id,
+                payload=dict(data.get("payload", {})),
+                criticality=EventCriticality.GOVERNANCE_CRITICAL,
+                timestamp=data.get("timestamp", datetime.now(timezone.utc).isoformat()),
+            )
+
         return cls(
             event_id=data.get("event_id", str(uuid.uuid4())),
             source=data.get("source", "unknown"),
-            event_type=data.get("event_type", "unknown"),
+            event_type=event_type or "unknown",
             agent_id=data.get("agent_id", "default_agent"),
             session_id=data.get("session_id", "default_session"),
             payload=dict(data.get("payload", {})),
+            criticality=crit or EventCriticality.BEST_EFFORT,
             timestamp=data.get("timestamp", datetime.now(timezone.utc).isoformat()),
         )
 
@@ -61,11 +127,32 @@ class ProtocolEventGateway:
     """
     Authoritative event hub intercepting, normalizing, and fanning out protocol traffic.
     Guarantees that observation and governance layers receive structured, immutable events.
+    Governance-critical events fail closed on subscriber errors and persist durably.
     """
 
-    def __init__(self, max_history: int = 1000):
+    def __init__(self, max_history: int = 1000, db_path: Optional[str] = None):
         self._listeners: Dict[str, Tuple[ProtocolEventListener, Optional[Set[str]], Optional[str]]] = {}
         self._history: deque[ProtocolEvent] = deque(maxlen=max_history)
+        self._db_path = db_path
+        self._durable_store: List[ProtocolEvent] = []
+
+    def _persist_durable_event(self, event: ProtocolEvent) -> None:
+        """Writes durable security events to authoritative storage."""
+        self._durable_store.append(event)
+        target_db = self._db_path
+        if not target_db and os.path.exists(os.path.join(".sclass", "db", "events.db")):
+            target_db = os.path.abspath(os.path.join(".sclass", "db", "events.db"))
+        if target_db and os.path.exists(target_db):
+            try:
+                import sqlite3
+                with sqlite3.connect(target_db, timeout=5.0) as conn:
+                    conn.execute(
+                        "INSERT OR REPLACE INTO events (event_id, source, event_type, agent_id, session_id, payload_json, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (event.event_id, event.source, event.event_type, event.agent_id, event.session_id, json.dumps(event.payload), event.timestamp),
+                    )
+                    conn.commit()
+            except Exception as ex:
+                logger.warning(f"Failed to persist durable event to SQLite {target_db}: {ex}")
 
     def subscribe(
         self,
@@ -92,8 +179,13 @@ class ProtocolEventGateway:
         """
         Emits a canonical ProtocolEvent, recording to history and fanning out
         to all matching registered subscribers.
+        For GOVERNANCE_CRITICAL events: listener failures fail closed / propagate.
+        Durable events are persisted to authoritative storage.
         """
         self._history.append(event)
+
+        if event.criticality in (EventCriticality.DURABLE, EventCriticality.GOVERNANCE_CRITICAL):
+            self._persist_durable_event(event)
 
         for sub_id, (listener, event_types, source) in list(self._listeners.items()):
             if source and event.source != source:
@@ -104,6 +196,11 @@ class ProtocolEventGateway:
                 listener(event)
             except Exception as exc:
                 logger.warning(f"Subscriber {sub_id} failed on event {event.event_id}: {exc}")
+                if event.criticality == EventCriticality.GOVERNANCE_CRITICAL:
+                    raise RuntimeError(
+                        f"Governance-critical subscriber {sub_id} failed on authoritative event "
+                        f"'{event.event_type}' ({event.event_id}): {exc}"
+                    ) from exc
 
     def emit_event(
         self,
@@ -113,6 +210,7 @@ class ProtocolEventGateway:
         session_id: str,
         payload: Dict[str, Any],
         event_id: Optional[str] = None,
+        criticality: Optional[EventCriticality] = None,
     ) -> ProtocolEvent:
         """Helper to construct and emit a ProtocolEvent in a single call."""
         event = ProtocolEvent(
@@ -122,6 +220,7 @@ class ProtocolEventGateway:
             agent_id=agent_id,
             session_id=session_id,
             payload=payload,
+            criticality=criticality or EventCriticality.BEST_EFFORT,
         )
         self.emit(event)
         return event
@@ -187,3 +286,14 @@ def reset_protocol_gateway() -> ProtocolEventGateway:
     global _GLOBAL_GATEWAY
     _GLOBAL_GATEWAY = ProtocolEventGateway()
     return _GLOBAL_GATEWAY
+
+
+__all__ = [
+    "EventCriticality",
+    "ProtocolEvent",
+    "ProtocolEventGateway",
+    "get_protocol_gateway",
+    "reset_protocol_gateway",
+    "GOVERNANCE_CRITICAL_EVENT_TYPES",
+    "DURABLE_EVENT_TYPES",
+]

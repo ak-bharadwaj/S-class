@@ -9,7 +9,7 @@ import os
 import sys
 import json
 from typing import Dict, Any, Optional, List, Union
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, ConfigDict
 import yaml
 
 try:
@@ -21,19 +21,84 @@ except ImportError:
         tomllib = None
 
 
-class GeneralConfig(BaseModel):
+from enum import Enum
+
+
+class SClassBaseConfig(BaseModel):
+    """Base configuration model with assignment validation and clean enum serialization."""
+    model_config = ConfigDict(validate_assignment=True, use_enum_values=True)
+
+
+
+class GovernanceMode(str, Enum):
+    """Governance and enforcement posture modes."""
+    ENFORCE = "enforce"
+    MONITOR = "monitor"
+    SILENT = "silent"
+    PERMISSIVE = "permissive"
+
+
+class PolicyProvider(str, Enum):
+    """Authoritative policy provider types."""
+    OPA = "opa"
+    CEDAR = "cedar"
+    LOCAL = "local"
+
+
+class ExecutionProviderType(str, Enum):
+    """Execution containment and sandboxing provider types."""
+    NATIVE = "native"
+    SANDBOX = "sandbox"
+    ISOLATED = "isolated"
+
+
+class VerificationLevel(str, Enum):
+    """Multi-tiered verification hierarchy levels."""
+    V0 = "V0"
+    V1 = "V1"
+    V2 = "V2"
+    V3 = "V3"
+    V4 = "V4"
+    V5 = "V5"
+    V6 = "V6"
+    V7 = "V7"
+
+
+class MemoryProvider(str, Enum):
+    """Contextual memory provider backends."""
+    LOCAL = "local"
+    MEM0 = "mem0"
+
+
+class ConflictStrategy(str, Enum):
+    """Fleet coordination write-conflict strategies."""
+    QUARANTINE = "quarantine"
+    OVERWRITE = "overwrite"
+    REJECT = "reject"
+
+
+class IsolationLevel(str, Enum):
+    """OS-level process and container isolation tiers."""
+    PROCESS = "process"
+    CONTAINER = "container"
+    VM = "vm"
+    NONE = "none"
+
+
+class GeneralConfig(SClassBaseConfig):
     """General workspace and runtime configuration."""
     workspace_name: str = "sclass-workspace"
     version: str = "1.0.0"
-    mode: str = "enforce"  # enforce, monitor, silent
+    mode: GovernanceMode = GovernanceMode.ENFORCE
     data_dir: str = ".sclass"
     project_id: Optional[str] = None
     description: str = "S-Class governed workspace"
 
 
-class PolicyConfig(BaseModel):
+class PolicyConfig(SClassBaseConfig):
     """Policy and authorization engine configuration."""
-    provider: str = "opa"  # opa, cedar, local
+    provider: PolicyProvider = PolicyProvider.OPA
+    experimental: bool = False
     bundle_dir: str = ".sclass/policies"
     fail_closed: bool = True
     strict_provenance: bool = True
@@ -41,20 +106,26 @@ class PolicyConfig(BaseModel):
     timeout_ms: int = 5000
     enforce_leases: bool = True
 
+    @model_validator(mode="after")
+    def _validate_cedar_experimental(self) -> PolicyConfig:
+        if self.provider == PolicyProvider.CEDAR and not self.experimental:
+            raise ValueError("Cedar policy provider requires explicit experimental opt-in (policy.experimental = True).")
+        return self
 
-class ExecutionConfig(BaseModel):
+
+class ExecutionConfig(SClassBaseConfig):
     """Execution containment and sandboxing configuration."""
-    provider: str = "native"  # native, sandbox, isolated
+    provider: ExecutionProviderType = ExecutionProviderType.NATIVE
     default_timeout: int = 300
-    allow_network: bool = True
+    allow_network: bool = False  # Deny network by default; capability-specific policy grants it
     max_memory_mb: int = 4096
-    isolation_level: str = "process"
+    isolation_level: IsolationLevel = IsolationLevel.PROCESS
     quarantine_on_violation: bool = True
 
 
-class VerificationConfig(BaseModel):
+class VerificationConfig(SClassBaseConfig):
     """Multi-tiered verification hierarchy configuration."""
-    default_level: str = "V3"  # V0 to V7
+    default_level: VerificationLevel = VerificationLevel.V3
     adaptive: bool = True
     fail_closed: bool = True
     auto_verify: bool = True
@@ -62,26 +133,26 @@ class VerificationConfig(BaseModel):
     require_independent_observation: bool = True
 
 
-class MemoryConfig(BaseModel):
+class MemoryConfig(SClassBaseConfig):
     """Contextual memory provider configuration."""
-    provider: str = "local"  # local, mem0
+    provider: MemoryProvider = MemoryProvider.LOCAL
     db_path: str = ".sclass/db/memory.db"
     max_items: int = 10000
     enable_wal: bool = True
     decay_days: int = 30
 
 
-class FleetConfig(BaseModel):
+class FleetConfig(SClassBaseConfig):
     """Multi-agent fleet coordinator configuration."""
     enabled: bool = True
     lease_ttl_seconds: int = 300
     heartbeat_seconds: int = 30
-    conflict_strategy: str = "quarantine"  # quarantine, overwrite, reject
+    conflict_strategy: ConflictStrategy = ConflictStrategy.QUARANTINE
     db_path: str = ".sclass/db/fleet.db"
     max_active_agents: int = 16
 
 
-class PlatformConfig(BaseModel):
+class PlatformConfig(SClassBaseConfig):
     """Platform detection and compensation profile configuration."""
     primary_platform: str = "auto"
     auto_detect: bool = True
@@ -99,7 +170,7 @@ class PlatformConfig(BaseModel):
     )
 
 
-class LoggingConfig(BaseModel):
+class LoggingConfig(SClassBaseConfig):
     """Logging and telemetry configuration."""
     level: str = "INFO"
     format: str = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
@@ -107,7 +178,7 @@ class LoggingConfig(BaseModel):
     structured_json: bool = False
 
 
-class SClassConfig(BaseModel):
+class SClassConfig(SClassBaseConfig):
     """Canonical S-Class configuration root."""
     schema_version: str = "1.0.0"
     general: GeneralConfig = Field(default_factory=GeneralConfig)
@@ -139,7 +210,7 @@ class SClassConfig(BaseModel):
 
     def to_dict(self) -> Dict[str, Any]:
         """Serializes configuration to standard nested dictionary."""
-        return self.model_dump()
+        return self.model_dump(mode="json")
 
     def to_yaml(self) -> str:
         """Serializes configuration to YAML string."""

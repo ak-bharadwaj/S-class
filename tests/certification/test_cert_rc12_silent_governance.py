@@ -148,14 +148,14 @@ def test_rc12_provider_discovery_probing(rc12_ws):
     os.makedirs(agents_dir, exist_ok=True)
     all_provs = discovery.discover_all(workspace_dir=rc12_ws)
     antigrav = next(p for p in all_provs if p.platform_id == "antigravity")
-    assert antigrav.status == AdapterStatus.INSTALLED
+    assert antigrav.status == AdapterStatus.CONFIGURED
     assert antigrav.detected_by == "workspace_marker"
 
-    # 2. Probe with environment variable for Codex
+    # 2. Probe with environment variable for Codex -> CONFIGURED
     with patch.dict(os.environ, {"CODEX_HOME": rc12_ws}):
         all_provs_env = discovery.discover_all(workspace_dir=rc12_ws)
         codex_prov = next(p for p in all_provs_env if p.platform_id == "codex")
-        assert codex_prov.status == AdapterStatus.INSTALLED
+        assert codex_prov.status == AdapterStatus.CONFIGURED
         assert codex_prov.detected_by.startswith("env:")
 
 

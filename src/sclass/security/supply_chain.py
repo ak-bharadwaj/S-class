@@ -66,10 +66,11 @@ class PackageInfo:
 class SBOMResult:
     """Normalized SBOM generation evidence."""
     status: str  # SUCCESS | UNKNOWN | ERROR
-    is_verified: bool
-    format: str
-    packages_count: int
+    is_verified: bool = False
+    format: str = "spdx-json"
+    packages_count: int = 0
     packages: List[PackageInfo] = field(default_factory=list)
+    evidence_state: str = "OBSERVED"  # OBSERVED | VERIFIED | UNKNOWN | ERROR
     tool_version: str = "unknown"
     execution_duration: float = 0.0
     error: Optional[str] = None
@@ -80,6 +81,7 @@ class SBOMResult:
         return {
             "status": self.status,
             "is_verified": self.is_verified,
+            "evidence_state": self.evidence_state,
             "format": self.format,
             "packages_count": self.packages_count,
             "packages": [p.to_dict() for p in self.packages],
@@ -117,13 +119,14 @@ class VulnerabilityFinding:
 class VulnerabilityScanResult:
     """Normalized vulnerability scan evidence."""
     status: str  # SUCCESS | UNKNOWN | ERROR
-    is_verified: bool
-    findings_count: int
+    is_verified: bool = False
+    findings_count: int = 0
     findings: List[VulnerabilityFinding] = field(default_factory=list)
     critical_count: int = 0
     high_count: int = 0
     medium_count: int = 0
     low_count: int = 0
+    evidence_state: str = "OBSERVED"  # OBSERVED | VERIFIED | UNKNOWN | ERROR
     tool_version: str = "unknown"
     execution_duration: float = 0.0
     error: Optional[str] = None
@@ -133,6 +136,7 @@ class VulnerabilityScanResult:
         return {
             "status": self.status,
             "is_verified": self.is_verified,
+            "evidence_state": self.evidence_state,
             "findings_count": self.findings_count,
             "findings": [f.to_dict() for f in self.findings],
             "critical_count": self.critical_count,
@@ -281,7 +285,8 @@ class SyftProvider:
             out_hash = hashlib.sha256(proc.stdout.encode("utf-8")).hexdigest()
             return SBOMResult(
                 status="SUCCESS",
-                is_verified=True,
+                is_verified=False,
+                evidence_state="OBSERVED",
                 format=format,
                 packages_count=len(packages),
                 packages=packages,
@@ -301,6 +306,7 @@ class SyftProvider:
             return SBOMResult(
                 status="UNKNOWN",
                 is_verified=False,
+                evidence_state="UNKNOWN",
                 format=format,
                 packages_count=0,
                 tool_version=health.version,
@@ -312,6 +318,7 @@ class SyftProvider:
             return SBOMResult(
                 status="UNKNOWN",
                 is_verified=False,
+                evidence_state="UNKNOWN",
                 format=format,
                 packages_count=0,
                 tool_version=health.version,
@@ -486,7 +493,8 @@ class GrypeProvider:
             out_hash = hashlib.sha256(proc.stdout.encode("utf-8")).hexdigest()
             return VulnerabilityScanResult(
                 status="SUCCESS",
-                is_verified=True,
+                is_verified=False,
+                evidence_state="OBSERVED",
                 findings_count=len(findings),
                 findings=findings,
                 critical_count=critical,
@@ -508,6 +516,7 @@ class GrypeProvider:
             return VulnerabilityScanResult(
                 status="UNKNOWN",
                 is_verified=False,
+                evidence_state="UNKNOWN",
                 findings_count=0,
                 tool_version=health.version,
                 execution_duration=timeout,
@@ -568,6 +577,57 @@ class GrypeProvider:
         return findings
 
 
+def promote_to_verified(result: Any) -> Any:
+    """Promotes corroborated tool observation (OBSERVED) to VERIFIED S-Class evidence."""
+    if isinstance(result, SBOMResult):
+        return SBOMResult(
+            status=result.status,
+            is_verified=True,
+            evidence_state="VERIFIED",
+            format=result.format,
+            packages_count=result.packages_count,
+            packages=result.packages,
+            raw_json=result.raw_json,
+            tool_version=result.tool_version,
+            execution_duration=result.execution_duration,
+            error=result.error,
+            provenance=dict(result.provenance),
+        )
+    elif isinstance(result, VulnerabilityScanResult):
+        return VulnerabilityScanResult(
+            status=result.status,
+            is_verified=True,
+            evidence_state="VERIFIED",
+            findings_count=result.findings_count,
+            findings=result.findings,
+            critical_count=result.critical_count,
+            high_count=result.high_count,
+            medium_count=result.medium_count,
+            low_count=result.low_count,
+            tool_version=result.tool_version,
+            execution_duration=result.execution_duration,
+            error=result.error,
+            provenance=dict(result.provenance),
+        )
+    elif type(result).__name__ == "APIAssuranceResult" or hasattr(result, "violations_count"):
+        from sclass.security.api_assurance import APIAssuranceResult
+        if isinstance(result, APIAssuranceResult):
+            return APIAssuranceResult(
+                status=result.status,
+                is_verified=True,
+                evidence_state="VERIFIED",
+                endpoints_tested=result.endpoints_tested,
+                violations_count=result.violations_count,
+                violations=result.violations,
+                execution_duration=result.execution_duration,
+                tool_version=result.tool_version,
+                error=result.error,
+                provenance=dict(result.provenance),
+            )
+    return result
+
+
+
 def evaluate_supply_chain_policy(
     result: Union[SBOMResult, VulnerabilityScanResult],
     policy_mode: str = "strict",
@@ -579,8 +639,9 @@ def evaluate_supply_chain_policy(
     Law L8: Unknown security state fails closed when configured in strict mode.
     Whether UNKNOWN blocks is determined by policy/risk, not hard-coded globally.
     """
-    # 1. Handle UNKNOWN / UNVERIFIED Evidence
-    if result.status == "UNKNOWN" or not result.is_verified:
+    # 1. Handle UNKNOWN Evidence
+    is_unknown = (result.status == "UNKNOWN") or (getattr(result, "evidence_state", "") == "UNKNOWN") or (not result.is_verified and getattr(result, "evidence_state", "") != "OBSERVED")
+    if is_unknown:
         should_block = block_on_unknown if block_on_unknown is not None else (policy_mode.lower() in ("strict", "enforce", "high_risk"))
         if should_block:
             return SupplyChainPolicyDecision(

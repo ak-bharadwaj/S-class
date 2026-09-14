@@ -36,8 +36,14 @@ def count_tokens(text: str) -> int:
         return max(1, len(text) // 4)
 
 
-class CodexAgentProcess:
-    """Autonomous external agent process representing OpenAI Codex."""
+class SimulatedAgentProvider:
+    """
+    Simulated reference agent provider used for testing, benchmarking, and harnesses.
+    Explicitly marked as simulated test infrastructure (real_provider = False).
+    Commands route through canonical S-Class ExecutionProvider without shell=True.
+    """
+    provider_kind: str = "simulated"
+    real_provider: bool = False
 
     def __init__(
         self,
@@ -47,7 +53,7 @@ class CodexAgentProcess:
         report_file: Optional[str] = None,
     ) -> None:
         self.workspace_dir = os.path.abspath(workspace_dir)
-        self.session_id = session_id or f"codex_sess_{uuid.uuid4().hex[:8]}"
+        self.session_id = session_id or f"sim_sess_{uuid.uuid4().hex[:8]}"
         self.mode = mode.lower()
         self.report_file = report_file
         self.pid = os.getpid()
@@ -107,6 +113,8 @@ class CodexAgentProcess:
             "session_id": self.session_id,
             "mode": self.mode,
             "goal": goal,
+            "provider_kind": self.provider_kind,
+            "real_provider": self.real_provider,
             "steps_attempted": self.steps_attempted,
             "steps_completed": self.steps_completed,
             "steps_blocked": self.steps_blocked,
@@ -158,6 +166,7 @@ class CodexAgentProcess:
         return allowed
 
     def _handle_command(self, command: str) -> Tuple[bool, int]:
+        """Routes command execution through canonical ExecutionProvider without shell=True."""
         t0 = time.perf_counter()
         allowed = True
         reason = "Native execution"
@@ -174,16 +183,33 @@ class CodexAgentProcess:
 
         if allowed:
             try:
-                proc = subprocess.run(
-                    command,
-                    shell=True,
-                    cwd=self.workspace_dir,
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
+                from sclass.execution.base import split_command
+                from sclass.execution.native import NativeProcessProvider
+                from sclass.domain.action import ActionRequest
+                from sclass.domain.capability import CAP_TERMINAL_EXECUTE
+
+                req = ActionRequest(
+                    actor="simulated_agent",
+                    session=self.session_id,
+                    capability=CAP_TERMINAL_EXECUTE,
+                    action="run_command",
+                    target=command,
+                    parameters={"command": command},
+                    workspace=self.workspace_dir,
+                    provenance={"provider": "simulated_agent", "real_provider": False},
                 )
-                exit_code = proc.returncode
+                tokens = split_command(command)
+                exec_provider = NativeProcessProvider()
+                res = exec_provider.execute(
+                    command=tokens,
+                    request=req,
+                    timeout=30.0,
+                    cwd=self.workspace_dir,
+                )
+                exit_code = res.exit_code
                 self.steps_completed += 1
+                if exit_code != 0:
+                    reason = res.stderr.strip() or f"Exited with code {exit_code}"
             except Exception as e:
                 exit_code = 1
                 reason = str(e)
@@ -200,6 +226,11 @@ class CodexAgentProcess:
             "duration_ms": dt,
         })
         return allowed, exit_code
+
+
+# Backward-compatibility aliases
+CodexAgentProcess = SimulatedAgentProvider
+TestAgentProcess = SimulatedAgentProvider
 
 
 def main():

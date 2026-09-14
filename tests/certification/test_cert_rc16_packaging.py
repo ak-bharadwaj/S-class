@@ -81,14 +81,17 @@ def test_rc16_default_config_schema():
     assert cfg.logging.level == "INFO"
 
     # Test authorization alias setter
+    cfg.authorization.experimental = True
     cfg.authorization.provider = "cedar"
     assert cfg.policy.provider == "cedar"
+
 
 
 def test_rc16_config_yaml_serialization_and_roundtrip(temp_ws):
     """Validates YAML serialization, disk persistence, and round-trip fidelity."""
     cfg = generate_default_config()
     cfg.general.workspace_name = "test-project"
+    cfg.policy.experimental = True
     cfg.policy.provider = "cedar"
     cfg.verification.default_level = "V5"
 
@@ -132,6 +135,7 @@ def test_rc16_config_env_var_overrides(temp_ws):
     env_overrides = {
         "SCLASS_MODE": "silent",
         "SCLASS_POLICY_PROVIDER": "cedar",
+        "SCLASS_POLICY_EXPERIMENTAL": "true",
         "SCLASS_EXECUTION_PROVIDER": "sandbox",
         "SCLASS_VERIFICATION_DEFAULT_LEVEL": "V7",
         "SCLASS_FAIL_CLOSED": "false",
@@ -151,7 +155,7 @@ def test_rc16_platform_detection(temp_ws):
     """Validates multi-modal agent platform auto-discovery across markers and environments."""
     installer = ProductInstaller(temp_ws)
 
-    # Initial state - no markers
+    # Initial state
     detected = installer.detect_platforms()
     assert len(detected) >= 6
     plat_map = {p.platform_id: p for p in detected}
@@ -161,19 +165,19 @@ def test_rc16_platform_detection(temp_ws):
     assert "antigravity" in plat_map
     assert "windsurf" in plat_map
     assert "copilot" in plat_map
+    assert plat_map["windsurf"].discovery_state == "NOT_DETECTED"
 
-    # Add workspace markers for Cursor and Antigravity
-    with open(os.path.join(temp_ws, ".cursorrules"), "w") as f:
-        f.write("# Cursor rules")
-    os.makedirs(os.path.join(temp_ws, ".agents", "skills"), exist_ok=True)
+    # Add workspace marker for Windsurf
+    with open(os.path.join(temp_ws, ".windsurfrules"), "w") as f:
+        f.write("# Windsurf rules")
 
     detected2 = installer.detect_platforms()
     plat_map2 = {p.platform_id: p for p in detected2}
 
-    assert plat_map2["cursor"].installed is True
-    assert "workspace_marker" in plat_map2["cursor"].detected_by
-    assert plat_map2["antigravity"].installed is True
-    assert "workspace_marker" in plat_map2["antigravity"].detected_by
+    assert plat_map2["windsurf"].configured is True
+    assert plat_map2["windsurf"].installed is False
+    assert plat_map2["windsurf"].discovery_state == "CONFIGURED"
+    assert "workspace_marker" in plat_map2["windsurf"].detected_by
 
 
 def test_rc16_product_installer_workspace_scaffolding(temp_ws):

@@ -152,9 +152,10 @@ class CedarRule:
 
 class CedarProvider(PolicyProvider):
     """
-    Experimental, non-blocking Cedar policy engine provider.
-    Evaluates principal/action/resource/context authorizations and normalizes them
-    into canonical S-Class AuthorizationDecisions.
+    Experimental, Cedar-compatible parser/evaluator provider implementing the PolicyProvider abstraction.
+    This is a lightweight Cedar-compatible experimental parser/evaluator for non-production use,
+    not the official Rust Cedar engine (cedarpy is used when installed, otherwise this fallback evaluator runs).
+    Enforces strict default-deny (UNKNOWN -> DENY) when no policies are configured.
     """
 
     def __init__(
@@ -163,10 +164,14 @@ class CedarProvider(PolicyProvider):
         policy_version: str = "1.0.0-cedar",
         non_blocking: bool = True,
         strict_fail_closed: bool = False,
+        experimental: bool = True,
     ):
+        if not experimental:
+            raise ValueError("CedarProvider requires explicit experimental opt-in: experimental=True")
         self._policy_version = policy_version
         self.non_blocking = non_blocking
         self.strict_fail_closed = strict_fail_closed
+        self.experimental = experimental
         self._rules: List[CedarRule] = []
         self._cedarpy = None
         try:
@@ -181,9 +186,7 @@ class CedarProvider(PolicyProvider):
                     self.add_policy(p)
             elif isinstance(policies, str):
                 self.add_policy(policies)
-        else:
-            # Default permissive rule for unconfigured experimental Cedar
-            self.add_policy('permit (principal, action, resource);')
+        # Default when no policies provided: NO permissive rule added. Rules remain empty (default-deny).
 
     @property
     def provider_name(self) -> str:
@@ -346,52 +349,43 @@ class CedarProvider(PolicyProvider):
                     },
                 )
 
-            # Default: No permit matched
-            if self.non_blocking and not self.strict_fail_closed:
-                # In non-blocking experimental mode, warn rather than break roadmap
+            # Default: No policy or no permit matched
+            if not self._rules:
                 return AuthorizationDecision(
-                    outcome=DecisionOutcome.WARN if mode == "enforce" else DecisionOutcome.ALLOW,
-                    policy_id="CEDAR-DEFAULT-DENY-NONBLOCKING",
-                    risk_level="MEDIUM",
-                    reason="Cedar policy did not explicitly permit (non-blocking experimental mode permits progression with warning)",
-                    metadata={
-                        "principal": principal,
-                        "action": action,
-                        "resource": resource,
-                        "experimental": True,
-                        "provider": "cedar",
-                    },
-                )
-            else:
-                return AuthorizationDecision(
-                    outcome=DecisionOutcome.DENY,
-                    policy_id="CEDAR-DEFAULT-DENY",
+                    outcome=DecisionOutcome.DENY if (mode == "enforce" or self.strict_fail_closed) else DecisionOutcome.WARN,
+                    policy_id="CEDAR-NO-POLICY-DENY",
                     risk_level="HIGH",
-                    reason="Denied by Cedar policy: No matching permit statement found",
+                    reason="Denied by Cedar policy: No policy configured (UNKNOWN). Default-deny enforced.",
                     metadata={
                         "principal": principal,
                         "action": action,
                         "resource": resource,
                         "experimental": True,
                         "provider": "cedar",
+                        "status": "UNKNOWN",
                     },
                 )
 
+            return AuthorizationDecision(
+                outcome=DecisionOutcome.DENY if (mode == "enforce" or self.strict_fail_closed) else DecisionOutcome.WARN,
+                policy_id="CEDAR-DEFAULT-DENY",
+                risk_level="HIGH",
+                reason="Denied by Cedar policy: No matching permit statement found",
+                metadata={
+                    "principal": principal,
+                    "action": action,
+                    "resource": resource,
+                    "experimental": True,
+                    "provider": "cedar",
+                },
+            )
+
         except Exception as ex:
             logger.error(f"Cedar evaluation exception: {ex}")
-            if self.non_blocking and not self.strict_fail_closed:
-                # Cedar must never block the MVP roadmap
-                return AuthorizationDecision(
-                    outcome=DecisionOutcome.WARN,
-                    policy_id="CEDAR-EVAL-ERROR-NONBLOCKING",
-                    risk_level="LOW",
-                    reason=f"Cedar experimental evaluation error suppressed: {ex}",
-                    metadata={"error": str(ex), "experimental": True, "provider": "cedar"},
-                )
             return AuthorizationDecision(
                 outcome=DecisionOutcome.DENY,
                 policy_id="CEDAR-EVAL-ERROR",
                 risk_level="CRITICAL",
-                reason=f"Cedar policy evaluation failure: {ex}",
-                metadata={"error": str(ex), "experimental": True, "provider": "cedar"},
+                reason=f"Cedar policy evaluation failure: {ex} (UNKNOWN)",
+                metadata={"error": str(ex), "experimental": True, "provider": "cedar", "status": "UNKNOWN"},
             )
