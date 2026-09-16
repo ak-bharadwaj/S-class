@@ -1,0 +1,1 @@
+"""S-Class Structural Contracts."""
