@@ -215,6 +215,31 @@ class StateRepository:
                 metadata=json.loads(row["metadata_json"]),
             )
 
+    def list_claims(self, task_id: Optional[str] = None) -> List[Claim]:
+        """Lists claims with optional task_id filtering."""
+        clauses = []
+        params = []
+        if task_id:
+            clauses.append("task_id = ?")
+            params.append(task_id)
+        where_str = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        query = f"SELECT * FROM claims {where_str} ORDER BY created_at ASC"
+        with self.store.get_connection() as conn:
+            rows = conn.execute(query, params).fetchall()
+            return [
+                Claim(
+                    claim_id=r["claim_id"],
+                    task_id=r["task_id"],
+                    statement=r["statement"],
+                    claim_type=r["claim_type"],
+                    verifier=r["verifier"],
+                    target_files=tuple(json.loads(r["target_files_json"])),
+                    created_at=r["created_at"],
+                    metadata=json.loads(r["metadata_json"]),
+                )
+                for r in rows
+            ]
+
     def save_verification(self, result: VerificationResult) -> None:
         """Records a verification result."""
         import uuid
@@ -334,6 +359,10 @@ class StateRepository:
         """
         curr_ob_json = json.dumps(record.current_repair_obligation.to_dict()) if record.current_repair_obligation else None
         res_ver_json = json.dumps(record.resulting_verification) if record.resulting_verification else None
+        meta = dict(record.metadata)
+        if getattr(record, "regression_assessment", None):
+            meta["regression_assessment"] = record.regression_assessment.to_dict()
+
         data = {
             "recovery_id": record.recovery_id,
             "task_id": record.task_id,
@@ -353,7 +382,7 @@ class StateRepository:
             "current_repair_obligation_json": curr_ob_json,
             "resulting_verification_json": res_ver_json,
             "history_json": json.dumps(list(record.history)),
-            "metadata_json": json.dumps(dict(record.metadata)),
+            "metadata_json": json.dumps(meta),
         }
         conn = self.store.get_connection()
         try:
@@ -400,7 +429,7 @@ class StateRepository:
 
     def _row_to_recovery_record(self, row: Any) -> Any:
         """Converts an SQLite row to a RecoveryRecord."""
-        from sclass.recovery.models import RecoveryRecord, RecoveryState, RepairObligation
+        from sclass.recovery.models import RecoveryRecord, RecoveryState, RepairObligation, RegressionAssessment
         curr_ob = None
         if row["current_repair_obligation_json"]:
             curr_ob = RepairObligation.from_dict(json.loads(row["current_repair_obligation_json"]))
@@ -408,6 +437,11 @@ class StateRepository:
         res_ver = None
         if row["resulting_verification_json"]:
             res_ver = json.loads(row["resulting_verification_json"])
+
+        meta = json.loads(row["metadata_json"]) if row["metadata_json"] else {}
+        reg_assess = None
+        if "regression_assessment" in meta and meta["regression_assessment"]:
+            reg_assess = RegressionAssessment.from_dict(meta["regression_assessment"])
 
         return RecoveryRecord(
             recovery_id=row["recovery_id"],
@@ -428,5 +462,6 @@ class StateRepository:
             current_repair_obligation=curr_ob,
             history=json.loads(row["history_json"]) if row["history_json"] else [],
             resulting_verification=res_ver,
-            metadata=json.loads(row["metadata_json"]) if row["metadata_json"] else {},
+            metadata=meta,
+            regression_assessment=reg_assess,
         )

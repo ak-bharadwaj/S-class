@@ -26,6 +26,7 @@ from sclass.recovery.models import (
     RecoveryAttempt,
     RecoveryRecord,
     RecoveryResult,
+    RegressionAssessment,
 )
 from sclass.recovery.state_machine import RecoveryStateMachine
 from sclass.recovery.persistence import RecoveryPersistence
@@ -36,6 +37,7 @@ from sclass.core.errors import (
     RecoveryPersistenceError,
 )
 from sclass.domain.verification import VerificationResult as DomainVerificationResult
+from sclass.domain.claim import Claim
 from sclass.domain.evidence import (
     EvidenceReceipt as DomainEvidenceReceipt,
     ObservedReceipt as DomainObservedReceipt,
@@ -52,6 +54,23 @@ from sclass.trust.ledger import LocalLedger
 
 AUTH_VERIFICATION_CLASSES = (DomainVerificationResult, SurvivalVerificationResult)
 AUTH_RECEIPT_CLASSES = (DomainObservedReceipt, DomainEvidenceReceipt, ObservedReceipt, EvidenceReceipt)
+
+
+def _paths_overlap(claim_targets: set, repair_files: set) -> bool:
+    """Returns True if there is any definite target overlap between claim targets and repair files."""
+    if not claim_targets or not repair_files:
+        return False
+    if claim_targets & repair_files:
+        return True
+    for t in claim_targets:
+        t_clean = t.replace("\\", "/").strip("/")
+        for r in repair_files:
+            r_clean = r.replace("\\", "/").strip("/")
+            if t_clean == r_clean:
+                return True
+            if t_clean.endswith("/" + r_clean) or r_clean.endswith("/" + t_clean):
+                return True
+    return False
 
 
 class RecoveryEngine:
@@ -703,6 +722,271 @@ class RecoveryEngine:
 
         self.persistence.save_recovery(record)
 
+    def determine_regression_set(
+        self,
+        task_id: str,
+        repaired_claim_id: Optional[str] = None,
+        repair_evidence: Optional[Any] = None,
+    ) -> Tuple[List[Claim], List[str]]:
+        """
+        Determines which previously accepted claims for task_id require reassessment.
+        Returns:
+            (reassessment_claims, unaffected_claim_ids)
+
+        Rules (conservative regression set determination):
+        1. Definite dependency/target overlap -> reassess.
+        2. Dependency information unavailable/ambiguous -> conservatively reassess.
+        3. Never assume an accepted claim is unaffected merely because caller says so.
+        """
+        state_repo = StateRepository(self.workspace_dir)
+        task_claims = state_repo.list_claims(task_id=task_id)
+
+        # Identify previously accepted claims (excluding the claim currently under repair)
+        accepted_claims: List[Claim] = []
+        for c in task_claims:
+            if repaired_claim_id and c.claim_id == repaired_claim_id:
+                continue
+            verifs = state_repo.list_verifications(claim_id=c.claim_id)
+            if any(str(v.get("status", "")).upper() in ("ACCEPT", "PASS") for v in verifs):
+                accepted_claims.append(c)
+
+        if not accepted_claims:
+            return [], []
+
+        # Extract changed files from repair evidence
+        repair_files: Optional[set] = None
+        if repair_evidence is not None:
+            raw_files = getattr(repair_evidence, "files_changed", None)
+            if raw_files is None and hasattr(repair_evidence, "metadata") and isinstance(repair_evidence.metadata, dict):
+                raw_files = repair_evidence.metadata.get("files_changed")
+            if raw_files is not None and isinstance(raw_files, (list, tuple, set)):
+                repair_files = {
+                    os.path.normcase(os.path.normpath(str(f).replace("\\", "/")))
+                    for f in raw_files
+                    if str(f).strip()
+                }
+
+        reassessment_claims: List[Claim] = []
+        unaffected_claim_ids: List[str] = []
+
+        for claim in accepted_claims:
+            # If repair files are unavailable/ambiguous (None or empty while repair evidence was not supplied or had no files):
+            # Rule 2: dependency information unavailable/ambiguous -> conservatively reassess
+            if repair_files is None or len(repair_files) == 0:
+                reassessment_claims.append(claim)
+                continue
+
+            # Extract claim targets / scope
+            claim_targets: set = set()
+            if claim.target_files:
+                for tf in claim.target_files:
+                    claim_targets.add(os.path.normcase(os.path.normpath(str(tf).replace("\\", "/"))))
+            if claim.scope:
+                for p in getattr(claim.scope, "paths", ()):
+                    claim_targets.add(os.path.normcase(os.path.normpath(str(p).replace("\\", "/"))))
+                for tt in getattr(claim.scope, "test_targets", ()):
+                    claim_targets.add(os.path.normcase(os.path.normpath(str(tt).replace("\\", "/"))))
+            if claim.metadata and isinstance(claim.metadata, dict):
+                for k in ("target_files", "dependencies", "paths"):
+                    val = claim.metadata.get(k)
+                    if isinstance(val, (list, tuple)):
+                        for item in val:
+                            claim_targets.add(os.path.normcase(os.path.normpath(str(item).replace("\\", "/"))))
+
+            # If claim target information is unavailable or empty:
+            # Rule 2: dependency information unavailable/ambiguous -> conservatively reassess
+            if not claim_targets:
+                reassessment_claims.append(claim)
+                continue
+
+            # Rule 1: definite dependency/target overlap -> reassess
+            if _paths_overlap(claim_targets, repair_files):
+                reassessment_claims.append(claim)
+            else:
+                # Canonical dependency evidence establishes no impact -> unaffected
+                unaffected_claim_ids.append(claim.claim_id)
+
+        return reassessment_claims, unaffected_claim_ids
+
+    def assess_regression(
+        self,
+        recovery_id: str,
+        repair_evidence: Optional[Any] = None,
+        regression_verifications: Optional[List[Any]] = None,
+        fail_closed: bool = True,
+    ) -> RegressionAssessment:
+        """
+        Independently evaluates whether repairs caused regressions to previously accepted claims.
+        Enforces:
+        - Independent S-Class evaluation from StateRepository (not caller assertion).
+        - Conservative regression set determination.
+        - Strict fail-closed provenance validation (D9.1.2 / D9.1.3).
+        - Fresh authoritative verification for every affected claim.
+        """
+        record = self.persistence.load_recovery(recovery_id)
+        if not record:
+            raise RecoveryError(f"Recovery record '{recovery_id}' not found.")
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        # 1. Determine regression set conservatively
+        reassessment_claims, unaffected_claim_ids = self.determine_regression_set(
+            task_id=record.task_id,
+            repaired_claim_id=record.affected_claim_id,
+            repair_evidence=repair_evidence,
+        )
+
+        # If no previously accepted claims are affected:
+        if not reassessment_claims:
+            assessment = RegressionAssessment(
+                affected_claim_ids=(),
+                reverified_claim_ids=(),
+                failed_claim_ids=(),
+                stale_claim_ids=(),
+                regression_passed=True,
+                assessment_time=now_iso,
+                unaffected_claim_ids=tuple(unaffected_claim_ids),
+                provenance_references={},
+                reason="No previously accepted claims affected by repair.",
+            )
+            record.regression_assessment = assessment
+            self.persistence.save_recovery(record)
+            return assessment
+
+        affected_claim_ids = tuple(c.claim_id for c in reassessment_claims)
+        verif_list = list(regression_verifications or [])
+
+        # Map regression verifications by claim_id
+        reverified_map: Dict[str, Any] = {}
+        failed_claims: List[str] = []
+        stale_claims: List[str] = []
+        provenance_refs: Dict[str, str] = {}
+
+        for v in verif_list:
+            if v is None:
+                continue
+
+            # Must be authoritative VerificationResult
+            if not isinstance(v, AUTH_VERIFICATION_CLASSES):
+                err_msg = (
+                    f"Recovery accepts only established S-Class verification authority: "
+                    f"regression verification must be VerificationResult, received '{type(v).__name__}'."
+                )
+                if fail_closed:
+                    raise RecoveryError(err_msg)
+                failed_claims.append("unknown_claim")
+                continue
+
+            v_claim = getattr(v, "claim_id", None)
+            if not v_claim:
+                err_msg = "Missing claim binding: regression verification lacks claim_id."
+                if fail_closed:
+                    raise RecoveryError(err_msg)
+                failed_claims.append("unknown_claim")
+                continue
+
+            if v_claim not in affected_claim_ids:
+                err_msg = (
+                    f"Wrong claim regression result: verification claim_id '{v_claim}' "
+                    f"is not in the required regression set {affected_claim_ids}."
+                )
+                if fail_closed:
+                    raise RecoveryError(err_msg)
+                failed_claims.append(v_claim)
+                continue
+
+            v_task = getattr(v, "task_id", None)
+            if v_task and v_task != record.task_id:
+                err_msg = (
+                    f"Task mismatch: regression verification task_id '{v_task}' "
+                    f"does not match expected task_id '{record.task_id}'."
+                )
+                if fail_closed:
+                    raise RecoveryError(err_msg)
+                failed_claims.append(v_claim)
+                continue
+
+            # Check staleness
+            if getattr(v, "invalidation_reason", None):
+                err_msg = (
+                    f"Evidence is stale: regression verification for claim '{v_claim}' is invalidated: "
+                    f"{v.invalidation_reason}"
+                )
+                if fail_closed:
+                    raise RecoveryError(err_msg)
+                stale_claims.append(v_claim)
+                continue
+
+            # Check status
+            v_status = str(getattr(v, "status", "")).upper()
+            if v_status not in ("ACCEPT", "PASS"):
+                err_msg = (
+                    f"Conflicting regression result: regression verification for claim '{v_claim}' "
+                    f"has status '{v.status}' (reason: {getattr(v, 'reason', '')})."
+                )
+                if fail_closed:
+                    raise RecoveryError(err_msg)
+                failed_claims.append(v_claim)
+                continue
+
+            # Validate full canonical verification provenance (D9.1.2/D9.1.3)
+            try:
+                self._validate_canonical_verification_provenance(
+                    verification_result=v,
+                    expected_claim_id=v_claim,
+                    expected_task_id=record.task_id,
+                    expected_status=v.status,
+                )
+            except RecoveryError as e:
+                if fail_closed:
+                    raise
+                failed_claims.append(v_claim)
+                continue
+
+            reverified_map[v_claim] = v
+            provenance_refs[v_claim] = v.receipt_id or (v.verification_event.receipt_id if v.verification_event else "")
+
+        # Check for missing required regression verifications
+        missing_claims = [cid for cid in affected_claim_ids if cid not in reverified_map]
+        if missing_claims:
+            err_msg = (
+                f"Missing required regression verification: affected claim(s) {missing_claims} "
+                f"must be reverified from fresh authoritative evidence."
+            )
+            if fail_closed:
+                assessment = RegressionAssessment(
+                    affected_claim_ids=affected_claim_ids,
+                    reverified_claim_ids=tuple(reverified_map.keys()),
+                    failed_claim_ids=tuple(failed_claims + missing_claims),
+                    stale_claim_ids=tuple(stale_claims),
+                    regression_passed=False,
+                    assessment_time=now_iso,
+                    unaffected_claim_ids=tuple(unaffected_claim_ids),
+                    provenance_references=provenance_refs,
+                    reason=err_msg,
+                )
+                record.regression_assessment = assessment
+                self.persistence.save_recovery(record)
+                raise RecoveryError(err_msg)
+            failed_claims.extend(missing_claims)
+
+        regression_passed = len(failed_claims) == 0 and len(stale_claims) == 0 and len(missing_claims) == 0
+
+        assessment = RegressionAssessment(
+            affected_claim_ids=affected_claim_ids,
+            reverified_claim_ids=tuple(reverified_map.keys()),
+            failed_claim_ids=tuple(failed_claims),
+            stale_claim_ids=tuple(stale_claims),
+            regression_passed=regression_passed,
+            assessment_time=now_iso,
+            unaffected_claim_ids=tuple(unaffected_claim_ids),
+            provenance_references=provenance_refs,
+            reason="All affected claims independently reverified." if regression_passed else "Regression reassessment failed.",
+        )
+        record.regression_assessment = assessment
+        self.persistence.save_recovery(record)
+        return assessment
+
     def evaluate_convergence(
         self,
         recovery_id: str,
@@ -710,6 +994,7 @@ class RecoveryEngine:
         evidence: Optional[Any] = None,
         known_accepted_obligations: Optional[List[str]] = None,
         invalidated_obligations: Optional[List[str]] = None,
+        regression_verifications: Optional[List[Any]] = None,
     ) -> RecoveryResult:
         """
         Evaluates re-verification evidence against the recovery state machine.
@@ -718,6 +1003,7 @@ class RecoveryEngine:
         - Rejects plain dicts, textual assertions, and fabricated objects.
         - Requires authoritative receipt/verification identity.
         - Binds convergence to the affected obligation and claim.
+        - Canonical regression reassessment: gates convergence on regression success.
         - Stale or failed verification returns to REPAIR_REQUIRED (or RECOVERY_EXHAUSTED).
         - Regression protection: preserves previously accepted unaffected obligations.
         """
@@ -835,6 +1121,14 @@ class RecoveryEngine:
         prev_state = record.current_state
 
         if is_verified:
+            # D9.2: Canonical Regression Reassessment (must pass before CONVERGED)
+            reg_assessment = self.assess_regression(
+                recovery_id=recovery_id,
+                repair_evidence=evidence,
+                regression_verifications=regression_verifications,
+                fail_closed=True,
+            )
+
             # Transition REVERIFY_REQUIRED -> CONVERGED
             RecoveryStateMachine.validate_transition(prev_state, RecoveryState.CONVERGED)
             record.current_state = RecoveryState.CONVERGED
@@ -844,6 +1138,7 @@ class RecoveryEngine:
                 "evidence_id": verif_receipt_id,
                 "reason": verif_reason,
             }
+            record.regression_assessment = reg_assessment
             record.history.append({
                 "event": "convergence_established",
                 "from_state": prev_state.value,
@@ -856,6 +1151,12 @@ class RecoveryEngine:
             # Regression protection: distinguish repaired, preserved, and invalidated
             known = list(known_accepted_obligations or [])
             inval = list(invalidated_obligations or [])
+            for cid in reg_assessment.reverified_claim_ids:
+                if cid not in known and cid not in inval and cid != record.affected_obligation_id:
+                    known.append(cid)
+            for cid in reg_assessment.unaffected_claim_ids:
+                if cid not in known and cid not in inval and cid != record.affected_obligation_id:
+                    known.append(cid)
             preserved = [ob for ob in known if ob not in inval and ob != record.affected_obligation_id]
 
             return RecoveryResult(

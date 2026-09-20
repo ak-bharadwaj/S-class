@@ -8,6 +8,7 @@ from sclass.recovery.models import (
     RecoveryAttempt,
     RecoveryRecord,
     RecoveryResult,
+    RegressionAssessment,
 )
 from sclass.recovery.state_machine import RecoveryStateMachine
 from sclass.recovery.persistence import RecoveryPersistence
@@ -26,6 +27,7 @@ __all__ = [
     "RecoveryAttempt",
     "RecoveryRecord",
     "RecoveryResult",
+    "RegressionAssessment",
     "RecoveryEngine",
     "RecoveryPersistence",
     "RecoveryError",

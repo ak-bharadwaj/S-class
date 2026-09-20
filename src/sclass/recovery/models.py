@@ -122,6 +122,50 @@ class RecoveryAttempt:
         )
 
 
+@dataclass(frozen=True)
+class RegressionAssessment:
+    """
+    Canonical regression assessment outcome.
+    Evaluates whether repairs caused regressions to previously accepted claims.
+    """
+    affected_claim_ids: Tuple[str, ...]
+    reverified_claim_ids: Tuple[str, ...]
+    failed_claim_ids: Tuple[str, ...]
+    stale_claim_ids: Tuple[str, ...]
+    regression_passed: bool
+    assessment_time: str
+    unaffected_claim_ids: Tuple[str, ...] = field(default_factory=tuple)
+    provenance_references: Dict[str, str] = field(default_factory=dict)
+    reason: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "affected_claim_ids": list(self.affected_claim_ids),
+            "reverified_claim_ids": list(self.reverified_claim_ids),
+            "failed_claim_ids": list(self.failed_claim_ids),
+            "stale_claim_ids": list(self.stale_claim_ids),
+            "unaffected_claim_ids": list(self.unaffected_claim_ids),
+            "regression_passed": self.regression_passed,
+            "assessment_time": self.assessment_time,
+            "provenance_references": dict(self.provenance_references),
+            "reason": self.reason,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> RegressionAssessment:
+        return cls(
+            affected_claim_ids=tuple(data.get("affected_claim_ids", [])),
+            reverified_claim_ids=tuple(data.get("reverified_claim_ids", [])),
+            failed_claim_ids=tuple(data.get("failed_claim_ids", [])),
+            stale_claim_ids=tuple(data.get("stale_claim_ids", [])),
+            unaffected_claim_ids=tuple(data.get("unaffected_claim_ids", [])),
+            regression_passed=bool(data.get("regression_passed", False)),
+            assessment_time=data.get("assessment_time", ""),
+            provenance_references=dict(data.get("provenance_references", {})),
+            reason=data.get("reason", ""),
+        )
+
+
 @dataclass
 class RecoveryRecord:
     """
@@ -147,6 +191,7 @@ class RecoveryRecord:
     history: List[Dict[str, Any]] = field(default_factory=list)
     resulting_verification: Optional[Dict[str, Any]] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+    regression_assessment: Optional[RegressionAssessment] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -169,6 +214,7 @@ class RecoveryRecord:
             "history": list(self.history),
             "resulting_verification": dict(self.resulting_verification) if self.resulting_verification else None,
             "metadata": dict(self.metadata),
+            "regression_assessment": self.regression_assessment.to_dict() if self.regression_assessment else None,
         }
 
     @classmethod
@@ -176,6 +222,11 @@ class RecoveryRecord:
         repair_ob = None
         if data.get("current_repair_obligation"):
             repair_ob = RepairObligation.from_dict(data["current_repair_obligation"])
+
+        reg_assess = None
+        reg_data = data.get("regression_assessment") or data.get("metadata", {}).get("regression_assessment")
+        if reg_data:
+            reg_assess = RegressionAssessment.from_dict(reg_data)
 
         return cls(
             recovery_id=data["recovery_id"],
@@ -197,6 +248,7 @@ class RecoveryRecord:
             history=list(data.get("history", [])),
             resulting_verification=dict(data.get("resulting_verification")) if data.get("resulting_verification") else None,
             metadata=dict(data.get("metadata", {})),
+            regression_assessment=reg_assess,
         )
 
 
