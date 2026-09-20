@@ -187,27 +187,27 @@ class ExecutionEnvelope:
     issued_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     signature: str = ""
 
-    def verify(
+    def verify_integrity(
         self,
         secret_key: Optional[bytes] = None,
         expected_registry_generation: Optional[int] = None,
         expected_policy_version: Optional[str] = None,
-    ) -> bool:
-        """Verifies envelope authorization, authenticity, integrity, and binding."""
+    ) -> Tuple[bool, str]:
+        """Verifies envelope authorization, authenticity, integrity, and binding. Returns (is_valid, error_reason)."""
         if not self.authorization_decision or not self.authorization_decision.is_allowed:
-            return False
+            return False, "AuthorizationDecision is missing or not allowed."
         if not self.envelope_id or not self.signature or not self.action_request or not self.task_id:
-            return False
+            return False, "ExecutionEnvelope missing required envelope fields."
 
         # Verify task_id matches action_request context
         req_task = self.action_request.task_id or self.action_request.session
         if req_task and self.task_id != req_task:
-            return False
+            return False, f"Execution-context binding mismatch: envelope task_id '{self.task_id}' does not match request task_id '{req_task}'."
 
         key = secret_key or get_authorization_secret()
 
         # 1. Authority Authenticity & Integrity of the D5 decision
-        valid_dec, _ = verify_decision_integrity(
+        valid_dec, dec_err = verify_decision_integrity(
             self.authorization_decision,
             self.action_request,
             expected_registry_generation=expected_registry_generation,
@@ -215,7 +215,7 @@ class ExecutionEnvelope:
             secret_key=key,
         )
         if not valid_dec:
-            return False
+            return False, dec_err
 
         # 2. Envelope HMAC signature verification
         expected_sig = compute_envelope_signature(
@@ -226,9 +226,23 @@ class ExecutionEnvelope:
             secret_key=key,
         )
         if not hmac.compare_digest(self.signature, expected_sig):
-            return False
+            return False, "Envelope signature is invalid or forged."
 
-        return True
+        return True, ""
+
+    def verify(
+        self,
+        secret_key: Optional[bytes] = None,
+        expected_registry_generation: Optional[int] = None,
+        expected_policy_version: Optional[str] = None,
+    ) -> bool:
+        """Verifies envelope authorization, authenticity, integrity, and binding."""
+        valid, _ = self.verify_integrity(
+            secret_key=secret_key,
+            expected_registry_generation=expected_registry_generation,
+            expected_policy_version=expected_policy_version,
+        )
+        return valid
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -380,9 +394,9 @@ class SliceController:
             raise SecurityViolationError(f"Event journal is corrupt or unreadable: {e}") from e
 
         # 2. From persistent trust file
-        consumed_file = self._get_consumed_file_path()
-        if os.path.exists(consumed_file):
-            try:
+        try:
+            consumed_file = self._get_consumed_file_path()
+            if os.path.exists(consumed_file):
                 with open(consumed_file, "r", encoding="utf-8") as f:
                     for line_num, line in enumerate(f, start=1):
                         line = line.strip()
@@ -391,10 +405,10 @@ class SliceController:
                             if not isinstance(data, dict) or "envelope_id" not in data or not data["envelope_id"]:
                                 raise SecurityViolationError(f"Malformed consumed record in admission store at line {line_num}: missing 'envelope_id'.")
                             self.consumed_envelopes.add(data["envelope_id"])
-            except SecurityViolationError:
-                raise
-            except Exception as e:
-                raise SecurityViolationError(f"Durable admission store is corrupt or unreadable: {e}") from e
+        except SecurityViolationError:
+            raise
+        except Exception as e:
+            raise SecurityViolationError(f"Durable admission store is corrupt or unreadable: {e}") from e
 
     def is_consumed(self, envelope_id: str) -> bool:
         """Checks if an envelope ID has been consumed (re-checking persistent storage)."""
@@ -475,15 +489,16 @@ class SliceController:
         current_gen = getattr(getattr(self.auth_service, "capability_registry", None), "generation", None)
         if current_gen is None:
             current_gen = CapabilityResolver.get_global_registry().generation
-        current_pol_ver = getattr(self.auth_service, "policy_version", "1.0.0")
+        current_pol_ver = getattr(self.auth_service, "policy_version", None) or "1.0.0"
 
-        if not envelope.verify(
+        valid_env, env_err = envelope.verify_integrity(
             secret_key=self.secret_key,
             expected_registry_generation=current_gen,
             expected_policy_version=current_pol_ver,
-        ):
+        )
+        if not valid_env:
             raise SecurityViolationError(
-                "ExecutionEnvelope verification failed: AuthorizationDecision not allowed, forged, or tampered."
+                f"ExecutionEnvelope verification failed: {env_err}"
             )
 
         dec = envelope.authorization_decision
@@ -584,7 +599,7 @@ class SliceExecutor:
         # Resolve authoritative capability from registry to independently verify capability binding
         reg = getattr(getattr(self.controller, "auth_service", None), "capability_registry", None) or CapabilityResolver.get_global_registry()
         current_gen = reg.generation
-        current_pol_ver = getattr(getattr(self.controller, "auth_service", None), "policy_version", "1.0.0")
+        current_pol_ver = getattr(getattr(self.controller, "auth_service", None), "policy_version", None) or "1.0.0"
 
         expected_cap = reg.resolve(req, workspace_dir=self.workspace_dir)
         if expected_cap is None:
@@ -811,6 +826,7 @@ def verify_canonical_acceptance(
         and entry.get("payload", {}).get("claim_id") == target_claim.claim_id
         and entry.get("payload", {}).get("receipt_id") == task.verified_receipt_id
         and entry.get("payload", {}).get("decision") == "ACCEPT"
+        and (not entry.get("payload", {}).get("receipt_hash") or entry.get("payload", {}).get("receipt_hash") == payload.get("receipt_hash"))
         for entry in all_entries
     )
     if not has_ledger_acceptance:
@@ -854,16 +870,21 @@ def verify_canonical_acceptance(
         if evt.type == "sclass.task.verified" and evt.subject == f"task:{task_id}":
             if evt.data.get("verified_receipt_id") != task.verified_receipt_id:
                 continue
+            if evt.data.get("receipt_hash") and evt.data.get("receipt_hash") != receipt_obj.receipt_hash:
+                continue
             acc_dec = evt.data.get("acceptance_decision")
             if not acc_dec:
                 continue
             # Require AcceptanceDecision.claim_id == target_claim.claim_id
             if acc_dec.get("claim_id") != target_claim.claim_id:
                 continue
-            if acc_dec.get("decision") == "ACCEPT" or acc_dec.get("is_accepted") is True:
-                composite_accepted = True
-                matching_journal_dec = acc_dec
-                break
+            if acc_dec.get("decision") != "ACCEPT" and not acc_dec.get("is_accepted"):
+                continue
+            if acc_dec.get("unsatisfied_requirements"):
+                continue
+            composite_accepted = True
+            matching_journal_dec = acc_dec
+            break
 
     if not composite_accepted or not matching_journal_dec:
         return {"accepted": False, "reason": f"No accepted composite decision in CloudEvents journal for claim '{target_claim.claim_id}'"}
