@@ -62,6 +62,14 @@ D9.2.2 Required Canonical Timestamp Binding Tests:
 - canonical timestamp missing -> rejected
 - canonical timestamp matches and is after repair -> accepted
 - old receipt + forged new verification timestamp -> rejected
+
+D9.2.3 Required Canonical Repair-Boundary Freshness Tests:
+- forged newer record.history repair timestamp cannot move the boundary
+- forged current_repair_obligation.created_at cannot move the boundary
+- missing canonical boundary is rejected
+- malformed canonical boundary is rejected
+- canonical boundary + post-boundary canonical verification -> accepted/converged
+- canonical boundary + pre-boundary canonical verification -> rejected
 """
 
 import os
@@ -2971,3 +2979,353 @@ def test_d9_2_2_old_receipt_forged_new_verification_timestamp_rejected(tmp_path)
         )
 
     assert engine.get_recovery(record.recovery_id).current_state == RecoveryState.REVERIFY_REQUIRED
+
+
+# ==========================================================================
+# ==========================================================================
+# D9.2.3 CANONICAL REPAIR-BOUNDARY BINDING TESTS
+# ==========================================================================
+
+
+def test_d9_2_3_forged_newer_record_history_repair_timestamp_cannot_move_boundary(tmp_path):
+    """
+    D9.2.3 Test 1:
+    Attacker forges a newer repair timestamp into record.history (in memory and/or SQLite),
+    attempting to move the canonical repair boundary forward and invalidate a valid fresh verification.
+    Expected: canonical boundary from authoritative EventJournal cannot be moved;
+    valid regression verification after the real repair is accepted.
+    """
+    ws = str(tmp_path / "d9_2_3_test_1")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+
+    claim_prev = Claim(claim_id="claim_p_23_1", task_id="task_d9_2_3_1", statement="P1", target_files=("src/math.py",))
+    _save_test_claim(state_repo, ws, claim_prev)
+    rcpt_prev = make_observed_success_receipt(receipt_id="rcpt_prev_23_1", task_id="task_d9_2_3_1", claim_id="claim_p_23_1", workspace=ws)
+    make_canonical_verification_result(rcpt_prev, status="ACCEPT", claim_id="claim_p_23_1", workspace=ws)
+
+    claim_repair = Claim(claim_id="claim_rep_23_1", task_id="task_d9_2_3_1", statement="Rep", target_files=("src/math.py",))
+    _save_test_claim(state_repo, ws, claim_repair)
+    ev_fail = make_observed_failure_receipt(receipt_id="rcpt_f_23_1", task_id="task_d9_2_3_1", claim_id="claim_rep_23_1", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d9_2_3_1", obligation_id="ob_rep_23_1", failure_evidence=ev_fail, claim_id="claim_rep_23_1")
+    engine.create_repair_obligation(record.recovery_id)
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    ev_pass = make_observed_success_receipt(receipt_id="rcpt_pass_23_1", task_id="task_d9_2_3_1", claim_id="claim_rep_23_1", workspace=ws)
+    ev_pass.files_changed = ["src/math.py"]
+    verdict = make_canonical_verification_result(ev_pass, status="ACCEPT", claim_id="claim_rep_23_1", workspace=ws)
+
+    # Valid regression verification strictly after repair
+    rcpt_reg = make_observed_success_receipt(receipt_id="rcpt_reg_23_1", task_id="task_d9_2_3_1", claim_id="claim_p_23_1", workspace=ws)
+    verif_reg = make_canonical_verification_result(rcpt_reg, status="ACCEPT", claim_id="claim_p_23_1", workspace=ws)
+
+    # Attacker fetches record and mutates record.history in memory with a forged newer timestamp (year 2099)
+    record = engine.get_recovery(record.recovery_id)
+    forged_newer_ts = "2099-01-01T00:00:00+00:00"
+    record.history.append({
+        "event": "repair_in_progress",
+        "timestamp": forged_newer_ts,
+    })
+
+    # Also test mutating SQLite history_json directly
+    with state_repo.store.get_connection() as conn:
+        conn.execute(
+            "UPDATE recovery_records SET history_json = ? WHERE recovery_id = ?",
+            (json.dumps(record.history), record.recovery_id),
+        )
+        conn.commit()
+
+    # Even with forged in-memory and SQLite history, canonical EventJournal boundary prevents moving the boundary
+    assessment = engine.assess_regression(
+        record=record,
+        regression_verifications=[verif_reg],
+        fail_closed=True,
+    )
+    assert assessment.regression_passed is True
+
+    res = engine.evaluate_convergence(
+        record.recovery_id,
+        verification_result=verdict,
+        evidence=ev_pass,
+        regression_verifications=[verif_reg],
+    )
+    assert res.is_converged is True
+    assert res.status == RecoveryState.CONVERGED.value
+
+
+def test_d9_2_3_forged_current_repair_obligation_created_at_cannot_move_boundary(tmp_path):
+    """
+    D9.2.3 Test 2:
+    Attacker forges current_repair_obligation.created_at (in memory and/or SQLite),
+    attempting to move the canonical repair boundary forward.
+    Expected: canonical boundary from authoritative EventJournal cannot be moved;
+    valid regression verification after the real repair is accepted.
+    """
+    ws = str(tmp_path / "d9_2_3_test_2")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+
+    claim_prev = Claim(claim_id="claim_p_23_2", task_id="task_d9_2_3_2", statement="P2", target_files=("src/math.py",))
+    _save_test_claim(state_repo, ws, claim_prev)
+    rcpt_prev = make_observed_success_receipt(receipt_id="rcpt_prev_23_2", task_id="task_d9_2_3_2", claim_id="claim_p_23_2", workspace=ws)
+    make_canonical_verification_result(rcpt_prev, status="ACCEPT", claim_id="claim_p_23_2", workspace=ws)
+
+    claim_repair = Claim(claim_id="claim_rep_23_2", task_id="task_d9_2_3_2", statement="Rep", target_files=("src/math.py",))
+    _save_test_claim(state_repo, ws, claim_repair)
+    ev_fail = make_observed_failure_receipt(receipt_id="rcpt_f_23_2", task_id="task_d9_2_3_2", claim_id="claim_rep_23_2", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d9_2_3_2", obligation_id="ob_rep_23_2", failure_evidence=ev_fail, claim_id="claim_rep_23_2")
+    engine.create_repair_obligation(record.recovery_id)
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    ev_pass = make_observed_success_receipt(receipt_id="rcpt_pass_23_2", task_id="task_d9_2_3_2", claim_id="claim_rep_23_2", workspace=ws)
+    ev_pass.files_changed = ["src/math.py"]
+    verdict = make_canonical_verification_result(ev_pass, status="ACCEPT", claim_id="claim_rep_23_2", workspace=ws)
+
+    rcpt_reg = make_observed_success_receipt(receipt_id="rcpt_reg_23_2", task_id="task_d9_2_3_2", claim_id="claim_p_23_2", workspace=ws)
+    verif_reg = make_canonical_verification_result(rcpt_reg, status="ACCEPT", claim_id="claim_p_23_2", workspace=ws)
+
+    # Attacker fetches record and mutates current_repair_obligation.created_at in memory
+    record = engine.get_recovery(record.recovery_id)
+    forged_newer_ts = "2099-01-01T00:00:00+00:00"
+    if record.current_repair_obligation:
+        object.__setattr__(record.current_repair_obligation, "created_at", forged_newer_ts)
+
+    # Also test mutating SQLite current_repair_obligation_json
+    with state_repo.store.get_connection() as conn:
+        ob_dict = record.current_repair_obligation.to_dict() if record.current_repair_obligation else {}
+        ob_dict["created_at"] = forged_newer_ts
+        conn.execute(
+            "UPDATE recovery_records SET current_repair_obligation_json = ? WHERE recovery_id = ?",
+            (json.dumps(ob_dict), record.recovery_id),
+        )
+        conn.commit()
+
+    assessment = engine.assess_regression(
+        record=record,
+        regression_verifications=[verif_reg],
+        fail_closed=True,
+    )
+    assert assessment.regression_passed is True
+
+    res = engine.evaluate_convergence(
+        record.recovery_id,
+        verification_result=verdict,
+        evidence=ev_pass,
+        regression_verifications=[verif_reg],
+    )
+    assert res.is_converged is True
+    assert res.status == RecoveryState.CONVERGED.value
+
+
+def test_d9_2_3_missing_canonical_boundary_is_rejected(tmp_path):
+    """
+    D9.2.3 Test 3:
+    Canonical repair boundary is missing from authoritative persisted state.
+    Expected: fails closed with RecoveryError (does not fall back to caller or datetime.now()).
+    """
+    ws = str(tmp_path / "d9_2_3_test_3")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+
+    claim_prev = Claim(claim_id="claim_p_23_3", task_id="task_d9_2_3_3", statement="P3", target_files=("src/math.py",))
+    _save_test_claim(state_repo, ws, claim_prev)
+    rcpt_prev = make_observed_success_receipt(receipt_id="rcpt_prev_23_3", task_id="task_d9_2_3_3", claim_id="claim_p_23_3", workspace=ws)
+    make_canonical_verification_result(rcpt_prev, status="ACCEPT", claim_id="claim_p_23_3", workspace=ws)
+
+    claim_repair = Claim(claim_id="claim_rep_23_3", task_id="task_d9_2_3_3", statement="Rep", target_files=("src/math.py",))
+    _save_test_claim(state_repo, ws, claim_repair)
+    ev_fail = make_observed_failure_receipt(receipt_id="rcpt_f_23_3", task_id="task_d9_2_3_3", claim_id="claim_rep_23_3", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d9_2_3_3", obligation_id="ob_rep_23_3", failure_evidence=ev_fail, claim_id="claim_rep_23_3")
+    engine.create_repair_obligation(record.recovery_id)
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    ev_pass = make_observed_success_receipt(receipt_id="rcpt_pass_23_3", task_id="task_d9_2_3_3", claim_id="claim_rep_23_3", workspace=ws)
+    ev_pass.files_changed = ["src/math.py"]
+    verdict = make_canonical_verification_result(ev_pass, status="ACCEPT", claim_id="claim_rep_23_3", workspace=ws)
+
+    rcpt_reg = make_observed_success_receipt(receipt_id="rcpt_reg_23_3", task_id="task_d9_2_3_3", claim_id="claim_p_23_3", workspace=ws)
+    verif_reg = make_canonical_verification_result(rcpt_reg, status="ACCEPT", claim_id="claim_p_23_3", workspace=ws)
+
+    # Delete journal events for this recovery
+    jfile = engine.persistence.journal.journal_file
+    if os.path.exists(jfile):
+        os.remove(jfile)
+
+    # Clear repair boundary from SQLite persisted record
+    with state_repo.store.get_connection() as conn:
+        conn.execute(
+            "UPDATE recovery_records SET history_json = '[]', current_repair_obligation_json = NULL, created_at = '' WHERE recovery_id = ?",
+            (record.recovery_id,),
+        )
+        conn.commit()
+
+    with pytest.raises(RecoveryError, match="Missing canonical repair boundary"):
+        engine.evaluate_convergence(
+            record.recovery_id,
+            verification_result=verdict,
+            evidence=ev_pass,
+            regression_verifications=[verif_reg],
+        )
+
+    assert engine.get_recovery(record.recovery_id).current_state == RecoveryState.REVERIFY_REQUIRED
+
+
+def test_d9_2_3_malformed_canonical_boundary_is_rejected(tmp_path):
+    """
+    D9.2.3 Test 4:
+    Canonical repair boundary exists in persisted state but has a malformed/unparseable timestamp.
+    Expected: fails closed with RecoveryError (cannot parse canonical boundary).
+    """
+    ws = str(tmp_path / "d9_2_3_test_4")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+
+    claim_prev = Claim(claim_id="claim_p_23_4", task_id="task_d9_2_3_4", statement="P4", target_files=("src/math.py",))
+    _save_test_claim(state_repo, ws, claim_prev)
+    rcpt_prev = make_observed_success_receipt(receipt_id="rcpt_prev_23_4", task_id="task_d9_2_3_4", claim_id="claim_p_23_4", workspace=ws)
+    make_canonical_verification_result(rcpt_prev, status="ACCEPT", claim_id="claim_p_23_4", workspace=ws)
+
+    claim_repair = Claim(claim_id="claim_rep_23_4", task_id="task_d9_2_3_4", statement="Rep", target_files=("src/math.py",))
+    _save_test_claim(state_repo, ws, claim_repair)
+    ev_fail = make_observed_failure_receipt(receipt_id="rcpt_f_23_4", task_id="task_d9_2_3_4", claim_id="claim_rep_23_4", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d9_2_3_4", obligation_id="ob_rep_23_4", failure_evidence=ev_fail, claim_id="claim_rep_23_4")
+    engine.create_repair_obligation(record.recovery_id)
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    ev_pass = make_observed_success_receipt(receipt_id="rcpt_pass_23_4", task_id="task_d9_2_3_4", claim_id="claim_rep_23_4", workspace=ws)
+    ev_pass.files_changed = ["src/math.py"]
+    verdict = make_canonical_verification_result(ev_pass, status="ACCEPT", claim_id="claim_rep_23_4", workspace=ws)
+
+    rcpt_reg = make_observed_success_receipt(receipt_id="rcpt_reg_23_4", task_id="task_d9_2_3_4", claim_id="claim_p_23_4", workspace=ws)
+    verif_reg = make_canonical_verification_result(rcpt_reg, status="ACCEPT", claim_id="claim_p_23_4", workspace=ws)
+
+    # Delete journal events for this recovery
+    jfile = engine.persistence.journal.journal_file
+    if os.path.exists(jfile):
+        os.remove(jfile)
+
+    # Set malformed boundary timestamp in SQLite
+    malformed_history = [{"event": "repair_in_progress", "timestamp": "NOT_AN_ISO_TIMESTAMP"}]
+    with state_repo.store.get_connection() as conn:
+        conn.execute(
+            "UPDATE recovery_records SET history_json = ? WHERE recovery_id = ?",
+            (json.dumps(malformed_history), record.recovery_id),
+        )
+        conn.commit()
+
+    with pytest.raises(RecoveryError, match="Invalid canonical repair boundary"):
+        engine.evaluate_convergence(
+            record.recovery_id,
+            verification_result=verdict,
+            evidence=ev_pass,
+            regression_verifications=[verif_reg],
+        )
+
+    assert engine.get_recovery(record.recovery_id).current_state == RecoveryState.REVERIFY_REQUIRED
+
+
+def test_d9_2_3_canonical_boundary_post_boundary_verification_accepted(tmp_path):
+    """
+    D9.2.3 Test 5:
+    Canonical repair boundary is present and valid; regression verification timestamp
+    strictly post-dates the canonical repair boundary.
+    Expected: accepted, CONVERGED.
+    """
+    ws = str(tmp_path / "d9_2_3_test_5")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+
+    claim_prev = Claim(claim_id="claim_p_23_5", task_id="task_d9_2_3_5", statement="P5", target_files=("src/math.py",))
+    _save_test_claim(state_repo, ws, claim_prev)
+    rcpt_prev = make_observed_success_receipt(receipt_id="rcpt_prev_23_5", task_id="task_d9_2_3_5", claim_id="claim_p_23_5", workspace=ws)
+    make_canonical_verification_result(rcpt_prev, status="ACCEPT", claim_id="claim_p_23_5", workspace=ws)
+
+    claim_repair = Claim(claim_id="claim_rep_23_5", task_id="task_d9_2_3_5", statement="Rep", target_files=("src/math.py",))
+    _save_test_claim(state_repo, ws, claim_repair)
+    ev_fail = make_observed_failure_receipt(receipt_id="rcpt_f_23_5", task_id="task_d9_2_3_5", claim_id="claim_rep_23_5", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d9_2_3_5", obligation_id="ob_rep_23_5", failure_evidence=ev_fail, claim_id="claim_rep_23_5")
+    engine.create_repair_obligation(record.recovery_id)
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    ev_pass = make_observed_success_receipt(receipt_id="rcpt_pass_23_5", task_id="task_d9_2_3_5", claim_id="claim_rep_23_5", workspace=ws)
+    ev_pass.files_changed = ["src/math.py"]
+    verdict = make_canonical_verification_result(ev_pass, status="ACCEPT", claim_id="claim_rep_23_5", workspace=ws)
+
+    # Valid canonical regression verification strictly after repair boundary
+    rcpt_reg = make_observed_success_receipt(receipt_id="rcpt_reg_23_5", task_id="task_d9_2_3_5", claim_id="claim_p_23_5", workspace=ws)
+    verif_reg = make_canonical_verification_result(rcpt_reg, status="ACCEPT", claim_id="claim_p_23_5", workspace=ws)
+
+    res = engine.evaluate_convergence(
+        record.recovery_id,
+        verification_result=verdict,
+        evidence=ev_pass,
+        regression_verifications=[verif_reg],
+    )
+
+    assert res.is_converged is True
+    assert res.status == RecoveryState.CONVERGED.value
+    assert engine.get_recovery(record.recovery_id).current_state == RecoveryState.CONVERGED
+    assert "claim_p_23_5" in res.preserved_obligation_ids
+    assert engine.get_recovery(record.recovery_id).regression_assessment.regression_passed is True
+
+
+def test_d9_2_3_canonical_boundary_pre_boundary_verification_rejected(tmp_path):
+    """
+    D9.2.3 Test 6:
+    Canonical repair boundary is present and valid; regression verification timestamp
+    is before the canonical repair boundary (or identical).
+    Expected: fails closed with RecoveryError (stale regression verification).
+    """
+    ws = str(tmp_path / "d9_2_3_test_6")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+
+    claim_prev = Claim(claim_id="claim_p_23_6", task_id="task_d9_2_3_6", statement="P6", target_files=("src/math.py",))
+    _save_test_claim(state_repo, ws, claim_prev)
+    rcpt_prev = make_observed_success_receipt(receipt_id="rcpt_prev_23_6", task_id="task_d9_2_3_6", claim_id="claim_p_23_6", workspace=ws)
+    make_canonical_verification_result(rcpt_prev, status="ACCEPT", claim_id="claim_p_23_6", workspace=ws)
+
+    claim_repair = Claim(claim_id="claim_rep_23_6", task_id="task_d9_2_3_6", statement="Rep", target_files=("src/math.py",))
+    _save_test_claim(state_repo, ws, claim_repair)
+    ev_fail = make_observed_failure_receipt(receipt_id="rcpt_f_23_6", task_id="task_d9_2_3_6", claim_id="claim_rep_23_6", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d9_2_3_6", obligation_id="ob_rep_23_6", failure_evidence=ev_fail, claim_id="claim_rep_23_6")
+    engine.create_repair_obligation(record.recovery_id)
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    ev_pass = make_observed_success_receipt(receipt_id="rcpt_pass_23_6", task_id="task_d9_2_3_6", claim_id="claim_rep_23_6", workspace=ws)
+    ev_pass.files_changed = ["src/math.py"]
+    verdict = make_canonical_verification_result(ev_pass, status="ACCEPT", claim_id="claim_rep_23_6", workspace=ws)
+
+    # Canonical verification with timestamp strictly before repair
+    old_ts = "2020-01-01T00:00:00+00:00"
+    rcpt_reg = make_observed_success_receipt(receipt_id="rcpt_reg_23_6", task_id="task_d9_2_3_6", claim_id="claim_p_23_6", workspace=ws)
+    verif_before = make_canonical_verification_result(
+        rcpt_reg,
+        status="ACCEPT",
+        claim_id="claim_p_23_6",
+        workspace=ws,
+        verification_time=old_ts,
+    )
+
+    with pytest.raises(RecoveryError, match="Stale regression verification"):
+        engine.evaluate_convergence(
+            record.recovery_id,
+            verification_result=verdict,
+            evidence=ev_pass,
+            regression_verifications=[verif_before],
+        )
+
+    assert engine.get_recovery(record.recovery_id).current_state == RecoveryState.REVERIFY_REQUIRED
+

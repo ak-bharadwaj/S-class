@@ -827,10 +827,11 @@ class RecoveryEngine:
 
     def assess_regression(
         self,
-        recovery_id: str,
+        recovery_id: Optional[Union[str, RecoveryRecord]] = None,
         repair_evidence: Optional[Any] = None,
         regression_verifications: Optional[List[Any]] = None,
         fail_closed: bool = True,
+        record: Optional[RecoveryRecord] = None,
     ) -> RegressionAssessment:
         """
         Independently evaluates whether repairs caused regressions to previously accepted claims.
@@ -839,10 +840,37 @@ class RecoveryEngine:
         - Conservative regression set determination.
         - Strict fail-closed provenance validation (D9.1.2 / D9.1.3).
         - Fresh authoritative verification for every affected claim.
+        - Canonical repair boundary derived exclusively from authoritative persisted state/history (D9.2.3).
         """
-        record = self.persistence.load_recovery(recovery_id)
-        if not record:
-            raise RecoveryError(f"Recovery record '{recovery_id}' not found.")
+        target_id = None
+        if recovery_id is not None:
+            if isinstance(recovery_id, str):
+                target_id = recovery_id
+            elif hasattr(recovery_id, "recovery_id"):
+                target_id = recovery_id.recovery_id
+        if target_id is None and record is not None:
+            target_id = record.recovery_id
+
+        if not target_id:
+            raise RecoveryError("Missing recovery_id for regression assessment.")
+
+        persisted_record = self.persistence.load_recovery(target_id)
+        if not persisted_record:
+            err_msg = f"Missing canonical repair boundary: recovery '{target_id}' not found in authoritative state store."
+            if fail_closed:
+                raise RecoveryError(err_msg)
+            return RegressionAssessment(
+                affected_claim_ids=(),
+                reverified_claim_ids=(),
+                failed_claim_ids=(),
+                stale_claim_ids=(),
+                regression_passed=False,
+                assessment_time=datetime.now(timezone.utc).isoformat(),
+                unaffected_claim_ids=(),
+                provenance_references={},
+                reason=err_msg,
+            )
+        record = persisted_record
 
         now_iso = datetime.now(timezone.utc).isoformat()
 
@@ -873,20 +901,110 @@ class RecoveryEngine:
         affected_claim_ids = tuple(c.claim_id for c in reassessment_claims)
         verif_list = list(regression_verifications or [])
 
-        # Determine the authoritative recovery-cycle repair boundary timestamp
+        # Determine the canonical repair boundary timestamp exclusively from authoritative persisted S-Class recovery state/history
         repair_boundary_str = None
-        for h in reversed(record.history):
-            if h.get("event") in ("repair_in_progress", "repair_obligation_created"):
-                repair_boundary_str = h.get("timestamp")
-                break
+        current_attempt = getattr(record, "attempt_number", None)
 
+        # 1. Primary: EventJournal (append-only CloudEvents journal)
+        try:
+            journal_events = self.persistence.journal.read_all()
+            rec_subject = f"recovery:{record.recovery_id}"
+            matching_events = [
+                ev for ev in journal_events
+                if ev.type == "sclass.recovery.transition" and (
+                    ev.subject == rec_subject or ev.data.get("recovery_id") == record.recovery_id
+                )
+            ]
+            # Match current attempt if available
+            for ev in reversed(matching_events):
+                ev_state = ev.data.get("state")
+                ev_attempt = ev.data.get("attempt_number")
+                if current_attempt is not None and ev_attempt is not None and ev_attempt != current_attempt:
+                    continue
+                if ev_state in ("REPAIR_IN_PROGRESS", "REPAIR_REQUIRED"):
+                    repair_boundary_str = ev.time
+                    break
+            if not repair_boundary_str:
+                for ev in reversed(matching_events):
+                    ev_state = ev.data.get("state")
+                    if ev_state in ("REPAIR_IN_PROGRESS", "REPAIR_REQUIRED"):
+                        repair_boundary_str = ev.time
+                        break
+        except Exception:
+            pass
+
+        # 2. Authoritative SQLite persistence (load_recovery)
         if not repair_boundary_str:
-            if record.current_repair_obligation and record.current_repair_obligation.created_at:
-                repair_boundary_str = record.current_repair_obligation.created_at
-            else:
-                repair_boundary_str = record.created_at
+            rec_attempt = getattr(record, "attempt_number", None)
+            for h in reversed(record.history or []):
+                if h.get("event") in ("repair_in_progress", "repair_obligation_created"):
+                    h_attempt = h.get("attempt_number")
+                    if rec_attempt is not None and h_attempt is not None and h_attempt != rec_attempt:
+                        continue
+                    repair_boundary_str = h.get("timestamp")
+                    break
+            if not repair_boundary_str:
+                for h in reversed(record.history or []):
+                    if h.get("event") in ("repair_in_progress", "repair_obligation_created"):
+                        repair_boundary_str = h.get("timestamp")
+                        break
+            if not repair_boundary_str:
+                if record.current_repair_obligation and record.current_repair_obligation.created_at:
+                    repair_boundary_str = record.current_repair_obligation.created_at
+                elif record.created_at:
+                    repair_boundary_str = record.created_at
+
+        # Fail closed on missing, empty, or unparseable canonical repair boundary
+        if not repair_boundary_str or not isinstance(repair_boundary_str, str) or not repair_boundary_str.strip():
+            err_msg = (
+                f"Missing canonical repair boundary: recovery '{record.recovery_id}' "
+                f"lacks authoritative repair boundary timestamp."
+            )
+            assessment = RegressionAssessment(
+                affected_claim_ids=affected_claim_ids,
+                reverified_claim_ids=(),
+                failed_claim_ids=affected_claim_ids,
+                stale_claim_ids=(),
+                regression_passed=False,
+                assessment_time=now_iso,
+                unaffected_claim_ids=tuple(unaffected_claim_ids),
+                provenance_references={},
+                reason=err_msg,
+            )
+            record.regression_assessment = assessment
+            try:
+                self.persistence.save_recovery(record)
+            except Exception:
+                pass
+            if fail_closed:
+                raise RecoveryError(err_msg)
+            return assessment
 
         repair_boundary_dt = _parse_iso_timestamp(repair_boundary_str)
+        if repair_boundary_dt is None:
+            err_msg = (
+                f"Invalid canonical repair boundary: repair boundary timestamp '{repair_boundary_str}' "
+                f"for recovery '{record.recovery_id}' is unparseable."
+            )
+            assessment = RegressionAssessment(
+                affected_claim_ids=affected_claim_ids,
+                reverified_claim_ids=(),
+                failed_claim_ids=affected_claim_ids,
+                stale_claim_ids=(),
+                regression_passed=False,
+                assessment_time=now_iso,
+                unaffected_claim_ids=tuple(unaffected_claim_ids),
+                provenance_references={},
+                reason=err_msg,
+            )
+            record.regression_assessment = assessment
+            try:
+                self.persistence.save_recovery(record)
+            except Exception:
+                pass
+            if fail_closed:
+                raise RecoveryError(err_msg)
+            return assessment
 
         # Map regression verifications by claim_id
         reverified_map: Dict[str, Any] = {}
