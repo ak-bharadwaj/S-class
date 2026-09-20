@@ -4,14 +4,14 @@ Implements the D9 recovery lifecycle:
 FAILED / DRIFTED -> DIAGNOSE -> CREATE REPAIR OBLIGATION -> BOUNDED ATTEMPT -> REVERIFY -> CONVERGED / EXHAUSTED
 
 Enforces:
-1. Recovery is evidence-driven (cannot begin from textual claim).
-2. Repair obligations are deterministic and distinguishable from original obligations.
-3. Explicit recovery state machine with illegal transitions rejected.
-4. Bounded retries: monotonic attempt count, durable across process restarts, exhaustion fails closed.
-5. Convergence is verification, not optimism.
-6. Regression protection: preserves previously accepted unaffected obligations.
-7. Durable, fail-closed recovery persistence.
-8. Idempotency against replayed transitions.
+1. Canonical evidence binding: accepts only established S-Class verification/evidence authority.
+2. Canonical recovery state authority: integrates with authoritative SQLite state store.
+3. Durable recovery-cycle identity tied to originating failure/event.
+4. Provenance preservation: parent_event_id, staleness cause, claim/evidence identity, project-state ref.
+5. Strict retry bound and fail-closed exhaustion.
+6. Convergence is verification, not optimism.
+7. Regression protection: preserves previously accepted unaffected obligations.
+8. Idempotency against duplicate transitions.
 """
 
 from __future__ import annotations
@@ -35,6 +35,15 @@ from sclass.core.errors import (
     RecoveryExhaustedError,
     RecoveryPersistenceError,
 )
+from sclass.domain.verification import VerificationResult as DomainVerificationResult
+from sclass.survival.models import (
+    VerificationResult as SurvivalVerificationResult,
+    ObservedReceipt,
+    EvidenceReceipt,
+    _OBSERVATION_TOKEN,
+)
+
+AUTH_VERIFICATION_CLASSES = (DomainVerificationResult, SurvivalVerificationResult)
 
 
 class RecoveryEngine:
@@ -61,60 +70,142 @@ class RecoveryEngine:
         failure_evidence: Any,
         failure_classification: str = "EXECUTION_FAILURE",
         reason: str = "",
+        parent_event_id: Optional[str] = None,
         staleness_cause: Optional[str] = None,
+        claim_id: Optional[str] = None,
         max_attempts: Optional[int] = None,
         project_state_ref: str = "",
     ) -> RecoveryRecord:
         """
         Initiates an evidence-driven recovery cycle from an authoritative failure or drift condition.
         Enforces:
-        - Must be evidence-driven: textual claims ("fix complete") cannot establish failure or recovery.
-        - Fails closed if failure_evidence lacks authentic failure provenance.
+        - Canonical evidence binding: accepts only established S-Class verification/evidence authority.
+        - Rejects plain dicts and fabricated status-bearing objects.
+        - Requires authoritative receipt/verification identity.
+        - Binds failure to the affected obligation and claim.
+        - Generates a durable recovery-cycle identity tied to the originating failure/event.
+        - Preserves provenance without fabrication.
         """
         if not task_id or not obligation_id:
             raise RecoveryError("Recovery requires non-empty task_id and obligation_id.")
 
-        # Invariant 1: Recovery is evidence-driven
+        # Invariant 1: Recovery is evidence-driven; reject textual assertions and missing evidence
         if failure_evidence is None or isinstance(failure_evidence, str):
             raise RecoveryError(
                 "Recovery is evidence-driven: cannot initiate recovery from textual statement or missing evidence. "
-                "Authoritative failure evidence (VerificationResult, ObservedReceipt, or failure record) is required."
+                "Authoritative failure evidence (VerificationResult or ObservedReceipt) is required."
             )
 
-        # Inspect failure evidence for authentic failure condition
+        # Invariant 2: Reject fabricated status-bearing dicts
+        if isinstance(failure_evidence, dict):
+            raise RecoveryError(
+                "Recovery accepts only established S-Class verification/evidence authority: plain dicts are rejected."
+            )
+
+        # Inspect failure evidence against canonical S-Class authorities
         is_failure = False
-        aff_claim_id = None
+        aff_claim_id = claim_id
         aff_evidence_id = None
         ev_reason = reason
+        resolved_parent_event_id = parent_event_id
+        resolved_staleness_cause = staleness_cause
+        resolved_project_state_ref = project_state_ref
 
-        if hasattr(failure_evidence, "is_verified"):
-            if not failure_evidence.is_verified:
+        if isinstance(failure_evidence, AUTH_VERIFICATION_CLASSES):
+            # Authoritative VerificationResult
+            receipt_id = failure_evidence.receipt_id
+            if not receipt_id and failure_evidence.verification_event:
+                receipt_id = getattr(failure_evidence.verification_event, "receipt_id", None)
+
+            if not receipt_id:
+                raise RecoveryError(
+                    "Missing receipt/verification provenance: VerificationResult lacks authoritative receipt_id."
+                )
+
+            aff_evidence_id = receipt_id
+
+            # Bind claim
+            ev_claim = getattr(failure_evidence, "claim_id", None)
+            if ev_claim:
+                if aff_claim_id and aff_claim_id != ev_claim:
+                    raise RecoveryError(
+                        f"Claim/obligation mismatch: evidence claim_id '{ev_claim}' does not match expected claim_id '{aff_claim_id}'."
+                    )
+                aff_claim_id = ev_claim
+
+            # Provenance extraction (never fabricate)
+            if failure_evidence.verification_event:
+                if not resolved_parent_event_id:
+                    resolved_parent_event_id = getattr(failure_evidence.verification_event, "event_id", None)
+                if not resolved_project_state_ref:
+                    resolved_project_state_ref = getattr(failure_evidence.verification_event, "repository_fingerprint", "")
+
+            if getattr(failure_evidence, "invalidation_reason", None):
+                if not resolved_staleness_cause:
+                    resolved_staleness_cause = failure_evidence.invalidation_reason
+
+            ev_reason = ev_reason or getattr(failure_evidence, "reason", "")
+
+            # Check if this represents an authoritative failure or invalidation
+            status_str = str(getattr(failure_evidence, "status", "")).upper()
+            if status_str in ("REJECT", "INVALID", "FAILED", "ERROR", "INCONCLUSIVE") or not getattr(failure_evidence, "is_verified", True):
                 is_failure = True
-                ev_reason = ev_reason or getattr(failure_evidence, "reason", "")
-                aff_claim_id = getattr(failure_evidence, "claim_id", None)
-                aff_evidence_id = getattr(failure_evidence, "receipt_id", None)
-        elif hasattr(failure_evidence, "exit_code"):
+
+        elif isinstance(failure_evidence, (ObservedReceipt, EvidenceReceipt)):
+            # Authoritative EvidenceReceipt / ObservedReceipt
+            if not failure_evidence.is_observed:
+                raise RecoveryError(
+                    "Forged or unobserved failure evidence: Evidence must be an authoritative ObservedReceipt with authentic observation provenance."
+                )
+
+            if not failure_evidence.receipt_id:
+                raise RecoveryError(
+                    "Missing receipt/verification provenance: Evidence receipt lacks authoritative receipt_id."
+                )
+
+            aff_evidence_id = failure_evidence.receipt_id
+
+            # Check task binding
+            ev_task = getattr(failure_evidence, "task_id", None)
+            if ev_task and ev_task != task_id:
+                raise RecoveryError(
+                    f"Task mismatch: evidence task_id '{ev_task}' does not match expected task_id '{task_id}'."
+                )
+
+            # Check claim binding
+            ev_claim = getattr(failure_evidence, "claim_id", None)
+            if ev_claim:
+                if aff_claim_id and aff_claim_id != ev_claim:
+                    raise RecoveryError(
+                        f"Claim/obligation mismatch: evidence claim_id '{ev_claim}' does not match expected claim_id '{aff_claim_id}'."
+                    )
+                aff_claim_id = ev_claim
+
+            if not resolved_project_state_ref:
+                resolved_project_state_ref = getattr(failure_evidence, "workspace_fingerprint", "")
+
+            ev_reason = ev_reason or f"Command '{failure_evidence.command}' failed with exit code {failure_evidence.exit_code}"
+
             if failure_evidence.exit_code != 0:
                 is_failure = True
-                aff_evidence_id = getattr(failure_evidence, "receipt_id", None)
-        elif isinstance(failure_evidence, dict):
-            status = str(failure_evidence.get("status", "")).upper()
-            exit_code = failure_evidence.get("exit_code")
-            if status in ("REJECT", "INVALID", "FAILED", "ERROR") or (exit_code is not None and exit_code != 0):
-                is_failure = True
-                ev_reason = ev_reason or failure_evidence.get("reason", "")
-                aff_claim_id = failure_evidence.get("claim_id")
-                aff_evidence_id = failure_evidence.get("receipt_id")
+        else:
+            raise RecoveryError(
+                f"Recovery accepts only established S-Class verification/evidence authority. "
+                f"Received unauthoritative object of type '{type(failure_evidence).__name__}'."
+            )
 
         if not is_failure:
             raise RecoveryError(
                 "Recovery is evidence-driven: provided evidence does not represent an authoritative failure or drift condition."
             )
 
-        recovery_id = f"recov_{task_id}_{obligation_id}"
+        # Durable recovery-cycle identity tied to originating failure/event
+        origin_id = resolved_parent_event_id or aff_evidence_id or f"fail_{hashlib.sha256(ev_reason.encode('utf-8')).hexdigest()[:10]}"
+        recovery_id = f"recov_{task_id}_{obligation_id}_{origin_id}"
+
         existing = self.persistence.load_recovery(recovery_id)
         if existing:
-            # Idempotency: return existing in-progress recovery if not terminal
+            # Idempotency: return existing recovery cycle if not terminal
             if not existing.current_state.is_terminal:
                 return existing
 
@@ -132,9 +223,11 @@ class RecoveryEngine:
             updated_at=now_iso,
             failure_classification=failure_classification,
             reason=ev_reason,
+            parent_event_id=resolved_parent_event_id,
+            staleness_cause=resolved_staleness_cause,
             affected_claim_id=aff_claim_id,
             affected_evidence_id=aff_evidence_id,
-            project_state_ref=project_state_ref,
+            project_state_ref=resolved_project_state_ref,
             history=[{
                 "event": "failure_diagnosed",
                 "from_state": None,
@@ -168,6 +261,7 @@ class RecoveryEngine:
         Enforces:
         - Monotonic attempt numbering.
         - Strict retry bound: exceeding max_attempts transitions to RECOVERY_EXHAUSTED and fails closed.
+        - Preserves provenance fields on the repair obligation.
         - Idempotency: duplicate calls within the same attempt return the existing repair obligation.
         """
         record = self.persistence.load_recovery(recovery_id)
@@ -196,9 +290,8 @@ class RecoveryEngine:
             RecoveryStateMachine.validate_transition(record.current_state, RecoveryState.REPAIR_REQUIRED)
             next_attempt = record.attempt_number + 1
 
-        # Enforce attempt bound (Requirement 4)
+        # Enforce attempt bound
         if next_attempt > record.max_attempts:
-            # Transition to RECOVERY_EXHAUSTED
             prev_state = record.current_state
             RecoveryStateMachine.validate_transition(prev_state, RecoveryState.RECOVERY_EXHAUSTED)
             record.current_state = RecoveryState.RECOVERY_EXHAUSTED
@@ -230,7 +323,9 @@ class RecoveryEngine:
             affected_evidence_id=record.affected_evidence_id,
             failure_classification=record.failure_classification,
             reason=reason_override or record.reason,
+            staleness_cause=record.staleness_cause,
             attempt_number=next_attempt,
+            parent_event_id=record.parent_event_id,
             project_state_ref=record.project_state_ref,
             target=repair_target,
             created_at=now_iso,
@@ -266,6 +361,9 @@ class RecoveryEngine:
             return record.current_repair_obligation
 
         RecoveryStateMachine.validate_transition(record.current_state, RecoveryState.REPAIR_IN_PROGRESS)
+
+        if record.current_repair_obligation is None:
+            raise RecoveryError("Cannot start repair without creating a repair obligation.")
 
         now_iso = datetime.now(timezone.utc).isoformat()
         prev_state = record.current_state
@@ -318,8 +416,11 @@ class RecoveryEngine:
         """
         Evaluates re-verification evidence against the recovery state machine.
         Enforces:
-        - Convergence is verification, not optimism: requires authentic positive verification verdict.
-        - Stale or failed verification returns to REPAIR_REQUIRED (or RECOVERY_EXHAUSTED if attempt limit reached).
+        - Canonical evidence binding: accepts only established S-Class VerificationResult.
+        - Rejects plain dicts, textual assertions, and fabricated objects.
+        - Requires authoritative receipt/verification identity.
+        - Binds convergence to the affected obligation and claim.
+        - Stale or failed verification returns to REPAIR_REQUIRED (or RECOVERY_EXHAUSTED).
         - Regression protection: preserves previously accepted unaffected obligations.
         """
         record = self.persistence.load_recovery(recovery_id)
@@ -347,35 +448,72 @@ class RecoveryEngine:
         if record.current_state != RecoveryState.REVERIFY_REQUIRED:
             RecoveryStateMachine.validate_transition(record.current_state, RecoveryState.CONVERGED)
 
-        # Requirement 5: Convergence is verification, not optimism
+        # Invariant: reject textual assertions and missing verification
         if verification_result is None or isinstance(verification_result, str):
             raise RecoveryError(
                 "Convergence is verification, not optimism: cannot establish convergence from textual statement or missing verification."
             )
 
-        is_verified = False
-        verif_reason = ""
-        evidence_id = getattr(evidence, "receipt_id", None) if evidence else None
+        # Invariant: reject fabricated dicts
+        if isinstance(verification_result, dict):
+            raise RecoveryError(
+                "Recovery accepts only established S-Class verification/evidence authority: plain dicts are rejected."
+            )
 
-        if hasattr(verification_result, "is_verified"):
-            is_verified = bool(verification_result.is_verified)
-            verif_reason = getattr(verification_result, "reason", "")
-            evidence_id = evidence_id or getattr(verification_result, "receipt_id", None)
-        elif hasattr(verification_result, "status"):
-            is_verified = (str(verification_result.status).upper() in ("ACCEPT", "PASS"))
-            verif_reason = getattr(verification_result, "reason", "")
-        elif isinstance(verification_result, dict):
-            status = str(verification_result.get("status", "")).upper()
-            is_verified = (status in ("ACCEPT", "PASS"))
-            verif_reason = verification_result.get("reason", "")
-            evidence_id = evidence_id or verification_result.get("receipt_id")
+        # Invariant: must be authoritative VerificationResult
+        if not isinstance(verification_result, AUTH_VERIFICATION_CLASSES):
+            raise RecoveryError(
+                f"Recovery accepts only established S-Class verification/evidence authority: VerificationResult is required, "
+                f"received '{type(verification_result).__name__}'."
+            )
+
+        # Invariant: require authoritative receipt identity
+        verif_receipt_id = verification_result.receipt_id
+        if not verif_receipt_id and verification_result.verification_event:
+            verif_receipt_id = getattr(verification_result.verification_event, "receipt_id", None)
+
+        if not verif_receipt_id:
+            raise RecoveryError(
+                "Missing receipt/verification provenance: VerificationResult lacks authoritative receipt_id."
+            )
+
+        # Invariant: bind convergence to affected claim
+        verif_claim_id = getattr(verification_result, "claim_id", None)
+        if record.affected_claim_id and verif_claim_id:
+            if verif_claim_id != record.affected_claim_id:
+                raise RecoveryError(
+                    f"Claim/obligation mismatch: verification claim_id '{verif_claim_id}' does not match affected claim_id '{record.affected_claim_id}'."
+                )
+
+        # Invariant: if evidence is supplied, verify observation provenance and matching receipt_id
+        if evidence is not None:
+            if not isinstance(evidence, (ObservedReceipt, EvidenceReceipt)):
+                raise RecoveryError(
+                    f"Forged or unobserved evidence: Evidence must be an authoritative ObservedReceipt, received '{type(evidence).__name__}'."
+                )
+            if not evidence.is_observed:
+                raise RecoveryError(
+                    "Forged or unobserved evidence: Evidence must be an authoritative ObservedReceipt with authentic observation provenance."
+                )
+            if not evidence.receipt_id:
+                raise RecoveryError(
+                    "Missing receipt/verification provenance: Evidence receipt lacks authoritative receipt_id."
+                )
+            if evidence.receipt_id != verif_receipt_id:
+                raise RecoveryError(
+                    f"Receipt ID mismatch between verification result ('{verif_receipt_id}') and evidence ('{evidence.receipt_id}')."
+                )
+
+        # Evaluate verdict
+        is_verified = bool(getattr(verification_result, "is_verified", False))
+        verif_reason = getattr(verification_result, "reason", "")
 
         # Check evidence staleness
-        if hasattr(verification_result, "invalidation_reason") and verification_result.invalidation_reason:
+        if getattr(verification_result, "invalidation_reason", None):
             is_verified = False
             verif_reason = f"Evidence invalidated: {verification_result.invalidation_reason}"
 
-        if hasattr(evidence, "is_stale") and evidence.is_stale:
+        if evidence and getattr(evidence, "is_stale", False):
             is_verified = False
             verif_reason = "Evidence is stale: subsequent workspace modifications detected."
 
@@ -385,17 +523,17 @@ class RecoveryEngine:
             # Transition REVERIFY_REQUIRED -> CONVERGED
             RecoveryStateMachine.validate_transition(prev_state, RecoveryState.CONVERGED)
             record.current_state = RecoveryState.CONVERGED
-            record.affected_evidence_id = evidence_id
+            record.affected_evidence_id = verif_receipt_id
             record.resulting_verification = {
                 "verified_at": now_iso,
-                "evidence_id": evidence_id,
+                "evidence_id": verif_receipt_id,
                 "reason": verif_reason,
             }
             record.history.append({
                 "event": "convergence_established",
                 "from_state": prev_state.value,
                 "to_state": RecoveryState.CONVERGED.value,
-                "evidence_id": evidence_id,
+                "evidence_id": verif_receipt_id,
                 "timestamp": now_iso,
             })
             self.persistence.save_recovery(record)
@@ -403,7 +541,6 @@ class RecoveryEngine:
             # Regression protection: distinguish repaired, preserved, and invalidated
             known = list(known_accepted_obligations or [])
             inval = list(invalidated_obligations or [])
-            # Invariant: unaffected accepted obligations remain preserved
             preserved = [ob for ob in known if ob not in inval and ob != record.affected_obligation_id]
 
             return RecoveryResult(
@@ -415,12 +552,11 @@ class RecoveryEngine:
                 invalidated_obligation_ids=tuple(inval),
                 attempts_used=record.attempt_number,
                 max_attempts=record.max_attempts,
-                final_evidence_id=evidence_id,
+                final_evidence_id=verif_receipt_id,
                 reason=verif_reason or "Obligation independently reverified and converged.",
             )
         else:
             # Re-verification failed or is stale
-            # Check attempt bound to transition to REPAIR_REQUIRED or RECOVERY_EXHAUSTED
             if record.attempt_number >= record.max_attempts:
                 # Exhausted
                 RecoveryStateMachine.validate_transition(prev_state, RecoveryState.RECOVERY_EXHAUSTED)
@@ -443,7 +579,7 @@ class RecoveryEngine:
                     invalidated_obligation_ids=tuple(invalidated_obligations or []),
                     attempts_used=record.attempt_number,
                     max_attempts=record.max_attempts,
-                    final_evidence_id=evidence_id,
+                    final_evidence_id=verif_receipt_id,
                     reason=f"Recovery exhausted after {record.attempt_number} attempts: {verif_reason}",
                 )
             else:
@@ -469,6 +605,6 @@ class RecoveryEngine:
                     invalidated_obligation_ids=tuple(invalidated_obligations or []),
                     attempts_used=record.attempt_number,
                     max_attempts=record.max_attempts,
-                    final_evidence_id=evidence_id,
+                    final_evidence_id=verif_receipt_id,
                     reason=f"Re-verification failed: {verif_reason}. Fresh repair attempt required.",
                 )

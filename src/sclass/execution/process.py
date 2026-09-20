@@ -104,7 +104,7 @@ class ProcessRunner:
             wrapped_tokens = self.sandbox.wrap_command(requested_tokens, cwd=ws)
 
         started_dt = datetime.now(timezone.utc)
-        start_mono = time.monotonic()
+        start_mono = time.perf_counter()
         timed_out = False
 
         if config is not None and getattr(config, "env_whitelist", None) is not None:
@@ -222,7 +222,7 @@ class ProcessRunner:
                     wrapper_identity=wrapper_id,
                 )
 
-        duration_ms = (time.monotonic() - start_mono) * 1000.0
+        duration_ms = max((time.perf_counter() - start_mono) * 1000.0, 0.01)
         finished_dt = datetime.now(timezone.utc)
 
         return ProcessExecutionResult(

@@ -14,6 +14,7 @@ MIGRATIONS = [
     "002_execution_identity",
     "003_claim_scope",
     "004_checkpoint",
+    "005_recovery_state",
 ]
 
 

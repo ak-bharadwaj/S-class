@@ -194,7 +194,7 @@ class ObservationConvergence:
             active_budget = budget or kwargs.get("budget")
             if active_budget is not None and hasattr(active_budget, "record_overhead"):
                 active_budget.record_overhead(
-                    latency_ms=exec_result.duration_ms,
+                    latency_ms=max(float(exec_result.duration_ms), 0.01),
                     tool_calls=1,
                 )
 

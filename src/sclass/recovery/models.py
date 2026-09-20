@@ -139,6 +139,7 @@ class RecoveryRecord:
     failure_classification: str
     reason: str
     parent_event_id: Optional[str] = None
+    staleness_cause: Optional[str] = None
     affected_claim_id: Optional[str] = None
     affected_evidence_id: Optional[str] = None
     project_state_ref: str = ""
@@ -160,6 +161,7 @@ class RecoveryRecord:
             "failure_classification": self.failure_classification,
             "reason": self.reason,
             "parent_event_id": self.parent_event_id,
+            "staleness_cause": self.staleness_cause,
             "affected_claim_id": self.affected_claim_id,
             "affected_evidence_id": self.affected_evidence_id,
             "project_state_ref": self.project_state_ref,
@@ -187,6 +189,7 @@ class RecoveryRecord:
             failure_classification=data.get("failure_classification", "EXECUTION_FAILURE"),
             reason=data.get("reason", ""),
             parent_event_id=data.get("parent_event_id"),
+            staleness_cause=data.get("staleness_cause"),
             affected_claim_id=data.get("affected_claim_id"),
             affected_evidence_id=data.get("affected_evidence_id"),
             project_state_ref=data.get("project_state_ref", ""),

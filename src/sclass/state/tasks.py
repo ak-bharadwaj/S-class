@@ -251,3 +251,138 @@ class StateRepository:
         with self.store.get_connection() as conn:
             conn.execute(query, data)
             conn.commit()
+
+    def save_recovery(self, record: Any) -> None:
+        """Upserts a recovery record into the authoritative SQLite store."""
+        query = """
+        INSERT INTO recovery_records (
+            recovery_id, task_id, affected_obligation_id, current_state,
+            attempt_number, max_attempts, failure_classification, reason,
+            affected_claim_id, affected_evidence_id, project_state_ref,
+            parent_event_id, staleness_cause, created_at, updated_at,
+            current_repair_obligation_json, resulting_verification_json,
+            history_json, metadata_json
+        )
+        VALUES (
+            :recovery_id, :task_id, :affected_obligation_id, :current_state,
+            :attempt_number, :max_attempts, :failure_classification, :reason,
+            :affected_claim_id, :affected_evidence_id, :project_state_ref,
+            :parent_event_id, :staleness_cause, :created_at, :updated_at,
+            :current_repair_obligation_json, :resulting_verification_json,
+            :history_json, :metadata_json
+        )
+        ON CONFLICT(recovery_id) DO UPDATE SET
+            current_state = excluded.current_state,
+            attempt_number = excluded.attempt_number,
+            max_attempts = excluded.max_attempts,
+            failure_classification = excluded.failure_classification,
+            reason = excluded.reason,
+            affected_claim_id = excluded.affected_claim_id,
+            affected_evidence_id = excluded.affected_evidence_id,
+            project_state_ref = excluded.project_state_ref,
+            parent_event_id = excluded.parent_event_id,
+            staleness_cause = excluded.staleness_cause,
+            updated_at = excluded.updated_at,
+            current_repair_obligation_json = excluded.current_repair_obligation_json,
+            resulting_verification_json = excluded.resulting_verification_json,
+            history_json = excluded.history_json,
+            metadata_json = excluded.metadata_json;
+        """
+        curr_ob_json = json.dumps(record.current_repair_obligation.to_dict()) if record.current_repair_obligation else None
+        res_ver_json = json.dumps(record.resulting_verification) if record.resulting_verification else None
+        data = {
+            "recovery_id": record.recovery_id,
+            "task_id": record.task_id,
+            "affected_obligation_id": record.affected_obligation_id,
+            "current_state": record.current_state.value if hasattr(record.current_state, "value") else str(record.current_state),
+            "attempt_number": record.attempt_number,
+            "max_attempts": record.max_attempts,
+            "failure_classification": record.failure_classification,
+            "reason": record.reason,
+            "affected_claim_id": record.affected_claim_id,
+            "affected_evidence_id": record.affected_evidence_id,
+            "project_state_ref": record.project_state_ref,
+            "parent_event_id": record.parent_event_id,
+            "staleness_cause": record.staleness_cause,
+            "created_at": record.created_at,
+            "updated_at": record.updated_at,
+            "current_repair_obligation_json": curr_ob_json,
+            "resulting_verification_json": res_ver_json,
+            "history_json": json.dumps(list(record.history)),
+            "metadata_json": json.dumps(dict(record.metadata)),
+        }
+        conn = self.store.get_connection()
+        try:
+            conn.execute(query, data)
+            conn.commit()
+        finally:
+            conn.close()
+
+    def get_recovery(self, recovery_id: str) -> Optional[Any]:
+        """Retrieves a recovery record by recovery_id."""
+        query = "SELECT * FROM recovery_records WHERE recovery_id = ?"
+        conn = self.store.get_connection()
+        try:
+            row = conn.execute(query, (recovery_id,)).fetchone()
+            if not row:
+                return None
+            return self._row_to_recovery_record(row)
+        finally:
+            conn.close()
+
+    def list_recoveries(
+        self,
+        task_id: Optional[str] = None,
+        affected_obligation_id: Optional[str] = None,
+    ) -> List[Any]:
+        """Lists recovery records with optional filtering."""
+        clauses = []
+        params: List[Any] = []
+        if task_id:
+            clauses.append("task_id = ?")
+            params.append(task_id)
+        if affected_obligation_id:
+            clauses.append("affected_obligation_id = ?")
+            params.append(affected_obligation_id)
+
+        where_str = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        query = f"SELECT * FROM recovery_records {where_str} ORDER BY created_at ASC"
+        conn = self.store.get_connection()
+        try:
+            rows = conn.execute(query, params).fetchall()
+            return [self._row_to_recovery_record(r) for r in rows]
+        finally:
+            conn.close()
+
+    def _row_to_recovery_record(self, row: Any) -> Any:
+        """Converts an SQLite row to a RecoveryRecord."""
+        from sclass.recovery.models import RecoveryRecord, RecoveryState, RepairObligation
+        curr_ob = None
+        if row["current_repair_obligation_json"]:
+            curr_ob = RepairObligation.from_dict(json.loads(row["current_repair_obligation_json"]))
+
+        res_ver = None
+        if row["resulting_verification_json"]:
+            res_ver = json.loads(row["resulting_verification_json"])
+
+        return RecoveryRecord(
+            recovery_id=row["recovery_id"],
+            task_id=row["task_id"],
+            affected_obligation_id=row["affected_obligation_id"],
+            current_state=RecoveryState(row["current_state"]),
+            attempt_number=int(row["attempt_number"]),
+            max_attempts=int(row["max_attempts"]),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+            failure_classification=row["failure_classification"],
+            reason=row["reason"],
+            parent_event_id=row["parent_event_id"],
+            staleness_cause=row["staleness_cause"],
+            affected_claim_id=row["affected_claim_id"],
+            affected_evidence_id=row["affected_evidence_id"],
+            project_state_ref=row["project_state_ref"],
+            current_repair_obligation=curr_ob,
+            history=json.loads(row["history_json"]) if row["history_json"] else [],
+            resulting_verification=res_ver,
+            metadata=json.loads(row["metadata_json"]) if row["metadata_json"] else {},
+        )

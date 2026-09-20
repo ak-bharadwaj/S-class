@@ -101,7 +101,8 @@ class SQLiteStateStore:
     def _init_db(self) -> None:
         """Initializes database tables, verifies schema, and applies versioned migrations."""
         try:
-            with self.get_connection() as conn:
+            conn = self.get_connection()
+            try:
                 conn.executescript(SCHEMA_V1)
                 conn.execute(
                     "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (1, datetime('now'))"
@@ -109,5 +110,7 @@ class SQLiteStateStore:
                 conn.commit()
                 # Run versioned schema migrations
                 apply_migrations(conn)
+            finally:
+                conn.close()
         except sqlite3.Error as e:
             raise StorageError(f"Failed to initialize SQLite state database at {self.db_path}: {e}") from e
