@@ -1094,16 +1094,19 @@ def test_d10_registry_generation_change_old_admission_denied(tmp_path):
     # Mutate registry generation after authorization
     reg = slice_runner.controller.auth_service.capability_registry
     old_gen = reg.generation
-    reg.reload_defaults()
-    assert reg.generation > old_gen
+    try:
+        reg.reload_defaults()
+        assert reg.generation > old_gen
 
-    # D6 execution boundary rejects the old admission
-    with pytest.raises(SecurityViolationError, match="Registry generation mismatch"):
-        slice_runner.executor.execute_envelope(env)
+        # D6 execution boundary rejects the old admission
+        with pytest.raises(SecurityViolationError, match="Registry generation mismatch"):
+            slice_runner.executor.execute_envelope(env)
 
-    # Controller validate_and_consume also rejects the stale admission
-    with pytest.raises(SecurityViolationError, match="Registry generation mismatch|verification failed"):
-        slice_runner.controller.validate_and_consume(env)
+        # Controller validate_and_consume also rejects the stale admission
+        with pytest.raises(SecurityViolationError, match="Registry generation mismatch|verification failed"):
+            slice_runner.controller.validate_and_consume(env)
+    finally:
+        reg._generation = old_gen
 
 
 def test_d10_policy_version_change_old_admission_denied(tmp_path):
