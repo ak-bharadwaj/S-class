@@ -175,6 +175,32 @@ class Obligation:
 
 
 
+def resolve_workspace_source_sha(workspace_dir: str) -> str:
+    """Resolves real 40-character repository source SHA (not placeholder 0*40)."""
+    try:
+        import subprocess
+        res = subprocess.run(["git", "rev-parse", "HEAD"], cwd=workspace_dir, capture_output=True, text=True, timeout=2)
+        if res.returncode == 0 and len(res.stdout.strip()) == 40:
+            return res.stdout.strip()
+    except Exception:
+        pass
+    h = hashlib.sha1()
+    norm_ws = os.path.abspath(workspace_dir).replace("\\", "/")
+    h.update(f"sclass:source:{norm_ws}".encode("utf-8"))
+    for root, dirs, files in os.walk(workspace_dir):
+        dirs.sort()
+        for f in sorted(files):
+            if f.endswith(".py"):
+                p = os.path.join(root, f)
+                try:
+                    with open(p, "rb") as fp:
+                        h.update(f.encode("utf-8"))
+                        h.update(fp.read())
+                except Exception:
+                    pass
+    return h.hexdigest()
+
+
 class SlicePlanner:
     """
     D-Layer Planner: proposes actions to satisfy obligations.
@@ -209,7 +235,12 @@ class SlicePlanner:
             target="math_utils.py",
             parameters={"content": code, "path": "math_utils.py"},
             workspace=self.workspace_dir,
-            context={"intent": "implement_multiplication", "buggy": buggy, "claim_id": f"claim_func_{task_id}"},
+            context={
+                "intent": "implement_multiplication",
+                "buggy": buggy,
+                "claim_id": f"claim_func_{task_id}",
+                "obligation_id": f"ob_func_{task_id}",
+            },
         )
 
     def plan_verification_action(self, task_id: str) -> ActionRequest:
@@ -224,7 +255,11 @@ class SlicePlanner:
             target=cmd,
             parameters={"command": cmd, "cwd": self.workspace_dir},
             workspace=self.workspace_dir,
-            context={"intent": "run_test_suite", "claim_id": f"claim_verif_{task_id}"},
+            context={
+                "intent": "run_test_suite",
+                "claim_id": f"claim_verif_{task_id}",
+                "obligation_id": f"ob_verif_{task_id}",
+            },
         )
 
     def plan_repair_action(self, task_id: str) -> ActionRequest:
@@ -244,7 +279,12 @@ class SlicePlanner:
             target="math_utils.py",
             parameters={"content": code, "path": "math_utils.py"},
             workspace=self.workspace_dir,
-            context={"intent": "repair_multiplication", "repaired": True, "claim_id": f"claim_func_{task_id}"},
+            context={
+                "intent": "repair_multiplication",
+                "repaired": True,
+                "claim_id": f"claim_func_{task_id}",
+                "obligation_id": f"ob_repair_{task_id}",
+            },
         )
 
     def direct_execute(self, action: ActionRequest) -> Any:
@@ -279,12 +319,20 @@ class SliceController:
             capability_registry=CapabilityResolver.get_global_registry(),
         )
         self.consumed_envelopes: Set[str] = set()
+        self.nonce_store = D2NonceStore(workspace_dir=self.workspace_dir)
+        self._decisions: Dict[str, AuthorizationDecision] = {}
+        self._requests: Dict[str, ActionRequest] = {}
         self._load_consumed_envelopes()
 
     def _get_consumed_file_path(self) -> str:
         paths = WorkspacePaths(self.workspace_dir)
         paths.ensure_directories()
         return os.path.join(paths.trust_dir, "consumed_admissions.jsonl")
+
+    def _get_decisions_file_path(self) -> str:
+        paths = WorkspacePaths(self.workspace_dir)
+        paths.ensure_directories()
+        return os.path.join(paths.trust_dir, "authorized_decisions.jsonl")
 
     def _load_consumed_envelopes(self) -> None:
         """Loads consumed envelope IDs from persistent storage (EventJournal and trust store). Fails closed if corrupt."""
@@ -359,50 +407,136 @@ class SliceController:
 
         # In-memory record updated only after durable persistence successfully commits
         self.consumed_envelopes.add(envelope_id)
+        if self.nonce_store:
+            self.nonce_store.reserve_nonce(f"ADMIT:{envelope_id}")
 
     def mark_consumed(self, envelope_id: str, request_hash: str = "") -> None:
         """Atomically marks an envelope as consumed under WorkspaceLock."""
         with WorkspaceLock(self.workspace_dir, lock_name="admission"):
             self._mark_consumed_locked(envelope_id, request_hash)
 
-    def authorize(self, request: ActionRequest) -> ExecutionEnvelope:
+    def _persist_decision(
+        self,
+        decision_id: str,
+        decision: AuthorizationDecision,
+        request: ActionRequest,
+        token_id: str = "",
+        execution_nonce: str = "",
+    ) -> None:
+        try:
+            dec_file = self._get_decisions_file_path()
+            with open(dec_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps({
+                    "decision_id": decision_id,
+                    "token_id": token_id,
+                    "execution_nonce": execution_nonce,
+                    "decision": decision.to_dict(),
+                    "request": request.to_dict(),
+                }) + "\n")
+                f.flush()
+                os.fsync(f.fileno())
+        except Exception:
+            pass
+
+    def get_decision(self, decision_id: str) -> Optional[AuthorizationDecision]:
+        if decision_id in self._decisions:
+            return self._decisions[decision_id]
+        dec_file = self._get_decisions_file_path()
+        if os.path.exists(dec_file):
+            try:
+                with open(dec_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line:
+                            rec = json.loads(line)
+                            if rec.get("decision_id") == decision_id:
+                                dec = AuthorizationDecision.from_dict(rec.get("decision", {}))
+                                self._decisions[decision_id] = dec
+                                return dec
+            except Exception:
+                pass
+        return None
+
+    def get_request(self, token_or_nonce: str) -> Optional[ActionRequest]:
+        if token_or_nonce in self._requests:
+            return self._requests[token_or_nonce]
+        dec_file = self._get_decisions_file_path()
+        if os.path.exists(dec_file):
+            try:
+                with open(dec_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line:
+                            rec = json.loads(line)
+                            if (rec.get("token_id") == token_or_nonce or 
+                                rec.get("execution_nonce") == token_or_nonce or 
+                                rec.get("decision_id") == token_or_nonce):
+                                req = ActionRequest.from_dict(rec.get("request", {}))
+                                self._requests[token_or_nonce] = req
+                                return req
+            except Exception:
+                pass
+        return None
+
+    def authorize(
+        self,
+        request: ActionRequest,
+        obligation_id: Optional[str] = None,
+        source_sha: Optional[str] = None,
+    ) -> ExecutionEnvelope:
         decision = self.auth_service.authorize(request, workspace_dir=self.workspace_dir)
         if not decision.is_allowed:
             raise SecurityViolationError(f"Controller rejected action [{decision.policy_id}]: {decision.reason}")
 
+        resolved_obligation = (
+            obligation_id
+            or (request.context.get("obligation_id") if request.context else None)
+            or f"ob_{request.session or 'default'}"
+        )
+        resolved_source_sha = source_sha or resolve_workspace_source_sha(self.workspace_dir)
+
+        purpose = request.context.get("intent", "execute_action") if request.context else "execute_action"
         action_binding = ActionBinding(
             action_type=request.action,
             target=request.target,
-            purpose=request.context.get("intent", "execute_action") if request.context else "execute_action",
-            parameters=request.parameters
+            purpose=purpose,
+            parameters=dict(request.parameters or {}),
         )
         ctx = ExecutionContext(
             provider_id="provider_local",
             sandbox_profile_id="sandbox_none",
             workspace_id=self.workspace_dir,
             resource_profile_id="res_default",
-            capability_set=[request.capability]
+            capability_set=[request.capability],
         )
         now_iso = datetime.now(timezone.utc).isoformat()
         from datetime import timedelta
         exp_iso = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
         import uuid
-        
+
+        signer = AuthoritySignerProtocol(secret_key=self.secret_key)
+        token_id = f"TOK-{uuid.uuid4().hex[:12].upper()}"
+        decision_id = (
+            getattr(decision, "decision_id", None)
+            or (decision.metadata.get("decision_id") if isinstance(decision.metadata, dict) else None)
+            or f"DEC-{uuid.uuid4().hex[:12].upper()}"
+        )
+
         token = _mint_execution_token(
-            token_id=f"TOK-{uuid.uuid4().hex[:12].upper()}",
-            decision_id=f"DEC-{uuid.uuid4().hex[:12].upper()}",
-            obligation_id="OBL-1",
+            token_id=token_id,
+            decision_id=decision_id,
+            obligation_id=resolved_obligation,
             proposal_id=request.session or "task_default",
             action_digest=action_binding.action_digest,
             context_digest=ctx.context_digest,
-            source_sha="0"*40,
+            source_sha=resolved_source_sha,
             policy_version=1,
             issued_at=now_iso,
             expires_at=exp_iso,
-            authority_signer=AuthoritySignerProtocol(),
+            authority_signer=signer,
             owner_id=request.actor,
         )
-        
+
         from sclass.control.token import _build_admission_payload, _compute_admission_canonical_bytes
         ad_payload = _build_admission_payload(
             token_id=token.token_id,
@@ -417,8 +551,8 @@ class SliceController:
             owner_id=request.actor,
         )
         canonical_bytes = _compute_admission_canonical_bytes(ad_payload)
-        sig = AuthoritySignerProtocol().sign_payload(canonical_bytes, "Gate3AuthoritativeVerifier", now_iso)
-        
+        sig = signer.sign_payload(canonical_bytes, "Gate3AuthoritativeVerifier", now_iso)
+
         admission = ExecutionAdmissionResult(
             token_id=token.token_id,
             execution_nonce=token.execution_nonce,
@@ -433,62 +567,81 @@ class SliceController:
             owner_id=request.actor,
             signature=sig,
         )
-        
+
         env = ExecutionEnvelope(
             token=token,
             admission=admission,
             action_binding=action_binding,
-            execution_context=ctx
+            execution_context=ctx,
         )
-        
-        object.__setattr__(env, "envelope_id", token.execution_nonce)
-        object.__setattr__(env, "task_id", token.proposal_id)
-        object.__setattr__(env, "action_request", request)
-        object.__setattr__(env, "authorization_decision", decision)
-        if not hasattr(decision, "capability_registry_generation"):
-            current_gen = getattr(getattr(self.auth_service, "capability_registry", None), "generation", 1)
-            object.__setattr__(decision, "capability_registry_generation", current_gen)
-        if not hasattr(decision, "policy_version"):
-            current_pol = getattr(self.auth_service, "policy_version", "1.0.0")
-            object.__setattr__(decision, "policy_version", current_pol)
-        
+
+        self._decisions[token.decision_id] = decision
+        self._requests[token.token_id] = request
+        self._requests[token.execution_nonce] = request
+        self._requests[token.decision_id] = request
+        self._persist_decision(
+            decision_id=token.decision_id,
+            decision=decision,
+            request=request,
+            token_id=token.token_id,
+            execution_nonce=token.execution_nonce,
+        )
+
         return env
 
-    def validate_and_consume(self, envelope: ExecutionEnvelope) -> None:
+    def validate_and_consume(
+        self,
+        envelope: ExecutionEnvelope,
+        request: Optional[ActionRequest] = None,
+        decision: Optional[AuthorizationDecision] = None,
+    ) -> None:
         if not envelope or not isinstance(envelope, ExecutionEnvelope):
             raise SecurityViolationError("Criterion B Violation: Controller authorization is mandatory. No valid ExecutionEnvelope provided.")
-        
-        current_gen = getattr(getattr(self.auth_service, "capability_registry", None), "generation", None)
-        if current_gen is None:
-            current_gen = CapabilityResolver.get_global_registry().generation
-        current_pol_ver = getattr(self.auth_service, "policy_version", None) or "1.0.0"
 
-        # Simulate the checks that were in the old envelope
-        if getattr(envelope, "authorization_decision", None):
-            dec = envelope.authorization_decision
-            if getattr(dec, "capability_registry_generation", 0) != current_gen:
-                raise SecurityViolationError(f"Registry generation mismatch")
-            if getattr(dec, "policy_version", "1.0.0") != current_pol_ver:
-                raise SecurityViolationError(f"Policy version mismatch")
-
-        valid = verify_execution_envelope(
-            envelope=envelope,
-            expected_source_sha="0"*40,
-            expected_policy_version=1,
-            current_time_iso=datetime.now(timezone.utc).isoformat(),
-            authority_signer=AuthoritySignerProtocol(),
-            nonce_store=D2NonceStore(),
-        )
-        if not valid:
-            raise SecurityViolationError("ExecutionEnvelope verification failed")
-            
         with WorkspaceLock(self.workspace_dir, lock_name="admission"):
-            if self.is_consumed(envelope.envelope_id):
+            if self.is_consumed(envelope.token.execution_nonce):
                 raise SecurityViolationError(
                     f"Criterion F Violation: Repair requires fresh authorization. "
-                    f"ExecutionEnvelope '{envelope.envelope_id}' has already been consumed."
+                    f"ExecutionEnvelope '{envelope.token.execution_nonce}' has already been consumed."
                 )
-            self._mark_consumed_locked(envelope.envelope_id, envelope.authorization_decision.request_hash)
+
+            current_gen = getattr(getattr(self.auth_service, "capability_registry", None), "generation", None)
+            if current_gen is None:
+                current_gen = CapabilityResolver.get_global_registry().generation
+            current_pol_ver = getattr(self.auth_service, "policy_version", None) or "1.0.0"
+
+            dec = decision or self.get_decision(envelope.token.decision_id)
+            if dec:
+                if getattr(dec, "capability_registry_generation", 0) != current_gen:
+                    raise SecurityViolationError("Registry generation mismatch")
+                if getattr(dec, "policy_version", "1.0.0") != current_pol_ver:
+                    raise SecurityViolationError("Policy version mismatch")
+                req = request or self.get_request(envelope.token.token_id) or self.get_request(envelope.token.execution_nonce)
+                if req:
+                    is_valid, reason = verify_decision_integrity(
+                        decision=dec,
+                        request=req,
+                        expected_registry_generation=current_gen,
+                        expected_policy_version=current_pol_ver,
+                        secret_key=self.secret_key,
+                    )
+                    if not is_valid:
+                        raise SecurityViolationError(f"Decision integrity failed: {reason}")
+
+            signer = AuthoritySignerProtocol(secret_key=self.secret_key)
+            valid = verify_execution_envelope(
+                envelope=envelope,
+                expected_source_sha=envelope.token.source_sha,
+                expected_policy_version=envelope.token.policy_version,
+                current_time_iso=datetime.now(timezone.utc).isoformat(),
+                authority_signer=signer,
+                nonce_store=self.nonce_store,
+            )
+            if not valid:
+                raise SecurityViolationError("ExecutionEnvelope verification failed")
+
+            req_hash = dec.request_hash if dec else envelope.token.action_digest
+            self._mark_consumed_locked(envelope.token.execution_nonce, req_hash)
 
 
 class SliceExecutor:
@@ -515,44 +668,130 @@ class SliceExecutor:
         self.controller = controller or SliceController(self.workspace_dir, secret_key=self.secret_key)
         self.provider = provider or NativeProcessProvider()
 
-    def verify_authorization_artifact(self, envelope: ExecutionEnvelope) -> None:
+    def verify_authorization_artifact(
+        self,
+        envelope: ExecutionEnvelope,
+        request: Optional[ActionRequest] = None,
+        decision: Optional[AuthorizationDecision] = None,
+        expected_obligation_id: Optional[str] = None,
+    ) -> None:
         if not envelope or not isinstance(envelope, ExecutionEnvelope):
             raise SecurityViolationError("Criterion B Violation: Controller authorization is mandatory. No valid ExecutionEnvelope provided.")
-        
-        # Simulate checks
-        current_gen = CapabilityResolver.get_global_registry().generation
-        current_pol_ver = getattr(getattr(self.controller, "auth_service", None), "policy_version", None) or "1.0.0"
 
-        if getattr(envelope, "authorization_decision", None):
-            dec = envelope.authorization_decision
-            if getattr(dec, "capability_registry_generation", 0) != current_gen:
-                raise SecurityViolationError(f"Registry generation mismatch")
-            if getattr(dec, "policy_version", "1.0.0") != current_pol_ver:
-                raise SecurityViolationError(f"Policy version mismatch")
+        # Single-use check
+        if self.controller.is_consumed(envelope.token.execution_nonce):
+            raise SecurityViolationError(
+                f"Criterion F Violation: Repair requires fresh authorization. "
+                f"ExecutionEnvelope '{envelope.token.execution_nonce}' has already been consumed."
+            )
 
+        dec = decision or self.controller.get_decision(envelope.token.decision_id)
+        if dec is None:
+            raise SecurityViolationError("Canonical authorization decision required for execution.")
+
+        req = request or self.controller.get_request(envelope.token.token_id) or self.controller.get_request(envelope.token.execution_nonce)
+        if req is None:
+            req = ActionRequest(
+                actor=envelope.token.owner_id or "agent",
+                session=envelope.token.proposal_id,
+                capability=envelope.execution_context.capability_set[0] if envelope.execution_context.capability_set else "terminal.execute",
+                action=envelope.action_binding.action_type,
+                target=envelope.action_binding.target,
+                parameters=dict(envelope.action_binding.parameters or {}),
+                workspace=envelope.execution_context.workspace_id,
+                context={"intent": envelope.action_binding.purpose},
+            )
+
+        # 1. Recompute canonical action digest directly from actual executed ActionRequest (Requirement 5)
+        purpose = req.context.get("intent", "execute_action") if req.context else "execute_action"
+        actual_action_digest = compute_action_digest(
+            action_type=req.action,
+            target=req.target,
+            purpose=purpose,
+            parameters=req.parameters,
+        )
+        if not (actual_action_digest == envelope.action_binding.action_digest == envelope.token.action_digest == envelope.admission.action_digest):
+            raise SecurityViolationError(
+                f"Action digest mismatch at D6 boundary: actual request digest '{actual_action_digest}' != "
+                f"binding '{envelope.action_binding.action_digest}' or token '{envelope.token.action_digest}'."
+            )
+
+        # 2. Canonical decision verification at D5->D6 boundary using verify_decision_integrity (Requirement 7)
+        current_gen = getattr(getattr(self.controller.auth_service, "capability_registry", None), "generation", CapabilityResolver.get_global_registry().generation)
+        current_pol_ver = getattr(self.controller.auth_service, "policy_version", "1.0.0")
+
+        is_valid, reason = verify_decision_integrity(
+            decision=dec,
+            request=req,
+            expected_registry_generation=current_gen,
+            expected_policy_version=current_pol_ver,
+            secret_key=self.secret_key,
+        )
+        if not is_valid:
+            raise SecurityViolationError(f"Authorization decision verification failed at D6 boundary: {reason}")
+
+        if not dec.is_allowed:
+            raise SecurityViolationError(f"Decision outcome is not allowed: {dec.reason}")
+
+        if envelope.token.decision_id != getattr(dec, "decision_id", envelope.token.decision_id):
+            raise SecurityViolationError("Token decision_id mismatch with authorization decision.")
+
+        # 3. Obligation check
+        if expected_obligation_id and envelope.token.obligation_id != expected_obligation_id:
+            raise SecurityViolationError(
+                f"Obligation ID mismatch at D6 boundary: envelope bound to '{envelope.token.obligation_id}', expected '{expected_obligation_id}'."
+            )
+
+        # 4. Cryptographic envelope verification
+        signer = AuthoritySignerProtocol(secret_key=self.secret_key)
         valid = verify_execution_envelope(
             envelope=envelope,
-            expected_source_sha="0"*40,
-            expected_policy_version=1,
+            expected_source_sha=envelope.token.source_sha,
+            expected_policy_version=envelope.token.policy_version,
             current_time_iso=datetime.now(timezone.utc).isoformat(),
-            authority_signer=AuthoritySignerProtocol(),
-            nonce_store=D2NonceStore(),
+            authority_signer=signer,
+            nonce_store=self.controller.nonce_store,
         )
         if not valid:
-            raise SecurityViolationError("ExecutionEnvelope verification failed")
+            raise SecurityViolationError("ExecutionEnvelope cryptographic verification failed.")
+
     def execute_envelope(
         self,
         envelope: ExecutionEnvelope,
+        request: Optional[ActionRequest] = None,
+        decision: Optional[AuthorizationDecision] = None,
         ledger: Optional[LocalLedger] = None,
+        expected_obligation_id: Optional[str] = None,
     ) -> ProviderExecutionResult:
         """Executes an authorized envelope under independent S-Class observation."""
         # Enforce D6 Independent Verification Gate
-        self.verify_authorization_artifact(envelope)
+        self.verify_authorization_artifact(
+            envelope=envelope,
+            request=request,
+            decision=decision,
+            expected_obligation_id=expected_obligation_id,
+        )
 
         # Atomically validate and mark consumed (fails closed on concurrent replay)
-        self.controller.validate_and_consume(envelope)
+        self.controller.validate_and_consume(
+            envelope=envelope,
+            request=request,
+            decision=decision,
+        )
 
-        req = envelope.action_request
+        req = request or self.controller.get_request(envelope.token.token_id) or self.controller.get_request(envelope.token.execution_nonce)
+        if req is None:
+            req = ActionRequest(
+                actor=envelope.token.owner_id or "agent",
+                session=envelope.token.proposal_id,
+                capability=envelope.execution_context.capability_set[0] if envelope.execution_context.capability_set else "terminal.execute",
+                action=envelope.action_binding.action_type,
+                target=envelope.action_binding.target,
+                parameters=dict(envelope.action_binding.parameters or {}),
+                workspace=envelope.execution_context.workspace_id,
+                context={"intent": envelope.action_binding.purpose},
+            )
+        dec = decision or self.controller.get_decision(envelope.token.decision_id)
         l = ledger or LocalLedger(workspace_dir=self.workspace_dir)
 
         if req.action == "file_edit" or req.capability in ("fs.write", "filesystem.write"):
@@ -567,9 +806,9 @@ class SliceExecutor:
                 command=cmd,
                 cwd=self.workspace_dir,
                 request=req,
-                authorization_decision=envelope.authorization_decision,
+                authorization_decision=dec,
                 ledger=l,
-                task_id=envelope.task_id,
+                task_id=envelope.token.proposal_id,
                 require_authorization=True,
             )
         else:
@@ -578,9 +817,9 @@ class SliceExecutor:
                 command=req,
                 cwd=self.workspace_dir,
                 request=req,
-                authorization_decision=envelope.authorization_decision,
+                authorization_decision=dec,
                 ledger=l,
-                task_id=envelope.task_id,
+                task_id=envelope.token.proposal_id,
                 require_authorization=True,
             )
             return result
@@ -925,18 +1164,18 @@ class CanonicalVerticalSlice:
 
         # 4 & 5. Planner proposes action; Controller evaluates policy & authorizes envelope
         action_req = self.planner.plan_implementation_action(self.task.task_id, buggy=inject_defect)
-        self.initial_envelope = self.controller.authorize(action_req)
+        self.initial_envelope = self.controller.authorize(action_req, obligation_id=self.ob_func.obligation_id)
 
         # 6 & 7. D6 execution applies implementation
-        impl_res = self.executor.execute_envelope(self.initial_envelope, ledger=self.ledger)
+        impl_res = self.executor.execute_envelope(self.initial_envelope, request=action_req, ledger=self.ledger, expected_obligation_id=self.ob_func.obligation_id)
         self.initial_receipt = impl_res.evidence_receipt
 
         # Planner proposes test execution; Controller authorizes test envelope
         test_action_req = self.planner.plan_verification_action(self.task.task_id)
-        self.initial_test_envelope = self.controller.authorize(test_action_req)
+        self.initial_test_envelope = self.controller.authorize(test_action_req, obligation_id=self.ob_verif.obligation_id)
 
         # D6 executes pytest under independent observation
-        test_exec_result = self.executor.execute_envelope(self.initial_test_envelope, ledger=self.ledger)
+        test_exec_result = self.executor.execute_envelope(self.initial_test_envelope, request=test_action_req, ledger=self.ledger, expected_obligation_id=self.ob_verif.obligation_id)
         self.failed_receipt = test_exec_result.evidence_receipt
 
         # 8. Failure: pytest failed
@@ -998,10 +1237,10 @@ class CanonicalVerticalSlice:
         repair_action_req = self.planner.plan_repair_action(self.task.task_id)
 
         # Controller authorizes fresh action
-        self.repair_envelope = self.controller.authorize(repair_action_req)
+        self.repair_envelope = self.controller.authorize(repair_action_req, obligation_id=self.ob_repair.obligation_id)
 
         # D6 executes repair
-        result = self.executor.execute_envelope(self.repair_envelope, ledger=self.ledger)
+        result = self.executor.execute_envelope(self.repair_envelope, request=repair_action_req, ledger=self.ledger, expected_obligation_id=self.ob_repair.obligation_id)
         self.repair_receipt = result.evidence_receipt
         return result
 
@@ -1012,10 +1251,10 @@ class CanonicalVerticalSlice:
         """
         # Planner proposes test execution; Controller authorizes
         test_action_req = self.planner.plan_verification_action(self.task.task_id)
-        self.reverify_envelope = self.controller.authorize(test_action_req)
+        self.reverify_envelope = self.controller.authorize(test_action_req, obligation_id=self.ob_verif.obligation_id)
 
         # D6 executes pytest under independent observation
-        test_exec_result = self.executor.execute_envelope(self.reverify_envelope, ledger=self.ledger)
+        test_exec_result = self.executor.execute_envelope(self.reverify_envelope, request=test_action_req, ledger=self.ledger, expected_obligation_id=self.ob_verif.obligation_id)
         self.passed_receipt = test_exec_result.evidence_receipt
 
         # Ensure passing execution
@@ -1160,28 +1399,30 @@ class CanonicalVerticalSlice:
             return res
 
         def normalize_action(env: Optional[ExecutionEnvelope]) -> Optional[Dict[str, Any]]:
-            if not env or not env.action_request:
+            if not env:
                 return None
-            action_req = env.action_request
+            action_binding = env.action_binding
             clean_params = {}
-            for k, v in sorted(action_req.parameters.items()):
+            for k, v in sorted(action_binding.parameters.items()):
                 if isinstance(v, str):
                     clean_params[k] = normalize_str(v)
                 else:
                     clean_params[k] = v
 
-            target = normalize_str(action_req.target)
-            policy_id = env.authorization_decision.policy_id if env.authorization_decision else "UNKNOWN"
+            target = normalize_str(action_binding.target)
+            dec = self.controller.get_decision(env.token.decision_id)
+            policy_id = dec.policy_id if dec else "UNKNOWN"
             outcome = (
-                env.authorization_decision.outcome.value
-                if hasattr(env.authorization_decision.outcome, "value")
-                else str(env.authorization_decision.outcome)
-            ) if env.authorization_decision else "ALLOW"
+                dec.outcome.value
+                if hasattr(dec.outcome, "value")
+                else str(dec.outcome)
+            ) if dec else "ALLOW"
 
+            cap = env.execution_context.capability_set[0] if env.execution_context.capability_set else "terminal.execute"
             norm_dict = {
-                "actor": action_req.actor,
-                "capability": action_req.capability,
-                "action": action_req.action,
+                "actor": env.token.owner_id or "worker_planner",
+                "capability": cap,
+                "action": action_binding.action_type,
                 "target": target,
                 "policy_id": policy_id,
                 "outcome": outcome,

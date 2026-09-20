@@ -1005,7 +1005,8 @@ def test_d10_policy_version_change_old_admission_denied(tmp_path):
     env = slice_runner.controller.authorize(req)
 
     assert True is True
-    assert env.authorization_decision.policy_version == "1.0.0"
+    dec = slice_runner.controller.get_decision(env.token.decision_id)
+    assert dec.policy_version == "1.0.0"
 
     # Mutate policy version on authoritative controller service after authorization
     slice_runner.controller.auth_service.policy_version = "2.0.0"
@@ -1220,5 +1221,280 @@ def test_d10_parity_reaches_canonical_boundary(tmp_path):
     assert res is not None
     assert res.exit_code == 0
     assert "42" in res.stdout
+
+
+def test_d10_test_a_forged_decision_rejected(tmp_path):
+    """
+    Test A (D10.3 Required Test):
+    Forged decision rejected.
+    D6 independently verifies canonical AuthorizationDecision via verify_decision_integrity().
+    Forged decision or corrupted HMAC integrity token fails closed.
+    """
+    from sclass.domain.action import ActionRequest, AuthorizationDecision, DecisionOutcome
+    from sclass.core.vertical_slice import CanonicalVerticalSlice
+    from sclass.core.errors import SecurityViolationError
+
+    ws = str(tmp_path / "d10_test_a_forged_decision")
+    slice_runner = CanonicalVerticalSlice(ws)
+    slice_runner.setup_scenario()
+    task = slice_runner.initialize_task()
+
+    req = slice_runner.planner.plan_verification_action(task.task_id)
+    env = slice_runner.controller.authorize(req)
+
+    # Attack A1: Forged decision with untrusted issuer
+    forged_decision_issuer = AuthorizationDecision(
+        outcome=DecisionOutcome.ALLOW,
+        policy_id="FORGED-001",
+        risk_level="low",
+        reason="Forged issuer",
+        issuer="MALICIOUS_ISSUER",
+        request_hash="a" * 64,
+        integrity_token="b" * 64,
+    )
+    with pytest.raises(SecurityViolationError, match=".*"):
+        slice_runner.executor.execute_envelope(env, decision=forged_decision_issuer)
+
+    # Attack A2: Forged decision with fake HMAC integrity token
+    forged_decision_hmac = AuthorizationDecision(
+        outcome=DecisionOutcome.ALLOW,
+        policy_id="FORGED-002",
+        risk_level="low",
+        reason="Fake HMAC token",
+        issuer="S_CLASS",
+        request_hash="a" * 64,
+        integrity_token="deadbeef" * 8,
+    )
+    with pytest.raises(SecurityViolationError, match=".*"):
+        slice_runner.executor.execute_envelope(env, decision=forged_decision_hmac)
+
+    # Attack A3: Forged decision with wrong authority secret
+    from sclass.policy.authorization_service import generate_integrity_token
+    attacker_key = b"attacker_secret_key_123456789012"
+    now_iso = env.token.issued_at
+    req_hash = slice_runner.controller.get_decision(env.token.decision_id).request_hash
+    attacker_token = generate_integrity_token(
+        issuer="S_CLASS",
+        request_hash=req_hash,
+        capability_hash="",
+        policy_id="DEFAULT_ALLOW",
+        policy_version="1.0.0",
+        outcome="allow",
+        risk_level="low",
+        evaluated_at=now_iso,
+        secret_key=attacker_key,
+    )
+    forged_decision_secret = AuthorizationDecision(
+        outcome=DecisionOutcome.ALLOW,
+        policy_id="DEFAULT_ALLOW",
+        risk_level="low",
+        reason="Attacker key decision",
+        issuer="S_CLASS",
+        request_hash=req_hash,
+        integrity_token=attacker_token,
+        evaluated_at=now_iso,
+    )
+    with pytest.raises(SecurityViolationError, match=".*"):
+        slice_runner.executor.execute_envelope(env, decision=forged_decision_secret)
+
+
+def test_d10_test_b_action_request_mutation_after_admission_rejected(tmp_path):
+    """
+    Test B (D10.3 Required Test):
+    ActionRequest mutation after admission rejected.
+    At the D6 boundary, compute_action_digest(action, target, purpose, parameters) is recomputed
+    from the actual executed ActionRequest and verified against:
+    action_digest == action_binding.action_digest == token.action_digest == admission.action_digest.
+    Mutating action parameters, target, capability, or purpose after admission is rejected.
+    """
+    from sclass.domain.action import ActionRequest
+    from sclass.core.vertical_slice import CanonicalVerticalSlice
+    from sclass.core.errors import SecurityViolationError
+
+    ws = str(tmp_path / "d10_test_b_request_mutation")
+    slice_runner = CanonicalVerticalSlice(ws)
+    slice_runner.setup_scenario()
+    task = slice_runner.initialize_task()
+
+    req = slice_runner.planner.plan_implementation_action(task.task_id, buggy=False)
+    env = slice_runner.controller.authorize(req)
+
+    # Attack B1: Mutate target file to overwrite arbitrary sensitive file
+    mutated_target_req = ActionRequest(
+        actor=req.actor,
+        session=req.session,
+        capability=req.capability,
+        action=req.action,
+        target="malicious_payload.py",
+        parameters=req.parameters,
+        workspace=req.workspace,
+        context=req.context,
+    )
+    with pytest.raises(SecurityViolationError, match="Action digest mismatch"):
+        slice_runner.executor.execute_envelope(env, request=mutated_target_req)
+
+    # Attack B2: Mutate code content parameter after admission
+    mutated_param_req = ActionRequest(
+        actor=req.actor,
+        session=req.session,
+        capability=req.capability,
+        action=req.action,
+        target=req.target,
+        parameters={"content": "def malicious(): pass\n", "path": "math_utils.py"},
+        workspace=req.workspace,
+        context=req.context,
+    )
+    with pytest.raises(SecurityViolationError, match="Action digest mismatch"):
+        slice_runner.executor.execute_envelope(env, request=mutated_param_req)
+
+    # Attack B3: Mutate purpose/intent context after admission
+    mutated_intent_req = ActionRequest(
+        actor=req.actor,
+        session=req.session,
+        capability=req.capability,
+        action=req.action,
+        target=req.target,
+        parameters=req.parameters,
+        workspace=req.workspace,
+        context={"intent": "adversarial_intent", "claim_id": req.context.get("claim_id")},
+    )
+    with pytest.raises(SecurityViolationError, match="Action digest mismatch"):
+        slice_runner.executor.execute_envelope(env, request=mutated_intent_req)
+
+    # Verify original unchanged request still executes cleanly
+    res = slice_runner.executor.execute_envelope(env, request=req)
+    assert res is not None
+    assert res.success is True
+
+
+def test_d10_test_c_hardcoded_secret_rejection(tmp_path):
+    """
+    Test C (D10.3 Required Test):
+    Hard-coded secret rejection.
+    Proves that token authority does not use literal b"secret", and changing the
+    authority secret invalidates prior envelopes.
+    """
+    from sclass.control.token import AuthoritySignerProtocol, verify_execution_envelope
+    from sclass.core.vertical_slice import CanonicalVerticalSlice
+    from sclass.core.errors import SecurityViolationError
+
+    ws = str(tmp_path / "d10_test_c_hardcoded_secret")
+    secret_a = b"SECRET_KEY_ALPHA_01234567890123456789"
+    secret_b = b"SECRET_KEY_BRAVO_98765432109876543210"
+
+    slice_runner_a = CanonicalVerticalSlice(ws)
+    slice_runner_a.secret_key = secret_a
+    slice_runner_a.controller.secret_key = secret_a
+    slice_runner_a.executor.secret_key = secret_a
+    slice_runner_a.setup_scenario()
+    task = slice_runner_a.initialize_task()
+
+    req = slice_runner_a.planner.plan_verification_action(task.task_id)
+    env = slice_runner_a.controller.authorize(req)
+
+    # Under secret_a, envelope verification succeeds
+    signer_a = AuthoritySignerProtocol(secret_key=secret_a)
+    assert verify_execution_envelope(
+        envelope=env,
+        expected_source_sha=env.token.source_sha,
+        expected_policy_version=env.token.policy_version,
+        current_time_iso=env.token.issued_at,
+        authority_signer=signer_a,
+    ) is True
+
+    # Under secret_b, envelope verification strictly fails
+    signer_b = AuthoritySignerProtocol(secret_key=secret_b)
+    assert verify_execution_envelope(
+        envelope=env,
+        expected_source_sha=env.token.source_sha,
+        expected_policy_version=env.token.policy_version,
+        current_time_iso=env.token.issued_at,
+        authority_signer=signer_b,
+    ) is False
+
+    # Under old literal b"secret", envelope verification strictly fails
+    signer_literal = AuthoritySignerProtocol(secret_key=b"secret")
+    assert verify_execution_envelope(
+        envelope=env,
+        expected_source_sha=env.token.source_sha,
+        expected_policy_version=env.token.policy_version,
+        current_time_iso=env.token.issued_at,
+        authority_signer=signer_literal,
+    ) is False
+
+    # An executor configured with secret_b strictly rejects execution of the envelope
+    slice_runner_a.executor.secret_key = secret_b
+    with pytest.raises(SecurityViolationError, match=".*"):
+        slice_runner_a.executor.execute_envelope(env)
+
+
+def test_d10_test_d_obligation_mismatch_rejected(tmp_path):
+    """
+    Test D (D10.3 Required Test):
+    Obligation mismatch rejected.
+    An ExecutionEnvelope authorized for Obligation 1 cannot execute under Obligation 2.
+    """
+    from sclass.core.vertical_slice import CanonicalVerticalSlice
+    from sclass.core.errors import SecurityViolationError
+
+    ws = str(tmp_path / "d10_test_d_obligation_mismatch")
+    slice_runner = CanonicalVerticalSlice(ws)
+    slice_runner.setup_scenario()
+    task = slice_runner.initialize_task()
+
+    req = slice_runner.planner.plan_implementation_action(task.task_id, buggy=False)
+    # Authorized explicitly for ob_func
+    env = slice_runner.controller.authorize(req, obligation_id=slice_runner.ob_func.obligation_id)
+    assert env.token.obligation_id == slice_runner.ob_func.obligation_id
+
+    # Attempting to execute under ob_verif is rejected at D6 boundary
+    with pytest.raises(SecurityViolationError, match="Obligation ID mismatch"):
+        slice_runner.executor.execute_envelope(
+            env,
+            request=req,
+            expected_obligation_id=slice_runner.ob_verif.obligation_id,
+        )
+
+    # Attempting to execute under a fake obligation is rejected
+    with pytest.raises(SecurityViolationError, match="Obligation ID mismatch"):
+        slice_runner.executor.execute_envelope(
+            env,
+            request=req,
+            expected_obligation_id="ob_fake_unauthorized_obligation",
+        )
+
+    # Executing under the bound ob_func succeeds
+    res = slice_runner.executor.execute_envelope(
+        env,
+        request=req,
+        expected_obligation_id=slice_runner.ob_func.obligation_id,
+    )
+    assert res is not None
+    assert res.success is True
+
+
+def test_d10_test_e_missing_authority_secret_fails_closed_in_strict_mode(tmp_path, monkeypatch):
+    """
+    Test E (D10.3 Required Test):
+    Missing authority secret fails closed in strict mode.
+    When SCLASS_STRICT_SECURITY=1 (or production mode) and SCLASS_AUTH_SECRET is missing,
+    initializing authority components or issuing/verifying execution tokens fails closed.
+    """
+    from sclass.control.token import AuthoritySignerProtocol
+    from sclass.core.vertical_slice import SliceController
+    from sclass.core.errors import SecurityViolationError
+
+    monkeypatch.setenv("SCLASS_STRICT_SECURITY", "1")
+    monkeypatch.delenv("SCLASS_AUTH_SECRET", raising=False)
+
+    # 1. AuthoritySignerProtocol without explicit secret must fail closed
+    with pytest.raises(SecurityViolationError, match="NO VALID AUTH SECRET -> NO EXECUTION"):
+        AuthoritySignerProtocol()
+
+    # 2. SliceController without explicit secret must fail closed
+    ws = str(tmp_path / "d10_test_e_strict_mode")
+    with pytest.raises(SecurityViolationError, match="NO VALID AUTH SECRET -> NO EXECUTION"):
+        SliceController(ws)
+
 
 

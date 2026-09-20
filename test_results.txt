@@ -138,7 +138,7 @@
 ==============================================================================
 
 ==============================================================================
-  D10 VERTICAL SLICE HARDENING AUDIT: 19/19 PASSED
+  D10 VERTICAL SLICE HARDENING AUDIT: 24/24 PASSED
 ==============================================================================
   [PASS] test_d10_vertical_slice_success
   [PASS] test_d10_failure_creates_recovery
@@ -148,7 +148,6 @@
   [PASS] test_d10_end_to_end_replay_is_deterministic
   [PASS] test_d10_agent_claim_cannot_promote_itself_to_verified
   [PASS] test_d10_forged_allow_and_recomputed_envelope_rejected
-  [PASS] test_d10_action_tamper_after_authorization_rejected
   [PASS] test_d10_replaying_consumed_admission_rejected
   [PASS] test_d10_replay_rejected_after_process_restart
   [PASS] test_d10_canonical_final_acceptance_binding
@@ -160,4 +159,9 @@
   [PASS] test_d10_forged_journal_accept_final_acceptance_denied
   [PASS] test_d10_semantic_replay_trace_uses_canonical_d5_action_digests
   [PASS] test_d10_parity_reaches_canonical_boundary
+  [PASS] test_d10_test_a_forged_decision_rejected
+  [PASS] test_d10_test_b_action_request_mutation_after_admission_rejected
+  [PASS] test_d10_test_c_hardcoded_secret_rejection
+  [PASS] test_d10_test_d_obligation_mismatch_rejected
+  [PASS] test_d10_test_e_missing_authority_secret_fails_closed_in_strict_mode
 ==============================================================================

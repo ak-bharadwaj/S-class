@@ -11,33 +11,215 @@ Controller holds the ONLY issuance path.
 """
 
 from __future__ import annotations
+import os
+import re
 import uuid
 import hashlib
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Mapping, Optional, Sequence, Tuple, Any
+import copyreg
+from types import MappingProxyType
+from typing import Mapping, Optional, Sequence, Tuple, Any, Set
 import json
 
 AsymmetricAuthoritySignature = str
-HEX_40_PATTERN = r".*"
-HEX_64_PATTERN = r".*"
+HEX_40_PATTERN = r"^[0-9a-fA-F]{40}$"
+HEX_64_PATTERN = r"^[0-9a-fA-F]{64}$"
 
-def _validate_pattern(*args): pass
-def _validate_iso8601(*args): pass
-def _freeze_nested(x): return x
-def canonicalize_json(x): return json.dumps(x, sort_keys=True).encode("utf-8")
+def _reconstruct_mapping_proxy(d: dict) -> MappingProxyType:
+    return MappingProxyType(d)
+
+def _pickle_mappingproxy(mp: MappingProxyType) -> Tuple[Any, Tuple[dict]]:
+    return (_reconstruct_mapping_proxy, (dict(mp),))
+
+copyreg.pickle(MappingProxyType, _pickle_mappingproxy)
+
+def _validate_pattern(val: str, pattern: Any, name: str) -> None:
+    if not isinstance(val, str):
+        raise ValueError(f"Invalid {name}: must be a string.")
+    if isinstance(pattern, str):
+        if not re.match(pattern, val):
+            raise ValueError(f"Invalid {name}: '{val}' does not match required pattern '{pattern}'.")
+    elif hasattr(pattern, "match"):
+        if not pattern.match(val):
+            raise ValueError(f"Invalid {name}: '{val}' does not match required pattern.")
+    else:
+        raise ValueError(f"Invalid pattern type: {type(pattern)}")
+
+def _validate_iso8601(val: str, name: str) -> None:
+    if not isinstance(val, str):
+        raise ValueError(f"Invalid {name}: must be an ISO 8601 string.")
+    try:
+        if val.endswith("Z"):
+            datetime.fromisoformat(val[:-1] + "+00:00")
+        else:
+            datetime.fromisoformat(val)
+    except Exception as e:
+        raise ValueError(f"Invalid {name}: '{val}' is not a valid ISO 8601 string.") from e
+
+def _freeze_nested(val: Any) -> Any:
+    """Recursively converts dicts to MappingProxyType and sequences to tuples."""
+    if isinstance(val, (dict, Mapping)):
+        return MappingProxyType({k: _freeze_nested(v) for k, v in val.items()})
+    elif isinstance(val, (list, tuple, set)):
+        return tuple(_freeze_nested(x) for x in val)
+    return val
+
+def canonicalize_json(x: Any) -> bytes:
+    def _default(obj: Any) -> Any:
+        if isinstance(obj, (dict, Mapping)):
+            return dict(obj)
+        if isinstance(obj, (tuple, set, list)):
+            return list(obj)
+        raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+    return json.dumps(x, sort_keys=True, default=_default).encode("utf-8")
 
 class D2NonceStore:
-    def reserve_nonce(self, nonce: str) -> bool: return True
-    def is_nonce_consumed(self, nonce: str) -> bool: return True
+    def __init__(
+        self,
+        workspace_dir: Optional[str] = None,
+        file_path: Optional[str] = None,
+    ):
+        import threading
+        self._local_lock = threading.Lock()
+        self._process_cache: Set[str] = set()
+        self._file_path: Optional[str] = None
+        if file_path:
+            self._file_path = os.path.abspath(file_path)
+        elif workspace_dir:
+            from sclass.storage.paths import WorkspacePaths
+            paths = WorkspacePaths(workspace_dir)
+            paths.ensure_directories()
+            self._file_path = os.path.join(paths.trust_dir, "d2_nonces.jsonl")
+
+    def reserve_nonce(self, nonce: str) -> bool:
+        """Atomically reserves a single-use nonce. Returns True on success, False if already consumed."""
+        if not nonce or not isinstance(nonce, str):
+            raise ValueError("Nonce must be a non-empty string.")
+        with self._local_lock:
+            if (nonce in self._process_cache or 
+                f"ADMIT:{nonce}" in self._process_cache or 
+                (nonce.startswith("ADMIT:") and nonce[6:] in self._process_cache)):
+                return False
+            if self._file_path:
+                from sclass.core.errors import SecurityViolationError
+                os.makedirs(os.path.dirname(self._file_path), exist_ok=True)
+                try:
+                    if os.path.exists(self._file_path):
+                        with open(self._file_path, "r", encoding="utf-8") as f:
+                            for line_num, line in enumerate(f, start=1):
+                                line_str = line.strip()
+                                if not line_str:
+                                    continue
+                                try:
+                                    rec = json.loads(line_str)
+                                    rec_nonce = rec.get("nonce") or rec.get("envelope_id")
+                                    if not rec_nonce or not isinstance(rec_nonce, str):
+                                        raise SecurityViolationError(f"Corrupt nonce record at line {line_num}: missing 'nonce'")
+                                    self._process_cache.add(rec_nonce)
+                                    if "nonce" in rec and isinstance(rec["nonce"], str):
+                                        self._process_cache.add(rec["nonce"])
+                                    if "envelope_id" in rec and isinstance(rec["envelope_id"], str):
+                                        self._process_cache.add(rec["envelope_id"])
+                                        self._process_cache.add(f"ADMIT:{rec['envelope_id']}")
+                                except json.JSONDecodeError as err:
+                                    raise SecurityViolationError(f"Corrupt JSON in nonce store at line {line_num}: {err}") from err
+                    if (nonce in self._process_cache or 
+                        f"ADMIT:{nonce}" in self._process_cache or 
+                        (nonce.startswith("ADMIT:") and nonce[6:] in self._process_cache)):
+                        return False
+                    record = {
+                        "nonce": nonce,
+                        "envelope_id": nonce[6:] if nonce.startswith("ADMIT:") else nonce,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    }
+                    line_bytes = canonicalize_json(record) + b"\n"
+                    with open(self._file_path, "ab") as f:
+                        f.write(line_bytes)
+                        f.flush()
+                        os.fsync(f.fileno())
+                    self._process_cache.add(nonce)
+                    if nonce.startswith("ADMIT:"):
+                        self._process_cache.add(nonce[6:])
+                    else:
+                        self._process_cache.add(f"ADMIT:{nonce}")
+                    return True
+                except SecurityViolationError:
+                    raise
+                except Exception as e:
+                    raise SecurityViolationError(f"I/O failure in nonce store: {e}") from e
+            else:
+                self._process_cache.add(nonce)
+                if nonce.startswith("ADMIT:"):
+                    self._process_cache.add(nonce[6:])
+                else:
+                    self._process_cache.add(f"ADMIT:{nonce}")
+                return True
+
+    def is_nonce_consumed(self, nonce: str) -> bool:
+        """Queries whether a nonce is already consumed."""
+        if not nonce or not isinstance(nonce, str):
+            return False
+        with self._local_lock:
+            if (nonce in self._process_cache or 
+                f"ADMIT:{nonce}" in self._process_cache or 
+                (nonce.startswith("ADMIT:") and nonce[6:] in self._process_cache)):
+                return True
+            if self._file_path and os.path.exists(self._file_path):
+                from sclass.core.errors import SecurityViolationError
+                try:
+                    with open(self._file_path, "r", encoding="utf-8") as f:
+                        for line_num, line in enumerate(f, start=1):
+                            line_str = line.strip()
+                            if not line_str:
+                                continue
+                            try:
+                                rec = json.loads(line_str)
+                                rec_nonce = rec.get("nonce") or rec.get("envelope_id")
+                                if not rec_nonce or not isinstance(rec_nonce, str):
+                                    raise SecurityViolationError(f"Corrupt nonce record at line {line_num}: missing 'nonce'")
+                                self._process_cache.add(rec_nonce)
+                                if "nonce" in rec and isinstance(rec["nonce"], str):
+                                    self._process_cache.add(rec["nonce"])
+                                if "envelope_id" in rec and isinstance(rec["envelope_id"], str):
+                                    self._process_cache.add(rec["envelope_id"])
+                                    self._process_cache.add(f"ADMIT:{rec['envelope_id']}")
+                            except json.JSONDecodeError as err:
+                                raise SecurityViolationError(f"Corrupt JSON in nonce store at line {line_num}: {err}") from err
+                except SecurityViolationError:
+                    raise
+                except Exception as e:
+                    raise SecurityViolationError(f"I/O failure reading nonce store: {e}") from e
+            return (
+                nonce in self._process_cache or 
+                f"ADMIT:{nonce}" in self._process_cache or 
+                (nonce.startswith("ADMIT:") and nonce[6:] in self._process_cache)
+            )
+
+    def clear(self) -> None:
+        with self._local_lock:
+            self._process_cache.clear()
+            if self._file_path and os.path.exists(self._file_path):
+                try:
+                    os.remove(self._file_path)
+                except OSError:
+                    pass
 
 class AuthoritySignerProtocol:
+    def __init__(self, secret_key: Optional[bytes] = None):
+        if secret_key is not None:
+            self.secret_key = secret_key
+        else:
+            from sclass.policy.authorization_service import get_authorization_secret
+            self.secret_key = get_authorization_secret()
+
     def sign_payload(self, canonical_bytes: bytes, verifier_identity: str, timestamp_iso: str) -> str:
         import hashlib, hmac
-        return hmac.new(b"secret", canonical_bytes, hashlib.sha256).hexdigest()
+        return hmac.new(self.secret_key, canonical_bytes, hashlib.sha256).hexdigest()
+
     def verify_signature(self, canonical_bytes: bytes, signature: str) -> bool:
         import hashlib, hmac
-        expected = hmac.new(b"secret", canonical_bytes, hashlib.sha256).hexdigest()
+        expected = hmac.new(self.secret_key, canonical_bytes, hashlib.sha256).hexdigest()
         return hmac.compare_digest(signature, expected)
 
 
@@ -336,6 +518,14 @@ class ExecutionEnvelope:
             raise ValueError("State digest mismatch between token and admission.")
         if self.token.authority_context_digest != self.admission.authority_context_digest:
             raise ValueError("Authority context digest mismatch between token and admission.")
+
+    @property
+    def envelope_id(self) -> str:
+        return self.token.execution_nonce
+
+    @property
+    def task_id(self) -> str:
+        return self.token.proposal_id
 
 
 def _build_token_payload(
@@ -657,13 +847,13 @@ def verify_execution_envelope(
     action_binding = envelope.action_binding
     ctx = envelope.execution_context
     if not admission.is_admitted: return False
-    if not (token.action_digest == admission.action_digest == action_binding.action_digest): print("digest fail"); return False
-    if not (token.context_digest == admission.context_digest == ctx.context_digest): print("ctx digest fail"); return False
+    if not (token.action_digest == admission.action_digest == action_binding.action_digest): return False
+    if not (token.context_digest == admission.context_digest == ctx.context_digest): return False
     if token.token_id != admission.token_id: return False
     if token.execution_nonce != admission.execution_nonce: return False
     if token.obligation_id != admission.obligation_id: return False
-    if token.source_sha != expected_source_sha or admission.source_sha != expected_source_sha: print("sha fail"); return False
-    if token.policy_version != expected_policy_version or admission.policy_version != expected_policy_version: print("policy fail"); return False
+    if token.source_sha != expected_source_sha or admission.source_sha != expected_source_sha: return False
+    if token.policy_version != expected_policy_version or admission.policy_version != expected_policy_version: return False
     if token.decision_id != admission.decision_id: return False
     if token.owner_id != admission.owner_id: return False
     if token.fencing_token != admission.fencing_token: return False
@@ -675,10 +865,12 @@ def verify_execution_envelope(
         t_current = datetime.fromisoformat(current_time_iso.replace("Z", "+00:00"))
         t_issued = datetime.fromisoformat(token.issued_at.replace("Z", "+00:00"))
         t_expiry = datetime.fromisoformat(token.expires_at.replace("Z", "+00:00"))
-        if t_current < t_issued or t_current > t_expiry: print("time fail"); return False
+        if t_current < t_issued or t_current > t_expiry: return False
     except Exception: return False
-    if not verify_execution_token_signature(token, authority_signer): print("sig 1 fail"); return False
-    if not verify_admission_signature(admission, authority_signer): print("sig 2 fail"); return False
+    if not verify_execution_token_signature(token, authority_signer): return False
+    if not verify_admission_signature(admission, authority_signer): return False
+    if nonce_store is not None and nonce_store.is_nonce_consumed(token.execution_nonce):
+        return False
     return True
 
 
