@@ -16,6 +16,7 @@ Enforces:
 
 from __future__ import annotations
 import os
+import json
 import hashlib
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List, Tuple, Union
@@ -960,40 +961,125 @@ class RecoveryEngine:
                 failed_claims.append(v_claim)
                 continue
 
-            # D9.2.1: Bind verification to the current recovery-cycle repair boundary
-            verif_time_str = None
+            # D9.2.2: Bind regression freshness to authoritative persisted verification provenance
+            supplied_ts = None
             if getattr(v, "verification_event", None) and getattr(v.verification_event, "verification_time", None):
-                verif_time_str = v.verification_event.verification_time
+                supplied_ts = v.verification_event.verification_time
             elif getattr(v, "verification_time", None):
-                verif_time_str = v.verification_time
+                supplied_ts = v.verification_time
             elif hasattr(v, "metadata") and isinstance(v.metadata, dict) and v.metadata.get("verification_time"):
-                verif_time_str = v.metadata.get("verification_time")
+                supplied_ts = v.metadata.get("verification_time")
 
-            if not verif_time_str or not isinstance(verif_time_str, str) or not verif_time_str.strip():
+            if not supplied_ts or not isinstance(supplied_ts, str) or not supplied_ts.strip():
                 err_msg = (
                     f"Missing verification timestamp: regression verification for claim '{v_claim}' "
-                    f"lacks required canonical verification timestamp."
+                    f"lacks required verification timestamp."
                 )
                 if fail_closed:
                     raise RecoveryError(err_msg)
                 failed_claims.append(v_claim)
                 continue
 
-            verif_dt = _parse_iso_timestamp(verif_time_str)
-            if verif_dt is None:
+            supplied_dt = _parse_iso_timestamp(supplied_ts)
+            if supplied_dt is None:
                 err_msg = (
                     f"Invalid verification timestamp: regression verification for claim '{v_claim}' "
-                    f"has unparseable timestamp '{verif_time_str}'."
+                    f"has unparseable timestamp '{supplied_ts}'."
                 )
                 if fail_closed:
                     raise RecoveryError(err_msg)
                 failed_claims.append(v_claim)
                 continue
 
-            if repair_boundary_dt and verif_dt <= repair_boundary_dt:
+            # Look up authoritative StateRepository and LocalLedger records
+            v_rcpt_id = getattr(v, "receipt_id", None) or (v.verification_event.receipt_id if getattr(v, "verification_event", None) else None)
+            state_repo = StateRepository(self.workspace_dir)
+            verif_rec = state_repo.get_verification(claim_id=v_claim, receipt_id=v_rcpt_id)
+
+            l = self._validate_ledger()
+            all_entries = l.read_all_entries()
+            matching_ledger_entry = None
+            for e in reversed(all_entries):
+                if e.get("event") in ("verification", "rejection", "composite_acceptance"):
+                    p = e.get("payload", {})
+                    if p.get("receipt_id") == v_rcpt_id and (not v_claim or p.get("claim_id") == v_claim):
+                        matching_ledger_entry = e
+                        break
+
+            # 1. & 2. Fail closed on missing/mismatched authoritative timestamp
+            canonical_ts = None
+            if verif_rec:
+                state_ts = verif_rec.get("verification_time")
+                if not state_ts or not isinstance(state_ts, str) or not state_ts.strip():
+                    err_msg = (
+                        f"Missing authoritative timestamp: canonical StateRepository verification record "
+                        f"for claim '{v_claim}' lacks usable verification_time."
+                    )
+                    if fail_closed:
+                        raise RecoveryError(err_msg)
+                    failed_claims.append(v_claim)
+                    continue
+                if supplied_ts != state_ts:
+                    err_msg = (
+                        f"Verification timestamp mismatch: supplied timestamp '{supplied_ts}' "
+                        f"does not match canonical StateRepository verification_time '{state_ts}'."
+                    )
+                    if fail_closed:
+                        raise RecoveryError(err_msg)
+                    failed_claims.append(v_claim)
+                    continue
+                canonical_ts = state_ts
+
+            if matching_ledger_entry:
+                p = matching_ledger_entry.get("payload", {})
+                ledger_ts = p.get("verification_time") or p.get("timestamp") or matching_ledger_entry.get("timestamp")
+                if not ledger_ts or not isinstance(ledger_ts, str) or not ledger_ts.strip():
+                    err_msg = (
+                        f"Missing authoritative timestamp: canonical LocalLedger verification record "
+                        f"for claim '{v_claim}' lacks usable timestamp."
+                    )
+                    if fail_closed:
+                        raise RecoveryError(err_msg)
+                    failed_claims.append(v_claim)
+                    continue
+                if supplied_ts != ledger_ts:
+                    err_msg = (
+                        f"Verification timestamp mismatch: supplied timestamp '{supplied_ts}' "
+                        f"does not match canonical LocalLedger verification-event timestamp '{ledger_ts}'."
+                    )
+                    if fail_closed:
+                        raise RecoveryError(err_msg)
+                    failed_claims.append(v_claim)
+                    continue
+                if canonical_ts is None:
+                    canonical_ts = ledger_ts
+
+            if not canonical_ts:
                 err_msg = (
-                    f"Stale regression verification: verification for claim '{v_claim}' "
-                    f"with timestamp '{verif_time_str}' does not post-date repair boundary '{repair_boundary_str}'. "
+                    f"Missing authoritative timestamp: no canonical verification timestamp found "
+                    f"in StateRepository or LocalLedger for claim '{v_claim}'."
+                )
+                if fail_closed:
+                    raise RecoveryError(err_msg)
+                failed_claims.append(v_claim)
+                continue
+
+            canonical_dt = _parse_iso_timestamp(canonical_ts)
+            if canonical_dt is None:
+                err_msg = (
+                    f"Invalid authoritative timestamp: canonical verification timestamp '{canonical_ts}' "
+                    f"for claim '{v_claim}' is unparseable."
+                )
+                if fail_closed:
+                    raise RecoveryError(err_msg)
+                failed_claims.append(v_claim)
+                continue
+
+            # 3. Preserve the repair-boundary comparison: canonical verification_time > repair_boundary_time
+            if repair_boundary_dt and canonical_dt <= repair_boundary_dt:
+                err_msg = (
+                    f"Stale regression verification: canonical verification for claim '{v_claim}' "
+                    f"with timestamp '{canonical_ts}' does not post-date repair boundary '{repair_boundary_str}'. "
                     f"Reusing historical verifications from before the current repair cycle is rejected."
                 )
                 if fail_closed:
@@ -1001,8 +1087,7 @@ class RecoveryEngine:
                 stale_claims.append(v_claim)
                 continue
 
-            # Check underlying evidence observation timing where available
-            v_rcpt_id = getattr(v, "receipt_id", None) or (v.verification_event.receipt_id if getattr(v, "verification_event", None) else None)
+            # 4. Preserve canonical receipt timing: receipt observation completion > repair boundary
             evidence_time_str = None
             if v_rcpt_id:
                 try:
@@ -1012,6 +1097,29 @@ class RecoveryEngine:
                         evidence_time_str = getattr(receipt_obj, "finished_at", None) or getattr(receipt_obj, "started_at", None)
                 except Exception:
                     pass
+                if not evidence_time_str:
+                    try:
+                        from sclass.storage.paths import WorkspacePaths
+                        paths = WorkspacePaths(self.workspace_dir)
+                        for cand in [
+                            os.path.join(paths.receipts_dir, f"{v_rcpt_id}.json"),
+                            os.path.join(paths.legacy_receipts_dir, f"{v_rcpt_id}.json"),
+                        ]:
+                            if os.path.isfile(cand):
+                                with open(cand, "r", encoding="utf-8") as rf:
+                                    rdata = json.load(rf)
+                                    evidence_time_str = rdata.get("finished_at") or rdata.get("started_at")
+                                    if evidence_time_str:
+                                        break
+                    except Exception:
+                        pass
+                if not evidence_time_str:
+                    for e in reversed(all_entries):
+                        if e.get("event") == "OBSERVATION" and e.get("payload", {}).get("receipt_id") == v_rcpt_id:
+                            p = e.get("payload", {})
+                            evidence_time_str = p.get("finished_at") or p.get("started_at")
+                            if evidence_time_str:
+                                break
 
             if evidence_time_str and isinstance(evidence_time_str, str) and evidence_time_str.strip():
                 ev_dt = _parse_iso_timestamp(evidence_time_str)
