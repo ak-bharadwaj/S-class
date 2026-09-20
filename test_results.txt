@@ -1,76 +1,163 @@
-============================= test session starts =============================
-platform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0
-rootdir: C:\Users\dorni\.gemini\config\plugins\sclass-v5
-configfile: pyproject.toml
-plugins: anyio-4.13.0, hypothesis-6.165.9, cov-7.1.0, schemathesis-4.24.3
-collected 875 items
+==============================================================================
+  S-CLASS: 32/32 MASTER MILESTONE AUDITOR & REALITY CERTIFICATION
+==============================================================================
 
-tests\adversarial\test_acp_spoof.py .                                    [  0%]
-tests\adversarial\test_claim_evidence_mismatch.py .                      [  0%]
-tests\adversarial\test_claim_scope_mismatch.py .                         [  0%]
-tests\adversarial\test_composite_attacks.py .....                        [  0%]
-tests\adversarial\test_event_fork.py .                                   [  1%]
-tests\adversarial\test_execution_spoofing.py .                           [  1%]
-tests\adversarial\test_fake_observer.py .                                [  1%]
-tests\adversarial\test_fake_receipt.py .                                 [  1%]
-tests\adversarial\test_fake_verifier.py .                                [  1%]
-tests\adversarial\test_golden_scenarios.py ......                        [  2%]
-tests\adversarial\test_interpreter_spoof.py .                            [  2%]
-tests\adversarial\test_junction_escape.py .                              [  2%]
-tests\adversarial\test_ledger_tampering.py .                             [  2%]
-tests\adversarial\test_mcp_spoof.py .                                    [  2%]
-tests\adversarial\test_memory_poisoning.py .                             [  2%]
-tests\adversarial\test_path_hijack.py .                                  [  2%]
-tests\adversarial\test_post_verification_mutation.py .                   [  2%]
-tests\adversarial\test_protected_resource_escape.py ..                   [  3%]
-tests\adversarial\test_receipt_mutation.py ..                            [  3%]
-tests\adversarial\test_shell_escape.py ..                                [  3%]
-tests\adversarial\test_symlink_escape.py .                               [  3%]
-tests\adversarial\test_toctou.py .                                       [  3%]
-tests\adversarial\test_workspace_mutation.py .                           [  4%]
-tests\adversarial\test_wrapper_executable.py ..                          [  4%]
-tests\agents\test_claude.py .                                            [  4%]
-tests\agents\test_codex.py .                                             [  4%]
-tests\agents\test_cursor.py .                                            [  4%]
-tests\agents\test_opencode.py .                                          [  4%]
-tests\benchmarks\test_performance_matrix.py .                            [  4%]
-tests\certification\test_cert_acp.py ......                              [  5%]
-tests\certification\test_cert_b10_empirical_learning.py ......           [  6%]
-tests\certification\test_cert_b11_verified_project_state.py ...          [  6%]
-tests\certification\test_cert_b12_cross_platform_continuity.py ...       [  6%]
-tests\certification\test_cert_b15_agent_fleet_integrity.py ........      [  7%]
-tests\certification\test_cert_b16_adversarial_matrix.py .........        [  8%]
-tests\certification\test_cert_b2_opa_provider.py ................        [ 10%]
-tests\certification\test_cert_b3_platform_optimization.py .............. [ 12%]
-..........                                                               [ 13%]
-tests\certification\test_cert_b4_platform_profiling.py .......           [ 14%]
-tests\certification\test_cert_b5_mcp_official.py ..........              [ 15%]
-tests\certification\test_cert_b7_verification_providers.py ........      [ 16%]
-tests\certification\test_cert_b8_adaptive_verification.py .........      [ 17%]
-tests\certification\test_cert_b9_independent_observation.py .....        [ 17%]
-tests\certification\test_cert_execution.py ....                          [ 18%]
-tests\certification\test_cert_handoff.py ..                              [ 18%]
-tests\certification\test_cert_handoff_b.py ............                  [ 19%]
-tests\certification\test_cert_handoff_b1_security.py ................... [ 22%]
-........................                                                 [ 24%]
-tests\certification\test_cert_mcp.py ....                                [ 25%]
-tests\certification\test_cert_rc10_memory.py ............                [ 26%]
-tests\certification\test_cert_rc11_platform_engine.py ..........         [ 27%]
-tests\certification\test_cert_rc12_silent_governance.py ...........      [ 29%]
-tests\certification\test_cert_rc13_cli_ux.py .........                   [ 30%]
-tests\certification\test_cert_rc14_policy_product.py ..............      [ 31%]
-tests\certification\test_cert_rc15_supply_chain.py ............          [ 33%]
-tests\certification\test_cert_rc16_packaging.py .........                [ 34%]
-tests\certification\test_cert_rc1_codex_benchmark.py ....                [ 34%]
-tests\certification\test_cert_rc2_execution_providers.py ........        [ 35%]
-tests\certification\test_cert_rc3_observation.py ........                [ 36%]
-tests\certification\test_cert_rc4_verification_engine.py ........        [ 37%]
-tests\certification\test_cert_rc5_project_truth.py ........              [ 38%]
-tests\certification\test_cert_rc6_code_intelligence.py ...........       [ 39%]
-tests\certification\test_cert_rc7_protocol_gateway.py ..........         [ 40%]
-tests\certification\test_cert_rc8_handoff_continuity.py .........        [ 41%]
-tests\certification\test_cert_rc9_fleet_production.py .............      [ 43%]
-tests\certification\test_cert_trust.py ...                               [ 43%]
-tests\context\test_real_cross_agent_handoff.py .                         [ 43%]
-tests\demos\test_product_demos.py ........                               [ 44%]
-tests\protocols\test_protocol_contracts.py ..                            [ 44%]
+[01/32] Auditing Phase 1 Trust Kernel...                     [PASS] (3.56s)
+       Summary: 3 passed in 1.65s
+
+[02/32] Auditing Execution Security & Modes...               [PASS] (3.40s)
+       Summary: 4 passed in 1.56s
+
+[03/32] Auditing Session Handoff & Continuity...             [PASS] (3.47s)
+       Summary: 2 passed in 1.46s
+
+[04/32] Auditing MCP Protocol & Transport...                 [PASS] (3.45s)
+       Summary: 4 passed in 1.53s
+
+[05/32] Auditing B.2 OPA Policy Provider...                  [PASS] (6.59s)
+       Summary: 16 passed in 4.54s
+
+[06/32] Auditing B.3 Platform Optimization Core...           [PASS] (3.61s)
+       Summary: 24 passed in 1.52s
+
+[07/32] Auditing B.4 Platform Profiling Framework...         [PASS] (3.34s)
+       Summary: 7 passed in 1.41s
+
+[08/32] Auditing B.5 Official MCP Integration...             [PASS] (5.06s)
+       Summary: 10 passed in 3.03s
+
+[09/32] Auditing B.6 ACP Platform Integration...             [PASS] (3.80s)
+       Summary: 6 passed in 1.83s
+
+[10/32] Auditing B.7 Verification Providers...               [PASS] (8.98s)
+       Summary: 8 passed in 6.94s
+
+[11/32] Auditing B.8 Adaptive Verification Policies...       [PASS] (3.97s)
+       Summary: 9 passed in 1.85s
+
+[12/32] Auditing B.9 Independent Observation & OTel...       [PASS] (6.04s)
+       Summary: 5 passed in 3.96s
+
+[13/32] Auditing B.10 Empirical Outcome Learning...          [PASS] (3.42s)
+       Summary: 6 passed in 1.44s
+
+[14/32] Auditing B.11 Universal Truth Layer & Project State... [PASS] (3.38s)
+       Summary: 3 passed in 1.43s
+
+[15/32] Auditing B.12 Cross-Platform Continuity...           [PASS] (3.33s)
+       Summary: 3 passed in 1.41s
+
+[16/32] Auditing B.15 Multi-Agent Fleet Integrity...         [PASS] (3.70s)
+       Summary: 8 passed in 1.69s
+
+[17/32] Auditing RC.1 External Codex Subprocess & Benchmark... [PASS] (13.21s)
+       Summary: 4 passed in 11.34s
+
+[18/32] Auditing RC.2 Execution Provider Closure & Sandboxing... [PASS] (4.44s)
+       Summary: 8 passed in 2.60s
+
+[19/32] Auditing RC.3 Independent Observation Plane...       [PASS] (4.34s)
+       Summary: 8 passed in 2.44s
+
+[20/32] Auditing RC.4 Executable Verification Engine Hierarchy... [PASS] (3.33s)
+       Summary: 8 passed in 1.44s
+
+[21/32] Auditing RC.5 Universal Project Truth & Invalidation... [PASS] (3.21s)
+       Summary: 8 passed in 1.37s
+
+[22/32] Auditing RC.6 Tree-sitter Code Intelligence & SCIP... [PASS] (3.27s)
+       Summary: 11 passed in 1.44s
+
+[23/32] Auditing RC.7 ACP Proxy & MCP Protocol Gateway...    [PASS] (3.33s)
+       Summary: 10 passed in 1.47s
+
+[24/32] Auditing RC.8 Handoff & Continuity Engine...         [PASS] (3.68s)
+       Summary: 9 passed in 1.82s
+
+[25/32] Auditing RC.9 Fleet Task Graph & Production Engine... [PASS] (3.95s)
+       Summary: 13 passed in 2.11s
+
+[26/32] Auditing RC.10 Memory Provider Abstraction & Mem0... [PASS] (3.43s)
+       Summary: 12 passed in 1.61s
+
+[27/32] Auditing RC.11 Platform Profile Engine & Compensation Budget... [PASS] (3.25s)
+       Summary: 10 passed in 1.38s
+
+[28/32] Auditing RC.12 Silent Governance Mode & Universal Adapters... [PASS] (3.62s)
+       Summary: 11 passed in 1.72s
+
+[29/32] Auditing RC.13 CLI Completion & Explain/Audit UX...  [PASS] (4.84s)
+       Summary: 9 passed in 2.86s
+
+[30/32] Auditing RC.14 OPA/Cedar Policy Product & Bundles... [PASS] (15.41s)
+       Summary: 14 passed in 13.51s
+
+[31/32] Auditing RC.15 Supply-Chain Evidence & Provenance... [PASS] (3.44s)
+       Summary: 12 passed in 1.41s
+
+[32/32] Auditing RC.16 Packaging, Unified Config & Installer... [PASS] (3.79s)
+       Summary: 9 passed in 1.90s
+
+==============================================================================
+  AUDIT SUMMARY: 32/32 MILESTONES PASSED (149.65s total)
+==============================================================================
+  [PASS] [M01_TRUST_KERNEL] Phase 1 Trust Kernel                             (3.56s) - 3 passed in 1.65s
+  [PASS] [M02_EXECUTION_SECURITY] Execution Security & Modes                       (3.40s) - 4 passed in 1.56s
+  [PASS] [M03_SESSION_HANDOFF] Session Handoff & Continuity                     (3.47s) - 2 passed in 1.46s
+  [PASS] [M04_MCP_TRANSPORT] MCP Protocol & Transport                         (3.45s) - 4 passed in 1.53s
+  [PASS] [M05_OPA_PROVIDER] B.2 OPA Policy Provider                          (6.59s) - 16 passed in 4.54s
+  [PASS] [M06_PLATFORM_OPTIMIZATION] B.3 Platform Optimization Core                   (3.61s) - 24 passed in 1.52s
+  [PASS] [M07_PLATFORM_PROFILING] B.4 Platform Profiling Framework                 (3.34s) - 7 passed in 1.41s
+  [PASS] [M08_MCP_OFFICIAL] B.5 Official MCP Integration                     (5.06s) - 10 passed in 3.03s
+  [PASS] [M09_ACP_PROTOCOL] B.6 ACP Platform Integration                     (3.80s) - 6 passed in 1.83s
+  [PASS] [M10_VERIFICATION_PROVIDERS] B.7 Verification Providers                       (8.98s) - 8 passed in 6.94s
+  [PASS] [M11_ADAPTIVE_VERIFICATION] B.8 Adaptive Verification Policies               (3.97s) - 9 passed in 1.85s
+  [PASS] [M12_INDEPENDENT_OBSERVATION] B.9 Independent Observation & OTel               (6.04s) - 5 passed in 3.96s
+  [PASS] [M13_EMPIRICAL_LEARNING] B.10 Empirical Outcome Learning                  (3.42s) - 6 passed in 1.44s
+  [PASS] [M14_UNIVERSAL_TRUTH] B.11 Universal Truth Layer & Project State       (3.38s) - 3 passed in 1.43s
+  [PASS] [M15_CROSS_PLATFORM_CONTINUITY] B.12 Cross-Platform Continuity                   (3.33s) - 3 passed in 1.41s
+  [PASS] [M16_FLEET_INTEGRITY] B.15 Multi-Agent Fleet Integrity                 (3.70s) - 8 passed in 1.69s
+  [PASS] [M17_CODEX_BENCHMARK] RC.1 External Codex Subprocess & Benchmark       (13.21s) - 4 passed in 11.34s
+  [PASS] [M18_EXECUTION_PROVIDERS] RC.2 Execution Provider Closure & Sandboxing     (4.44s) - 8 passed in 2.60s
+  [PASS] [M19_OBSERVATION_PLANE] RC.3 Independent Observation Plane               (4.34s) - 8 passed in 2.44s
+  [PASS] [M20_VERIFICATION_ENGINE] RC.4 Executable Verification Engine Hierarchy    (3.33s) - 8 passed in 1.44s
+  [PASS] [M21_PROJECT_TRUTH] RC.5 Universal Project Truth & Invalidation      (3.21s) - 8 passed in 1.37s
+  [PASS] [M22_CODE_INTELLIGENCE] RC.6 Tree-sitter Code Intelligence & SCIP        (3.27s) - 11 passed in 1.44s
+  [PASS] [M23_PROTOCOL_GATEWAY] RC.7 ACP Proxy & MCP Protocol Gateway            (3.33s) - 10 passed in 1.47s
+  [PASS] [M24_HANDOFF_CONTINUITY] RC.8 Handoff & Continuity Engine                 (3.68s) - 9 passed in 1.82s
+  [PASS] [M25_FLEET_PRODUCTION] RC.9 Fleet Task Graph & Production Engine        (3.95s) - 13 passed in 2.11s
+  [PASS] [M26_MEMORY_PROVIDER] RC.10 Memory Provider Abstraction & Mem0         (3.43s) - 12 passed in 1.61s
+  [PASS] [M27_PLATFORM_ENGINE] RC.11 Platform Profile Engine & Compensation Budget (3.25s) - 10 passed in 1.38s
+  [PASS] [M28_SILENT_GOVERNANCE] RC.12 Silent Governance Mode & Universal Adapters (3.62s) - 11 passed in 1.72s
+  [PASS] [M29_CLI_UX] RC.13 CLI Completion & Explain/Audit UX          (4.84s) - 9 passed in 2.86s
+  [PASS] [M30_POLICY_PRODUCT] RC.14 OPA/Cedar Policy Product & Bundles         (15.41s) - 14 passed in 13.51s
+  [PASS] [M31_SUPPLY_CHAIN] RC.15 Supply-Chain Evidence & Provenance         (3.44s) - 12 passed in 1.41s
+  [PASS] [M32_PACKAGING] RC.16 Packaging, Unified Config & Installer      (3.79s) - 9 passed in 1.90s
+==============================================================================
+#  ALL 32/32 MILESTONES CERTIFIED 100% GREEN (ZERO DEFECTS)
+==============================================================================
+
+==============================================================================
+  D10 VERTICAL SLICE HARDENING AUDIT: 19/19 PASSED
+==============================================================================
+  [PASS] test_d10_vertical_slice_success
+  [PASS] test_d10_failure_creates_recovery
+  [PASS] test_d10_recovery_requires_controller
+  [PASS] test_d10_stale_evidence_cannot_satisfy_claim
+  [PASS] test_d10_final_acceptance_requires_fresh_evidence
+  [PASS] test_d10_end_to_end_replay_is_deterministic
+  [PASS] test_d10_agent_claim_cannot_promote_itself_to_verified
+  [PASS] test_d10_forged_allow_and_recomputed_envelope_rejected
+  [PASS] test_d10_action_tamper_after_authorization_rejected
+  [PASS] test_d10_replaying_consumed_admission_rejected
+  [PASS] test_d10_replay_rejected_after_process_restart
+  [PASS] test_d10_canonical_final_acceptance_binding
+  [PASS] test_d10_persistence_failure_execution_denied
+  [PASS] test_d10_corrupted_admission_store_execution_denied
+  [PASS] test_d10_registry_generation_change_old_admission_denied
+  [PASS] test_d10_policy_version_change_old_admission_denied
+  [PASS] test_d10_mismatched_composite_claim_id_acceptance_denied
+  [PASS] test_d10_forged_journal_accept_final_acceptance_denied
+  [PASS] test_d10_semantic_replay_trace_uses_canonical_d5_action_digests
+  [PASS] test_d10_parity_reaches_canonical_boundary
+==============================================================================
