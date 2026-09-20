@@ -48,6 +48,12 @@ D9.2 Required Canonical Regression Reassessment Tests:
 - unaffected accepted claim preserved when canonical dependency evidence establishes no impact
 - restart preserves regression assessment
 - valid target verification + valid regression verification -> CONVERGED
+
+D9.2.1 Required Repair-Cycle Regression Timing Tests:
+- canonical old ACCEPT reused after repair -> rejected
+- verification timestamp missing -> rejected
+- verification before repair but otherwise perfectly canonical -> rejected
+- verification after repair -> accepted
 """
 
 import os
@@ -2436,5 +2442,190 @@ def test_d9_2_valid_target_and_regression_verification_converges(tmp_path):
     assert engine.get_recovery(record.recovery_id).regression_assessment.regression_passed is True
 
 
+# ==========================================================================
+# D9.2.1 REPAIR-CYCLE REGRESSION TIMING TESTS
+# ==========================================================================
 
 
+def test_d9_2_1_canonical_old_accept_reused_after_repair_rejected(tmp_path):
+    """
+    D9.2.1 Test 1:
+    A historically valid canonical ACCEPT from before the current repair cycle
+    is reused as regression verification.
+    Expected: fails closed (rejected), state remains REVERIFY_REQUIRED.
+    """
+    ws = str(tmp_path / "d9_2_1_test_1")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+
+    # 1. Previously accepted claim, verified in the past
+    claim_prev = Claim(claim_id="claim_p_old", task_id="task_d9_2_1_1", statement="Math ok", target_files=("src/math.py",))
+    _save_test_claim(state_repo, ws, claim_prev)
+    rcpt_old = make_observed_success_receipt(receipt_id="rcpt_old_1", task_id="task_d9_2_1_1", claim_id="claim_p_old", workspace=ws)
+    verif_old = make_canonical_verification_result(rcpt_old, status="ACCEPT", claim_id="claim_p_old", workspace=ws)
+
+    # 2. Repair cycle occurs strictly later
+    claim_repair = Claim(claim_id="claim_rep_1", task_id="task_d9_2_1_1", statement="Rep", target_files=("src/math.py",))
+    _save_test_claim(state_repo, ws, claim_repair)
+    ev_fail = make_observed_failure_receipt(receipt_id="rcpt_f_1", task_id="task_d9_2_1_1", claim_id="claim_rep_1", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d9_2_1_1", obligation_id="ob_rep_1", failure_evidence=ev_fail, claim_id="claim_rep_1")
+    engine.create_repair_obligation(record.recovery_id)
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    # 3. Target claim verified
+    ev_pass = make_observed_success_receipt(receipt_id="rcpt_p_1", task_id="task_d9_2_1_1", claim_id="claim_rep_1", workspace=ws)
+    ev_pass.files_changed = ["src/math.py"]
+    verdict = make_canonical_verification_result(ev_pass, status="ACCEPT", claim_id="claim_rep_1", workspace=ws)
+
+    # Reusing historical verif_old from before repair must be rejected
+    with pytest.raises(RecoveryError, match="Stale regression verification"):
+        engine.evaluate_convergence(
+            record.recovery_id,
+            verification_result=verdict,
+            evidence=ev_pass,
+            regression_verifications=[verif_old],
+        )
+
+    assert engine.get_recovery(record.recovery_id).current_state == RecoveryState.REVERIFY_REQUIRED
+
+
+def test_d9_2_1_verification_timestamp_missing_rejected(tmp_path):
+    """
+    D9.2.1 Test 2:
+    Regression verification has missing or empty verification timestamp.
+    Expected: fails closed on missing verification timestamp.
+    """
+    ws = str(tmp_path / "d9_2_1_test_2")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+
+    claim_prev = Claim(claim_id="claim_p_m2", task_id="task_d9_2_1_2", statement="P2", target_files=("src/math.py",))
+    _save_test_claim(state_repo, ws, claim_prev)
+    rcpt_prev = make_observed_success_receipt(receipt_id="rcpt_p_m2", task_id="task_d9_2_1_2", claim_id="claim_p_m2", workspace=ws)
+    make_canonical_verification_result(rcpt_prev, status="ACCEPT", claim_id="claim_p_m2", workspace=ws)
+
+    claim_repair = Claim(claim_id="claim_rep_2", task_id="task_d9_2_1_2", statement="Rep", target_files=("src/math.py",))
+    _save_test_claim(state_repo, ws, claim_repair)
+    ev_fail = make_observed_failure_receipt(receipt_id="rcpt_f_2", task_id="task_d9_2_1_2", claim_id="claim_rep_2", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d9_2_1_2", obligation_id="ob_rep_2", failure_evidence=ev_fail, claim_id="claim_rep_2")
+    engine.create_repair_obligation(record.recovery_id)
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    ev_pass = make_observed_success_receipt(receipt_id="rcpt_p_2", task_id="task_d9_2_1_2", claim_id="claim_rep_2", workspace=ws)
+    ev_pass.files_changed = ["src/math.py"]
+    verdict = make_canonical_verification_result(ev_pass, status="ACCEPT", claim_id="claim_rep_2", workspace=ws)
+
+    # Regression verification missing timestamp
+    rcpt_reg = make_observed_success_receipt(receipt_id="rcpt_reg_2", task_id="task_d9_2_1_2", claim_id="claim_p_m2", workspace=ws)
+    verif_no_ts = make_canonical_verification_result(rcpt_reg, status="ACCEPT", claim_id="claim_p_m2", workspace=ws)
+    if verif_no_ts.verification_event:
+        object.__setattr__(verif_no_ts.verification_event, "verification_time", "")
+    verif_no_ts.verification_time = "" if hasattr(verif_no_ts, "verification_time") else None
+
+    with pytest.raises(RecoveryError, match="Missing verification timestamp"):
+        engine.evaluate_convergence(
+            record.recovery_id,
+            verification_result=verdict,
+            evidence=ev_pass,
+            regression_verifications=[verif_no_ts],
+        )
+
+    assert engine.get_recovery(record.recovery_id).current_state == RecoveryState.REVERIFY_REQUIRED
+
+
+def test_d9_2_1_verification_before_repair_rejected(tmp_path):
+    """
+    D9.2.1 Test 3:
+    Regression verification has a timestamp before repair started, but is otherwise perfectly canonical.
+    Expected: fails closed on pre-repair timestamp.
+    """
+    ws = str(tmp_path / "d9_2_1_test_3")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+
+    claim_prev = Claim(claim_id="claim_p_b3", task_id="task_d9_2_1_3", statement="P3", target_files=("src/math.py",))
+    _save_test_claim(state_repo, ws, claim_prev)
+    rcpt_prev = make_observed_success_receipt(receipt_id="rcpt_p_b3", task_id="task_d9_2_1_3", claim_id="claim_p_b3", workspace=ws)
+    make_canonical_verification_result(rcpt_prev, status="ACCEPT", claim_id="claim_p_b3", workspace=ws)
+
+    claim_repair = Claim(claim_id="claim_rep_3", task_id="task_d9_2_1_3", statement="Rep", target_files=("src/math.py",))
+    _save_test_claim(state_repo, ws, claim_repair)
+    ev_fail = make_observed_failure_receipt(receipt_id="rcpt_f_3", task_id="task_d9_2_1_3", claim_id="claim_rep_3", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d9_2_1_3", obligation_id="ob_rep_3", failure_evidence=ev_fail, claim_id="claim_rep_3")
+    engine.create_repair_obligation(record.recovery_id)
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    ev_pass = make_observed_success_receipt(receipt_id="rcpt_p_3", task_id="task_d9_2_1_3", claim_id="claim_rep_3", workspace=ws)
+    ev_pass.files_changed = ["src/math.py"]
+    verdict = make_canonical_verification_result(ev_pass, status="ACCEPT", claim_id="claim_rep_3", workspace=ws)
+
+    # Canonical verification but with timestamp before repair
+    rcpt_reg = make_observed_success_receipt(receipt_id="rcpt_reg_3", task_id="task_d9_2_1_3", claim_id="claim_p_b3", workspace=ws)
+    verif_before = make_canonical_verification_result(rcpt_reg, status="ACCEPT", claim_id="claim_p_b3", workspace=ws)
+    old_iso = "2020-01-01T00:00:00+00:00"
+    if verif_before.verification_event:
+        object.__setattr__(verif_before.verification_event, "verification_time", old_iso)
+    if hasattr(verif_before, "verification_time"):
+        verif_before.verification_time = old_iso
+
+    with pytest.raises(RecoveryError, match="Stale regression verification"):
+        engine.evaluate_convergence(
+            record.recovery_id,
+            verification_result=verdict,
+            evidence=ev_pass,
+            regression_verifications=[verif_before],
+        )
+
+    assert engine.get_recovery(record.recovery_id).current_state == RecoveryState.REVERIFY_REQUIRED
+
+
+def test_d9_2_1_verification_after_repair_accepted(tmp_path):
+    """
+    D9.2.1 Test 4:
+    Regression verification has valid canonical verification with timestamp strictly after repair.
+    Expected: CONVERGED.
+    """
+    ws = str(tmp_path / "d9_2_1_test_4")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+
+    claim_prev = Claim(claim_id="claim_p_a4", task_id="task_d9_2_1_4", statement="P4", target_files=("src/math.py",))
+    _save_test_claim(state_repo, ws, claim_prev)
+    rcpt_prev = make_observed_success_receipt(receipt_id="rcpt_p_a4", task_id="task_d9_2_1_4", claim_id="claim_p_a4", workspace=ws)
+    make_canonical_verification_result(rcpt_prev, status="ACCEPT", claim_id="claim_p_a4", workspace=ws)
+
+    claim_repair = Claim(claim_id="claim_rep_4", task_id="task_d9_2_1_4", statement="Rep", target_files=("src/math.py",))
+    _save_test_claim(state_repo, ws, claim_repair)
+    ev_fail = make_observed_failure_receipt(receipt_id="rcpt_f_4", task_id="task_d9_2_1_4", claim_id="claim_rep_4", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d9_2_1_4", obligation_id="ob_rep_4", failure_evidence=ev_fail, claim_id="claim_rep_4")
+    engine.create_repair_obligation(record.recovery_id)
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    ev_pass = make_observed_success_receipt(receipt_id="rcpt_p_4", task_id="task_d9_2_1_4", claim_id="claim_rep_4", workspace=ws)
+    ev_pass.files_changed = ["src/math.py"]
+    verdict = make_canonical_verification_result(ev_pass, status="ACCEPT", claim_id="claim_rep_4", workspace=ws)
+
+    # Fresh regression verification after repair
+    rcpt_reg = make_observed_success_receipt(receipt_id="rcpt_reg_4", task_id="task_d9_2_1_4", claim_id="claim_p_a4", workspace=ws)
+    verif_after = make_canonical_verification_result(rcpt_reg, status="ACCEPT", claim_id="claim_p_a4", workspace=ws)
+
+    res = engine.evaluate_convergence(
+        record.recovery_id,
+        verification_result=verdict,
+        evidence=ev_pass,
+        regression_verifications=[verif_after],
+    )
+
+    assert res.is_converged is True
+    assert res.status == RecoveryState.CONVERGED.value
+    assert engine.get_recovery(record.recovery_id).current_state == RecoveryState.CONVERGED
+    assert "claim_p_a4" in res.preserved_obligation_ids
+    assert engine.get_recovery(record.recovery_id).regression_assessment.regression_passed is True

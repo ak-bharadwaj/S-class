@@ -73,6 +73,22 @@ def _paths_overlap(claim_targets: set, repair_files: set) -> bool:
     return False
 
 
+def _parse_iso_timestamp(ts: Any) -> Optional[datetime]:
+    """Parses an ISO 8601 timestamp string into a timezone-aware UTC datetime."""
+    if not ts or not isinstance(ts, str):
+        return None
+    s = ts.strip()
+    if not s:
+        return None
+    try:
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except Exception:
+        return None
+
+
 class RecoveryEngine:
     """Authoritative D9 recovery controller managing evidence-driven convergence cycles."""
 
@@ -856,6 +872,21 @@ class RecoveryEngine:
         affected_claim_ids = tuple(c.claim_id for c in reassessment_claims)
         verif_list = list(regression_verifications or [])
 
+        # Determine the authoritative recovery-cycle repair boundary timestamp
+        repair_boundary_str = None
+        for h in reversed(record.history):
+            if h.get("event") in ("repair_in_progress", "repair_obligation_created"):
+                repair_boundary_str = h.get("timestamp")
+                break
+
+        if not repair_boundary_str:
+            if record.current_repair_obligation and record.current_repair_obligation.created_at:
+                repair_boundary_str = record.current_repair_obligation.created_at
+            else:
+                repair_boundary_str = record.created_at
+
+        repair_boundary_dt = _parse_iso_timestamp(repair_boundary_str)
+
         # Map regression verifications by claim_id
         reverified_map: Dict[str, Any] = {}
         failed_claims: List[str] = []
@@ -928,6 +959,71 @@ class RecoveryEngine:
                     raise RecoveryError(err_msg)
                 failed_claims.append(v_claim)
                 continue
+
+            # D9.2.1: Bind verification to the current recovery-cycle repair boundary
+            verif_time_str = None
+            if getattr(v, "verification_event", None) and getattr(v.verification_event, "verification_time", None):
+                verif_time_str = v.verification_event.verification_time
+            elif getattr(v, "verification_time", None):
+                verif_time_str = v.verification_time
+            elif hasattr(v, "metadata") and isinstance(v.metadata, dict) and v.metadata.get("verification_time"):
+                verif_time_str = v.metadata.get("verification_time")
+
+            if not verif_time_str or not isinstance(verif_time_str, str) or not verif_time_str.strip():
+                err_msg = (
+                    f"Missing verification timestamp: regression verification for claim '{v_claim}' "
+                    f"lacks required canonical verification timestamp."
+                )
+                if fail_closed:
+                    raise RecoveryError(err_msg)
+                failed_claims.append(v_claim)
+                continue
+
+            verif_dt = _parse_iso_timestamp(verif_time_str)
+            if verif_dt is None:
+                err_msg = (
+                    f"Invalid verification timestamp: regression verification for claim '{v_claim}' "
+                    f"has unparseable timestamp '{verif_time_str}'."
+                )
+                if fail_closed:
+                    raise RecoveryError(err_msg)
+                failed_claims.append(v_claim)
+                continue
+
+            if repair_boundary_dt and verif_dt <= repair_boundary_dt:
+                err_msg = (
+                    f"Stale regression verification: verification for claim '{v_claim}' "
+                    f"with timestamp '{verif_time_str}' does not post-date repair boundary '{repair_boundary_str}'. "
+                    f"Reusing historical verifications from before the current repair cycle is rejected."
+                )
+                if fail_closed:
+                    raise RecoveryError(err_msg)
+                stale_claims.append(v_claim)
+                continue
+
+            # Check underlying evidence observation timing where available
+            v_rcpt_id = getattr(v, "receipt_id", None) or (v.verification_event.receipt_id if getattr(v, "verification_event", None) else None)
+            evidence_time_str = None
+            if v_rcpt_id:
+                try:
+                    from sclass.observation.receipt import load_receipt
+                    receipt_obj = load_receipt(v_rcpt_id, self.workspace_dir)
+                    if receipt_obj:
+                        evidence_time_str = getattr(receipt_obj, "finished_at", None) or getattr(receipt_obj, "started_at", None)
+                except Exception:
+                    pass
+
+            if evidence_time_str and isinstance(evidence_time_str, str) and evidence_time_str.strip():
+                ev_dt = _parse_iso_timestamp(evidence_time_str)
+                if ev_dt is not None and repair_boundary_dt and ev_dt <= repair_boundary_dt:
+                    err_msg = (
+                        f"Stale regression evidence: underlying receipt '{v_rcpt_id}' for claim '{v_claim}' "
+                        f"with timestamp '{evidence_time_str}' does not post-date repair boundary '{repair_boundary_str}'."
+                    )
+                    if fail_closed:
+                        raise RecoveryError(err_msg)
+                    stale_claims.append(v_claim)
+                    continue
 
             # Validate full canonical verification provenance (D9.1.2/D9.1.3)
             try:
