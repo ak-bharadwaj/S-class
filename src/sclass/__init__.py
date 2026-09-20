@@ -97,6 +97,15 @@ __all__ = [
     "FleetState",
     "FleetMergeResult",
     "FleetIntegrityEngine",
+    "CanonicalVerticalSlice",
+    "Obligation",
+    "ObligationKind",
+    "ObligationStatus",
+    "ExecutionEnvelope",
+    "SlicePlanner",
+    "SliceController",
+    "SliceExecutor",
+    "verify_canonical_acceptance",
 ]
 
 from sclass.platform.profile import PlatformProfile
@@ -114,4 +123,16 @@ from sclass.agent_fleet import (
     FleetState,
     FleetMergeResult,
     FleetIntegrityEngine,
+)
+
+from sclass.core.vertical_slice import (
+    CanonicalVerticalSlice,
+    Obligation,
+    ObligationKind,
+    ObligationStatus,
+    ExecutionEnvelope,
+    SlicePlanner,
+    SliceController,
+    SliceExecutor,
+    verify_canonical_acceptance,
 )
