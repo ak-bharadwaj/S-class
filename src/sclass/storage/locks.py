@@ -10,9 +10,12 @@ from typing import Optional
 
 try:
     import portalocker
+    import portalocker.exceptions
     HAS_PORTALOCKER = True
+    _LOCK_EXCEPTIONS = (OSError, IOError, portalocker.exceptions.BaseLockException)
 except ImportError:
     HAS_PORTALOCKER = False
+    _LOCK_EXCEPTIONS = (OSError, IOError)
 
 from sclass.storage.paths import WorkspacePaths
 
@@ -36,7 +39,7 @@ class WorkspaceLock:
                 if HAS_PORTALOCKER:
                     portalocker.lock(self._fp, portalocker.LOCK_EX | portalocker.LOCK_NB)
                 return self
-            except (OSError, IOError):
+            except _LOCK_EXCEPTIONS:
                 if self._fp:
                     try:
                         self._fp.close()

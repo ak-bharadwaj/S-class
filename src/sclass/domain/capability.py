@@ -95,6 +95,12 @@ class Capability:
         if self.operation.endswith(".*"):
             prefix = self.operation[:-2]
             return requested_op.startswith(prefix + ".")
+        if self.operation == CAP_FILESYSTEM_WRITE and requested_op in ("fs.write", "filesystem.write", "file_edit"):
+            return True
+        if self.operation == CAP_FILESYSTEM_READ and requested_op in ("fs.read", "filesystem.read", "file_read"):
+            return True
+        if self.operation == CAP_TERMINAL_EXECUTE and requested_op in ("terminal.execute", "execute", "run_command", "shell.execute"):
+            return True
         return False
 
     def allows_actor(self, requested_actor: str) -> bool:

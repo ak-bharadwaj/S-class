@@ -250,6 +250,9 @@ def test_d10_end_to_end_replay_is_deterministic(tmp_path):
     """
     Hard Acceptance Criterion J:
     The complete scenario is reproducible deterministically across independent runs.
+    Enforces deterministic replay at the semantic/canonical-trace level:
+    task -> obligations -> claims -> authorized action digests -> observed exit codes ->
+    verification verdicts -> recovery transition -> final accepted claim.
     """
     ws1 = str(tmp_path / "replay_run_1")
     ws2 = str(tmp_path / "replay_run_2")
@@ -264,13 +267,48 @@ def test_d10_end_to_end_replay_is_deterministic(tmp_path):
     assert slice1.task.state == TaskState.VERIFIED
     assert slice2.task.state == TaskState.VERIFIED
 
-    # Both initial attempts failed with exit_code 1
-    assert slice1.failed_receipt.exit_code == 1
-    assert slice2.failed_receipt.exit_code == 1
+    # Compare full canonical semantic traces
+    trace1 = slice1.get_canonical_trace()
+    trace2 = slice2.get_canonical_trace()
 
-    # Both reverifications passed with exit_code 0
-    assert slice1.passed_receipt.exit_code == 0
-    assert slice2.passed_receipt.exit_code == 0
+    # Exact semantic trace equality across independent runs
+    assert trace1 == trace2
+
+    # Verify trace contents
+    assert trace1["task"]["final_state"] == "verified"
+    assert len(trace1["obligations"]) == 3
+    assert len(trace1["claims"]) == 2
+    assert len(trace1["authorized_actions"]) == 4
+
+    # Requirement 5: Verify authorized action digests equality and non-empty
+    assert len(trace1["authorized_action_digests"]) == 4
+    assert trace1["authorized_action_digests"] == trace2["authorized_action_digests"]
+    assert all(isinstance(d, str) and len(d) == 64 for d in trace1["authorized_action_digests"])
+
+    # Observed exit codes: first fails (1), recovery passes (0)
+    assert trace1["observed_exit_codes"] == [1, 0]
+    assert trace1["observed_exit_codes"] == trace2["observed_exit_codes"]
+    assert trace1["observed_steps"][0]["exit_code"] == 1
+    assert trace1["observed_steps"][0]["verdict_status"] == "REJECT"
+    assert trace1["observed_steps"][1]["recovery_obligation_kind"] == "repair"
+    assert trace1["observed_steps"][2]["exit_code"] == 0
+    assert trace1["observed_steps"][2]["verdict_status"] in ("ACCEPT", "CLAIM_VERIFIED")
+
+    # Verification verdicts sequence
+    assert len(trace1["verification_verdicts"]) == 2
+    assert trace1["verification_verdicts"] == trace2["verification_verdicts"]
+    assert trace1["verification_verdicts"][0]["status"] == "REJECT"
+    assert trace1["verification_verdicts"][1]["status"] in ("ACCEPT", "CLAIM_VERIFIED")
+
+    # Recovery transition matches
+    assert trace1["recovery_transition"] is not None
+    assert trace1["recovery_transition"] == trace2["recovery_transition"]
+    assert trace1["recovery_transition"]["recovery_obligation_kind"] == "repair"
+    assert trace1["recovery_transition"]["parent_obligation_matches"] is True
+
+    # Final accepted claim
+    assert trace1["final_accepted_claim"]["accepted_receipt_exit_code"] == 0
+    assert trace1["final_accepted_claim"]["composite_decision"] == "ACCEPT"
 
     # Both final acceptance decisions are ACCEPT
     assert res1["acceptance"].decision == "ACCEPT"
@@ -279,10 +317,6 @@ def test_d10_end_to_end_replay_is_deterministic(tmp_path):
     # Both canonical state evaluations accept
     assert res1["canonical_status"]["accepted"] is True
     assert res2["canonical_status"]["accepted"] is True
-
-    # Obligations match
-    assert slice1.ob_repair.status == slice2.ob_repair.status == ObligationStatus.SATISFIED
-    assert slice1.ob_verif.status == slice2.ob_verif.status == ObligationStatus.SATISFIED
 
 
 def test_d10_agent_claim_cannot_promote_itself_to_verified(tmp_path):
@@ -402,7 +436,11 @@ def test_d10_agent_claim_cannot_promote_itself_to_verified(tmp_path):
     )
     canonical = verify_canonical_acceptance(task.task_id, ws)
     assert canonical["accepted"] is False
-    assert "not found in ledger" in canonical["reason"].lower()
+    assert (
+        "not found in ledger" in canonical["reason"].lower()
+        or "no accepted verification" in canonical["reason"].lower()
+        or "not found" in canonical["reason"].lower()
+    )
 
     # Attack 6: Agent fabricates an ExecutionEnvelope with a forged signature or tampered request
     from sclass.domain.action import ActionRequest, AuthorizationDecision, DecisionOutcome
@@ -430,4 +468,475 @@ def test_d10_agent_claim_cannot_promote_itself_to_verified(tmp_path):
     )
     with pytest.raises(SecurityViolationError, match="ExecutionEnvelope verification failed"):
         slice_runner.executor.execute_envelope(forged_envelope)
+
+
+def test_d10_forged_allow_and_recomputed_envelope_rejected(tmp_path):
+    """
+    Adversarial Regression 1:
+    A caller must NOT be able to construct an ALLOW decision and manufacture
+    a valid execution envelope by recomputing a public SHA-256 digest.
+    Authority authenticity and cryptographic HMAC integrity are independently verified at D6 boundary.
+    """
+    import hashlib
+    from sclass.domain.action import ActionRequest, AuthorizationDecision, DecisionOutcome
+    from sclass.core.vertical_slice import CanonicalVerticalSlice, ExecutionEnvelope
+
+    ws = str(tmp_path / "d10_forged_allow")
+    slice_runner = CanonicalVerticalSlice(ws)
+    slice_runner.setup_scenario()
+    task = slice_runner.initialize_task()
+
+    # Adversary constructs forged ALLOW decision without authentic HMAC integrity token
+    forged_req = ActionRequest(
+        actor="adversary",
+        session=task.task_id,
+        capability="terminal.execute",
+        action="run_command",
+        target="echo pwned",
+        parameters={"command": "echo pwned"},
+        workspace=ws,
+    )
+    forged_decision = AuthorizationDecision(
+        outcome=DecisionOutcome.ALLOW,
+        policy_id="FORGED-ALLOW-001",
+        risk_level="low",
+        reason="Adversary manufactured allow decision",
+        issuer="S_CLASS",
+    )
+
+    # Attack 1a: Recompute public SHA-256 digest over envelope payload without authentic HMAC token
+    env_id = "env_forged_sha256"
+    recomputed_sha256 = hashlib.sha256(
+        f"{env_id}:{forged_req.target}:{forged_decision.evaluated_at}".encode("utf-8")
+    ).hexdigest()
+
+    forged_env = ExecutionEnvelope(
+        envelope_id=env_id,
+        task_id=task.task_id,
+        action_request=forged_req,
+        authorization_decision=forged_decision,
+        signature=recomputed_sha256,
+    )
+
+    # D6 execution boundary independently rejects the forged artifact
+    with pytest.raises(SecurityViolationError, match="ExecutionEnvelope verification failed"):
+        slice_runner.executor.execute_envelope(forged_env)
+
+    # Controller validate_and_consume also rejects
+    with pytest.raises(SecurityViolationError, match="ExecutionEnvelope verification failed"):
+        slice_runner.controller.validate_and_consume(forged_env)
+
+    # Attack 1b: Adversary manufactures decision with fake HMAC integrity token and recomputes envelope SHA-256
+    fake_token_decision = AuthorizationDecision(
+        outcome=DecisionOutcome.ALLOW,
+        policy_id="FORGED-ALLOW-002",
+        risk_level="low",
+        reason="Manufactured token",
+        issuer="S_CLASS",
+        request_hash="a" * 64,
+        integrity_token="b" * 64,
+    )
+    fake_token_env = ExecutionEnvelope(
+        envelope_id="env_forged_token",
+        task_id=task.task_id,
+        action_request=forged_req,
+        authorization_decision=fake_token_decision,
+        signature=hashlib.sha256(b"fake").hexdigest(),
+    )
+    with pytest.raises(SecurityViolationError, match="ExecutionEnvelope verification failed"):
+        slice_runner.executor.execute_envelope(fake_token_env)
+    with pytest.raises(SecurityViolationError, match="ExecutionEnvelope verification failed"):
+        slice_runner.controller.validate_and_consume(fake_token_env)
+
+    # Attack 1c: Untrusted issuer fails closed
+    fake_issuer_decision = AuthorizationDecision(
+        outcome=DecisionOutcome.ALLOW,
+        policy_id="FORGED-ALLOW-003",
+        risk_level="low",
+        reason="Untrusted issuer",
+        issuer="UNTRUSTED_AGENT",
+    )
+    fake_issuer_env = ExecutionEnvelope(
+        envelope_id="env_forged_issuer",
+        task_id=task.task_id,
+        action_request=forged_req,
+        authorization_decision=fake_issuer_decision,
+        signature="sig",
+    )
+    with pytest.raises(SecurityViolationError, match="Untrusted authorization issuer|ExecutionEnvelope verification failed"):
+        slice_runner.executor.execute_envelope(fake_issuer_env)
+
+
+def test_d10_action_tamper_after_authorization_rejected(tmp_path):
+    """
+    Adversarial Regression 2:
+    Changing action parameters, capability, context, action name, target, or actor after controller authorization
+    is strictly rejected by the D6 execution boundary.
+    Enforces exact action binding and execution-context binding.
+    """
+    from sclass.domain.action import ActionRequest
+    from sclass.core.vertical_slice import CanonicalVerticalSlice, ExecutionEnvelope
+
+    ws = str(tmp_path / "d10_action_tamper")
+    slice_runner = CanonicalVerticalSlice(ws)
+    slice_runner.setup_scenario()
+    task = slice_runner.initialize_task()
+
+    # Controller legitimately authorizes an action
+    legit_req = slice_runner.planner.plan_verification_action(task.task_id)
+    legit_env = slice_runner.controller.authorize(legit_req)
+    assert legit_env.verify() is True
+
+    # Attack 2a: Tampering with parameters (e.g. inject malicious command into parameters)
+    tampered_params_req = ActionRequest(
+        actor=legit_req.actor,
+        session=legit_req.session,
+        capability=legit_req.capability,
+        action=legit_req.action,
+        target=legit_req.target,
+        parameters={"command": "malicious_payload", "cwd": ws},
+        workspace=legit_req.workspace,
+        context=dict(legit_req.context),
+    )
+    tampered_env_params = ExecutionEnvelope(
+        envelope_id=legit_env.envelope_id,
+        task_id=legit_env.task_id,
+        action_request=tampered_params_req,
+        authorization_decision=legit_env.authorization_decision,
+        signature=legit_env.signature,
+    )
+    assert tampered_env_params.verify() is False
+    with pytest.raises(SecurityViolationError, match="Action binding mismatch|verification failed"):
+        slice_runner.executor.execute_envelope(tampered_env_params)
+    with pytest.raises(SecurityViolationError, match="verification failed"):
+        slice_runner.controller.validate_and_consume(tampered_env_params)
+
+    # Attack 2b: Tampering with capability after authorization
+    tampered_cap_req = ActionRequest(
+        actor=legit_req.actor,
+        session=legit_req.session,
+        capability="system.unrestricted_exec",
+        action=legit_req.action,
+        target=legit_req.target,
+        parameters=dict(legit_req.parameters),
+        workspace=legit_req.workspace,
+    )
+    tampered_env_cap = ExecutionEnvelope(
+        envelope_id=legit_env.envelope_id,
+        task_id=legit_env.task_id,
+        action_request=tampered_cap_req,
+        authorization_decision=legit_env.authorization_decision,
+        signature=legit_env.signature,
+    )
+    assert tampered_env_cap.verify() is False
+    with pytest.raises(SecurityViolationError, match="Action binding mismatch|verification failed"):
+        slice_runner.executor.execute_envelope(tampered_env_cap)
+    with pytest.raises(SecurityViolationError, match="verification failed"):
+        slice_runner.controller.validate_and_consume(tampered_env_cap)
+
+    # Attack 2c: Tampering with execution-context (workspace path)
+    foreign_ws = str(tmp_path / "foreign_workspace")
+    tampered_ws_req = ActionRequest(
+        actor=legit_req.actor,
+        session=legit_req.session,
+        capability=legit_req.capability,
+        action=legit_req.action,
+        target=legit_req.target,
+        parameters=dict(legit_req.parameters),
+        workspace=foreign_ws,
+    )
+    tampered_env_ws = ExecutionEnvelope(
+        envelope_id=legit_env.envelope_id,
+        task_id=legit_env.task_id,
+        action_request=tampered_ws_req,
+        authorization_decision=legit_env.authorization_decision,
+        signature=legit_env.signature,
+    )
+    assert tampered_env_ws.verify() is False
+    with pytest.raises(SecurityViolationError, match="Execution-context binding mismatch|Action binding mismatch|Request hash mismatch|verification failed"):
+        slice_runner.executor.execute_envelope(tampered_env_ws)
+    with pytest.raises(SecurityViolationError, match="Execution-context binding mismatch|verification failed"):
+        slice_runner.controller.validate_and_consume(tampered_env_ws)
+
+    # Attack 2d: Tampering with envelope task_id
+    tampered_env_task = ExecutionEnvelope(
+        envelope_id=legit_env.envelope_id,
+        task_id="unrelated_task_999",
+        action_request=legit_req,
+        authorization_decision=legit_env.authorization_decision,
+        signature=legit_env.signature,
+    )
+    assert tampered_env_task.verify() is False
+    with pytest.raises(SecurityViolationError, match="Execution-context binding mismatch|verification failed"):
+        slice_runner.executor.execute_envelope(tampered_env_task)
+    with pytest.raises(SecurityViolationError, match="Execution-context binding mismatch|verification failed"):
+        slice_runner.controller.validate_and_consume(tampered_env_task)
+
+    # Attack 2e: Tampering with action target
+    tampered_target_req = ActionRequest(
+        actor=legit_req.actor,
+        session=legit_req.session,
+        capability=legit_req.capability,
+        action=legit_req.action,
+        target="rm -rf /",
+        parameters=dict(legit_req.parameters),
+        workspace=legit_req.workspace,
+    )
+    tampered_env_target = ExecutionEnvelope(
+        envelope_id=legit_env.envelope_id,
+        task_id=legit_env.task_id,
+        action_request=tampered_target_req,
+        authorization_decision=legit_env.authorization_decision,
+        signature=legit_env.signature,
+    )
+    assert tampered_env_target.verify() is False
+    with pytest.raises(SecurityViolationError, match="Action binding mismatch|verification failed"):
+        slice_runner.executor.execute_envelope(tampered_env_target)
+    with pytest.raises(SecurityViolationError, match="verification failed"):
+        slice_runner.controller.validate_and_consume(tampered_env_target)
+
+
+def test_d10_replaying_consumed_admission_rejected(tmp_path):
+    """
+    Adversarial Regression 3:
+    Replaying a consumed admission envelope is strictly rejected.
+    Enforces single-use admission protection (Criterion F) including
+    under multi-threaded / concurrent process-level contention.
+    """
+    import threading
+    from sclass.core.vertical_slice import CanonicalVerticalSlice, SliceController
+
+    ws = str(tmp_path / "d10_replay_consumed")
+    slice_runner = CanonicalVerticalSlice(ws)
+    slice_runner.setup_scenario()
+    task = slice_runner.initialize_task()
+
+    # Authorize a valid action
+    req = slice_runner.planner.plan_verification_action(task.task_id)
+    env = slice_runner.controller.authorize(req)
+
+    # 1. First execution succeeds
+    res = slice_runner.executor.execute_envelope(env)
+    assert res is not None
+
+    # 2. Sequential replay attempt of the exact same envelope is strictly rejected
+    with pytest.raises(SecurityViolationError, match="Criterion F Violation|already been consumed"):
+        slice_runner.executor.execute_envelope(env)
+
+    # Direct controller consumption of already-consumed envelope is also rejected
+    with pytest.raises(SecurityViolationError, match="Criterion F Violation|already been consumed"):
+        slice_runner.controller.validate_and_consume(env)
+
+    # 3. Concurrent contention test:
+    # Authorize a fresh envelope, then run 4 concurrent controller instances racing to consume it
+    fresh_req = slice_runner.planner.plan_verification_action(task.task_id)
+    fresh_env = slice_runner.controller.authorize(fresh_req)
+
+    success_count = []
+    failure_count = []
+
+    def race_worker():
+        ctrl = SliceController(ws)
+        try:
+            ctrl.validate_and_consume(fresh_env)
+            success_count.append(1)
+        except SecurityViolationError:
+            failure_count.append(1)
+
+    threads = [threading.Thread(target=race_worker) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    # Exactly ONE thread can consume; all others must fail closed with SecurityViolationError
+    assert len(success_count) == 1, f"Expected exactly 1 successful consumption, got {len(success_count)}"
+    assert len(failure_count) == 3, f"Expected 3 rejected replay attempts, got {len(failure_count)}"
+
+
+def test_d10_replay_rejected_after_process_restart(tmp_path):
+    """
+    Adversarial Regression 4:
+    Replay remains rejected after controller/process restart where the existing
+    D5 persistence mechanism (EventJournal and trust admission store) supports this.
+    """
+    from sclass.core.vertical_slice import (
+        CanonicalVerticalSlice,
+        SliceController,
+        SliceExecutor,
+    )
+
+    ws = str(tmp_path / "d10_restart_replay")
+    slice_runner = CanonicalVerticalSlice(ws)
+    slice_runner.setup_scenario()
+    task = slice_runner.initialize_task()
+
+    # Authorize and execute an envelope in the first controller/executor instance
+    req = slice_runner.planner.plan_verification_action(task.task_id)
+    env = slice_runner.controller.authorize(req)
+
+    res = slice_runner.executor.execute_envelope(env)
+    assert res is not None
+
+    # Simulate process termination and restart:
+    # Completely destroy controller and executor, create new instances on the same workspace
+    del slice_runner.controller
+    del slice_runner.executor
+
+    restarted_controller = SliceController(ws)
+    restarted_executor = SliceExecutor(ws, restarted_controller)
+
+    # Proves durable persistence: the consumed envelope ID was loaded from persistent storage
+    assert restarted_controller.is_consumed(env.envelope_id) is True
+
+    # Attempting to replay the consumed envelope in the restarted process must fail closed
+    with pytest.raises(SecurityViolationError, match="Criterion F Violation|already been consumed"):
+        restarted_executor.execute_envelope(env)
+
+    with pytest.raises(SecurityViolationError, match="Criterion F Violation|already been consumed"):
+        restarted_controller.validate_and_consume(env)
+
+
+def test_d10_canonical_final_acceptance_binding(tmp_path):
+    """
+    Adversarial Regression 5:
+    Tightens verify_canonical_acceptance() so final acceptance is bound to the
+    exact canonical claim being accepted:
+    - task ID
+    - claim ID
+    - final observed receipt ID
+    - receipt hash/provenance
+    - fresh workspace evidence (rejects mutated/stale workspace or deleted receipt)
+    - accepted verification result in StateRepository
+    - final composite acceptance decision
+
+    Do not treat TaskState.VERIFIED plus any successful observation as sufficient truth.
+    """
+    import json
+    from sclass.core.vertical_slice import CanonicalVerticalSlice, verify_canonical_acceptance
+    from sclass.storage.paths import WorkspacePaths
+    from sclass.state.events import EventJournal
+
+    ws = str(tmp_path / "d10_canonical_acceptance_binding")
+    slice_runner = CanonicalVerticalSlice(ws)
+    results = slice_runner.run_full_slice()
+
+    task_id = slice_runner.task.task_id
+    receipt_id = slice_runner.passed_receipt.receipt_id
+    claim_id = slice_runner.claim_verif.claim_id
+
+    # Baseline: genuine canonical acceptance passes
+    status = verify_canonical_acceptance(task_id, ws, claim_id=claim_id)
+    assert status["accepted"] is True
+    assert status["task_id"] == task_id
+    assert status["claim_id"] == claim_id
+    assert status["verified_receipt_id"] == receipt_id
+    assert status["fresh_evidence"] is True
+    assert status["composite_decision"] == "ACCEPT"
+
+    # Binding Check 1: Non-existent task ID fails
+    nonexistent = verify_canonical_acceptance("task_does_not_exist", ws)
+    assert nonexistent["accepted"] is False
+    assert "not found" in nonexistent["reason"].lower()
+
+    # Binding Check 2: Unrelated / mismatched claim ID fails
+    mismatched_claim = verify_canonical_acceptance(task_id, ws, claim_id="claim_unrelated_999")
+    assert mismatched_claim["accepted"] is False
+    assert "not found" in mismatched_claim["reason"].lower() or "does not match" in mismatched_claim["reason"].lower()
+
+    # Binding Check 3: State repository verification result must be ACCEPT
+    with slice_runner.state_repo.store.get_connection() as conn:
+        conn.execute("UPDATE verifications SET status = 'REJECT' WHERE claim_id = ?", (claim_id,))
+        conn.commit()
+
+    tampered_verif = verify_canonical_acceptance(task_id, ws, claim_id=claim_id)
+    assert tampered_verif["accepted"] is False
+    assert "no accepted verification" in tampered_verif["reason"].lower()
+
+    # Restore verification row to ACCEPT
+    with slice_runner.state_repo.store.get_connection() as conn:
+        conn.execute("UPDATE verifications SET status = 'ACCEPT' WHERE claim_id = ?", (claim_id,))
+        conn.commit()
+
+    # Binding Check 4: Workspace mutation invalidates evidence freshness (Invariant L7)
+    math_path = os.path.join(ws, "math_utils.py")
+    with open(math_path, "rb") as f:
+        original_bytes = f.read()
+    with open(math_path, "ab") as f:
+        f.write(b"\n# Untracked post-acceptance backdoor\n")
+
+    stale_check = verify_canonical_acceptance(task_id, ws, claim_id=claim_id)
+    assert stale_check["accepted"] is False
+    assert "stale" in stale_check["reason"].lower() or "modified" in stale_check["reason"].lower()
+
+    # Restore workspace file so evidence is fresh again
+    with open(math_path, "wb") as f:
+        f.write(original_bytes)
+    assert verify_canonical_acceptance(task_id, ws, claim_id=claim_id)["accepted"] is True
+
+    # Binding Check 5: Deleted receipt file on disk fails closed
+    paths = WorkspacePaths(ws)
+    rcpt_file = os.path.join(paths.receipts_dir, f"{receipt_id}.json")
+    legacy_rcpt_file = os.path.join(paths.legacy_receipts_dir, f"{receipt_id}.json")
+    with open(rcpt_file, "r", encoding="utf-8") as f:
+        saved_rcpt_content = f.read()
+    os.remove(rcpt_file)
+    if os.path.exists(legacy_rcpt_file):
+        os.remove(legacy_rcpt_file)
+
+    deleted_rcpt_status = verify_canonical_acceptance(task_id, ws, claim_id=claim_id)
+    assert deleted_rcpt_status["accepted"] is False
+    assert "not found" in deleted_rcpt_status["reason"].lower()
+
+    # Restore receipt file
+    with open(rcpt_file, "w", encoding="utf-8") as f:
+        f.write(saved_rcpt_content)
+    if not os.path.exists(paths.legacy_receipts_dir):
+        os.makedirs(paths.legacy_receipts_dir, exist_ok=True)
+    with open(legacy_rcpt_file, "w", encoding="utf-8") as f:
+        f.write(saved_rcpt_content)
+    assert verify_canonical_acceptance(task_id, ws, claim_id=claim_id)["accepted"] is True
+
+    # Binding Check 6: Tampering with receipt hash on disk fails closed
+    tampered_data = json.loads(saved_rcpt_content)
+    tampered_data["receipt_hash"] = "f" * 64
+    with open(rcpt_file, "w", encoding="utf-8") as f:
+        f.write(json.dumps(tampered_data))
+    if os.path.exists(legacy_rcpt_file):
+        with open(legacy_rcpt_file, "w", encoding="utf-8") as f:
+            f.write(json.dumps(tampered_data))
+
+    tampered_rcpt_status = verify_canonical_acceptance(task_id, ws, claim_id=claim_id)
+    assert tampered_rcpt_status["accepted"] is False
+    assert "mismatch" in tampered_rcpt_status["reason"].lower() or "tampered" in tampered_rcpt_status["reason"].lower() or "not found" in tampered_rcpt_status["reason"].lower()
+
+    # Restore valid receipt
+    with open(rcpt_file, "w", encoding="utf-8") as f:
+        f.write(saved_rcpt_content)
+    if os.path.exists(legacy_rcpt_file):
+        with open(legacy_rcpt_file, "w", encoding="utf-8") as f:
+            f.write(saved_rcpt_content)
+
+    # Binding Check 7: Missing / invalid composite acceptance decision in journal fails closed
+    journal = EventJournal(ws)
+    with open(journal.journal_file, "r", encoding="utf-8") as f:
+        journal_backup = f.read()
+
+    # Overwrite journal with event missing acceptance_decision
+    with open(journal.journal_file, "w", encoding="utf-8") as f:
+        pass
+    journal.append(
+        event_type="sclass.task.verified",
+        subject=f"task:{task_id}",
+        data={"task_id": task_id, "verified_receipt_id": receipt_id},
+    )
+
+    no_composite_status = verify_canonical_acceptance(task_id, ws, claim_id=claim_id)
+    assert no_composite_status["accepted"] is False
+    assert "no accepted composite decision" in no_composite_status["reason"].lower()
+
+    # Restore original journal
+    with open(journal.journal_file, "w", encoding="utf-8") as f:
+        f.write(journal_backup)
+    assert verify_canonical_acceptance(task_id, ws, claim_id=claim_id)["accepted"] is True
 

@@ -67,6 +67,18 @@ class CapabilityRegistry:
                 network=False,
             ),
             Capability(
+                id="cap:filesystem.write:baseline",
+                version="1.0.0",
+                actor="*",
+                operation=CAP_FILESYSTEM_WRITE,
+                resource="**",
+                scope="workspace",
+                risk="medium",
+                duration=300.0,
+                filesystem="read_write",
+                network=False,
+            ),
+            Capability(
                 id="cap:git.read:baseline",
                 version="1.0.0",
                 actor="*",
@@ -164,7 +176,7 @@ class CapabilityRegistry:
 
         for cap in self._capabilities:
             # 1. Check Operation match
-            if cap.operation != "*" and cap.operation != req_op:
+            if not cap.allows_operation(req_op):
                 continue
 
             # 2. Check Resource match

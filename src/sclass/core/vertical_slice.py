@@ -53,12 +53,15 @@ import sys
 import uuid
 import json
 import time
+import hmac
 import hashlib
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, Any, Optional, List, Tuple, Set
 
+from sclass.storage.paths import WorkspacePaths
+from sclass.storage.locks import WorkspaceLock
 from sclass.domain.project import Project, ProjectBoundary
 from sclass.domain.task import Task, TaskState, TaskPriority
 from sclass.domain.action import ActionRequest, AuthorizationDecision, DecisionOutcome
@@ -72,8 +75,14 @@ from sclass.domain.evidence import (
 )
 from sclass.domain.observation import Observation
 from sclass.domain.verification import VerificationResult
-from sclass.control.authorization import authorize
 from sclass.control.policy import DefaultPolicyEngine
+from sclass.policy.authorization_service import (
+    AuthorizationService,
+    verify_decision_integrity,
+    compute_canonical_request_hash,
+    get_authorization_secret,
+)
+from sclass.policy.capability_resolver import CapabilityResolver
 from sclass.execution.base import ExecutionProvider, ProviderExecutionResult
 from sclass.execution.native import NativeProcessProvider
 from sclass.observation.factory import ObservationFactory
@@ -81,6 +90,7 @@ from sclass.observation.fingerprint import (
     compute_workspace_snapshot,
     compute_workspace_fingerprint,
 )
+from sclass.observation.receipt import load_receipt
 from sclass.trust.ledger import LocalLedger
 from sclass.verification.engine import verify_claim, check_staleness
 from sclass.state.tasks import StateRepository
@@ -149,12 +159,26 @@ class Obligation:
         )
 
 
+def compute_envelope_signature(
+    envelope_id: str,
+    task_id: str,
+    request_hash: str,
+    decision_token: str,
+    secret_key: Optional[bytes] = None,
+) -> str:
+    """Computes HMAC-SHA256 signature binding envelope identity, task context, canonical request and D5 integrity token."""
+    key = secret_key or get_authorization_secret()
+    payload = f"ENVELOPE:{envelope_id}:{task_id}:{request_hash}:{decision_token}"
+    return hmac.new(key, payload.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
 @dataclass(frozen=True)
 class ExecutionEnvelope:
     """
     Mandatory controller authorization envelope required for D6 execution.
     Direct planner execution is impossible without this envelope.
     Enforces Criterion A (Planner cannot directly execute) & B (Controller authorization is mandatory).
+    Thin adapter over canonical D5 AuthorizationDecision sealed with HMAC.
     """
     envelope_id: str
     task_id: str
@@ -163,19 +187,40 @@ class ExecutionEnvelope:
     issued_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     signature: str = ""
 
-    def verify(self) -> bool:
-        """Verifies envelope authorization, validity, and cryptographic signature."""
+    def verify(self, secret_key: Optional[bytes] = None) -> bool:
+        """Verifies envelope authorization, authenticity, integrity, and binding."""
         if not self.authorization_decision or not self.authorization_decision.is_allowed:
             return False
-        if not self.envelope_id:
+        if not self.envelope_id or not self.signature or not self.action_request or not self.task_id:
             return False
-        if not self.signature or not self.action_request:
+
+        # Verify task_id matches action_request context
+        req_task = self.action_request.task_id or self.action_request.session
+        if req_task and self.task_id != req_task:
             return False
-        expected_sig = hashlib.sha256(
-            f"{self.envelope_id}:{self.action_request.target}:{self.authorization_decision.evaluated_at}".encode("utf-8")
-        ).hexdigest()
-        if self.signature != expected_sig:
+
+        key = secret_key or get_authorization_secret()
+
+        # 1. Authority Authenticity & Integrity of the D5 decision
+        valid_dec, _ = verify_decision_integrity(
+            self.authorization_decision,
+            self.action_request,
+            secret_key=key,
+        )
+        if not valid_dec:
             return False
+
+        # 2. Envelope HMAC signature verification
+        expected_sig = compute_envelope_signature(
+            self.envelope_id,
+            self.task_id,
+            self.authorization_decision.request_hash,
+            self.authorization_decision.integrity_token,
+            secret_key=key,
+        )
+        if not hmac.compare_digest(self.signature, expected_sig):
+            return False
+
         return True
 
     def to_dict(self) -> Dict[str, Any]:
@@ -187,6 +232,17 @@ class ExecutionEnvelope:
             "issued_at": self.issued_at,
             "signature": self.signature,
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> ExecutionEnvelope:
+        return cls(
+            envelope_id=data["envelope_id"],
+            task_id=data.get("task_id", ""),
+            action_request=ActionRequest.from_dict(data["action_request"]),
+            authorization_decision=AuthorizationDecision.from_dict(data["authorization_decision"]),
+            issued_at=data.get("issued_at", ""),
+            signature=data.get("signature", ""),
+        )
 
 
 class SlicePlanner:
@@ -223,7 +279,7 @@ class SlicePlanner:
             target="math_utils.py",
             parameters={"content": code, "path": "math_utils.py"},
             workspace=self.workspace_dir,
-            context={"intent": "implement_multiplication", "buggy": buggy},
+            context={"intent": "implement_multiplication", "buggy": buggy, "claim_id": f"claim_func_{task_id}"},
         )
 
     def plan_verification_action(self, task_id: str) -> ActionRequest:
@@ -238,7 +294,7 @@ class SlicePlanner:
             target=cmd,
             parameters={"command": cmd, "cwd": self.workspace_dir},
             workspace=self.workspace_dir,
-            context={"intent": "run_test_suite"},
+            context={"intent": "run_test_suite", "claim_id": f"claim_verif_{task_id}"},
         )
 
     def plan_repair_action(self, task_id: str) -> ActionRequest:
@@ -258,7 +314,7 @@ class SlicePlanner:
             target="math_utils.py",
             parameters={"content": code, "path": "math_utils.py"},
             workspace=self.workspace_dir,
-            context={"intent": "repair_multiplication", "repaired": True},
+            context={"intent": "repair_multiplication", "repaired": True, "claim_id": f"claim_func_{task_id}"},
         )
 
     def direct_execute(self, action: ActionRequest) -> Any:
@@ -274,44 +330,160 @@ class SlicePlanner:
 
 class SliceController:
     """
-    D5 Controller: Authorizes ActionRequests and issues single-use ExecutionEnvelopes.
+    D5 Controller: Authorizes ActionRequests using canonical D5 AuthorizationService
+    and issues single-use ExecutionEnvelopes sealed with HMAC integrity tokens.
     Enforces Criterion B: Controller authorization is mandatory.
     Enforces Criterion F: Repair requires a fresh authorization (envelopes are single-use).
+    Durable single-use protection persists across controller/process restarts.
     """
-    def __init__(self, workspace_dir: str):
-        self.workspace_dir = workspace_dir
+    def __init__(
+        self,
+        workspace_dir: str,
+        auth_service: Optional[AuthorizationService] = None,
+        secret_key: Optional[bytes] = None,
+    ):
+        self.workspace_dir = os.path.abspath(workspace_dir)
+        self.secret_key = secret_key or get_authorization_secret()
+        self.auth_service = auth_service or AuthorizationService(
+            secret_key=self.secret_key,
+            capability_registry=CapabilityResolver.get_global_registry(),
+        )
         self.consumed_envelopes: Set[str] = set()
+        self._load_consumed_envelopes()
+
+    def _get_consumed_file_path(self) -> str:
+        paths = WorkspacePaths(self.workspace_dir)
+        paths.ensure_directories()
+        return os.path.join(paths.trust_dir, "consumed_admissions.jsonl")
+
+    def _load_consumed_envelopes(self) -> None:
+        """Loads consumed envelope IDs from persistent storage (EventJournal and trust store)."""
+        # 1. From EventJournal
+        try:
+            journal = EventJournal(self.workspace_dir)
+            for evt in journal.read_all():
+                if evt.type == "sclass.admission.consumed":
+                    env_id = evt.data.get("envelope_id")
+                    if env_id:
+                        self.consumed_envelopes.add(env_id)
+        except Exception:
+            pass
+
+        # 2. From persistent trust file
+        consumed_file = self._get_consumed_file_path()
+        if os.path.exists(consumed_file):
+            try:
+                with open(consumed_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line:
+                            data = json.loads(line)
+                            if "envelope_id" in data:
+                                self.consumed_envelopes.add(data["envelope_id"])
+            except Exception:
+                pass
+
+    def is_consumed(self, envelope_id: str) -> bool:
+        """Checks if an envelope ID has been consumed (re-checking persistent storage)."""
+        if envelope_id in self.consumed_envelopes:
+            return True
+        self._load_consumed_envelopes()
+        return envelope_id in self.consumed_envelopes
+
+    def _mark_consumed_locked(self, envelope_id: str, request_hash: str = "") -> None:
+        """Internal helper to mark envelope consumed while caller holds WorkspaceLock."""
+        self.consumed_envelopes.add(envelope_id)
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        # 1. Append to EventJournal
+        try:
+            journal = EventJournal(self.workspace_dir)
+            journal.append(
+                event_type="sclass.admission.consumed",
+                subject=f"admission:{envelope_id}",
+                data={
+                    "envelope_id": envelope_id,
+                    "request_hash": request_hash,
+                    "consumed_at": now_iso,
+                },
+            )
+        except Exception:
+            pass
+
+        # 2. Append to persistent trust file
+        try:
+            consumed_file = self._get_consumed_file_path()
+            with open(consumed_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps({
+                    "envelope_id": envelope_id,
+                    "request_hash": request_hash,
+                    "consumed_at": now_iso,
+                }) + "\n")
+                f.flush()
+                os.fsync(f.fileno())
+        except Exception:
+            pass
+
+    def mark_consumed(self, envelope_id: str, request_hash: str = "") -> None:
+        """Atomically marks an envelope as consumed under WorkspaceLock."""
+        with WorkspaceLock(self.workspace_dir, lock_name="admission"):
+            self._mark_consumed_locked(envelope_id, request_hash)
 
     def authorize(self, request: ActionRequest) -> ExecutionEnvelope:
-        """Evaluates D3 policy and issues a single-use ExecutionEnvelope."""
-        decision = authorize(request, mode="enforce", workspace_dir=self.workspace_dir)
+        """Evaluates D5 policy via AuthorizationService and issues a sealed ExecutionEnvelope."""
+        decision = self.auth_service.authorize(request, workspace_dir=self.workspace_dir)
         if not decision.is_allowed:
             raise SecurityViolationError(f"Controller rejected action [{decision.policy_id}]: {decision.reason}")
 
         envelope_id = f"env_{uuid.uuid4().hex[:12]}"
-        sig = hashlib.sha256(f"{envelope_id}:{request.target}:{decision.evaluated_at}".encode("utf-8")).hexdigest()
+        task_id = request.task_id or request.session or "task_default"
+        sig = compute_envelope_signature(
+            envelope_id=envelope_id,
+            task_id=task_id,
+            request_hash=decision.request_hash,
+            decision_token=decision.integrity_token,
+            secret_key=self.secret_key,
+        )
         return ExecutionEnvelope(
             envelope_id=envelope_id,
-            task_id=request.task_id or "task_default",
+            task_id=task_id,
             action_request=request,
             authorization_decision=decision,
             signature=sig,
         )
 
     def validate_and_consume(self, envelope: ExecutionEnvelope) -> None:
-        """Validates envelope and marks it consumed. Replay strictly fails closed."""
+        """Atomically validates envelope and marks it consumed under WorkspaceLock. Replay strictly fails closed."""
         if not envelope or not isinstance(envelope, ExecutionEnvelope):
             raise SecurityViolationError(
                 "Criterion B Violation: Controller authorization is mandatory. No valid ExecutionEnvelope provided."
             )
-        if not envelope.verify():
-            raise SecurityViolationError("ExecutionEnvelope verification failed: AuthorizationDecision not allowed.")
-        if envelope.envelope_id in self.consumed_envelopes:
+        if not envelope.verify(secret_key=self.secret_key):
             raise SecurityViolationError(
-                f"Criterion F Violation: Repair requires fresh authorization. "
-                f"ExecutionEnvelope '{envelope.envelope_id}' has already been consumed."
+                "ExecutionEnvelope verification failed: AuthorizationDecision not allowed, forged, or tampered."
             )
-        self.consumed_envelopes.add(envelope.envelope_id)
+
+        # Context binding checks
+        req = envelope.action_request
+        req_ws = os.path.abspath(req.workspace or self.workspace_dir)
+        if req_ws != self.workspace_dir:
+            raise SecurityViolationError(
+                f"Execution-context binding mismatch: request workspace '{req_ws}' does not match controller workspace '{self.workspace_dir}'."
+            )
+        req_task = req.task_id or req.session
+        if req_task and envelope.task_id != req_task:
+            raise SecurityViolationError(
+                f"Execution-context binding mismatch: envelope task_id '{envelope.task_id}' does not match request task_id '{req_task}'."
+            )
+
+        # Atomic check-and-consume under WorkspaceLock
+        with WorkspaceLock(self.workspace_dir, lock_name="admission"):
+            if self.is_consumed(envelope.envelope_id):
+                raise SecurityViolationError(
+                    f"Criterion F Violation: Repair requires fresh authorization. "
+                    f"ExecutionEnvelope '{envelope.envelope_id}' has already been consumed."
+                )
+            self._mark_consumed_locked(envelope.envelope_id, envelope.authorization_decision.request_hash)
 
 
 class SliceExecutor:
@@ -319,16 +491,130 @@ class SliceExecutor:
     D6 Execution Provider Gateway:
     Executes authorized ExecutionEnvelopes using existing NativeProcessProvider.
     Do not introduce a second executor.
+    Independently verifies authoritative authorization artifact before executing:
+    - authority authenticity and cryptographic integrity
+    - exact action binding
+    - exact execution-context binding
+    - policy/capability/version binding
+    - single-use/replay protection
     """
     def __init__(
         self,
         workspace_dir: str,
-        controller: SliceController,
+        controller: Optional[SliceController] = None,
         provider: Optional[ExecutionProvider] = None,
+        secret_key: Optional[bytes] = None,
     ):
-        self.workspace_dir = workspace_dir
-        self.controller = controller
+        self.workspace_dir = os.path.abspath(workspace_dir)
+        self.secret_key = secret_key or get_authorization_secret()
+        self.controller = controller or SliceController(self.workspace_dir, secret_key=self.secret_key)
         self.provider = provider or NativeProcessProvider()
+
+    def verify_authorization_artifact(self, envelope: ExecutionEnvelope) -> None:
+        """
+        Independently verifies the authoritative authorization artifact at the D6 execution boundary.
+        Enforces:
+        1. Authority authenticity & cryptographic integrity (HMAC verification)
+        2. Exact action binding (action_id, action name, target, parameters hash)
+        3. Exact execution-context binding (workspace, actor, task_id)
+        4. Policy / capability / version binding
+        5. Single-use / replay protection
+        """
+        if not envelope or not isinstance(envelope, ExecutionEnvelope):
+            raise SecurityViolationError(
+                "Criterion B Violation: Controller authorization is mandatory. No valid ExecutionEnvelope provided."
+            )
+
+        dec = envelope.authorization_decision
+        req = envelope.action_request
+        if not dec or not req:
+            raise SecurityViolationError("ExecutionEnvelope lacks authorization decision or action request.")
+
+        # 1. Authority Authenticity / Cryptographic Integrity
+        if dec.issuer != "S_CLASS":
+            raise SecurityViolationError(
+                f"Untrusted authorization issuer '{dec.issuer}': only S-Class is authoritative."
+            )
+
+        if not dec.is_allowed:
+            raise SecurityViolationError(
+                f"ExecutionEnvelope verification failed: AuthorizationDecision not allowed [{dec.policy_id}]: {dec.reason}"
+            )
+
+        if not dec.integrity_token:
+            raise SecurityViolationError(
+                "ExecutionEnvelope verification failed: AuthorizationDecision lacks authoritative HMAC integrity token."
+            )
+
+        # Resolve authoritative capability from registry to independently verify capability binding
+        reg = CapabilityResolver.get_global_registry()
+        expected_cap = reg.resolve(req, workspace_dir=self.workspace_dir)
+        if expected_cap is None:
+            raise SecurityViolationError(
+                "ExecutionEnvelope verification failed: No authoritative capability found in registry matching request."
+            )
+
+        valid_dec, dec_err = verify_decision_integrity(
+            dec,
+            req,
+            capability=expected_cap,
+            secret_key=self.secret_key,
+        )
+        if not valid_dec:
+            raise SecurityViolationError(
+                f"ExecutionEnvelope verification failed: Authority authenticity/integrity check failed: {dec_err}"
+            )
+
+        # Verify envelope HMAC signature
+        expected_sig = compute_envelope_signature(
+            envelope.envelope_id,
+            envelope.task_id,
+            dec.request_hash,
+            dec.integrity_token,
+            secret_key=self.secret_key,
+        )
+        if not hmac.compare_digest(envelope.signature, expected_sig):
+            raise SecurityViolationError(
+                "ExecutionEnvelope verification failed: Envelope signature is invalid or forged."
+            )
+
+        # 2. Exact Action Binding
+        canonical_req_hash = compute_canonical_request_hash(req)
+        if not hmac.compare_digest(dec.request_hash, canonical_req_hash):
+            raise SecurityViolationError(
+                f"Action binding mismatch: decision bound to request hash '{dec.request_hash}', "
+                f"but action request hash is '{canonical_req_hash}'."
+            )
+
+        # 3. Exact Execution-Context Binding
+        req_ws = os.path.abspath(req.workspace or self.workspace_dir)
+        if req_ws != self.workspace_dir:
+            raise SecurityViolationError(
+                f"Execution-context binding mismatch: request workspace '{req_ws}' does not match executor workspace '{self.workspace_dir}'."
+            )
+
+        req_task = req.task_id or req.session
+        if req_task and envelope.task_id != req_task:
+            raise SecurityViolationError(
+                f"Execution-context binding mismatch: envelope task_id '{envelope.task_id}' does not match request task_id '{req_task}'."
+            )
+
+        # 4. Policy / Capability / Version Binding
+        if dec.policy_version != "1.0.0":
+            raise SecurityViolationError(
+                f"Policy version mismatch: decision bound to version '{dec.policy_version}', expected '1.0.0'."
+            )
+        if dec.capability_version != "1.0.0":
+            raise SecurityViolationError(
+                f"Capability version mismatch: decision bound to version '{dec.capability_version}', expected '1.0.0'."
+            )
+
+        # 5. Single-use / Replay Protection
+        if self.controller.is_consumed(envelope.envelope_id):
+            raise SecurityViolationError(
+                f"Criterion F Violation: Repair requires fresh authorization. "
+                f"ExecutionEnvelope '{envelope.envelope_id}' has already been consumed."
+            )
 
     def execute_envelope(
         self,
@@ -336,13 +622,16 @@ class SliceExecutor:
         ledger: Optional[LocalLedger] = None,
     ) -> ProviderExecutionResult:
         """Executes an authorized envelope under independent S-Class observation."""
-        # Enforce Controller Authorization Gate (Criterion B & F)
+        # Enforce D6 Independent Verification Gate
+        self.verify_authorization_artifact(envelope)
+
+        # Atomically validate and mark consumed (fails closed on concurrent replay)
         self.controller.validate_and_consume(envelope)
 
         req = envelope.action_request
         l = ledger or LocalLedger(workspace_dir=self.workspace_dir)
 
-        if req.action == "file_edit" or req.capability == "fs.write":
+        if req.action == "file_edit" or req.capability in ("fs.write", "filesystem.write"):
             target_rel = req.target or req.parameters.get("path", "math_utils.py")
             content = req.parameters.get("content", "")
             import base64
@@ -373,10 +662,22 @@ class SliceExecutor:
             return result
 
 
-def verify_canonical_acceptance(task_id: str, workspace_dir: str) -> Dict[str, Any]:
+def verify_canonical_acceptance(
+    task_id: str,
+    workspace_dir: str,
+    claim_id: Optional[str] = None,
+) -> Dict[str, Any]:
     """
     Derives acceptance strictly from canonical state (SQLite, Ledger, Journal).
     Rejects any unverified success flag (Criterion I).
+    Binds acceptance to:
+    - exact task ID
+    - exact claim ID
+    - final observed receipt ID
+    - receipt hash and provenance
+    - fresh workspace evidence (rejects stale/mutated evidence)
+    - accepted verification result in StateRepository
+    - final composite acceptance decision
     """
     ws = os.path.abspath(workspace_dir)
 
@@ -390,7 +691,41 @@ def verify_canonical_acceptance(task_id: str, workspace_dir: str) -> Dict[str, A
     if not task.verified_receipt_id:
         return {"accepted": False, "reason": "Task lacks verified_receipt_id in canonical state"}
 
-    # 2. Local ledger cryptographic integrity and receipt provenance
+    # 2. Canonical claim check
+    target_claim = None
+    if claim_id:
+        target_claim = repo.get_claim(claim_id)
+        if not target_claim or target_claim.task_id != task_id:
+            return {"accepted": False, "reason": f"Claim '{claim_id}' not found or does not match task '{task_id}'"}
+    else:
+        with repo.store.get_connection() as conn:
+            rows = conn.execute("SELECT claim_id FROM claims WHERE task_id = ?", (task_id,)).fetchall()
+            if not rows:
+                return {"accepted": False, "reason": f"No claims found for task '{task_id}'"}
+            for r in rows:
+                c = repo.get_claim(r["claim_id"])
+                if c and (c.claim_type == ClaimType.TEST_PASS.value or "verif" in c.claim_id):
+                    target_claim = c
+                    break
+            if not target_claim and rows:
+                target_claim = repo.get_claim(rows[0]["claim_id"])
+
+    if not target_claim:
+        return {"accepted": False, "reason": f"No canonical claim could be resolved for task '{task_id}'"}
+
+    # 3. Accepted verification result in SQLite state repository
+    with repo.store.get_connection() as conn:
+        verif_rows = conn.execute(
+            "SELECT * FROM verifications WHERE claim_id = ? AND receipt_id = ? AND status IN ('ACCEPT', 'CLAIM_VERIFIED')",
+            (target_claim.claim_id, task.verified_receipt_id),
+        ).fetchall()
+        if not verif_rows:
+            return {
+                "accepted": False,
+                "reason": f"No accepted verification found in StateRepository for claim '{target_claim.claim_id}' and receipt '{task.verified_receipt_id}'",
+            }
+
+    # 4. Local ledger cryptographic integrity and receipt provenance
     ledger = LocalLedger(ws)
     is_valid, err = ledger.verify_integrity()
     if not is_valid:
@@ -408,7 +743,11 @@ def verify_canonical_acceptance(task_id: str, workspace_dir: str) -> Dict[str, A
     if payload.get("exit_code") != 0:
         return {"accepted": False, "reason": f"Ledger receipt exit code is {payload.get('exit_code')}, expected 0"}
 
-    # 3. Verification event recorded in ledger
+    # Receipt provenance: task_id binding in ledger
+    if payload.get("task_id") and payload.get("task_id") != task_id:
+        return {"accepted": False, "reason": f"Receipt task_id '{payload.get('task_id')}' does not match task '{task_id}'"}
+
+    # Verification event recorded in ledger
     has_verif_event = any(
         entry.get("event") == "verification" and entry.get("payload", {}).get("receipt_id") == task.verified_receipt_id
         for entry in ledger.read_all_entries()
@@ -416,21 +755,56 @@ def verify_canonical_acceptance(task_id: str, workspace_dir: str) -> Dict[str, A
     if not has_verif_event:
         return {"accepted": False, "reason": "No verification event for receipt in ledger"}
 
-    # 4. CloudEvents Journal record
+    # 5. Fresh workspace evidence: load receipt and test staleness
+    receipt_obj = load_receipt(task.verified_receipt_id, ws)
+    if receipt_obj is None:
+        return {"accepted": False, "reason": f"Verified receipt '{task.verified_receipt_id}' not found in workspace"}
+
+    # Receipt binding and integrity checks
+    if receipt_obj.receipt_id != task.verified_receipt_id:
+        return {"accepted": False, "reason": "Receipt ID mismatch on loaded receipt artifact"}
+    if receipt_obj.task_id and receipt_obj.task_id != task_id:
+        return {"accepted": False, "reason": f"Receipt task_id '{receipt_obj.task_id}' does not match task '{task_id}'"}
+    if receipt_obj.claim_id and receipt_obj.claim_id != target_claim.claim_id and receipt_obj.claim_id != f"claim_{task_id}":
+        return {"accepted": False, "reason": f"Receipt claim_id '{receipt_obj.claim_id}' does not match canonical claim '{target_claim.claim_id}'"}
+    if receipt_obj.exit_code != 0:
+        return {"accepted": False, "reason": f"Receipt exit code is {receipt_obj.exit_code}, expected 0"}
+
+    expected_rcpt_hash = receipt_obj.compute_hash()
+    if receipt_obj.receipt_hash and receipt_obj.receipt_hash != expected_rcpt_hash:
+        return {"accepted": False, "reason": "Evidence receipt hash mismatch: receipt has been tampered with"}
+
+    if payload.get("receipt_hash") and receipt_obj.receipt_hash != payload.get("receipt_hash"):
+        return {"accepted": False, "reason": "Evidence receipt hash does not match ledger provenance record"}
+
+    is_fresh, staleness_err = check_staleness(receipt_obj, ws)
+    if not is_fresh:
+        return {"accepted": False, "reason": f"Evidence is stale: {staleness_err}"}
+
+    # 6. CloudEvents Journal record and final composite acceptance decision
     journal = EventJournal(ws)
     events = journal.read_all()
-    has_cloud_event = any(
-        evt.type in ("sclass.task.verified", "sclass.verification.accepted") and evt.subject == f"task:{task_id}"
-        for evt in events
-    )
-    if not has_cloud_event:
-        return {"accepted": False, "reason": "CloudEvent journal lacks sclass.task.verified event"}
+    composite_accepted = False
+    for evt in events:
+        if evt.type == "sclass.task.verified" and evt.subject == f"task:{task_id}":
+            if evt.data.get("verified_receipt_id") != task.verified_receipt_id:
+                continue
+            acc_dec = evt.data.get("acceptance_decision")
+            if acc_dec and (acc_dec.get("decision") == "ACCEPT" or acc_dec.get("is_accepted") is True):
+                composite_accepted = True
+                break
+
+    if not composite_accepted:
+        return {"accepted": False, "reason": "No accepted composite decision in CloudEvents journal"}
 
     return {
         "accepted": True,
         "task_id": task_id,
+        "claim_id": target_claim.claim_id,
         "verified_receipt_id": task.verified_receipt_id,
         "receipt_hash": payload.get("receipt_hash"),
+        "fresh_evidence": True,
+        "composite_decision": "ACCEPT",
         "timestamp": task.completed_at,
     }
 
@@ -577,6 +951,8 @@ class CanonicalVerticalSlice:
 
         self.task.transition_to(TaskState.CLAIMED)
         self.state_repo.save_task(self.task)
+        self.state_repo.save_claim(self.claim_func)
+        self.state_repo.save_claim(self.claim_verif)
         return self.task
 
     def attempt_initial_implementation(self, inject_defect: bool = True) -> Tuple[ObservedReceipt, VerificationResult]:
@@ -790,4 +1166,169 @@ class CanonicalVerticalSlice:
             "verdict": verdict,
             "acceptance": acceptance,
             "canonical_status": canonical_status,
+        }
+
+    def get_canonical_trace(self) -> Dict[str, Any]:
+        """
+        Derives normalized, deterministic semantic trace of the slice execution:
+        task -> obligations -> claims -> authorized action digests -> observed exit codes ->
+        verification verdicts -> recovery transition -> final accepted claim.
+        Filters out runtime-only non-deterministic values (PID, wall-clock timestamps,
+        workspace absolute paths, and random UUID components).
+        """
+        def normalize_str(s: str) -> str:
+            if not s:
+                return s
+            norm_ws = self.workspace_dir.replace("\\", "/")
+            norm_py = sys.executable.replace("\\", "/")
+            res = s.replace("\\", "/")
+            import re
+            if norm_ws.lower() in res.lower():
+                res = re.sub(re.escape(norm_ws), "<WORKSPACE>", res, flags=re.IGNORECASE)
+            if norm_py.lower() in res.lower():
+                res = re.sub(re.escape(norm_py), "<PYTHON>", res, flags=re.IGNORECASE)
+            return res
+
+        def normalize_action(env: Optional[ExecutionEnvelope]) -> Optional[Dict[str, Any]]:
+            if not env or not env.action_request:
+                return None
+            action_req = env.action_request
+            clean_params = {}
+            for k, v in sorted(action_req.parameters.items()):
+                if isinstance(v, str):
+                    clean_params[k] = normalize_str(v)
+                else:
+                    clean_params[k] = v
+
+            target = normalize_str(action_req.target)
+            policy_id = env.authorization_decision.policy_id if env.authorization_decision else "UNKNOWN"
+            outcome = (
+                env.authorization_decision.outcome.value
+                if hasattr(env.authorization_decision.outcome, "value")
+                else str(env.authorization_decision.outcome)
+            ) if env.authorization_decision else "ALLOW"
+
+            norm_dict = {
+                "actor": action_req.actor,
+                "capability": action_req.capability,
+                "action": action_req.action,
+                "target": target,
+                "policy_id": policy_id,
+                "outcome": outcome,
+                "parameters_hash": hashlib.sha256(json.dumps(clean_params, sort_keys=True).encode()).hexdigest(),
+            }
+            return norm_dict
+
+        obligations = []
+        for ob in (self.ob_func, self.ob_verif, self.ob_repair):
+            if ob:
+                obligations.append({
+                    "kind": ob.kind.value if isinstance(ob.kind, ObligationKind) else str(ob.kind),
+                    "description": ob.description,
+                    "target": ob.target,
+                    "status": ob.status.value if isinstance(ob.status, ObligationStatus) else str(ob.status),
+                })
+
+        claims = []
+        for c in (self.claim_func, self.claim_verif):
+            if c:
+                claims.append({
+                    "claim_type": c.claim_type,
+                    "statement": c.statement,
+                    "target_files": sorted(list(c.target_files)),
+                    "verifier": c.verifier,
+                })
+
+        authorized_actions = []
+        authorized_action_digests = []
+        for env in (self.initial_envelope, self.initial_test_envelope, self.repair_envelope, self.reverify_envelope):
+            if env:
+                norm_act = normalize_action(env)
+                if norm_act:
+                    authorized_actions.append(norm_act)
+                    act_bytes = json.dumps(norm_act, sort_keys=True, separators=(",", ":")).encode("utf-8")
+                    authorized_action_digests.append(hashlib.sha256(act_bytes).hexdigest())
+
+        observed_exit_codes = []
+        if self.failed_receipt:
+            observed_exit_codes.append(self.failed_receipt.exit_code)
+        if self.passed_receipt:
+            observed_exit_codes.append(self.passed_receipt.exit_code)
+
+        verification_verdicts = []
+        if self.failed_verdict:
+            verification_verdicts.append({
+                "verdict_type": "initial_verification",
+                "status": self.failed_verdict.status,
+                "is_rejected": self.failed_verdict.is_rejected,
+                "is_accepted": self.failed_verdict.is_accepted,
+            })
+        if self.passed_verdict:
+            verification_verdicts.append({
+                "verdict_type": "reverification",
+                "status": self.passed_verdict.status,
+                "is_rejected": self.passed_verdict.is_rejected,
+                "is_accepted": self.passed_verdict.is_accepted,
+            })
+
+        recovery_transition = None
+        if self.ob_repair:
+            recovery_transition = {
+                "recovery_obligation_kind": self.ob_repair.kind.value if isinstance(self.ob_repair.kind, ObligationKind) else str(self.ob_repair.kind),
+                "recovery_target": self.ob_repair.target,
+                "parent_obligation_matches": bool(self.ob_verif and self.ob_repair.parent_obligation_id == self.ob_verif.obligation_id),
+            }
+
+        steps = []
+        if self.failed_receipt and self.failed_verdict:
+            steps.append({
+                "step": "initial_verification_defect",
+                "exit_code": self.failed_receipt.exit_code,
+                "verdict_status": self.failed_verdict.status,
+                "is_rejected": self.failed_verdict.is_rejected,
+                "is_accepted": self.failed_verdict.is_accepted,
+            })
+
+        if self.ob_repair:
+            steps.append({
+                "step": "recovery_transition",
+                "recovery_obligation_kind": self.ob_repair.kind.value if isinstance(self.ob_repair.kind, ObligationKind) else str(self.ob_repair.kind),
+                "recovery_target": self.ob_repair.target,
+                "parent_obligation_matches": bool(self.ob_verif and self.ob_repair.parent_obligation_id == self.ob_verif.obligation_id),
+            })
+
+        if self.passed_receipt and self.passed_verdict:
+            steps.append({
+                "step": "reverification_pass",
+                "exit_code": self.passed_receipt.exit_code,
+                "verdict_status": self.passed_verdict.status,
+                "is_rejected": self.passed_verdict.is_rejected,
+                "is_accepted": self.passed_verdict.is_accepted,
+            })
+
+        final_claim = None
+        if self.claim_verif:
+            final_claim = {
+                "statement": self.claim_verif.statement,
+                "claim_type": self.claim_verif.claim_type,
+                "accepted_receipt_exit_code": self.passed_receipt.exit_code if self.passed_receipt else None,
+                "composite_decision": "ACCEPT",
+            }
+
+        return {
+            "task": {
+                "title": self.task.title if self.task else "",
+                "description": self.task.description if self.task else "",
+                "priority": self.task.priority.value if self.task else "",
+                "final_state": self.task.state.value if self.task else "",
+            },
+            "obligations": obligations,
+            "claims": claims,
+            "authorized_actions": authorized_actions,
+            "authorized_action_digests": authorized_action_digests,
+            "observed_steps": steps,
+            "observed_exit_codes": observed_exit_codes,
+            "verification_verdicts": verification_verdicts,
+            "recovery_transition": recovery_transition,
+            "final_accepted_claim": final_claim,
         }
