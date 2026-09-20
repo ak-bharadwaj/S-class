@@ -28,6 +28,14 @@ D9.1.2 Required Canonical Verification Provenance Closure Tests:
 - Test F: ledger provenance absence rejected
 - Test G: ledger corruption fails closed
 - Test H: valid canonical verification converges
+
+D9.1.3 Required Fail-Closed Receipt Binding and Certification Closure Tests:
+- Test A: workspace mismatch rejected
+- Test B: missing task binding rejected
+- Test C: missing claim binding rejected
+- Test D: missing receipt hash rejected
+- Test E: receipt hash mismatch rejected
+- Test F: valid canonical receipt converges
 """
 
 import os
@@ -71,10 +79,12 @@ def make_observed_failure_receipt(
     anchor_in_ledger: bool = True,
 ) -> ObservedReceipt:
     ws = os.path.abspath(workspace)
+    t_id = task_id or (f"task_{receipt_id.replace('rcpt_fail_', '').replace('rcpt_', '')}" if receipt_id else "task_default")
+    c_id = claim_id or f"claim_{t_id.replace('task_', '')}"
     receipt = ObservedReceipt(
         receipt_id=receipt_id,
-        task_id=task_id,
-        claim_id=claim_id,
+        task_id=t_id,
+        claim_id=c_id,
         agent="test_agent",
         action="execute",
         workspace=ws,
@@ -90,8 +100,8 @@ def make_observed_failure_receipt(
             payload={
                 "receipt_id": receipt.receipt_id,
                 "receipt_hash": receipt.receipt_hash,
-                "task_id": task_id,
-                "claim_id": claim_id,
+                "task_id": t_id,
+                "claim_id": c_id,
                 "exit_code": exit_code,
                 "workspace": ws,
                 "command": command,
@@ -109,10 +119,12 @@ def make_observed_success_receipt(
     anchor_in_ledger: bool = True,
 ) -> ObservedReceipt:
     ws = os.path.abspath(workspace)
+    t_id = task_id or (f"task_{receipt_id.replace('rcpt_pass_', '').replace('rcpt_', '')}" if receipt_id else "task_default")
+    c_id = claim_id or f"claim_{t_id.replace('task_', '')}"
     receipt = ObservedReceipt(
         receipt_id=receipt_id,
-        task_id=task_id,
-        claim_id=claim_id,
+        task_id=t_id,
+        claim_id=c_id,
         agent="test_agent",
         action="execute",
         workspace=ws,
@@ -128,8 +140,8 @@ def make_observed_success_receipt(
             payload={
                 "receipt_id": receipt.receipt_id,
                 "receipt_hash": receipt.receipt_hash,
-                "task_id": task_id,
-                "claim_id": claim_id,
+                "task_id": t_id,
+                "claim_id": c_id,
                 "exit_code": 0,
                 "workspace": ws,
                 "command": command,
@@ -417,11 +429,18 @@ def test_d9_test_e_regression_preservation_unaffected_obligations_remain_accepte
     ws = str(tmp_path / "d9_test_e")
     engine = RecoveryEngine(workspace_dir=ws)
 
-    evidence = make_observed_failure_receipt(receipt_id="rcpt_fail_005", exit_code=1, workspace=ws)
+    evidence = make_observed_failure_receipt(
+        receipt_id="rcpt_fail_005",
+        task_id="task_005",
+        claim_id="claim_repaired_multiply",
+        exit_code=1,
+        workspace=ws,
+    )
     record = engine.diagnose_failure(
         task_id="task_005",
         obligation_id="ob_func_multiply",
         failure_evidence=evidence,
+        claim_id="claim_repaired_multiply",
     )
     engine.create_repair_obligation(record.recovery_id, target="math_utils.py")
     engine.start_repair(record.recovery_id)
@@ -433,6 +452,7 @@ def test_d9_test_e_regression_preservation_unaffected_obligations_remain_accepte
     # Provide authentic passing verification and observed evidence
     passing_evidence = make_observed_success_receipt(
         receipt_id="rcpt_pass_multiply",
+        task_id="task_005",
         claim_id="claim_repaired_multiply",
         workspace=ws,
     )
@@ -608,11 +628,22 @@ def test_d9_test_h_stale_recovery_evidence_cannot_converge(tmp_path):
     engine.start_repair(record.recovery_id)
     engine.submit_for_reverification(record.recovery_id)
 
-    stale_ev = make_observed_success_receipt(receipt_id="rcpt_pass_008_fresh", workspace=ws)
+    stale_ev = make_observed_success_receipt(
+        receipt_id="rcpt_pass_008_fresh",
+        task_id="task_008",
+        claim_id="claim_008",
+        workspace=ws,
+    )
     # Mark as stale
     object.__setattr__(stale_ev, "is_stale", True) if hasattr(stale_ev, "__dataclass_fields__") else setattr(stale_ev, "is_stale", True)
 
-    normal_verdict = make_canonical_verification_result(stale_ev, status="ACCEPT", reason="Passed", workspace=ws)
+    normal_verdict = make_canonical_verification_result(
+        stale_ev,
+        status="ACCEPT",
+        claim_id="claim_008",
+        reason="Passed",
+        workspace=ws,
+    )
 
     res2 = engine.evaluate_convergence(
         record.recovery_id,
@@ -692,7 +723,7 @@ def test_d9_forged_accept_verification_rejected(tmp_path):
     ws = str(tmp_path / "forged_accept")
     engine = RecoveryEngine(workspace_dir=ws)
 
-    evidence = make_observed_failure_receipt(receipt_id="rcpt_fail_real", exit_code=1, workspace=ws)
+    evidence = make_observed_failure_receipt(receipt_id="rcpt_fail_real", task_id="task_01", claim_id="claim_01", exit_code=1, workspace=ws)
     record = engine.diagnose_failure(task_id="task_01", obligation_id="ob_01", failure_evidence=evidence)
     engine.create_repair_obligation(record.recovery_id)
     engine.start_repair(record.recovery_id)
@@ -718,7 +749,7 @@ def test_d9_forged_accept_verification_rejected(tmp_path):
         )
 
     # 3. Authentic VerificationResult but paired with unobserved EvidenceReceipt
-    valid_ev = make_observed_success_receipt(receipt_id="rcpt_unobserved_pass", workspace=ws)
+    valid_ev = make_observed_success_receipt(receipt_id="rcpt_unobserved_pass", task_id="task_01", claim_id="claim_01", workspace=ws)
     valid_verdict = make_canonical_verification_result(valid_ev, status="ACCEPT", workspace=ws)
     unobserved_ev = EvidenceReceipt(
         receipt_id="rcpt_unobserved_pass",
@@ -750,7 +781,7 @@ def test_d9_claim_obligation_mismatch_rejected(tmp_path):
     engine = RecoveryEngine(workspace_dir=ws)
 
     # 1. Failure evidence has claim_id="claim_X", caller expects "claim_Y"
-    ev_mismatch = make_observed_failure_receipt(receipt_id="rcpt_fail_mismatch", claim_id="claim_X", exit_code=1, workspace=ws)
+    ev_mismatch = make_observed_failure_receipt(receipt_id="rcpt_fail_mismatch", task_id="task_01", claim_id="claim_X", exit_code=1, workspace=ws)
     with pytest.raises(RecoveryError, match="Claim/obligation mismatch"):
         engine.diagnose_failure(
             task_id="task_01",
@@ -760,7 +791,7 @@ def test_d9_claim_obligation_mismatch_rejected(tmp_path):
         )
 
     # 2. Start valid recovery bound to claim_id="claim_A"
-    ev_valid = make_observed_failure_receipt(receipt_id="rcpt_fail_a", claim_id="claim_A", exit_code=1, workspace=ws)
+    ev_valid = make_observed_failure_receipt(receipt_id="rcpt_fail_a", task_id="task_01", claim_id="claim_A", exit_code=1, workspace=ws)
     record = engine.diagnose_failure(
         task_id="task_01",
         obligation_id="ob_01",
@@ -774,7 +805,7 @@ def test_d9_claim_obligation_mismatch_rejected(tmp_path):
     engine.submit_for_reverification(record.recovery_id)
 
     # Reverification verdict claims "claim_B" instead of "claim_A"
-    ev_b = make_observed_success_receipt(receipt_id="rcpt_pass_b", claim_id="claim_B", workspace=ws)
+    ev_b = make_observed_success_receipt(receipt_id="rcpt_pass_b", task_id="task_01", claim_id="claim_B", workspace=ws)
     verdict_mismatch = make_canonical_verification_result(ev_b, status="ACCEPT", claim_id="claim_B", workspace=ws)
     with pytest.raises(RecoveryError, match="Claim/obligation mismatch"):
         engine.evaluate_convergence(
@@ -813,7 +844,7 @@ def test_d9_missing_receipt_verification_provenance_rejected(tmp_path):
         )
 
     # 3. Evaluate convergence with VerificationResult lacking receipt_id
-    valid_ev = make_observed_failure_receipt(receipt_id="rcpt_f_valid", exit_code=1, workspace=ws)
+    valid_ev = make_observed_failure_receipt(receipt_id="rcpt_f_valid", task_id="task_01", claim_id="claim_01", exit_code=1, workspace=ws)
     record = engine.diagnose_failure(task_id="task_01", obligation_id="ob_01", failure_evidence=valid_ev)
     engine.create_repair_obligation(record.recovery_id)
     engine.start_repair(record.recovery_id)
@@ -840,7 +871,7 @@ def test_d9_two_recovery_cycles_for_same_obligation_remain_distinct(tmp_path):
     engine = RecoveryEngine(workspace_dir=ws)
 
     # Cycle 1: initial failure
-    ev1 = make_observed_failure_receipt(receipt_id="rcpt_fail_cycle_1", exit_code=1, workspace=ws)
+    ev1 = make_observed_failure_receipt(receipt_id="rcpt_fail_cycle_1", task_id="task_cycle", claim_id="claim_cycle", exit_code=1, workspace=ws)
     rec1 = engine.diagnose_failure(
         task_id="task_cycle",
         obligation_id="ob_recurring",
@@ -854,13 +885,13 @@ def test_d9_two_recovery_cycles_for_same_obligation_remain_distinct(tmp_path):
     engine.create_repair_obligation(cycle1_id)
     engine.start_repair(cycle1_id)
     engine.submit_for_reverification(cycle1_id)
-    pass_ev1 = make_observed_success_receipt(receipt_id="rcpt_pass_cycle_1", workspace=ws)
+    pass_ev1 = make_observed_success_receipt(receipt_id="rcpt_pass_cycle_1", task_id="task_cycle", claim_id="claim_cycle", workspace=ws)
     verdict1 = make_canonical_verification_result(pass_ev1, status="ACCEPT", workspace=ws)
     res1 = engine.evaluate_convergence(cycle1_id, verification_result=verdict1)
     assert res1.is_converged is True
 
     # Cycle 2: later, a different failure occurs for the SAME obligation
-    ev2 = make_observed_failure_receipt(receipt_id="rcpt_fail_cycle_2", exit_code=2, workspace=ws)
+    ev2 = make_observed_failure_receipt(receipt_id="rcpt_fail_cycle_2", task_id="task_cycle", claim_id="claim_cycle", exit_code=2, workspace=ws)
     rec2 = engine.diagnose_failure(
         task_id="task_cycle",
         obligation_id="ob_recurring",
@@ -896,7 +927,7 @@ def test_d9_canonical_state_survives_restart(tmp_path):
     ws = str(tmp_path / "restart_state")
     engine1 = RecoveryEngine(workspace_dir=ws, default_max_attempts=3)
 
-    evidence = make_observed_failure_receipt(receipt_id="rcpt_fail_restart", exit_code=1, workspace=ws)
+    evidence = make_observed_failure_receipt(receipt_id="rcpt_fail_restart", task_id="task_restart", claim_id="claim_restart", exit_code=1, workspace=ws)
     record = engine1.diagnose_failure(
         task_id="task_restart",
         obligation_id="ob_restart",
@@ -962,6 +993,7 @@ def test_d9_provenance_fields_survive_reconstruction(tmp_path):
 
     evidence = make_observed_failure_receipt(
         receipt_id="rcpt_fail_provenance",
+        task_id="task_prov",
         claim_id="claim_prov_001",
         exit_code=1,
         workspace=ws,
@@ -1100,6 +1132,7 @@ def test_d9_1_2_test_c_unregistered_real_receipt_rejected(tmp_path):
     # Real-looking ObservedReceipt without ledger anchoring
     unregistered_ev = make_observed_failure_receipt(
         receipt_id="rcpt_unregistered_fail",
+        task_id="task_c",
         claim_id="claim_c",
         workspace=ws,
         anchor_in_ledger=False,
@@ -1128,18 +1161,18 @@ def test_d9_1_2_test_d_verification_record_receipt_mismatch_rejected(tmp_path):
     ws = str(tmp_path / "d9_1_2_test_d")
     engine = RecoveryEngine(workspace_dir=ws)
 
-    ev_fail = make_observed_failure_receipt(receipt_id="rcpt_fail_d", claim_id="claim_d", workspace=ws)
+    ev_fail = make_observed_failure_receipt(receipt_id="rcpt_fail_d", task_id="task_d", claim_id="claim_d", workspace=ws)
     record = engine.diagnose_failure(task_id="task_d", obligation_id="ob_d", failure_evidence=ev_fail, claim_id="claim_d")
     engine.create_repair_obligation(record.recovery_id)
     engine.start_repair(record.recovery_id)
     engine.submit_for_reverification(record.recovery_id)
 
     # Persist verification record with receipt_id = "rcpt_canonical_A" in StateRepository
-    rec_a = make_observed_success_receipt(receipt_id="rcpt_canonical_A", claim_id="claim_d", workspace=ws)
+    rec_a = make_observed_success_receipt(receipt_id="rcpt_canonical_A", task_id="task_d", claim_id="claim_d", workspace=ws)
     make_canonical_verification_result(rec_a, status="ACCEPT", claim_id="claim_d", workspace=ws)
 
     # Supply receipt_id = "rcpt_different_B" to evaluate_convergence
-    rec_b = make_observed_success_receipt(receipt_id="rcpt_different_B", claim_id="claim_d", workspace=ws)
+    rec_b = make_observed_success_receipt(receipt_id="rcpt_different_B", task_id="task_d", claim_id="claim_d", workspace=ws)
     verif_b = VerificationResult(
         status="ACCEPT",
         claim_id="claim_d",
@@ -1451,4 +1484,413 @@ def test_d9_1_2_test_h_valid_canonical_verification_converges(tmp_path):
     assert res.is_converged is True
     assert res.status == RecoveryState.CONVERGED.value
     assert engine.get_recovery(record.recovery_id).current_state == RecoveryState.CONVERGED
+
+
+# --------------------------------------------------------------------------
+# D9.1.3 Test A — Workspace Mismatch Rejected
+# --------------------------------------------------------------------------
+def test_d9_1_3_test_a_workspace_mismatch_rejected(tmp_path):
+    """
+    Test A:
+    Receipt claims foreign workspace.
+    Expected: recovery rejects immediately (fail closed), state unchanged, no convergence.
+    """
+    target_ws = str(tmp_path / "target_ws")
+    foreign_ws = str(tmp_path / "foreign_ws")
+    os.makedirs(target_ws, exist_ok=True)
+    os.makedirs(foreign_ws, exist_ok=True)
+
+    engine = RecoveryEngine(workspace_dir=target_ws)
+
+    # 1. Foreign workspace in diagnose_failure failure evidence must reject
+    fail_ev_foreign = make_observed_failure_receipt(
+        receipt_id="rcpt_fail_foreign",
+        task_id="task_foreign",
+        claim_id="claim_foreign",
+        workspace=foreign_ws,
+    )
+    with pytest.raises(RecoveryError, match="Workspace/project mismatch"):
+        engine.diagnose_failure(
+            task_id="task_foreign",
+            obligation_id="ob_foreign",
+            failure_evidence=fail_ev_foreign,
+        )
+
+    # 2. Setup a valid recovery cycle in target_ws
+    ev_fail = make_observed_failure_receipt(
+        receipt_id="rcpt_fail_target",
+        task_id="task_target",
+        claim_id="claim_target",
+        workspace=target_ws,
+    )
+    record = engine.diagnose_failure(
+        task_id="task_target",
+        obligation_id="ob_target",
+        failure_evidence=ev_fail,
+    )
+    engine.create_repair_obligation(record.recovery_id)
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    # 3. Foreign workspace in evaluate_convergence must reject and leave state unchanged
+    pass_ev_foreign = make_observed_success_receipt(
+        receipt_id="rcpt_pass_foreign",
+        task_id="task_target",
+        claim_id="claim_target",
+        workspace=foreign_ws,
+    )
+    verdict_foreign = make_canonical_verification_result(
+        pass_ev_foreign,
+        status="ACCEPT",
+        claim_id="claim_target",
+        workspace=foreign_ws,
+    )
+    with pytest.raises(RecoveryError, match="Workspace/project mismatch"):
+        engine.evaluate_convergence(
+            record.recovery_id,
+            verification_result=verdict_foreign,
+            evidence=pass_ev_foreign,
+        )
+
+    # Invariant: Authoritative state remains unchanged, no convergence
+    recovery = engine.get_recovery(record.recovery_id)
+    assert recovery.current_state == RecoveryState.REVERIFY_REQUIRED
+    assert recovery.current_state != RecoveryState.CONVERGED
+
+
+# --------------------------------------------------------------------------
+# D9.1.3 Test B — Missing Task Binding Rejected
+# --------------------------------------------------------------------------
+def test_d9_1_3_test_b_missing_task_binding_rejected(tmp_path):
+    """
+    Test B:
+    Observation has no task binding (missing in ledger or receipt object).
+    Expected: fails closed immediately, no convergence.
+    """
+    ws = str(tmp_path / "d9_1_3_test_b")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+
+    ev_fail = make_observed_failure_receipt(
+        receipt_id="rcpt_fail_b",
+        task_id="task_b",
+        claim_id="claim_b",
+        workspace=ws,
+    )
+    record = engine.diagnose_failure(
+        task_id="task_b",
+        obligation_id="ob_b",
+        failure_evidence=ev_fail,
+    )
+    engine.create_repair_obligation(record.recovery_id)
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    # Case B1: Ledger entry lacks task_id
+    receipt_pass = make_observed_success_receipt(
+        receipt_id="rcpt_pass_b",
+        task_id="task_b",
+        claim_id="claim_b",
+        workspace=ws,
+        anchor_in_ledger=False,
+    )
+    save_receipt(receipt_pass, ws)
+    ledger = LocalLedger(workspace_dir=ws)
+    ledger.append(
+        event="OBSERVATION",
+        payload={
+            "receipt_id": receipt_pass.receipt_id,
+            "receipt_hash": receipt_pass.receipt_hash,
+            # task_id omitted
+            "claim_id": "claim_b",
+            "exit_code": 0,
+            "workspace": ws,
+        },
+    )
+    verdict = make_canonical_verification_result(
+        receipt_pass,
+        status="ACCEPT",
+        claim_id="claim_b",
+        workspace=ws,
+    )
+
+    with pytest.raises(RecoveryError, match="Missing task binding"):
+        engine.evaluate_convergence(
+            record.recovery_id,
+            verification_result=verdict,
+            evidence=receipt_pass,
+        )
+
+    # State unchanged
+    assert engine.get_recovery(record.recovery_id).current_state == RecoveryState.REVERIFY_REQUIRED
+
+
+# --------------------------------------------------------------------------
+# D9.1.3 Test C — Missing Claim Binding Rejected
+# --------------------------------------------------------------------------
+def test_d9_1_3_test_c_missing_claim_binding_rejected(tmp_path):
+    """
+    Test C:
+    Observation has no claim binding (missing in ledger or receipt object).
+    Expected: fails closed immediately, no convergence.
+    """
+    ws = str(tmp_path / "d9_1_3_test_c")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+
+    ev_fail = make_observed_failure_receipt(
+        receipt_id="rcpt_fail_c",
+        task_id="task_c",
+        claim_id="claim_c",
+        workspace=ws,
+    )
+    record = engine.diagnose_failure(
+        task_id="task_c",
+        obligation_id="ob_c",
+        failure_evidence=ev_fail,
+    )
+    engine.create_repair_obligation(record.recovery_id)
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    # Case C1: Ledger entry lacks claim_id
+    receipt_pass = make_observed_success_receipt(
+        receipt_id="rcpt_pass_c",
+        task_id="task_c",
+        claim_id="claim_c",
+        workspace=ws,
+        anchor_in_ledger=False,
+    )
+    save_receipt(receipt_pass, ws)
+    ledger = LocalLedger(workspace_dir=ws)
+    ledger.append(
+        event="OBSERVATION",
+        payload={
+            "receipt_id": receipt_pass.receipt_id,
+            "receipt_hash": receipt_pass.receipt_hash,
+            "task_id": "task_c",
+            # claim_id omitted
+            "exit_code": 0,
+            "workspace": ws,
+        },
+    )
+    verdict = make_canonical_verification_result(
+        receipt_pass,
+        status="ACCEPT",
+        claim_id="claim_c",
+        workspace=ws,
+    )
+
+    with pytest.raises(RecoveryError, match="Missing claim binding"):
+        engine.evaluate_convergence(
+            record.recovery_id,
+            verification_result=verdict,
+            evidence=receipt_pass,
+        )
+
+    # State unchanged
+    assert engine.get_recovery(record.recovery_id).current_state == RecoveryState.REVERIFY_REQUIRED
+
+
+# --------------------------------------------------------------------------
+# D9.1.3 Test D — Missing Receipt Hash Rejected
+# --------------------------------------------------------------------------
+def test_d9_1_3_test_d_missing_receipt_hash_rejected(tmp_path):
+    """
+    Test D:
+    Receipt object or ledger entry lacks receipt_hash.
+    Expected: fails closed without fallback hashing.
+    """
+    ws = str(tmp_path / "d9_1_3_test_d")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+
+    ev_fail = make_observed_failure_receipt(
+        receipt_id="rcpt_fail_d",
+        task_id="task_d",
+        claim_id="claim_d",
+        workspace=ws,
+    )
+    record = engine.diagnose_failure(
+        task_id="task_d",
+        obligation_id="ob_d",
+        failure_evidence=ev_fail,
+    )
+    engine.create_repair_obligation(record.recovery_id)
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    # Case D1: Ledger entry lacks receipt_hash
+    receipt_pass = make_observed_success_receipt(
+        receipt_id="rcpt_pass_d",
+        task_id="task_d",
+        claim_id="claim_d",
+        workspace=ws,
+        anchor_in_ledger=False,
+    )
+    save_receipt(receipt_pass, ws)
+    ledger = LocalLedger(workspace_dir=ws)
+    ledger.append(
+        event="OBSERVATION",
+        payload={
+            "receipt_id": receipt_pass.receipt_id,
+            # receipt_hash omitted
+            "task_id": "task_d",
+            "claim_id": "claim_d",
+            "exit_code": 0,
+            "workspace": ws,
+        },
+    )
+    verdict = make_canonical_verification_result(
+        receipt_pass,
+        status="ACCEPT",
+        claim_id="claim_d",
+        workspace=ws,
+    )
+
+    with pytest.raises(RecoveryError, match="Missing authoritative receipt hash"):
+        engine.evaluate_convergence(
+            record.recovery_id,
+            verification_result=verdict,
+            evidence=receipt_pass,
+        )
+
+    # Case D2: Receipt object lacks receipt_hash
+    receipt_pass_nohash = make_observed_success_receipt(
+        receipt_id="rcpt_pass_d2",
+        task_id="task_d",
+        claim_id="claim_d",
+        workspace=ws,
+        anchor_in_ledger=True,
+    )
+    receipt_pass_nohash.receipt_hash = None  # strip hash from object
+    verdict_d2 = make_canonical_verification_result(
+        receipt_pass_nohash,
+        status="ACCEPT",
+        claim_id="claim_d",
+        workspace=ws,
+    )
+    with pytest.raises(RecoveryError, match="Missing authoritative receipt hash"):
+        engine.evaluate_convergence(
+            record.recovery_id,
+            verification_result=verdict_d2,
+            evidence=receipt_pass_nohash,
+        )
+
+    # State unchanged
+    assert engine.get_recovery(record.recovery_id).current_state == RecoveryState.REVERIFY_REQUIRED
+
+
+# --------------------------------------------------------------------------
+# D9.1.3 Test E — Receipt Hash Mismatch Rejected
+# --------------------------------------------------------------------------
+def test_d9_1_3_test_e_receipt_hash_mismatch_rejected(tmp_path):
+    """
+    Test E:
+    Receipt hash differs from ledger record.
+    Expected: fails closed immediately, no convergence.
+    """
+    ws = str(tmp_path / "d9_1_3_test_e")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+
+    ev_fail = make_observed_failure_receipt(
+        receipt_id="rcpt_fail_e",
+        task_id="task_e",
+        claim_id="claim_e",
+        workspace=ws,
+    )
+    record = engine.diagnose_failure(
+        task_id="task_e",
+        obligation_id="ob_e",
+        failure_evidence=ev_fail,
+    )
+    engine.create_repair_obligation(record.recovery_id)
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    receipt_pass = make_observed_success_receipt(
+        receipt_id="rcpt_pass_e",
+        task_id="task_e",
+        claim_id="claim_e",
+        workspace=ws,
+        anchor_in_ledger=True,
+    )
+    # Modify receipt_hash on object so it mismatches ledger
+    receipt_pass.receipt_hash = "tampered_receipt_hash_value"
+    verdict = make_canonical_verification_result(
+        receipt_pass,
+        status="ACCEPT",
+        claim_id="claim_e",
+        workspace=ws,
+    )
+
+    with pytest.raises(RecoveryError, match="Receipt hash mismatch"):
+        engine.evaluate_convergence(
+            record.recovery_id,
+            verification_result=verdict,
+            evidence=receipt_pass,
+        )
+
+    # State unchanged
+    assert engine.get_recovery(record.recovery_id).current_state == RecoveryState.REVERIFY_REQUIRED
+
+
+# --------------------------------------------------------------------------
+# D9.1.3 Test F — Valid Canonical Receipt Converges
+# --------------------------------------------------------------------------
+def test_d9_1_3_test_f_valid_canonical_receipt_converges(tmp_path):
+    """
+    Test F:
+    Valid canonical receipt with matching workspace, task, claim, and receipt hash.
+    Expected: CONVERGED. State transitions to CONVERGED.
+    """
+    ws = str(tmp_path / "d9_1_3_test_f")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+
+    # 1. Failure evidence correctly anchored
+    ev_fail = make_observed_failure_receipt(
+        receipt_id="rcpt_fail_f",
+        task_id="task_f",
+        claim_id="claim_f",
+        workspace=ws,
+    )
+    record = engine.diagnose_failure(
+        task_id="task_f",
+        obligation_id="ob_f",
+        failure_evidence=ev_fail,
+        claim_id="claim_f",
+    )
+    assert record.current_state == RecoveryState.DIAGNOSING
+
+    engine.create_repair_obligation(record.recovery_id)
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    # 2. Success evidence correctly anchored with matching workspace, task, claim, hash
+    receipt_pass = make_observed_success_receipt(
+        receipt_id="rcpt_pass_f",
+        task_id="task_f",
+        claim_id="claim_f",
+        workspace=ws,
+        anchor_in_ledger=True,
+    )
+    verdict = make_canonical_verification_result(
+        receipt_pass,
+        status="ACCEPT",
+        claim_id="claim_f",
+        workspace=ws,
+    )
+
+    res = engine.evaluate_convergence(
+        record.recovery_id,
+        verification_result=verdict,
+        evidence=receipt_pass,
+    )
+
+    assert res.is_converged is True
+    assert res.status == RecoveryState.CONVERGED.value
+    assert engine.get_recovery(record.recovery_id).current_state == RecoveryState.CONVERGED
+
 

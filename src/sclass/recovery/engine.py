@@ -90,6 +90,21 @@ class RecoveryEngine:
         if not receipt_id:
             raise RecoveryError("Missing receipt/verification provenance: receipt_id is required.")
 
+        norm_engine_ws = os.path.normcase(os.path.abspath(self.workspace_dir))
+
+        # Check receipt_obj workspace immediately (fail closed on workspace mismatch)
+        if receipt_obj is not None:
+            obj_ws = getattr(receipt_obj, "workspace", None)
+            if not obj_ws:
+                raise RecoveryError(
+                    f"Missing workspace binding: receipt object '{receipt_id}' lacks workspace."
+                )
+            norm_obj_ws = os.path.normcase(os.path.abspath(str(obj_ws)))
+            if norm_obj_ws != norm_engine_ws:
+                raise RecoveryError(
+                    f"Workspace/project mismatch: receipt workspace '{obj_ws}' does not match engine workspace '{self.workspace_dir}'."
+                )
+
         l = ledger or self._validate_ledger()
         entries = l.read_all_entries()
 
@@ -108,42 +123,76 @@ class RecoveryEngine:
 
         obs_payload = matching_entry.get("payload", {})
 
-        # Check receipt hash if receipt_obj provided
+        # 1. Receipt Hash: mandatory in both ledger observation and receipt object
+        ledger_hash = obs_payload.get("receipt_hash")
+        if not ledger_hash:
+            raise RecoveryError(
+                f"Missing authoritative receipt hash: ledger observation for receipt '{receipt_id}' lacks receipt_hash."
+            )
+
         if receipt_obj is not None:
             rec_hash = getattr(receipt_obj, "receipt_hash", None)
-            if not rec_hash and hasattr(receipt_obj, "compute_hash"):
-                rec_hash = receipt_obj.compute_hash()
-            ledger_hash = obs_payload.get("receipt_hash")
-            if rec_hash and ledger_hash and rec_hash != ledger_hash:
+            if not rec_hash:
+                raise RecoveryError(
+                    f"Missing authoritative receipt hash: receipt object '{receipt_id}' lacks receipt_hash."
+                )
+            if rec_hash != ledger_hash:
                 raise RecoveryError(
                     f"Receipt hash mismatch: object receipt_hash '{rec_hash}' does not match ledger receipt_hash '{ledger_hash}'."
                 )
 
-            # Check workspace binding
-            obj_ws = getattr(receipt_obj, "workspace", None)
-            if obj_ws:
-                try:
-                    if os.path.normcase(os.path.abspath(obj_ws)) != os.path.normcase(os.path.abspath(self.workspace_dir)):
-                        raise RecoveryError(
-                            f"Workspace/project mismatch: receipt workspace '{obj_ws}' does not match engine workspace '{self.workspace_dir}'."
-                        )
-                except Exception:
-                    pass
+        # 2. Workspace Binding in ledger: fail-closed, no swallowing RecoveryError, platform-safe normalization
+        obs_ws = obs_payload.get("workspace")
+        if not obs_ws:
+            raise RecoveryError(
+                f"Missing workspace binding: ledger observation for receipt '{receipt_id}' lacks workspace."
+            )
+        norm_obs_ws = os.path.normcase(os.path.abspath(str(obs_ws)))
+        if norm_obs_ws != norm_engine_ws:
+            raise RecoveryError(
+                f"Workspace/project mismatch: ledger receipt workspace '{obs_ws}' does not match engine workspace '{self.workspace_dir}'."
+            )
 
-        # Check task binding
-        if expected_task_id:
-            rec_task = obs_payload.get("task_id")
-            if rec_task and rec_task != expected_task_id:
+        # 3. Task Binding: required in ledger observation and receipt object; must match expected_task_id if provided
+        rec_task = obs_payload.get("task_id")
+        if not rec_task:
+            raise RecoveryError(
+                f"Missing task binding: ledger receipt '{receipt_id}' lacks required task_id."
+            )
+        if expected_task_id and rec_task != expected_task_id:
+            raise RecoveryError(
+                f"Task mismatch: ledger receipt task_id '{rec_task}' does not match expected '{expected_task_id}'."
+            )
+        if receipt_obj is not None:
+            obj_task = getattr(receipt_obj, "task_id", None)
+            if not obj_task:
                 raise RecoveryError(
-                    f"Task mismatch: ledger receipt task_id '{rec_task}' does not match expected '{expected_task_id}'."
+                    f"Missing task binding: receipt object '{receipt_id}' lacks required task_id."
+                )
+            if obj_task != rec_task:
+                raise RecoveryError(
+                    f"Task mismatch: object task_id '{obj_task}' does not match ledger task_id '{rec_task}'."
                 )
 
-        # Check claim binding
-        if expected_claim_id:
-            rec_claim = obs_payload.get("claim_id")
-            if rec_claim and rec_claim != expected_claim_id:
+        # 4. Claim Binding: required in ledger observation and receipt object; must match expected_claim_id if provided
+        rec_claim = obs_payload.get("claim_id")
+        if not rec_claim:
+            raise RecoveryError(
+                f"Missing claim binding: ledger receipt '{receipt_id}' lacks required claim_id."
+            )
+        if expected_claim_id and rec_claim != expected_claim_id:
+            raise RecoveryError(
+                f"Claim mismatch: ledger receipt claim_id '{rec_claim}' does not match expected '{expected_claim_id}'."
+            )
+        if receipt_obj is not None:
+            obj_claim = getattr(receipt_obj, "claim_id", None)
+            if not obj_claim:
                 raise RecoveryError(
-                    f"Claim mismatch: ledger receipt claim_id '{rec_claim}' does not match expected '{expected_claim_id}'."
+                    f"Missing claim binding: receipt object '{receipt_id}' lacks required claim_id."
+                )
+            if obj_claim != rec_claim:
+                raise RecoveryError(
+                    f"Claim mismatch: object claim_id '{obj_claim}' does not match ledger claim_id '{rec_claim}'."
                 )
 
         return obs_payload
@@ -753,15 +802,7 @@ class RecoveryEngine:
                     f"Receipt ID mismatch between verification result ('{verif_receipt_id}') and evidence ('{evidence.receipt_id}')."
                 )
 
-        # D9.1.2: Enforce canonical verification provenance
-        self._validate_canonical_verification_provenance(
-            verification_result=verification_result,
-            expected_claim_id=record.affected_claim_id,
-            expected_task_id=record.task_id,
-            expected_status=verification_result.status,
-        )
-
-        # D9.1.2: Enforce canonical receipt provenance for evidence if supplied
+        # D9.1.2/D9.1.3: Enforce canonical receipt provenance for evidence if supplied
         if evidence is not None:
             self._validate_canonical_receipt_provenance(
                 receipt_id=evidence.receipt_id,
@@ -769,6 +810,14 @@ class RecoveryEngine:
                 expected_task_id=record.task_id,
                 receipt_obj=evidence,
             )
+
+        # D9.1.2: Enforce canonical verification provenance
+        self._validate_canonical_verification_provenance(
+            verification_result=verification_result,
+            expected_claim_id=record.affected_claim_id,
+            expected_task_id=record.task_id,
+            expected_status=verification_result.status,
+        )
 
         # Evaluate verdict
         is_verified = bool(getattr(verification_result, "is_verified", False))
