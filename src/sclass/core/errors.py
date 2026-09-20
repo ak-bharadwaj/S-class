@@ -75,3 +75,23 @@ class FleetIntegrityError(SClassError):
     pass
 
 
+class RecoveryError(SClassError):
+    """Base exception for all recovery and convergence faults."""
+    pass
+
+
+class RecoveryStateTransitionError(RecoveryError, StateTransitionError):
+    """Raised when an invalid or forbidden recovery state transition is attempted."""
+    pass
+
+
+class RecoveryExhaustedError(RecoveryError):
+    """Raised when recovery attempt budget is exhausted without convergence."""
+    pass
+
+
+class RecoveryPersistenceError(RecoveryError, StorageError):
+    """Raised when recovery state cannot be durably persisted or is corrupt."""
+    pass
+
+
