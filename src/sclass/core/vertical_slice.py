@@ -187,7 +187,12 @@ class ExecutionEnvelope:
     issued_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     signature: str = ""
 
-    def verify(self, secret_key: Optional[bytes] = None) -> bool:
+    def verify(
+        self,
+        secret_key: Optional[bytes] = None,
+        expected_registry_generation: Optional[int] = None,
+        expected_policy_version: Optional[str] = None,
+    ) -> bool:
         """Verifies envelope authorization, authenticity, integrity, and binding."""
         if not self.authorization_decision or not self.authorization_decision.is_allowed:
             return False
@@ -205,6 +210,8 @@ class ExecutionEnvelope:
         valid_dec, _ = verify_decision_integrity(
             self.authorization_decision,
             self.action_request,
+            expected_registry_generation=expected_registry_generation,
+            expected_policy_version=expected_policy_version,
             secret_key=key,
         )
         if not valid_dec:
@@ -357,45 +364,48 @@ class SliceController:
         return os.path.join(paths.trust_dir, "consumed_admissions.jsonl")
 
     def _load_consumed_envelopes(self) -> None:
-        """Loads consumed envelope IDs from persistent storage (EventJournal and trust store)."""
+        """Loads consumed envelope IDs from persistent storage (EventJournal and trust store). Fails closed if corrupt."""
         # 1. From EventJournal
         try:
             journal = EventJournal(self.workspace_dir)
             for evt in journal.read_all():
                 if evt.type == "sclass.admission.consumed":
-                    env_id = evt.data.get("envelope_id")
-                    if env_id:
-                        self.consumed_envelopes.add(env_id)
-        except Exception:
-            pass
+                    env_id = evt.data.get("envelope_id") if isinstance(evt.data, dict) else None
+                    if not env_id:
+                        raise SecurityViolationError("Malformed admission event in EventJournal: missing 'envelope_id'.")
+                    self.consumed_envelopes.add(env_id)
+        except SecurityViolationError:
+            raise
+        except Exception as e:
+            raise SecurityViolationError(f"Event journal is corrupt or unreadable: {e}") from e
 
         # 2. From persistent trust file
         consumed_file = self._get_consumed_file_path()
         if os.path.exists(consumed_file):
             try:
                 with open(consumed_file, "r", encoding="utf-8") as f:
-                    for line in f:
+                    for line_num, line in enumerate(f, start=1):
                         line = line.strip()
                         if line:
                             data = json.loads(line)
-                            if "envelope_id" in data:
-                                self.consumed_envelopes.add(data["envelope_id"])
-            except Exception:
-                pass
+                            if not isinstance(data, dict) or "envelope_id" not in data or not data["envelope_id"]:
+                                raise SecurityViolationError(f"Malformed consumed record in admission store at line {line_num}: missing 'envelope_id'.")
+                            self.consumed_envelopes.add(data["envelope_id"])
+            except SecurityViolationError:
+                raise
+            except Exception as e:
+                raise SecurityViolationError(f"Durable admission store is corrupt or unreadable: {e}") from e
 
     def is_consumed(self, envelope_id: str) -> bool:
         """Checks if an envelope ID has been consumed (re-checking persistent storage)."""
-        if envelope_id in self.consumed_envelopes:
-            return True
         self._load_consumed_envelopes()
         return envelope_id in self.consumed_envelopes
 
     def _mark_consumed_locked(self, envelope_id: str, request_hash: str = "") -> None:
-        """Internal helper to mark envelope consumed while caller holds WorkspaceLock."""
-        self.consumed_envelopes.add(envelope_id)
+        """Internal helper to mark envelope consumed while caller holds WorkspaceLock. Fails closed on I/O error."""
         now_iso = datetime.now(timezone.utc).isoformat()
 
-        # 1. Append to EventJournal
+        # 1. Append to EventJournal (must commit before execution)
         try:
             journal = EventJournal(self.workspace_dir)
             journal.append(
@@ -407,10 +417,10 @@ class SliceController:
                     "consumed_at": now_iso,
                 },
             )
-        except Exception:
-            pass
+        except Exception as e:
+            raise SecurityViolationError(f"Failed to persist consumed admission to EventJournal: {e}") from e
 
-        # 2. Append to persistent trust file
+        # 2. Append to persistent trust file (must commit before execution)
         try:
             consumed_file = self._get_consumed_file_path()
             with open(consumed_file, "a", encoding="utf-8") as f:
@@ -421,8 +431,11 @@ class SliceController:
                 }) + "\n")
                 f.flush()
                 os.fsync(f.fileno())
-        except Exception:
-            pass
+        except Exception as e:
+            raise SecurityViolationError(f"Failed to persist consumed admission to trust store: {e}") from e
+
+        # In-memory record updated only after durable persistence successfully commits
+        self.consumed_envelopes.add(envelope_id)
 
     def mark_consumed(self, envelope_id: str, request_hash: str = "") -> None:
         """Atomically marks an envelope as consumed under WorkspaceLock."""
@@ -458,9 +471,31 @@ class SliceController:
             raise SecurityViolationError(
                 "Criterion B Violation: Controller authorization is mandatory. No valid ExecutionEnvelope provided."
             )
-        if not envelope.verify(secret_key=self.secret_key):
+
+        current_gen = getattr(getattr(self.auth_service, "capability_registry", None), "generation", None)
+        if current_gen is None:
+            current_gen = CapabilityResolver.get_global_registry().generation
+        current_pol_ver = getattr(self.auth_service, "policy_version", "1.0.0")
+
+        if not envelope.verify(
+            secret_key=self.secret_key,
+            expected_registry_generation=current_gen,
+            expected_policy_version=current_pol_ver,
+        ):
             raise SecurityViolationError(
                 "ExecutionEnvelope verification failed: AuthorizationDecision not allowed, forged, or tampered."
+            )
+
+        dec = envelope.authorization_decision
+        if getattr(dec, "capability_registry_generation", 0) != current_gen:
+            raise SecurityViolationError(
+                f"Registry generation mismatch: decision bound to generation {getattr(dec, 'capability_registry_generation', 0)}, "
+                f"but active registry generation is {current_gen}."
+            )
+        if getattr(dec, "policy_version", "1.0.0") != current_pol_ver:
+            raise SecurityViolationError(
+                f"Policy version mismatch: decision bound to version '{getattr(dec, 'policy_version', '1.0.0')}', "
+                f"but active policy version is '{current_pol_ver}'."
             )
 
         # Context binding checks
@@ -547,7 +582,10 @@ class SliceExecutor:
             )
 
         # Resolve authoritative capability from registry to independently verify capability binding
-        reg = CapabilityResolver.get_global_registry()
+        reg = getattr(getattr(self.controller, "auth_service", None), "capability_registry", None) or CapabilityResolver.get_global_registry()
+        current_gen = reg.generation
+        current_pol_ver = getattr(getattr(self.controller, "auth_service", None), "policy_version", "1.0.0")
+
         expected_cap = reg.resolve(req, workspace_dir=self.workspace_dir)
         if expected_cap is None:
             raise SecurityViolationError(
@@ -558,6 +596,8 @@ class SliceExecutor:
             dec,
             req,
             capability=expected_cap,
+            expected_registry_generation=current_gen,
+            expected_policy_version=current_pol_ver,
             secret_key=self.secret_key,
         )
         if not valid_dec:
@@ -599,14 +639,18 @@ class SliceExecutor:
                 f"Execution-context binding mismatch: envelope task_id '{envelope.task_id}' does not match request task_id '{req_task}'."
             )
 
-        # 4. Policy / Capability / Version Binding
-        if dec.policy_version != "1.0.0":
+        # 4. Policy / Capability / Version / Generation Freshness Binding
+        if dec.policy_version != current_pol_ver:
             raise SecurityViolationError(
-                f"Policy version mismatch: decision bound to version '{dec.policy_version}', expected '1.0.0'."
+                f"Policy version mismatch: decision bound to version '{dec.policy_version}', expected '{current_pol_ver}'."
             )
-        if dec.capability_version != "1.0.0":
+        if dec.capability_version != (expected_cap.version if expected_cap else "1.0.0"):
             raise SecurityViolationError(
-                f"Capability version mismatch: decision bound to version '{dec.capability_version}', expected '1.0.0'."
+                f"Capability version mismatch: decision bound to version '{dec.capability_version}', expected '{expected_cap.version if expected_cap else '1.0.0'}'."
+            )
+        if getattr(dec, "capability_registry_generation", 0) != current_gen:
+            raise SecurityViolationError(
+                f"Registry generation mismatch: decision bound to registry generation {getattr(dec, 'capability_registry_generation', 0)}, expected {current_gen}."
             )
 
         # 5. Single-use / Replay Protection
@@ -747,13 +791,33 @@ def verify_canonical_acceptance(
     if payload.get("task_id") and payload.get("task_id") != task_id:
         return {"accepted": False, "reason": f"Receipt task_id '{payload.get('task_id')}' does not match task '{task_id}'"}
 
-    # Verification event recorded in ledger
+    all_entries = ledger.read_all_entries()
+
+    # Verification event recorded in ledger corresponding to exact claim/receipt pair
     has_verif_event = any(
-        entry.get("event") == "verification" and entry.get("payload", {}).get("receipt_id") == task.verified_receipt_id
-        for entry in ledger.read_all_entries()
+        entry.get("event") == "verification"
+        and entry.get("payload", {}).get("receipt_id") == task.verified_receipt_id
+        and entry.get("payload", {}).get("claim_id") == target_claim.claim_id
+        and entry.get("payload", {}).get("result") in ("ACCEPT", "CLAIM_VERIFIED")
+        for entry in all_entries
     )
     if not has_verif_event:
-        return {"accepted": False, "reason": "No verification event for receipt in ledger"}
+        return {"accepted": False, "reason": f"No verification event for claim '{target_claim.claim_id}' and receipt '{task.verified_receipt_id}' in ledger"}
+
+    # Authoritative acceptance facts anchored in existing ledger mechanism (rejects unauthenticated journal-only ACCEPT)
+    has_ledger_acceptance = any(
+        entry.get("event") in ("acceptance", "composite_acceptance")
+        and entry.get("payload", {}).get("task_id") == task_id
+        and entry.get("payload", {}).get("claim_id") == target_claim.claim_id
+        and entry.get("payload", {}).get("receipt_id") == task.verified_receipt_id
+        and entry.get("payload", {}).get("decision") == "ACCEPT"
+        for entry in all_entries
+    )
+    if not has_ledger_acceptance:
+        return {
+            "accepted": False,
+            "reason": f"No authentic acceptance record anchored in ledger for claim '{target_claim.claim_id}'",
+        }
 
     # 5. Fresh workspace evidence: load receipt and test staleness
     receipt_obj = load_receipt(task.verified_receipt_id, ws)
@@ -781,21 +845,28 @@ def verify_canonical_acceptance(
     if not is_fresh:
         return {"accepted": False, "reason": f"Evidence is stale: {staleness_err}"}
 
-    # 6. CloudEvents Journal record and final composite acceptance decision
+    # 6. CloudEvents Journal record and final composite acceptance decision bound to exact claim
     journal = EventJournal(ws)
     events = journal.read_all()
     composite_accepted = False
+    matching_journal_dec = None
     for evt in events:
         if evt.type == "sclass.task.verified" and evt.subject == f"task:{task_id}":
             if evt.data.get("verified_receipt_id") != task.verified_receipt_id:
                 continue
             acc_dec = evt.data.get("acceptance_decision")
-            if acc_dec and (acc_dec.get("decision") == "ACCEPT" or acc_dec.get("is_accepted") is True):
+            if not acc_dec:
+                continue
+            # Require AcceptanceDecision.claim_id == target_claim.claim_id
+            if acc_dec.get("claim_id") != target_claim.claim_id:
+                continue
+            if acc_dec.get("decision") == "ACCEPT" or acc_dec.get("is_accepted") is True:
                 composite_accepted = True
+                matching_journal_dec = acc_dec
                 break
 
-    if not composite_accepted:
-        return {"accepted": False, "reason": "No accepted composite decision in CloudEvents journal"}
+    if not composite_accepted or not matching_journal_dec:
+        return {"accepted": False, "reason": f"No accepted composite decision in CloudEvents journal for claim '{target_claim.claim_id}'"}
 
     return {
         "accepted": True,
@@ -1133,6 +1204,19 @@ class CanonicalVerticalSlice:
         if self.passed_func_verdict:
             self.state_repo.save_verification(self.passed_func_verdict)
 
+        # Authoritative anchor in LocalLedger for composite acceptance
+        self.ledger.append(
+            event="composite_acceptance",
+            payload={
+                "task_id": self.task.task_id,
+                "claim_id": self.claim_verif.claim_id,
+                "receipt_id": self.passed_receipt.receipt_id,
+                "receipt_hash": self.passed_receipt.receipt_hash,
+                "decision": acceptance.decision,
+                "satisfied_requirements": list(acceptance.satisfied_requirements),
+            },
+        )
+
         self.event_journal.append(
             event_type="sclass.task.verified",
             subject=f"task:{self.task.task_id}",
@@ -1246,8 +1330,9 @@ class CanonicalVerticalSlice:
                 norm_act = normalize_action(env)
                 if norm_act:
                     authorized_actions.append(norm_act)
-                    act_bytes = json.dumps(norm_act, sort_keys=True, separators=(",", ":")).encode("utf-8")
-                    authorized_action_digests.append(hashlib.sha256(act_bytes).hexdigest())
+                # Expose canonical D5 action-binding digest directly from authoritative authorization decision
+                if env.authorization_decision and env.authorization_decision.request_hash:
+                    authorized_action_digests.append(env.authorization_decision.request_hash)
 
         observed_exit_codes = []
         if self.failed_receipt:

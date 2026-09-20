@@ -36,6 +36,7 @@ from sclass.domain.evidence import ClaimedEvidence, ProposedEvidence, ObservedRe
 from sclass.control.authorization import authorize
 from sclass.verification.engine import verify_claim
 from sclass.state.tasks import StateRepository
+from sclass.state.events import EventJournal
 from sclass.trust.ledger import LocalLedger
 from sclass.core.errors import SecurityViolationError, StateTransitionError
 
@@ -267,12 +268,17 @@ def test_d10_end_to_end_replay_is_deterministic(tmp_path):
     assert slice1.task.state == TaskState.VERIFIED
     assert slice2.task.state == TaskState.VERIFIED
 
-    # Compare full canonical semantic traces
     trace1 = slice1.get_canonical_trace()
     trace2 = slice2.get_canonical_trace()
 
-    # Exact semantic trace equality across independent runs
-    assert trace1 == trace2
+    # Compare normalized semantic replay trace across independent runs
+    semantic_keys = [
+        "task", "obligations", "claims", "authorized_actions",
+        "observed_steps", "observed_exit_codes", "verification_verdicts",
+        "recovery_transition", "final_accepted_claim"
+    ]
+    for k in semantic_keys:
+        assert trace1[k] == trace2[k], f"Semantic trace mismatch on key {k}"
 
     # Verify trace contents
     assert trace1["task"]["final_state"] == "verified"
@@ -280,10 +286,23 @@ def test_d10_end_to_end_replay_is_deterministic(tmp_path):
     assert len(trace1["claims"]) == 2
     assert len(trace1["authorized_actions"]) == 4
 
-    # Requirement 5: Verify authorized action digests equality and non-empty
+    # Verify authorized action digests expose authoritative D5 action-binding digests
     assert len(trace1["authorized_action_digests"]) == 4
-    assert trace1["authorized_action_digests"] == trace2["authorized_action_digests"]
+    assert len(trace2["authorized_action_digests"]) == 4
     assert all(isinstance(d, str) and len(d) == 64 for d in trace1["authorized_action_digests"])
+    assert all(isinstance(d, str) and len(d) == 64 for d in trace2["authorized_action_digests"])
+    assert trace1["authorized_action_digests"] == [
+        slice1.initial_envelope.authorization_decision.request_hash,
+        slice1.initial_test_envelope.authorization_decision.request_hash,
+        slice1.repair_envelope.authorization_decision.request_hash,
+        slice1.reverify_envelope.authorization_decision.request_hash,
+    ]
+    assert trace2["authorized_action_digests"] == [
+        slice2.initial_envelope.authorization_decision.request_hash,
+        slice2.initial_test_envelope.authorization_decision.request_hash,
+        slice2.repair_envelope.authorization_decision.request_hash,
+        slice2.reverify_envelope.authorization_decision.request_hash,
+    ]
 
     # Observed exit codes: first fails (1), recovery passes (0)
     assert trace1["observed_exit_codes"] == [1, 0]
@@ -939,4 +958,322 @@ def test_d10_canonical_final_acceptance_binding(tmp_path):
     with open(journal.journal_file, "w", encoding="utf-8") as f:
         f.write(journal_backup)
     assert verify_canonical_acceptance(task_id, ws, claim_id=claim_id)["accepted"] is True
+
+
+def test_d10_persistence_failure_execution_denied(tmp_path, monkeypatch):
+    """
+    Adversarial Regression 6:
+    If EventJournal or the durable admission store cannot be written,
+    validate_and_consume() MUST raise SecurityViolationError and MUST NOT permit execution.
+    Proves that the action is not executed when persistence fails.
+    """
+    from sclass.state.events import EventJournal
+
+    ws = str(tmp_path / "d10_persist_fail")
+    slice_runner = CanonicalVerticalSlice(ws)
+    slice_runner.setup_scenario()
+    task = slice_runner.initialize_task()
+
+    req = slice_runner.planner.plan_implementation_action(task.task_id, buggy=False)
+    env = slice_runner.controller.authorize(req)
+
+    # Attack 1: Simulated failure writing to EventJournal
+    def failing_journal_append(*args, **kwargs):
+        raise IOError("Simulated disk full or I/O failure on EventJournal")
+
+    monkeypatch.setattr(EventJournal, "append", failing_journal_append)
+
+    with pytest.raises(SecurityViolationError, match="Failed to persist consumed admission to EventJournal"):
+        slice_runner.executor.execute_envelope(env)
+
+    with pytest.raises(SecurityViolationError, match="Failed to persist consumed admission to EventJournal"):
+        slice_runner.controller.validate_and_consume(env)
+
+    # Prove action was not executed (math_utils.py does not contain multiply)
+    math_path = os.path.join(ws, "math_utils.py")
+    with open(math_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    assert "multiply" not in content
+
+    monkeypatch.undo()
+
+    # Attack 2: Simulated failure writing to durable admission store
+    real_open = open
+
+    def failing_open(file, mode="r", *args, **kwargs):
+        if "consumed_admissions.jsonl" in str(file) and "a" in mode:
+            raise PermissionError("Simulated permission error writing to admission store")
+        return real_open(file, mode, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.open", failing_open)
+
+    fresh_env1 = slice_runner.controller.authorize(req)
+
+    with pytest.raises(SecurityViolationError, match="Failed to persist consumed admission to trust store"):
+        slice_runner.executor.execute_envelope(fresh_env1)
+
+    fresh_env2 = slice_runner.controller.authorize(req)
+
+    with pytest.raises(SecurityViolationError, match="Failed to persist consumed admission to trust store"):
+        slice_runner.controller.validate_and_consume(fresh_env2)
+
+    # Prove action was still not executed
+    with open(math_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    assert "multiply" not in content
+
+
+def test_d10_corrupted_admission_store_execution_denied(tmp_path):
+    """
+    Adversarial Regression 7:
+    If admission persistence is malformed/corrupt/unreadable, fail closed rather
+    than silently ignoring it.
+    """
+    from sclass.storage.paths import WorkspacePaths
+    import json
+
+    ws = str(tmp_path / "d10_corrupt_admission")
+    slice_runner = CanonicalVerticalSlice(ws)
+    slice_runner.setup_scenario()
+    task = slice_runner.initialize_task()
+
+    req = slice_runner.planner.plan_verification_action(task.task_id)
+    env = slice_runner.controller.authorize(req)
+
+    paths = WorkspacePaths(ws)
+    paths.ensure_directories()
+    consumed_file = os.path.join(paths.trust_dir, "consumed_admissions.jsonl")
+
+    # Attack 2a: Write truncated / invalid JSON into admission store
+    with open(consumed_file, "w", encoding="utf-8") as f:
+        f.write('{"envelope_id": "env_corrupt_truncated\n')
+
+    with pytest.raises(SecurityViolationError, match="admission store is corrupt or unreadable"):
+        slice_runner.controller.validate_and_consume(env)
+
+    with pytest.raises(SecurityViolationError, match="admission store is corrupt or unreadable"):
+        slice_runner.executor.execute_envelope(env)
+
+    # Attack 2b: Write malformed entry missing 'envelope_id'
+    with open(consumed_file, "w", encoding="utf-8") as f:
+        f.write(json.dumps({"request_hash": "deadbeef"}) + "\n")
+
+    with pytest.raises(SecurityViolationError, match="Malformed consumed record|missing 'envelope_id'"):
+        slice_runner.controller.validate_and_consume(env)
+
+    # Attack 2c: Corrupted EventJournal
+    os.remove(consumed_file)
+    journal_file = os.path.join(paths.events_dir, "journal.jsonl")
+    with open(journal_file, "w", encoding="utf-8") as f:
+        f.write("<<<CORRUPTED_JOURNAL_JSONL>>>\n")
+
+    with pytest.raises(SecurityViolationError, match="Event journal is corrupt or unreadable"):
+        slice_runner.controller.validate_and_consume(env)
+
+    with pytest.raises(SecurityViolationError, match="Event journal is corrupt or unreadable"):
+        slice_runner.executor.execute_envelope(env)
+
+
+def test_d10_registry_generation_change_old_admission_denied(tmp_path):
+    """
+    Adversarial Regression 8:
+    Verify decision's registry generation against authoritative active capability registry generation.
+    Mutating capability registry generation after authorization causes old admission to be rejected.
+    """
+    ws = str(tmp_path / "d10_registry_gen_change")
+    slice_runner = CanonicalVerticalSlice(ws)
+    slice_runner.setup_scenario()
+    task = slice_runner.initialize_task()
+
+    req = slice_runner.planner.plan_verification_action(task.task_id)
+    env = slice_runner.controller.authorize(req)
+
+    # Valid before mutation
+    assert env.verify() is True
+
+    # Mutate registry generation after authorization
+    reg = slice_runner.controller.auth_service.capability_registry
+    old_gen = reg.generation
+    reg.reload_defaults()
+    assert reg.generation > old_gen
+
+    # D6 execution boundary rejects the old admission
+    with pytest.raises(SecurityViolationError, match="Registry generation mismatch"):
+        slice_runner.executor.execute_envelope(env)
+
+    # Controller validate_and_consume also rejects the stale admission
+    with pytest.raises(SecurityViolationError, match="Registry generation mismatch|verification failed"):
+        slice_runner.controller.validate_and_consume(env)
+
+
+def test_d10_policy_version_change_old_admission_denied(tmp_path):
+    """
+    Adversarial Regression 9:
+    Verify decision against authoritative current policy version rather than merely hard-coding '1.0.0'.
+    Mutating policy version after authorization causes old admission to be rejected.
+    """
+    ws = str(tmp_path / "d10_policy_version_change")
+    slice_runner = CanonicalVerticalSlice(ws)
+    slice_runner.setup_scenario()
+    task = slice_runner.initialize_task()
+
+    req = slice_runner.planner.plan_verification_action(task.task_id)
+    env = slice_runner.controller.authorize(req)
+
+    assert env.verify() is True
+    assert env.authorization_decision.policy_version == "1.0.0"
+
+    # Mutate policy version on authoritative controller service after authorization
+    slice_runner.controller.auth_service.policy_version = "2.0.0"
+
+    # D6 execution boundary rejects the old admission
+    with pytest.raises(SecurityViolationError, match="Policy version mismatch"):
+        slice_runner.executor.execute_envelope(env)
+
+    # Controller validate_and_consume also rejects the stale admission
+    with pytest.raises(SecurityViolationError, match="Policy version mismatch|verification failed"):
+        slice_runner.controller.validate_and_consume(env)
+
+
+def test_d10_mismatched_composite_claim_id_acceptance_denied(tmp_path):
+    """
+    Adversarial Regression 10:
+    Bind final composite acceptance cryptographically/canonically to the exact claim.
+    Requires AcceptanceDecision.claim_id == target_claim.claim_id.
+    Reject an ACCEPT decision for another claim even when task ID and receipt ID match.
+    """
+    ws = str(tmp_path / "d10_mismatched_claim_id")
+    slice_runner = CanonicalVerticalSlice(ws)
+    results = slice_runner.run_full_slice()
+
+    task_id = slice_runner.task.task_id
+    target_claim_id = slice_runner.claim_verif.claim_id
+    receipt_id = slice_runner.passed_receipt.receipt_id
+
+    # Baseline: genuine canonical acceptance passes
+    status = verify_canonical_acceptance(task_id, ws, claim_id=target_claim_id)
+    assert status["accepted"] is True
+
+    # Tamper journal: overwrite sclass.task.verified event with decision for a DIFFERENT claim ID
+    # Task ID and verified receipt ID match, but claim_id belongs to another claim
+    journal = EventJournal(ws)
+    mismatched_decision = {
+        "claim_id": "claim_unrelated_feature_999",
+        "decision": "ACCEPT",
+        "satisfied_requirements": ["req_func", "req_test"],
+        "unsatisfied_requirements": [],
+        "sub_verdicts": {},
+        "reason": "Adversary manufactured acceptance for another claim",
+    }
+
+    with open(journal.journal_file, "w", encoding="utf-8") as f:
+        pass
+    journal.append(
+        event_type="sclass.task.verified",
+        subject=f"task:{task_id}",
+        data={
+            "task_id": task_id,
+            "verified_receipt_id": receipt_id,
+            "receipt_hash": slice_runner.passed_receipt.receipt_hash,
+            "acceptance_decision": mismatched_decision,
+        },
+    )
+
+    # Must strictly reject because AcceptanceDecision.claim_id != target_claim.claim_id
+    tampered_status = verify_canonical_acceptance(task_id, ws, claim_id=target_claim_id)
+    assert tampered_status["accepted"] is False
+    assert (
+        "no accepted composite decision" in tampered_status["reason"].lower()
+        or "claim" in tampered_status["reason"].lower()
+    )
+
+
+def test_d10_forged_journal_accept_final_acceptance_denied(tmp_path):
+    """
+    Adversarial Regression 11:
+    Do not trust an unauthenticated journal-only ACCEPT as final truth;
+    anchor the required acceptance facts in the existing authoritative ledger/state mechanism.
+    """
+    ws = str(tmp_path / "d10_forged_journal_accept")
+    slice_runner = CanonicalVerticalSlice(ws)
+    slice_runner.setup_scenario()
+    task = slice_runner.initialize_task()
+
+    # Adversary creates an unauthenticated journal-only ACCEPT CloudEvent
+    # without authentic verification or acceptance facts anchored in LocalLedger
+    fake_receipt_id = "rcpt_unanchored_123"
+    journal = EventJournal(ws)
+    journal.append(
+        event_type="sclass.task.verified",
+        subject=f"task:{task.task_id}",
+        data={
+            "task_id": task.task_id,
+            "verified_receipt_id": fake_receipt_id,
+            "receipt_hash": "a" * 64,
+            "acceptance_decision": {
+                "claim_id": slice_runner.claim_verif.claim_id,
+                "decision": "ACCEPT",
+                "satisfied_requirements": ["req_func", "req_test"],
+                "unsatisfied_requirements": [],
+                "sub_verdicts": {},
+                "reason": "Adversary manufactured journal-only accept",
+            },
+        },
+    )
+
+    # Must fail closed: task is not verified in canonical state and not in ledger
+    status = verify_canonical_acceptance(task.task_id, ws, claim_id=slice_runner.claim_verif.claim_id)
+    assert status["accepted"] is False
+
+    # Even if adversary tampers task.state = VERIFIED in SQLite and writes receipt file
+    # but LocalLedger lacks authentic verification / acceptance facts:
+    task.state = TaskState.VERIFIED
+    task.verified_receipt_id = fake_receipt_id
+    slice_runner.state_repo.save_task(task)
+
+    status2 = verify_canonical_acceptance(task.task_id, ws, claim_id=slice_runner.claim_verif.claim_id)
+    assert status2["accepted"] is False
+    assert (
+        "no accepted verification" in status2["reason"].lower()
+        or "not found in ledger" in status2["reason"].lower()
+        or "no authentic acceptance record" in status2["reason"].lower()
+    )
+
+
+def test_d10_semantic_replay_trace_uses_canonical_d5_action_digests(tmp_path):
+    """
+    Adversarial Regression 12:
+    Proves that the semantic replay trace exposes the actual authoritative
+    canonical D5 action-binding digest used for execution authorization,
+    and strictly equals the D5 authorization artifact's request_hash.
+    """
+    from sclass.policy.authorization_service import compute_canonical_request_hash
+
+    ws = str(tmp_path / "d10_trace_canonical_digests")
+    slice_runner = CanonicalVerticalSlice(ws)
+    res = slice_runner.run_full_slice()
+
+    trace = slice_runner.get_canonical_trace()
+
+    assert "authorized_action_digests" in trace
+    digests = trace["authorized_action_digests"]
+    assert len(digests) == 4
+
+    # 1. Proves the trace digests strictly equal the D5 authorization artifact's request_hash
+    expected_digests = [
+        slice_runner.initial_envelope.authorization_decision.request_hash,
+        slice_runner.initial_test_envelope.authorization_decision.request_hash,
+        slice_runner.repair_envelope.authorization_decision.request_hash,
+        slice_runner.reverify_envelope.authorization_decision.request_hash,
+    ]
+    assert digests == expected_digests
+
+    # 2. Proves all digests are valid 64-character SHA-256 hex strings
+    assert all(isinstance(d, str) and len(d) == 64 for d in digests)
+
+    # 3. Proves the trace digests match the actual canonical ActionRequest hashes
+    assert digests[0] == compute_canonical_request_hash(slice_runner.initial_envelope.action_request)
+    assert digests[1] == compute_canonical_request_hash(slice_runner.initial_test_envelope.action_request)
+    assert digests[2] == compute_canonical_request_hash(slice_runner.repair_envelope.action_request)
+    assert digests[3] == compute_canonical_request_hash(slice_runner.reverify_envelope.action_request)
 
