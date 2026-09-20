@@ -80,6 +80,7 @@ from sclass.policy.authorization_service import (
     AuthorizationService,
     verify_decision_integrity,
     compute_canonical_request_hash,
+    compute_canonical_capability_hash,
     get_authorization_secret,
 )
 from sclass.policy.capability_resolver import CapabilityResolver
@@ -368,15 +369,46 @@ class SliceController:
             raise SecurityViolationError(f"Durable admission store is corrupt or unreadable: {e}") from e
 
     def is_consumed(self, envelope_id: str) -> bool:
-        """Checks if an envelope ID has been consumed (re-checking persistent storage)."""
+        """Checks if an envelope ID has been consumed. Authoritative decision comes strictly from D2NonceStore."""
         self._load_consumed_envelopes()
-        return envelope_id in self.consumed_envelopes
+        if not self.nonce_store:
+            raise SecurityViolationError("Authoritative D2NonceStore is not configured.")
+        return (
+            self.nonce_store.is_nonce_consumed(f"ADMIT:{envelope_id}")
+            or self.nonce_store.is_nonce_consumed(envelope_id)
+        )
 
     def _mark_consumed_locked(self, envelope_id: str, request_hash: str = "") -> None:
         """Internal helper to mark envelope consumed while caller holds WorkspaceLock. Fails closed on I/O error."""
         now_iso = datetime.now(timezone.utc).isoformat()
 
-        # 1. Append to EventJournal (must commit before execution)
+        # 1. Authoritative D2 Nonce Reservation MUST succeed
+        if not self.nonce_store:
+            raise SecurityViolationError("Authoritative D2NonceStore is not configured.")
+
+        reserved = self.nonce_store.reserve_nonce(f"ADMIT:{envelope_id}")
+        if not reserved:
+            raise SecurityViolationError(
+                f"Criterion F Violation: Repair requires fresh authorization. "
+                f"ExecutionEnvelope '{envelope_id}' has already been consumed (D2 nonce duplicate rejected)."
+            )
+
+        # 2. Append to persistent trust file (audit / history, must commit before execution)
+        try:
+            consumed_file = self._get_consumed_file_path()
+            with open(consumed_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps({
+                    "envelope_id": envelope_id,
+                    "nonce": f"ADMIT:{envelope_id}",
+                    "request_hash": request_hash,
+                    "consumed_at": now_iso,
+                }) + "\n")
+                f.flush()
+                os.fsync(f.fileno())
+        except Exception as e:
+            raise SecurityViolationError(f"Failed to persist consumed admission to trust store: {e}") from e
+
+        # 3. Append to EventJournal (audit / history, must commit before execution)
         try:
             journal = EventJournal(self.workspace_dir)
             journal.append(
@@ -391,24 +423,8 @@ class SliceController:
         except Exception as e:
             raise SecurityViolationError(f"Failed to persist consumed admission to EventJournal: {e}") from e
 
-        # 2. Append to persistent trust file (must commit before execution)
-        try:
-            consumed_file = self._get_consumed_file_path()
-            with open(consumed_file, "a", encoding="utf-8") as f:
-                f.write(json.dumps({
-                    "envelope_id": envelope_id,
-                    "request_hash": request_hash,
-                    "consumed_at": now_iso,
-                }) + "\n")
-                f.flush()
-                os.fsync(f.fileno())
-        except Exception as e:
-            raise SecurityViolationError(f"Failed to persist consumed admission to trust store: {e}") from e
-
-        # In-memory record updated only after durable persistence successfully commits
+        # In-memory audit record updated only after durable persistence successfully commits
         self.consumed_envelopes.add(envelope_id)
-        if self.nonce_store:
-            self.nonce_store.reserve_nonce(f"ADMIT:{envelope_id}")
 
     def mark_consumed(self, envelope_id: str, request_hash: str = "") -> None:
         """Atomically marks an envelope as consumed under WorkspaceLock."""
@@ -435,8 +451,8 @@ class SliceController:
                 }) + "\n")
                 f.flush()
                 os.fsync(f.fileno())
-        except Exception:
-            pass
+        except Exception as e:
+            raise SecurityViolationError(f"Failed to persist authoritative authorization decision: {e}") from e
 
     def get_decision(self, decision_id: str) -> Optional[AuthorizationDecision]:
         if decision_id in self._decisions:
@@ -445,16 +461,20 @@ class SliceController:
         if os.path.exists(dec_file):
             try:
                 with open(dec_file, "r", encoding="utf-8") as f:
-                    for line in f:
+                    for line_num, line in enumerate(f, start=1):
                         line = line.strip()
                         if line:
                             rec = json.loads(line)
+                            if not isinstance(rec, dict) or "decision" not in rec:
+                                raise SecurityViolationError(f"Corrupt decision record at line {line_num}: missing 'decision'")
                             if rec.get("decision_id") == decision_id:
                                 dec = AuthorizationDecision.from_dict(rec.get("decision", {}))
                                 self._decisions[decision_id] = dec
                                 return dec
-            except Exception:
-                pass
+            except SecurityViolationError:
+                raise
+            except Exception as e:
+                raise SecurityViolationError(f"Decision store is corrupt or unreadable: {e}") from e
         return None
 
     def get_request(self, token_or_nonce: str) -> Optional[ActionRequest]:
@@ -464,18 +484,22 @@ class SliceController:
         if os.path.exists(dec_file):
             try:
                 with open(dec_file, "r", encoding="utf-8") as f:
-                    for line in f:
+                    for line_num, line in enumerate(f, start=1):
                         line = line.strip()
                         if line:
                             rec = json.loads(line)
+                            if not isinstance(rec, dict) or "request" not in rec:
+                                raise SecurityViolationError(f"Corrupt request record at line {line_num}: missing 'request'")
                             if (rec.get("token_id") == token_or_nonce or 
                                 rec.get("execution_nonce") == token_or_nonce or 
                                 rec.get("decision_id") == token_or_nonce):
                                 req = ActionRequest.from_dict(rec.get("request", {}))
                                 self._requests[token_or_nonce] = req
                                 return req
-            except Exception:
-                pass
+            except SecurityViolationError:
+                raise
+            except Exception as e:
+                raise SecurityViolationError(f"Decision/request store is corrupt or unreadable: {e}") from e
         return None
 
     def authorize(
@@ -522,6 +546,15 @@ class SliceController:
             or f"DEC-{uuid.uuid4().hex[:12].upper()}"
         )
 
+        # Derive integer policy version coherently from decision.policy_version
+        raw_pol_ver = getattr(decision, "policy_version", "1.0.0")
+        try:
+            int_pol_ver = int(raw_pol_ver) if isinstance(raw_pol_ver, int) else int(str(raw_pol_ver).split(".")[0])
+        except Exception:
+            int_pol_ver = 1
+        if int_pol_ver < 1:
+            int_pol_ver = 1
+
         token = _mint_execution_token(
             token_id=token_id,
             decision_id=decision_id,
@@ -530,7 +563,7 @@ class SliceController:
             action_digest=action_binding.action_digest,
             context_digest=ctx.context_digest,
             source_sha=resolved_source_sha,
-            policy_version=1,
+            policy_version=int_pol_ver,
             issued_at=now_iso,
             expires_at=exp_iso,
             authority_signer=signer,
@@ -575,17 +608,24 @@ class SliceController:
             execution_context=ctx,
         )
 
+        # Durably persist decision BEFORE updating in-memory cache
+        try:
+            self._persist_decision(
+                decision_id=token.decision_id,
+                decision=decision,
+                request=request,
+                token_id=token.token_id,
+                execution_nonce=token.execution_nonce,
+            )
+        except SecurityViolationError:
+            raise
+        except Exception as e:
+            raise SecurityViolationError(f"Failed to persist authoritative authorization decision: {e}") from e
+
         self._decisions[token.decision_id] = decision
         self._requests[token.token_id] = request
         self._requests[token.execution_nonce] = request
         self._requests[token.decision_id] = request
-        self._persist_decision(
-            decision_id=token.decision_id,
-            decision=decision,
-            request=request,
-            token_id=token.token_id,
-            execution_nonce=token.execution_nonce,
-        )
 
         return env
 
@@ -616,11 +656,26 @@ class SliceController:
                     raise SecurityViolationError("Registry generation mismatch")
                 if getattr(dec, "policy_version", "1.0.0") != current_pol_ver:
                     raise SecurityViolationError("Policy version mismatch")
+                decision_pol_ver = getattr(dec, "policy_version", "1.0.0")
+                try:
+                    expected_int_pol_ver = int(decision_pol_ver) if isinstance(decision_pol_ver, int) else int(str(decision_pol_ver).split(".")[0])
+                except Exception:
+                    expected_int_pol_ver = 1
+                if envelope.token.policy_version != expected_int_pol_ver:
+                    raise SecurityViolationError(
+                        f"Policy version mismatch: decision version '{decision_pol_ver}' != token policy_version ({envelope.token.policy_version})"
+                    )
                 req = request or self.get_request(envelope.token.token_id) or self.get_request(envelope.token.execution_nonce)
                 if req:
+                    reg = getattr(self.auth_service, "capability_registry", None) or CapabilityResolver.get_global_registry()
+                    cap = reg.resolve(req, workspace_dir=self.workspace_dir)
                     is_valid, reason = verify_decision_integrity(
                         decision=dec,
                         request=req,
+                        capability=cap,
+                        expected_capability_hash=compute_canonical_capability_hash(cap) if cap else None,
+                        expected_capability_id=cap.id if cap else None,
+                        expected_capability_version=cap.version if cap else None,
                         expected_registry_generation=current_gen,
                         expected_policy_version=current_pol_ver,
                         secret_key=self.secret_key,
@@ -716,13 +771,71 @@ class SliceExecutor:
                 f"binding '{envelope.action_binding.action_digest}' or token '{envelope.token.action_digest}'."
             )
 
-        # 2. Canonical decision verification at D5->D6 boundary using verify_decision_integrity (Requirement 7)
-        current_gen = getattr(getattr(self.controller.auth_service, "capability_registry", None), "generation", CapabilityResolver.get_global_registry().generation)
+        # 2. Resolve authoritative capability directly from the authoritative registry (Requirement 3)
+        registry = getattr(self.controller.auth_service, "capability_registry", None) or CapabilityResolver.get_global_registry()
+        resolved_cap = registry.resolve(req, workspace_dir=self.workspace_dir)
+        if resolved_cap is None:
+            raise SecurityViolationError(f"No authoritative capability grants requested action: {req.capability}")
+
+        expected_cap_hash = compute_canonical_capability_hash(resolved_cap)
+        current_gen = getattr(registry, "generation", 0)
         current_pol_ver = getattr(self.controller.auth_service, "policy_version", "1.0.0")
+
+        # Explicit independent verification of authoritative capability identity, version, and hash
+        if dec.issuer != "S_CLASS":
+            raise SecurityViolationError(f"Untrusted issuer '{dec.issuer}': only S-Class issued decisions are authoritative")
+
+        if dec.capability_id != resolved_cap.id:
+            raise SecurityViolationError(
+                f"Capability ID mismatch at D6 boundary: decision bound to '{dec.capability_id}', but authoritative capability ID is '{resolved_cap.id}'"
+            )
+
+        if dec.capability_version != resolved_cap.version:
+            raise SecurityViolationError(
+                f"Capability version mismatch at D6 boundary: decision bound to version '{dec.capability_version}', but authoritative capability version is '{resolved_cap.version}'"
+            )
+
+        if not dec.capability_hash or not hmac.compare_digest(dec.capability_hash, expected_cap_hash):
+            raise SecurityViolationError(
+                f"Capability hash mismatch at D6 boundary: decision bound to '{dec.capability_hash}', but authoritative capability hash is '{expected_cap_hash}'"
+            )
+
+        if getattr(dec, "capability_registry_generation", 0) != current_gen:
+            raise SecurityViolationError(
+                f"Registry generation mismatch at D6 boundary: decision bound to generation {getattr(dec, 'capability_registry_generation', 0)}, but current generation is {current_gen}"
+            )
+
+        if getattr(dec, "policy_version", "1.0.0") != current_pol_ver:
+            raise SecurityViolationError(
+                f"Policy version mismatch at D6 boundary: decision bound to version '{getattr(dec, 'policy_version', '1.0.0')}', but current policy version is '{current_pol_ver}'"
+            )
+
+        # Coherent policy version check between decision and token/admission (Requirement 5)
+        decision_pol_ver = getattr(dec, "policy_version", "1.0.0")
+        try:
+            expected_int_pol_ver = int(decision_pol_ver) if isinstance(decision_pol_ver, int) else int(str(decision_pol_ver).split(".")[0])
+        except Exception:
+            expected_int_pol_ver = 1
+
+        if envelope.token.policy_version != expected_int_pol_ver:
+            raise SecurityViolationError(
+                f"Policy version mismatch: decision version '{decision_pol_ver}' (expected {expected_int_pol_ver}) "
+                f"does not match token policy_version ({envelope.token.policy_version})."
+            )
+
+        if envelope.admission.policy_version != expected_int_pol_ver:
+            raise SecurityViolationError(
+                f"Policy version mismatch: decision version '{decision_pol_ver}' (expected {expected_int_pol_ver}) "
+                f"does not match admission policy_version ({envelope.admission.policy_version})."
+            )
 
         is_valid, reason = verify_decision_integrity(
             decision=dec,
             request=req,
+            capability=resolved_cap,
+            expected_capability_hash=expected_cap_hash,
+            expected_capability_id=resolved_cap.id,
+            expected_capability_version=resolved_cap.version,
             expected_registry_generation=current_gen,
             expected_policy_version=current_pol_ver,
             secret_key=self.secret_key,

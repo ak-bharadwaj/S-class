@@ -452,10 +452,13 @@ class AuthorizationService:
                 expected_policy_version=self.policy_version,
             )
         elif policy_engine is not None:
-            raw_decision = policy_engine.evaluate(request, ws)
+            try:
+                raw_decision = policy_engine.evaluate(request, ws, policy_version=self.policy_version)
+            except TypeError:
+                raw_decision = policy_engine.evaluate(request, ws)
         else:
             from sclass.control.policy import DefaultPolicyEngine
-            raw_decision = DefaultPolicyEngine().evaluate(request, ws)
+            raw_decision = DefaultPolicyEngine().evaluate(request, ws, policy_version=self.policy_version)
 
         if raw_decision is None:
             return self.seal_decision(

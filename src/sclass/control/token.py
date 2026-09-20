@@ -97,10 +97,6 @@ class D2NonceStore:
         if not nonce or not isinstance(nonce, str):
             raise ValueError("Nonce must be a non-empty string.")
         with self._local_lock:
-            if (nonce in self._process_cache or 
-                f"ADMIT:{nonce}" in self._process_cache or 
-                (nonce.startswith("ADMIT:") and nonce[6:] in self._process_cache)):
-                return False
             if self._file_path:
                 from sclass.core.errors import SecurityViolationError
                 os.makedirs(os.path.dirname(self._file_path), exist_ok=True)
@@ -149,6 +145,10 @@ class D2NonceStore:
                 except Exception as e:
                     raise SecurityViolationError(f"I/O failure in nonce store: {e}") from e
             else:
+                if (nonce in self._process_cache or 
+                    f"ADMIT:{nonce}" in self._process_cache or 
+                    (nonce.startswith("ADMIT:") and nonce[6:] in self._process_cache)):
+                    return False
                 self._process_cache.add(nonce)
                 if nonce.startswith("ADMIT:"):
                     self._process_cache.add(nonce[6:])
@@ -161,10 +161,6 @@ class D2NonceStore:
         if not nonce or not isinstance(nonce, str):
             return False
         with self._local_lock:
-            if (nonce in self._process_cache or 
-                f"ADMIT:{nonce}" in self._process_cache or 
-                (nonce.startswith("ADMIT:") and nonce[6:] in self._process_cache)):
-                return True
             if self._file_path and os.path.exists(self._file_path):
                 from sclass.core.errors import SecurityViolationError
                 try:

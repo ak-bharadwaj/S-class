@@ -57,7 +57,13 @@ class PolicyContext:
 class PolicyEngine(Protocol):
     """Protocol for policy evaluation engines."""
 
-    def evaluate(self, request: ActionRequest, workspace_dir: str, mode: str = "enforce") -> AuthorizationDecision:
+    def evaluate(
+        self,
+        request: ActionRequest,
+        workspace_dir: str,
+        mode: str = "enforce",
+        policy_version: Optional[str] = None,
+    ) -> AuthorizationDecision:
         """Evaluates an ActionRequest and returns an authoritative AuthorizationDecision."""
         ...
 
@@ -65,8 +71,15 @@ class PolicyEngine(Protocol):
 class DefaultPolicyEngine:
     """Built-in deterministic policy engine with capability and protected resource gating."""
 
-    def evaluate(self, request: ActionRequest, workspace_dir: str, mode: str = "enforce") -> AuthorizationDecision:
+    def evaluate(
+        self,
+        request: ActionRequest,
+        workspace_dir: str,
+        mode: str = "enforce",
+        policy_version: Optional[str] = None,
+    ) -> AuthorizationDecision:
         ws = os.path.abspath(workspace_dir or request.workspace or os.getcwd())
+        pol_ver = policy_version or "1.0.0"
 
         # 1. Protected resource analysis on target path (for filesystem actions)
         if request.target and request.action not in ("shell.execute", "execute", "run_command"):
@@ -78,6 +91,7 @@ class DefaultPolicyEngine:
                     risk_level="CRITICAL",
                     reason=f"Target path '{request.target}' is a secret/credential resource.",
                     remediation="Access to secrets (.env, keys, credentials) is strictly prohibited.",
+                    policy_version=pol_ver,
                 )
             if boundary in (AuthorityBoundary.SCLASS_TRUST_ROOT, AuthorityBoundary.SCLASS_VERIFICATION_ONLY):
                 # Agents may not mutate trust roots or evidence
@@ -89,6 +103,7 @@ class DefaultPolicyEngine:
                         risk_level="CRITICAL",
                         reason=f"Target path '{request.target}' is protected under boundary {boundary.value}.",
                         remediation="Trust state and evidence files are strictly non-agent-writable.",
+                        policy_version=pol_ver,
                     )
 
             # Legacy path authority check
@@ -100,6 +115,7 @@ class DefaultPolicyEngine:
                     risk_level="CRITICAL",
                     reason=f"Target path '{request.target}' is protected under SCLASS_ONLY authority.",
                     remediation="Direct modification of S-Class state or ledger files by external agents is forbidden.",
+                    policy_version=pol_ver,
                 )
 
         # 2. Check secret exposure in parameters / content
@@ -115,6 +131,7 @@ class DefaultPolicyEngine:
                     risk_level="HIGH",
                     reason=f"High-confidence credential detected in action parameters (fingerprint(s): {fps}). Value redacted.",
                     remediation="Do not hardcode secrets or private keys in source files or parameters.",
+                    policy_version=pol_ver,
                 )
 
         # 3. Check commands for protected resource references and dangerous shell chaining
@@ -130,6 +147,7 @@ class DefaultPolicyEngine:
                     risk_level="CRITICAL",
                     reason=f"Command references protected S-Class resource: {reason}",
                     remediation="Agent processes cannot access or alter .sclass trust state.",
+                    policy_version=pol_ver,
                 )
 
             # Check dangerous destructive commands (e.g. rm -rf /, format, wipe)
@@ -147,6 +165,7 @@ class DefaultPolicyEngine:
                         risk_level="CRITICAL",
                         reason=f"Dangerous destructive command pattern detected: '{cmd}'",
                         remediation="Destructive filesystem commands are strictly forbidden by policy.",
+                        policy_version=pol_ver,
                     )
 
             # Check dangerous shell chaining if not explicitly permitted
@@ -160,6 +179,7 @@ class DefaultPolicyEngine:
                         risk_level="HIGH",
                         reason="Command contains forbidden shell injection or chaining operators.",
                         remediation="Execute commands with single arguments or without shell chaining.",
+                        policy_version=pol_ver,
                     )
             else:
                 # HOST_SHELL mode requires approval
@@ -169,6 +189,7 @@ class DefaultPolicyEngine:
                     risk_level="HIGH",
                     reason="HOST_SHELL command execution requires explicit approval under shell policy.",
                     remediation="Confirm approval to execute host shell process.",
+                    policy_version=pol_ver,
                 )
 
         # 4. Default: Allow
@@ -177,6 +198,7 @@ class DefaultPolicyEngine:
             policy_id="SCLASS-CORE-DEFAULT",
             risk_level="LOW",
             reason="Operation authorized under standard workspace policy.",
+            policy_version=pol_ver,
         )
 
 
@@ -187,10 +209,17 @@ class OPAEngine:
         self.endpoint_url = endpoint_url or os.environ.get("SCLASS_OPA_URL", "http://localhost:8181/v1/data/sclass/authz")
         self.fallback = DefaultPolicyEngine()
 
-    def evaluate(self, request: ActionRequest, workspace_dir: str, mode: str = "enforce") -> AuthorizationDecision:
+    def evaluate(
+        self,
+        request: ActionRequest,
+        workspace_dir: str,
+        mode: str = "enforce",
+        policy_version: Optional[str] = None,
+    ) -> AuthorizationDecision:
+        pol_ver = policy_version or "1.0.0"
         try:
             import requests
-            payload = {"input": request.to_dict()}
+            payload = {"input": request.to_dict(), "policy_version": pol_ver}
             resp = requests.post(self.endpoint_url, json=payload, timeout=1.0)
             if resp.status_code == 200:
                 data = resp.json().get("result", {})
@@ -201,13 +230,15 @@ class OPAEngine:
                         policy_id=data.get("policy_id", "OPA-DENY"),
                         risk_level="HIGH",
                         reason=data.get("reason", "Denied by external OPA engine"),
+                        policy_version=pol_ver,
                     )
                 return AuthorizationDecision(
                     outcome=DecisionOutcome.ALLOW,
                     policy_id="OPA-ALLOW",
                     risk_level="LOW",
                     reason="Allowed by external OPA engine",
+                    policy_version=pol_ver,
                 )
         except Exception:
             pass
-        return self.fallback.evaluate(request, workspace_dir, mode)
+        return self.fallback.evaluate(request, workspace_dir, mode, policy_version=pol_ver)

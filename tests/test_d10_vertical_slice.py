@@ -1497,4 +1497,354 @@ def test_d10_test_e_missing_authority_secret_fails_closed_in_strict_mode(tmp_pat
         SliceController(ws)
 
 
+def test_d10_authorization_decision_persistence_failure_denied(tmp_path, monkeypatch):
+    """
+    D10.4 Requirement 1:
+    Authorization decision persistence must fail closed.
+    Any failure writing the authoritative decision record raises SecurityViolationError.
+    authorize() must not return an executable ExecutionEnvelope when the decision was not durably persisted.
+    No provider execution occurs.
+    """
+    from sclass.core.vertical_slice import CanonicalVerticalSlice
+    from sclass.core.errors import SecurityViolationError
+
+    ws = str(tmp_path / "d10_decision_persistence_fail")
+    slice_runner = CanonicalVerticalSlice(ws)
+    slice_runner.setup_scenario()
+    task = slice_runner.initialize_task()
+
+    req = slice_runner.planner.plan_verification_action(task.task_id)
+
+    # 1. Normal authorization succeeds
+    env = slice_runner.controller.authorize(req)
+    assert env is not None
+
+    # 2. Force persistence failure on authorized_decisions.jsonl
+    req2 = slice_runner.planner.plan_verification_action(task.task_id)
+    def fail_persist(*args, **kwargs):
+        raise OSError("Disk I/O error writing authorized_decisions.jsonl")
+
+    monkeypatch.setattr(slice_runner.controller, "_persist_decision", fail_persist)
+
+    # 3. Authorization must fail closed with SecurityViolationError
+    with pytest.raises(SecurityViolationError, match=".*"):
+        slice_runner.controller.authorize(req2)
+
+    # 4. No executable envelope returned, and in-memory cache did not store req2
+    assert req2.session not in slice_runner.controller._requests
+
+
+def test_d10_d2_nonce_is_authoritative_replay_state(tmp_path):
+    """
+    D10.4 Requirement 2:
+    Canonical D2 nonce store is the single authoritative replay decision.
+    Even if consumed_admissions.jsonl is removed/cleared, D2 nonce store enforces replay protection.
+    """
+    from sclass.core.vertical_slice import CanonicalVerticalSlice
+    from sclass.core.errors import SecurityViolationError
+    from sclass.storage.paths import WorkspacePaths
+
+    ws = str(tmp_path / "d10_d2_nonce_authoritative")
+    slice_runner = CanonicalVerticalSlice(ws)
+    slice_runner.setup_scenario()
+    task = slice_runner.initialize_task()
+
+    req = slice_runner.planner.plan_verification_action(task.task_id)
+    env = slice_runner.controller.authorize(req)
+
+    # First execution succeeds and marks D2 nonce as consumed
+    res = slice_runner.executor.execute_envelope(env)
+    assert res is not None
+    assert slice_runner.controller.nonce_store.is_nonce_consumed(env.token.execution_nonce) is True
+
+    # Delete/empty consumed_admissions.jsonl
+    paths = WorkspacePaths(ws)
+    consumed_file = os.path.join(paths.trust_dir, "consumed_admissions.jsonl")
+    if os.path.exists(consumed_file):
+        with open(consumed_file, "w", encoding="utf-8") as f:
+            f.write("")
+
+    # Authoritative replay state comes from D2: is_consumed remains True
+    assert slice_runner.controller.is_consumed(env.token.execution_nonce) is True
+
+    # Replay attempt is rejected
+    with pytest.raises(SecurityViolationError, match="already been consumed"):
+        slice_runner.executor.execute_envelope(env)
+
+
+def test_d10_d2_nonce_duplicate_rejected(tmp_path):
+    """
+    D10.4 Requirement 2:
+    Duplicate D2 nonce reservation is rejected with SecurityViolationError.
+    """
+    from sclass.core.vertical_slice import CanonicalVerticalSlice
+    from sclass.core.errors import SecurityViolationError
+
+    ws = str(tmp_path / "d10_d2_nonce_dup")
+    slice_runner = CanonicalVerticalSlice(ws)
+    slice_runner.setup_scenario()
+    task = slice_runner.initialize_task()
+
+    req = slice_runner.planner.plan_verification_action(task.task_id)
+    env = slice_runner.controller.authorize(req)
+
+    # Pre-reserve the nonce in D2 store
+    reserved = slice_runner.controller.nonce_store.reserve_nonce(f"ADMIT:{env.token.execution_nonce}")
+    assert reserved is True
+
+    # Attempting execution must be rejected at admission boundary
+    with pytest.raises(SecurityViolationError, match="already been consumed"):
+        slice_runner.executor.execute_envelope(env)
+
+
+def test_d10_d2_nonce_persistence_corruption_fails_closed(tmp_path):
+    """
+    D10.4 Requirement 2:
+    Corruption in the D2 nonce persistence file fails closed with SecurityViolationError.
+    """
+    from sclass.core.vertical_slice import CanonicalVerticalSlice
+    from sclass.core.errors import SecurityViolationError
+    from sclass.storage.paths import WorkspacePaths
+
+    ws = str(tmp_path / "d10_d2_nonce_corrupt")
+    slice_runner = CanonicalVerticalSlice(ws)
+    slice_runner.setup_scenario()
+    task = slice_runner.initialize_task()
+
+    req = slice_runner.planner.plan_verification_action(task.task_id)
+    env = slice_runner.controller.authorize(req)
+
+    # Corrupt d2_nonces.jsonl
+    paths = WorkspacePaths(ws)
+    nonce_file = os.path.join(paths.trust_dir, "d2_nonces.jsonl")
+    with open(nonce_file, "w", encoding="utf-8") as f:
+        f.write("<<<CORRUPT_NONCE_FILE_JSONL>>>\n")
+
+    # is_consumed and execute_envelope must fail closed
+    with pytest.raises(SecurityViolationError, match=".*"):
+        slice_runner.controller.is_consumed(env.token.execution_nonce)
+
+    with pytest.raises(SecurityViolationError, match=".*"):
+        slice_runner.executor.execute_envelope(env)
+
+
+def test_d10_d2_nonce_reservation_failure_denies_execution(tmp_path, monkeypatch):
+    """
+    D10.4 Requirement 2:
+    If D2 nonce reservation fails, execution is denied and raises SecurityViolationError.
+    """
+    from sclass.core.vertical_slice import CanonicalVerticalSlice
+    from sclass.core.errors import SecurityViolationError
+
+    ws = str(tmp_path / "d10_d2_nonce_res_fail")
+    slice_runner = CanonicalVerticalSlice(ws)
+    slice_runner.setup_scenario()
+    task = slice_runner.initialize_task()
+
+    req = slice_runner.planner.plan_verification_action(task.task_id)
+    env = slice_runner.controller.authorize(req)
+
+    # Force reserve_nonce to return False
+    def fail_reserve(*args, **kwargs):
+        return False
+
+    monkeypatch.setattr(slice_runner.controller.nonce_store, "reserve_nonce", fail_reserve)
+
+    with pytest.raises(SecurityViolationError, match=".*"):
+        slice_runner.executor.execute_envelope(env)
+
+
+def test_d10_capability_id_mismatch_rejected(tmp_path):
+    """
+    D10.4 Requirement 4:
+    Construct an authentic-looking decision whose capability ID does not match the authoritative capability.
+    Execution must fail before provider execution.
+    """
+    from sclass.domain.action import AuthorizationDecision, DecisionOutcome
+    from sclass.core.vertical_slice import CanonicalVerticalSlice
+    from sclass.core.errors import SecurityViolationError
+    from sclass.policy.authorization_service import generate_integrity_token
+
+    ws = str(tmp_path / "d10_cap_id_mismatch")
+    slice_runner = CanonicalVerticalSlice(ws)
+    slice_runner.setup_scenario()
+    task = slice_runner.initialize_task()
+
+    req = slice_runner.planner.plan_verification_action(task.task_id)
+    env = slice_runner.controller.authorize(req)
+
+    orig_dec = slice_runner.controller.get_decision(env.token.decision_id)
+    mismatched_cap_id = "cap:filesystem.read:baseline"
+
+    now_iso = orig_dec.evaluated_at
+    sig_token = generate_integrity_token(
+        issuer="S_CLASS",
+        request_hash=orig_dec.request_hash,
+        capability_hash=orig_dec.capability_hash,
+        capability_id=mismatched_cap_id,
+        capability_version=orig_dec.capability_version,
+        registry_generation=orig_dec.capability_registry_generation,
+        policy_id=orig_dec.policy_id,
+        policy_version=orig_dec.policy_version,
+        outcome="allow",
+        risk_level=orig_dec.risk_level,
+        evaluated_at=now_iso,
+        secret_key=slice_runner.controller.secret_key,
+    )
+
+    mismatched_dec = AuthorizationDecision(
+        outcome=DecisionOutcome.ALLOW,
+        policy_id=orig_dec.policy_id,
+        risk_level=orig_dec.risk_level,
+        reason=orig_dec.reason,
+        issuer="S_CLASS",
+        request_hash=orig_dec.request_hash,
+        capability_hash=orig_dec.capability_hash,
+        capability_id=mismatched_cap_id,
+        capability_version=orig_dec.capability_version,
+        capability_registry_generation=orig_dec.capability_registry_generation,
+        policy_version=orig_dec.policy_version,
+        integrity_token=sig_token,
+        evaluated_at=now_iso,
+    )
+
+    with pytest.raises(SecurityViolationError, match="Capability ID mismatch"):
+        slice_runner.executor.execute_envelope(env, decision=mismatched_dec)
+
+
+def test_d10_capability_version_mismatch_rejected(tmp_path):
+    """
+    D10.4 Requirement 4:
+    Change the authoritative capability version after authorization and verify that the old admission cannot execute.
+    """
+    from sclass.core.vertical_slice import CanonicalVerticalSlice
+    from sclass.core.errors import SecurityViolationError
+
+    ws = str(tmp_path / "d10_cap_ver_mismatch")
+    slice_runner = CanonicalVerticalSlice(ws)
+    slice_runner.setup_scenario()
+    task = slice_runner.initialize_task()
+
+    req = slice_runner.planner.plan_verification_action(task.task_id)
+    env = slice_runner.controller.authorize(req)
+
+    import dataclasses
+    reg = slice_runner.controller.auth_service.capability_registry
+    cap = reg.resolve(req, workspace_dir=ws)
+    assert cap is not None
+    new_cap = dataclasses.replace(cap, version="2.0.0")
+    reg._capabilities.remove(cap)
+    reg._capabilities.append(new_cap)
+
+    with pytest.raises(SecurityViolationError, match="Capability version mismatch"):
+        slice_runner.executor.execute_envelope(env)
+
+
+def test_d10_capability_hash_mismatch_rejected(tmp_path):
+    """
+    D10.4 Requirement 4:
+    Tamper with the capability identity/content represented by the decision and verify D6 rejects it.
+    """
+    from sclass.domain.action import AuthorizationDecision, DecisionOutcome
+    from sclass.core.vertical_slice import CanonicalVerticalSlice
+    from sclass.core.errors import SecurityViolationError
+    from sclass.policy.authorization_service import generate_integrity_token
+
+    ws = str(tmp_path / "d10_cap_hash_mismatch")
+    slice_runner = CanonicalVerticalSlice(ws)
+    slice_runner.setup_scenario()
+    task = slice_runner.initialize_task()
+
+    req = slice_runner.planner.plan_verification_action(task.task_id)
+    env = slice_runner.controller.authorize(req)
+
+    orig_dec = slice_runner.controller.get_decision(env.token.decision_id)
+    tampered_cap_hash = "deadbeef" * 8
+
+    now_iso = orig_dec.evaluated_at
+    sig_token = generate_integrity_token(
+        issuer="S_CLASS",
+        request_hash=orig_dec.request_hash,
+        capability_hash=tampered_cap_hash,
+        capability_id=orig_dec.capability_id,
+        capability_version=orig_dec.capability_version,
+        registry_generation=orig_dec.capability_registry_generation,
+        policy_id=orig_dec.policy_id,
+        policy_version=orig_dec.policy_version,
+        outcome="allow",
+        risk_level=orig_dec.risk_level,
+        evaluated_at=now_iso,
+        secret_key=slice_runner.controller.secret_key,
+    )
+
+    tampered_dec = AuthorizationDecision(
+        outcome=DecisionOutcome.ALLOW,
+        policy_id=orig_dec.policy_id,
+        risk_level=orig_dec.risk_level,
+        reason=orig_dec.reason,
+        issuer="S_CLASS",
+        request_hash=orig_dec.request_hash,
+        capability_hash=tampered_cap_hash,
+        capability_id=orig_dec.capability_id,
+        capability_version=orig_dec.capability_version,
+        capability_registry_generation=orig_dec.capability_registry_generation,
+        policy_version=orig_dec.policy_version,
+        integrity_token=sig_token,
+        evaluated_at=now_iso,
+    )
+
+    with pytest.raises(SecurityViolationError, match="Capability hash mismatch"):
+        slice_runner.executor.execute_envelope(env, decision=tampered_dec)
+
+
+def test_d10_decision_token_policy_binding(tmp_path):
+    """
+    D10.4 Requirement 5:
+    Policy/token binding must remain coherent.
+    Covers both:
+    1. stale decision after policy change (rejected)
+    2. newly authorized action after policy change (carries coherent policy identity and succeeds)
+    3. mismatched token/decision policy version is rejected.
+    """
+    from sclass.core.vertical_slice import CanonicalVerticalSlice
+    from sclass.core.errors import SecurityViolationError
+
+    ws = str(tmp_path / "d10_policy_binding")
+    slice_runner = CanonicalVerticalSlice(ws)
+    slice_runner.setup_scenario()
+    task = slice_runner.initialize_task()
+
+    req1 = slice_runner.planner.plan_verification_action(task.task_id)
+    env1 = slice_runner.controller.authorize(req1)
+    assert env1.token.policy_version == 1
+    assert env1.admission.policy_version == 1
+
+    # 1. Stale decision after policy change
+    slice_runner.controller.auth_service.policy_version = "2.0.0"
+
+    with pytest.raises(SecurityViolationError, match="Policy version mismatch"):
+        slice_runner.executor.execute_envelope(env1)
+
+    # 2. Newly authorized action after policy change
+    req2 = slice_runner.planner.plan_implementation_action(task.task_id, buggy=False)
+    env2 = slice_runner.controller.authorize(req2)
+    assert env2.token.policy_version == 2
+    assert env2.admission.policy_version == 2
+
+    # Executes successfully with coherent policy identity
+    res2 = slice_runner.executor.execute_envelope(env2)
+    assert res2 is not None
+    assert res2.success is True
+
+    # 3. Mismatched token/decision policy version is rejected
+    import dataclasses
+    req3 = slice_runner.planner.plan_implementation_action(task.task_id, buggy=False)
+    env3 = slice_runner.controller.authorize(req3)
+    tampered_token = dataclasses.replace(env3.token, policy_version=99)
+    tampered_admission = dataclasses.replace(env3.admission, policy_version=99)
+    tampered_env = dataclasses.replace(env3, token=tampered_token, admission=tampered_admission)
+    with pytest.raises(SecurityViolationError, match="Policy version mismatch"):
+        slice_runner.executor.execute_envelope(tampered_env)
+
+
 
