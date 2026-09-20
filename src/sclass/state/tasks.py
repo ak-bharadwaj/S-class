@@ -252,6 +252,50 @@ class StateRepository:
             conn.execute(query, data)
             conn.commit()
 
+    def get_verification(
+        self,
+        claim_id: Optional[str] = None,
+        receipt_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Retrieves a verification record by claim_id and/or receipt_id."""
+        clauses = []
+        params = []
+        if claim_id:
+            clauses.append("claim_id = ?")
+            params.append(claim_id)
+        if receipt_id:
+            clauses.append("receipt_id = ?")
+            params.append(receipt_id)
+        if not clauses:
+            return None
+        query = f"SELECT * FROM verifications WHERE {' AND '.join(clauses)} ORDER BY verification_time DESC LIMIT 1"
+        with self.store.get_connection() as conn:
+            row = conn.execute(query, params).fetchone()
+            if not row:
+                return None
+            return dict(row)
+
+    def list_verifications(
+        self,
+        claim_id: Optional[str] = None,
+        receipt_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Lists verification records by claim_id and/or receipt_id."""
+        clauses = []
+        params = []
+        if claim_id:
+            clauses.append("claim_id = ?")
+            params.append(claim_id)
+        if receipt_id:
+            clauses.append("receipt_id = ?")
+            params.append(receipt_id)
+        where_str = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        query = f"SELECT * FROM verifications {where_str} ORDER BY verification_time DESC"
+        with self.store.get_connection() as conn:
+            rows = conn.execute(query, params).fetchall()
+            return [dict(r) for r in rows]
+
+
     def save_recovery(self, record: Any) -> None:
         """Upserts a recovery record into the authoritative SQLite store."""
         query = """

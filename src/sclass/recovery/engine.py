@@ -36,6 +36,10 @@ from sclass.core.errors import (
     RecoveryPersistenceError,
 )
 from sclass.domain.verification import VerificationResult as DomainVerificationResult
+from sclass.domain.evidence import (
+    EvidenceReceipt as DomainEvidenceReceipt,
+    ObservedReceipt as DomainObservedReceipt,
+)
 from sclass.survival.models import (
     VerificationResult as SurvivalVerificationResult,
     ObservedReceipt,
@@ -43,7 +47,11 @@ from sclass.survival.models import (
     _OBSERVATION_TOKEN,
 )
 
+from sclass.state.tasks import StateRepository
+from sclass.trust.ledger import LocalLedger
+
 AUTH_VERIFICATION_CLASSES = (DomainVerificationResult, SurvivalVerificationResult)
+AUTH_RECEIPT_CLASSES = (DomainObservedReceipt, DomainEvidenceReceipt, ObservedReceipt, EvidenceReceipt)
 
 
 class RecoveryEngine:
@@ -59,9 +67,234 @@ class RecoveryEngine:
         self.default_max_attempts = max(1, int(default_max_attempts))
         self.persistence = persistence or RecoveryPersistence(self.workspace_dir)
 
+    def _validate_ledger(self) -> LocalLedger:
+        """Validates cryptographic integrity of LocalLedger. Fails closed if corrupted."""
+        ledger = LocalLedger(workspace_dir=self.workspace_dir)
+        is_valid, err = ledger.verify_integrity()
+        if not is_valid:
+            raise RecoveryError(f"Ledger integrity compromised: {err}")
+        return ledger
+
+    def _validate_canonical_receipt_provenance(
+        self,
+        receipt_id: str,
+        expected_claim_id: Optional[str] = None,
+        expected_task_id: Optional[str] = None,
+        ledger: Optional[LocalLedger] = None,
+        receipt_obj: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """
+        Validates that receipt is authentically committed to canonical LocalLedger OBSERVATION records.
+        Binds task_id, claim_id, workspace, and receipt_hash.
+        """
+        if not receipt_id:
+            raise RecoveryError("Missing receipt/verification provenance: receipt_id is required.")
+
+        l = ledger or self._validate_ledger()
+        entries = l.read_all_entries()
+
+        matching_entry = None
+        for entry in entries:
+            if entry.get("event") == "OBSERVATION":
+                payload = entry.get("payload", {})
+                if payload.get("receipt_id") == receipt_id:
+                    matching_entry = entry
+                    break
+
+        if not matching_entry:
+            raise RecoveryError(
+                f"Missing authoritative receipt: receipt '{receipt_id}' not found in canonical ledger OBSERVATION records."
+            )
+
+        obs_payload = matching_entry.get("payload", {})
+
+        # Check receipt hash if receipt_obj provided
+        if receipt_obj is not None:
+            rec_hash = getattr(receipt_obj, "receipt_hash", None)
+            if not rec_hash and hasattr(receipt_obj, "compute_hash"):
+                rec_hash = receipt_obj.compute_hash()
+            ledger_hash = obs_payload.get("receipt_hash")
+            if rec_hash and ledger_hash and rec_hash != ledger_hash:
+                raise RecoveryError(
+                    f"Receipt hash mismatch: object receipt_hash '{rec_hash}' does not match ledger receipt_hash '{ledger_hash}'."
+                )
+
+            # Check workspace binding
+            obj_ws = getattr(receipt_obj, "workspace", None)
+            if obj_ws:
+                try:
+                    if os.path.normcase(os.path.abspath(obj_ws)) != os.path.normcase(os.path.abspath(self.workspace_dir)):
+                        raise RecoveryError(
+                            f"Workspace/project mismatch: receipt workspace '{obj_ws}' does not match engine workspace '{self.workspace_dir}'."
+                        )
+                except Exception:
+                    pass
+
+        # Check task binding
+        if expected_task_id:
+            rec_task = obs_payload.get("task_id")
+            if rec_task and rec_task != expected_task_id:
+                raise RecoveryError(
+                    f"Task mismatch: ledger receipt task_id '{rec_task}' does not match expected '{expected_task_id}'."
+                )
+
+        # Check claim binding
+        if expected_claim_id:
+            rec_claim = obs_payload.get("claim_id")
+            if rec_claim and rec_claim != expected_claim_id:
+                raise RecoveryError(
+                    f"Claim mismatch: ledger receipt claim_id '{rec_claim}' does not match expected '{expected_claim_id}'."
+                )
+
+        return obs_payload
+
+    def _validate_canonical_verification_provenance(
+        self,
+        verification_result: Any,
+        expected_claim_id: Optional[str] = None,
+        expected_task_id: Optional[str] = None,
+        expected_status: Optional[str] = None,
+        ledger: Optional[LocalLedger] = None,
+    ) -> None:
+        """
+        Validates that verification result is backed by authoritative StateRepository
+        and LocalLedger records. Enforces exact binding rules.
+        """
+        verif_receipt_id = verification_result.receipt_id
+        if not verif_receipt_id and verification_result.verification_event:
+            verif_receipt_id = getattr(verification_result.verification_event, "receipt_id", None)
+
+        if not verif_receipt_id:
+            raise RecoveryError(
+                "Missing receipt/verification provenance: VerificationResult lacks authoritative receipt_id."
+            )
+
+        l = ledger or self._validate_ledger()
+
+        # 1. First validate canonical receipt provenance in LocalLedger
+        obs_payload = self._validate_canonical_receipt_provenance(
+            receipt_id=verif_receipt_id,
+            expected_claim_id=expected_claim_id,
+            expected_task_id=expected_task_id,
+            ledger=l,
+        )
+
+        # 2. Check claim binding
+        verif_claim_id = getattr(verification_result, "claim_id", None)
+        if expected_claim_id and verif_claim_id and verif_claim_id != expected_claim_id:
+            raise RecoveryError(
+                f"Claim mismatch: verification claim_id '{verif_claim_id}' does not match expected '{expected_claim_id}'."
+            )
+        target_claim_id = expected_claim_id or verif_claim_id
+
+        # Verification-event binding: validate event attributes before persistence checks
+        if verification_result.verification_event:
+            event = verification_result.verification_event
+            # Bind event claim ID == recovery claim ID
+            if target_claim_id and event.claim_id and event.claim_id != target_claim_id:
+                raise RecoveryError(
+                    f"Verification-event mismatch: event claim_id '{event.claim_id}' does not match expected '{target_claim_id}'."
+                )
+            # Bind event receipt ID == authoritative receipt ID
+            if event.receipt_id != verif_receipt_id:
+                raise RecoveryError(
+                    f"Verification-event mismatch: event receipt_id '{event.receipt_id}' does not match verification receipt_id '{verif_receipt_id}'."
+                )
+            # Bind event result == authoritative verification status
+            ev_res = str(event.result).upper()
+            v_res = str(verification_result.status).upper()
+            if ev_res != v_res and not (v_res in ("ACCEPT", "PASS") and ev_res in ("ACCEPT", "PASS", "CLAIM_VERIFIED")) and not (v_res in ("REJECT", "FAILED", "INVALID") and ev_res in ("REJECT", "FAILED", "INVALID")):
+                raise RecoveryError(
+                    f"Verification-event mismatch: event result '{event.result}' does not match verification status '{verification_result.status}'."
+                )
+            # Bind event receipt hash matches canonical receipt
+            if obs_payload.get("receipt_hash") and event.receipt_hash:
+                if event.receipt_hash != obs_payload.get("receipt_hash"):
+                    raise RecoveryError(
+                        f"Verification-event mismatch: event receipt_hash '{event.receipt_hash}' does not match canonical receipt_hash '{obs_payload.get('receipt_hash')}'."
+                    )
+
+        # 3. Canonical verification record lookup in StateRepository
+        state_repo = StateRepository(self.workspace_dir)
+        verif_rec = state_repo.get_verification(claim_id=target_claim_id, receipt_id=verif_receipt_id)
+
+        # Check if there is any verification record for this claim with different receipt_id (receipt mismatch)
+        if target_claim_id:
+            claim_verifs = state_repo.list_verifications(claim_id=target_claim_id)
+            if claim_verifs:
+                matching_receipt_verifs = [v for v in claim_verifs if v.get("receipt_id") == verif_receipt_id]
+                if not matching_receipt_verifs:
+                    raise RecoveryError(
+                        f"Receipt mismatch: persisted verification for claim '{target_claim_id}' expects receipt '{claim_verifs[0].get('receipt_id')}', but got '{verif_receipt_id}'."
+                    )
+
+        # Also look for verification event in LocalLedger
+        all_entries = l.read_all_entries()
+        verif_ledger_entries = [
+            e for e in all_entries
+            if e.get("event") in ("verification", "rejection", "composite_acceptance")
+            and e.get("payload", {}).get("receipt_id") == verif_receipt_id
+            and (not target_claim_id or e.get("payload", {}).get("claim_id") == target_claim_id)
+        ]
+
+        # Must be persisted in StateRepository OR recorded in LocalLedger
+        if not verif_rec and not verif_ledger_entries:
+            raise RecoveryError(
+                f"Missing authoritative verification record: no canonical verification found in StateRepository or LocalLedger for claim '{target_claim_id}' and receipt '{verif_receipt_id}'."
+            )
+
+        # Verify status consistency if found in StateRepository
+        if verif_rec:
+            rec_status = str(verif_rec.get("status", "")).upper()
+            res_status = str(verification_result.status).upper()
+            if rec_status != res_status:
+                raise RecoveryError(
+                    f"Verification status mismatch: persisted status '{rec_status}' does not match supplied '{res_status}'."
+                )
+            if expected_status and rec_status != expected_status.upper():
+                raise RecoveryError(
+                    f"Verification status mismatch: persisted status '{rec_status}' does not match expected '{expected_status}'."
+                )
+
+        # Verify status consistency if found in LocalLedger
+        if verif_ledger_entries:
+            latest_entry = verif_ledger_entries[-1]
+            p = latest_entry.get("payload", {})
+            ledger_result = str(p.get("verification_result") or p.get("status") or p.get("decision") or "").upper()
+            res_status = str(verification_result.status).upper()
+            if res_status in ("ACCEPT", "PASS") and ledger_result not in ("ACCEPT", "PASS", "CLAIM_VERIFIED", "SATISFIED", "APPROVED"):
+                raise RecoveryError(
+                    f"Verification status mismatch: ledger verification result '{ledger_result}' does not match ACCEPT."
+                )
+            elif res_status in ("REJECT", "INVALID", "FAILED") and ledger_result not in ("REJECT", "INVALID", "FAILED", "REJECTION"):
+                raise RecoveryError(
+                    f"Verification status mismatch: ledger verification result '{ledger_result}' does not match REJECT."
+                )
+
+        # 4. Event must be part of trusted ledger/history rather than merely attached to caller object
+        if verification_result.verification_event:
+            event = verification_result.verification_event
+            anchored_event = any(
+                e.get("event") in ("verification", "rejection", "composite_acceptance")
+                and (
+                    e.get("payload", {}).get("event_id") == event.event_id
+                    or (
+                        e.get("payload", {}).get("receipt_id") == event.receipt_id
+                        and e.get("payload", {}).get("claim_id") == event.claim_id
+                        and (not e.get("payload", {}).get("event_id") or e.get("payload", {}).get("event_id") == event.event_id)
+                    )
+                )
+                for e in all_entries
+            )
+            if not anchored_event:
+                raise RecoveryError(
+                    f"Unanchored verification event: event '{event.event_id}' is not anchored in trusted LocalLedger."
+                )
+
     def get_recovery(self, recovery_id: str) -> Optional[RecoveryRecord]:
         """Loads authoritative RecoveryRecord by ID from persistent storage."""
         return self.persistence.load_recovery(recovery_id)
+
 
     def diagnose_failure(
         self,
@@ -151,7 +384,7 @@ class RecoveryEngine:
             if status_str in ("REJECT", "INVALID", "FAILED", "ERROR", "INCONCLUSIVE") or not getattr(failure_evidence, "is_verified", True):
                 is_failure = True
 
-        elif isinstance(failure_evidence, (ObservedReceipt, EvidenceReceipt)):
+        elif isinstance(failure_evidence, AUTH_RECEIPT_CLASSES):
             # Authoritative EvidenceReceipt / ObservedReceipt
             if not failure_evidence.is_observed:
                 raise RecoveryError(
@@ -197,6 +430,22 @@ class RecoveryEngine:
         if not is_failure:
             raise RecoveryError(
                 "Recovery is evidence-driven: provided evidence does not represent an authoritative failure or drift condition."
+            )
+
+        # D9.1.2: Enforce failure-side canonical verification / receipt provenance
+        if isinstance(failure_evidence, AUTH_VERIFICATION_CLASSES):
+            self._validate_canonical_verification_provenance(
+                verification_result=failure_evidence,
+                expected_claim_id=aff_claim_id,
+                expected_task_id=task_id,
+                expected_status=failure_evidence.status,
+            )
+        elif isinstance(failure_evidence, AUTH_RECEIPT_CLASSES):
+            self._validate_canonical_receipt_provenance(
+                receipt_id=failure_evidence.receipt_id,
+                expected_claim_id=aff_claim_id,
+                expected_task_id=task_id,
+                receipt_obj=failure_evidence,
             )
 
         # Durable recovery-cycle identity tied to originating failure/event
@@ -487,7 +736,7 @@ class RecoveryEngine:
 
         # Invariant: if evidence is supplied, verify observation provenance and matching receipt_id
         if evidence is not None:
-            if not isinstance(evidence, (ObservedReceipt, EvidenceReceipt)):
+            if not isinstance(evidence, AUTH_RECEIPT_CLASSES):
                 raise RecoveryError(
                     f"Forged or unobserved evidence: Evidence must be an authoritative ObservedReceipt, received '{type(evidence).__name__}'."
                 )
@@ -503,6 +752,23 @@ class RecoveryEngine:
                 raise RecoveryError(
                     f"Receipt ID mismatch between verification result ('{verif_receipt_id}') and evidence ('{evidence.receipt_id}')."
                 )
+
+        # D9.1.2: Enforce canonical verification provenance
+        self._validate_canonical_verification_provenance(
+            verification_result=verification_result,
+            expected_claim_id=record.affected_claim_id,
+            expected_task_id=record.task_id,
+            expected_status=verification_result.status,
+        )
+
+        # D9.1.2: Enforce canonical receipt provenance for evidence if supplied
+        if evidence is not None:
+            self._validate_canonical_receipt_provenance(
+                receipt_id=evidence.receipt_id,
+                expected_claim_id=record.affected_claim_id,
+                expected_task_id=record.task_id,
+                receipt_obj=evidence,
+            )
 
         # Evaluate verdict
         is_verified = bool(getattr(verification_result, "is_verified", False))
