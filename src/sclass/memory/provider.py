@@ -65,14 +65,14 @@ class MemoryItem:
         # Calculate expires_at from ttl_seconds if not explicitly provided
         if self.ttl_seconds is not None and self.expires_at is None:
             try:
-                base_dt = datetime.fromisoformat(self.created_at)
+                base_dt = datetime.fromisoformat(self.created_at.replace("Z", "+00:00"))
             except Exception:
                 base_dt = datetime.now(timezone.utc)
             exp = base_dt + timedelta(seconds=max(0, int(self.ttl_seconds)))
             object.__setattr__(self, "expires_at", exp.astimezone(timezone.utc).isoformat())
         elif self.expires_at is not None:
             try:
-                exp_dt = datetime.fromisoformat(self.expires_at)
+                exp_dt = datetime.fromisoformat(self.expires_at.replace("Z", "+00:00"))
                 if exp_dt.tzinfo is None:
                     exp_dt = exp_dt.replace(tzinfo=timezone.utc)
                 else:
@@ -86,8 +86,8 @@ class MemoryItem:
         if not self.expires_at:
             return False
         try:
-            exp_dt = datetime.fromisoformat(self.expires_at)
-            now_dt = datetime.fromisoformat(now_iso) if now_iso else datetime.now(timezone.utc)
+            exp_dt = datetime.fromisoformat(self.expires_at.replace("Z", "+00:00"))
+            now_dt = datetime.fromisoformat(now_iso.replace("Z", "+00:00")) if now_iso else datetime.now(timezone.utc)
             if exp_dt.tzinfo is None:
                 exp_dt = exp_dt.replace(tzinfo=timezone.utc)
             if now_dt.tzinfo is None:

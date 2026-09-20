@@ -222,7 +222,7 @@ def verify_decision_integrity(
     # 5. Check Staleness
     if eval_at:
         try:
-            dt = datetime.fromisoformat(eval_at)
+            dt = datetime.fromisoformat(eval_at.replace("Z", "+00:00"))
             now = datetime.now(timezone.utc)
             if (now - dt).total_seconds() > max_age_seconds:
                 return False, f"Authorization decision is stale (age exceeds {max_age_seconds}s)"

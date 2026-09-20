@@ -1,177 +1,116 @@
 ==============================================================================
-  S-CLASS: 32/32 MASTER MILESTONE AUDITOR & REALITY CERTIFICATION
+  S-CLASS D10.5 INDEPENDENT CERTIFICATION & EXACT-SHA PROOF
 ==============================================================================
-
-[01/32] Auditing Phase 1 Trust Kernel...                     [PASS] (3.56s)
-       Summary: 3 passed in 1.65s
-
-[02/32] Auditing Execution Security & Modes...               [PASS] (3.40s)
-       Summary: 4 passed in 1.56s
-
-[03/32] Auditing Session Handoff & Continuity...             [PASS] (3.47s)
-       Summary: 2 passed in 1.46s
-
-[04/32] Auditing MCP Protocol & Transport...                 [PASS] (3.45s)
-       Summary: 4 passed in 1.53s
-
-[05/32] Auditing B.2 OPA Policy Provider...                  [PASS] (6.59s)
-       Summary: 16 passed in 4.54s
-
-[06/32] Auditing B.3 Platform Optimization Core...           [PASS] (3.61s)
-       Summary: 24 passed in 1.52s
-
-[07/32] Auditing B.4 Platform Profiling Framework...         [PASS] (3.34s)
-       Summary: 7 passed in 1.41s
-
-[08/32] Auditing B.5 Official MCP Integration...             [PASS] (5.06s)
-       Summary: 10 passed in 3.03s
-
-[09/32] Auditing B.6 ACP Platform Integration...             [PASS] (3.80s)
-       Summary: 6 passed in 1.83s
-
-[10/32] Auditing B.7 Verification Providers...               [PASS] (8.98s)
-       Summary: 8 passed in 6.94s
-
-[11/32] Auditing B.8 Adaptive Verification Policies...       [PASS] (3.97s)
-       Summary: 9 passed in 1.85s
-
-[12/32] Auditing B.9 Independent Observation & OTel...       [PASS] (6.04s)
-       Summary: 5 passed in 3.96s
-
-[13/32] Auditing B.10 Empirical Outcome Learning...          [PASS] (3.42s)
-       Summary: 6 passed in 1.44s
-
-[14/32] Auditing B.11 Universal Truth Layer & Project State... [PASS] (3.38s)
-       Summary: 3 passed in 1.43s
-
-[15/32] Auditing B.12 Cross-Platform Continuity...           [PASS] (3.33s)
-       Summary: 3 passed in 1.41s
-
-[16/32] Auditing B.15 Multi-Agent Fleet Integrity...         [PASS] (3.70s)
-       Summary: 8 passed in 1.69s
-
-[17/32] Auditing RC.1 External Codex Subprocess & Benchmark... [PASS] (13.21s)
-       Summary: 4 passed in 11.34s
-
-[18/32] Auditing RC.2 Execution Provider Closure & Sandboxing... [PASS] (4.44s)
-       Summary: 8 passed in 2.60s
-
-[19/32] Auditing RC.3 Independent Observation Plane...       [PASS] (4.34s)
-       Summary: 8 passed in 2.44s
-
-[20/32] Auditing RC.4 Executable Verification Engine Hierarchy... [PASS] (3.33s)
-       Summary: 8 passed in 1.44s
-
-[21/32] Auditing RC.5 Universal Project Truth & Invalidation... [PASS] (3.21s)
-       Summary: 8 passed in 1.37s
-
-[22/32] Auditing RC.6 Tree-sitter Code Intelligence & SCIP... [PASS] (3.27s)
-       Summary: 11 passed in 1.44s
-
-[23/32] Auditing RC.7 ACP Proxy & MCP Protocol Gateway...    [PASS] (3.33s)
-       Summary: 10 passed in 1.47s
-
-[24/32] Auditing RC.8 Handoff & Continuity Engine...         [PASS] (3.68s)
-       Summary: 9 passed in 1.82s
-
-[25/32] Auditing RC.9 Fleet Task Graph & Production Engine... [PASS] (3.95s)
-       Summary: 13 passed in 2.11s
-
-[26/32] Auditing RC.10 Memory Provider Abstraction & Mem0... [PASS] (3.43s)
-       Summary: 12 passed in 1.61s
-
-[27/32] Auditing RC.11 Platform Profile Engine & Compensation Budget... [PASS] (3.25s)
-       Summary: 10 passed in 1.38s
-
-[28/32] Auditing RC.12 Silent Governance Mode & Universal Adapters... [PASS] (3.62s)
-       Summary: 11 passed in 1.72s
-
-[29/32] Auditing RC.13 CLI Completion & Explain/Audit UX...  [PASS] (4.84s)
-       Summary: 9 passed in 2.86s
-
-[30/32] Auditing RC.14 OPA/Cedar Policy Product & Bundles... [PASS] (15.41s)
-       Summary: 14 passed in 13.51s
-
-[31/32] Auditing RC.15 Supply-Chain Evidence & Provenance... [PASS] (3.44s)
-       Summary: 12 passed in 1.41s
-
-[32/32] Auditing RC.16 Packaging, Unified Config & Installer... [PASS] (3.79s)
-       Summary: 9 passed in 1.90s
-
-==============================================================================
-  AUDIT SUMMARY: 32/32 MILESTONES PASSED (149.65s total)
-==============================================================================
-  [PASS] [M01_TRUST_KERNEL] Phase 1 Trust Kernel                             (3.56s) - 3 passed in 1.65s
-  [PASS] [M02_EXECUTION_SECURITY] Execution Security & Modes                       (3.40s) - 4 passed in 1.56s
-  [PASS] [M03_SESSION_HANDOFF] Session Handoff & Continuity                     (3.47s) - 2 passed in 1.46s
-  [PASS] [M04_MCP_TRANSPORT] MCP Protocol & Transport                         (3.45s) - 4 passed in 1.53s
-  [PASS] [M05_OPA_PROVIDER] B.2 OPA Policy Provider                          (6.59s) - 16 passed in 4.54s
-  [PASS] [M06_PLATFORM_OPTIMIZATION] B.3 Platform Optimization Core                   (3.61s) - 24 passed in 1.52s
-  [PASS] [M07_PLATFORM_PROFILING] B.4 Platform Profiling Framework                 (3.34s) - 7 passed in 1.41s
-  [PASS] [M08_MCP_OFFICIAL] B.5 Official MCP Integration                     (5.06s) - 10 passed in 3.03s
-  [PASS] [M09_ACP_PROTOCOL] B.6 ACP Platform Integration                     (3.80s) - 6 passed in 1.83s
-  [PASS] [M10_VERIFICATION_PROVIDERS] B.7 Verification Providers                       (8.98s) - 8 passed in 6.94s
-  [PASS] [M11_ADAPTIVE_VERIFICATION] B.8 Adaptive Verification Policies               (3.97s) - 9 passed in 1.85s
-  [PASS] [M12_INDEPENDENT_OBSERVATION] B.9 Independent Observation & OTel               (6.04s) - 5 passed in 3.96s
-  [PASS] [M13_EMPIRICAL_LEARNING] B.10 Empirical Outcome Learning                  (3.42s) - 6 passed in 1.44s
-  [PASS] [M14_UNIVERSAL_TRUTH] B.11 Universal Truth Layer & Project State       (3.38s) - 3 passed in 1.43s
-  [PASS] [M15_CROSS_PLATFORM_CONTINUITY] B.12 Cross-Platform Continuity                   (3.33s) - 3 passed in 1.41s
-  [PASS] [M16_FLEET_INTEGRITY] B.15 Multi-Agent Fleet Integrity                 (3.70s) - 8 passed in 1.69s
-  [PASS] [M17_CODEX_BENCHMARK] RC.1 External Codex Subprocess & Benchmark       (13.21s) - 4 passed in 11.34s
-  [PASS] [M18_EXECUTION_PROVIDERS] RC.2 Execution Provider Closure & Sandboxing     (4.44s) - 8 passed in 2.60s
-  [PASS] [M19_OBSERVATION_PLANE] RC.3 Independent Observation Plane               (4.34s) - 8 passed in 2.44s
-  [PASS] [M20_VERIFICATION_ENGINE] RC.4 Executable Verification Engine Hierarchy    (3.33s) - 8 passed in 1.44s
-  [PASS] [M21_PROJECT_TRUTH] RC.5 Universal Project Truth & Invalidation      (3.21s) - 8 passed in 1.37s
-  [PASS] [M22_CODE_INTELLIGENCE] RC.6 Tree-sitter Code Intelligence & SCIP        (3.27s) - 11 passed in 1.44s
-  [PASS] [M23_PROTOCOL_GATEWAY] RC.7 ACP Proxy & MCP Protocol Gateway            (3.33s) - 10 passed in 1.47s
-  [PASS] [M24_HANDOFF_CONTINUITY] RC.8 Handoff & Continuity Engine                 (3.68s) - 9 passed in 1.82s
-  [PASS] [M25_FLEET_PRODUCTION] RC.9 Fleet Task Graph & Production Engine        (3.95s) - 13 passed in 2.11s
-  [PASS] [M26_MEMORY_PROVIDER] RC.10 Memory Provider Abstraction & Mem0         (3.43s) - 12 passed in 1.61s
-  [PASS] [M27_PLATFORM_ENGINE] RC.11 Platform Profile Engine & Compensation Budget (3.25s) - 10 passed in 1.38s
-  [PASS] [M28_SILENT_GOVERNANCE] RC.12 Silent Governance Mode & Universal Adapters (3.62s) - 11 passed in 1.72s
-  [PASS] [M29_CLI_UX] RC.13 CLI Completion & Explain/Audit UX          (4.84s) - 9 passed in 2.86s
-  [PASS] [M30_POLICY_PRODUCT] RC.14 OPA/Cedar Policy Product & Bundles         (15.41s) - 14 passed in 13.51s
-  [PASS] [M31_SUPPLY_CHAIN] RC.15 Supply-Chain Evidence & Provenance         (3.44s) - 12 passed in 1.41s
-  [PASS] [M32_PACKAGING] RC.16 Packaging, Unified Config & Installer      (3.79s) - 9 passed in 1.90s
-==============================================================================
-#  ALL 32/32 MILESTONES CERTIFIED 100% GREEN (ZERO DEFECTS)
+Timestamp (UTC):          2026-09-20T11:53:31.469589+00:00
+Repository:               ak-bharadwaj/S-class
+Branch:                   survival-v0
+Baseline Certified SHA:   87c7624b81b692f94b555da98fe60fbd787cb7ca
+Current Execution SHA:    87c7624b81b692f94b555da98fe60fbd787cb7ca
+Working-Tree Cleanliness: STAGED/MODIFIED
+Operating System:         Windows 11 (AMD64)
+Python Version:           3.14.5
 ==============================================================================
 
 ==============================================================================
-  D10 VERTICAL SLICE HARDENING AUDIT: 33/33 PASSED
+  1. D10 VERTICAL SLICE SUITE: 33/33 PASSED (Exit Code: 0)
 ==============================================================================
-  [PASS] test_d10_vertical_slice_success
-  [PASS] test_d10_failure_creates_recovery
-  [PASS] test_d10_recovery_requires_controller
-  [PASS] test_d10_stale_evidence_cannot_satisfy_claim
-  [PASS] test_d10_final_acceptance_requires_fresh_evidence
-  [PASS] test_d10_end_to_end_replay_is_deterministic
-  [PASS] test_d10_agent_claim_cannot_promote_itself_to_verified
-  [PASS] test_d10_forged_allow_and_recomputed_envelope_rejected
-  [PASS] test_d10_replaying_consumed_admission_rejected
-  [PASS] test_d10_replay_rejected_after_process_restart
-  [PASS] test_d10_canonical_final_acceptance_binding
-  [PASS] test_d10_persistence_failure_execution_denied
-  [PASS] test_d10_corrupted_admission_store_execution_denied
-  [PASS] test_d10_registry_generation_change_old_admission_denied
-  [PASS] test_d10_policy_version_change_old_admission_denied
-  [PASS] test_d10_mismatched_composite_claim_id_acceptance_denied
-  [PASS] test_d10_forged_journal_accept_final_acceptance_denied
-  [PASS] test_d10_semantic_replay_trace_uses_canonical_d5_action_digests
-  [PASS] test_d10_parity_reaches_canonical_boundary
-  [PASS] test_d10_test_a_forged_decision_rejected
-  [PASS] test_d10_test_b_action_request_mutation_after_admission_rejected
-  [PASS] test_d10_test_c_hardcoded_secret_rejection
-  [PASS] test_d10_test_d_obligation_mismatch_rejected
-  [PASS] test_d10_test_e_missing_authority_secret_fails_closed_in_strict_mode
-  [PASS] test_d10_authorization_decision_persistence_failure_denied
-  [PASS] test_d10_d2_nonce_is_authoritative_replay_state
-  [PASS] test_d10_d2_nonce_duplicate_rejected
-  [PASS] test_d10_d2_nonce_persistence_corruption_fails_closed
-  [PASS] test_d10_d2_nonce_reservation_failure_denies_execution
-  [PASS] test_d10_capability_id_mismatch_rejected
-  [PASS] test_d10_capability_version_mismatch_rejected
-  [PASS] test_d10_capability_hash_mismatch_rejected
-  [PASS] test_d10_decision_token_policy_binding
+Command: "C:\Users\dorni\AppData\Local\Python\pythoncore-3.14-64\python.exe" -m pytest tests/test_d10_vertical_slice.py -v
+Duration: 41.28s
+Collected: 33 | Passed: 33 | Failed: 0 | Skipped: 0 | Errors: 0
+Individual Test Results:
+  tests/test_d10_vertical_slice.py::test_d10_vertical_slice_success PASSED [  3%]
+  tests/test_d10_vertical_slice.py::test_d10_failure_creates_recovery PASSED [  6%]
+  tests/test_d10_vertical_slice.py::test_d10_recovery_requires_controller PASSED [  9%]
+  tests/test_d10_vertical_slice.py::test_d10_stale_evidence_cannot_satisfy_claim PASSED [ 12%]
+  tests/test_d10_vertical_slice.py::test_d10_final_acceptance_requires_fresh_evidence PASSED [ 15%]
+  tests/test_d10_vertical_slice.py::test_d10_end_to_end_replay_is_deterministic PASSED [ 18%]
+  tests/test_d10_vertical_slice.py::test_d10_agent_claim_cannot_promote_itself_to_verified PASSED [ 21%]
+  tests/test_d10_vertical_slice.py::test_d10_forged_allow_and_recomputed_envelope_rejected PASSED [ 24%]
+  tests/test_d10_vertical_slice.py::test_d10_replaying_consumed_admission_rejected PASSED [ 27%]
+  tests/test_d10_vertical_slice.py::test_d10_replay_rejected_after_process_restart PASSED [ 30%]
+  tests/test_d10_vertical_slice.py::test_d10_canonical_final_acceptance_binding PASSED [ 33%]
+  tests/test_d10_vertical_slice.py::test_d10_persistence_failure_execution_denied PASSED [ 36%]
+  tests/test_d10_vertical_slice.py::test_d10_corrupted_admission_store_execution_denied PASSED [ 39%]
+  tests/test_d10_vertical_slice.py::test_d10_registry_generation_change_old_admission_denied PASSED [ 42%]
+  tests/test_d10_vertical_slice.py::test_d10_policy_version_change_old_admission_denied PASSED [ 45%]
+  tests/test_d10_vertical_slice.py::test_d10_mismatched_composite_claim_id_acceptance_denied PASSED [ 48%]
+  tests/test_d10_vertical_slice.py::test_d10_forged_journal_accept_final_acceptance_denied PASSED [ 51%]
+  tests/test_d10_vertical_slice.py::test_d10_semantic_replay_trace_uses_canonical_d5_action_digests PASSED [ 54%]
+  tests/test_d10_vertical_slice.py::test_d10_parity_reaches_canonical_boundary PASSED [ 57%]
+  tests/test_d10_vertical_slice.py::test_d10_test_a_forged_decision_rejected PASSED [ 60%]
+  tests/test_d10_vertical_slice.py::test_d10_test_b_action_request_mutation_after_admission_rejected PASSED [ 63%]
+  tests/test_d10_vertical_slice.py::test_d10_test_c_hardcoded_secret_rejection PASSED [ 66%]
+  tests/test_d10_vertical_slice.py::test_d10_test_d_obligation_mismatch_rejected PASSED [ 69%]
+  tests/test_d10_vertical_slice.py::test_d10_test_e_missing_authority_secret_fails_closed_in_strict_mode PASSED [ 72%]
+  tests/test_d10_vertical_slice.py::test_d10_authorization_decision_persistence_failure_denied PASSED [ 75%]
+  tests/test_d10_vertical_slice.py::test_d10_d2_nonce_is_authoritative_replay_state PASSED [ 78%]
+  tests/test_d10_vertical_slice.py::test_d10_d2_nonce_duplicate_rejected PASSED [ 81%]
+  tests/test_d10_vertical_slice.py::test_d10_d2_nonce_persistence_corruption_fails_closed PASSED [ 84%]
+  tests/test_d10_vertical_slice.py::test_d10_d2_nonce_reservation_failure_denies_execution PASSED [ 87%]
+  tests/test_d10_vertical_slice.py::test_d10_capability_id_mismatch_rejected PASSED [ 90%]
+  tests/test_d10_vertical_slice.py::test_d10_capability_version_mismatch_rejected PASSED [ 93%]
+  tests/test_d10_vertical_slice.py::test_d10_capability_hash_mismatch_rejected PASSED [ 96%]
+  tests/test_d10_vertical_slice.py::test_d10_decision_token_policy_binding PASSED [100%]
 ==============================================================================
 
+==============================================================================
+  2. B.1 SECURITY CERTIFICATION SUITE: 43/43 PASSED (Exit Code: 0)
+==============================================================================
+Command: "C:\Users\dorni\AppData\Local\Python\pythoncore-3.14-64\python.exe" -m pytest tests/certification/test_cert_handoff_b1_security.py -v
+Duration: 4.61s
+Collected: 43 | Passed: 43 | Failed: 0 | Skipped: 0 | Errors: 0
+==============================================================================
+
+==============================================================================
+  3. B.2 REAL OPA CERTIFICATION SUITE: 16/16 PASSED (Exit Code: 0)
+==============================================================================
+Command: "C:\Users\dorni\AppData\Local\Python\pythoncore-3.14-64\python.exe" -m pytest tests/certification/test_cert_b2_opa_provider.py -v
+Duration: 3.89s
+Collected: 16 | Passed: 16 | Failed: 0 | Skipped: 0 | Errors: 0
+==============================================================================
+
+==============================================================================
+  4. REPOSITORY-WIDE TEST SUITE (tests/): 889/889 PASSED (Exit Code: 0)
+==============================================================================
+Command: "C:\Users\dorni\AppData\Local\Python\pythoncore-3.14-64\python.exe" -m pytest tests/ -v
+Duration: 151.20s
+Collected: 889 | Passed: 889 | Failed: 0 | Skipped: 0 | Errors: 0
+Repository-Wide Suite Exit Status: SUCCESS (0)
+==============================================================================
+
+==============================================================================
+  HISTORICAL AUDIT ARCHIVE (LABELED HISTORICAL: 32/32 MASTER MILESTONES)
+==============================================================================
+  [HISTORICAL PASS] [M01_TRUST_KERNEL] Phase 1 Trust Kernel
+  [HISTORICAL PASS] [M02_EXECUTION_SECURITY] Execution Security & Modes
+  [HISTORICAL PASS] [M03_SESSION_HANDOFF] Session Handoff & Continuity
+  [HISTORICAL PASS] [M04_MCP_TRANSPORT] MCP Protocol & Transport
+  [HISTORICAL PASS] [M05_OPA_PROVIDER] B.2 OPA Policy Provider
+  [HISTORICAL PASS] [M06_PLATFORM_OPTIMIZATION] B.3 Platform Optimization Core
+  [HISTORICAL PASS] [M07_PLATFORM_PROFILING] B.4 Platform Profiling Framework
+  [HISTORICAL PASS] [M08_MCP_OFFICIAL] B.5 Official MCP Integration
+  [HISTORICAL PASS] [M09_ACP_PROTOCOL] B.6 ACP Platform Integration
+  [HISTORICAL PASS] [M10_VERIFICATION_PROVIDERS] B.7 Verification Providers
+  [HISTORICAL PASS] [M11_ADAPTIVE_VERIFICATION] B.8 Adaptive Verification Policies
+  [HISTORICAL PASS] [M12_INDEPENDENT_OBSERVATION] B.9 Independent Observation & OTel
+  [HISTORICAL PASS] [M13_EMPIRICAL_LEARNING] B.10 Empirical Outcome Learning
+  [HISTORICAL PASS] [M14_UNIVERSAL_TRUTH] B.11 Universal Truth Layer & Project State
+  [HISTORICAL PASS] [M15_CROSS_PLATFORM_CONTINUITY] B.12 Cross-Platform Continuity
+  [HISTORICAL PASS] [M16_FLEET_INTEGRITY] B.15 Multi-Agent Fleet Integrity
+  [HISTORICAL PASS] [M17_CODEX_BENCHMARK] RC.1 External Codex Subprocess & Benchmark
+  [HISTORICAL PASS] [M18_EXECUTION_PROVIDERS] RC.2 Execution Provider Closure & Sandboxing
+  [HISTORICAL PASS] [M19_OBSERVATION_PLANE] RC.3 Independent Observation Plane
+  [HISTORICAL PASS] [M20_VERIFICATION_ENGINE] RC.4 Executable Verification Engine Hierarchy
+  [HISTORICAL PASS] [M21_PROJECT_TRUTH] RC.5 Universal Project Truth & Invalidation
+  [HISTORICAL PASS] [M22_CODE_INTELLIGENCE] RC.6 Tree-sitter Code Intelligence & SCIP
+  [HISTORICAL PASS] [M23_PROTOCOL_GATEWAY] RC.7 ACP Proxy & MCP Protocol Gateway
+  [HISTORICAL PASS] [M24_HANDOFF_CONTINUITY] RC.8 Handoff & Continuity Engine
+  [HISTORICAL PASS] [M25_FLEET_PRODUCTION] RC.9 Fleet Task Graph & Production Engine
+  [HISTORICAL PASS] [M26_MEMORY_PROVIDER] RC.10 Memory Provider Abstraction & Mem0
+  [HISTORICAL PASS] [M27_PLATFORM_ENGINE] RC.11 Platform Profile Engine & Compensation Budget
+  [HISTORICAL PASS] [M28_SILENT_GOVERNANCE] RC.12 Silent Governance Mode & Universal Adapters
+  [HISTORICAL PASS] [M29_CLI_UX] RC.13 CLI Completion & Explain/Audit UX
+  [HISTORICAL PASS] [M30_POLICY_PRODUCT] RC.14 OPA/Cedar Policy Product & Bundles
+  [HISTORICAL PASS] [M31_SUPPLY_CHAIN] RC.15 Supply-Chain Evidence & Provenance
+  [HISTORICAL PASS] [M32_PACKAGING] RC.16 Packaging, Unified Config & Installer
+==============================================================================
