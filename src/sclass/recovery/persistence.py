@@ -51,6 +51,12 @@ class RecoveryPersistence:
                 ) from e
 
         # Mirror transition event to EventJournal as append-only audit evidence
+        transition_ts = None
+        if record.history:
+            last_entry = record.history[-1]
+            if isinstance(last_entry, dict):
+                transition_ts = last_entry.get("timestamp")
+
         try:
             self.journal.append(
                 event_type="sclass.recovery.transition",
@@ -65,6 +71,7 @@ class RecoveryPersistence:
                     "affected_claim_id": record.affected_claim_id,
                     "affected_evidence_id": record.affected_evidence_id,
                 },
+                time=transition_ts or now_iso,
             )
         except Exception as e:
             raise RecoveryPersistenceError(f"Failed to mirror recovery event to EventJournal: {e}") from e

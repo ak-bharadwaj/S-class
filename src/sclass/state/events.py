@@ -59,6 +59,7 @@ class CloudEvent:
         subject: str,
         data: Dict[str, Any],
         source: str = "sclass.control_plane",
+        time: Optional[str] = None,
     ) -> CloudEvent:
         """Factory method to emit standard CloudEvents."""
         return cls(
@@ -66,7 +67,7 @@ class CloudEvent:
             source=source,
             type=event_type,
             subject=subject,
-            time=datetime.now(timezone.utc).isoformat(),
+            time=time or datetime.now(timezone.utc).isoformat(),
             data=data,
         )
 
@@ -79,9 +80,16 @@ class EventJournal:
         self.paths.ensure_directories()
         self.journal_file = os.path.join(self.paths.events_dir, "journal.jsonl")
 
-    def append(self, event_type: str, subject: str, data: Dict[str, Any], source: str = "sclass.control_plane") -> CloudEvent:
+    def append(
+        self,
+        event_type: str,
+        subject: str,
+        data: Dict[str, Any],
+        source: str = "sclass.control_plane",
+        time: Optional[str] = None,
+    ) -> CloudEvent:
         """Atomically appends a CloudEvent to the journal."""
-        event = CloudEvent.create(event_type=event_type, subject=subject, data=data, source=source)
+        event = CloudEvent.create(event_type=event_type, subject=subject, data=data, source=source, time=time)
         line = json.dumps(event.to_dict(), ensure_ascii=False) + "\n"
 
         with WorkspaceLock(self.paths.root, lock_name="journal"):

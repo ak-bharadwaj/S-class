@@ -707,6 +707,7 @@ class RecoveryEngine:
             "from_state": prev_state.value,
             "to_state": RecoveryState.REPAIR_IN_PROGRESS.value,
             "timestamp": now_iso,
+            "attempt_number": record.attempt_number,
         })
 
         self.persistence.save_recovery(record)
@@ -901,11 +902,15 @@ class RecoveryEngine:
         affected_claim_ids = tuple(c.claim_id for c in reassessment_claims)
         verif_list = list(regression_verifications or [])
 
-        # Determine the canonical repair boundary timestamp exclusively from authoritative persisted S-Class recovery state/history
-        repair_boundary_str = None
-        current_attempt = getattr(record, "attempt_number", None)
+        # D9.2.4: Derive canonical repair boundary exclusively from actual REPAIR_IN_PROGRESS
+        # transition for the current recovery attempt in authoritative stores (SQLite and EventJournal).
+        # Generic fallbacks (record.created_at, current_repair_obligation.created_at, datetime.now(), caller timestamps)
+        # are strictly prohibited.
+        current_attempt = getattr(record, "attempt_number", 1)
 
-        # 1. Primary: EventJournal (append-only CloudEvents journal)
+        journal_repair_boundary: Optional[str] = None
+        journal_previous_attempt: bool = False
+
         try:
             journal_events = self.persistence.journal.read_all()
             rec_subject = f"recovery:{record.recovery_id}"
@@ -915,50 +920,158 @@ class RecoveryEngine:
                     ev.subject == rec_subject or ev.data.get("recovery_id") == record.recovery_id
                 )
             ]
-            # Match current attempt if available
-            for ev in reversed(matching_events):
-                ev_state = ev.data.get("state")
-                ev_attempt = ev.data.get("attempt_number")
-                if current_attempt is not None and ev_attempt is not None and ev_attempt != current_attempt:
-                    continue
-                if ev_state in ("REPAIR_IN_PROGRESS", "REPAIR_REQUIRED"):
-                    repair_boundary_str = ev.time
-                    break
-            if not repair_boundary_str:
-                for ev in reversed(matching_events):
-                    ev_state = ev.data.get("state")
-                    if ev_state in ("REPAIR_IN_PROGRESS", "REPAIR_REQUIRED"):
-                        repair_boundary_str = ev.time
-                        break
+            journal_rip_events = [
+                ev for ev in matching_events
+                if ev.data.get("state") in ("REPAIR_IN_PROGRESS", RecoveryState.REPAIR_IN_PROGRESS.value)
+            ]
+            if journal_rip_events:
+                current_rip_events = [
+                    ev for ev in journal_rip_events
+                    if ev.data.get("attempt_number") == current_attempt
+                ]
+                if not current_rip_events:
+                    journal_previous_attempt = True
+                else:
+                    journal_repair_boundary = current_rip_events[-1].time
         except Exception:
             pass
 
-        # 2. Authoritative SQLite persistence (load_recovery)
-        if not repair_boundary_str:
-            rec_attempt = getattr(record, "attempt_number", None)
-            for h in reversed(record.history or []):
-                if h.get("event") in ("repair_in_progress", "repair_obligation_created"):
-                    h_attempt = h.get("attempt_number")
-                    if rec_attempt is not None and h_attempt is not None and h_attempt != rec_attempt:
-                        continue
-                    repair_boundary_str = h.get("timestamp")
-                    break
-            if not repair_boundary_str:
-                for h in reversed(record.history or []):
-                    if h.get("event") in ("repair_in_progress", "repair_obligation_created"):
-                        repair_boundary_str = h.get("timestamp")
-                        break
-            if not repair_boundary_str:
-                if record.current_repair_obligation and record.current_repair_obligation.created_at:
-                    repair_boundary_str = record.current_repair_obligation.created_at
-                elif record.created_at:
-                    repair_boundary_str = record.created_at
+        sqlite_repair_boundary: Optional[str] = None
+        sqlite_previous_attempt: bool = False
 
-        # Fail closed on missing, empty, or unparseable canonical repair boundary
-        if not repair_boundary_str or not isinstance(repair_boundary_str, str) or not repair_boundary_str.strip():
+        history_rip = [
+            h for h in (record.history or [])
+            if isinstance(h, dict) and (
+                h.get("event") == "repair_in_progress"
+                or h.get("to_state") in ("REPAIR_IN_PROGRESS", RecoveryState.REPAIR_IN_PROGRESS.value)
+            )
+        ]
+        if history_rip:
+            current_history_rip = [
+                h for h in history_rip
+                if h.get("attempt_number") == current_attempt
+                or (h.get("attempt_number") is None and current_attempt == 1 and len(history_rip) == 1)
+            ]
+            if not current_history_rip:
+                sqlite_previous_attempt = True
+            else:
+                sqlite_repair_boundary = current_history_rip[-1].get("timestamp")
+
+        # Required authority rule:
+        # 1. Previous-attempt transition in either store -> fail closed.
+        if journal_previous_attempt:
+            err_msg = (
+                f"Previous-attempt transition: EventJournal REPAIR_IN_PROGRESS transition "
+                f"for recovery '{record.recovery_id}' is from a previous attempt (expected attempt {current_attempt})."
+            )
+            assessment = RegressionAssessment(
+                affected_claim_ids=affected_claim_ids,
+                reverified_claim_ids=(),
+                failed_claim_ids=affected_claim_ids,
+                stale_claim_ids=(),
+                regression_passed=False,
+                assessment_time=now_iso,
+                unaffected_claim_ids=tuple(unaffected_claim_ids),
+                provenance_references={},
+                reason=err_msg,
+            )
+            record.regression_assessment = assessment
+            try:
+                self.persistence.save_recovery(record)
+            except Exception:
+                pass
+            if fail_closed:
+                raise RecoveryError(err_msg)
+            return assessment
+
+        if sqlite_previous_attempt:
+            err_msg = (
+                f"Previous-attempt transition: SQLite repair_in_progress transition "
+                f"for recovery '{record.recovery_id}' is from a previous attempt (expected attempt {current_attempt})."
+            )
+            assessment = RegressionAssessment(
+                affected_claim_ids=affected_claim_ids,
+                reverified_claim_ids=(),
+                failed_claim_ids=affected_claim_ids,
+                stale_claim_ids=(),
+                regression_passed=False,
+                assessment_time=now_iso,
+                unaffected_claim_ids=tuple(unaffected_claim_ids),
+                provenance_references={},
+                reason=err_msg,
+            )
+            record.regression_assessment = assessment
+            try:
+                self.persistence.save_recovery(record)
+            except Exception:
+                pass
+            if fail_closed:
+                raise RecoveryError(err_msg)
+            return assessment
+
+        # 2. Missing canonical transition in authoritative stores -> fail closed.
+        if journal_repair_boundary is None and sqlite_repair_boundary is None:
+            err_msg = (
+                f"Missing canonical repair boundary: no REPAIR_IN_PROGRESS transition "
+                f"found for recovery '{record.recovery_id}' in authoritative stores."
+            )
+            assessment = RegressionAssessment(
+                affected_claim_ids=affected_claim_ids,
+                reverified_claim_ids=(),
+                failed_claim_ids=affected_claim_ids,
+                stale_claim_ids=(),
+                regression_passed=False,
+                assessment_time=now_iso,
+                unaffected_claim_ids=tuple(unaffected_claim_ids),
+                provenance_references={},
+                reason=err_msg,
+            )
+            record.regression_assessment = assessment
+            try:
+                self.persistence.save_recovery(record)
+            except Exception:
+                pass
+            if fail_closed:
+                raise RecoveryError(err_msg)
+            return assessment
+
+        # 3. Required authority rule:
+        # When both authoritative stores contain the repair transition:
+        # SQLite canonical repair transition == EventJournal canonical repair transition
+        # Any mismatch -> fail closed.
+        if journal_repair_boundary is not None and sqlite_repair_boundary is not None:
+            if sqlite_repair_boundary != journal_repair_boundary:
+                err_msg = (
+                    f"Canonical repair transition mismatch: SQLite transition '{sqlite_repair_boundary}' "
+                    f"does not match EventJournal transition '{journal_repair_boundary}'."
+                )
+                assessment = RegressionAssessment(
+                    affected_claim_ids=affected_claim_ids,
+                    reverified_claim_ids=(),
+                    failed_claim_ids=affected_claim_ids,
+                    stale_claim_ids=(),
+                    regression_passed=False,
+                    assessment_time=now_iso,
+                    unaffected_claim_ids=tuple(unaffected_claim_ids),
+                    provenance_references={},
+                    reason=err_msg,
+                )
+                record.regression_assessment = assessment
+                try:
+                    self.persistence.save_recovery(record)
+                except Exception:
+                    pass
+                if fail_closed:
+                    raise RecoveryError(err_msg)
+                return assessment
+
+        repair_boundary_str = journal_repair_boundary if journal_repair_boundary is not None else sqlite_repair_boundary
+
+        # Fail closed on empty or non-string boundary timestamp
+        if not isinstance(repair_boundary_str, str) or not repair_boundary_str.strip():
             err_msg = (
                 f"Missing canonical repair boundary: recovery '{record.recovery_id}' "
-                f"lacks authoritative repair boundary timestamp."
+                f"lacks non-empty repair boundary timestamp."
             )
             assessment = RegressionAssessment(
                 affected_claim_ids=affected_claim_ids,
