@@ -10,10 +10,15 @@ from sclass.recovery.models import (
     RecoveryResult,
     RegressionAssessment,
     FrontierRecomputation,
+    RepairStrategy,
+    RepairStep,
+    RecoveryBounds,
+    RepairPlan,
 )
 from sclass.recovery.state_machine import RecoveryStateMachine
 from sclass.recovery.persistence import RecoveryPersistence
 from sclass.recovery.engine import RecoveryEngine
+from sclass.recovery.planner import RecoveryPlanner
 from sclass.core.errors import (
     RecoveryError,
     RecoveryStateTransitionError,
@@ -30,7 +35,12 @@ __all__ = [
     "RecoveryResult",
     "RegressionAssessment",
     "FrontierRecomputation",
+    "RepairStrategy",
+    "RepairStep",
+    "RecoveryBounds",
+    "RepairPlan",
     "RecoveryEngine",
+    "RecoveryPlanner",
     "RecoveryPersistence",
     "RecoveryError",
     "RecoveryStateTransitionError",

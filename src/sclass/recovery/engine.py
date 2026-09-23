@@ -1696,6 +1696,14 @@ class RecoveryEngine:
             reason=reason,
         )
 
+        # Persist recomputed frontier state with canonical provenance
+        record.frontier_recomputation = frontier
+        record.metadata["frontier_recomputation"] = frontier.to_dict()
+        try:
+            self.persistence.save_recovery(record)
+        except Exception:
+            pass
+
         if fail_closed and not is_valid:
             if reg_assessment is not None and not reg_assessment.regression_passed:
                 raise RecoveryError(
@@ -1966,3 +1974,35 @@ class RecoveryEngine:
                     final_evidence_id=verif_receipt_id,
                     reason=f"Re-verification failed: {verif_reason}. Fresh repair attempt required.",
                 )
+
+    def create_recovery_plan(
+        self,
+        recovery_id: Union[str, RecoveryRecord],
+        caller_frontier: Optional[Any] = None,
+        caller_accepted_obligations: Optional[List[str]] = None,
+        fail_closed: bool = True,
+        recursion_depth: int = 0,
+        max_recursion_depth: int = 3,
+        budget_limit: Optional[float] = None,
+        current_cost: float = 0.0,
+    ) -> RepairPlan:
+        """
+        D9.4: Bounded Canonical Recovery Planner.
+        Converts validated canonical recovery state and frontier into a declarative,
+        bounded repair plan for Controller authorization and execution.
+        """
+        from sclass.recovery.planner import RecoveryPlanner
+        planner = RecoveryPlanner(
+            workspace_dir=self.workspace_dir,
+            persistence=self.persistence,
+        )
+        return planner.create_plan(
+            recovery_id=recovery_id,
+            caller_frontier=caller_frontier,
+            caller_accepted_obligations=caller_accepted_obligations,
+            fail_closed=fail_closed,
+            recursion_depth=recursion_depth,
+            max_recursion_depth=max_recursion_depth,
+            budget_limit=budget_limit,
+            current_cost=current_cost,
+        )

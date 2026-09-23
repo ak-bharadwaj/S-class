@@ -10,6 +10,7 @@ Enforces Invariant:
 
 from __future__ import annotations
 import uuid
+import hashlib
 from enum import Enum
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -219,6 +220,162 @@ class FrontierRecomputation:
         )
 
 
+class RepairStrategy(str, Enum):
+    """Deterministic repair strategies for bounded recovery planning."""
+    TARGETED_REPAIR = "TARGETED_REPAIR"
+    WORKSPACE_RECONCILIATION = "WORKSPACE_RECONCILIATION"
+    STATE_RESYNCHRONIZATION = "STATE_RESYNCHRONIZATION"
+    DEPENDENCY_RECOMPILATION = "DEPENDENCY_RECOMPILATION"
+    ISOLATED_ROLLBACK = "ISOLATED_ROLLBACK"
+
+
+@dataclass(frozen=True)
+class RepairStep:
+    """A deterministic, declarative step within a bounded RepairPlan."""
+    step_id: str
+    action_type: str
+    target: str
+    description: str
+    parameters: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "step_id": self.step_id,
+            "action_type": self.action_type,
+            "target": self.target,
+            "description": self.description,
+            "parameters": dict(self.parameters),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> RepairStep:
+        return cls(
+            step_id=data["step_id"],
+            action_type=data["action_type"],
+            target=data.get("target", ""),
+            description=data.get("description", ""),
+            parameters=dict(data.get("parameters", {})),
+        )
+
+    def to_action_request(
+        self,
+        task_id: str,
+        workspace_dir: str,
+        actor: str = "recovery_planner",
+    ) -> Any:
+        """Converts declarative repair step into a canonical ActionRequest for Controller submission."""
+        from sclass.domain.action import ActionRequest
+        return ActionRequest(
+            actor=actor,
+            session=task_id,
+            capability="fs.write" if "patch" in self.action_type else "terminal.execute",
+            action=self.action_type,
+            target=self.target,
+            parameters=dict(self.parameters),
+            workspace=workspace_dir,
+            context={
+                "step_id": self.step_id,
+                "intent": self.description,
+                "plan_step": True,
+            },
+        )
+
+
+@dataclass(frozen=True)
+class RecoveryBounds:
+    """Execution boundaries and limits enforced on recovery plans."""
+    max_attempts: int
+    current_attempt: int
+    max_recursion_depth: int
+    current_recursion_depth: int
+    budget_limit: Optional[float] = None
+    current_cost: float = 0.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "max_attempts": self.max_attempts,
+            "current_attempt": self.current_attempt,
+            "max_recursion_depth": self.max_recursion_depth,
+            "current_recursion_depth": self.current_recursion_depth,
+            "budget_limit": self.budget_limit,
+            "current_cost": self.current_cost,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> RecoveryBounds:
+        return cls(
+            max_attempts=int(data.get("max_attempts", 3)),
+            current_attempt=int(data.get("current_attempt", 0)),
+            max_recursion_depth=int(data.get("max_recursion_depth", 3)),
+            current_recursion_depth=int(data.get("current_recursion_depth", 0)),
+            budget_limit=float(data["budget_limit"]) if data.get("budget_limit") is not None else None,
+            current_cost=float(data.get("current_cost", 0.0)),
+        )
+
+
+@dataclass(frozen=True)
+class RepairPlan:
+    """
+    Persisted, serializable planner result converting validated recovery state
+    into a deterministic, bounded sequence of repair steps for Controller authorization.
+    The planner output is strictly declarative and executes nothing.
+    """
+    recovery_id: str
+    task_id: str
+    repair_obligation_id: str
+    selected_strategy: str
+    ordered_repair_steps: Tuple[RepairStep, ...]
+    constraints: Dict[str, Any]
+    rationale: str
+    is_valid: bool
+    provenance: Dict[str, Any]
+    created_at: str
+    plan_id: str = ""
+
+    def __post_init__(self):
+        if not isinstance(self.ordered_repair_steps, tuple):
+            object.__setattr__(self, "ordered_repair_steps", tuple(self.ordered_repair_steps))
+        if not self.plan_id:
+            plan_sig = f"{self.recovery_id}:{self.repair_obligation_id}:{self.selected_strategy}"
+            object.__setattr__(
+                self,
+                "plan_id",
+                f"plan_{hashlib.sha256(plan_sig.encode('utf-8')).hexdigest()[:12]}",
+            )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "plan_id": self.plan_id,
+            "recovery_id": self.recovery_id,
+            "task_id": self.task_id,
+            "repair_obligation_id": self.repair_obligation_id,
+            "selected_strategy": self.selected_strategy,
+            "ordered_repair_steps": [s.to_dict() for s in self.ordered_repair_steps],
+            "constraints": dict(self.constraints),
+            "rationale": self.rationale,
+            "is_valid": self.is_valid,
+            "provenance": dict(self.provenance),
+            "created_at": self.created_at,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> RepairPlan:
+        steps = tuple(RepairStep.from_dict(s) for s in data.get("ordered_repair_steps", []))
+        return cls(
+            plan_id=data.get("plan_id", ""),
+            recovery_id=data["recovery_id"],
+            task_id=data["task_id"],
+            repair_obligation_id=data["repair_obligation_id"],
+            selected_strategy=data["selected_strategy"],
+            ordered_repair_steps=steps,
+            constraints=dict(data.get("constraints", {})),
+            rationale=data.get("rationale", ""),
+            is_valid=bool(data.get("is_valid", False)),
+            provenance=dict(data.get("provenance", {})),
+            created_at=data.get("created_at", ""),
+        )
+
+
 @dataclass
 class RecoveryRecord:
     """
@@ -246,6 +403,7 @@ class RecoveryRecord:
     metadata: Dict[str, Any] = field(default_factory=dict)
     regression_assessment: Optional[RegressionAssessment] = None
     frontier_recomputation: Optional[FrontierRecomputation] = None
+    repair_plan: Optional[RepairPlan] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -270,6 +428,7 @@ class RecoveryRecord:
             "metadata": dict(self.metadata),
             "regression_assessment": self.regression_assessment.to_dict() if self.regression_assessment else None,
             "frontier_recomputation": self.frontier_recomputation.to_dict() if self.frontier_recomputation else None,
+            "repair_plan": self.repair_plan.to_dict() if self.repair_plan else None,
         }
 
     @classmethod
@@ -287,6 +446,11 @@ class RecoveryRecord:
         frontier_data = data.get("frontier_recomputation") or data.get("metadata", {}).get("frontier_recomputation")
         if frontier_data:
             frontier_rec = FrontierRecomputation.from_dict(frontier_data)
+
+        plan = None
+        plan_data = data.get("repair_plan") or data.get("metadata", {}).get("repair_plan")
+        if plan_data:
+            plan = RepairPlan.from_dict(plan_data)
 
         return cls(
             recovery_id=data["recovery_id"],
@@ -310,6 +474,7 @@ class RecoveryRecord:
             metadata=dict(data.get("metadata", {})),
             regression_assessment=reg_assess,
             frontier_recomputation=frontier_rec,
+            repair_plan=plan,
         )
 
 

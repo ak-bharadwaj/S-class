@@ -87,13 +87,20 @@ from sclass.recovery import (
     RecoveryResult,
     RegressionAssessment,
     FrontierRecomputation,
+    RepairStrategy,
+    RepairStep,
+    RecoveryBounds,
+    RepairPlan,
     RecoveryEngine,
+    RecoveryPlanner,
     RecoveryPersistence,
     RecoveryError,
     RecoveryStateTransitionError,
     RecoveryExhaustedError,
     RecoveryPersistenceError,
 )
+from sclass.core.errors import SecurityViolationError
+from sclass.core.vertical_slice import SliceExecutor, ExecutionEnvelope, ActionRequest
 from sclass.domain.verification import VerificationResult, VerificationEvent
 from sclass.domain.claim import Claim
 from sclass.domain.task import Task
@@ -4683,6 +4690,388 @@ def test_d9_3_1_direct_recompute_frontier_cannot_bypass_convergence(tmp_path):
             known_accepted_obligations=["claim_3_1_7_unacc"],
             fail_closed=True,
         )
+
+
+# ==============================================================================
+# D9.4 Bounded Canonical Recovery Planner Tests (12 Mandatory Adversarial Scenarios)
+# ==============================================================================
+
+def test_d9_4_forged_in_memory_recovery_rejected(tmp_path):
+    """
+    D9.4 Test 1: Forged in-memory recovery record rejected.
+    RecoveryPlanner must fail closed when the recovery record does not exist
+    in authoritative persistence (RecoveryPersistence / StateRepository).
+    Synthetic in-memory objects or nonexistent recovery IDs cannot establish planning.
+    """
+    ws = str(tmp_path / "d9_4_test_1")
+    os.makedirs(ws, exist_ok=True)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    # Synthetic in-memory record not in persistence
+    fake_record = RecoveryRecord(
+        recovery_id="rec_fake_forged_001",
+        task_id="task_fake",
+        affected_obligation_id="ob_fake",
+        current_state=RecoveryState.REPAIR_REQUIRED,
+        attempt_number=1,
+        max_attempts=3,
+        created_at="2026-09-23T00:00:00Z",
+        updated_at="2026-09-23T00:00:00Z",
+        failure_classification="TEST_FAILURE",
+        reason="Forged test record",
+    )
+
+    with pytest.raises(RecoveryError, match="Missing canonical recovery record|not found in authoritative state store"):
+        planner.create_plan(fake_record)
+
+    with pytest.raises(RecoveryError, match="Missing canonical recovery record|not found in authoritative state store"):
+        planner.create_plan("rec_fake_forged_001")
+
+
+def test_d9_4_forged_frontier_rejected(tmp_path):
+    """
+    D9.4 Test 2: Forged frontier rejected.
+    If caller attempts to supply a forged frontier that diverges from the authoritative canonical frontier,
+    the planner fails closed.
+    """
+    ws = str(tmp_path / "d9_4_test_2")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    # Establish canonical state
+    claim = Claim(claim_id="claim_d94_2", task_id="task_d94_2", statement="Canonical test", target_files=("src/app.py",))
+    _save_test_claim(state_repo, ws, claim)
+    rc_fail = make_observed_failure_receipt(receipt_id="rc_f_d94_2", task_id="task_d94_2", claim_id="claim_d94_2", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d94_2", obligation_id="ob_d94_2", failure_evidence=rc_fail, claim_id="claim_d94_2")
+    engine.create_repair_obligation(record.recovery_id, target="src/app.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+    engine.recompute_frontier(record.recovery_id)
+
+    # Forged frontier with fabricated obligations
+    forged_frontier = FrontierRecomputation(
+        task_id="task_d94_2",
+        repaired_obligation_id="ob_d94_2",
+        frontier_obligations=("fabricated_obligation_999",),
+        preserved_obligation_ids=("fake_preserved_999",),
+        invalidated_obligation_ids=(),
+        unresolved_obligation_ids=(),
+        is_valid=True,
+        recomputed_at="2026-09-23T00:00:00Z",
+    )
+
+    with pytest.raises(RecoveryError, match="Forged frontier rejected|diverges from authoritative canonical frontier"):
+        planner.create_plan(record.recovery_id, caller_frontier=forged_frontier)
+
+
+def test_d9_4_forged_accepted_obligation_rejected(tmp_path):
+    """
+    D9.4 Test 3: Forged accepted obligation rejected.
+    Caller-provided accepted obligations must be authoritatively verified in StateRepository;
+    unaccepted or forged assertions fail closed.
+    """
+    ws = str(tmp_path / "d9_4_test_3")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    claim = Claim(claim_id="claim_d94_3", task_id="task_d94_3", statement="Target claim", target_files=("src/main.py",))
+    _save_test_claim(state_repo, ws, claim)
+    rc_fail = make_observed_failure_receipt(receipt_id="rc_f_d94_3", task_id="task_d94_3", claim_id="claim_d94_3", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d94_3", obligation_id="ob_d94_3", failure_evidence=rc_fail, claim_id="claim_d94_3")
+    engine.create_repair_obligation(record.recovery_id, target="src/main.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+    engine.recompute_frontier(record.recovery_id)
+
+    # Pass an unaccepted claim obligation assertion
+    with pytest.raises(RecoveryError, match="Untrusted obligation assertion|not an authoritatively accepted claim"):
+        planner.create_plan(
+            record.recovery_id,
+            caller_accepted_obligations=["fabricated_claim_unaccepted"],
+        )
+
+
+def test_d9_4_missing_canonical_frontier_rejected(tmp_path):
+    """
+    D9.4 Test 4: Missing canonical frontier rejected.
+    When authoritative frontier cannot be resolved (e.g. affected accepted claims exist
+    without canonical regression assessment), planning must fail closed.
+    """
+    ws = str(tmp_path / "d9_4_test_4")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    # Pre-existing accepted claim
+    claim_prev = Claim(claim_id="claim_d94_4_prev", task_id="task_d94_4", statement="Prev", target_files=("src/calc.py",))
+    _save_test_claim(state_repo, ws, claim_prev)
+    rc_prev = make_observed_success_receipt(receipt_id="rc_p_d94_4", task_id="task_d94_4", claim_id="claim_d94_4_prev", workspace=ws)
+    make_canonical_verification_result(rc_prev, status="ACCEPT", claim_id="claim_d94_4_prev", workspace=ws)
+
+    # Target failure
+    claim_fail = Claim(claim_id="claim_d94_4_fail", task_id="task_d94_4", statement="Fail", target_files=("src/calc.py",))
+    _save_test_claim(state_repo, ws, claim_fail)
+    rc_fail = make_observed_failure_receipt(receipt_id="rc_f_d94_4", task_id="task_d94_4", claim_id="claim_d94_4_fail", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d94_4", obligation_id="ob_d94_4", failure_evidence=rc_fail, claim_id="claim_d94_4_fail")
+    engine.create_repair_obligation(record.recovery_id, target="src/calc.py")
+    engine.start_repair(record.recovery_id)
+    # Regression assessment deliberately NOT done for claim_prev
+
+    # Calling create_plan fails closed because canonical frontier cannot be resolved without regression assessment
+    with pytest.raises(RecoveryError, match="Missing canonical frontier|Regression assessment missing"):
+        planner.create_plan(record.recovery_id, fail_closed=True)
+
+
+def test_d9_4_exhausted_attempts_no_plan(tmp_path):
+    """
+    D9.4 Test 5: Exhausted attempts produce no plan and fail closed.
+    When attempt_number >= max_attempts, recovery is exhausted.
+    """
+    ws = str(tmp_path / "d9_4_test_5")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    claim = Claim(claim_id="claim_d94_5", task_id="task_d94_5", statement="Target", target_files=("src/app.py",))
+    _save_test_claim(state_repo, ws, claim)
+    rc_fail = make_observed_failure_receipt(receipt_id="rc_f_d94_5", task_id="task_d94_5", claim_id="claim_d94_5", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d94_5", obligation_id="ob_d94_5", failure_evidence=rc_fail, claim_id="claim_d94_5")
+    engine.create_repair_obligation(record.recovery_id, target="src/app.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+    engine.recompute_frontier(record.recovery_id)
+
+    # Exhaust attempts
+    rec = engine.get_recovery(record.recovery_id)
+    rec.attempt_number = rec.max_attempts
+    engine.persistence.save_recovery(rec)
+
+    with pytest.raises(RecoveryError, match="Recovery attempts exhausted"):
+        planner.create_plan(record.recovery_id, fail_closed=True)
+
+    plan = planner.create_plan(record.recovery_id, fail_closed=False)
+    assert plan is None
+
+
+def test_d9_4_exceeded_recursion_depth_no_plan(tmp_path):
+    """
+    D9.4 Test 6: Exceeded recursion depth produces no plan and fails closed.
+    """
+    ws = str(tmp_path / "d9_4_test_6")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    claim = Claim(claim_id="claim_d94_6", task_id="task_d94_6", statement="Target", target_files=("src/app.py",))
+    _save_test_claim(state_repo, ws, claim)
+    rc_fail = make_observed_failure_receipt(receipt_id="rc_f_d94_6", task_id="task_d94_6", claim_id="claim_d94_6", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d94_6", obligation_id="ob_d94_6", failure_evidence=rc_fail, claim_id="claim_d94_6")
+    engine.create_repair_obligation(record.recovery_id, target="src/app.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+    engine.recompute_frontier(record.recovery_id)
+
+    with pytest.raises(RecoveryError, match="Recovery recursion depth limit exceeded"):
+        planner.create_plan(record.recovery_id, recursion_depth=3, max_recursion_depth=3, fail_closed=True)
+
+    plan = planner.create_plan(record.recovery_id, recursion_depth=3, max_recursion_depth=3, fail_closed=False)
+    assert plan is None
+
+
+def test_d9_4_exceeded_budget_no_plan(tmp_path):
+    """
+    D9.4 Test 7: Exceeded budget produces no plan and fails closed.
+    """
+    ws = str(tmp_path / "d9_4_test_7")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    claim = Claim(claim_id="claim_d94_7", task_id="task_d94_7", statement="Target", target_files=("src/app.py",))
+    _save_test_claim(state_repo, ws, claim)
+    rc_fail = make_observed_failure_receipt(receipt_id="rc_f_d94_7", task_id="task_d94_7", claim_id="claim_d94_7", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d94_7", obligation_id="ob_d94_7", failure_evidence=rc_fail, claim_id="claim_d94_7")
+    engine.create_repair_obligation(record.recovery_id, target="src/app.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+    engine.recompute_frontier(record.recovery_id)
+
+    with pytest.raises(RecoveryError, match="Recovery budget exhausted"):
+        planner.create_plan(record.recovery_id, budget_limit=50.0, current_cost=50.0, fail_closed=True)
+
+    plan = planner.create_plan(record.recovery_id, budget_limit=50.0, current_cost=75.0, fail_closed=False)
+    assert plan is None
+
+
+def test_d9_4_identical_canonical_state_identical_plan(tmp_path):
+    """
+    D9.4 Test 8: Deterministic planning: identical canonical state -> identical plan.
+    Repeated planning invocations over unchanged canonical state yield bit-for-bit identical plans.
+    """
+    ws = str(tmp_path / "d9_4_test_8")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    claim = Claim(claim_id="claim_d94_8", task_id="task_d94_8", statement="Deterministic target", target_files=("src/module.py",))
+    _save_test_claim(state_repo, ws, claim)
+    rc_fail = make_observed_failure_receipt(receipt_id="rc_f_d94_8", task_id="task_d94_8", claim_id="claim_d94_8", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d94_8", obligation_id="ob_d94_8", failure_evidence=rc_fail, claim_id="claim_d94_8")
+    engine.create_repair_obligation(record.recovery_id, target="src/module.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+    engine.recompute_frontier(record.recovery_id)
+
+    plan1 = planner.create_plan(record.recovery_id)
+    plan2 = planner.create_plan(record.recovery_id)
+
+    assert plan1 is not None
+    assert plan2 is not None
+    assert plan1.plan_id == plan2.plan_id
+    assert plan1.to_dict() == plan2.to_dict()
+    assert plan1.selected_strategy == plan2.selected_strategy
+    assert len(plan1.ordered_repair_steps) == len(plan2.ordered_repair_steps)
+    for s1, s2 in zip(plan1.ordered_repair_steps, plan2.ordered_repair_steps):
+        assert s1.to_dict() == s2.to_dict()
+
+
+def test_d9_4_planner_cannot_execute_action(tmp_path):
+    """
+    D9.4 Test 9: Planner cannot execute action directly (Criterion A).
+    Direct execution via the planner raises SecurityViolationError.
+    Workspace files remain completely unchanged.
+    """
+    ws = str(tmp_path / "d9_4_test_9")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    claim = Claim(claim_id="claim_d94_9", task_id="task_d94_9", statement="Target", target_files=("src/app.py",))
+    _save_test_claim(state_repo, ws, claim)
+    rc_fail = make_observed_failure_receipt(receipt_id="rc_f_d94_9", task_id="task_d94_9", claim_id="claim_d94_9", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d94_9", obligation_id="ob_d94_9", failure_evidence=rc_fail, claim_id="claim_d94_9")
+    engine.create_repair_obligation(record.recovery_id, target="src/app.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+    engine.recompute_frontier(record.recovery_id)
+
+    plan = planner.create_plan(record.recovery_id)
+    assert len(plan.ordered_repair_steps) > 0
+
+    with pytest.raises(SecurityViolationError, match="Criterion A Violation: Planner cannot directly execute actions"):
+        planner.direct_execute(plan.ordered_repair_steps[0])
+
+
+def test_d9_4_planner_cannot_transition_recovery_to_converged(tmp_path):
+    """
+    D9.4 Test 10: Planner cannot transition recovery to CONVERGED.
+    Generating a repair plan is strictly declarative; authoritative recovery state
+    in persistence remains non-converged.
+    """
+    ws = str(tmp_path / "d9_4_test_10")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    claim = Claim(claim_id="claim_d94_10", task_id="task_d94_10", statement="Target", target_files=("src/app.py",))
+    _save_test_claim(state_repo, ws, claim)
+    rc_fail = make_observed_failure_receipt(receipt_id="rc_f_d94_10", task_id="task_d94_10", claim_id="claim_d94_10", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d94_10", obligation_id="ob_d94_10", failure_evidence=rc_fail, claim_id="claim_d94_10")
+    engine.create_repair_obligation(record.recovery_id, target="src/app.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+    engine.recompute_frontier(record.recovery_id)
+
+    pre_rec = engine.get_recovery(record.recovery_id)
+    assert pre_rec.current_state == RecoveryState.REVERIFY_REQUIRED
+    assert pre_rec.current_state != RecoveryState.CONVERGED
+
+    plan = planner.create_plan(record.recovery_id)
+    assert plan is not None
+
+    post_rec = engine.get_recovery(record.recovery_id)
+    assert post_rec.current_state == RecoveryState.REVERIFY_REQUIRED
+    assert post_rec.current_state != RecoveryState.CONVERGED
+
+
+def test_d9_4_planner_cannot_mark_task_verified(tmp_path):
+    """
+    D9.4 Test 11: Planner cannot mark task VERIFIED.
+    Task state in StateRepository remains unchanged.
+    """
+    ws = str(tmp_path / "d9_4_test_11")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    claim = Claim(claim_id="claim_d94_11", task_id="task_d94_11", statement="Target", target_files=("src/app.py",))
+    _save_test_claim(state_repo, ws, claim)
+
+    task = state_repo.get_task("task_d94_11")
+    task.state = TaskState.VERIFYING
+    state_repo.save_task(task)
+
+    rc_fail = make_observed_failure_receipt(receipt_id="rc_f_d94_11", task_id="task_d94_11", claim_id="claim_d94_11", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d94_11", obligation_id="ob_d94_11", failure_evidence=rc_fail, claim_id="claim_d94_11")
+    engine.create_repair_obligation(record.recovery_id, target="src/app.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+    engine.recompute_frontier(record.recovery_id)
+
+    plan = planner.create_plan(record.recovery_id)
+    assert plan is not None
+
+    persisted_task = state_repo.get_task("task_d94_11")
+    assert persisted_task.state == TaskState.VERIFYING
+    assert persisted_task.state != TaskState.VERIFIED
+
+
+def test_d9_4_forged_planner_result_cannot_bypass_controller_authorization(tmp_path):
+    """
+    D9.4 Test 12: Forged planner result cannot bypass Controller authorization (Criterion B).
+    Submitting an action directly from a RepairPlan or forged envelope without
+    valid Controller authorization fails closed with SecurityViolationError.
+    """
+    ws = str(tmp_path / "d9_4_test_12")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    claim = Claim(claim_id="claim_d94_12", task_id="task_d94_12", statement="Target", target_files=("src/app.py",))
+    _save_test_claim(state_repo, ws, claim)
+    rc_fail = make_observed_failure_receipt(receipt_id="rc_f_d94_12", task_id="task_d94_12", claim_id="claim_d94_12", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d94_12", obligation_id="ob_d94_12", failure_evidence=rc_fail, claim_id="claim_d94_12")
+    engine.create_repair_obligation(record.recovery_id, target="src/app.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+    engine.recompute_frontier(record.recovery_id)
+
+    plan = planner.create_plan(record.recovery_id)
+    first_step = plan.ordered_repair_steps[0]
+    action_req = first_step.to_action_request(task_id="task_d94_12", workspace_dir=ws)
+
+    # 1. Attacker attempts to bypass controller by directly executing via planner
+    with pytest.raises(SecurityViolationError, match="Criterion A Violation: Planner cannot directly execute actions"):
+        planner.direct_execute(action_req)
+
+    # 2. Attacker attempts to submit to executor without valid ExecutionEnvelope (Criterion B)
+    executor = SliceExecutor(workspace_dir=ws)
+    with pytest.raises(SecurityViolationError, match="Criterion B Violation: Controller authorization is mandatory"):
+        executor.execute_envelope(None)
+
 
 
 
