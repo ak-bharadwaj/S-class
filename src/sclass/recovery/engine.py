@@ -1456,36 +1456,15 @@ class RecoveryEngine:
         else:
             raise RecoveryError("Invalid recovery_id provided for frontier recomputation.")
 
-        # Authoritative canonical record from persistence
+        # D9.3.1: Strict Canonical Recovery Record Binding (no in-memory fallbacks)
         canonical_record = self.persistence.load_recovery(rec_id)
-        if canonical_record:
-            record = canonical_record
-        elif hasattr(recovery_id, "recovery_id"):
-            record = recovery_id
-        else:
-            raise RecoveryError(f"Recovery record '{rec_id}' not found.")
+        if not canonical_record:
+            raise RecoveryError(
+                f"Missing canonical recovery record: recovery '{rec_id}' not found in authoritative state store."
+            )
+        record = canonical_record
 
         now_iso = datetime.now(timezone.utc).isoformat()
-
-        # Defend against forged in-memory regression assessment (Test 11)
-        persisted_reg = record.regression_assessment
-        if persisted_reg is not None:
-            if reg_assessment is not None:
-                if (
-                    persisted_reg.failed_claim_ids != reg_assessment.failed_claim_ids
-                    or persisted_reg.stale_claim_ids != reg_assessment.stale_claim_ids
-                    or persisted_reg.regression_passed != reg_assessment.regression_passed
-                    or persisted_reg.reverified_claim_ids != reg_assessment.reverified_claim_ids
-                    or persisted_reg.unaffected_claim_ids != reg_assessment.unaffected_claim_ids
-                    or persisted_reg.affected_claim_ids != reg_assessment.affected_claim_ids
-                ):
-                    if fail_closed:
-                        raise RecoveryError(
-                            "Regression assessment mismatch: in-memory regression assessment diverges from canonical persisted assessment."
-                        )
-            reg_assessment = persisted_reg
-        elif reg_assessment is None:
-            reg_assessment = record.regression_assessment
 
         state_repo = StateRepository(self.workspace_dir)
         task_claims = state_repo.list_claims(task_id=record.task_id)
@@ -1499,6 +1478,80 @@ class RecoveryEngine:
             verifs = state_repo.list_verifications(claim_id=c.claim_id)
             if any(str(v.get("status", "")).upper() in ("ACCEPT", "PASS") for v in verifs):
                 repo_accepted_claim_ids.add(c.claim_id)
+
+        # D9.3.1: Check if this recovery affects previously accepted claims
+        repair_targets = set()
+        if record.affected_claim_id and record.affected_claim_id in claim_map:
+            rep_c = claim_map[record.affected_claim_id]
+            if rep_c.target_files:
+                for tf in rep_c.target_files:
+                    repair_targets.add(os.path.normcase(os.path.normpath(str(tf).replace("\\", "/"))))
+            if rep_c.scope:
+                for p in getattr(rep_c.scope, "paths", ()):
+                    repair_targets.add(os.path.normcase(os.path.normpath(str(p).replace("\\", "/"))))
+                for tt in getattr(rep_c.scope, "test_targets", ()):
+                    repair_targets.add(os.path.normcase(os.path.normpath(str(tt).replace("\\", "/"))))
+            if rep_c.metadata and isinstance(rep_c.metadata, dict):
+                for k in ("target_files", "dependencies", "paths"):
+                    val = rep_c.metadata.get(k)
+                    if isinstance(val, (list, tuple)):
+                        for item in val:
+                            repair_targets.add(os.path.normcase(os.path.normpath(str(item).replace("\\", "/"))))
+        if record.current_repair_obligation and record.current_repair_obligation.target:
+            repair_targets.add(os.path.normcase(os.path.normpath(str(record.current_repair_obligation.target).replace("\\", "/"))))
+
+        affected_previously_accepted = set()
+        for cid in repo_accepted_claim_ids:
+            c = claim_map.get(cid)
+            if not c:
+                affected_previously_accepted.add(cid)
+                continue
+            c_targets = set()
+            if c.target_files:
+                for tf in c.target_files:
+                    c_targets.add(os.path.normcase(os.path.normpath(str(tf).replace("\\", "/"))))
+            if c.scope:
+                for p in getattr(c.scope, "paths", ()):
+                    c_targets.add(os.path.normcase(os.path.normpath(str(p).replace("\\", "/"))))
+                for tt in getattr(c.scope, "test_targets", ()):
+                    c_targets.add(os.path.normcase(os.path.normpath(str(tt).replace("\\", "/"))))
+            if c.metadata and isinstance(c.metadata, dict):
+                for k in ("target_files", "dependencies", "paths"):
+                    val = c.metadata.get(k)
+                    if isinstance(val, (list, tuple)):
+                        for item in val:
+                            c_targets.add(os.path.normcase(os.path.normpath(str(item).replace("\\", "/"))))
+
+            if not repair_targets or not c_targets:
+                affected_previously_accepted.add(cid)
+            elif _paths_overlap(c_targets, repair_targets):
+                affected_previously_accepted.add(cid)
+
+        # D9.3.1: Strict Canonical Regression Assessment Binding
+        persisted_reg = record.regression_assessment
+        if persisted_reg is not None:
+            # Canonical persisted assessment exists: caller cannot override failed with passing
+            if reg_assessment is not None:
+                if not persisted_reg.regression_passed and reg_assessment.regression_passed:
+                    if fail_closed:
+                        raise RecoveryError(
+                            "Regression assessment mismatch: in-memory regression assessment diverges from canonical persisted assessment."
+                        )
+            # Canonical persisted assessment wins over any in-memory assessment
+            reg_assessment = persisted_reg
+        else:
+            # Canonical persisted assessment is absent
+            if reg_assessment is not None:
+                if fail_closed:
+                    raise RecoveryError(
+                        "Untrusted regression assessment: cannot supply in-memory regression assessment when canonical persisted assessment is absent."
+                    )
+                reg_assessment = None
+            elif affected_previously_accepted:
+                if fail_closed:
+                    raise RecoveryError(
+                        "Missing canonical regression assessment: recovery affects previously accepted claims but canonical regression assessment is absent."
+                    )
 
         preserved_candidates = set(repo_accepted_claim_ids)
         invalidated_set = set(invalidated_obligations or [])
@@ -1618,14 +1671,18 @@ class RecoveryEngine:
         is_valid = (
             len(invalidated_tuple) == 0
             and len(unresolved_tuple) == 0
+            and not (persisted_reg is None and len(affected_previously_accepted) > 0)
             and (reg_assessment is None or reg_assessment.regression_passed)
         )
 
-        reason = (
-            "Frontier successfully recomputed: all obligations verified."
-            if is_valid
-            else f"Frontier invalid: {len(invalidated_tuple)} invalidated, {len(unresolved_tuple)} unresolved."
-        )
+        if is_valid:
+            reason = "Frontier successfully recomputed: all obligations verified."
+        elif persisted_reg is None and len(affected_previously_accepted) > 0:
+            reason = f"Frontier invalid: missing canonical regression assessment for affected claims {tuple(sorted(affected_previously_accepted))}."
+        elif reg_assessment is not None and not reg_assessment.regression_passed:
+            reason = "Frontier invalid: canonical regression assessment failed."
+        else:
+            reason = f"Frontier invalid: {len(invalidated_tuple)} invalidated, {len(unresolved_tuple)} unresolved."
 
         frontier = FrontierRecomputation(
             task_id=record.task_id,
@@ -1640,6 +1697,10 @@ class RecoveryEngine:
         )
 
         if fail_closed and not is_valid:
+            if reg_assessment is not None and not reg_assessment.regression_passed:
+                raise RecoveryError(
+                    "Frontier recomputation failed: canonical regression assessment failed."
+                )
             raise RecoveryError(
                 f"Frontier recomputation failed: unresolved obligations {unresolved_tuple} "
                 f"or invalidated obligations {invalidated_tuple} block convergence."
