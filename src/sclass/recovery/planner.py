@@ -17,6 +17,7 @@ import os
 import hashlib
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any, Union, Tuple
+from dataclasses import replace
 
 from sclass.core.errors import RecoveryError, SecurityViolationError, RecoveryPersistenceError
 from sclass.recovery.models import (
@@ -222,11 +223,14 @@ class RecoveryPlanner:
             current_cost=float(eff_cost),
         )
 
-        existing_plan = record.metadata.get("repair_plan") if isinstance(record.metadata, dict) else None
-        if existing_plan and isinstance(existing_plan, dict) and "provenance" in existing_plan:
-            frontier_ts = existing_plan["provenance"].get("frontier_recomputed_at", canonical_frontier.recomputed_at)
-        else:
-            frontier_ts = canonical_frontier.recomputed_at
+        # Plan provenance and timestamps must derive strictly from canonical recovery/repair/frontier state.
+        # Persisted metadata["repair_plan"] must NEVER be used as an input to generate a new plan.
+        created_at_ts = (
+            repair_ob.created_at
+            or record.created_at
+            or "2026-09-23T00:00:00Z"
+        )
+        frontier_ts = canonical_frontier.recomputed_at
 
         provenance = {
             "recovery_id": record.recovery_id,
@@ -235,16 +239,6 @@ class RecoveryPlanner:
             "frontier_recomputed_at": frontier_ts,
             "preserved_count": len(canonical_frontier.preserved_obligation_ids),
         }
-
-        # Deterministic created_at tied to canonical state
-        if existing_plan and isinstance(existing_plan, dict) and "created_at" in existing_plan:
-            created_at_ts = existing_plan["created_at"]
-        else:
-            created_at_ts = (
-                repair_ob.created_at
-                or record.created_at
-                or "2026-09-23T00:00:00Z"
-            )
 
         plan = RepairPlan(
             recovery_id=record.recovery_id,
@@ -281,39 +275,107 @@ class RecoveryPlanner:
         - unresolved obligations
         - frontier obligations
         - validity
+        All identity fields are required to exist and exactly match.
+        Missing/empty required identity fields fail closed.
         Fails closed on any divergence.
         """
-        if candidate is None:
-            return
-
-        if isinstance(candidate, dict):
-            c_task_id = str(candidate.get("task_id", ""))
-            c_rep_ob = str(candidate.get("repaired_obligation_id", ""))
-            c_pres = tuple(candidate.get("preserved_obligation_ids", ()))
-            c_inval = tuple(candidate.get("invalidated_obligation_ids", ()))
-            c_unres = tuple(candidate.get("unresolved_obligation_ids", ()))
-            c_front = tuple(candidate.get("frontier_obligations", ()))
-            c_valid = bool(candidate.get("is_valid", False))
-        else:
-            c_task_id = str(getattr(candidate, "task_id", ""))
-            c_rep_ob = str(getattr(candidate, "repaired_obligation_id", ""))
-            c_pres = tuple(getattr(candidate, "preserved_obligation_ids", ()))
-            c_inval = tuple(getattr(candidate, "invalidated_obligation_ids", ()))
-            c_unres = tuple(getattr(candidate, "unresolved_obligation_ids", ()))
-            c_front = tuple(getattr(candidate, "frontier_obligations", ()))
-            c_valid = bool(getattr(candidate, "is_valid", False))
-
         is_caller = (source_name == "caller_frontier")
         prefix = "Forged frontier rejected" if is_caller else f"Forged persisted frontier rejected ({source_name})"
 
+        if candidate is None:
+            raise RecoveryError(f"{prefix}: frontier identity cannot be None.")
+
+        # Determine field presence and values
+        if isinstance(candidate, dict):
+            has_task_id = "task_id" in candidate and candidate["task_id"] is not None and bool(str(candidate["task_id"]).strip())
+            c_task_id = str(candidate.get("task_id", "") or "").strip()
+
+            has_rep_ob = "repaired_obligation_id" in candidate and candidate["repaired_obligation_id"] is not None and bool(str(candidate["repaired_obligation_id"]).strip())
+            c_rep_ob = str(candidate.get("repaired_obligation_id", "") or "").strip()
+
+            has_pres = "preserved_obligation_ids" in candidate and candidate["preserved_obligation_ids"] is not None
+            c_pres = tuple(candidate.get("preserved_obligation_ids") or ())
+
+            has_inval = "invalidated_obligation_ids" in candidate and candidate["invalidated_obligation_ids"] is not None
+            c_inval = tuple(candidate.get("invalidated_obligation_ids") or ())
+
+            has_unres = "unresolved_obligation_ids" in candidate and candidate["unresolved_obligation_ids"] is not None
+            c_unres = tuple(candidate.get("unresolved_obligation_ids") or ())
+
+            has_front = "frontier_obligations" in candidate and candidate["frontier_obligations"] is not None
+            c_front = tuple(candidate.get("frontier_obligations") or ())
+
+            has_valid = "is_valid" in candidate and candidate["is_valid"] is not None
+            c_valid = bool(candidate.get("is_valid"))
+        else:
+            has_task_id = hasattr(candidate, "task_id") and getattr(candidate, "task_id", None) is not None and bool(str(getattr(candidate, "task_id")).strip())
+            c_task_id = str(getattr(candidate, "task_id", "") or "").strip()
+
+            has_rep_ob = hasattr(candidate, "repaired_obligation_id") and getattr(candidate, "repaired_obligation_id", None) is not None and bool(str(getattr(candidate, "repaired_obligation_id")).strip())
+            c_rep_ob = str(getattr(candidate, "repaired_obligation_id", "") or "").strip()
+
+            has_pres = hasattr(candidate, "preserved_obligation_ids") and getattr(candidate, "preserved_obligation_ids", None) is not None
+            c_pres = tuple(getattr(candidate, "preserved_obligation_ids", None) or ())
+
+            has_inval = hasattr(candidate, "invalidated_obligation_ids") and getattr(candidate, "invalidated_obligation_ids", None) is not None
+            c_inval = tuple(getattr(candidate, "invalidated_obligation_ids", None) or ())
+
+            has_unres = hasattr(candidate, "unresolved_obligation_ids") and getattr(candidate, "unresolved_obligation_ids", None) is not None
+            c_unres = tuple(getattr(candidate, "unresolved_obligation_ids", None) or ())
+
+            has_front = hasattr(candidate, "frontier_obligations") and getattr(candidate, "frontier_obligations", None) is not None
+            c_front = tuple(getattr(candidate, "frontier_obligations", None) or ())
+
+            has_valid = hasattr(candidate, "is_valid") and getattr(candidate, "is_valid", None) is not None
+            c_valid = bool(getattr(candidate, "is_valid", False))
+
+        # Check divergence on present key fields first
+        if has_task_id and c_task_id != canonical.task_id:
+            raise RecoveryError(
+                f"{prefix}: task_id '{c_task_id}' diverges from authoritative canonical frontier task_id '{canonical.task_id}'."
+            )
+
+        if has_rep_ob and c_rep_ob != canonical.repaired_obligation_id:
+            raise RecoveryError(
+                f"{prefix}: repaired_obligation_id '{c_rep_ob}' diverges from authoritative canonical frontier '{canonical.repaired_obligation_id}'."
+            )
+
+        if has_front and set(c_front) != set(canonical.frontier_obligations):
+            raise RecoveryError(
+                f"{prefix}: frontier_obligations {tuple(sorted(c_front))} diverge from authoritative canonical frontier {tuple(sorted(canonical.frontier_obligations))}."
+            )
+
+        # Check required identity fields presence
+        if not has_task_id:
+            raise RecoveryError(f"{prefix}: missing or empty required identity field 'task_id'.")
+
+        if not has_rep_ob:
+            raise RecoveryError(f"{prefix}: missing or empty required identity field 'repaired_obligation_id'.")
+
+        if not has_pres:
+            raise RecoveryError(f"{prefix}: missing required identity field 'preserved_obligation_ids'.")
+
+        if not has_inval:
+            raise RecoveryError(f"{prefix}: missing required identity field 'invalidated_obligation_ids'.")
+
+        if not has_unres:
+            raise RecoveryError(f"{prefix}: missing required identity field 'unresolved_obligation_ids'.")
+
+        if not has_front:
+            raise RecoveryError(f"{prefix}: missing required identity field 'frontier_obligations'.")
+
+        if not has_valid:
+            raise RecoveryError(f"{prefix}: missing required identity field 'is_valid'.")
+
+        # Check exact matches across all 7 identity fields
         # 1. task ID
-        if c_task_id and canonical.task_id and c_task_id != canonical.task_id:
+        if c_task_id != canonical.task_id:
             raise RecoveryError(
                 f"{prefix}: task_id '{c_task_id}' diverges from authoritative canonical frontier task_id '{canonical.task_id}'."
             )
 
         # 2. repaired obligation
-        if c_rep_ob and canonical.repaired_obligation_id and c_rep_ob != canonical.repaired_obligation_id:
+        if c_rep_ob != canonical.repaired_obligation_id:
             raise RecoveryError(
                 f"{prefix}: repaired_obligation_id '{c_rep_ob}' diverges from authoritative canonical frontier '{canonical.repaired_obligation_id}'."
             )
@@ -405,6 +467,14 @@ class RecoveryPlanner:
                 canonical_frontier,
                 source_name="record.frontier_recomputation",
             )
+            # Preserve the canonical recomputed_at timestamp from the authoritative cached frontier
+            existing_ts = None
+            if hasattr(cached_record_frontier, "recomputed_at") and getattr(cached_record_frontier, "recomputed_at"):
+                existing_ts = getattr(cached_record_frontier, "recomputed_at")
+            elif isinstance(cached_record_frontier, dict) and cached_record_frontier.get("recomputed_at"):
+                existing_ts = cached_record_frontier["recomputed_at"]
+            if existing_ts:
+                canonical_frontier = replace(canonical_frontier, recomputed_at=existing_ts)
 
         # 4. Validate task metadata frontier if present in StateRepository
         if cached_task_frontier is not None:

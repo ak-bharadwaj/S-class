@@ -5331,13 +5331,238 @@ def test_d9_4_1_caller_frontier_cannot_influence_resulting_plan(tmp_path):
 
     # 3. Caller provides None vs caller provides valid canonical frontier -> identical plan derived strictly from canonical state
     plan_clean = planner.create_plan(record.recovery_id, caller_frontier=None)
-    canonical_frontier = engine.recompute_frontier(record.recovery_id)
+    canonical_frontier = engine.get_recovery(record.recovery_id).frontier_recomputation
     plan_with_caller_frontier = planner.create_plan(record.recovery_id, caller_frontier=canonical_frontier)
 
     assert plan_clean.plan_id == plan_with_caller_frontier.plan_id
     assert plan_clean.to_dict() == plan_with_caller_frontier.to_dict()
     record_latest = engine.get_recovery(record.recovery_id)
     assert plan_clean.repair_obligation_id == record_latest.current_repair_obligation.obligation_id
+
+
+# ==========================================================================
+# D9.4.2 CANONICAL PLANNER INTEGRITY ADVERSARIAL TESTS
+# ==========================================================================
+
+
+def test_d9_4_2_persisted_frontier_missing_task_id_rejected(tmp_path):
+    """
+    D9.4.2 Test 1: Persisted frontier missing task_id -> rejected.
+    When cached RecoveryRecord.frontier_recomputation has missing or empty task_id,
+    planner fails closed with RecoveryError.
+    """
+    ws = str(tmp_path / "d9_4_2_test_1")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    claim = Claim(claim_id="claim_d942_1", task_id="task_d942_1", statement="Target", target_files=("src/app.py",))
+    _save_test_claim(state_repo, ws, claim)
+    rc_fail = make_observed_failure_receipt(receipt_id="rc_f_d942_1", task_id="task_d942_1", claim_id="claim_d942_1", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d942_1", obligation_id="ob_d942_1", failure_evidence=rc_fail, claim_id="claim_d942_1")
+    engine.create_repair_obligation(record.recovery_id, target="src/app.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+    engine.recompute_frontier(record.recovery_id)
+
+    persisted_record = engine.get_recovery(record.recovery_id)
+    assert persisted_record.frontier_recomputation is not None
+    persisted_record.frontier_recomputation = replace(
+        persisted_record.frontier_recomputation,
+        task_id="",
+    )
+    engine.persistence.save_recovery(persisted_record)
+
+    with pytest.raises(RecoveryError, match="missing or empty required identity field 'task_id'"):
+        planner.create_plan(record.recovery_id)
+
+
+def test_d9_4_2_persisted_frontier_missing_repaired_obligation_id_rejected(tmp_path):
+    """
+    D9.4.2 Test 2: Persisted frontier missing repaired_obligation_id -> rejected.
+    When cached RecoveryRecord.frontier_recomputation has missing or empty repaired_obligation_id,
+    planner fails closed with RecoveryError.
+    """
+    ws = str(tmp_path / "d9_4_2_test_2")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    claim = Claim(claim_id="claim_d942_2", task_id="task_d942_2", statement="Target", target_files=("src/app.py",))
+    _save_test_claim(state_repo, ws, claim)
+    rc_fail = make_observed_failure_receipt(receipt_id="rc_f_d942_2", task_id="task_d942_2", claim_id="claim_d942_2", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d942_2", obligation_id="ob_d942_2", failure_evidence=rc_fail, claim_id="claim_d942_2")
+    engine.create_repair_obligation(record.recovery_id, target="src/app.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+    engine.recompute_frontier(record.recovery_id)
+
+    persisted_record = engine.get_recovery(record.recovery_id)
+    assert persisted_record.frontier_recomputation is not None
+    persisted_record.frontier_recomputation = replace(
+        persisted_record.frontier_recomputation,
+        repaired_obligation_id="",
+    )
+    engine.persistence.save_recovery(persisted_record)
+
+    with pytest.raises(RecoveryError, match="missing or empty required identity field 'repaired_obligation_id'"):
+        planner.create_plan(record.recovery_id)
+
+
+def test_d9_4_2_task_metadata_frontier_missing_either_identity_field_rejected(tmp_path):
+    """
+    D9.4.2 Test 3: Task metadata frontier missing either identity field -> rejected.
+    When task.metadata["frontier"] lacks task_id or repaired_obligation_id,
+    planner fails closed with RecoveryError.
+    """
+    ws = str(tmp_path / "d9_4_2_test_3")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    claim = Claim(claim_id="claim_d942_3", task_id="task_d942_3", statement="Target", target_files=("src/app.py",))
+    _save_test_claim(state_repo, ws, claim)
+    rc_fail = make_observed_failure_receipt(receipt_id="rc_f_d942_3", task_id="task_d942_3", claim_id="claim_d942_3", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d942_3", obligation_id="ob_d942_3", failure_evidence=rc_fail, claim_id="claim_d942_3")
+    engine.create_repair_obligation(record.recovery_id, target="src/app.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+    engine.recompute_frontier(record.recovery_id)
+
+    # Case A: task.metadata["frontier"] missing task_id
+    task = state_repo.get_task(record.task_id)
+    assert task is not None
+    assert "frontier" in task.metadata
+    task.metadata["frontier"]["task_id"] = ""
+    state_repo.save_task(task)
+
+    with pytest.raises(RecoveryError, match="missing or empty required identity field 'task_id'"):
+        planner.create_plan(record.recovery_id)
+
+    # Case B: task.metadata["frontier"] missing repaired_obligation_id
+    task = state_repo.get_task(record.task_id)
+    task.metadata["frontier"]["task_id"] = record.task_id
+    task.metadata["frontier"].pop("repaired_obligation_id", None)
+    state_repo.save_task(task)
+
+    with pytest.raises(RecoveryError, match="missing or empty required identity field 'repaired_obligation_id'"):
+        planner.create_plan(record.recovery_id)
+
+
+def test_d9_4_2_forged_persisted_repair_plan_created_at_cannot_alter_canonical_plan(tmp_path):
+    """
+    D9.4.2 Test 4: Forged persisted repair_plan.created_at cannot alter canonical plan.
+    Tampering with created_at in persisted metadata["repair_plan"] has zero effect on subsequent
+    planning; created_at is derived strictly from canonical state.
+    """
+    ws = str(tmp_path / "d9_4_2_test_4")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    claim = Claim(claim_id="claim_d942_4", task_id="task_d942_4", statement="Target", target_files=("src/app.py",))
+    _save_test_claim(state_repo, ws, claim)
+    rc_fail = make_observed_failure_receipt(receipt_id="rc_f_d942_4", task_id="task_d942_4", claim_id="claim_d942_4", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d942_4", obligation_id="ob_d942_4", failure_evidence=rc_fail, claim_id="claim_d942_4")
+    engine.create_repair_obligation(record.recovery_id, target="src/app.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+    engine.recompute_frontier(record.recovery_id)
+
+    plan_orig = planner.create_plan(record.recovery_id)
+    assert plan_orig is not None
+
+    # Attacker tampers with metadata["repair_plan"]["created_at"]
+    persisted_record = engine.get_recovery(record.recovery_id)
+    assert "repair_plan" in persisted_record.metadata
+    persisted_record.metadata["repair_plan"]["created_at"] = "1999-12-31T23:59:59Z"
+    engine.persistence.save_recovery(persisted_record)
+
+    plan_new = planner.create_plan(record.recovery_id)
+    assert plan_new is not None
+    assert plan_new.created_at == plan_orig.created_at
+    assert plan_new.created_at != "1999-12-31T23:59:59Z"
+    assert plan_new.plan_id == plan_orig.plan_id
+
+
+def test_d9_4_2_forged_persisted_repair_plan_provenance_cannot_alter_canonical_provenance(tmp_path):
+    """
+    D9.4.2 Test 5: Forged persisted repair_plan.provenance cannot alter canonical provenance.
+    Tampering with provenance in persisted metadata["repair_plan"] has zero effect on subsequent
+    planning; provenance is derived strictly from canonical recovery, repair, and frontier state.
+    """
+    ws = str(tmp_path / "d9_4_2_test_5")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    claim = Claim(claim_id="claim_d942_5", task_id="task_d942_5", statement="Target", target_files=("src/app.py",))
+    _save_test_claim(state_repo, ws, claim)
+    rc_fail = make_observed_failure_receipt(receipt_id="rc_f_d942_5", task_id="task_d942_5", claim_id="claim_d942_5", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d942_5", obligation_id="ob_d942_5", failure_evidence=rc_fail, claim_id="claim_d942_5")
+    engine.create_repair_obligation(record.recovery_id, target="src/app.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+    engine.recompute_frontier(record.recovery_id)
+
+    plan_orig = planner.create_plan(record.recovery_id)
+    assert plan_orig is not None
+
+    # Attacker tampers with metadata["repair_plan"]["provenance"]
+    persisted_record = engine.get_recovery(record.recovery_id)
+    persisted_record.metadata["repair_plan"]["provenance"] = {
+        "attacker": "forged_data",
+        "frontier_recomputed_at": "1999-01-01T00:00:00Z",
+    }
+    engine.persistence.save_recovery(persisted_record)
+
+    plan_new = planner.create_plan(record.recovery_id)
+    assert plan_new is not None
+    assert plan_new.provenance == plan_orig.provenance
+    assert "attacker" not in plan_new.provenance
+    assert plan_new.plan_id == plan_orig.plan_id
+
+
+def test_d9_4_2_identical_canonical_state_with_corrupted_derived_plan_metadata_produces_same_plan(tmp_path):
+    """
+    D9.4.2 Test 6: Identical canonical state with corrupted derived plan metadata still produces
+    the same canonical plan.
+    Even when metadata["repair_plan"] is non-dict garbage, the planner ignores it and computes
+    the bit-for-bit identical plan from authoritative canonical state.
+    """
+    ws = str(tmp_path / "d9_4_2_test_6")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    claim = Claim(claim_id="claim_d942_6", task_id="task_d942_6", statement="Target", target_files=("src/app.py",))
+    _save_test_claim(state_repo, ws, claim)
+    rc_fail = make_observed_failure_receipt(receipt_id="rc_f_d942_6", task_id="task_d942_6", claim_id="claim_d942_6", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d942_6", obligation_id="ob_d942_6", failure_evidence=rc_fail, claim_id="claim_d942_6")
+    engine.create_repair_obligation(record.recovery_id, target="src/app.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+    engine.recompute_frontier(record.recovery_id)
+
+    plan_orig = planner.create_plan(record.recovery_id)
+    assert plan_orig is not None
+
+    # Attacker completely corrupts metadata["repair_plan"] with invalid non-dict data
+    persisted_record = engine.get_recovery(record.recovery_id)
+    persisted_record.metadata["repair_plan"] = "CORRUPTED_STRING_VALUE_NOT_A_DICT"
+    engine.persistence.save_recovery(persisted_record)
+
+    plan_new = planner.create_plan(record.recovery_id)
+    assert plan_new is not None
+    assert plan_new.plan_id == plan_orig.plan_id
+    assert plan_new.to_dict() == plan_orig.to_dict()
+
 
 
 
