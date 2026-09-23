@@ -85,6 +85,8 @@ from sclass.recovery import (
     RecoveryAttempt,
     RecoveryRecord,
     RecoveryResult,
+    RegressionAssessment,
+    FrontierRecomputation,
     RecoveryEngine,
     RecoveryPersistence,
     RecoveryError,
@@ -95,6 +97,7 @@ from sclass.recovery import (
 from sclass.domain.verification import VerificationResult, VerificationEvent
 from sclass.domain.claim import Claim
 from sclass.domain.task import Task
+from sclass.core.lifecycle import TaskState
 from sclass.domain.project import Project, ProjectBoundary
 from sclass.survival.models import ObservedReceipt, EvidenceReceipt
 from sclass.survival.verification import verify_claim
@@ -3815,5 +3818,581 @@ def test_d9_2_4_forged_persisted_created_at_cannot_create_boundary(tmp_path):
             regression_verifications=[verif_reg],
             fail_closed=True,
         )
+
+
+# ==========================================================================
+# D9.3 Required Adversarial Tests: Canonical Frontier Recomputation
+# ==========================================================================
+
+def test_d9_3_caller_falsely_claims_unaccepted_obligation_rejected(tmp_path):
+    """
+    D9.3 Test 1: Caller falsely claims an unaccepted obligation -> rejected.
+    StateRepository has registered claims for this task, but one claim was never accepted.
+    When caller tries to supply it as a known_accepted obligation, convergence fails closed.
+    """
+    ws = str(tmp_path / "d9_3_test_1")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+
+    # Claim to be repaired
+    claim_rep = Claim(claim_id="claim_3_1_rep", task_id="task_3_1", statement="Repaired claim", target_files=("src/rep.py",))
+    _save_test_claim(state_repo, ws, claim_rep)
+
+    # Claim that exists for task but has NO ACCEPT verification (unaccepted)
+    claim_unacc = Claim(claim_id="claim_3_1_unaccepted", task_id="task_3_1", statement="Unaccepted claim", target_files=("src/other.py",))
+    _save_test_claim(state_repo, ws, claim_unacc)
+
+    ev_fail = make_observed_failure_receipt(receipt_id="rcpt_f_3_1", task_id="task_3_1", claim_id="claim_3_1_rep", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_3_1", obligation_id="ob_3_1_rep", failure_evidence=ev_fail, claim_id="claim_3_1_rep")
+    engine.create_repair_obligation(record.recovery_id, target="src/rep.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    ev_pass = make_observed_success_receipt(receipt_id="rcpt_p_3_1", task_id="task_3_1", claim_id="claim_3_1_rep", workspace=ws)
+    verdict = make_canonical_verification_result(ev_pass, status="ACCEPT", claim_id="claim_3_1_rep", workspace=ws)
+
+    with pytest.raises(RecoveryError, match="not an authoritatively accepted claim"):
+        engine.evaluate_convergence(
+            record.recovery_id,
+            verification_result=verdict,
+            evidence=ev_pass,
+            known_accepted_obligations=["claim_3_1_unaccepted"],
+        )
+
+    # Authoritative state remains REVERIFY_REQUIRED
+    rec = engine.get_recovery(record.recovery_id)
+    assert rec.current_state == RecoveryState.REVERIFY_REQUIRED
+    assert rec.current_state != RecoveryState.CONVERGED
+
+
+def test_d9_3_caller_tries_to_preserve_regressed_obligation_rejected(tmp_path):
+    """
+    D9.3 Test 2: Caller tries to preserve a regressed obligation -> rejected.
+    An obligation failed regression assessment. Caller tries to preserve it via known_accepted.
+    Convergence must fail closed.
+    """
+    ws = str(tmp_path / "d9_3_test_2")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+
+    claim_rep = Claim(claim_id="claim_3_2_rep", task_id="task_3_2", statement="Repaired claim", target_files=("src/shared.py",))
+    _save_test_claim(state_repo, ws, claim_rep)
+
+    claim_reg = Claim(claim_id="claim_3_2_reg", task_id="task_3_2", statement="Regressed claim", target_files=("src/shared.py",))
+    _save_test_claim(state_repo, ws, claim_reg)
+    rcpt_prev = make_observed_success_receipt(receipt_id="rcpt_prev_3_2", task_id="task_3_2", claim_id="claim_3_2_reg", workspace=ws)
+    make_canonical_verification_result(rcpt_prev, status="ACCEPT", claim_id="claim_3_2_reg", workspace=ws)
+
+    ev_fail = make_observed_failure_receipt(receipt_id="rcpt_f_3_2", task_id="task_3_2", claim_id="claim_3_2_rep", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_3_2", obligation_id="ob_3_2_rep", failure_evidence=ev_fail, claim_id="claim_3_2_rep")
+    engine.create_repair_obligation(record.recovery_id, target="src/shared.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    ev_pass = make_observed_success_receipt(receipt_id="rcpt_p_3_2", task_id="task_3_2", claim_id="claim_3_2_rep", workspace=ws)
+    ev_pass.files_changed = ["src/shared.py"]
+    verdict = make_canonical_verification_result(ev_pass, status="ACCEPT", claim_id="claim_3_2_rep", workspace=ws)
+
+    # Regressed claim verification fails (FAIL)
+    rcpt_fail_reg = make_observed_failure_receipt(receipt_id="rcpt_f_reg_3_2", task_id="task_3_2", claim_id="claim_3_2_reg", workspace=ws)
+    verdict_fail_reg = make_canonical_verification_result(rcpt_fail_reg, status="FAIL", claim_id="claim_3_2_reg", workspace=ws)
+
+    with pytest.raises(RecoveryError, match="Conflicting regression result|failed regression assessment"):
+        engine.evaluate_convergence(
+            record.recovery_id,
+            verification_result=verdict,
+            evidence=ev_pass,
+            known_accepted_obligations=["claim_3_2_reg"],
+            regression_verifications=[verdict_fail_reg],
+        )
+
+    rec = engine.get_recovery(record.recovery_id)
+    assert rec.current_state == RecoveryState.REVERIFY_REQUIRED
+
+
+def test_d9_3_caller_tries_to_preserve_unresolved_obligation_rejected(tmp_path):
+    """
+    D9.3 Test 3: Caller tries to preserve unresolved obligation -> rejected.
+    An affected claim was never reverified (unresolved). Caller attempts to preserve it.
+    Must fail closed.
+    """
+    ws = str(tmp_path / "d9_3_test_3")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+
+    claim_rep = Claim(claim_id="claim_3_3_rep", task_id="task_3_3", statement="Repaired claim", target_files=("src/calc.py",))
+    _save_test_claim(state_repo, ws, claim_rep)
+
+    claim_unres = Claim(claim_id="claim_3_3_unres", task_id="task_3_3", statement="Unresolved claim", target_files=("src/calc.py",))
+    _save_test_claim(state_repo, ws, claim_unres)
+    rcpt_prev = make_observed_success_receipt(receipt_id="rcpt_prev_3_3", task_id="task_3_3", claim_id="claim_3_3_unres", workspace=ws)
+    make_canonical_verification_result(rcpt_prev, status="ACCEPT", claim_id="claim_3_3_unres", workspace=ws)
+
+    ev_fail = make_observed_failure_receipt(receipt_id="rcpt_f_3_3", task_id="task_3_3", claim_id="claim_3_3_rep", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_3_3", obligation_id="ob_3_3_rep", failure_evidence=ev_fail, claim_id="claim_3_3_rep")
+    engine.create_repair_obligation(record.recovery_id, target="src/calc.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    ev_pass = make_observed_success_receipt(receipt_id="rcpt_p_3_3", task_id="task_3_3", claim_id="claim_3_3_rep", workspace=ws)
+    ev_pass.files_changed = ["src/calc.py"]
+    verdict = make_canonical_verification_result(ev_pass, status="ACCEPT", claim_id="claim_3_3_rep", workspace=ws)
+
+    # Caller passes no regression verification for claim_3_3_unres, but puts it in known_accepted
+    with pytest.raises(RecoveryError, match="Missing required regression verification|unresolved"):
+        engine.evaluate_convergence(
+            record.recovery_id,
+            verification_result=verdict,
+            evidence=ev_pass,
+            known_accepted_obligations=["claim_3_3_unres"],
+            regression_verifications=[],
+        )
+
+    rec = engine.get_recovery(record.recovery_id)
+    assert rec.current_state == RecoveryState.REVERIFY_REQUIRED
+
+
+def test_d9_3_caller_omits_canonically_accepted_unaffected_claim_still_preserved(tmp_path):
+    """
+    D9.3 Test 4: Caller omits a canonically accepted unaffected claim -> still preserved.
+    Frontier is derived from StateRepository, not caller input.
+    """
+    ws = str(tmp_path / "d9_3_test_4")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+
+    claim_rep = Claim(claim_id="claim_3_4_rep", task_id="task_3_4", statement="Repaired claim", target_files=("src/a.py",))
+    _save_test_claim(state_repo, ws, claim_rep)
+
+    claim_unaf = Claim(claim_id="claim_3_4_unaf", task_id="task_3_4", statement="Unaffected claim", target_files=("src/b.py",))
+    _save_test_claim(state_repo, ws, claim_unaf)
+    rcpt_unaf = make_observed_success_receipt(receipt_id="rcpt_unaf_3_4", task_id="task_3_4", claim_id="claim_3_4_unaf", workspace=ws)
+    make_canonical_verification_result(rcpt_unaf, status="ACCEPT", claim_id="claim_3_4_unaf", workspace=ws)
+
+    ev_fail = make_observed_failure_receipt(receipt_id="rcpt_f_3_4", task_id="task_3_4", claim_id="claim_3_4_rep", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_3_4", obligation_id="ob_3_4_rep", failure_evidence=ev_fail, claim_id="claim_3_4_rep")
+    engine.create_repair_obligation(record.recovery_id, target="src/a.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    ev_pass = make_observed_success_receipt(receipt_id="rcpt_p_3_4", task_id="task_3_4", claim_id="claim_3_4_rep", workspace=ws)
+    ev_pass.files_changed = ["src/a.py"]
+    verdict = make_canonical_verification_result(ev_pass, status="ACCEPT", claim_id="claim_3_4_rep", workspace=ws)
+
+    # Caller passes known_accepted_obligations=[] omitting claim_3_4_unaf
+    res = engine.evaluate_convergence(
+        record.recovery_id,
+        verification_result=verdict,
+        evidence=ev_pass,
+        known_accepted_obligations=[],
+    )
+
+    assert res.is_converged is True
+    assert res.status == RecoveryState.CONVERGED.value
+    assert "claim_3_4_unaf" in res.preserved_obligation_ids
+    assert res.frontier_recomputation is not None
+    assert "claim_3_4_unaf" in res.frontier_recomputation.preserved_obligation_ids
+    assert "claim_3_4_unaf" in res.frontier_recomputation.frontier_obligations
+
+
+def test_d9_3_caller_passes_empty_accepted_list_canonical_claims_discovered(tmp_path):
+    """
+    D9.3 Test 5: Caller passes empty accepted list -> canonical accepted claims are still discovered.
+    All unaffected accepted claims in StateRepository are automatically discovered and preserved.
+    """
+    ws = str(tmp_path / "d9_3_test_5")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+
+    claim_rep = Claim(claim_id="claim_3_5_rep", task_id="task_3_5", statement="Repaired claim", target_files=("src/mod.py",))
+    _save_test_claim(state_repo, ws, claim_rep)
+
+    claim_u1 = Claim(claim_id="claim_3_5_u1", task_id="task_3_5", statement="Unaffected 1", target_files=("src/x.py",))
+    _save_test_claim(state_repo, ws, claim_u1)
+    rcpt_u1 = make_observed_success_receipt(receipt_id="rcpt_u1_3_5", task_id="task_3_5", claim_id="claim_3_5_u1", workspace=ws)
+    make_canonical_verification_result(rcpt_u1, status="ACCEPT", claim_id="claim_3_5_u1", workspace=ws)
+
+    claim_u2 = Claim(claim_id="claim_3_5_u2", task_id="task_3_5", statement="Unaffected 2", target_files=("src/y.py",))
+    _save_test_claim(state_repo, ws, claim_u2)
+    rcpt_u2 = make_observed_success_receipt(receipt_id="rcpt_u2_3_5", task_id="task_3_5", claim_id="claim_3_5_u2", workspace=ws)
+    make_canonical_verification_result(rcpt_u2, status="ACCEPT", claim_id="claim_3_5_u2", workspace=ws)
+
+    ev_fail = make_observed_failure_receipt(receipt_id="rcpt_f_3_5", task_id="task_3_5", claim_id="claim_3_5_rep", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_3_5", obligation_id="ob_3_5_rep", failure_evidence=ev_fail, claim_id="claim_3_5_rep")
+    engine.create_repair_obligation(record.recovery_id, target="src/mod.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    ev_pass = make_observed_success_receipt(receipt_id="rcpt_p_3_5", task_id="task_3_5", claim_id="claim_3_5_rep", workspace=ws)
+    ev_pass.files_changed = ["src/mod.py"]
+    verdict = make_canonical_verification_result(ev_pass, status="ACCEPT", claim_id="claim_3_5_rep", workspace=ws)
+
+    # Caller passes None as known_accepted_obligations
+    res = engine.evaluate_convergence(
+        record.recovery_id,
+        verification_result=verdict,
+        evidence=ev_pass,
+        known_accepted_obligations=None,
+    )
+
+    assert res.is_converged is True
+    assert set(res.preserved_obligation_ids) == {"claim_3_5_u1", "claim_3_5_u2"}
+    assert res.frontier_recomputation.preserved_obligation_ids == ("claim_3_5_u1", "claim_3_5_u2")
+
+
+def test_d9_3_repaired_obligation_not_incorrectly_preserved_as_old_obligation(tmp_path):
+    """
+    D9.3 Test 6: Repaired obligation is not incorrectly preserved as an old obligation.
+    (a) Caller asserting repaired obligation in known_accepted raises RecoveryError.
+    (b) In valid convergence, repaired obligation appears in repaired_obligation_id /
+        frontier_obligations, but NEVER in preserved_obligation_ids.
+    """
+    ws = str(tmp_path / "d9_3_test_6")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+
+    claim_rep = Claim(claim_id="claim_3_6_rep", task_id="task_3_6", statement="Repaired claim", target_files=("src/mod.py",))
+    _save_test_claim(state_repo, ws, claim_rep)
+
+    ev_fail = make_observed_failure_receipt(receipt_id="rcpt_f_3_6", task_id="task_3_6", claim_id="claim_3_6_rep", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_3_6", obligation_id="ob_3_6_rep", failure_evidence=ev_fail, claim_id="claim_3_6_rep")
+    engine.create_repair_obligation(record.recovery_id, target="src/mod.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    ev_pass = make_observed_success_receipt(receipt_id="rcpt_p_3_6", task_id="task_3_6", claim_id="claim_3_6_rep", workspace=ws)
+    verdict = make_canonical_verification_result(ev_pass, status="ACCEPT", claim_id="claim_3_6_rep", workspace=ws)
+
+    # Subtest 6a: Caller attempts to preserve the repaired obligation itself
+    with pytest.raises(RecoveryError, match="cannot be asserted as preserved"):
+        engine.evaluate_convergence(
+            record.recovery_id,
+            verification_result=verdict,
+            evidence=ev_pass,
+            known_accepted_obligations=["ob_3_6_rep"],
+        )
+
+    # Subtest 6b: Valid call without the illegal assertion
+    res = engine.evaluate_convergence(
+        record.recovery_id,
+        verification_result=verdict,
+        evidence=ev_pass,
+    )
+    assert res.is_converged is True
+    assert "ob_3_6_rep" not in res.preserved_obligation_ids
+    assert "claim_3_6_rep" not in res.preserved_obligation_ids
+    assert res.repaired_obligation_id == "ob_3_6_rep"
+    assert "ob_3_6_rep" in res.frontier_recomputation.frontier_obligations
+
+
+def test_d9_3_invalidated_obligation_absent_from_preserved_frontier(tmp_path):
+    """
+    D9.3 Test 7: Invalidated obligation is absent from preserved frontier.
+    When a claim fails regression, it enters invalidated_obligation_ids and is strictly
+    excluded from preserved_obligation_ids and frontier_obligations.
+    """
+    ws = str(tmp_path / "d9_3_test_7")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+
+    claim_rep = Claim(claim_id="claim_3_7_rep", task_id="task_3_7", statement="Rep", target_files=("src/c.py",))
+    _save_test_claim(state_repo, ws, claim_rep)
+
+    claim_aff = Claim(claim_id="claim_3_7_aff", task_id="task_3_7", statement="Aff", target_files=("src/c.py",))
+    _save_test_claim(state_repo, ws, claim_aff)
+    rcpt_prev = make_observed_success_receipt(receipt_id="rcpt_prev_3_7", task_id="task_3_7", claim_id="claim_3_7_aff", workspace=ws)
+    make_canonical_verification_result(rcpt_prev, status="ACCEPT", claim_id="claim_3_7_aff", workspace=ws)
+
+    ev_fail = make_observed_failure_receipt(receipt_id="rcpt_f_3_7", task_id="task_3_7", claim_id="claim_3_7_rep", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_3_7", obligation_id="ob_3_7_rep", failure_evidence=ev_fail, claim_id="claim_3_7_rep")
+    engine.create_repair_obligation(record.recovery_id, target="src/c.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    rcpt_fail_aff = make_observed_failure_receipt(receipt_id="rcpt_f_aff_3_7", task_id="task_3_7", claim_id="claim_3_7_aff", workspace=ws)
+    verif_fail_aff = make_canonical_verification_result(rcpt_fail_aff, status="FAIL", claim_id="claim_3_7_aff", workspace=ws)
+
+    reg_assessment = engine.assess_regression(
+        record.recovery_id,
+        regression_verifications=[verif_fail_aff],
+        fail_closed=False,
+    )
+    assert not reg_assessment.regression_passed
+    assert "claim_3_7_aff" in reg_assessment.failed_claim_ids
+
+    frontier = engine.recompute_frontier(
+        recovery_id=record.recovery_id,
+        reg_assessment=reg_assessment,
+        fail_closed=False,
+    )
+    assert frontier.is_valid is False
+    assert "claim_3_7_aff" in frontier.invalidated_obligation_ids
+    assert "claim_3_7_aff" not in frontier.preserved_obligation_ids
+    assert "claim_3_7_aff" not in frontier.frontier_obligations
+
+
+def test_d9_3_unresolved_obligation_blocks_convergence(tmp_path):
+    """
+    D9.3 Test 8: Unresolved obligation blocks convergence.
+    An affected claim lacks fresh reverification. Recomputation marks it unresolved,
+    is_valid is False, and evaluate_convergence fails closed.
+    """
+    ws = str(tmp_path / "d9_3_test_8")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+
+    claim_rep = Claim(claim_id="claim_3_8_rep", task_id="task_3_8", statement="Rep", target_files=("src/d.py",))
+    _save_test_claim(state_repo, ws, claim_rep)
+
+    claim_aff = Claim(claim_id="claim_3_8_aff", task_id="task_3_8", statement="Aff", target_files=("src/d.py",))
+    _save_test_claim(state_repo, ws, claim_aff)
+    rcpt_prev = make_observed_success_receipt(receipt_id="rcpt_prev_3_8", task_id="task_3_8", claim_id="claim_3_8_aff", workspace=ws)
+    make_canonical_verification_result(rcpt_prev, status="ACCEPT", claim_id="claim_3_8_aff", workspace=ws)
+
+    ev_fail = make_observed_failure_receipt(receipt_id="rcpt_f_3_8", task_id="task_3_8", claim_id="claim_3_8_rep", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_3_8", obligation_id="ob_3_8_rep", failure_evidence=ev_fail, claim_id="claim_3_8_rep")
+    engine.create_repair_obligation(record.recovery_id, target="src/d.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    reg_assess = engine.assess_regression(record.recovery_id, regression_verifications=[], fail_closed=False)
+    frontier_after = engine.recompute_frontier(record.recovery_id, reg_assessment=reg_assess, fail_closed=False)
+    assert frontier_after.is_valid is False
+    assert "claim_3_8_aff" in frontier_after.unresolved_obligation_ids
+    assert "claim_3_8_aff" not in frontier_after.preserved_obligation_ids
+
+    # Convergence fails closed
+    ev_pass = make_observed_success_receipt(receipt_id="rcpt_p_3_8", task_id="task_3_8", claim_id="claim_3_8_rep", workspace=ws)
+    verdict = make_canonical_verification_result(ev_pass, status="ACCEPT", claim_id="claim_3_8_rep", workspace=ws)
+    with pytest.raises(RecoveryError):
+        engine.evaluate_convergence(
+            record.recovery_id,
+            verification_result=verdict,
+            evidence=ev_pass,
+            regression_verifications=[],
+        )
+    assert engine.get_recovery(record.recovery_id).current_state == RecoveryState.REVERIFY_REQUIRED
+
+
+def test_d9_3_identical_canonical_state_produces_deterministic_identical_frontier(tmp_path):
+    """
+    D9.3 Test 9: Identical canonical state produces deterministic identical frontier.
+    Repeated recomputation on identical canonical state produces identical, deterministically
+    sorted tuple outputs regardless of caller permutations.
+    """
+    ws = str(tmp_path / "d9_3_test_9")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+
+    claim_rep = Claim(claim_id="claim_3_9_rep", task_id="task_3_9", statement="Rep", target_files=("src/k.py",))
+    _save_test_claim(state_repo, ws, claim_rep)
+
+    for cid, fn in [("claim_z", "src/z.py"), ("claim_a", "src/a.py"), ("claim_m", "src/m.py")]:
+        cl = Claim(claim_id=cid, task_id="task_3_9", statement=cid, target_files=(fn,))
+        _save_test_claim(state_repo, ws, cl)
+        rc = make_observed_success_receipt(receipt_id=f"rcpt_{cid}", task_id="task_3_9", claim_id=cid, workspace=ws)
+        make_canonical_verification_result(rc, status="ACCEPT", claim_id=cid, workspace=ws)
+
+    ev_fail = make_observed_failure_receipt(receipt_id="rcpt_f_3_9", task_id="task_3_9", claim_id="claim_3_9_rep", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_3_9", obligation_id="ob_3_9_rep", failure_evidence=ev_fail, claim_id="claim_3_9_rep")
+    engine.create_repair_obligation(record.recovery_id, target="src/k.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    # First recomputation
+    f1 = engine.recompute_frontier(record.recovery_id)
+    # Second recomputation
+    f2 = engine.recompute_frontier(record.recovery_id)
+
+    assert f1.preserved_obligation_ids == f2.preserved_obligation_ids == ("claim_a", "claim_m", "claim_z")
+    assert f1.frontier_obligations == f2.frontier_obligations
+    # All tuples must be strictly sorted
+    assert list(f1.preserved_obligation_ids) == sorted(f1.preserved_obligation_ids)
+    assert list(f1.frontier_obligations) == sorted(f1.frontier_obligations)
+    assert f1.is_valid is True
+
+
+def test_d9_3_valid_regression_and_repaired_claim_converges_with_canonical_frontier(tmp_path):
+    """
+    D9.3 Test 10: Valid regression + valid repaired claim -> convergence with canonical frontier.
+    End-to-end recovery cycle:
+    - repaired claim reverified
+    - affected claim reverified after repair boundary
+    - unaffected claim preserved
+    - task state in StateRepository transitions to VERIFIED
+    """
+    ws = str(tmp_path / "d9_3_test_10")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+
+    claim_rep = Claim(claim_id="claim_3_10_rep", task_id="task_3_10", statement="Rep", target_files=("src/target.py",))
+    _save_test_claim(state_repo, ws, claim_rep)
+
+    claim_aff = Claim(claim_id="claim_3_10_aff", task_id="task_3_10", statement="Aff", target_files=("src/target.py",))
+    _save_test_claim(state_repo, ws, claim_aff)
+    rc_prev = make_observed_success_receipt(receipt_id="rc_prev_3_10", task_id="task_3_10", claim_id="claim_3_10_aff", workspace=ws)
+    make_canonical_verification_result(rc_prev, status="ACCEPT", claim_id="claim_3_10_aff", workspace=ws)
+
+    claim_unaf = Claim(claim_id="claim_3_10_unaf", task_id="task_3_10", statement="Unaf", target_files=("src/other.py",))
+    _save_test_claim(state_repo, ws, claim_unaf)
+    rc_unaf = make_observed_success_receipt(receipt_id="rc_unaf_3_10", task_id="task_3_10", claim_id="claim_3_10_unaf", workspace=ws)
+    make_canonical_verification_result(rc_unaf, status="ACCEPT", claim_id="claim_3_10_unaf", workspace=ws)
+
+    ev_fail = make_observed_failure_receipt(receipt_id="rcpt_f_3_10", task_id="task_3_10", claim_id="claim_3_10_rep", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_3_10", obligation_id="ob_3_10_rep", failure_evidence=ev_fail, claim_id="claim_3_10_rep")
+    engine.create_repair_obligation(record.recovery_id, target="src/target.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    # Ensure task is in CLAIMED/VERIFYING state in StateRepository
+    task = state_repo.get_task("task_3_10")
+    task.state = TaskState.VERIFYING
+    state_repo.save_task(task)
+
+    # Fresh verifications after repair boundary
+    ev_pass_rep = make_observed_success_receipt(receipt_id="rc_p_rep_3_10", task_id="task_3_10", claim_id="claim_3_10_rep", workspace=ws)
+    ev_pass_rep.files_changed = ["src/target.py"]
+    verdict_rep = make_canonical_verification_result(ev_pass_rep, status="ACCEPT", claim_id="claim_3_10_rep", workspace=ws)
+
+    ev_pass_aff = make_observed_success_receipt(receipt_id="rc_p_aff_3_10", task_id="task_3_10", claim_id="claim_3_10_aff", workspace=ws)
+    verdict_aff = make_canonical_verification_result(ev_pass_aff, status="ACCEPT", claim_id="claim_3_10_aff", workspace=ws)
+
+    res = engine.evaluate_convergence(
+        record.recovery_id,
+        verification_result=verdict_rep,
+        evidence=ev_pass_rep,
+        regression_verifications=[verdict_aff],
+    )
+
+    assert res.is_converged is True
+    assert res.status == RecoveryState.CONVERGED.value
+    assert set(res.preserved_obligation_ids) == {"claim_3_10_aff", "claim_3_10_unaf"}
+    assert res.frontier_recomputation is not None
+    assert res.frontier_recomputation.is_valid is True
+
+    # StateRepository task updated to VERIFIED and frontier persisted
+    updated_task = state_repo.get_task("task_3_10")
+    assert updated_task.state == TaskState.VERIFIED
+    task_frontier = state_repo.get_task_frontier("task_3_10")
+    assert task_frontier is not None
+    assert task_frontier["is_valid"] is True
+
+
+def test_d9_3_forged_in_memory_regression_assessment_cannot_bypass_canonical_derivation(tmp_path):
+    """
+    D9.3 Test 11: Forged in-memory regression assessment cannot bypass canonical derivation.
+    When a regression assessment is persisted indicating failure, a caller cannot bypass it
+    by constructing or passing a forged in-memory RegressionAssessment claiming success.
+    """
+    ws = str(tmp_path / "d9_3_test_11")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+
+    claim_rep = Claim(claim_id="claim_3_11_rep", task_id="task_3_11", statement="Rep", target_files=("src/math.py",))
+    _save_test_claim(state_repo, ws, claim_rep)
+
+    claim_reg = Claim(claim_id="claim_3_11_reg", task_id="task_3_11", statement="Reg", target_files=("src/math.py",))
+    _save_test_claim(state_repo, ws, claim_reg)
+    rc_prev = make_observed_success_receipt(receipt_id="rc_prev_3_11", task_id="task_3_11", claim_id="claim_3_11_reg", workspace=ws)
+    make_canonical_verification_result(rc_prev, status="ACCEPT", claim_id="claim_3_11_reg", workspace=ws)
+
+    ev_fail = make_observed_failure_receipt(receipt_id="rcpt_f_3_11", task_id="task_3_11", claim_id="claim_3_11_rep", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_3_11", obligation_id="ob_3_11_rep", failure_evidence=ev_fail, claim_id="claim_3_11_rep")
+    engine.create_repair_obligation(record.recovery_id, target="src/math.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    # Authentic regression failure occurs and is persisted
+    rc_reg_fail = make_observed_failure_receipt(receipt_id="rc_rf_3_11", task_id="task_3_11", claim_id="claim_3_11_reg", workspace=ws)
+    v_reg_fail = make_canonical_verification_result(rc_reg_fail, status="FAIL", claim_id="claim_3_11_reg", workspace=ws)
+    real_assess = engine.assess_regression(record.recovery_id, regression_verifications=[v_reg_fail], fail_closed=False)
+    assert not real_assess.regression_passed
+
+    # Attacker constructs a forged in-memory RegressionAssessment claiming regression passed
+    forged_assess = RegressionAssessment(
+        affected_claim_ids=("claim_3_11_reg",),
+        reverified_claim_ids=("claim_3_11_reg",),
+        failed_claim_ids=(),
+        stale_claim_ids=(),
+        regression_passed=True,
+        assessment_time=datetime.now(timezone.utc).isoformat(),
+        unaffected_claim_ids=(),
+        provenance_references={},
+        reason="Forged passing assessment",
+    )
+
+    # Attempt to bypass via recompute_frontier
+    with pytest.raises(RecoveryError, match="Regression assessment mismatch|in-memory regression assessment diverges"):
+        engine.recompute_frontier(
+            record.recovery_id,
+            reg_assessment=forged_assess,
+            fail_closed=True,
+        )
+
+
+def test_d9_3_forged_caller_frontier_data_cannot_bypass_recomputation(tmp_path):
+    """
+    D9.3 Test 12: Forged caller frontier data cannot bypass recomputation.
+    An attacker attempts to inject a forged frontier into task metadata or record.metadata
+    claiming unaccepted obligations are verified. evaluate_convergence independently
+    recomputes the frontier and overwrites the forged state.
+    """
+    ws = str(tmp_path / "d9_3_test_12")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+
+    claim_rep = Claim(claim_id="claim_3_12_rep", task_id="task_3_12", statement="Rep", target_files=("src/run.py",))
+    _save_test_claim(state_repo, ws, claim_rep)
+
+    # An unaccepted claim
+    claim_unacc = Claim(claim_id="claim_3_12_fake", task_id="task_3_12", statement="Fake", target_files=("src/fake.py",))
+    _save_test_claim(state_repo, ws, claim_unacc)
+
+    ev_fail = make_observed_failure_receipt(receipt_id="rcpt_f_3_12", task_id="task_3_12", claim_id="claim_3_12_rep", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_3_12", obligation_id="ob_3_12_rep", failure_evidence=ev_fail, claim_id="claim_3_12_rep")
+    engine.create_repair_obligation(record.recovery_id, target="src/run.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    # Attacker injects forged frontier dictionary into task metadata
+    task = state_repo.get_task("task_3_12")
+    task.metadata["frontier"] = {
+        "task_id": "task_3_12",
+        "is_valid": True,
+        "frontier_obligations": ["claim_3_12_rep", "claim_3_12_fake"],
+        "preserved_obligation_ids": ["claim_3_12_fake"],
+    }
+    state_repo.save_task(task)
+
+    ev_pass = make_observed_success_receipt(receipt_id="rcpt_p_3_12", task_id="task_3_12", claim_id="claim_3_12_rep", workspace=ws)
+    verdict = make_canonical_verification_result(ev_pass, status="ACCEPT", claim_id="claim_3_12_rep", workspace=ws)
+
+    # Caller passes valid verification for repaired claim
+    res = engine.evaluate_convergence(
+        record.recovery_id,
+        verification_result=verdict,
+        evidence=ev_pass,
+    )
+
+    assert res.is_converged is True
+    # The forged claim_3_12_fake MUST NOT be in preserved obligations or frontier
+    assert "claim_3_12_fake" not in res.preserved_obligation_ids
+    assert "claim_3_12_fake" not in res.frontier_recomputation.frontier_obligations
+    # Task metadata frontier was overwritten with canonical derivation
+    updated_frontier = state_repo.get_task_frontier("task_3_12")
+    assert "claim_3_12_fake" not in updated_frontier["frontier_obligations"]
+
 
 

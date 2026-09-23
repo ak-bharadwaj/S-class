@@ -362,6 +362,8 @@ class StateRepository:
         meta = dict(record.metadata)
         if getattr(record, "regression_assessment", None):
             meta["regression_assessment"] = record.regression_assessment.to_dict()
+        if getattr(record, "frontier_recomputation", None):
+            meta["frontier_recomputation"] = record.frontier_recomputation.to_dict()
 
         data = {
             "recovery_id": record.recovery_id,
@@ -429,7 +431,13 @@ class StateRepository:
 
     def _row_to_recovery_record(self, row: Any) -> Any:
         """Converts an SQLite row to a RecoveryRecord."""
-        from sclass.recovery.models import RecoveryRecord, RecoveryState, RepairObligation, RegressionAssessment
+        from sclass.recovery.models import (
+            RecoveryRecord,
+            RecoveryState,
+            RepairObligation,
+            RegressionAssessment,
+            FrontierRecomputation,
+        )
         curr_ob = None
         if row["current_repair_obligation_json"]:
             curr_ob = RepairObligation.from_dict(json.loads(row["current_repair_obligation_json"]))
@@ -442,6 +450,10 @@ class StateRepository:
         reg_assess = None
         if "regression_assessment" in meta and meta["regression_assessment"]:
             reg_assess = RegressionAssessment.from_dict(meta["regression_assessment"])
+
+        frontier_rec = None
+        if "frontier_recomputation" in meta and meta["frontier_recomputation"]:
+            frontier_rec = FrontierRecomputation.from_dict(meta["frontier_recomputation"])
 
         return RecoveryRecord(
             recovery_id=row["recovery_id"],
@@ -464,4 +476,18 @@ class StateRepository:
             resulting_verification=res_ver,
             metadata=meta,
             regression_assessment=reg_assess,
+            frontier_recomputation=frontier_rec,
         )
+
+    def get_task_frontier(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves the authoritative recomputed task frontier metadata from the latest recovery or task metadata."""
+        task = self.get_task(task_id)
+        if task and task.metadata and "frontier" in task.metadata:
+            return task.metadata["frontier"]
+        recoveries = self.list_recoveries(task_id=task_id)
+        for rec in reversed(recoveries):
+            if getattr(rec, "frontier_recomputation", None):
+                return rec.frontier_recomputation.to_dict()
+            if rec.metadata and "frontier_recomputation" in rec.metadata:
+                return rec.metadata["frontier_recomputation"]
+        return None

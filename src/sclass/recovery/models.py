@@ -166,6 +166,59 @@ class RegressionAssessment:
         )
 
 
+@dataclass(frozen=True)
+class FrontierRecomputation:
+    """
+    Authoritative recomputation of task frontier obligations following repair and regression assessment.
+    Enforces:
+    - Authoritative derivation: (previously accepted claims) - (regressed/unresolved) + (repaired claim).
+    - Unresolved/invalidated obligations fail closed.
+    - Preserved obligations are verified, not asserted.
+    """
+    task_id: str
+    repaired_obligation_id: str
+    preserved_obligation_ids: Tuple[str, ...]
+    invalidated_obligation_ids: Tuple[str, ...]
+    unresolved_obligation_ids: Tuple[str, ...]
+    frontier_obligations: Tuple[str, ...]
+    is_valid: bool
+    recomputed_at: str
+    reason: str = ""
+
+    def __post_init__(self):
+        object.__setattr__(self, "preserved_obligation_ids", tuple(sorted(self.preserved_obligation_ids)))
+        object.__setattr__(self, "invalidated_obligation_ids", tuple(sorted(self.invalidated_obligation_ids)))
+        object.__setattr__(self, "unresolved_obligation_ids", tuple(sorted(self.unresolved_obligation_ids)))
+        object.__setattr__(self, "frontier_obligations", tuple(sorted(self.frontier_obligations)))
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "task_id": self.task_id,
+            "repaired_obligation_id": self.repaired_obligation_id,
+            "preserved_obligation_ids": list(self.preserved_obligation_ids),
+            "invalidated_obligation_ids": list(self.invalidated_obligation_ids),
+            "unresolved_obligation_ids": list(self.unresolved_obligation_ids),
+            "frontier_obligations": list(self.frontier_obligations),
+            "is_valid": self.is_valid,
+            "recomputed_at": self.recomputed_at,
+            "reason": self.reason,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> FrontierRecomputation:
+        return cls(
+            task_id=data["task_id"],
+            repaired_obligation_id=data.get("repaired_obligation_id", ""),
+            preserved_obligation_ids=tuple(sorted(data.get("preserved_obligation_ids", []))),
+            invalidated_obligation_ids=tuple(sorted(data.get("invalidated_obligation_ids", []))),
+            unresolved_obligation_ids=tuple(sorted(data.get("unresolved_obligation_ids", []))),
+            frontier_obligations=tuple(sorted(data.get("frontier_obligations", []))),
+            is_valid=bool(data.get("is_valid", False)),
+            recomputed_at=data.get("recomputed_at", ""),
+            reason=data.get("reason", ""),
+        )
+
+
 @dataclass
 class RecoveryRecord:
     """
@@ -192,6 +245,7 @@ class RecoveryRecord:
     resulting_verification: Optional[Dict[str, Any]] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
     regression_assessment: Optional[RegressionAssessment] = None
+    frontier_recomputation: Optional[FrontierRecomputation] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -215,6 +269,7 @@ class RecoveryRecord:
             "resulting_verification": dict(self.resulting_verification) if self.resulting_verification else None,
             "metadata": dict(self.metadata),
             "regression_assessment": self.regression_assessment.to_dict() if self.regression_assessment else None,
+            "frontier_recomputation": self.frontier_recomputation.to_dict() if self.frontier_recomputation else None,
         }
 
     @classmethod
@@ -227,6 +282,11 @@ class RecoveryRecord:
         reg_data = data.get("regression_assessment") or data.get("metadata", {}).get("regression_assessment")
         if reg_data:
             reg_assess = RegressionAssessment.from_dict(reg_data)
+
+        frontier_rec = None
+        frontier_data = data.get("frontier_recomputation") or data.get("metadata", {}).get("frontier_recomputation")
+        if frontier_data:
+            frontier_rec = FrontierRecomputation.from_dict(frontier_data)
 
         return cls(
             recovery_id=data["recovery_id"],
@@ -249,6 +309,7 @@ class RecoveryRecord:
             resulting_verification=dict(data.get("resulting_verification")) if data.get("resulting_verification") else None,
             metadata=dict(data.get("metadata", {})),
             regression_assessment=reg_assess,
+            frontier_recomputation=frontier_rec,
         )
 
 
@@ -268,6 +329,7 @@ class RecoveryResult:
     max_attempts: int
     final_evidence_id: Optional[str] = None
     reason: str = ""
+    frontier_recomputation: Optional[FrontierRecomputation] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -281,4 +343,5 @@ class RecoveryResult:
             "max_attempts": self.max_attempts,
             "final_evidence_id": self.final_evidence_id,
             "reason": self.reason,
+            "frontier_recomputation": self.frontier_recomputation.to_dict() if self.frontier_recomputation else None,
         }

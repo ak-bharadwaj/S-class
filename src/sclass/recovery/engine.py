@@ -28,7 +28,9 @@ from sclass.recovery.models import (
     RecoveryRecord,
     RecoveryResult,
     RegressionAssessment,
+    FrontierRecomputation,
 )
+from sclass.core.lifecycle import TaskState
 from sclass.recovery.state_machine import RecoveryStateMachine
 from sclass.recovery.persistence import RecoveryPersistence
 from sclass.core.errors import (
@@ -1422,6 +1424,229 @@ class RecoveryEngine:
         self.persistence.save_recovery(record)
         return assessment
 
+    def recompute_frontier(
+        self,
+        recovery_id: Union[str, RecoveryRecord],
+        reg_assessment: Optional[RegressionAssessment] = None,
+        known_accepted_obligations: Optional[List[str]] = None,
+        invalidated_obligations: Optional[List[str]] = None,
+        fail_closed: bool = True,
+    ) -> FrontierRecomputation:
+        """
+        D9.3: Canonical Frontier Recomputation.
+        CORE-22: The ready/blocked task frontier is a deterministic derived view of
+        canonical S-Class state, not caller-provided state.
+
+        Derivation:
+            accepted/preserved claims
+            - invalidated claims
+            - unresolved claims
+            + repaired obligation/claim
+
+        Enforces:
+        - Canonical state authority: derives exclusively from StateRepository and canonical RegressionAssessment.
+        - Rejects caller assertions of unaccepted, regressed, stale, unresolved, or repaired obligations.
+        - Fail-closed on invalid recomputation or regression failure.
+        - Deterministically sorted tuples.
+        """
+        if isinstance(recovery_id, str):
+            rec_id = recovery_id
+        elif hasattr(recovery_id, "recovery_id"):
+            rec_id = recovery_id.recovery_id
+        else:
+            raise RecoveryError("Invalid recovery_id provided for frontier recomputation.")
+
+        # Authoritative canonical record from persistence
+        canonical_record = self.persistence.load_recovery(rec_id)
+        if canonical_record:
+            record = canonical_record
+        elif hasattr(recovery_id, "recovery_id"):
+            record = recovery_id
+        else:
+            raise RecoveryError(f"Recovery record '{rec_id}' not found.")
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        # Defend against forged in-memory regression assessment (Test 11)
+        persisted_reg = record.regression_assessment
+        if persisted_reg is not None:
+            if reg_assessment is not None:
+                if (
+                    persisted_reg.failed_claim_ids != reg_assessment.failed_claim_ids
+                    or persisted_reg.stale_claim_ids != reg_assessment.stale_claim_ids
+                    or persisted_reg.regression_passed != reg_assessment.regression_passed
+                    or persisted_reg.reverified_claim_ids != reg_assessment.reverified_claim_ids
+                    or persisted_reg.unaffected_claim_ids != reg_assessment.unaffected_claim_ids
+                    or persisted_reg.affected_claim_ids != reg_assessment.affected_claim_ids
+                ):
+                    if fail_closed:
+                        raise RecoveryError(
+                            "Regression assessment mismatch: in-memory regression assessment diverges from canonical persisted assessment."
+                        )
+            reg_assessment = persisted_reg
+        elif reg_assessment is None:
+            reg_assessment = record.regression_assessment
+
+        state_repo = StateRepository(self.workspace_dir)
+        task_claims = state_repo.list_claims(task_id=record.task_id)
+        claim_map = {c.claim_id: c for c in task_claims}
+
+        # 1. Authoritatively identify all previously accepted claims for this task in StateRepository
+        repo_accepted_claim_ids = set()
+        for c in task_claims:
+            if record.affected_claim_id and c.claim_id == record.affected_claim_id:
+                continue
+            verifs = state_repo.list_verifications(claim_id=c.claim_id)
+            if any(str(v.get("status", "")).upper() in ("ACCEPT", "PASS") for v in verifs):
+                repo_accepted_claim_ids.add(c.claim_id)
+
+        preserved_candidates = set(repo_accepted_claim_ids)
+        invalidated_set = set(invalidated_obligations or [])
+        unresolved_set = set()
+
+        # 2. Incorporate regression assessment outcomes
+        if reg_assessment:
+            for cid in reg_assessment.reverified_claim_ids:
+                preserved_candidates.add(cid)
+            for cid in reg_assessment.unaffected_claim_ids:
+                preserved_candidates.add(cid)
+            for cid in reg_assessment.failed_claim_ids:
+                invalidated_set.add(cid)
+                preserved_candidates.discard(cid)
+            for cid in reg_assessment.stale_claim_ids:
+                invalidated_set.add(cid)
+                preserved_candidates.discard(cid)
+            for cid in reg_assessment.affected_claim_ids:
+                if cid not in reg_assessment.reverified_claim_ids:
+                    unresolved_set.add(cid)
+                    preserved_candidates.discard(cid)
+
+        # 3. Caller assertion defense: validate caller-supplied known_accepted_obligations
+        if known_accepted_obligations:
+            for ob_id in known_accepted_obligations:
+                if not ob_id:
+                    continue
+
+                # Repaired obligation/claim cannot be asserted as preserved
+                if ob_id in (record.affected_obligation_id, record.affected_claim_id):
+                    if fail_closed:
+                        raise RecoveryError(
+                            f"Untrusted obligation assertion: repaired obligation '{ob_id}' cannot be asserted as preserved."
+                        )
+                    continue
+
+                # Regressed obligation cannot be preserved
+                if ob_id in invalidated_set or (reg_assessment and ob_id in reg_assessment.failed_claim_ids):
+                    if fail_closed:
+                        raise RecoveryError(
+                            f"Untrusted obligation assertion: obligation '{ob_id}' failed regression assessment and cannot be preserved."
+                        )
+                    continue
+
+                # Stale obligation cannot be preserved
+                if reg_assessment and ob_id in reg_assessment.stale_claim_ids:
+                    if fail_closed:
+                        raise RecoveryError(
+                            f"Untrusted obligation assertion: obligation '{ob_id}' is stale and cannot be preserved."
+                        )
+                    continue
+
+                # Unresolved obligation cannot be preserved
+                if ob_id in unresolved_set:
+                    if fail_closed:
+                        raise RecoveryError(
+                            f"Untrusted obligation assertion: obligation '{ob_id}' is unresolved and cannot be preserved."
+                        )
+                    continue
+
+                # Unaccepted obligation cannot be asserted as preserved
+                if ob_id in claim_map:
+                    if ob_id not in repo_accepted_claim_ids and (
+                        not reg_assessment or ob_id not in reg_assessment.reverified_claim_ids
+                    ):
+                        if fail_closed:
+                            raise RecoveryError(
+                                f"Untrusted obligation assertion: obligation '{ob_id}' is not an authoritatively accepted claim in StateRepository."
+                            )
+                        unresolved_set.add(ob_id)
+                        continue
+                else:
+                    claim_obj = state_repo.get_claim(ob_id)
+                    if claim_obj:
+                        verifs = state_repo.list_verifications(claim_id=ob_id)
+                        if not any(str(v.get("status", "")).upper() in ("ACCEPT", "PASS") for v in verifs):
+                            if fail_closed:
+                                raise RecoveryError(
+                                    f"Untrusted obligation assertion: obligation '{ob_id}' is not an authoritatively accepted claim in StateRepository."
+                                )
+                            unresolved_set.add(ob_id)
+                            continue
+                    else:
+                        verifs = state_repo.list_verifications(claim_id=ob_id)
+                        if verifs and not any(str(v.get("status", "")).upper() in ("ACCEPT", "PASS") for v in verifs):
+                            if fail_closed:
+                                raise RecoveryError(
+                                    f"Untrusted obligation assertion: obligation '{ob_id}' is not an authoritatively accepted claim in StateRepository."
+                                )
+                            unresolved_set.add(ob_id)
+                            continue
+
+                preserved_candidates.add(ob_id)
+
+        # 4. Clean up sets: remove invalidated and unresolved from preserved candidates
+        for inv in invalidated_set:
+            preserved_candidates.discard(inv)
+        for unr in unresolved_set:
+            preserved_candidates.discard(unr)
+
+        # Repaired obligation/claim cannot be in preserved_obligations
+        preserved_candidates.discard(record.affected_obligation_id)
+        if record.affected_claim_id:
+            preserved_candidates.discard(record.affected_claim_id)
+
+        preserved_tuple = tuple(sorted(preserved_candidates))
+        invalidated_tuple = tuple(sorted(invalidated_set))
+        unresolved_tuple = tuple(sorted(unresolved_set))
+
+        frontier_set = set(preserved_candidates)
+        if record.affected_obligation_id:
+            frontier_set.add(record.affected_obligation_id)
+        if record.affected_claim_id:
+            frontier_set.add(record.affected_claim_id)
+        frontier_tuple = tuple(sorted(frontier_set))
+
+        is_valid = (
+            len(invalidated_tuple) == 0
+            and len(unresolved_tuple) == 0
+            and (reg_assessment is None or reg_assessment.regression_passed)
+        )
+
+        reason = (
+            "Frontier successfully recomputed: all obligations verified."
+            if is_valid
+            else f"Frontier invalid: {len(invalidated_tuple)} invalidated, {len(unresolved_tuple)} unresolved."
+        )
+
+        frontier = FrontierRecomputation(
+            task_id=record.task_id,
+            repaired_obligation_id=record.affected_obligation_id,
+            preserved_obligation_ids=preserved_tuple,
+            invalidated_obligation_ids=invalidated_tuple,
+            unresolved_obligation_ids=unresolved_tuple,
+            frontier_obligations=frontier_tuple,
+            is_valid=is_valid,
+            recomputed_at=now_iso,
+            reason=reason,
+        )
+
+        if fail_closed and not is_valid:
+            raise RecoveryError(
+                f"Frontier recomputation failed: unresolved obligations {unresolved_tuple} "
+                f"or invalidated obligations {invalidated_tuple} block convergence."
+            )
+
+        return frontier
+
     def evaluate_convergence(
         self,
         recovery_id: str,
@@ -1450,17 +1675,20 @@ class RecoveryEngine:
 
         # Idempotency: if already CONVERGED
         if record.current_state == RecoveryState.CONVERGED:
+            preserved = record.frontier_recomputation.preserved_obligation_ids if record.frontier_recomputation else tuple(known_accepted_obligations or [])
+            invalidated = record.frontier_recomputation.invalidated_obligation_ids if record.frontier_recomputation else tuple(invalidated_obligations or [])
             return RecoveryResult(
                 recovery_id=record.recovery_id,
                 status=record.current_state.value,
                 is_converged=True,
                 repaired_obligation_id=record.affected_obligation_id,
-                preserved_obligation_ids=tuple(known_accepted_obligations or []),
-                invalidated_obligation_ids=tuple(invalidated_obligations or []),
+                preserved_obligation_ids=preserved,
+                invalidated_obligation_ids=invalidated,
                 attempts_used=record.attempt_number,
                 max_attempts=record.max_attempts,
                 final_evidence_id=record.affected_evidence_id,
                 reason="Recovery already converged.",
+                frontier_recomputation=record.frontier_recomputation,
             )
 
         # Must be in REVERIFY_REQUIRED to evaluate convergence
@@ -1564,6 +1792,15 @@ class RecoveryEngine:
                 fail_closed=True,
             )
 
+            # D9.3: Canonical Frontier Recomputation
+            frontier = self.recompute_frontier(
+                recovery_id=record,
+                reg_assessment=reg_assessment,
+                known_accepted_obligations=known_accepted_obligations,
+                invalidated_obligations=invalidated_obligations,
+                fail_closed=True,
+            )
+
             # Transition REVERIFY_REQUIRED -> CONVERGED
             RecoveryStateMachine.validate_transition(prev_state, RecoveryState.CONVERGED)
             record.current_state = RecoveryState.CONVERGED
@@ -1574,37 +1811,46 @@ class RecoveryEngine:
                 "reason": verif_reason,
             }
             record.regression_assessment = reg_assessment
+            record.frontier_recomputation = frontier
             record.history.append({
                 "event": "convergence_established",
                 "from_state": prev_state.value,
                 "to_state": RecoveryState.CONVERGED.value,
                 "evidence_id": verif_receipt_id,
                 "timestamp": now_iso,
+                "frontier_obligations": list(frontier.frontier_obligations),
             })
             self.persistence.save_recovery(record)
 
-            # Regression protection: distinguish repaired, preserved, and invalidated
-            known = list(known_accepted_obligations or [])
-            inval = list(invalidated_obligations or [])
-            for cid in reg_assessment.reverified_claim_ids:
-                if cid not in known and cid not in inval and cid != record.affected_obligation_id:
-                    known.append(cid)
-            for cid in reg_assessment.unaffected_claim_ids:
-                if cid not in known and cid not in inval and cid != record.affected_obligation_id:
-                    known.append(cid)
-            preserved = [ob for ob in known if ob not in inval and ob != record.affected_obligation_id]
+            # D9.3: Update StateRepository task with recomputed frontier
+            state_repo = StateRepository(self.workspace_dir)
+            task = state_repo.get_task(record.task_id)
+            if task:
+                if not task.metadata:
+                    task.metadata = {}
+                task.metadata["frontier"] = frontier.to_dict()
+                task.verified_receipt_id = verif_receipt_id
+                task_claims = state_repo.list_claims(task_id=record.task_id)
+                if task_claims and all(c.claim_id in frontier.frontier_obligations for c in task_claims):
+                    if task.state == TaskState.CLAIMED:
+                        task.transition_to(TaskState.VERIFYING)
+                        task.transition_to(TaskState.VERIFIED)
+                    elif task.state == TaskState.VERIFYING:
+                        task.transition_to(TaskState.VERIFIED)
+                state_repo.save_task(task)
 
             return RecoveryResult(
                 recovery_id=record.recovery_id,
                 status=RecoveryState.CONVERGED.value,
                 is_converged=True,
                 repaired_obligation_id=record.affected_obligation_id,
-                preserved_obligation_ids=tuple(preserved),
-                invalidated_obligation_ids=tuple(inval),
+                preserved_obligation_ids=frontier.preserved_obligation_ids,
+                invalidated_obligation_ids=frontier.invalidated_obligation_ids,
                 attempts_used=record.attempt_number,
                 max_attempts=record.max_attempts,
                 final_evidence_id=verif_receipt_id,
                 reason=verif_reason or "Obligation independently reverified and converged.",
+                frontier_recomputation=frontier,
             )
         else:
             # Re-verification failed or is stale
